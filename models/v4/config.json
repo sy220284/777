@@ -1,0 +1,50 @@
+{
+  "name": "双色球号码级概率排序模型",
+  "version": "4.0",
+  "goal": "优先提升下一期6个红球的逐号概率排序质量，并以实际双色球奖级作为最终验收指标",
+  "history_snapshot": "data/ssq_history_2003_2026-05-03.csv.gz",
+  "red": {
+    "candidate_count": 33,
+    "features": {
+      "multi_scale_frequency": [5, 10, 20, 50, 100, 200, "expanding"],
+      "trend": ["5-20", "10-50", "20-100"],
+      "omission": ["current_gap", "log_gap", "gap_vs_own_mean"],
+      "previous_draw_relation": ["repeat", "distance_1", "distance_2"],
+      "cooccurrence": ["conditioned_on_previous_draw", "conditioned_on_recent_3_draws"],
+      "number_identity": ["normalized_value", "odd_even", "big_small", "three_zones"],
+      "structure_context": ["sum_reversion", "odd_reversion", "big_reversion", "recent_sum_state"]
+    },
+    "base_models": [
+      {"name": "all_history_logistic", "window": "expanding"},
+      {"name": "mid_term_logistic", "window": 1000},
+      {"name": "short_term_logistic", "window": 500}
+    ],
+    "ensemble": {
+      "method": "causal_trailing_performance_weighting",
+      "validation_window": 250,
+      "ranking_metric": "top10_red_hits",
+      "rule": "每一期权重只由该期之前已完成的盲测成绩决定"
+    },
+    "ticket_generation": {
+      "ticket1": "红球概率排名1-6",
+      "ticket2": "红球概率排名7-12",
+      "default_overlap": 0,
+      "reason": "当前尚未证明共享胆码能稳定提高四等奖以上概率"
+    }
+  },
+  "blue": {
+    "candidate_count": 16,
+    "features": ["multi_scale_frequency", "trend", "gap", "repeat", "neighbor", "number_identity"],
+    "model": "rolling_logistic_1000",
+    "ticket1": "蓝球概率第1名",
+    "ticket2": "蓝球概率第2名",
+    "edge_confirmed": false
+  },
+  "validation": {
+    "warmup_draws": 750,
+    "block_size": 250,
+    "primary_metrics": ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖", "未中奖"],
+    "diagnostic_metrics": ["top6_pool_hits", "top10_pool_hits", "top12_pool_hits"],
+    "anti_leakage": "目标期特征、模型训练和动态权重全部只允许读取目标期之前的数据"
+  }
+}
