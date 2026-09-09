@@ -1,0 +1,57 @@
+{
+  "model": "双色球概率覆盖模型 V3",
+  "evaluation_target": "实际双色球奖级",
+  "tested_draws": 3146,
+  "tickets_per_draw": 2,
+  "total_tickets": 6292,
+  "ticket_cost_yuan": 12584,
+  "ticket_prize_counts": {
+    "一等奖": 0,
+    "二等奖": 0,
+    "三等奖": 0,
+    "四等奖": 3,
+    "五等奖": 45,
+    "六等奖": 373,
+    "未中奖": 5871
+  },
+  "draw_best_prize_counts": {
+    "一等奖": 0,
+    "二等奖": 0,
+    "三等奖": 0,
+    "四等奖": 3,
+    "五等奖": 45,
+    "六等奖": 372,
+    "未中奖": 2726
+  },
+  "winning_ticket_rate": 0.06691036236490781,
+  "winning_draw_rate_two_tickets": 0.13350286077558804,
+  "fixed_prize_return_yuan": 2915,
+  "fixed_prize_return_ratio": 0.23164335664335664,
+  "note_on_return": "本次盲测未出现一等奖、二等奖、三等奖，因此实际回报全部来自固定奖级，可直接统计。",
+  "exact_neutral_pair_baseline": {
+    "winning_draw_rate_two_tickets": 0.13357644857922946,
+    "best_prize_probabilities": {
+      "一等奖": 1.1285988760960953e-07,
+      "二等奖": 1.692898314144143e-06,
+      "三等奖": 1.8283301792756744e-05,
+      "四等奖": 0.0008684568351559452,
+      "五等奖": 0.01551541304913107,
+      "六等奖": 0.11717248963494792,
+      "未中奖": 0.8664235514207705
+    }
+  },
+  "forward_2026095_2026104": {
+    "draws": 10,
+    "best_prize_counts": {
+      "一等奖": 0,
+      "二等奖": 0,
+      "三等奖": 0,
+      "四等奖": 0,
+      "五等奖": 0,
+      "六等奖": 1,
+      "未中奖": 9
+    },
+    "fixed_prize_return_yuan": 5,
+    "cost_yuan": 40
+  }
+}

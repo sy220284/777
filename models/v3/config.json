@@ -1,0 +1,45 @@
+{
+  "name": "双色球概率分布覆盖模型",
+  "version": "3.0",
+  "history_snapshot": "ssq_history_2003_2026-05-03.json",
+  "tested_draws": 3146,
+  "warmup_draws": 300,
+  "ticket_count_per_draw": 2,
+  "primary_objective": [
+    "最大化两注至少一注命中3个以上红球的覆盖率",
+    "其次最大化至少一注命中4个以上红球的覆盖率",
+    "不以单注平均命中数作为唯一优化目标"
+  ],
+  "layer1": {
+    "type": "exact_prior_plus_prequential_gate",
+    "base_distributions": [
+      "6个排序位置的精确组合先验",
+      "5个相邻间距的精确组合先验",
+      "和值区间",
+      "大号数",
+      "奇数数",
+      "连号对数",
+      "与上期重号数"
+    ],
+    "dynamic_candidate": "按近期状态估计条件分布，并用逐期先验对数得分验证是否优于数学基准",
+    "confidence_gate": {
+      "principle": "未验证增益时必须回退数学基准，不允许强制偏移",
+      "experimental_active_draws": 80,
+      "experimental_active_rate": 0.02542911633820725,
+      "result": "动态偏移未表现出跨阶段稳定增益",
+      "production_default": "closed"
+    }
+  },
+  "layer2": {
+    "red_overlap_required": 0,
+    "reason": "无可靠号码级预测信号时，两注完全错开可最大化有限注数的联合覆盖",
+    "blue_numbers": "两注使用不同蓝球",
+    "specific_number_selection": "中立、确定性、仅依赖目标期之前历史的哈希轮换；不使用未来结果"
+  },
+  "validation": {
+    "method": "前300期热身，后3146期逐期滚动盲测；另做前后各1573期时序留出对比",
+    "neutral_control_runs": 100,
+    "predictive_number_edge_confirmed": false,
+    "coverage_edge_vs_v2_confirmed": true
+  }
+}
