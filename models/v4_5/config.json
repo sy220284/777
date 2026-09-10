@@ -1,0 +1,68 @@
+{
+  "name": "双色球高奖级集中组合模型",
+  "version": "4.5",
+  "baseline": "V4.4",
+  "goal": "在每期两注预算不变的前提下，将奖金分布向四等奖及以上推进；优先提升5红/4红+蓝的集中概率，而非追求六等奖中奖期率",
+  "red": {
+    "ranking": "完全复用V4逐号概率排序",
+    "baseline_partition": "V4.3多尺度两两关系+600期长窗门控",
+    "high_tier_portfolio": {
+      "candidate_pool": 12,
+      "subset_size": 6,
+      "score": "组内两两联合关系标准分 + 1.25×逐号边际排名和标准分",
+      "max_ticket_overlap": 3,
+      "gate_window": 800,
+      "gate_quantile": 0.75,
+      "minimum_history": 50,
+      "rule": "仅当当前高奖集中置信度达到过去800期75%分位以上时启用；否则回退V4.3分组"
+    }
+  },
+  "blue": {
+    "models": [
+      {"name": "base", "train_window": 1000, "features": "V4完整蓝球特征", "C": 0.2},
+      {"name": "full750", "train_window": 750, "features": "V4完整蓝球特征", "C": 0.2},
+      {"name": "freq1000", "train_window": 1000, "features": "频率+趋势+遗漏+上期关系+长期频率", "C": 0.05}
+    ],
+    "fusion": {
+      "method": "基于历史奖级效用的因果收缩式排名融合",
+      "window": 1100,
+      "temperature": 0.75,
+      "equal_weight_shrink": 0.15,
+      "top2_hit_shrink_weight": 20.0,
+      "prize_utility": {"一等奖": 100, "二等奖": 50, "三等奖": 20, "四等奖": 8, "五等奖": 2, "六等奖": 0.5, "未中奖": 0},
+      "rule": "当前期权重仅使用此前已开奖期次的实际奖级效用与前二蓝球覆盖表现"
+    }
+  },
+  "validation": {
+    "draws": 2696,
+    "tickets_per_draw": 2,
+    "anti_leakage": "所有逐号排序、联合关系、门控、蓝球模型权重仅允许读取目标期之前的数据",
+    "primary_metric": "实际双色球奖级分布",
+    "result": {
+      "一等奖": 0,
+      "二等奖": 0,
+      "三等奖": 0,
+      "四等奖": 13,
+      "五等奖": 50,
+      "六等奖": 328,
+      "未中奖": 2305,
+      "fixed_return_yuan": 4740,
+      "fixed_return_ratio": 0.439540059347181,
+      "red_5plus_draws": 3
+    },
+    "vs_v4_4": {
+      "四等奖": "+3（10→13）",
+      "五等奖": "-9（59→50）",
+      "六等奖": "+1（327→328）",
+      "fixed_return": "+515元（4225→4740，+12.19%）",
+      "red_5plus_draws": "+2（1→3）"
+    }
+  },
+  "rejected_experiments": {
+    "expanded_pool_14_15": "前14/15候选池包含更多真实号码，但6号压缩能力不足，实际奖级未超过12号池高置信集中方案",
+    "always_duplicate_blue": "显著损失蓝球覆盖，未产生三等奖，拒绝",
+    "cross_model_blue_diversification": "分别取不同模型蓝球第一候选导致四等奖下降，拒绝",
+    "single_best_blue_model": "静态模型不如奖级效用融合，拒绝",
+    "triple_joint_probability": "沿用V4.3结论，三元事件稀疏且跨段不稳定，继续拒绝"
+  }
+}
