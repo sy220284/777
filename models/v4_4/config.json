@@ -1,0 +1,30 @@
+{
+  "name": "双色球多尺度联合关系与自适应蓝球模型",
+  "version": "4.4",
+  "baseline": "V4.3",
+  "goal": "保持V4.3红球候选池与联合聚类不变，独立提升蓝球在最终奖级上的有效配合率",
+  "red": {
+    "model": "完全复用V4.3",
+    "reason": "本阶段候选池4+状态识别、二级概率校准、三子模型重新集成、监督号码对、排名位置共现均未通过跨段验证"
+  },
+  "blue": {
+    "base_model": {"features": "V4完整17维蓝球特征", "train_window": 1000, "C": 0.2},
+    "alternate_model": {"features": "移除号码绝对位置与奇偶身份，保留频率、趋势、遗漏、上期关系、长期频率", "train_window": 750, "C": 0.05},
+    "selector": {
+      "metric": "目标期之前各子模型前2蓝球候选真实命中率",
+      "window": 900,
+      "tie_break": "回退V4基线模型",
+      "anti_leakage": "目标期选择只读取此前开奖"
+    }
+  },
+  "validation": {
+    "draws": 2696,
+    "tickets_per_draw": 2,
+    "primary_metric": "实际双色球奖级",
+    "result": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 10, "五等奖": 59, "六等奖": 327, "未中奖": 2300},
+    "fixed_return_yuan": 4225,
+    "fixed_return_ratio": 0.39178412462908013,
+    "relative_return_vs_v43": 0.1016949152542373,
+    "sensitivity": "蓝球选择窗口800至1000期均维持10次四等奖和相近固定回报，900期取窗口中部"
+  }
+}
