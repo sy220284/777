@@ -1,0 +1,49 @@
+{
+  "status": "not_promoted",
+  "baseline": "V4.5",
+  "dataset_draws": 3501,
+  "blind_test_draws": 2751,
+  "principle": "只处理已验证瓶颈；简单方案优先；独立前向不改善则不升级",
+  "baseline_result": {
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 50, "六等奖": 334, "未中奖": 2354},
+    "fixed_return_yuan": 4780,
+    "forward55": {"四等奖": 0, "五等奖": 0, "六等奖": 6, "fixed_return_yuan": 30}
+  },
+  "experiments": {
+    "retrain_block_50": {
+      "forward55_top6_mean": 1.0727272727,
+      "forward55_top12_mean": 2.2,
+      "forward55_top12_4plus": 4,
+      "full_best_prize_counts": {"四等奖": 6, "五等奖": 44, "六等奖": 347},
+      "full_fixed_return_yuan": 3385,
+      "red_5plus_draws": 1,
+      "decision": "reject"
+    },
+    "causal_fast_slow_gate_w100_margin_005": {
+      "active_rate_full": 0.2395492548,
+      "active_rate_forward55": 0.7090909091,
+      "forward55_top12_4plus": 5,
+      "full_best_prize_counts": {"四等奖": 13, "五等奖": 42, "六等奖": 335},
+      "full_fixed_return_yuan": 4705,
+      "red_5plus_draws": 4,
+      "decision": "reject"
+    },
+    "pool_internal_reorder": {
+      "note": "保持V4前12集合，仅用快模型重排池内号码；整体低于V4.5。某激进配置旧历史偶然出现1次二等奖，但无前向改善且固定回报更差，视为单点过拟合。",
+      "decision": "reject"
+    },
+    "regularization_c_010": {
+      "full_top12_mean": 2.2319156670,
+      "forward55_top12_mean": 2.0363636364,
+      "forward55_top12_4plus": 2,
+      "decision": "reject"
+    },
+    "regularization_c_005": {
+      "full_top12_mean": 2.2119229371,
+      "forward55_top12_mean": 2.0363636364,
+      "forward55_top12_4plus": 3,
+      "decision": "reject"
+    }
+  },
+  "conclusion": "更快重训练能够改善部分近期候选池指标，但没有稳定转化为更高奖级；V4.5继续作为当前生产研究版。下一阶段停止微调重训/门控/正则，优先寻找能直接提高前12含5+真实红球概率的新信息。"
+}
