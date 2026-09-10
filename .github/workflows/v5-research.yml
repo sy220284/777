@@ -27,19 +27,68 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip numpy pandas scikit-learn
 
-      - name: Recover and validate current history
+      - name: Rebuild and validate frozen history
         shell: bash
         run: |
-          set +e
-          gzip -dc data/ssq_history_2003_2026-05-03.csv.gz > /tmp/base_recovered.csv
-          GZIP_RC=$?
-          set -e
-          echo "original_gzip_exit=$GZIP_RC"
-          echo "recovered_lines=$(wc -l < /tmp/base_recovered.csv)"
-          echo "recovered_tail:"
-          tail -n 3 /tmp/base_recovered.csv
-          gzip -c /tmp/base_recovered.csv > /tmp/base_repaired.csv.gz
-          cp /tmp/base_repaired.csv.gz data/ssq_history_2003_2026-05-03.csv.gz
+          curl -L --fail --retry 3 \
+            https://raw.githubusercontent.com/ipdisabled/fetch_data/master/ssq_data.csv \
+            -o /tmp/ssq_source.csv
+          python - <<'PY'
+          import csv
+          import gzip
+          from pathlib import Path
+
+          source = Path('/tmp/ssq_source.csv')
+          base_out = Path('/tmp/base_rebuilt.csv')
+          increment = Path('data/increment_2026050_2026104.csv')
+          rows = []
+          source_by_issue = {}
+          with source.open('r', encoding='utf-8-sig', newline='') as f:
+              for row in csv.DictReader(f):
+                  issue = int(row['index'])
+                  source_by_issue[issue] = (
+                      tuple(int(row[f'r{i}']) for i in range(1, 7)),
+                      int(row['b1']),
+                  )
+                  if issue <= 2026049:
+                      rows.append(row)
+
+          if len(rows) != 3446:
+              raise SystemExit(f'重建基础期数不符: {len(rows)} != 3446')
+          if int(rows[0]['index']) != 2003001 or int(rows[-1]['index']) != 2026049:
+              raise SystemExit('重建基础首尾期号不符')
+
+          with base_out.open('w', encoding='utf-8', newline='') as f:
+              w = csv.writer(f, lineterminator='\n')
+              w.writerow(['seq','red1','red2','red3','red4','red5','red6','blue'])
+              for seq, row in enumerate(rows, 1):
+                  w.writerow([
+                      seq,
+                      *(int(row[f'r{i}']) for i in range(1, 7)),
+                      int(row['b1']),
+                  ])
+
+          overlap_checked = 0
+          with increment.open('r', encoding='utf-8-sig', newline='') as f:
+              for row in csv.DictReader(f):
+                  issue = int(row['issue'])
+                  if issue not in source_by_issue:
+                      continue
+                  expected = source_by_issue[issue]
+                  actual = (
+                      tuple(int(row[f'red{i}']) for i in range(1, 7)),
+                      int(row['blue']),
+                  )
+                  if actual != expected:
+                      raise SystemExit(f'增量与独立源不一致: issue={issue} actual={actual} source={expected}')
+                  overlap_checked += 1
+
+          print(f'rebuilt_base_draws={len(rows)}')
+          print(f'independent_increment_overlap_checked={overlap_checked}')
+          print('base_first=', rows[0]['index'], rows[0]['time'])
+          print('base_last=', rows[-1]['index'], rows[-1]['time'])
+          PY
+          gzip -c /tmp/base_rebuilt.csv > data/ssq_history_2003_2026-05-03.csv.gz
           python tools/load_history.py --out /tmp/current_history.csv
 
       - name: Run causal V5 experiment
