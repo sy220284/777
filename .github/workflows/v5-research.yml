@@ -6,6 +6,7 @@ on:
       - research/v5-milestone
     paths:
       - 'tools/v5_core_fringe_experiment.py'
+      - 'tools/v5_high_hit_diagnostics.py'
       - 'models/**'
       - 'data/**'
       - '.github/workflows/v5-research.yml'
@@ -35,7 +36,6 @@ jobs:
             -o /tmp/ssq_source.csv
           python - <<'PY'
           import csv
-          import gzip
           from pathlib import Path
 
           source = Path('/tmp/ssq_source.csv')
@@ -62,11 +62,7 @@ jobs:
               w = csv.writer(f, lineterminator='\n')
               w.writerow(['seq','red1','red2','red3','red4','red5','red6','blue'])
               for seq, row in enumerate(rows, 1):
-                  w.writerow([
-                      seq,
-                      *(int(row[f'r{i}']) for i in range(1, 7)),
-                      int(row['b1']),
-                  ])
+                  w.writerow([seq, *(int(row[f'r{i}']) for i in range(1, 7)), int(row['b1'])])
 
           overlap_checked = 0
           with increment.open('r', encoding='utf-8-sig', newline='') as f:
@@ -75,10 +71,7 @@ jobs:
                   if issue not in source_by_issue:
                       continue
                   expected = source_by_issue[issue]
-                  actual = (
-                      tuple(int(row[f'red{i}']) for i in range(1, 7)),
-                      int(row['blue']),
-                  )
+                  actual = (tuple(int(row[f'red{i}']) for i in range(1, 7)), int(row['blue']))
                   if actual != expected:
                       raise SystemExit(f'增量与独立源不一致: issue={issue} actual={actual} source={expected}')
                   overlap_checked += 1
@@ -96,6 +89,11 @@ jobs:
           python tools/v5_core_fringe_experiment.py \
             --summary backtests/v5_research/core_fringe_summary.json \
             --details backtests/v5_research/core_fringe_details.csv
+
+      - name: Diagnose V4.5 high-hit events
+        run: |
+          python tools/v5_high_hit_diagnostics.py \
+            --out backtests/v5_research/high_hit_diagnostics.json
 
       - name: Print milestone summary
         run: |
