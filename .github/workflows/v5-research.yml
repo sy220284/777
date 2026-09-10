@@ -1,0 +1,68 @@
+name: V5 milestone blind test
+
+on:
+  push:
+    branches:
+      - research/v5-milestone
+    paths:
+      - 'tools/v5_core_fringe_experiment.py'
+      - 'models/**'
+      - 'data/**'
+      - '.github/workflows/v5-research.yml'
+  workflow_dispatch:
+
+jobs:
+  blind-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip numpy pandas scikit-learn
+
+      - name: Validate current history
+        run: python tools/load_history.py --out /tmp/current_history.csv
+
+      - name: Run causal V5 experiment
+        run: |
+          python tools/v5_core_fringe_experiment.py \
+            --summary backtests/v5_research/core_fringe_summary.json \
+            --details backtests/v5_research/core_fringe_details.csv
+
+      - name: Print milestone summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('backtests/v5_research/core_fringe_summary.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          for name, row in d['strategies'].items():
+              f = row['full']
+              fw = row['new_forward_seq_ge_3447']
+              print(
+                  name,
+                  'highest=', f['highest_prize'],
+                  '4+=', f['red_4plus_draws'],
+                  '5+=', f['red_5plus_draws'],
+                  '6=', f['red_6_draws'],
+                  'return=', f['fixed_return_yuan'],
+                  'forward_highest=', fw['highest_prize'],
+                  'forward_4+=', fw['red_4plus_draws'],
+                  'forward_5+=', fw['red_5plus_draws'],
+                  'forward_return=', fw['fixed_return_yuan'],
+              )
+          PY
+
+      - name: Upload research outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: v5-core-fringe-results
+          path: backtests/v5_research/
+          retention-days: 7
