@@ -1,0 +1,46 @@
+{
+  "name": "双色球多尺度联合关系模型",
+  "version": "4.3",
+  "baseline": "V4.2",
+  "goal": "在不降低候选池覆盖的前提下，提高真实红球在同一注中的集中度，并以实际奖级作为最终验收指标",
+  "red_number_ranking": "完全复用V4逐号概率排序，避免同时改动底层排序与组合层造成归因混乱",
+  "joint_layer": {
+    "type": "multi_scale_pair_affinity",
+    "primary_window": 500,
+    "secondary_window": 600,
+    "primary_weight": 0.8,
+    "secondary_weight": 0.2,
+    "candidate_pool": 12,
+    "partition": "枚举前12候选号全部462种6+6无重复分组，最大化组内联合关系得分"
+  },
+  "confidence_gate": {
+    "window": 600,
+    "quantile": 0.5,
+    "minimum_history": 50,
+    "rule": "仅使用目标期之前的聚类置信度分布；当前置信度达到过去600期中位数才启用联合聚类，否则退回V4的前6/后6拆分"
+  },
+  "blue": "复用V4蓝球模型，不在本版本同时调整",
+  "rejected_experiments": {
+    "triple_joint_probability": "开发段改善、留出段退化；三元事件过稀疏，拒绝进入生产",
+    "fixed_or_dynamic_anchor_numbers": "头部排名命中率不单调，固定共享1至3个胆码明显降低历史奖级回报",
+    "marginal_concentration_bonus": "强化头部号码聚集后开发段与留出段表现方向不一致，拒绝进入生产",
+    "short_confidence_gate": "250期门控对局部波动过敏，改为600期稳定基准"
+  },
+  "validation": {
+    "draws": 2696,
+    "tickets_per_draw": 2,
+    "anti_leakage": "逐期滚动；所有排序、联合关系、置信门控只读取目标期之前的数据",
+    "primary_metric": "实际双色球奖级",
+    "result": {
+      "一等奖": 0,
+      "二等奖": 0,
+      "三等奖": 0,
+      "四等奖": 8,
+      "五等奖": 60,
+      "六等奖": 327,
+      "未中奖": 2301,
+      "fixed_return_yuan": 3835,
+      "fixed_return_ratio": 0.35561943620178044
+    }
+  }
+}
