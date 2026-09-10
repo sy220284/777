@@ -1,0 +1,56 @@
+{
+  "model": "双色球高奖级集中组合模型 V4.5",
+  "dataset": {
+    "draws": 3501,
+    "cutoff": "2026-09-08",
+    "last_issue": 2026104,
+    "last_seq": 3501,
+    "sha256": "cb785b64c12860ff291075f1b80040555c630bc2992096af4bc8e79162fc83f9"
+  },
+  "blind_test_rule": "前750期作为最小热身；从seq=751起逐期因果盲测，每期两注；任何特征、联合关系、门控、蓝球权重只使用目标期之前的数据。",
+  "full_2751": {
+    "draws": 2751,
+    "tickets": 5502,
+    "cost_yuan": 11004,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 50, "六等奖": 334, "未中奖": 2354},
+    "ticket_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 50, "六等奖": 336, "未中奖": 5103},
+    "winning_draw_rate": 0.14431115957833515,
+    "winning_ticket_rate": 0.07251908396946564,
+    "double_winning_draws": 2,
+    "fixed_return_yuan": 4780,
+    "fixed_return_ratio": 0.43438749545619776,
+    "red_max_hit_distribution": {"0": 183, "1": 1123, "2": 1131, "3": 273, "4": 38, "5": 3},
+    "red_5plus_draws": 3,
+    "gate_active_rate": 0.26208651399491095,
+    "average_overlap": 0.7808069792802618
+  },
+  "legacy_segment_seq751_3446": {
+    "draws": 2696,
+    "tickets": 5392,
+    "cost_yuan": 10784,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 50, "六等奖": 328, "未中奖": 2305},
+    "ticket_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 50, "六等奖": 330, "未中奖": 4999},
+    "winning_draw_rate": 0.14502967359050445,
+    "winning_ticket_rate": 0.07288575667655786,
+    "double_winning_draws": 2,
+    "fixed_return_yuan": 4750,
+    "fixed_return_ratio": 0.4404673590504451,
+    "red_max_hit_distribution": {"0": 179, "1": 1097, "2": 1111, "3": 268, "4": 38, "5": 3},
+    "red_5plus_draws": 3
+  },
+  "new_forward_segment_seq3447_3501": {
+    "draws": 55,
+    "tickets": 110,
+    "cost_yuan": 220,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 0, "五等奖": 0, "六等奖": 6, "未中奖": 49},
+    "ticket_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 0, "五等奖": 0, "六等奖": 6, "未中奖": 104},
+    "winning_draw_rate": 0.10909090909090909,
+    "winning_ticket_rate": 0.05454545454545454,
+    "double_winning_draws": 0,
+    "fixed_return_yuan": 30,
+    "fixed_return_ratio": 0.13636363636363635,
+    "red_max_hit_distribution": {"0": 4, "1": 26, "2": 20, "3": 5},
+    "red_5plus_draws": 0
+  },
+  "reporting_fix": "奖金与单注中奖率按两张票逐票统计；best_prize_counts仅表示每期两注中的最高奖级。此前V4.5汇总只按best_prize计回报，会漏掉同一期第二张中奖票。"
+}
