@@ -1,0 +1,24 @@
+{
+  "model": "双色球多尺度联合关系与自适应蓝球模型 V4.4",
+  "tested_draws": 2696,
+  "tickets_per_draw": 2,
+  "total_tickets": 5392,
+  "ticket_cost_yuan": 10784,
+  "best_prize_counts": {
+    "一等奖": 0,
+    "二等奖": 0,
+    "三等奖": 0,
+    "四等奖": 10,
+    "五等奖": 59,
+    "六等奖": 327,
+    "未中奖": 2300
+  },
+  "winning_draw_rate": 0.14688427299703263,
+  "fixed_prize_return_yuan": 4225,
+  "fixed_prize_return_ratio": 0.39178412462908013,
+  "pair_gate_active_rate": 0.49295252225519287,
+  "blue_alt_active_rate": 0.49554896142433236,
+  "blue_selector_window": 900,
+  "blue_alt_train_window": 750,
+  "note": "候选池4+状态识别、二级概率校准、监督式号码对模型、排名位置共现均未通过跨段验证；V4.4仅增加通过四分段复核的蓝球双模型因果选择。"
+}
