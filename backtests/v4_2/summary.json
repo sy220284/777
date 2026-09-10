@@ -1,0 +1,36 @@
+{
+  "model": "V4.2",
+  "baseline": "V4",
+  "full": {
+    "v4": {
+      "draws": 2696,
+      "counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 5, "五等奖": 49, "六等奖": 337, "未中奖": 2305},
+      "winning_draw_rate": 0.14502967359050445,
+      "fixed_return_yuan": 3175,
+      "fixed_return_ratio": 0.29441765578635015
+    },
+    "v4_2": {
+      "draws": 2696,
+      "counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 7, "五等奖": 57, "六等奖": 328, "未中奖": 2304},
+      "winning_draw_rate": 0.14540059347181009,
+      "fixed_return_yuan": 3610,
+      "fixed_return_ratio": 0.33475519287833827
+    }
+  },
+  "development_first_1348": {
+    "v4": {"四等奖": 1, "五等奖": 22, "六等奖": 157, "未中奖": 1168, "fixed_return_yuan": 1205},
+    "v4_2": {"四等奖": 2, "五等奖": 27, "六等奖": 152, "未中奖": 1167, "fixed_return_yuan": 1430}
+  },
+  "holdout_last_1348": {
+    "v4": {"四等奖": 4, "五等奖": 27, "六等奖": 180, "未中奖": 1137, "fixed_return_yuan": 1970},
+    "v4_2": {"四等奖": 5, "五等奖": 30, "六等奖": 176, "未中奖": 1137, "fixed_return_yuan": 2180}
+  },
+  "delta": {
+    "fourth_prize": 2,
+    "fifth_prize": 8,
+    "sixth_prize": -9,
+    "fixed_return_yuan": 435,
+    "fixed_return_relative": 0.1370078740157481
+  },
+  "interpretation": "V4.2主要提升命中集中度而非证明可预测性；一二三等奖仍为0。"
+}
