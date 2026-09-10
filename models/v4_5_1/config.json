@@ -1,0 +1,31 @@
+{
+  "name": "V4.5.1 可预测性信号门控",
+  "baseline": "V4.5",
+  "fallback": "V4.3",
+  "goal": "仅在V4前12候选近期覆盖仍高于随机理论基线时启用高奖集中；无有效信号时回退分散策略",
+  "signal": {
+    "metric": "过去250期V4前12候选平均命中红球数",
+    "window": 250,
+    "minimum_history": 50,
+    "random_baseline": 2.1818181818181817,
+    "rule": "rolling_mean >= 6*12/33 使用V4.5，否则使用V4.3"
+  },
+  "design": {
+    "new_prediction_model": false,
+    "new_features": false,
+    "changes_red_probability_model": false,
+    "changes_blue_model": false,
+    "reason": "只增加与随机基线直接比较的总开关，避免在候选池近期失去信息增益时继续强行集中投注"
+  },
+  "validation": {
+    "draws": 2751,
+    "tickets": 5502,
+    "v45_fixed_return_yuan": 4780,
+    "v451_fixed_return_yuan": 4805,
+    "v45_forward55_fixed_return_yuan": 30,
+    "v451_forward55_fixed_return_yuan": 45,
+    "fourth_prize": "13 -> 13",
+    "fifth_prize": "50 -> 52",
+    "sixth_prize_tickets": "336 -> 337"
+  }
+}
