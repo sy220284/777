@@ -27,8 +27,20 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip numpy pandas scikit-learn
 
-      - name: Validate current history
-        run: python tools/load_history.py --out /tmp/current_history.csv
+      - name: Recover and validate current history
+        shell: bash
+        run: |
+          set +e
+          gzip -dc data/ssq_history_2003_2026-05-03.csv.gz > /tmp/base_recovered.csv
+          GZIP_RC=$?
+          set -e
+          echo "original_gzip_exit=$GZIP_RC"
+          echo "recovered_lines=$(wc -l < /tmp/base_recovered.csv)"
+          echo "recovered_tail:"
+          tail -n 3 /tmp/base_recovered.csv
+          gzip -c /tmp/base_recovered.csv > /tmp/base_repaired.csv.gz
+          cp /tmp/base_repaired.csv.gz data/ssq_history_2003_2026-05-03.csv.gz
+          python tools/load_history.py --out /tmp/current_history.csv
 
       - name: Run causal V5 experiment
         run: |
