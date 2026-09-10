@@ -1,0 +1,44 @@
+{
+  "name": "双色球号码级概率与联合聚类模型",
+  "version": "4.2",
+  "goal": "尽可能提高下一期号码排序与同注命中集中度，并以实际双色球奖级作为最终验收指标",
+  "history_snapshot": "data/ssq_history_2003_2026-05-03.csv.gz",
+  "red": {
+    "ranking": "沿用V4逐号概率多尺度逻辑回归集成",
+    "base_models": [
+      {"name": "all_history_logistic", "window": "expanding"},
+      {"name": "mid_term_logistic", "window": 1000},
+      {"name": "short_term_logistic", "window": 500}
+    ],
+    "ensemble": {
+      "method": "causal_trailing_performance_weighting",
+      "validation_window": 250,
+      "metric": "top10_red_hits"
+    },
+    "joint_probability": {
+      "pair_window": 500,
+      "candidate_pool": 12,
+      "partition_count": 462,
+      "method": "号码对实际共现相对边际期望的标准化残差",
+      "objective": "在不减少前12候选覆盖的条件下，将具有正联合关系的号码尽量聚到同一注"
+    },
+    "pair_gate": {
+      "confidence": "最佳分组得分相对所有462种分组得分中位数的标准化距离",
+      "threshold": "目标期之前最近250期置信度中位数",
+      "min_history": 50,
+      "rule": "当前置信度不低于历史滚动中位数才启用联合聚类，否则沿用1-6/7-12拆分"
+    },
+    "overlap": 0
+  },
+  "blue": {
+    "model": "V4 rolling_logistic_1000",
+    "decision": "保留V4全特征蓝球模型。简化模型虽提升蓝球单独Top1/Top2命中率，但降低端到端四等奖以上表现，因此未进入生产。"
+  },
+  "validation": {
+    "warmup_draws": 750,
+    "tested_draws": 2696,
+    "anti_leakage": "所有训练、联合概率、门控阈值仅读取目标期之前数据",
+    "primary_metrics": ["一等奖", "二等奖", "三等奖", "四等奖", "五等奖", "六等奖", "未中奖", "固定奖金回报"],
+    "holdout": "前后各1348期分别检查方向一致性"
+  }
+}
