@@ -1,0 +1,47 @@
+{
+  "model": "V4.5.1 可预测性信号门控",
+  "rule": {
+    "window": 250,
+    "metric": "过去250期V4前12候选平均包含真实红球数",
+    "random_baseline": 2.1818181818181817,
+    "when_signal": "rolling_mean >= 6*12/33 时使用V4.5高奖集中，否则回退V4.3分散策略",
+    "warmup": "最初50个盲测点默认回退V4.3"
+  },
+  "full": {
+    "draws": 2751,
+    "tickets": 5502,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 52, "六等奖": 335, "未中奖": 2351},
+    "ticket_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 52, "六等奖": 337, "未中奖": 5100},
+    "fixed_return_yuan": 4805,
+    "fixed_return_ratio": 0.4366593965830607,
+    "winning_draw_rate": 0.14540167211922936,
+    "winning_ticket_rate": 0.07306434023991276,
+    "red_5plus_draws": 3,
+    "signal_active_rate": 0.8011632133769538
+  },
+  "legacy": {
+    "draws": 2696,
+    "fixed_return_yuan": 4760,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 13, "五等奖": 52, "六等奖": 326, "未中奖": 2305},
+    "red_5plus_draws": 3,
+    "signal_active_rate": 0.8175074183976261
+  },
+  "forward55": {
+    "draws": 55,
+    "tickets": 110,
+    "best_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 0, "五等奖": 0, "六等奖": 9, "未中奖": 46},
+    "ticket_prize_counts": {"一等奖": 0, "二等奖": 0, "三等奖": 0, "四等奖": 0, "五等奖": 0, "六等奖": 9, "未中奖": 101},
+    "fixed_return_yuan": 45,
+    "fixed_return_ratio": 0.20454545454545456,
+    "signal_active_rate": 0.0
+  },
+  "quarters_vs_v45_return_delta_yuan": [10, -10, 15, 10],
+  "comparison_vs_v45": {
+    "fixed_return_yuan": "4780 -> 4805",
+    "fourth_prize": "13 -> 13",
+    "fifth_prize": "50 -> 52",
+    "sixth_prize_tickets": "336 -> 337",
+    "forward55_fixed_return_yuan": "30 -> 45",
+    "forward55_sixth_prize_tickets": "6 -> 9"
+  }
+}
