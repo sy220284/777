@@ -1,0 +1,87 @@
+{
+  "status": "rejected_as_production_upgrade",
+  "dataset_draws": 3501,
+  "blind_test_start_seq": 751,
+  "random_red_probability": 0.18181818181818182,
+  "raw_probability_quality": {
+    "full_seq751_3501": {
+      "random_constant_brier": 0.14876033057851235,
+      "all_brier": 0.1488380807247643,
+      "all_auc": 0.5045289044077055,
+      "w1000_brier": 0.14888581792422118,
+      "w1000_auc": 0.5036209033270477,
+      "w500_brier": 0.1490048425892045,
+      "w500_auc": 0.5003680440878233
+    },
+    "forward55_seq3447_3501": {
+      "random_constant_brier": 0.14876033057851235,
+      "all_brier": 0.14893589213902259,
+      "all_auc": 0.4880624426078971,
+      "w1000_brier": 0.14919070051615976,
+      "w1000_auc": 0.4769758187940006,
+      "w500_brier": 0.14969445358197092,
+      "w500_auc": 0.4513641465156617
+    }
+  },
+  "base_rank_top12": {
+    "full_mean": 2.2221010541621227,
+    "full_4plus": 338,
+    "full_5plus": 46,
+    "full_6": 4,
+    "forward55_mean": 2.0545454545454547,
+    "forward55_4plus": 3,
+    "forward55_5plus": 1,
+    "forward55_6": 0
+  },
+  "rank_position_calibration_examples": {
+    "window100_prior1000": {
+      "brier": 0.14877209423023455,
+      "full_top12_mean": 2.1802980734278443,
+      "full_4plus": 295,
+      "full_5plus": 42,
+      "forward55_top12_mean": 2.0727272727272728,
+      "forward55_4plus": 7,
+      "forward55_5plus": 1
+    },
+    "window250_prior1000": {
+      "brier": 0.14878762517852262,
+      "full_top12_mean": 2.1653944020356235,
+      "full_4plus": 275,
+      "full_5plus": 38,
+      "forward55_top12_mean": 2.290909090909091,
+      "forward55_4plus": 6,
+      "forward55_5plus": 1
+    }
+  },
+  "ranking_changing_bias_correction": {
+    "representative_window200_weight010": {
+      "full_top12_mean": 2.225736095965104,
+      "full_4plus": 322,
+      "full_5plus": 51,
+      "forward55_top12_mean": 2.1272727272727274,
+      "forward55_4plus": 5,
+      "after_v4_5_portfolio": {
+        "fourth_prize": 8,
+        "fifth_prize": 48,
+        "sixth_prize_best_draws": 336,
+        "fixed_return_yuan": 3770
+      },
+      "decision": "reject"
+    },
+    "representative_window250_weight010": {
+      "full_top12_mean": 2.2300981461286806,
+      "full_4plus": 323,
+      "full_5plus": 45,
+      "forward55_top12_mean": 2.1272727272727274,
+      "forward55_4plus": 5,
+      "after_v4_5_portfolio": {
+        "fourth_prize": 10,
+        "fifth_prize": 46,
+        "sixth_prize_best_draws": 333,
+        "fixed_return_yuan": 4145
+      },
+      "decision": "reject"
+    }
+  },
+  "conclusion": "V4原始概率没有优于18.18%恒定随机概率的Brier分数；排名位置校准能让数值更接近基准，但会显著削弱长期候选池；允许校准改变号码排序时，实际四等奖和固定回报下降。概率校准保留为诊断工具，不进入当前生产选号链。V4.5.1继续作为主版本。"
+}
