@@ -327,18 +327,26 @@ def backtest(df: pd.DataFrame, start: int = 750) -> pd.DataFrame:
 
 
 def summarize(result: pd.DataFrame) -> dict:
-    counts = result["best_prize"].value_counts().to_dict()
-    fixed_return = int(sum(FIXED_PRIZE[p] for p in result["best_prize"]))
+    # 每期最佳奖级用于衡量“这一期最高中了几等奖”；奖金与单注中奖率必须逐票统计，
+    # 否则同一期两张票都中奖时会漏计第二张票的奖金。
+    best_counts = result["best_prize"].value_counts().to_dict()
+    ticket_prizes = pd.concat([result["prize1"], result["prize2"]], ignore_index=True)
+    ticket_counts = ticket_prizes.value_counts().to_dict()
+    fixed_return = int(sum(FIXED_PRIZE[p] for p in ticket_prizes))
     draws = len(result)
+    tickets = draws * 2
     maxhit = result["max_red_hit"].value_counts().to_dict()
     return {
         "model": "双色球高奖级集中组合模型 V4.5",
         "tested_draws": draws,
         "tickets_per_draw": 2,
-        "total_tickets": draws * 2,
+        "total_tickets": tickets,
         "ticket_cost_yuan": draws * 4,
-        "best_prize_counts": {k: int(counts.get(k, 0)) for k in PRIZE_RANK},
+        "best_prize_counts": {k: int(best_counts.get(k, 0)) for k in PRIZE_RANK},
+        "ticket_prize_counts": {k: int(ticket_counts.get(k, 0)) for k in PRIZE_RANK},
         "winning_draw_rate": float((result["best_prize"] != "未中奖").mean()),
+        "winning_ticket_rate": float((ticket_prizes != "未中奖").mean()),
+        "double_winning_draws": int(((result["prize1"] != "未中奖") & (result["prize2"] != "未中奖")).sum()),
         "fixed_prize_return_yuan": fixed_return,
         "fixed_prize_return_ratio": float(fixed_return / (draws * 4)),
         "red_max_hit_distribution": {str(k): int(v) for k, v in sorted(maxhit.items())},
