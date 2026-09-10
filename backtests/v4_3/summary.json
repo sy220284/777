@@ -1,0 +1,25 @@
+{
+  "model": "双色球多尺度联合关系模型 V4.3",
+  "tested_draws": 2696,
+  "tickets_per_draw": 2,
+  "total_tickets": 5392,
+  "ticket_cost_yuan": 10784,
+  "best_prize_counts": {
+    "一等奖": 0,
+    "二等奖": 0,
+    "三等奖": 0,
+    "四等奖": 8,
+    "五等奖": 60,
+    "六等奖": 327,
+    "未中奖": 2301
+  },
+  "winning_draw_rate": 0.146513353115727,
+  "fixed_prize_return_yuan": 3835,
+  "fixed_prize_return_ratio": 0.35561943620178044,
+  "pair_gate_active_rate": 0.49295252225519287,
+  "pair_primary_window": 500,
+  "pair_secondary_window": 600,
+  "pair_primary_weight": 0.8,
+  "pair_gate_window": 600,
+  "note": "三元联合、固定/动态胆码与边际强聚集均未通过跨段验证；V4.3仅保留多尺度两两关系与长窗门控。"
+}
