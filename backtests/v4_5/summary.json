@@ -1,0 +1,36 @@
+{
+  "model": "双色球高奖级集中组合模型 V4.5",
+  "tested_draws": 2696,
+  "tickets_per_draw": 2,
+  "total_tickets": 5392,
+  "ticket_cost_yuan": 10784,
+  "best_prize_counts": {
+    "一等奖": 0,
+    "二等奖": 0,
+    "三等奖": 0,
+    "四等奖": 13,
+    "五等奖": 50,
+    "六等奖": 328,
+    "未中奖": 2305
+  },
+  "winning_draw_rate": 0.14502967359050445,
+  "fixed_prize_return_yuan": 4740,
+  "fixed_prize_return_ratio": 0.439540059347181,
+  "red_max_hit_distribution": {
+    "0": 179,
+    "1": 1097,
+    "2": 1111,
+    "3": 268,
+    "4": 38,
+    "5": 3
+  },
+  "red_5plus_draws": 3,
+  "red_concentration_gate_active_rate": 0.2607566765578635,
+  "average_red_overlap": 0.7770771513353115,
+  "average_blue_weights": {
+    "base": 0.31521745172630977,
+    "full750": 0.5233618630103453,
+    "freq1000": 0.16142068526334483
+  },
+  "note": "V4.5把优化目标从覆盖率进一步上移到奖级集中：仅在高置信状态允许最多3个红球重合，并用过去奖级效用对三个蓝球模型做收缩式融合。历史提升不代表未来可稳定预测。"
+}
