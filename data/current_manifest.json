@@ -11,7 +11,6 @@
     "rebuild_tool": "tools/load_history.py"
   },
   "integrity": {
-    "frozen_base_git_blob_sha1": "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e",
     "current_increment_sha256": "cfba2f2d51197cd7a3a6949dac76a81b657c9f883d47818b0781a90959cf5718",
     "checks": [
       "seq 1-3502 连续",
@@ -21,17 +20,38 @@
       "蓝球范围1-16",
       "冻结基础快照使用Git blob SHA1锁定",
       "当前增量使用SHA256锁定"
-    ]
+    ],
+    "frozen_base_sha256": "706b680cb3133bd8b3e78f0de3aa0f5099e1ec9cbe4c42bf1fcaf1bcdc1f62e8",
+    "legacy_corrupt_base_git_blob_sha1": "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e"
   },
   "latest_draw_source": {
     "issue": 2026105,
     "date": "2026-09-10",
-    "red": [2, 4, 13, 14, 15, 30],
+    "red": [
+      2,
+      4,
+      13,
+      14,
+      15,
+      30
+    ],
     "blue": 8,
     "verified_against": [
       "上海市福利彩票发行中心",
       "福建福彩网"
     ]
   },
-  "note": "当前研究默认由冻结基线+current_increment重建完整历史；2026104版本增量继续保留，用于复现原55期独立前向段。"
+  "note": "当前研究默认由冻结基线+current_increment重建完整历史；2026104版本增量继续保留，用于复现原55期独立前向段。",
+  "frozen_base_draws": 3446,
+  "base_repair": {
+    "status": "repaired",
+    "sources": [
+      "https://raw.githubusercontent.com/yangxb919/lottery-data/main/data/ssq.json",
+      "https://raw.githubusercontent.com/Justdoitfor/my-lottery-data/main/data/ssq.json"
+    ],
+    "full_history_sources_agree_draws": 3502,
+    "legacy_valid_prefix_rows_verified": 928,
+    "current_increment_rows_verified": 56,
+    "method": "两个全量历史源3502期逐期一致，且同时匹配旧损坏快照连续合法前缀与仓库56期当前增量后，重建冻结基线"
+  }
 }
