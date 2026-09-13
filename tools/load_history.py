@@ -42,11 +42,19 @@ def verify_current_sources(
     manifest_path: str | Path = CURRENT_MANIFEST,
 ) -> None:
     manifest = load_manifest(manifest_path)
-    expected_base = manifest["integrity"]["frozen_base_git_blob_sha1"]
-    expected_increment = manifest["integrity"]["current_increment_sha256"]
-    base_blob = _git_blob_sha1(base_path)
-    if base_blob != expected_base:
-        raise ValueError(f"冻结基础快照已变化: expected={expected_base} actual={base_blob}")
+    integrity = manifest["integrity"]
+    if "frozen_base_sha256" in integrity:
+        expected_base = integrity["frozen_base_sha256"]
+        actual_base = _sha256(base_path)
+        if actual_base != expected_base:
+            raise ValueError(f"冻结基础快照SHA256不一致: expected={expected_base} actual={actual_base}")
+    else:
+        expected_base = integrity["frozen_base_git_blob_sha1"]
+        actual_base = _git_blob_sha1(base_path)
+        if actual_base != expected_base:
+            raise ValueError(f"冻结基础快照已变化: expected={expected_base} actual={actual_base}")
+
+    expected_increment = integrity["current_increment_sha256"]
     increment_sha = _sha256(increment_path)
     if increment_sha != expected_increment:
         raise ValueError(
@@ -55,13 +63,7 @@ def verify_current_sources(
 
 
 def _decode_base_csv(path: str | Path) -> str:
-    """解压冻结基线。
-
-    仓库早期提交的 gzip 缺少尾部校验段，但主体 deflate 数据仍可完整解出。
-    先走严格 gzip；仅在 EOFError 时使用 zlib 宽容恢复。最终仍必须通过
-    3446期数量、连续 seq、号码格式和仓库 blob 哈希四重校验，因此不会静默
-    接受真正被截断的数据主体。
-    """
+    """解压冻结基线；兼容仓库早期损坏快照，仅用于修复过渡。"""
     raw = Path(path).read_bytes()
     try:
         return gzip.decompress(raw).decode("utf-8-sig")
@@ -77,6 +79,8 @@ def _read_base(path: str | Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     text = _decode_base_csv(path)
     for row in csv.DictReader(io.StringIO(text, newline="")):
+        if any(row.get(f"red{i}") is None for i in range(1, 7)) or row.get("blue") is None:
+            raise ValueError("冻结基础快照CSV存在截断行")
         rows.append({
             "seq": int(row["seq"]),
             "red": [int(row[f"red{i}"]) for i in range(1, 7)],
@@ -85,7 +89,7 @@ def _read_base(path: str | Path) -> list[dict[str, object]]:
     validate_history(rows)
     if len(rows) != BASE_DRAWS or int(rows[-1]["seq"]) != BASE_DRAWS:
         raise ValueError(
-            f"冻结基础快照恢复不完整: draws={len(rows)} last_seq={rows[-1]['seq'] if rows else None}"
+            f"冻结基础快照不完整: draws={len(rows)} last_seq={rows[-1]['seq'] if rows else None}"
         )
     return rows
 
