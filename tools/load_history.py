@@ -4,7 +4,9 @@ import argparse
 import csv
 import gzip
 import hashlib
+import io
 import json
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +23,7 @@ CURRENT_INCREMENT = ROOT / _MANIFEST["storage"]["current_increment"]
 CURRENT_DRAWS = int(_MANIFEST["current_draws"])
 CURRENT_LAST_SEQ = int(_MANIFEST["current_last_seq"])
 CURRENT_LAST_ISSUE = int(_MANIFEST["current_last_issue"])
+BASE_DRAWS = int(_MANIFEST.get("frozen_base_draws", 3446))
 
 
 def _sha256(path: str | Path) -> str:
@@ -51,15 +54,39 @@ def verify_current_sources(
         )
 
 
+def _decode_base_csv(path: str | Path) -> str:
+    """解压冻结基线。
+
+    仓库早期提交的 gzip 缺少尾部校验段，但主体 deflate 数据仍可完整解出。
+    先走严格 gzip；仅在 EOFError 时使用 zlib 宽容恢复。最终仍必须通过
+    3446期数量、连续 seq、号码格式和仓库 blob 哈希四重校验，因此不会静默
+    接受真正被截断的数据主体。
+    """
+    raw = Path(path).read_bytes()
+    try:
+        return gzip.decompress(raw).decode("utf-8-sig")
+    except EOFError:
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        recovered = decoder.decompress(raw) + decoder.flush()
+        if not recovered:
+            raise ValueError("冻结基础快照无法恢复")
+        return recovered.decode("utf-8-sig")
+
+
 def _read_base(path: str | Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    with gzip.open(Path(path), "rt", encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
-            rows.append({
-                "seq": int(row["seq"]),
-                "red": [int(row[f"red{i}"]) for i in range(1, 7)],
-                "blue": int(row["blue"]),
-            })
+    text = _decode_base_csv(path)
+    for row in csv.DictReader(io.StringIO(text, newline="")):
+        rows.append({
+            "seq": int(row["seq"]),
+            "red": [int(row[f"red{i}"]) for i in range(1, 7)],
+            "blue": int(row["blue"]),
+        })
+    validate_history(rows)
+    if len(rows) != BASE_DRAWS or int(rows[-1]["seq"]) != BASE_DRAWS:
+        raise ValueError(
+            f"冻结基础快照恢复不完整: draws={len(rows)} last_seq={rows[-1]['seq'] if rows else None}"
+        )
     return rows
 
 
