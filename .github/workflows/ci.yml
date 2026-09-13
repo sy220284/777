@@ -1,0 +1,44 @@
+name: final-product-check
+
+on:
+  push:
+    branches: [final-product, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q ssq.py tools models
+      - name: 数据完整性检查
+        run: python ssq.py verify
+      - name: 最终模型真实数据烟雾测试
+        run: python ssq.py predict --out /tmp/latest.json
+      - name: 输出结构检查
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path('/tmp/latest.json').read_text(encoding='utf-8'))
+          assert result['model'].startswith('V4.5.1')
+          assert result['selected_strategy'] in {'V4.3', 'V4.5'}
+          assert len(result['tickets']) == 2
+          assert len(result['red_top12']) == 12
+          for ticket in result['tickets']:
+              assert len(ticket['red']) == 6
+              assert len(set(ticket['red'])) == 6
+              assert all(1 <= n <= 33 for n in ticket['red'])
+              assert 1 <= ticket['blue'] <= 16
+          print('final-product smoke check: ok')
+          PY
