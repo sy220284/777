@@ -12,17 +12,17 @@
   },
   "integrity": {
     "current_increment_sha256": "cfba2f2d51197cd7a3a6949dac76a81b657c9f883d47818b0781a90959cf5718",
+    "frozen_base_sha256": "706b680cb3133bd8b3e78f0de3aa0f5099e1ec9cbe4c42bf1fcaf1bcdc1f62e8",
+    "legacy_corrupt_base_git_blob_sha1": "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e",
     "checks": [
       "seq 1-3502 连续",
       "无重复 seq",
       "增量期号单调且不重复",
       "每期6个不重复升序红球，范围1-33",
       "蓝球范围1-16",
-      "冻结基础快照使用Git blob SHA1锁定",
+      "修复后的冻结基础快照使用SHA256锁定",
       "当前增量使用SHA256锁定"
-    ],
-    "frozen_base_sha256": "706b680cb3133bd8b3e78f0de3aa0f5099e1ec9cbe4c42bf1fcaf1bcdc1f62e8",
-    "legacy_corrupt_base_git_blob_sha1": "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e"
+    ]
   },
   "latest_draw_source": {
     "issue": 2026105,
