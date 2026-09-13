@@ -4,15 +4,23 @@ import argparse
 import csv
 import gzip
 import hashlib
+import json
 from pathlib import Path
 
-BASE_SNAPSHOT = Path("data/ssq_history_2003_2026-05-03.csv.gz")
-CURRENT_INCREMENT = Path("data/increment_2026050_2026105.csv")
-CURRENT_DRAWS = 3502
-CURRENT_LAST_SEQ = 3502
-CURRENT_LAST_ISSUE = 2026105
-FROZEN_BASE_GIT_BLOB_SHA1 = "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e"
-CURRENT_INCREMENT_SHA256 = "cfba2f2d51197cd7a3a6949dac76a81b657c9f883d47818b0781a90959cf5718"
+ROOT = Path(__file__).resolve().parents[1]
+CURRENT_MANIFEST = ROOT / "data" / "current_manifest.json"
+
+
+def load_manifest(path: str | Path = CURRENT_MANIFEST) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+_MANIFEST = load_manifest()
+BASE_SNAPSHOT = ROOT / _MANIFEST["storage"]["frozen_base"]
+CURRENT_INCREMENT = ROOT / _MANIFEST["storage"]["current_increment"]
+CURRENT_DRAWS = int(_MANIFEST["current_draws"])
+CURRENT_LAST_SEQ = int(_MANIFEST["current_last_seq"])
+CURRENT_LAST_ISSUE = int(_MANIFEST["current_last_issue"])
 
 
 def _sha256(path: str | Path) -> str:
@@ -28,16 +36,18 @@ def _git_blob_sha1(path: str | Path) -> str:
 def verify_current_sources(
     base_path: str | Path = BASE_SNAPSHOT,
     increment_path: str | Path = CURRENT_INCREMENT,
+    manifest_path: str | Path = CURRENT_MANIFEST,
 ) -> None:
+    manifest = load_manifest(manifest_path)
+    expected_base = manifest["integrity"]["frozen_base_git_blob_sha1"]
+    expected_increment = manifest["integrity"]["current_increment_sha256"]
     base_blob = _git_blob_sha1(base_path)
-    if base_blob != FROZEN_BASE_GIT_BLOB_SHA1:
-        raise ValueError(
-            f"冻结基础快照已变化: expected={FROZEN_BASE_GIT_BLOB_SHA1} actual={base_blob}"
-        )
+    if base_blob != expected_base:
+        raise ValueError(f"冻结基础快照已变化: expected={expected_base} actual={base_blob}")
     increment_sha = _sha256(increment_path)
-    if increment_sha != CURRENT_INCREMENT_SHA256:
+    if increment_sha != expected_increment:
         raise ValueError(
-            f"当前增量SHA256不一致: expected={CURRENT_INCREMENT_SHA256} actual={increment_sha}"
+            f"当前增量SHA256不一致: expected={expected_increment} actual={increment_sha}"
         )
 
 
@@ -118,6 +128,23 @@ def write_current_csv(
     return _sha256(out)
 
 
+def validate_current_state(
+    base_path: str | Path = BASE_SNAPSHOT,
+    increment_path: str | Path = CURRENT_INCREMENT,
+    *,
+    verify_hash: bool = True,
+) -> list[dict[str, object]]:
+    if verify_hash:
+        verify_current_sources(base_path, increment_path)
+    rows = load_history(base_path, increment_path)
+    if len(rows) != CURRENT_DRAWS or int(rows[-1]["seq"]) != CURRENT_LAST_SEQ:
+        raise ValueError("当前历史期数/末序号与清单不一致")
+    increment_rows = _read_increment(increment_path)
+    if not increment_rows or int(increment_rows[-1]["issue"]) != CURRENT_LAST_ISSUE:
+        raise ValueError("当前增量末期号与清单不一致")
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="读取/重建双色球当前历史数据")
     parser.add_argument("--base", default=str(BASE_SNAPSHOT))
@@ -126,15 +153,12 @@ def main() -> None:
     parser.add_argument("--skip-source-hash", action="store_true", help="自定义数据源时跳过仓库冻结哈希检查")
     args = parser.parse_args()
 
-    if not args.skip_source_hash:
-        verify_current_sources(args.base, args.increment)
-    rows = load_history(args.base, args.increment)
+    rows = validate_current_state(
+        args.base,
+        args.increment,
+        verify_hash=not args.skip_source_hash,
+    )
     print(f"draws={len(rows)} first={rows[0]} last={rows[-1]}")
-    if len(rows) != CURRENT_DRAWS or int(rows[-1]["seq"]) != CURRENT_LAST_SEQ:
-        raise SystemExit("当前历史期数/末序号与清单不一致")
-    increment_rows = _read_increment(args.increment)
-    if not increment_rows or int(increment_rows[-1]["issue"]) != CURRENT_LAST_ISSUE:
-        raise SystemExit("当前增量末期号与清单不一致")
     if args.out:
         digest = write_current_csv(args.out, args.base, args.increment)
         print(f"merged_sha256={digest}")
