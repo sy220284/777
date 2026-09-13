@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+predictions/
+data/history_current.csv
+.pytest_cache/
