@@ -7,10 +7,38 @@ import hashlib
 from pathlib import Path
 
 BASE_SNAPSHOT = Path("data/ssq_history_2003_2026-05-03.csv.gz")
-CURRENT_INCREMENT = Path("data/increment_2026050_2026104.csv")
-CURRENT_DRAWS = 3501
-CURRENT_LAST_SEQ = 3501
-CURRENT_MERGED_SHA256 = "cb785b64c12860ff291075f1b80040555c630bc2992096af4bc8e79162fc83f9"
+CURRENT_INCREMENT = Path("data/increment_2026050_2026105.csv")
+CURRENT_DRAWS = 3502
+CURRENT_LAST_SEQ = 3502
+CURRENT_LAST_ISSUE = 2026105
+FROZEN_BASE_GIT_BLOB_SHA1 = "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e"
+CURRENT_INCREMENT_SHA256 = "cfba2f2d51197cd7a3a6949dac76a81b657c9f883d47818b0781a90959cf5718"
+
+
+def _sha256(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _git_blob_sha1(path: str | Path) -> str:
+    data = Path(path).read_bytes()
+    header = f"blob {len(data)}\0".encode("ascii")
+    return hashlib.sha1(header + data).hexdigest()
+
+
+def verify_current_sources(
+    base_path: str | Path = BASE_SNAPSHOT,
+    increment_path: str | Path = CURRENT_INCREMENT,
+) -> None:
+    base_blob = _git_blob_sha1(base_path)
+    if base_blob != FROZEN_BASE_GIT_BLOB_SHA1:
+        raise ValueError(
+            f"冻结基础快照已变化: expected={FROZEN_BASE_GIT_BLOB_SHA1} actual={base_blob}"
+        )
+    increment_sha = _sha256(increment_path)
+    if increment_sha != CURRENT_INCREMENT_SHA256:
+        raise ValueError(
+            f"当前增量SHA256不一致: expected={CURRENT_INCREMENT_SHA256} actual={increment_sha}"
+        )
 
 
 def _read_base(path: str | Path) -> list[dict[str, object]]:
@@ -35,6 +63,10 @@ def _read_increment(path: str | Path) -> list[dict[str, object]]:
                 "red": [int(row[f"red{i}"]) for i in range(1, 7)],
                 "blue": int(row["blue"]),
             })
+    if rows:
+        issues = [int(r["issue"]) for r in rows]
+        if issues != sorted(issues) or len(set(issues)) != len(issues):
+            raise ValueError("增量期号存在乱序或重复")
     return rows
 
 
@@ -58,10 +90,10 @@ def load_history(
     base_path: str | Path = BASE_SNAPSHOT,
     increment_path: str | Path | None = CURRENT_INCREMENT,
 ) -> list[dict[str, object]]:
-    """读取当前双色球历史。
+    """读取双色球历史。
 
-    默认由冻结基础快照（截至2026-05-03）+ 2026050—2026104增量重建当前3501期数据。
-    将 increment_path 设为 None 可只读取冻结基础快照，供旧版本盲测复现。
+    默认由冻结基础快照（截至2026-05-03）与当前增量重建完整历史。
+    将 increment_path 设为 None 可只读取冻结基础快照，供旧版本复现。
     """
     rows = _read_base(base_path)
     if increment_path is not None and Path(increment_path).exists():
@@ -83,8 +115,7 @@ def write_current_csv(
         w.writerow(["seq", "red1", "red2", "red3", "red4", "red5", "red6", "blue"])
         for row in rows:
             w.writerow([row["seq"], *row["red"], row["blue"]])
-    digest = hashlib.sha256(out.read_bytes()).hexdigest()
-    return digest
+    return _sha256(out)
 
 
 def main() -> None:
@@ -92,17 +123,21 @@ def main() -> None:
     parser.add_argument("--base", default=str(BASE_SNAPSHOT))
     parser.add_argument("--increment", default=str(CURRENT_INCREMENT))
     parser.add_argument("--out", default=None, help="可选：重建当前合并CSV到指定路径")
+    parser.add_argument("--skip-source-hash", action="store_true", help="自定义数据源时跳过仓库冻结哈希检查")
     args = parser.parse_args()
 
+    if not args.skip_source_hash:
+        verify_current_sources(args.base, args.increment)
     rows = load_history(args.base, args.increment)
     print(f"draws={len(rows)} first={rows[0]} last={rows[-1]}")
     if len(rows) != CURRENT_DRAWS or int(rows[-1]["seq"]) != CURRENT_LAST_SEQ:
         raise SystemExit("当前历史期数/末序号与清单不一致")
+    increment_rows = _read_increment(args.increment)
+    if not increment_rows or int(increment_rows[-1]["issue"]) != CURRENT_LAST_ISSUE:
+        raise SystemExit("当前增量末期号与清单不一致")
     if args.out:
         digest = write_current_csv(args.out, args.base, args.increment)
         print(f"merged_sha256={digest}")
-        if digest != CURRENT_MERGED_SHA256:
-            raise SystemExit("重建文件 SHA256 与本地当前快照不一致")
 
 
 if __name__ == "__main__":
