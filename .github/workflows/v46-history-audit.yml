@@ -1,0 +1,36 @@
+name: v46-history-audit
+
+on:
+  push:
+    branches:
+      - v4-6-nonlinear-challenger
+    paths:
+      - "tools/v4_6_history_audit.py"
+      - ".github/workflows/v46-history-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q tools/v4_6_history_audit.py tools/load_history.py
+      - name: 运行三源历史审计
+        run: python tools/v4_6_history_audit.py
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-history-audit
+          path: backtests/v4_6/history_audit.json
+          if-no-files-found: error
