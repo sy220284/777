@@ -6,6 +6,7 @@ on:
     paths:
       - 'tools/v4_7_research.py'
       - 'tools/v4_7_research_strict.py'
+      - 'tools/v4_7_fast_repair.py'
       - 'models/**'
       - 'data/**'
       - 'requirements.txt'
@@ -26,11 +27,11 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: 编译检查
         run: python -m compileall -q tools models
-      - name: 运行V4.7严格因果研究
-        run: python tools/v4_7_research_strict.py
+      - name: 运行快模型补漏研究
+        run: python tools/v4_7_fast_repair.py
       - name: 保存研究结果
         uses: actions/upload-artifact@v4
         with:
-          name: v4-7-research-summary
-          path: backtests/v4_7/research_summary.json
+          name: v4-7-fast-repair-summary
+          path: backtests/v4_7/fast_repair_summary.json
           if-no-files-found: error
