@@ -1,0 +1,36 @@
+name: v46-adaptive-outball-robustness
+
+on:
+  push:
+    branches:
+      - v4-6-nonlinear-challenger
+    paths:
+      - "tools/v4_6_adaptive_outball_robustness.py"
+      - ".github/workflows/v46-adaptive-outball-robustness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q tools/v4_6_adaptive_outball_robustness.py tools/v4_6_adaptive_outball_gate.py models
+      - name: 运行全历史分块鲁棒性审计
+        run: python tools/v4_6_adaptive_outball_robustness.py
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-adaptive-outball-robustness
+          path: backtests/v4_6/adaptive_outball_robustness.json
+          if-no-files-found: error
