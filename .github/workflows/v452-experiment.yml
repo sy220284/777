@@ -1,0 +1,57 @@
+name: v452-experiment
+
+on:
+  push:
+    branches:
+      - v4-5-2-tiered-concentration
+    paths:
+      - 'models/v4_5_2/**'
+      - '.github/workflows/v452-experiment.yml'
+      - 'models/v4/**'
+      - 'models/v4_3/**'
+      - 'models/v4_5/**'
+      - 'models/v4_5_1/**'
+      - 'tools/load_history.py'
+      - 'data/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'models/v4_5_2/**'
+      - '.github/workflows/v452-experiment.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q models/v4_5_2
+      - name: 数据完整性检查
+        run: python ssq.py verify
+      - name: 低红球信号蓝球专家稳健性核验
+        run: python models/v4_5_2/regime_blue_robustness.py
+      - name: 输出稳健性关键结果
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path('backtests/v4_5_2/regime_blue_robustness.json').read_text(encoding='utf-8'))
+          print('OVERALL', json.dumps(x['overall'], ensure_ascii=False))
+          print('SIGNAL_OFF_ONLY', json.dumps(x['signal_off_only'], ensure_ascii=False))
+          print('ROBUSTNESS', json.dumps(x['robustness'], ensure_ascii=False))
+          print('BLOCKS', json.dumps(x['chronological_250_draw_blocks'], ensure_ascii=False))
+          print('OFF_BLOCKS', json.dumps(x['signal_off_100_draw_blocks'], ensure_ascii=False))
+          print('CHECKPOINTS', json.dumps(x['cumulative_checkpoints'], ensure_ascii=False))
+          PY

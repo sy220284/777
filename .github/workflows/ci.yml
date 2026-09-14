@@ -2,14 +2,14 @@ name: final-product-check
 
 on:
   push:
-    branches: [final-product, main]
+    branches: [final-product, main, v4-5-2-tiered-concentration]
   pull_request:
     branches: [main]
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,4 +41,20 @@ jobs:
               assert all(1 <= n <= 33 for n in ticket['red'])
               assert 1 <= ticket['blue'] <= 16
           print('final-product smoke check: ok')
+          PY
+      - name: V4.5.2 分层集中度实验
+        if: ${{ github.head_ref == 'v4-5-2-tiered-concentration' || github.ref == 'refs/heads/v4-5-2-tiered-concentration' }}
+        run: python models/v4_5_2/experiment.py
+      - name: V4.5.2 关键结果
+        if: ${{ github.head_ref == 'v4-5-2-tiered-concentration' || github.ref == 'refs/heads/v4-5-2-tiered-concentration' }}
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path('backtests/v4_5_2/experiment_summary.json').read_text(encoding='utf-8'))
+          print('BASELINE', json.dumps(x['baseline_v451'], ensure_ascii=False))
+          for name, row in x['variants'].items():
+              print('VARIANT', name, json.dumps(row['delta_vs_v451'], ensure_ascii=False))
+              print('FORWARD56', name, json.dumps(row['forward56'], ensure_ascii=False))
+              print('TIERS', name, json.dumps(row['signal_tier_counts'], ensure_ascii=False))
           PY
