@@ -1,9 +1,9 @@
 {
   "dataset": "双色球历史开奖当前快照",
-  "current_cutoff": "2026-09-10",
-  "current_last_issue": 2026105,
-  "current_last_seq": 3502,
-  "current_draws": 3502,
+  "current_cutoff": "2026-09-13",
+  "current_last_issue": 2026106,
+  "current_last_seq": 3503,
+  "current_draws": 3503,
   "storage": {
     "frozen_base": "data/ssq_history_2003_2026-05-03.csv.gz",
     "current_increment": "data/increment_current.csv",
@@ -11,11 +11,11 @@
     "rebuild_tool": "tools/load_history.py"
   },
   "integrity": {
-    "current_increment_sha256": "cfba2f2d51197cd7a3a6949dac76a81b657c9f883d47818b0781a90959cf5718",
+    "current_increment_sha256": "bc923691f8a128daf0e2824691fb2087b2f7535199d850119f66c94bb19e542e",
     "frozen_base_sha256": "706b680cb3133bd8b3e78f0de3aa0f5099e1ec9cbe4c42bf1fcaf1bcdc1f62e8",
     "legacy_corrupt_base_git_blob_sha1": "c80e59cf0ffbfbc58746d804e02bae7f34a8d51e",
     "checks": [
-      "seq 1-3502 连续",
+      "seq 1-3503 连续",
       "无重复 seq",
       "增量期号单调且不重复",
       "每期6个不重复升序红球，范围1-33",
@@ -25,20 +25,20 @@
     ]
   },
   "latest_draw_source": {
-    "issue": 2026105,
-    "date": "2026-09-10",
+    "issue": 2026106,
+    "date": "2026-09-13",
     "red": [
-      2,
-      4,
+      6,
+      11,
       13,
       14,
-      15,
+      22,
       30
     ],
-    "blue": 8,
+    "blue": 14,
     "verified_against": [
-      "上海市福利彩票发行中心",
-      "福建福彩网"
+      "唯彩看球开奖回顾",
+      "yangxb919/lottery-data（源标记500.com）"
     ]
   },
   "note": "当前研究默认由冻结基线+current_increment重建完整历史；2026104版本增量继续保留，用于复现原55期独立前向段。",
