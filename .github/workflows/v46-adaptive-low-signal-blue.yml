@@ -1,0 +1,36 @@
+name: v46-adaptive-low-signal-blue
+
+on:
+  push:
+    branches:
+      - v4-6-nonlinear-challenger
+    paths:
+      - "tools/v4_6_adaptive_low_signal_blue.py"
+      - ".github/workflows/v46-adaptive-low-signal-blue.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q tools/v4_6_adaptive_low_signal_blue.py models
+      - name: 运行低信号蓝球因果选择门
+        run: python tools/v4_6_adaptive_low_signal_blue.py
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-adaptive-low-signal-blue
+          path: backtests/v4_6/adaptive_low_signal_blue.json
+          if-no-files-found: error
