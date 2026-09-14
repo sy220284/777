@@ -8,9 +8,6 @@ on:
       - 'models/v4_5_2/**'
       - '.github/workflows/v452-experiment.yml'
       - 'models/v4/**'
-      - 'models/v4_3/**'
-      - 'models/v4_5/**'
-      - 'models/v4_5_1/**'
       - 'tools/load_history.py'
       - 'data/**'
   pull_request:
@@ -40,18 +37,19 @@ jobs:
         run: python -m compileall -q models/v4_5_2
       - name: 数据完整性检查
         run: python ssq.py verify
-      - name: 分层集中度严格前向实验
-        run: python models/v4_5_2/experiment.py
-      - name: 输出关键结果
+      - name: 红球候选池共识稳定性实验
+        run: python models/v4_5_2/candidate_consensus.py
+      - name: 输出候选池关键结果
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('backtests/v4_5_2/experiment_summary.json')
-          x = json.loads(p.read_text(encoding='utf-8'))
-          print('BASELINE', json.dumps(x['baseline_v451'], ensure_ascii=False))
-          for name, row in x['variants'].items():
-              print('VARIANT', name, json.dumps(row['delta_vs_v451'], ensure_ascii=False))
-              print('FORWARD56', name, json.dumps(row['forward56'], ensure_ascii=False))
-              print('TIERS', name, json.dumps(row['signal_tier_counts'], ensure_ascii=False))
+          x = json.loads(Path('backtests/v4_5_2/candidate_consensus_summary.json').read_text(encoding='utf-8'))
+          base = x['summaries']['v4_dynamic']
+          print('BASE_FULL', json.dumps(base['full'], ensure_ascii=False))
+          print('BASE_FORWARD56', json.dumps(base['forward56'], ensure_ascii=False))
+          for name, check in x['promotion_checks'].items():
+              print('CANDIDATE', name, json.dumps(check, ensure_ascii=False))
+              print('FULL', name, json.dumps(x['summaries'][name]['full'], ensure_ascii=False))
+              print('FORWARD56', name, json.dumps(x['summaries'][name]['forward56'], ensure_ascii=False))
           PY
