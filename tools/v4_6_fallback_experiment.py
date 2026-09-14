@@ -176,6 +176,14 @@ def summary(result: pd.DataFrame, lo: int, hi: int):
     }
 
 
+def _nonworse_optional(current: float | None, baseline: float | None) -> bool:
+    if baseline is None:
+        return current is None
+    if current is None:
+        return False
+    return current >= baseline - 1e-12
+
+
 def main():
     p = argparse.ArgumentParser(description="V4.6 低信号回退组合实验")
     p.add_argument("--out", default="backtests/v4_6/fallback_experiment.json")
@@ -215,11 +223,17 @@ def main():
     for name in ("always_pair","always_split","pool13_omit1_pair"):
         cur = report["configs"][name]
         stable = True
+        checked_low_signal_segments = 0
         for seg in ("validation_1","validation_2","forward55"):
-            stable &= cur[seg]["low_signal_max_red_hit_mean"] >= base[seg]["low_signal_max_red_hit_mean"] - 1e-12
+            baseline_low = base[seg]["low_signal_max_red_hit_mean"]
+            current_low = cur[seg]["low_signal_max_red_hit_mean"]
+            stable &= _nonworse_optional(current_low, baseline_low)
+            if baseline_low is not None:
+                checked_low_signal_segments += 1
             stable &= cur[seg]["red_5plus_draws"] >= base[seg]["red_5plus_draws"]
         promotion[name] = {
-            "stable_low_signal_gate": bool(stable),
+            "stable_low_signal_gate": bool(stable and checked_low_signal_segments >= 1),
+            "checked_low_signal_segments": checked_low_signal_segments,
             "forward55_red_hit_delta": float(cur["forward55"]["max_red_hit_mean"] - base["forward55"]["max_red_hit_mean"]),
             "forward55_fixed_return_delta": int(cur["forward55"]["fixed_return_yuan"] - base["forward55"]["fixed_return_yuan"]),
             "full_fixed_return_delta": int(cur["full"]["fixed_return_yuan"] - base["full"]["fixed_return_yuan"]),
