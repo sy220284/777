@@ -1,0 +1,33 @@
+name: v46-boot-numbers-audit
+
+on:
+  push:
+    branches:
+      - v4-6-nonlinear-challenger
+    paths:
+      - "tools/v4_6_boot_numbers_audit.py"
+      - ".github/workflows/v46-boot-numbers-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 编译检查
+        run: python -m compileall -q tools/v4_6_boot_numbers_audit.py
+      - name: 运行开机号数据源审计
+        run: python tools/v4_6_boot_numbers_audit.py
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-boot-numbers-audit
+          path: backtests/v4_6/boot_numbers_audit.json
+          if-no-files-found: error
