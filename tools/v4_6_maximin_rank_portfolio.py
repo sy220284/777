@@ -46,7 +46,7 @@ MASKS = _partition_masks()
 def build_maximin_groups(pred: np.ndarray, occ: np.ndarray, fallback) -> dict[int, tuple[np.ndarray, np.ndarray]]:
     """用过去1000期四个250期子块的最差表现选6+6排名位置分组。"""
     hit_hist = rankpat.build_rank_hit_history(pred, occ)
-    valid = np.where(hit_hist[:, 0] >= 0, hit_hist, 0).astype(np.int16)
+    valid = np.where((hit_hist[:, 0] >= 0)[:, None], hit_hist, 0).astype(np.int16)
     totals = valid.sum(axis=1)
     hit_a = valid @ MASKS.T
     hit_b = totals[:, None] - hit_a
