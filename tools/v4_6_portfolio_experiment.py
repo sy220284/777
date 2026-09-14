@@ -11,6 +11,8 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 组合层实验保持两注预算不变，仅比较候选池宽度与受控重叠。
+
 
 def _load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
