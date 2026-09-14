@@ -25,11 +25,11 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: 编译检查
         run: python -m compileall -q tools models
-      - name: 运行新增专家研究
-        run: python tools/v4_7_expert_expansion.py
+      - name: 运行自适应策略路由研究
+        run: python tools/v4_7_adaptive_router.py
       - name: 保存研究结果
         uses: actions/upload-artifact@v4
         with:
-          name: v4-7-expert-expansion-summary
-          path: backtests/v4_7/expert_expansion_summary.json
+          name: v4-7-adaptive-router-summary
+          path: backtests/v4_7/adaptive_router_summary.json
           if-no-files-found: error
