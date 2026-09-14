@@ -18,7 +18,7 @@ def _load(name: str, path: Path):
 
 
 history = _load("ssq_history_cli", ROOT / "tools" / "load_history.py")
-final_model = _load("ssq_final_cli", ROOT / "models" / "v4_5_1" / "predictor.py")
+final_model = _load("ssq_final_cli", ROOT / "models" / "v4_5_2" / "predictor.py")
 append_tool = _load("ssq_append_cli", ROOT / "tools" / "append_draw.py")
 
 
@@ -63,14 +63,13 @@ def cmd_append(args: argparse.Namespace) -> None:
         blue=args.blue,
         verified_against=args.verified_against,
     )
-    # 追加后立即重新读入并做结构校验；哈希已由追加工具同步到清单。
     history_reloaded = _load("ssq_history_cli_after_append", ROOT / "tools" / "load_history.py")
     history_reloaded.validate_current_state()
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="双色球历史数据与V4.5.1最终研究版")
+    parser = argparse.ArgumentParser(description="双色球历史数据与V4.5.2最终研究版")
     sub = parser.add_subparsers(dest="command", required=True)
 
     verify = sub.add_parser("verify", help="校验当前数据、哈希与清单")
