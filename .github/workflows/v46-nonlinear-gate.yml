@@ -1,0 +1,36 @@
+name: v46-nonlinear-gate
+
+on:
+  push:
+    branches:
+      - v4-6-nonlinear-challenger
+    paths:
+      - "tools/v4_6_nonlinear_gate.py"
+      - ".github/workflows/v46-nonlinear-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 编译检查
+        run: python -m compileall -q tools/v4_6_nonlinear_gate.py tools/v4_6_nonlinear_experiment.py models
+      - name: 运行挑战者门控实验
+        run: python tools/v4_6_nonlinear_gate.py
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-nonlinear-gate
+          path: backtests/v4_6/nonlinear_gate.json
+          if-no-files-found: error
