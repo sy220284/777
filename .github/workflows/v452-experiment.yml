@@ -40,14 +40,14 @@ jobs:
         run: python -m compileall -q models/v4_5_2
       - name: 数据完整性检查
         run: python ssq.py verify
-      - name: 红票强弱与蓝球配对实验
-        run: python models/v4_5_2/joint_alignment_experiment.py
-      - name: 输出配对关键结果
+      - name: 红球状态驱动蓝球切换实验
+        run: python models/v4_5_2/regime_blue_experiment.py
+      - name: 输出状态切换关键结果
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          x = json.loads(Path('backtests/v4_5_2/joint_alignment_summary.json').read_text(encoding='utf-8'))
+          x = json.loads(Path('backtests/v4_5_2/regime_blue_summary.json').read_text(encoding='utf-8'))
           b = x['summaries']['v451_baseline']
           print('BASE_FULL', json.dumps(b['full'], ensure_ascii=False))
           print('BASE_FORWARD56', json.dumps(b['forward56'], ensure_ascii=False))
