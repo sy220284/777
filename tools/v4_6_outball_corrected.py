@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "tools" / "v4_6_outball_features.py"
 
@@ -25,6 +27,7 @@ VERIFIED_CORRECTIONS = {
 }
 
 _original_fetch = exp._fetch_legacy_orders
+_original_load_order_matrix = exp.load_order_matrix
 
 
 def _fetch_corrected_orders() -> list[dict]:
@@ -46,7 +49,21 @@ def _fetch_corrected_orders() -> list[dict]:
     return rows
 
 
+def _load_order_matrix_blind_target(df):
+    """允许最后一行是完全留出的目标期；其顺序绝不进入目标特征。"""
+    order = _original_load_order_matrix(df)
+    if len(df) == len(order):
+        return order
+    if len(df) != len(order) + 1:
+        raise RuntimeError(f"顺序历史与目标边界异常: df={len(df)} order={len(order)}")
+    # build_order_features 在构造 t 时只读取 [:t] 和 t-1；当前行在特征完成后才写入状态。
+    # 因此追加任意合法占位顺序只用于保持矩阵维度，不会泄漏目标期真实顺序。
+    placeholder = np.arange(1, 7, dtype=int).reshape(1, 6)
+    return np.vstack([order, placeholder])
+
+
 exp._fetch_legacy_orders = _fetch_corrected_orders
+exp.load_order_matrix = _load_order_matrix_blind_target
 
 
 if __name__ == "__main__":
