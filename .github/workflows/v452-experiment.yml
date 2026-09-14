@@ -13,6 +13,12 @@ on:
       - 'models/v4_5_1/**'
       - 'tools/load_history.py'
       - 'data/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'models/v4_5_2/**'
+      - '.github/workflows/v452-experiment.yml'
   workflow_dispatch:
 
 permissions:
