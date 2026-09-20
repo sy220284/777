@@ -23,6 +23,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.screens.connect.ConnectScreen
+import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
 import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
@@ -55,14 +56,17 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         // back to an empty address field would lose the one thing the user had already supplied.
         var showPair by rememberSaveable { mutableStateOf(false) }
         var pairUrl by rememberSaveable { mutableStateOf<String?>(null) }
+        var showLocalHarness by rememberSaveable { mutableStateOf(false) }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
             showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
+            showLocalHarness -> LocalHarnessScreen(onClose = { showLocalHarness = false })
             showMain -> MainScreen(onOpenSettings = { showSettings = true })
             else -> ConnectScreen(
                 onOpenSettings = { showSettings = true },
+                onOpenLocalHarness = { showLocalHarness = true },
                 onPair = { url ->
                     pairUrl = url
                     showPair = true

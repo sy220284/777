@@ -9,6 +9,14 @@
 > and uses the independent application ID `com.sy220284.dshmobile`, so it can be installed beside
 > the upstream app. The original MIT license and third-party notices are retained in full.
 
+## 777 phase 2: on-device Harness
+
+Version `0.12.0-777.2` adds a native Android agent loop. The new **Local Harness** entry runs model
+turns, durable history, workspace file tools, text search, Android shell commands, web fetches,
+plans, skills and read-only subagents in the APK itself. It stores the model key in Android
+Keystore and asks for approval before file writes or shell execution. Android's application
+sandbox still limits this mode to its own workspace and the commands shipped by the device.
+
 <p align="center">
   An open-source Android companion that puts your <b>DeepSeek Harness</b> in your pocket.<br>
   Drive sessions, review plans and goals, answer approvals and questions, and get notified

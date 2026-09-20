@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -78,6 +79,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 @Composable
 fun ConnectScreen(
     onOpenSettings: () -> Unit,
+    onOpenLocalHarness: () -> Unit,
     onPair: (prefillUrl: String?) -> Unit,
     viewModel: ConnectViewModel = hiltViewModel(),
 ) {
@@ -111,6 +113,29 @@ fun ConnectScreen(
             }
 
             ConnectHeader()
+
+            DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("本机 Harness", style = DsType.base16Strong, color = colors.labelPrimary)
+                        Text(
+                            "模型、工具、文件、命令、技能和子代理直接在手机内运行，不需要电脑在线。",
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                        )
+                    }
+                    Spacer(Modifier.width(DsSpacing.medium))
+                    DsButton(
+                        text = "进入",
+                        onClick = onOpenLocalHarness,
+                        variant = DsButtonVariant.Primary,
+                    )
+                }
+            }
 
             // ---- How to connect ----------------------------------------------
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
