@@ -21,7 +21,7 @@ class DeepSeekClientTest {
                   "tool_calls": [{
                     "id": "call-1",
                     "type": "function",
-                    "function": {"name": "list_files", "arguments": "{\\"path\\":\\".\\"}"}
+                    "function": {"name": "list_files", "arguments": "{\"path\":\".\"}"}
                   }]
                 }
               }]
