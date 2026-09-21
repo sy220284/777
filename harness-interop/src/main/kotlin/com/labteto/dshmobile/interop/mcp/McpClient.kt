@@ -5,6 +5,7 @@ import java.io.File
 import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -165,31 +166,36 @@ class McpStdioTransport(
     private val lineProcess = McpLineProcess(command, workingDirectory)
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        lineProcess.ensureStarted()
-        val id = ids.getAndIncrement()
-        val payload = buildJsonObject {
-            put("jsonrpc", "2.0")
-            put("id", id)
-            put("method", method)
-            put(
-                "params",
-                params.withMetadata(
-                    protocolVersion = protocolVersion,
-                    clientName = clientName,
-                    clientVersion = clientVersion,
-                    clientCapabilities = JsonObject(emptyMap()),
-                ),
-            )
+        try {
+            lineProcess.ensureStarted()
+            val id = ids.getAndIncrement()
+            val payload = buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("id", id)
+                put("method", method)
+                put(
+                    "params",
+                    params.withMetadata(
+                        protocolVersion = protocolVersion,
+                        clientName = clientName,
+                        clientVersion = clientVersion,
+                        clientCapabilities = JsonObject(emptyMap()),
+                    ),
+                )
+            }
+            lineProcess.writeLine(json.encodeToString(JsonObject.serializer(), payload))
+            while (true) {
+                val line = lineProcess.readLine()
+                if (line.isBlank()) continue
+                val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                    ?: continue
+                if (message["id"]?.jsonPrimitive?.content == id.toString()) return@withLock message
+            }
+            error("不可达")
+        } catch (error: CancellationException) {
+            lineProcess.abort()
+            throw error
         }
-        lineProcess.writeLine(json.encodeToString(JsonObject.serializer(), payload))
-        while (true) {
-            val line = lineProcess.readLine()
-            if (line.isBlank()) continue
-            val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                ?: continue
-            if (message["id"]?.jsonPrimitive?.content == id.toString()) return@withLock message
-        }
-        error("不可达")
     }
 
     override fun close() = lineProcess.close()
@@ -253,6 +259,10 @@ internal class McpLineProcess(
         val result = channel.receiveCatching()
         return result.getOrNull()
             ?: throw (result.exceptionOrNull() ?: IllegalStateException("MCP stdio 进程已结束"))
+    }
+
+    fun abort() {
+        if (!closed) resetProcess()
     }
 
     private fun resetProcess() {
