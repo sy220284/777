@@ -109,6 +109,7 @@ class AgentLoopTest {
                 observedCalls = calls
                 listOf("结果甲", "结果乙")
             },
+            isParallelTool = { true },
             eventSink = AgentEventSink { events += it },
             idFactory = { "turn-batch" },
         )
