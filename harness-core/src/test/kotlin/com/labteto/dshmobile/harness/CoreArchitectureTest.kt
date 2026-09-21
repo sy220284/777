@@ -9,6 +9,8 @@ import com.labteto.dshmobile.harness.session.SessionDocument
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -58,6 +60,51 @@ class CoreArchitectureTest {
         registry.uninstall("test-plugin")
         assertFalse(registry.isInstalled("test-plugin"))
         assertEquals(null, registry.context.tools.get("echo"))
+    }
+
+    @Test
+    fun alwaysApprovalPolicyBlocksWithoutApprovalAndHonorsDecision() = runTest {
+        val registry = PluginRegistry()
+        var executions = 0
+        registry.context.tools.register(
+            HarnessTool(
+                name = "danger",
+                schema = buildJsonObject { put("name", "danger") },
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                executor = HarnessToolExecutor { _, _, _ ->
+                    executions += 1
+                    ToolResult("executed")
+                },
+            ),
+        )
+
+        val missing = registry.context.tools.execute("danger", buildJsonObject { })
+        assertTrue(missing.isError)
+        assertEquals(0, executions)
+
+        var asked = 0
+        val denied = registry.context.tools.execute(
+            "danger",
+            buildJsonObject { },
+            context = ToolContext(
+                approval = {
+                    asked += 1
+                    false
+                },
+            ),
+        )
+        assertTrue(denied.isError)
+        assertEquals(1, asked)
+        assertEquals(0, executions)
+
+        val allowed = registry.context.tools.execute(
+            "danger",
+            buildJsonObject { },
+            context = ToolContext(approval = { true }),
+        )
+        assertFalse(allowed.isError)
+        assertEquals("executed", allowed.content)
+        assertEquals(1, executions)
     }
 
     @Test
