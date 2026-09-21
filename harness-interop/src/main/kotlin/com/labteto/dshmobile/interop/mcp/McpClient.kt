@@ -5,6 +5,8 @@ import java.io.File
 import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -297,20 +299,17 @@ internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
         enqueue(
             object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    val token = continuation.tryResumeWithException(error)
-                    if (token != null) continuation.completeResume(token)
+                    if (continuation.isActive) continuation.resumeWithException(error)
                 }
 
                 override fun onResponse(call: Call, response: Response) {
                     try {
                         response.use {
                             val value = block(it)
-                            val token = continuation.tryResume(value)
-                            if (token != null) continuation.completeResume(token)
+                            if (continuation.isActive) continuation.resume(value)
                         }
                     } catch (error: Throwable) {
-                        val token = continuation.tryResumeWithException(error)
-                        if (token != null) continuation.completeResume(token)
+                        if (continuation.isActive) continuation.resumeWithException(error)
                     }
                 }
             },
@@ -319,18 +318,21 @@ internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
 
 internal suspend fun Call.awaitResponseCancellable(): Response =
     suspendCancellableCoroutine { continuation ->
-        continuation.invokeOnCancellation { cancel() }
+        var responseRef: Response? = null
+        continuation.invokeOnCancellation {
+            cancel()
+            responseRef?.close()
+        }
         enqueue(
             object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    val token = continuation.tryResumeWithException(error)
-                    if (token != null) continuation.completeResume(token)
+                    if (continuation.isActive) continuation.resumeWithException(error)
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    val token = continuation.tryResume(response)
-                    if (token != null) {
-                        continuation.completeResume(token)
+                    responseRef = response
+                    if (continuation.isActive) {
+                        continuation.resume(response)
                     } else {
                         response.close()
                     }
