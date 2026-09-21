@@ -24,4 +24,5 @@ rootProject.name = "deepseek-harness-android-777"
 
 include(":app")
 include(":core")
+include(":harness-core")
 include(":mock-harness")

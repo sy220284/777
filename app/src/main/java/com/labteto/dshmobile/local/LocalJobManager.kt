@@ -1,139 +1,32 @@
 package com.labteto.dshmobile.local
 
-import java.util.UUID
-import kotlinx.coroutines.CancellationException
+import com.labteto.dshmobile.harness.jobs.HarnessJobManager
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
-/** In-process background jobs mirroring the official shared job controller. */
+/** Android projection adapter for the process-agnostic core job controller. */
 class LocalJobManager(
-    private val scope: CoroutineScope,
-    private val onChanged: (List<LocalJobInfo>) -> Unit,
+    scope: CoroutineScope,
+    onChanged: (List<LocalJobInfo>) -> Unit,
 ) {
-    private data class Record(
-        val id: String,
-        val label: String,
-        var status: String = "running",
-        var output: String = "",
-        var job: Job? = null,
-        val inbox: MutableList<String> = mutableListOf(),
-    )
-
-    private val lock = Any()
-    private val records = linkedMapOf<String, Record>()
-
-    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String {
-        val record = synchronized(lock) {
-            var id: String
-            do {
-                id = "job-" + UUID.randomUUID().toString().replace("-", "").take(16)
-            } while (records.containsKey(id))
-            Record(id, label.take(160)).also { records[id] = it }
-        }
-        record.job = scope.launch {
-            try {
-                val report: (String) -> Unit = { output ->
-                    synchronized(lock) { record.output = output.takeLast(MAX_OUTPUT) }
-                    publish()
-                }
-                val result = block(record.id, report).takeLast(MAX_OUTPUT)
-                synchronized(lock) {
-                    record.output = result
-                    record.status = "completed"
-                }
-            } catch (cancelled: CancellationException) {
-                synchronized(lock) {
-                    record.status = "cancelled"
-                    record.output = "任务已取消"
-                }
-                throw cancelled
-            } catch (error: Exception) {
-                synchronized(lock) {
-                    record.status = "failed"
-                    record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
-                }
-            } finally {
-                publish()
-            }
-        }
-        publish()
-        return "后台任务已启动：${record.id}"
+    private val delegate = HarnessJobManager(scope) { jobs ->
+        onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status) })
     }
 
-    fun list(): String {
-        val snapshot = synchronized(lock) { records.values.toList() }
-        return if (snapshot.isEmpty()) {
-            "没有后台任务"
-        } else {
-            snapshot.joinToString("\n") { "${it.id} [${it.status}] ${it.label}" }
-        }
-    }
+    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
+        delegate.start(label, block)
 
-    fun listAgents(): String {
-        val snapshot = synchronized(lock) { records.values.filter { it.label.startsWith("子代理：") } }
-        return if (snapshot.isEmpty()) {
-            "没有后台代理"
-        } else {
-            snapshot.joinToString("\n") { "${it.id} [${it.status}] ${it.label.removePrefix("子代理：")}" }
-        }
-    }
+    fun list(): String = delegate.list()
 
-    fun output(id: String): String {
-        val record = synchronized(lock) { records[id] } ?: return "后台任务不存在：$id"
-        return "${record.id} [${record.status}] ${record.label}\n${record.output.ifBlank { "暂无输出" }}"
-    }
+    fun listAgents(): String = delegate.listAgents()
 
-    fun kill(id: String): String {
-        val job = synchronized(lock) {
-            val record = records[id] ?: return "后台任务不存在：$id"
-            if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
-            record.status = "cancelled"
-            record.output = "任务已取消"
-            record.job
-        }
-        job?.cancel()
-        publish()
-        return "已停止后台任务：$id"
-    }
+    fun output(id: String): String = delegate.output(id)
 
-    fun send(id: String, message: String): String {
-        val clean = message.trim()
-        require(clean.isNotEmpty()) { "消息不能为空" }
-        synchronized(lock) {
-            val record = records[id] ?: return "后台代理不存在：$id"
-            if (record.status != "running" || !record.label.startsWith("子代理：")) {
-                return "目标不是正在运行的后台代理：$id"
-            }
-            record.inbox += clean.take(4_000)
-        }
-        return "消息已发送给后台代理：$id"
-    }
+    fun kill(id: String): String = delegate.kill(id)
 
-    fun drainMessages(id: String): List<String> = synchronized(lock) {
-        val record = records[id] ?: return@synchronized emptyList()
-        record.inbox.toList().also { record.inbox.clear() }
-    }
+    fun send(id: String, message: String): String = delegate.send(id, message)
 
-    fun stopAll() {
-        val jobs = synchronized(lock) {
-            records.values.filter { it.status == "running" }.onEach {
-                it.status = "cancelled"
-                it.output = "任务已取消"
-            }.mapNotNull { it.job }
-        }
-        jobs.forEach { it.cancel() }
-        publish()
-    }
+    fun drainMessages(id: String): List<String> = delegate.drainMessages(id)
 
-    private fun publish() {
-        val snapshot = synchronized(lock) {
-            records.values.map { LocalJobInfo(it.id, it.label, it.status) }
-        }
-        onChanged(snapshot)
-    }
-
-    private companion object {
-        const val MAX_OUTPUT = 65_536
-    }
+    fun stopAll() = delegate.stopAll()
 }
+

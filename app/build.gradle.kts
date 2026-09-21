@@ -15,7 +15,7 @@ plugins {
  * upgrade at all. The code is derived from the name so it rises with semver on its own; the
  * fallback is what a local `assembleRelease` builds.
  */
-val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "0.12.0-777.9"
+val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "0.12.0-777.10"
 
 val dshForkRevision: Int = dshVersionName
     .substringAfter('-', "")
@@ -123,6 +123,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":harness-core"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
