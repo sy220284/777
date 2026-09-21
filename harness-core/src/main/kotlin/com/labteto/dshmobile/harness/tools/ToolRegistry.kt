@@ -6,7 +6,9 @@ import kotlinx.serialization.json.JsonObject
 enum class ToolAccess {
     READ_ONLY,
     WORKSPACE_WRITE,
+    SESSION_WRITE,
     PROCESS,
+    AGENT_CONTROL,
     NETWORK,
     DEVICE,
     PRIVILEGED,
