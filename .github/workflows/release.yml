@@ -47,6 +47,11 @@ jobs:
           DSH_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
+      - name: Verify Android 16 APK
+        run: |
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          .github/scripts/verify-android16-apk.sh "$APK"
+
       - name: Checksums
         run: |
           cd app/build/outputs/apk/release

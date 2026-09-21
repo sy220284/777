@@ -30,6 +30,8 @@ jobs:
         run: ./gradlew :app:lintDebug --stacktrace
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Verify Android 16 APK
+        run: .github/scripts/verify-android16-apk.sh app/build/outputs/apk/debug/app-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
