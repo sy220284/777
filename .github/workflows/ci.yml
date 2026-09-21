@@ -74,9 +74,9 @@ jobs:
           script: |
             ./gradlew :app:connectedDebugAndroidTest :app:assembleOptimized --stacktrace
             PACKAGE="com.sy220284.dshmobile.debug"
-            adb uninstall "$PACKAGE" || true
+            adb shell am force-stop "$PACKAGE" || true
             adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-            COMPONENT="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE" | tr -d '\r' | tail -n 1)"
+            COMPONENT="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE" | tr -d '\r' | tail -n 1)"
             echo "Resolved launcher: $COMPONENT"
             test -n "$COMPONENT"
             echo "$COMPONENT" | grep -q "/"
