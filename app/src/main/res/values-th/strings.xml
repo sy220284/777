@@ -382,7 +382,7 @@
     <string name="update_open">ดาวน์โหลดและติดตั้ง</string>
     <string name="update_later">ไว้ทีหลัง</string>
     <string name="settings_update_check">ตรวจหาอัปเดต</string>
-    <string name="settings_update_check_hint">สอบถาม GitHub เพื่อหารุ่นล่าสุดเมื่อเปิดแอป</string>
+    <string name="settings_update_check_hint">แตะเพื่อตรวจสอบ GitHub ตอนนี้ หากมี APK ที่ลงนามแล้วเวอร์ชันใหม่กว่า ระบบจะเริ่มดาวน์โหลดอัตโนมัติ</string>
     <string name="connect_mode_title">วิธีเชื่อมต่อ</string>
     <string name="connect_mode_lan">เครือข่ายภายใน</string>
     <string name="connect_mode_relay">รีเลย์</string>
