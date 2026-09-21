@@ -34,8 +34,22 @@ jobs:
             echo "::error::没有稳定签名时禁止发布，以免再次生成无法安装或无法持续升级的 APK。"
             exit 1
           fi
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          keytool -list             -keystore "$RUNNER_TEMP/release.keystore"             -storepass "$RELEASE_PASSWORD"             -alias "777-release" >/dev/null
+
+          KEYSTORE_VALUE="$KEYSTORE_B64"
+          KEYSTORE_VALUE="${KEYSTORE_VALUE#RELEASE_KEYSTORE=}"
+          KEYSTORE_VALUE="${KEYSTORE_VALUE#\"}"
+          KEYSTORE_VALUE="${KEYSTORE_VALUE%\"}"
+          printf '%s' "$KEYSTORE_VALUE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+          PASSWORD_VALUE="$RELEASE_PASSWORD"
+          PASSWORD_VALUE="${PASSWORD_VALUE#RELEASE_KEY_PASSWORD=}"
+          PASSWORD_VALUE="${PASSWORD_VALUE#\"}"
+          PASSWORD_VALUE="${PASSWORD_VALUE%\"}"
+          PASSWORD_VALUE="$(printf '%s' "$PASSWORD_VALUE" | tr -d '\r\n')"
+
+          keytool -list             -keystore "$RUNNER_TEMP/release.keystore"             -storepass "$PASSWORD_VALUE"             -alias "777-release" >/dev/null
+
+          echo "DSH_RELEASE_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
 
       # The tag is the single source of the shipped version; see app/build.gradle.kts.
       - name: Derive version from tag
@@ -47,9 +61,9 @@ jobs:
       - name: Build release APK
         env:
           DSH_KEYSTORE: ${{ runner.temp }}/release.keystore
-          DSH_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          DSH_KEYSTORE_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
           DSH_KEY_ALIAS: 777-release
-          DSH_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          DSH_KEY_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Verify Android 16 APK
