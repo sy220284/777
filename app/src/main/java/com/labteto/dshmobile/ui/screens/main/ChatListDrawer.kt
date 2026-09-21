@@ -138,7 +138,12 @@ fun ChatListDrawer(
 
     // Blank sessions are scratch space the harness reuses; subagent transcripts belong under their
     // parent, not as top-level rows.
-    val listable = sessions.filter { it.sessionId !in archivedIds && !it.blank }
+    val currentListSession = sessions.firstOrNull {
+        it.sessionId == currentSessionId && it.sessionId !in archivedIds && !it.blank
+    }
+    val listable = sessions.filter {
+        it.sessionId !in archivedIds && !it.blank && it.sessionId != currentSessionId
+    }
     val sessionsById = sessions.associateBy { it.sessionId }
     val archivedSessions = sessions.filter { it.sessionId in archivedIds }
     val workspaceSessionIds = workspaces.flatMap { it.sessionIds }.toSet()
@@ -252,7 +257,7 @@ fun ChatListDrawer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
-                SectionHeader(stringResource(R.string.chatlist_sessions))
+                SectionHeader("会话")
             }
             SortChip(sortByRecency) { next ->
                 scope.launch { hostsStore.setSessionSort(if (next) SORT_UPDATED else SORT_MANUAL) }
@@ -288,6 +293,27 @@ fun ChatListDrawer(
                     }
                 }
                 return@LazyColumn
+            }
+
+            currentListSession?.let { current ->
+                item(key = "current-session-header") {
+                    SectionHeader("当前会话")
+                }
+                item(key = "current-session-" + current.sessionId) {
+                    SessionRowItem(
+                        session = current,
+                        isCurrent = true,
+                        store = store,
+                        scope = scope,
+                        onClose = onClose,
+                    )
+                }
+            }
+            if (listable.isNotEmpty() || archivedSessions.isNotEmpty()) {
+                item(key = "history-session-header") {
+                    Spacer(Modifier.height(DsSpacing.small))
+                    SectionHeader("历史会话")
+                }
             }
 
             var anyShown = false
