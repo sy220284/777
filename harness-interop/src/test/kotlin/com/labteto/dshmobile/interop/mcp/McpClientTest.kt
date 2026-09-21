@@ -123,34 +123,34 @@ class McpClientTest {
         val script = File(dir, "server.sh")
         script.writeText(
             """
-            count_file="$1"
-            marker_file="$2"
-            run=$(cat "$count_file" 2>/dev/null || printf '0')
-            run=$((run + 1))
-            printf '%s' "$run" > "$count_file"
+            count_file="§1"
+            marker_file="§2"
+            run=§(cat "§count_file" 2>/dev/null || printf '0')
+            run=§((run + 1))
+            printf '%s' "§run" > "§count_file"
             initialized=0
             while IFS= read -r line; do
-              case "$line" in
+              case "§line" in
                 *'"method":"initialize"'*)
-                  id=$(printf '%s\n' "$line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
-                  printf '{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2026-07-28"}}\n' "$id"
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2026-07-28"}}\n' "§id"
                   ;;
                 *'"method":"notifications/initialized"'*)
                   initialized=1
                   ;;
                 *'"method":"tools/list"'*)
-                  [ "$initialized" -eq 1 ] || exit 9
-                  id=$(printf '%s\n' "$line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
-                  if [ "$run" -eq 1 ]; then
-                    : > "$marker_file"
+                  [ "§initialized" -eq 1 ] || exit 9
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  if [ "§run" -eq 1 ]; then
+                    : > "§marker_file"
                     while IFS= read -r ignored; do :; done
                     exit 0
                   fi
-                  printf '{"jsonrpc":"2.0","id":%s,"result":{"tools":[]}}\n' "$id"
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"tools":[]}}\n' "§id"
                   ;;
               esac
             done
-            """.trimIndent(),
+            """.trimIndent().replace('§', '$'),
         )
 
         val transport = McpLegacyStdioTransport(
@@ -188,31 +188,31 @@ class McpClientTest {
         val script = File(dir, "server.sh")
         script.writeText(
             """
-            count_file="$1"
-            run=$(cat "$count_file" 2>/dev/null || printf '0')
-            run=$((run + 1))
-            printf '%s' "$run" > "$count_file"
+            count_file="§1"
+            run=§(cat "§count_file" 2>/dev/null || printf '0')
+            run=§((run + 1))
+            printf '%s' "§run" > "§count_file"
             initialized=0
             while IFS= read -r line; do
-              case "$line" in
+              case "§line" in
                 *'"method":"initialize"'*)
-                  id=$(printf '%s\n' "$line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
-                  printf '{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2026-07-28"}}\n' "$id"
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2026-07-28"}}\n' "§id"
                   ;;
                 *'"method":"notifications/initialized"'*)
                   initialized=1
                   ;;
                 *'"method":"tools/list"'*)
-                  [ "$initialized" -eq 1 ] || exit 9
-                  id=$(printf '%s\n' "$line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
-                  if [ "$run" -eq 1 ]; then
+                  [ "§initialized" -eq 1 ] || exit 9
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  if [ "§run" -eq 1 ]; then
                     exit 17
                   fi
-                  printf '{"jsonrpc":"2.0","id":%s,"result":{"tools":[]}}\n' "$id"
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"tools":[]}}\n' "§id"
                   ;;
               esac
             done
-            """.trimIndent(),
+            """.trimIndent().replace('§', '$'),
         )
 
         val transport = McpLegacyStdioTransport(
