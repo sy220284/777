@@ -151,76 +151,105 @@ class McpToolBridgePlugin(
         MANAGEMENT_TOOLS.forEach(context.tools::unregister)
     }
 
-    private suspend fun connect(context: HarnessContext, rawId: String, rawEndpoint: String): String =
-        mutex.withLock {
-            val serverId = validateServerId(rawId)
-            require(serverId !in servers) { "MCP 服务已连接：$serverId" }
-            val endpoint = validateEndpoint(rawEndpoint)
-            val client = McpClient(transportFactory(endpoint))
-            val registered = mutableListOf<String>()
-            try {
-                val definitions = client.listTools()
-                require(definitions.size <= MAX_REMOTE_TOOLS) {
-                    "MCP 服务工具过多：${definitions.size}，上限 $MAX_REMOTE_TOOLS"
-                }
-                val names = definitions.map { definition ->
-                    localToolName(serverId, definition.name)
-                }
-                require(names.distinct().size == names.size) {
-                    "MCP 工具名规范化后发生冲突，请调整服务端工具名"
-                }
+    private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
+        val endpoint = validateEndpoint(rawEndpoint)
+        return connect(
+            context = context,
+            rawId = rawId,
+            transport = "http",
+            displayTarget = displayEndpoint(endpoint),
+        ) { McpClient(transportFactory(endpoint)) }
+    }
 
-                definitions.zip(names).forEach { (definition, localName) ->
-                    context.tools.register(
-                        HarnessTool(
-                            name = localName,
-                            schema = functionSchema(
-                                name = localName,
-                                description = buildString {
-                                    append("MCP[").append(serverId).append("] ")
-                                    append(definition.description?.takeIf(String::isNotBlank) ?: definition.name)
-                                },
-                                properties = definition.inputSchema,
-                                rawParameters = true,
-                            ),
-                            access = ToolAccess.PRIVILEGED,
-                            approvalPolicy = ToolApprovalPolicy.ALWAYS,
-                            timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
-                            executor = HarnessToolExecutor { _, input, _ ->
-                                val result = client.callTool(definition.name, input)
-                                ToolResult(
-                                    content = result.toString(),
-                                    isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
-                                )
-                            },
-                        ),
-                    )
-                    registered += localName
-                }
+    private suspend fun connectStdio(
+        context: HarnessContext,
+        rawId: String,
+        command: List<String>,
+        workingDirectory: String?,
+    ): String {
+        val normalizedCommand = validateCommand(command)
+        val resolvedDirectory = resolveWorkingDirectory(workingDirectory)
+        val executable = normalizedCommand.first().substringAfterLast(File.separatorChar)
+        return connect(
+            context = context,
+            rawId = rawId,
+            transport = "stdio",
+            displayTarget = "stdio:$executable",
+        ) { McpClient(stdioTransportFactory(normalizedCommand, resolvedDirectory)) }
+    }
 
-                val binding = ServerBinding(
-                    id = serverId,
-                    endpoint = endpoint,
-                    displayEndpoint = displayEndpoint(endpoint),
-                    client = client,
-                    toolNames = registered.toList(),
-                )
-                servers[serverId] = binding
-                buildString {
-                    append("已连接 MCP 服务：").append(serverId)
-                    append("\n地址：").append(binding.displayEndpoint)
-                    append("\n注册工具数：").append(registered.size)
-                    if (registered.isNotEmpty()) {
-                        append("\n工具：").append(registered.joinToString(", "))
-                    }
-                }
-            } catch (error: Exception) {
-                registered.forEach(context.tools::unregister)
-                client.close()
-                throw error
+    private suspend fun connect(
+        context: HarnessContext,
+        rawId: String,
+        transport: String,
+        displayTarget: String,
+        clientFactory: () -> McpClient,
+    ): String = mutex.withLock {
+        val serverId = validateServerId(rawId)
+        require(serverId !in servers) { "MCP 服务已连接：$serverId" }
+        val client = clientFactory()
+        val registered = mutableListOf<String>()
+        try {
+            val definitions = client.listTools()
+            require(definitions.size <= MAX_REMOTE_TOOLS) {
+                "MCP 服务工具过多：${definitions.size}，上限 $MAX_REMOTE_TOOLS"
             }
-        }
+            val names = definitions.map { definition -> localToolName(serverId, definition.name) }
+            require(names.distinct().size == names.size) {
+                "MCP 工具名规范化后发生冲突，请调整服务端工具名"
+            }
 
+            definitions.zip(names).forEach { (definition, localName) ->
+                context.tools.register(
+                    HarnessTool(
+                        name = localName,
+                        schema = functionSchema(
+                            name = localName,
+                            description = buildString {
+                                append("MCP[").append(serverId).append("] ")
+                                append(definition.description?.takeIf(String::isNotBlank) ?: definition.name)
+                            },
+                            properties = definition.inputSchema,
+                            rawParameters = true,
+                        ),
+                        access = ToolAccess.PRIVILEGED,
+                        approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                        timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
+                        executor = HarnessToolExecutor { _, input, _ ->
+                            val result = client.callTool(definition.name, input)
+                            ToolResult(
+                                content = result.toString(),
+                                isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
+                            )
+                        },
+                    ),
+                )
+                registered += localName
+            }
+
+            val binding = ServerBinding(
+                id = serverId,
+                transport = transport,
+                displayTarget = displayTarget,
+                client = client,
+                toolNames = registered.toList(),
+            )
+            servers[serverId] = binding
+            buildString {
+                append("已连接 MCP 服务：").append(serverId)
+                append("\n传输：").append(transport)
+                append("\n目标：").append(displayTarget)
+                append("\n注册工具数：").append(registered.size)
+                if (registered.isNotEmpty()) {
+                    append("\n工具：").append(registered.joinToString(", "))
+                }
+            }
+        } catch (error: Exception) {
+            registered.forEach(context.tools::unregister)
+            client.close()
+            throw error
+        }
+    }
     private suspend fun disconnect(context: HarnessContext, rawId: String): String = mutex.withLock {
         val serverId = validateServerId(rawId)
         val binding = servers.remove(serverId) ?: return@withLock "MCP 服务未连接：$serverId"
@@ -236,7 +265,8 @@ class McpToolBridgePlugin(
                 add(
                     buildJsonObject {
                         put("server_id", binding.id)
-                        put("endpoint", binding.displayEndpoint)
+                        put("transport", binding.transport)
+                        put("target", binding.displayTarget)
                         put("tools", buildJsonArray {
                             binding.toolNames.forEach { add(JsonPrimitive(it)) }
                         })
