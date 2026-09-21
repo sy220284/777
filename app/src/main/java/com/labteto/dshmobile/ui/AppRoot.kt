@@ -61,6 +61,11 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
+        val selectedRemoteMatches = when (surface) {
+            "relay" -> connection.host?.isRelay == true
+            "lan" -> connection.host?.isRelay == false
+            else -> false
+        }
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
             showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
@@ -69,7 +74,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 onOpenRelay = { surface = "relay" },
                 onOpenSettings = { showSettings = true },
             )
-            showMain -> MainScreen(onOpenSettings = { showSettings = true })
+            showMain && selectedRemoteMatches -> MainScreen(onOpenSettings = { showSettings = true })
             else -> ConnectScreen(
                 onOpenSettings = { showSettings = true },
                 onOpenLocalHarness = { surface = "local" },
