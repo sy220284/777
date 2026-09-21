@@ -73,6 +73,7 @@ import com.labteto.dshmobile.core.wire.dto.FileAttachmentRef
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.ContextMeter
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.skeleton
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -160,7 +161,8 @@ internal fun Composer(
     contextPressure: ContextPressureView?,
     running: Boolean,
     enabled: Boolean,
-    onOpenSheet: () -> Unit,
+    onOpenAttachments: () -> Unit,
+    onOpenTools: () -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onPickImage: () -> Unit = {},
@@ -245,32 +247,22 @@ internal fun Composer(
             ) {
                 CircleAction(
                     icon = Icons.Filled.Add,
-                    description = stringResource(R.string.chat_composer_commands),
-                    size = 30,
-                    background = colors.hoverSolid,
-                    tint = colors.labelPrimary,
-                    enabled = enabled,
-                    onClick = onOpenSheet,
-                )
-
-                CircleAction(
-                    icon = Icons.Outlined.Image,
-                    description = stringResource(R.string.chat_composer_attach),
-                    size = 30,
-                    background = colors.hoverSolid,
-                    tint = colors.labelPrimary,
-                    enabled = enabled && !preparing,
-                    onClick = onPickImage,
-                )
-
-                CircleAction(
-                    icon = Icons.Outlined.AttachFile,
                     description = stringResource(R.string.chat_composer_attach_file),
                     size = 30,
                     background = colors.hoverSolid,
                     tint = colors.labelPrimary,
                     enabled = enabled && !preparing,
-                    onClick = onPickFile,
+                    onClick = onOpenAttachments,
+                )
+
+                CircleAction(
+                    icon = FeatherIcons.Tool,
+                    description = stringResource(R.string.chat_context_tools),
+                    size = 30,
+                    background = Color.Transparent,
+                    tint = colors.labelTertiary,
+                    enabled = enabled,
+                    onClick = onOpenTools,
                 )
 
                 PermissionChip(
