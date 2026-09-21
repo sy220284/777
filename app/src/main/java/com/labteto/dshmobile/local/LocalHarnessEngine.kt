@@ -62,7 +62,10 @@ class LocalHarnessEngine @Inject constructor(
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
     private val modelHistory = mutableListOf<JsonObject>()
-    private val persistenceQueue = Channel<Pair<String, LocalHarnessSession>>(Channel.UNLIMITED)
+    private val persistenceLock = Any()
+    private val pendingPersistence = mutableMapOf<String, LocalHarnessSession>()
+    private val queuedPersistenceIds = mutableSetOf<String>()
+    private val persistenceQueue = Channel<String>(Channel.UNLIMITED)
     private val _state = MutableStateFlow(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
@@ -80,7 +83,23 @@ class LocalHarnessEngine @Inject constructor(
         seedWorkspace()
         migrateLegacySession()
         scope.launch {
-            for ((sessionId, snapshot) in persistenceQueue) writeSession(sessionId, snapshot)
+            for (sessionId in persistenceQueue) {
+                while (true) {
+                    val snapshot = synchronized(persistenceLock) {
+                        pendingPersistence.remove(sessionId)
+                    } ?: break
+                    writeSession(sessionId, snapshot)
+                }
+                val reschedule = synchronized(persistenceLock) {
+                    queuedPersistenceIds.remove(sessionId)
+                    if (pendingPersistence.containsKey(sessionId) && queuedPersistenceIds.add(sessionId)) {
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (reschedule) persistenceQueue.trySend(sessionId)
+            }
         }
         scope.launch { load() }
     }
@@ -1069,7 +1088,12 @@ class LocalHarnessEngine @Inject constructor(
             planMode = state.planMode,
             autoApproveMutations = state.autoApproveMutations,
         )
-        persistenceQueue.trySend(currentSessionId to snapshot)
+        val sessionId = currentSessionId
+        val shouldQueue = synchronized(persistenceLock) {
+            pendingPersistence[sessionId] = snapshot
+            queuedPersistenceIds.add(sessionId)
+        }
+        if (shouldQueue) persistenceQueue.trySend(sessionId)
     }
 
     private fun writeSession(sessionId: String, snapshot: LocalHarnessSession) {
