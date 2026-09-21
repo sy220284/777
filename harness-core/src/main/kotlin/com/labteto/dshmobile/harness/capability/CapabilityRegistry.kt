@@ -23,7 +23,7 @@ class CapabilityRegistry {
         replace: Boolean = false,
     ) {
         require(descriptor.id.isNotBlank()) { "能力编号不能为空" }
-        if (!replace) require(descriptor.id !in entries) { "能力已注册：\${descriptor.id}" }
+        if (!replace) require(descriptor.id !in entries) { "能力已注册：${descriptor.id}" }
         entries[descriptor.id] = Entry(descriptor, value)
     }
 
@@ -43,5 +43,5 @@ class CapabilityRegistry {
     }
 
     fun <T : Any> require(id: String, type: KClass<T>): T =
-        get(id, type) ?: error("能力不存在或类型不匹配：\$id")
+        get(id, type) ?: error("能力不存在或类型不匹配：$id")
 }
