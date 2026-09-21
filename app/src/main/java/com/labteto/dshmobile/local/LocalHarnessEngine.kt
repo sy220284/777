@@ -16,9 +16,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -308,8 +310,8 @@ class LocalHarnessEngine @Inject constructor(
                     eventLog.append("tool/call", buildJsonObject {
                         put("id", call.id); put("name", call.name); put("arguments", call.arguments)
                     })
-                    val result = runCatching { execute(call, allowMutation = true) }
-                        .getOrElse { error -> "工具执行失败：${error.message ?: error::class.java.simpleName}" }
+                }
+                executeToolBatch(reply.toolCalls, allowMutation = true).forEach { (call, result) ->
                     appendMessage("tool", result, call.name)
                     eventLog.append("tool/result", buildJsonObject {
                         put("id", call.id); put("name", call.name); put("content", result.take(MAX_EVENT_CHARS))
@@ -336,6 +338,37 @@ class LocalHarnessEngine @Inject constructor(
             persist()
         }
     }
+
+    private suspend fun executeToolBatch(
+        calls: List<LocalToolCall>,
+        allowMutation: Boolean,
+    ): List<Pair<LocalToolCall, String>> {
+        val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
+        if (!parallelSubagents) {
+            return calls.map { call -> call to executeSafely(call, allowMutation) }
+        }
+        return supervisorScope {
+            calls.map { call ->
+                async { call to executeSafely(call, allowMutation) }
+            }.map { it.await() }
+        }
+    }
+
+    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): String = try {
+        execute(call, allowMutation)
+    } catch (cancelled: CancellationException) {
+        if (!currentCoroutineContext().isActive) throw cancelled
+        formatToolFailure(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
+    } catch (error: LocalWebException) {
+        formatToolFailure(call, error.code, error.message ?: "网页工具失败")
+    } catch (error: LocalModelException) {
+        formatToolFailure(call, error.code, error.message ?: "模型请求失败")
+    } catch (error: Exception) {
+        formatToolFailure(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+    }
+
+    private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
+        "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
 
     private suspend fun execute(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
