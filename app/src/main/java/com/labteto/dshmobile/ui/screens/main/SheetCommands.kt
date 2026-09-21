@@ -57,7 +57,14 @@ internal fun CommandSheet(
     mode: String,
     running: Boolean,
     canAttach: Boolean,
+    currentTab: ChatTab,
+    subagentCount: Int,
     onModeChange: (String) -> Unit,
+    onOpenModels: () -> Unit,
+    onOpenPresets: () -> Unit,
+    onOpenSubagents: () -> Unit,
+    onOpenWorkspace: () -> Unit,
+    onTabChange: (ChatTab) -> Unit,
     onAttach: () -> Unit,
     onAttachFile: () -> Unit,
     onRunCommand: (String) -> Unit,
@@ -96,6 +103,49 @@ internal fun CommandSheet(
                     onAttachFile()
                 },
                 modifier = Modifier.weight(1f),
+            )
+        }
+
+        // Session capabilities ----------------------------------------------
+        SectionHeader(stringResource(R.string.chat_details_title))
+        DsGroupCard {
+            SheetRow(
+                title = stringResource(R.string.models_title),
+                onClick = {
+                    onDismiss()
+                    onOpenModels()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.presets_title),
+                onClick = {
+                    onDismiss()
+                    onOpenPresets()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.subagents_title),
+                trailing = subagentCount.takeIf { it > 0 }?.toString(),
+                onClick = {
+                    onDismiss()
+                    onOpenSubagents()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.panel_workspace),
+                onClick = {
+                    onDismiss()
+                    onOpenWorkspace()
+                },
+            )
+            SheetRow(
+                title = stringResource(
+                    if (currentTab == ChatTab.Chat) R.string.trajectory_title else R.string.chat_tab,
+                ),
+                onClick = {
+                    onDismiss()
+                    onTabChange(if (currentTab == ChatTab.Chat) ChatTab.Trajectory else ChatTab.Chat)
+                },
             )
         }
 

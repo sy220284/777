@@ -217,21 +217,35 @@ fun ChatListDrawer(
             )
         }
 
-        DsGroupCard {
-            DsCategoryRow(
-                icon = Icons.Outlined.PhoneAndroid,
-                title = "本机 Harness",
-                subtitle = "在手机上直接运行完整代理能力",
-                onClick = {
-                    onClose()
-                    onOpenLocalHarness()
-                },
-            )
-            DsCategoryRow(
-                icon = Icons.Filled.Settings,
-                title = stringResource(R.string.settings_title),
-                subtitle = "连接、通知、外观与数据",
-                onClick = onOpenSettings,
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            singleLine = true,
+            shape = DsShapes.pillFull,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = colors.bgLayer1,
+                unfocusedContainerColor = colors.bgLayer1,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                cursorColor = colors.accent,
+            ),
+        )
+        if (!contentSearchAvailable && query.isNotBlank()) {
+            Text(
+                stringResource(R.string.chatlist_search_content_off),
+                style = DsType.caption11,
+                color = colors.labelCaption,
+                modifier = Modifier.padding(bottom = DsSpacing.small),
             )
         }
 
@@ -406,37 +420,24 @@ fun ChatListDrawer(
             )
         }
 
-        TextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
-            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
-            leadingIcon = {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = colors.labelTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
-            singleLine = true,
-            shape = DsShapes.pillFull,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.bgLayer1,
-                unfocusedContainerColor = colors.bgLayer1,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                cursorColor = colors.accent,
-            ),
-        )
-        if (!contentSearchAvailable && query.isNotBlank()) {
-            Text(
-                stringResource(R.string.chatlist_search_content_off),
-                style = DsType.caption11,
-                color = colors.labelCaption,
-                modifier = Modifier.padding(bottom = DsSpacing.small),
+        DsGroupCard {
+            DsCategoryRow(
+                icon = Icons.Outlined.PhoneAndroid,
+                title = "本机 Harness",
+                subtitle = "在手机上直接运行完整代理能力",
+                onClick = {
+                    onClose()
+                    onOpenLocalHarness()
+                },
+            )
+            DsCategoryRow(
+                icon = Icons.Filled.Settings,
+                title = stringResource(R.string.settings_title),
+                subtitle = "连接、通知、外观与数据",
+                onClick = onOpenSettings,
             )
         }
+
     }
 
     if (newSessionOpen) {

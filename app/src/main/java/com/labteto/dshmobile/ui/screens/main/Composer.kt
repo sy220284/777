@@ -182,7 +182,7 @@ internal fun Composer(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium)
-            .shadow(8.dp, DsShapes.composer, clip = false)
+            .shadow(6.dp, DsShapes.composer, clip = false)
             .animateContentSize(),
         shape = DsShapes.composer,
         color = colors.composerCard,

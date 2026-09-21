@@ -373,26 +373,14 @@ fun ChatScreen(
                 title = title,
                 running = conversation?.running == true,
                 models = models,
-                agentPresetLabel = currentSession?.agentPreset?.takeIf { agentPresets?.modeSelectionEnabled != false }?.let { agentPresetLabel(it, agentPresets) },
-                subagentCount = subagents.size,
                 detailsOpen = detailsOpen,
-                tab = tab,
                 onOpenDrawer = onOpenDrawer,
                 onOpenModels = { sheet = ChatSheet.Models },
-                onOpenPresets = {
-                    scope.launch { store.refreshAgentPresets() }
-                    sheet = ChatSheet.Presets
-                },
-                onOpenSubagents = { sheet = ChatSheet.Subagents },
                 onOpenDetails = onOpenDetails,
-                onTabChange = { tab = it },
             )
 
             connectionError?.let {
                 androidx.compose.material3.TextButton(onClick = { store.retryConnection() }) { ConnectionBanner(it) }
-            }
-            androidx.compose.material3.TextButton(onClick = { panelKey = composer.key }, enabled = currentSessionId != null) {
-                androidx.compose.material3.Text(stringResource(R.string.panel_workspace))
             }
             if (conversation?.gap == true) {
                 ConnectionBanner(stringResource(R.string.common_reconnecting))
@@ -568,7 +556,6 @@ fun ChatScreen(
                 },
             )
 
-            StatsFooter(stats = sessionStats, usage = tokenUsage)
         }
         DsToastHost(toast, modifier = Modifier.fillMaxWidth())
     }
@@ -584,7 +571,17 @@ fun ChatScreen(
             mode = mode,
             running = conversation?.running == true,
             canAttach = currentSessionId != null && !composer.preparing && !composer.submitting,
+            currentTab = tab,
+            subagentCount = subagents.size,
             onModeChange = { mode = it },
+            onOpenModels = { sheet = ChatSheet.Models },
+            onOpenPresets = {
+                scope.launch { store.refreshAgentPresets() }
+                sheet = ChatSheet.Presets
+            },
+            onOpenSubagents = { sheet = ChatSheet.Subagents },
+            onOpenWorkspace = { panelKey = composer.key },
+            onTabChange = { tab = it },
             onAttach = {
                 if (!composer.preparing && store.composers.imagePickTarget == null) {
                     store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
