@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.labteto.dshmobile.automation.AutomationPlugin
+import com.labteto.dshmobile.automation.AutomationStore
+import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.device.AndroidDevicePlugin
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
@@ -74,6 +77,8 @@ class LocalHarnessEngine @Inject constructor(
     private val modelClient: DeepSeekClient,
     private val web: LocalWebProvider,
     private val json: Json,
+    private val automationScheduler: HarnessAutomationScheduler,
+    private val automationStore: AutomationStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
@@ -84,6 +89,7 @@ class LocalHarnessEngine @Inject constructor(
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val devicePlugin = AndroidDevicePlugin(context)
+    private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val builtinPlugin = object : HarnessPlugin {
         override val id = "android-local-builtins"
 
@@ -172,6 +178,7 @@ class LocalHarnessEngine @Inject constructor(
         scope.launch {
             pluginRegistry.install(builtinPlugin)
             pluginRegistry.install(devicePlugin)
+            pluginRegistry.install(automationPlugin)
             load()
         }
     }
