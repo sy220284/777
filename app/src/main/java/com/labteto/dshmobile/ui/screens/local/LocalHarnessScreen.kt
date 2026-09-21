@@ -34,8 +34,8 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -70,6 +70,8 @@ import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.LocalSessionSummary
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -78,6 +80,7 @@ import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -92,8 +95,7 @@ import kotlinx.coroutines.launch
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
-    onOpenLan: () -> Unit,
-    onOpenRelay: () -> Unit,
+    onOpenRemote: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
@@ -115,14 +117,16 @@ fun LocalHarnessScreen(
         drawerState = drawerState,
         drawerContent = {
             LocalModeDrawer(
+                currentSessionId = state.sessionId,
+                sessions = state.sessions,
                 onLocal = { scope.launch { drawerState.close() } },
-                onLan = {
+                onRemote = {
                     scope.launch { drawerState.close() }
-                    onOpenLan()
+                    onOpenRemote()
                 },
-                onRelay = {
+                onSwitchSession = { sessionId ->
+                    viewModel.switchSession(sessionId)
                     scope.launch { drawerState.close() }
-                    onOpenRelay()
                 },
                 onNetworkDiagnostic = {
                     scope.launch { drawerState.close() }
@@ -188,9 +192,11 @@ fun LocalHarnessScreen(
 
 @Composable
 private fun LocalModeDrawer(
+    currentSessionId: String,
+    sessions: List<LocalSessionSummary>,
     onLocal: () -> Unit,
-    onLan: () -> Unit,
-    onRelay: () -> Unit,
+    onRemote: () -> Unit,
+    onSwitchSession: (String) -> Unit,
     onNetworkDiagnostic: () -> Unit,
     onEnvironment: () -> Unit,
     onSettings: () -> Unit,
@@ -201,7 +207,9 @@ private fun LocalModeDrawer(
         modifier = Modifier.safeDrawingPadding(),
     ) {
         Column(
-            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
+            Modifier
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -212,6 +220,7 @@ private fun LocalModeDrawer(
                     Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
                 }
             }
+
             Text("运行方式", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
                 DsCategoryRow(
@@ -223,17 +232,41 @@ private fun LocalModeDrawer(
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Computer,
-                    title = "局域网 Harness",
-                    subtitle = "连接同一网络内的电脑",
-                    onClick = onLan,
-                )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Cloud,
-                    title = "中继连接",
-                    subtitle = "加密连接远程电脑",
-                    onClick = onRelay,
+                    title = "远程控制",
+                    subtitle = "通过局域网或安全中继连接电脑",
+                    onClick = onRemote,
                 )
             }
+
+            val current = sessions.firstOrNull { it.id == currentSessionId }
+            if (current != null) {
+                Text("当前会话", style = DsType.std14, color = colors.labelTertiary)
+                DsGroupCard {
+                    DsCategoryRow(
+                        icon = Icons.Outlined.History,
+                        title = current.title,
+                        subtitle = "正在进行",
+                        value = "当前",
+                        onClick = { onSwitchSession(current.id) },
+                    )
+                }
+            }
+
+            val history = sessions.filterNot { it.id == currentSessionId }
+            if (history.isNotEmpty()) {
+                Text("历史会话", style = DsType.std14, color = colors.labelTertiary)
+                DsGroupCard {
+                    history.forEach { session ->
+                        DsCategoryRow(
+                            icon = Icons.Outlined.History,
+                            title = session.title,
+                            subtitle = "本机会话",
+                            onClick = { onSwitchSession(session.id) },
+                        )
+                    }
+                }
+            }
+
             Text("工具与偏好", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
                 DsCategoryRow(
@@ -313,7 +346,7 @@ private fun LocalConfiguration(
         DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Text("手机直接执行", style = DsType.base16Strong, color = colors.labelPrimary)
             Text(
-                "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。局域网与中继已经移到侧边菜单。",
+                "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。",
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )
@@ -409,8 +442,8 @@ private fun LocalChat(
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
     var input by rememberSaveable { mutableStateOf("") }
-    var showSessions by rememberSaveable { mutableStateOf(false) }
     var attachmentError by remember { mutableStateOf<String?>(null) }
+    var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -532,13 +565,6 @@ private fun LocalChat(
                     if (state.planMode) "规划中" else "规划",
                     { onPlanModeChange(!state.planMode) },
                     variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                    enabled = !state.running,
-                )
-                DsButton(
-                    "会话",
-                    { showSessions = true },
-                    variant = DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
@@ -690,19 +716,13 @@ private fun LocalChat(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsButton(
-                    "图片",
-                    { imagePicker.launch(arrayOf("image/*")) },
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
+                DsIconButton(
+                    icon = Icons.Filled.Add,
+                    contentDescription = "添加附件",
+                    onClick = { showAttachmentPicker = true },
                     enabled = !state.running,
-                )
-                DsButton(
-                    "文件",
-                    { filePicker.launch(arrayOf("*/*")) },
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
-                    enabled = !state.running,
+                    tint = colors.labelPrimary,
+                    containerColor = colors.bgModulePlatform,
                 )
                 Spacer(Modifier.weight(1f))
                 if (state.running) {
@@ -726,20 +746,29 @@ private fun LocalChat(
 
     state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny, onAutoApprove) }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
-    if (showSessions) {
-        DsDialog(title = "本机会话", onDismiss = { showSessions = false }) {
-            if (state.sessions.isEmpty()) {
-                Text("暂无已保存会话", style = DsType.small13, color = colors.labelSecondary)
-            }
-            state.sessions.take(12).forEach { session ->
-                DsButton(
-                    text = if (session.id == state.sessionId) "● ${session.title}" else session.title,
+    if (showAttachmentPicker) {
+        DsBottomSheet(title = "添加附件", onDismiss = { showAttachmentPicker = false }) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                DsQuickActionTile(
+                    icon = androidx.compose.material.icons.Icons.Outlined.Image,
+                    label = "图片",
                     onClick = {
-                        onSwitchSession(session.id)
-                        showSessions = false
+                        showAttachmentPicker = false
+                        imagePicker.launch(arrayOf("image/*"))
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = if (session.id == state.sessionId) DsButtonVariant.Info else DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                )
+                DsQuickActionTile(
+                    icon = androidx.compose.material.icons.Icons.Outlined.AttachFile,
+                    label = "文件",
+                    onClick = {
+                        showAttachmentPicker = false
+                        filePicker.launch(arrayOf("*/*"))
+                    },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
