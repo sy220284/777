@@ -227,7 +227,20 @@ private fun DynamicSettingEditor(
                         size = DsButtonSize.Small,
                         variant = DsButtonVariant.Outline,
                     )
-                    if (!field.secret) {
+                    if (field.secret) {
+                        if (field.secretSet) {
+                            DsButton(
+                                text = "清除密钥",
+                                onClick = {
+                                    viewModel.unsetRemoteSetting(namespace, field.path) { error ->
+                                        report(error ?: "已清除 ${field.title}")
+                                    }
+                                },
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Ghost,
+                            )
+                        }
+                    } else {
                         DsButton(
                             text = "恢复默认",
                             onClick = {
@@ -367,6 +380,10 @@ internal fun LocalHarnessSettingsCard(
             DsButton(
                 text = "保存本机配置",
                 onClick = {
+                    if (!local.configured && apiKey.isBlank()) {
+                        report("首次使用请先填写模型密钥")
+                        return@DsButton
+                    }
                     viewModel.configureLocalHarness(
                         apiKey = apiKey,
                         model = model,
