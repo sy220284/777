@@ -25,6 +25,7 @@ data class LocalHarnessSession(
     val todos: List<LocalTodoItem> = emptyList(),
     val goal: LocalGoal? = null,
     val planMode: Boolean = false,
+    val autoApproveMutations: Boolean = false,
 )
 
 data class LocalImportedAttachment(
@@ -91,6 +92,7 @@ data class LocalHarnessState(
     val todos: List<LocalTodoItem> = emptyList(),
     val goal: LocalGoal? = null,
     val planMode: Boolean = false,
+    val autoApproveMutations: Boolean = false,
     val jobs: List<LocalJobInfo> = emptyList(),
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
