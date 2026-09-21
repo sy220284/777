@@ -19,7 +19,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.ConnectionPhase
-import com.labteto.dshmobile.connection.ConnectMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -61,17 +60,12 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
-        val selectedRemoteMatches = when (surface) {
-            "relay" -> connection.host?.isRelay == true
-            "lan" -> connection.host?.isRelay == false
-            else -> false
-        }
+        val selectedRemoteMatches = surface == "remote" && connection.host != null
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
             showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
             surface == "local" -> LocalHarnessScreen(
-                onOpenLan = { surface = "lan" },
-                onOpenRelay = { surface = "relay" },
+                onOpenRemote = { surface = "remote" },
                 onOpenSettings = { showSettings = true },
             )
             showMain && selectedRemoteMatches -> MainScreen(
@@ -81,7 +75,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
             else -> ConnectScreen(
                 onOpenSettings = { showSettings = true },
                 onOpenLocalHarness = { surface = "local" },
-                initialMode = if (surface == "relay") ConnectMode.RELAY else ConnectMode.LAN,
+                initialMode = null,
                 onPair = { url ->
                     pairUrl = url
                     showPair = true
