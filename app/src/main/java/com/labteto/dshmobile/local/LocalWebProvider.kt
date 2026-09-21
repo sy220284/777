@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -13,6 +14,7 @@ import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +43,13 @@ class LocalWebProvider @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
 ) {
-    suspend fun fetch(input: String): String = withContext(Dispatchers.IO) {
+    suspend fun fetch(
+        input: String,
+        maxBytes: Int = DEFAULT_FETCH_BYTES,
+        format: String = "text",
+    ): LocalWebFetchResult = withContext(Dispatchers.IO) {
+        require(format in setOf("text", "raw")) { "web_fetch format 仅支持 text 或 raw" }
+        val byteLimit = maxBytes.coerceIn(MIN_FETCH_BYTES, MAX_FETCH_BYTES)
         var current = validateTarget(input)
         try {
             repeat(MAX_REDIRECTS + 1) { redirectCount ->
@@ -64,10 +72,29 @@ class LocalWebProvider @Inject constructor(
                         val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
                         throw LocalWebException(code, "服务器返回 HTTP ${response.code}：${current.uri}")
                     }
-                    val mediaType = response.body?.contentType()?.toString().orEmpty()
-                    val body = response.body ?: return@withContext "网页没有响应正文"
-                    val text = body.charStream().use(::readBounded)
-                    return@withContext "URL: ${current.uri}\nContent-Type: $mediaType\n${normalize(text, mediaType)}"
+                    val body = response.body
+                        ?: return@withContext LocalWebFetchResult(
+                            url = current.uri.toString(),
+                            mediaType = "",
+                            content = "",
+                            bytesRead = 0,
+                            totalBytes = 0,
+                            truncated = false,
+                        )
+                    val mediaType = body.contentType()?.toString().orEmpty()
+                    val totalBytes = body.contentLength().takeIf { it >= 0L }
+                    val bounded = body.byteStream().use { readBounded(it, byteLimit) }
+                    val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
+                    val rawText = bounded.bytes.toString(charset)
+                    val content = if (format == "raw") rawText else normalize(rawText, mediaType)
+                    return@withContext LocalWebFetchResult(
+                        url = current.uri.toString(),
+                        mediaType = mediaType,
+                        content = content,
+                        bytesRead = bounded.bytes.size,
+                        totalBytes = totalBytes,
+                        truncated = bounded.truncated,
+                    )
                 }
             }
             throw LocalWebException("HTTP_REDIRECT", "网页重定向次数过多")
@@ -96,6 +123,22 @@ class LocalWebProvider @Inject constructor(
         val interfaces = activeTunnelInterfaces()
         val addresses = resolve(host)
         val blocked = addresses.filterNot { isPublicAddress(it) || isAllowedVpnFakeAddress(host, it, vpn) }
+
+        if (blocked.isNotEmpty()) {
+            return@withContext buildString {
+                appendLine("网络诊断")
+                appendLine("目标：$normalized")
+                appendLine("域名：$host")
+                appendLine("解析：${addresses.joinToString { it.hostAddress ?: it.toString() }}")
+                appendLine("系统代理：${proxy?.let { "${it.host}:${it.port}" } ?: "未检测到"}")
+                appendLine("VPN/TUN：${if (vpn) "已启用" else "未检测到"}${if (interfaces.isNotEmpty()) "（${interfaces.joinToString()}）" else ""}")
+                appendLine("命中受保护地址：${blocked.joinToString { it.hostAddress ?: it.toString() }}")
+                append("结论：安全策略会主动拦截。${blockedHint(host, blocked, vpn)}")
+            }.trimEnd()
+        }
+
+        val target = ValidatedTarget(uri, addresses, vpn)
+        val probe = probeConnectivity(target)
         buildString {
             appendLine("网络诊断")
             appendLine("目标：$normalized")
@@ -103,12 +146,15 @@ class LocalWebProvider @Inject constructor(
             appendLine("解析：${addresses.joinToString { it.hostAddress ?: it.toString() }}")
             appendLine("系统代理：${proxy?.let { "${it.host}:${it.port}" } ?: "未检测到"}")
             appendLine("VPN/TUN：${if (vpn) "已启用" else "未检测到"}${if (interfaces.isNotEmpty()) "（${interfaces.joinToString()}）" else ""}")
-            if (blocked.isEmpty()) {
-                append("结论：地址通过安全检查，可尝试直接抓取。")
-            } else {
-                appendLine("命中受保护地址：${blocked.joinToString { it.hostAddress ?: it.toString() }}")
-                append("结论：安全策略会主动拦截.${blockedHint(host, blocked, vpn)}")
-            }
+            appendLine("安全检查：通过")
+            appendLine("实际连通性：${probe.detail}")
+            append(
+                if (probe.reachable) {
+                    "结论：DNS、安全策略与实际 HTTP/TLS 连通性均已验证。"
+                } else {
+                    "结论：DNS 与安全策略检查通过，但实际连接失败；请检查代理分流、TUN 规则、TLS 拦截或目标服务可达性。"
+                },
+            )
         }.trimEnd()
     }
 
@@ -295,6 +341,31 @@ class LocalWebProvider @Inject constructor(
         return builder.build()
     }
 
+    private fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
+        val client = pinnedClient(target).newBuilder()
+            .connectTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(PROBE_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+        val request = Request.Builder()
+            .url(target.uri.toString())
+            .header("User-Agent", USER_AGENT)
+            .header("Range", "bytes=0-0")
+            .build()
+        return try {
+            client.newCall(request).execute().use { response ->
+                ConnectivityProbe(
+                    reachable = true,
+                    detail = "已建立 HTTP/TLS 连接（HTTP ${response.code}）",
+                )
+            }
+        } catch (error: SocketTimeoutException) {
+            ConnectivityProbe(false, "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}")
+        } catch (error: java.io.IOException) {
+            ConnectivityProbe(false, "探测失败（PROBE_FAILED）：${error.message ?: error::class.java.simpleName}")
+        }
+    }
+
     private fun systemHttpProxy(): ProxyEndpoint? {
         val manager = context.getSystemService(ConnectivityManager::class.java) ?: return null
         val network = manager.activeNetwork ?: return null
@@ -381,15 +452,22 @@ class LocalWebProvider @Inject constructor(
         return true
     }
 
-    private fun readBounded(reader: java.io.Reader): String {
-        val output = StringBuilder()
-        val buffer = CharArray(8_192)
-        while (output.length < MAX_FETCH_CHARS) {
-            val read = reader.read(buffer, 0, minOf(buffer.size, MAX_FETCH_CHARS - output.length))
+    private fun readBounded(input: java.io.InputStream, maxBytes: Int): BoundedBytes {
+        val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
+        val buffer = ByteArray(8_192)
+        var remaining = maxBytes + 1
+        while (remaining > 0) {
+            val read = input.read(buffer, 0, minOf(buffer.size, remaining))
             if (read < 0) break
-            output.append(buffer, 0, read)
+            output.write(buffer, 0, read)
+            remaining -= read
         }
-        return output.toString()
+        val all = output.toByteArray()
+        val truncated = all.size > maxBytes
+        return BoundedBytes(
+            bytes = if (truncated) all.copyOf(maxBytes) else all,
+            truncated = truncated,
+        )
     }
 
     private fun normalize(text: String, mediaType: String): String {
@@ -404,6 +482,10 @@ class LocalWebProvider @Inject constructor(
             .trim()
     }
 
+    private data class BoundedBytes(val bytes: ByteArray, val truncated: Boolean)
+
+    private data class ConnectivityProbe(val reachable: Boolean, val detail: String)
+
     private data class ValidatedTarget(
         val uri: URI,
         val addresses: List<InetAddress>,
@@ -417,12 +499,25 @@ class LocalWebProvider @Inject constructor(
         const val SEARCH_MODEL = "deepseek-v4-flash"
         const val USER_AGENT = "DSH-Mobile-Android16/0.12.0"
         const val MAX_REDIRECTS = 5
-        const val MAX_FETCH_CHARS = 200_000
+        const val MIN_FETCH_BYTES = 16 * 1024
+        const val DEFAULT_FETCH_BYTES = 2 * 1024 * 1024
+        const val MAX_FETCH_BYTES = 4 * 1024 * 1024
+        const val PROBE_TIMEOUT_SECONDS = 6L
+        const val PROBE_CALL_TIMEOUT_SECONDS = 8L
         const val MAX_QUERIES = 4
         const val MAX_RESULTS = 10
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+data class LocalWebFetchResult(
+    val url: String,
+    val mediaType: String,
+    val content: String,
+    val bytesRead: Int,
+    val totalBytes: Long?,
+    val truncated: Boolean,
+)
 
 class LocalWebException(
     val code: String,
