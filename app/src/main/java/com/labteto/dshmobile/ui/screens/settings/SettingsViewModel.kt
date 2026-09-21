@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
@@ -85,7 +87,8 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
-    private val deviceProvider = AndroidDeviceProvider(context)
+    private val appContext = context.applicationContext
+    private val deviceProvider = AndroidDeviceProvider(appContext)
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -329,6 +332,18 @@ class SettingsViewModel @Inject constructor(
             runCatching { deviceProvider.invoke("shizuku_request_permission", emptyMap()) }
             refreshDeviceCapabilities()
         }
+    }
+
+    fun openAccessibilitySettings() {
+        appContext.startActivity(
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    fun openNotificationAccessSettings() {
+        appContext.startActivity(
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     private fun replaceNamespace(updated: SettingsNamespaceView) {
