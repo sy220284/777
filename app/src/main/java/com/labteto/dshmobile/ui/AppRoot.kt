@@ -46,6 +46,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
     }
 
     val update by viewModel.availableUpdate.collectAsStateWithLifecycle()
+    val updateInstallStatus by viewModel.updateInstallStatus.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.checkForUpdate(BuildConfig.VERSION_NAME) }
 
     DshTheme(preference = themePreference) {
@@ -91,13 +92,28 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
 
         // Offered over whatever is on screen, and only once per release: dismissing records the
         // version, so the next launch is quiet until there is a newer one.
-        update?.let { UpdateDialog(it, onDismiss = { viewModel.dismissUpdate(it.version) }) }
+        update?.let {
+            UpdateDialog(
+                update = it,
+                status = updateInstallStatus,
+                onInstall = { viewModel.installUpdate(it) },
+                onDismiss = {
+                    viewModel.clearUpdateInstallStatus()
+                    viewModel.dismissUpdate(it.version)
+                },
+            )
+        }
     }
 }
 
-/** "There is a newer release" — a link out, not an installer; the app cannot update itself. */
+/** Verified in-app update handoff; Android's system package installer still owns final consent. */
 @Composable
-private fun UpdateDialog(update: AvailableUpdate, onDismiss: () -> Unit) {
+private fun UpdateDialog(
+    update: AvailableUpdate,
+    status: String?,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val colors = DsTheme.colors
     val uriHandler = LocalUriHandler.current
     DsDialog(title = stringResource(R.string.update_available_title), onDismiss = onDismiss) {
@@ -107,12 +123,23 @@ private fun UpdateDialog(update: AvailableUpdate, onDismiss: () -> Unit) {
             color = colors.labelSecondary,
             modifier = Modifier.padding(bottom = DsSpacing.medium),
         )
+        status?.let { message ->
+            Text(
+                text = message,
+                style = DsType.std14,
+                color = colors.labelSecondary,
+                modifier = Modifier.padding(bottom = DsSpacing.small),
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
                 text = stringResource(R.string.update_open),
                 onClick = {
-                    runCatching { uriHandler.openUri(update.url) }
-                    onDismiss()
+                    if (update.apkUrl != null && update.checksumUrl != null) {
+                        onInstall()
+                    } else {
+                        runCatching { uriHandler.openUri(update.url) }
+                    }
                 },
                 variant = DsButtonVariant.Info,
             )
