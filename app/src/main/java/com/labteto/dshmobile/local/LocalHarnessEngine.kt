@@ -11,6 +11,18 @@ import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
+import com.labteto.dshmobile.harness.plugin.HarnessContext
+import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.session.FutureSessionVersionException
+import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolContext
+import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.harness.tools.ToolResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -66,6 +78,51 @@ class LocalHarnessEngine @Inject constructor(
     private val workspace = LocalWorkspace(File(root, "workspace"))
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
+    private val sessionStore = VersionedSessionStore(sessionsRoot, json)
+    private val toolRegistry = ToolRegistry()
+    private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
+    private val builtinPlugin = object : HarnessPlugin {
+        override val id = "android-local-builtins"
+
+        override suspend fun install(context: HarnessContext) {
+            LocalToolCatalog.specs.forEach { element ->
+                val schema = element.jsonObject
+                val function = schema["function"]?.jsonObject ?: return@forEach
+                val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                context.tools.register(
+                    HarnessTool(
+                        name = name,
+                        schema = schema,
+                        access = toolAccess(name),
+                        approvalPolicy = toolApprovalPolicy(name),
+                        executor = HarnessToolExecutor { toolContext, input, rawArguments ->
+                            val callId = toolContext.attributes["call_id"] as? String
+                                ?: "registry-" + UUID.randomUUID().toString().take(8)
+                            ToolResult(
+                                this@LocalHarnessEngine.executeLegacy(
+                                    LocalToolCall(
+                                        id = callId,
+                                        name = name,
+                                        arguments = input,
+                                        rawArguments = rawArguments,
+                                    ),
+                                    allowMutation = toolContext.allowMutation,
+                                ),
+                            )
+                        },
+                    ),
+                )
+            }
+        }
+
+        override suspend fun uninstall(context: HarnessContext) {
+            LocalToolCatalog.specs.forEach { element ->
+                element.jsonObject["function"]?.jsonObject
+                    ?.get("name")?.jsonPrimitive?.contentOrNull
+                    ?.let(context.tools::unregister)
+            }
+        }
+    }
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
@@ -109,7 +166,10 @@ class LocalHarnessEngine @Inject constructor(
                 if (reschedule) persistenceQueue.trySend(sessionId)
             }
         }
-        scope.launch { load() }
+        scope.launch {
+            pluginRegistry.install(builtinPlugin)
+            load()
+        }
     }
 
     /** Save the local model route and its encrypted credential. */
@@ -484,7 +544,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): String = try {
-        execute(call, allowMutation)
+        executeRegistered(call, allowMutation)
     } catch (cancelled: CancellationException) {
         if (!currentCoroutineContext().isActive) throw cancelled
         formatToolFailure(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
@@ -499,7 +559,22 @@ class LocalHarnessEngine @Inject constructor(
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
 
-    private suspend fun execute(call: LocalToolCall, allowMutation: Boolean): String {
+    private suspend fun executeRegistered(call: LocalToolCall, allowMutation: Boolean): String {
+        val registered = toolRegistry.get(call.name)
+        if (registered == null) return executeLegacy(call, allowMutation)
+        return toolRegistry.execute(
+            name = call.name,
+            input = call.arguments,
+            rawArguments = call.rawArguments,
+            context = ToolContext(
+                sessionId = currentSessionId,
+                allowMutation = allowMutation,
+                attributes = mapOf("call_id" to call.id),
+            ),
+        ).content
+    }
+
+    private suspend fun executeLegacy(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
         if (_state.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
@@ -1069,7 +1144,13 @@ class LocalHarnessEngine @Inject constructor(
                 put("plan_mode", snapshot.planMode)
             })
             try {
-                return modelClient.complete(key, snapshot.baseUrl, snapshot.model, messages)
+                return modelClient.complete(
+                    apiKey = key,
+                    baseUrl = snapshot.baseUrl,
+                    model = snapshot.model,
+                    messages = messages,
+                    tools = toolRegistry.schemas(),
+                )
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 val retryable = (error as? LocalModelException)?.retryable == true || error is java.io.IOException
@@ -1174,11 +1255,21 @@ class LocalHarnessEngine @Inject constructor(
         model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
-        val sessionFile = sessionFileFor(sessionId)
-        val stored = runCatching {
-            if (sessionFile.isFile) json.decodeFromString(LocalHarnessSession.serializer(), sessionFile.readText())
-            else LocalHarnessSession(id = sessionId)
-        }.getOrDefault(LocalHarnessSession(id = sessionId))
+        val loaded = try {
+            sessionStore.read(sessionId)
+        } catch (future: FutureSessionVersionException) {
+            _state.update {
+                it.copy(
+                    loading = false,
+                    sessionId = sessionId,
+                    error = future.message,
+                )
+            }
+            return
+        }
+        val stored = loaded?.document?.payload?.let { payload ->
+            json.decodeFromString(LocalHarnessSession.serializer(), payload.toString())
+        } ?: LocalHarnessSession(id = sessionId)
         modelHistory.clear()
         modelHistory += stored.modelHistory
         _state.value = LocalHarnessState(
@@ -1226,14 +1317,17 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun writeSession(sessionId: String, snapshot: LocalHarnessSession) {
         runCatching {
-            val sessionFile = sessionFileFor(sessionId)
-            val temporary = File(sessionsRoot, "$sessionId.json.tmp")
-            temporary.writeText(json.encodeToString(LocalHarnessSession.serializer(), snapshot))
-            if (!temporary.renameTo(sessionFile)) {
-                sessionFile.writeText(temporary.readText())
-                temporary.delete()
-            }
+            val payload = json.parseToJsonElement(
+                json.encodeToString(LocalHarnessSession.serializer(), snapshot),
+            ).jsonObject
+            sessionStore.write(
+                id = sessionId,
+                payload = payload,
+                updatedAt = snapshot.updatedAt,
+            )
             _state.update { it.copy(sessions = sessionSummaries()) }
+        }.onFailure { error ->
+            _state.update { it.copy(error = error.message ?: "会话写入失败") }
         }
     }
 
@@ -1241,19 +1335,24 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun eventLogFor(id: String) = LocalSessionEventLog(File(sessionsRoot, "$id.events.jsonl"), json)
 
-    private fun sessionSummaries(): List<LocalSessionSummary> = sessionsRoot.listFiles().orEmpty()
-        .filter { it.isFile && it.name.endsWith(".json") && !it.name.endsWith(".tmp") }
-        .mapNotNull { file ->
+    private fun sessionSummaries(): List<LocalSessionSummary> = try {
+        sessionStore.list().mapNotNull { loaded ->
             runCatching {
-                val session = json.decodeFromString(LocalHarnessSession.serializer(), file.readText())
+                val session = json.decodeFromString(
+                    LocalHarnessSession.serializer(),
+                    loaded.document.payload.toString(),
+                )
                 LocalSessionSummary(
-                    id = session.id.ifBlank { file.name.removeSuffix(".json") },
+                    id = session.id.ifBlank { loaded.document.id },
                     title = session.title,
-                    updatedAt = session.updatedAt.takeIf { it > 0 } ?: file.lastModified(),
+                    updatedAt = session.updatedAt.takeIf { it > 0 } ?: loaded.document.updatedAt,
                 )
             }.getOrNull()
         }
-        .sortedByDescending(LocalSessionSummary::updatedAt)
+    } catch (future: FutureSessionVersionException) {
+        _state.update { it.copy(error = future.message) }
+        emptyList()
+    }
 
     private fun migrateLegacySession() {
         val legacy = File(root, "session.json")
@@ -1277,6 +1376,21 @@ class LocalHarnessEngine @Inject constructor(
                 """.trimIndent() + "\n",
             )
         }
+    }
+
+    private fun toolAccess(name: String): ToolAccess = when (name) {
+        "write", "edit", "present" -> ToolAccess.WORKSPACE_WRITE
+        "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal", "ask_user_question" ->
+            ToolAccess.SESSION_WRITE
+        "bash", "job_kill" -> ToolAccess.PROCESS
+        "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
+        "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
+        else -> ToolAccess.READ_ONLY
+    }
+
+    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy = when (name) {
+        "write", "edit", "bash" -> ToolApprovalPolicy.MUTATION
+        else -> ToolApprovalPolicy.NEVER
     }
 
     private fun JsonObject.string(key: String): String =
