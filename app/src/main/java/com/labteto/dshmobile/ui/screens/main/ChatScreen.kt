@@ -373,26 +373,14 @@ fun ChatScreen(
                 title = title,
                 running = conversation?.running == true,
                 models = models,
-                agentPresetLabel = currentSession?.agentPreset?.takeIf { agentPresets?.modeSelectionEnabled != false }?.let { agentPresetLabel(it, agentPresets) },
-                subagentCount = subagents.size,
                 detailsOpen = detailsOpen,
-                tab = tab,
                 onOpenDrawer = onOpenDrawer,
                 onOpenModels = { sheet = ChatSheet.Models },
-                onOpenPresets = {
-                    scope.launch { store.refreshAgentPresets() }
-                    sheet = ChatSheet.Presets
-                },
-                onOpenSubagents = { sheet = ChatSheet.Subagents },
                 onOpenDetails = onOpenDetails,
-                onTabChange = { tab = it },
             )
 
             connectionError?.let {
                 androidx.compose.material3.TextButton(onClick = { store.retryConnection() }) { ConnectionBanner(it) }
-            }
-            androidx.compose.material3.TextButton(onClick = { panelKey = composer.key }, enabled = currentSessionId != null) {
-                androidx.compose.material3.Text(stringResource(R.string.panel_workspace))
             }
             if (conversation?.gap == true) {
                 ConnectionBanner(stringResource(R.string.common_reconnecting))
@@ -544,7 +532,8 @@ fun ChatScreen(
                 running = conversation?.running == true,
                 enabled = currentSessionId != null && !composer.submitting,
                 preparing = composer.preparing,
-                onOpenSheet = { sheet = ChatSheet.Commands },
+                onOpenAttachments = { sheet = ChatSheet.Attachments },
+                onOpenTools = { sheet = ChatSheet.Commands },
                 // A lambda, not `::send`. The composer holds this through rememberUpdatedState,
                 // which keeps what it has when the new value is equal to it, and a reference to a
                 // local function equals every other reference to that function whatever it
@@ -554,21 +543,8 @@ fun ChatScreen(
                 // changes and compares by identity, so the composer always holds the current one.
                 onSend = { text -> send(text) },
                 onStop = { scope.launch { store.cancelTurn() } },
-                onPickImage = {
-                    if (!composer.preparing && store.composers.imagePickTarget == null) {
-                        store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
-                        imagePicker.launch("image/*")
-                    }
-                },
-                onPickFile = {
-                    if (!composer.preparing) {
-                        store.composers.filePickTarget = composer
-                        filePicker.launch(arrayOf("*/*"))
-                    }
-                },
             )
 
-            StatsFooter(stats = sessionStats, usage = tokenUsage)
         }
         DsToastHost(toast, modifier = Modifier.fillMaxWidth())
     }
@@ -577,21 +553,39 @@ fun ChatScreen(
     panelKey?.let { key -> WorkspacePanels(store, store.panels.get(key), onDismiss = { panelKey = null }) }
     feedback?.let { (key, id, positive) -> FeedbackDialog(store, key, id, positive) { feedback = null } }
     when (sheet) {
-        ChatSheet.Commands -> CommandSheet(
-            commands = commands,
-            commandsAvailable = commandsAvailable,
-            skills = skills,
-            mode = mode,
-            running = conversation?.running == true,
+        ChatSheet.Attachments -> AttachmentSheet(
             canAttach = currentSessionId != null && !composer.preparing && !composer.submitting,
-            onModeChange = { mode = it },
             onAttach = {
                 if (!composer.preparing && store.composers.imagePickTarget == null) {
                     store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
                     imagePicker.launch("image/*")
                 }
             },
-            onAttachFile = { store.composers.filePickTarget = composer; filePicker.launch(arrayOf("*/*")) },
+            onAttachFile = {
+                if (!composer.preparing) {
+                    store.composers.filePickTarget = composer
+                    filePicker.launch(arrayOf("*/*"))
+                }
+            },
+            onDismiss = { sheet = null },
+        )
+        ChatSheet.Commands -> CommandSheet(
+            commands = commands,
+            commandsAvailable = commandsAvailable,
+            skills = skills,
+            mode = mode,
+            running = conversation?.running == true,
+            currentTab = tab,
+            subagentCount = subagents.size,
+            onModeChange = { mode = it },
+            onOpenModels = { sheet = ChatSheet.Models },
+            onOpenPresets = {
+                scope.launch { store.refreshAgentPresets() }
+                sheet = ChatSheet.Presets
+            },
+            onOpenSubagents = { sheet = ChatSheet.Subagents },
+            onOpenWorkspace = { panelKey = composer.key },
+            onTabChange = { tab = it },
             // The sheet only auto-runs commands that take no input at all, and a command that
             // takes no input takes no attachments either — so a pending attachment refuses here
             // for the same reason it refuses at the composer, rather than being silently dropped.
@@ -626,7 +620,7 @@ fun ChatScreen(
 }
 
 /** Which sheet, if any, is open over the chat surface. */
-private enum class ChatSheet { Commands, Models, Presets, Subagents }
+private enum class ChatSheet { Attachments, Commands, Models, Presets, Subagents }
 
 /**
  * A picked document's display name and size, as its provider reports them.

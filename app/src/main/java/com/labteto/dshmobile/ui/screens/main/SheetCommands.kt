@@ -50,29 +50,13 @@ import com.labteto.dshmobile.ui.theme.DsType
  * a command the host will reject is worse than a menu that admits it does not know.
  */
 @Composable
-internal fun CommandSheet(
-    commands: List<CommandDescriptor>,
-    commandsAvailable: Boolean,
-    skills: List<SkillEntry>,
-    mode: String,
-    running: Boolean,
+internal fun AttachmentSheet(
     canAttach: Boolean,
-    onModeChange: (String) -> Unit,
     onAttach: () -> Unit,
     onAttachFile: () -> Unit,
-    onRunCommand: (String) -> Unit,
-    onPrefillDraft: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
-    var query by remember { mutableStateOf("") }
-    val filteredCommands = remember(commands, query) { commands.filterByQuery(query) { it.name to it.description } }
-    val filteredSkills = remember(skills, query) { skills.filterByQuery(query) { it.name to it.description } }
-    val searchable = commands.size + skills.size > 12
-
-    DsBottomSheet(title = stringResource(R.string.chat_composer_commands), onDismiss = onDismiss) {
-        // High-frequency sources sit in thumb-sized tiles; deeper capabilities remain grouped
-        // below, matching the hierarchy of the refreshed mobile home.
+    DsBottomSheet(title = "添加附件", onDismiss = onDismiss) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
@@ -96,6 +80,77 @@ internal fun CommandSheet(
                     onAttachFile()
                 },
                 modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CommandSheet(
+    commands: List<CommandDescriptor>,
+    commandsAvailable: Boolean,
+    skills: List<SkillEntry>,
+    mode: String,
+    running: Boolean,
+    currentTab: ChatTab,
+    subagentCount: Int,
+    onModeChange: (String) -> Unit,
+    onOpenModels: () -> Unit,
+    onOpenPresets: () -> Unit,
+    onOpenSubagents: () -> Unit,
+    onOpenWorkspace: () -> Unit,
+    onTabChange: (ChatTab) -> Unit,
+    onRunCommand: (String) -> Unit,
+    onPrefillDraft: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var query by remember { mutableStateOf("") }
+    val filteredCommands = remember(commands, query) { commands.filterByQuery(query) { it.name to it.description } }
+    val filteredSkills = remember(skills, query) { skills.filterByQuery(query) { it.name to it.description } }
+    val searchable = commands.size + skills.size > 12
+
+    DsBottomSheet(title = stringResource(R.string.chat_context_tools), onDismiss = onDismiss) {
+        // Session capabilities ----------------------------------------------
+        SectionHeader(stringResource(R.string.chat_details_title))
+        DsGroupCard {
+            SheetRow(
+                title = stringResource(R.string.models_title),
+                onClick = {
+                    onDismiss()
+                    onOpenModels()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.presets_title),
+                onClick = {
+                    onDismiss()
+                    onOpenPresets()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.subagents_title),
+                trailing = subagentCount.takeIf { it > 0 }?.toString(),
+                onClick = {
+                    onDismiss()
+                    onOpenSubagents()
+                },
+            )
+            SheetRow(
+                title = stringResource(R.string.panel_workspace),
+                onClick = {
+                    onDismiss()
+                    onOpenWorkspace()
+                },
+            )
+            SheetRow(
+                title = stringResource(
+                    if (currentTab == ChatTab.Chat) R.string.trajectory_title else R.string.chat_tab,
+                ),
+                onClick = {
+                    onDismiss()
+                    onTabChange(if (currentTab == ChatTab.Chat) ChatTab.Trajectory else ChatTab.Chat)
+                },
             )
         }
 

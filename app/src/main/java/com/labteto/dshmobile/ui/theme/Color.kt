@@ -81,11 +81,11 @@ object Ds {
 object DsLight {
     // Warm-neutral canvas with white floating surfaces, matching the mobile-first hierarchy used
     // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF5F5F5)
+    val bgBase = Color(0xFFF7F7F5)
     val bgLayer1 = Color(0xFFFFFFFF)
     val bgLayer2 = Color(0xFFFFFFFF)
     val bgLayer3 = Color(0xFFFFFFFF)
-    val bgModulePlatform = Color(0xFFF3F3F3)
+    val bgModulePlatform = Color(0xFFF2F2EF)
     val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
     val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
     val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
@@ -101,7 +101,7 @@ object DsLight {
     val accentTertiary = Ds.Deepseek100
     val accentHover = Ds.Deepseek400
     val hover = Color(0x0F263148) // rgba(38,49,72,.06)
-    val hoverSolid = Color(0xFFF3F3F3)
+    val hoverSolid = Color(0xFFF2F2EF)
     val hoverAccent = Color(0x24263148) // rgba(38,49,72,.14)
     val active = Color(0x1A263148) // rgba(38,49,72,.10)
     val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
@@ -133,7 +133,7 @@ object DsLight {
     val userBubble = Ds.Deepseek100
     val userBubbleHighlight = Ds.Deepseek200
     val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF5F5F5)
+    val sidebar = Color(0xFFF7F7F5)
     val sidebarNavActive = Ds.Bluish100
     val sidebarNavAccent = Ds.Deepseek100
     val sidebarNavHover = Ds.Bluish75

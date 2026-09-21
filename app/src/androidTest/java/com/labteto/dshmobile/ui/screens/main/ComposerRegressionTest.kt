@@ -31,7 +31,7 @@ class ComposerRegressionTest {
         compose.setContent {
             val target = selected
             DshTheme { Composer(target.text, { target.text = it }, target.attachments, {}, {}, null, null, {}, null, null,
-                running = false, enabled = true, onOpenSheet = {}, onStop = {},
+                running = false, enabled = true, onOpenAttachments = {}, onOpenTools = {}, onStop = {},
                 onSend = { sent.add(target.key.sessionId to target.attachments.toList()) }, preparing = target.preparing) }
         }
         compose.runOnIdle { selected = second; second.preparing = true }
@@ -58,7 +58,7 @@ class ComposerRegressionTest {
         var stops = 0
         compose.setContent {
             DshTheme { Composer(text, { text = it }, emptyList(), {}, {}, null, null, {}, null, null,
-                running = running, enabled = true, onOpenSheet = {}, onStop = { stops++ },
+                running = running, enabled = true, onOpenAttachments = {}, onOpenTools = {}, onStop = { stops++ },
                 onSend = { sent.add(it) }) }
         }
         val send = context.getString(R.string.chat_composer_send)

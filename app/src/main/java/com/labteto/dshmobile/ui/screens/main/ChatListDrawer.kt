@@ -56,9 +56,7 @@ import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -140,7 +138,12 @@ fun ChatListDrawer(
 
     // Blank sessions are scratch space the harness reuses; subagent transcripts belong under their
     // parent, not as top-level rows.
-    val listable = sessions.filter { it.sessionId !in archivedIds && !it.blank }
+    val currentListSession = sessions.firstOrNull {
+        it.sessionId == currentSessionId && it.sessionId !in archivedIds && !it.blank
+    }
+    val listable = sessions.filter {
+        it.sessionId !in archivedIds && !it.blank && it.sessionId != currentSessionId
+    }
     val sessionsById = sessions.associateBy { it.sessionId }
     val archivedSessions = sessions.filter { it.sessionId in archivedIds }
     val workspaceSessionIds = workspaces.flatMap { it.sessionIds }.toSet()
@@ -217,21 +220,35 @@ fun ChatListDrawer(
             )
         }
 
-        DsGroupCard {
-            DsCategoryRow(
-                icon = Icons.Outlined.PhoneAndroid,
-                title = "本机 Harness",
-                subtitle = "在手机上直接运行完整代理能力",
-                onClick = {
-                    onClose()
-                    onOpenLocalHarness()
-                },
-            )
-            DsCategoryRow(
-                icon = Icons.Filled.Settings,
-                title = stringResource(R.string.settings_title),
-                subtitle = "连接、通知、外观与数据",
-                onClick = onOpenSettings,
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            singleLine = true,
+            shape = DsShapes.pillFull,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = colors.bgLayer1,
+                unfocusedContainerColor = colors.bgLayer1,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                cursorColor = colors.accent,
+            ),
+        )
+        if (!contentSearchAvailable && query.isNotBlank()) {
+            Text(
+                stringResource(R.string.chatlist_search_content_off),
+                style = DsType.caption11,
+                color = colors.labelCaption,
+                modifier = Modifier.padding(bottom = DsSpacing.small),
             )
         }
 
@@ -240,7 +257,7 @@ fun ChatListDrawer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
-                SectionHeader(stringResource(R.string.chatlist_sessions))
+                SectionHeader("会话")
             }
             SortChip(sortByRecency) { next ->
                 scope.launch { hostsStore.setSessionSort(if (next) SORT_UPDATED else SORT_MANUAL) }
@@ -276,6 +293,27 @@ fun ChatListDrawer(
                     }
                 }
                 return@LazyColumn
+            }
+
+            currentListSession?.let { current ->
+                item(key = "current-session-header") {
+                    SectionHeader("当前会话")
+                }
+                item(key = "current-session-" + current.sessionId) {
+                    SessionRowItem(
+                        session = current,
+                        isCurrent = true,
+                        store = store,
+                        scope = scope,
+                        onClose = onClose,
+                    )
+                }
+            }
+            if (listable.isNotEmpty() || archivedSessions.isNotEmpty()) {
+                item(key = "history-session-header") {
+                    Spacer(Modifier.height(DsSpacing.small))
+                    SectionHeader("历史会话")
+                }
             }
 
             var anyShown = false
@@ -406,37 +444,32 @@ fun ChatListDrawer(
             )
         }
 
-        TextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
-            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
-            leadingIcon = {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = colors.labelTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
-            singleLine = true,
-            shape = DsShapes.pillFull,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.bgLayer1,
-                unfocusedContainerColor = colors.bgLayer1,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                cursorColor = colors.accent,
-            ),
-        )
-        if (!contentSearchAvailable && query.isNotBlank()) {
-            Text(
-                stringResource(R.string.chatlist_search_content_off),
-                style = DsType.caption11,
-                color = colors.labelCaption,
-                modifier = Modifier.padding(bottom = DsSpacing.small),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            DsButton(
+                text = "本机 Harness",
+                onClick = {
+                    onClose()
+                    onOpenLocalHarness()
+                },
+                modifier = Modifier.weight(1f),
+                variant = DsButtonVariant.Ghost,
+                icon = Icons.Outlined.PhoneAndroid,
+            )
+            DsButton(
+                text = stringResource(R.string.settings_title),
+                onClick = {
+                    onClose()
+                    onOpenSettings()
+                },
+                modifier = Modifier.weight(1f),
+                variant = DsButtonVariant.Ghost,
+                icon = Icons.Filled.Settings,
             )
         }
+
     }
 
     if (newSessionOpen) {
