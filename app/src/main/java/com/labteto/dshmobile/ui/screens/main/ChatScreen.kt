@@ -554,6 +554,18 @@ fun ChatScreen(
                 // changes and compares by identity, so the composer always holds the current one.
                 onSend = { text -> send(text) },
                 onStop = { scope.launch { store.cancelTurn() } },
+                onPickImage = {
+                    if (!composer.preparing && store.composers.imagePickTarget == null) {
+                        store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
+                        imagePicker.launch("image/*")
+                    }
+                },
+                onPickFile = {
+                    if (!composer.preparing) {
+                        store.composers.filePickTarget = composer
+                        filePicker.launch(arrayOf("*/*"))
+                    }
+                },
             )
 
             StatsFooter(stats = sessionStats, usage = tokenUsage)
