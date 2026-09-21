@@ -14,6 +14,8 @@ import kotlinx.coroutines.withContext
 class AndroidProcessRuntime(
     private val defaultWorkingDirectory: File? = null,
     private val extraSearchPaths: List<File> = emptyList(),
+    private val dynamicSearchPaths: () -> List<File> = { emptyList() },
+    private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
 ) : HarnessProcessRuntime {
 
     override fun isCommandAvailable(command: String): Boolean {
@@ -34,6 +36,7 @@ class AndroidProcessRuntime(
             .directory(workingDirectory)
             .apply {
                 environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
+                environment().putAll(baseEnvironment())
                 environment().putAll(request.environment)
             }
             .start()
@@ -95,7 +98,8 @@ class AndroidProcessRuntime(
             File("/product/bin"),
             File("/vendor/bin"),
         )
-        return (extraSearchPaths + envPaths + androidDefaults).distinctBy { it.path }
+        return (extraSearchPaths + dynamicSearchPaths() + envPaths + androidDefaults)
+            .distinctBy { it.path }
     }
 }
 

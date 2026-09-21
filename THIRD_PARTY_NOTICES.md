@@ -49,3 +49,15 @@ there as `LICENSE.xterm` and `LICENSE.addon-fit`.
 - Sources: https://registry.npmjs.org/@xterm/xterm/-/xterm-5.5.0.tgz
   and https://registry.npmjs.org/@xterm/addon-fit/-/addon-fit-0.10.0.tgz
 - No remote scripts or CDN resources are loaded by the terminal screen.
+
+
+## Bundled Node.js runtime
+
+The Android Harness bundles Node.js 24.18.0 from the official Termux `termux-main`
+`nodejs-lts` package. The build verifies Termux's signed package index and each package
+SHA-256 before packaging. Node.js core is distributed under the MIT license and includes
+additional notices for its bundled dependencies.
+
+The APK also carries the runtime shared libraries required by that Termux Node build.
+Their package copyright/license notices are copied from the verified Termux packages into
+`assets/runtime/node/notices/` during the build and ship inside the APK.

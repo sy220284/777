@@ -16,6 +16,8 @@ import kotlinx.coroutines.withContext
  */
 class PersistentPipeTerminalProvider(
     private val defaultWorkingDirectory: File? = null,
+    private val extraSearchPaths: () -> List<File> = { emptyList() },
+    private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
 ) : HarnessTerminalProvider {
     private data class Session(
         val process: Process,
@@ -30,9 +32,14 @@ class PersistentPipeTerminalProvider(
             require(command.isNotEmpty()) { "终端命令不能为空" }
             val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
             if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
-            val process = ProcessBuilder(command)
+            val resolved = resolveCommand(command)
+            val process = ProcessBuilder(resolved)
                 .directory(directory)
                 .redirectErrorStream(true)
+                .apply {
+                    environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
+                    environment().putAll(baseEnvironment())
+                }
                 .start()
             val id = "term-" + UUID.randomUUID().toString().replace("-", "").take(16)
             sessions[id] = Session(process, process.outputStream, process.inputStream)
@@ -64,6 +71,31 @@ class PersistentPipeTerminalProvider(
     fun isAlive(sessionId: String): Boolean = sessions[sessionId]?.process?.isAlive == true
 
     fun nativePtyAvailable(): Boolean = false
+
+    private fun resolveCommand(command: List<String>): List<String> {
+        val executable = command.first()
+        if (executable.contains(File.separatorChar)) return command
+        val resolved = searchPaths()
+            .asSequence()
+            .map { directory -> File(directory, executable) }
+            .firstOrNull(File::canExecute)
+            ?: return command
+        return listOf(resolved.absolutePath) + command.drop(1)
+    }
+
+    private fun searchPaths(): List<File> {
+        val inherited = System.getenv("PATH").orEmpty()
+            .split(File.pathSeparatorChar)
+            .filter(String::isNotBlank)
+            .map(::File)
+        val androidDefaults = listOf(
+            File("/system/bin"),
+            File("/system/xbin"),
+            File("/product/bin"),
+            File("/vendor/bin"),
+        )
+        return (extraSearchPaths() + inherited + androidDefaults).distinctBy { it.path }
+    }
 
     private fun requireSession(id: String): Session =
         sessions[id]?.takeIf { it.process.isAlive } ?: error("终端会话不存在或已结束：$id")
