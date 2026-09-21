@@ -22,7 +22,6 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.screens.connect.ConnectScreen
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
@@ -50,37 +49,40 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
 
     DshTheme(preference = themePreference) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
-        // Pairing is a detour off the connect screen rather than a mode of it: it owns the camera,
-        // it can succeed against an address the connect screen never listed, and it ends by
-        // connecting — at which point the routing below carries on as if the relay had always been
-        // remembered. `pairUrl` is saveable because the scan launches another activity, and coming
-        // back to an empty address field would lose the one thing the user had already supplied.
+        // Local Harness is always the product home. Remote control has exactly one transport:
+        // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
+        // carries the user into the remote session, while Back returns to the local home.
         var showPair by rememberSaveable { mutableStateOf(false) }
-        var pairUrl by rememberSaveable { mutableStateOf<String?>(null) }
-        // Local Harness is the product home. Remote transports are explicit detours from its drawer.
         var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         val selectedRemoteMatches = surface == "remote" && connection.host != null
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
-            showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
+            showPair -> PairScreen(
+                onClose = {
+                    showPair = false
+                    surface = "local"
+                },
+                onPaired = {
+                    showPair = false
+                    surface = "remote"
+                },
+            )
             surface == "local" -> LocalHarnessScreen(
-                onOpenRemote = { surface = "remote" },
+                onOpenRemote = {
+                    surface = "remote"
+                    showPair = true
+                },
                 onOpenSettings = { showSettings = true },
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = { showSettings = true },
                 onOpenLocalHarness = { surface = "local" },
             )
-            else -> ConnectScreen(
-                onOpenSettings = { showSettings = true },
-                onOpenLocalHarness = { surface = "local" },
-                initialMode = null,
-                onPair = { url ->
-                    pairUrl = url
-                    showPair = true
-                },
+            else -> PairScreen(
+                onClose = { surface = "local" },
+                onPaired = { surface = "remote" },
             )
         }
 
