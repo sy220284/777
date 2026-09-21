@@ -573,6 +573,12 @@ class LocalHarnessEngine @Inject constructor(
                 sessionId = currentSessionId,
                 allowMutation = allowMutation,
                 attributes = mapOf("call_id" to call.id),
+                approval = { tool ->
+                    approve(
+                        call,
+                        "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）",
+                    )
+                },
             ),
         ).content
     }
@@ -1391,10 +1397,8 @@ class LocalHarnessEngine @Inject constructor(
         else -> ToolAccess.READ_ONLY
     }
 
-    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy = when (name) {
-        "write", "edit", "bash" -> ToolApprovalPolicy.MUTATION
-        else -> ToolApprovalPolicy.NEVER
-    }
+    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy =
+        ToolApprovalPolicy.NEVER
 
     private fun JsonObject.string(key: String): String =
         optionalString(key)?.takeIf { it.isNotBlank() } ?: error("缺少参数：$key")
