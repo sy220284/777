@@ -29,8 +29,6 @@ class HostsStore @Inject constructor(
 ) {
     private object Keys {
         val HOSTS = stringPreferencesKey("hosts_json")
-        val AUTO_LAST = booleanPreferencesKey("auto_last")
-        val AUTO_RELAY = booleanPreferencesKey("auto_relay")
         val BACKGROUND = booleanPreferencesKey("background")
         val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
         val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
@@ -55,8 +53,6 @@ class HostsStore @Inject constructor(
 
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
         AppSettings(
-            autoConnectLast = prefs[Keys.AUTO_LAST] ?: true,
-            autoConnectRelay = prefs[Keys.AUTO_RELAY] ?: false,
             keepConnectedInBackground = prefs[Keys.BACKGROUND] ?: false,
             notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
             notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
@@ -195,8 +191,6 @@ class HostsStore @Inject constructor(
         // activity exists, and DataStore cannot be read from there. See DshApplication.
         DshApplication.storeThemePreference(context, next.themePreference)
         dataStore.edit { prefs ->
-            prefs[Keys.AUTO_LAST] = next.autoConnectLast
-            prefs[Keys.AUTO_RELAY] = next.autoConnectRelay
             prefs[Keys.BACKGROUND] = next.keepConnectedInBackground
             prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
