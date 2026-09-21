@@ -390,7 +390,7 @@ class LocalWebProvider @Inject constructor(
             null,
             address.hostAddress,
             uri.port,
-            uri.rawPath.ifEmpty { "/" },
+            uri.rawPath?.ifEmpty { "/" } ?: "/",
             uri.rawQuery,
             null,
         )
