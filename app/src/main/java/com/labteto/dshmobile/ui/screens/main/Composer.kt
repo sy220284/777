@@ -33,7 +33,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -160,6 +162,8 @@ internal fun Composer(
     onOpenSheet: () -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onPickImage: () -> Unit = {},
+    onPickFile: () -> Unit = {},
     modifier: Modifier = Modifier,
     preparing: Boolean = false,
 ) {
@@ -245,6 +249,26 @@ internal fun Composer(
                     tint = colors.labelPrimary,
                     enabled = enabled,
                     onClick = onOpenSheet,
+                )
+
+                CircleAction(
+                    icon = Icons.Outlined.Image,
+                    description = stringResource(R.string.chat_composer_attach),
+                    size = 30,
+                    background = colors.hoverSolid,
+                    tint = colors.labelPrimary,
+                    enabled = enabled && !preparing,
+                    onClick = onPickImage,
+                )
+
+                CircleAction(
+                    icon = Icons.Outlined.AttachFile,
+                    description = stringResource(R.string.chat_composer_attach_file),
+                    size = 30,
+                    background = colors.hoverSolid,
+                    tint = colors.labelPrimary,
+                    enabled = enabled && !preparing,
+                    onClick = onPickFile,
                 )
 
                 PermissionChip(
