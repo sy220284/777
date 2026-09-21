@@ -65,10 +65,10 @@ class HostsStore @Inject constructor(
             ?: listOf(3080)
         AppSettings(
             autoConnectLast = prefs[Keys.AUTO_LAST] ?: true,
-            autoConnectLan = prefs[Keys.AUTO_LAN] ?: false,
-            autoConnectLoopback = prefs[Keys.AUTO_LOOPBACK] ?: true,
+            autoConnectLan = false,
+            autoConnectLoopback = false,
             autoConnectRelay = prefs[Keys.AUTO_RELAY] ?: false,
-            connectMode = ConnectMode.of(prefs[Keys.CONNECT_MODE]),
+            connectMode = ConnectMode.RELAY,
             keepConnectedInBackground = prefs[Keys.BACKGROUND] ?: false,
             notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
             notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
@@ -215,10 +215,10 @@ class HostsStore @Inject constructor(
         DshApplication.storeThemePreference(context, next.themePreference)
         dataStore.edit { prefs ->
             prefs[Keys.AUTO_LAST] = next.autoConnectLast
-            prefs[Keys.AUTO_LAN] = next.autoConnectLan
-            prefs[Keys.AUTO_LOOPBACK] = next.autoConnectLoopback
+            prefs[Keys.AUTO_LAN] = false
+            prefs[Keys.AUTO_LOOPBACK] = false
             prefs[Keys.AUTO_RELAY] = next.autoConnectRelay
-            prefs[Keys.CONNECT_MODE] = next.connectMode
+            prefs[Keys.CONNECT_MODE] = ConnectMode.RELAY
             prefs[Keys.BACKGROUND] = next.keepConnectedInBackground
             prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
