@@ -277,7 +277,7 @@ class HarnessAutomationWorker(
         val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle("后台任务完成：$id")
-            .setContentText(result.replace("\\n", " ").take(180))
+            .setContentText(result.replace("\n", " ").take(180))
             .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(result.take(4_000)))
             .setAutoCancel(true)
             .build()
@@ -355,7 +355,7 @@ class AutomationPlugin(
             access = ToolAccess.READ_ONLY,
         ) {
             val tasks = store.list()
-            if (tasks.isEmpty()) "暂无后台任务" else tasks.joinToString("\\n\\n") { task ->
+            if (tasks.isEmpty()) "暂无后台任务" else tasks.joinToString("\n\n") { task ->
                 buildString {
                     appendLine("id=${task.id}")
                     appendLine("status=${task.status}")
