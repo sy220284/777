@@ -11,6 +11,7 @@ import android.util.Base64
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.shizuku.ShizukuBridge
+import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,6 +19,7 @@ import kotlinx.coroutines.withContext
 class AndroidDeviceProvider(
     private val context: Context,
     private val shizuku: ShizukuBridge = ShizukuBridge(context),
+    private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
 ) : HarnessDeviceProvider {
 
     override val capabilities: Set<String> = setOf(
@@ -42,6 +44,14 @@ class AndroidDeviceProvider(
         "notification_list",
         "clipboard_get",
         "clipboard_set",
+        "vscreen_create",
+        "vscreen_list",
+        "vscreen_status",
+        "vscreen_launch",
+        "vscreen_tap",
+        "vscreen_swipe",
+        "vscreen_screenshot",
+        "vscreen_close",
     )
 
     override suspend fun invoke(capability: String, arguments: Map<String, String>): String =
@@ -101,6 +111,45 @@ class AndroidDeviceProvider(
             "notification_list" -> notificationList()
             "clipboard_get" -> clipboardGet()
             "clipboard_set" -> clipboardSet(arguments.required("text"))
+            "vscreen_create" -> {
+                val status = virtualDisplays.create(
+                    width = arguments["width"]?.toIntOrNull() ?: 1080,
+                    height = arguments["height"]?.toIntOrNull() ?: 1920,
+                    densityDpi = arguments["density_dpi"]?.toIntOrNull() ?: 420,
+                )
+                virtualStatus(status)
+            }
+            "vscreen_list" -> virtualDisplays.list().joinToString("\n", transform = ::virtualStatus)
+            "vscreen_status" -> virtualStatus(virtualDisplays.status(arguments.required("id")))
+            "vscreen_launch" -> virtualDisplays.launch(
+                arguments.required("id"),
+                arguments.required("package"),
+            )
+            "vscreen_tap" -> {
+                val id = arguments.required("id")
+                accessibility().tap(
+                    x = arguments.required("x").toFloat(),
+                    y = arguments.required("y").toFloat(),
+                    durationMillis = arguments["duration_ms"]?.toLongOrNull() ?: 60L,
+                    displayId = virtualDisplays.displayId(id),
+                ).toString()
+            }
+            "vscreen_swipe" -> {
+                val id = arguments.required("id")
+                accessibility().swipe(
+                    startX = arguments.required("start_x").toFloat(),
+                    startY = arguments.required("start_y").toFloat(),
+                    endX = arguments.required("end_x").toFloat(),
+                    endY = arguments.required("end_y").toFloat(),
+                    durationMillis = arguments["duration_ms"]?.toLongOrNull() ?: 350L,
+                    displayId = virtualDisplays.displayId(id),
+                ).toString()
+            }
+            "vscreen_screenshot" -> {
+                val png = virtualDisplays.screenshotPng(arguments.required("id"))
+                "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
+            }
+            "vscreen_close" -> virtualDisplays.close(arguments.required("id")).toString()
             else -> error("设备能力不存在：$capability")
         }
 
@@ -202,6 +251,9 @@ class AndroidDeviceProvider(
         manager.setPrimaryClip(ClipData.newPlainText("777 Harness", text))
         return "已写入剪贴板"
     }
+
+    private fun virtualStatus(status: com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus): String =
+        "id=${status.id}\ndisplay_id=${status.displayId}\nsize=${status.width}x${status.height}\ndensity=${status.densityDpi}\nvalid=${status.valid}"
 
     private suspend fun privileged(command: String): String =
         shizuku.execute(command)
