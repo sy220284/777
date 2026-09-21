@@ -1,5 +1,4 @@
-# DSH Mobile ProGuard rules (release build).
-# Minification is disabled for v1; rules here are ready for when it is enabled.
+# DSH Mobile R8 rules for optimized and release builds.
 
 # kotlinx.serialization
 -keepattributes *Annotation*, InnerClasses

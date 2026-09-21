@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import java.io.File
 import java.io.Reader
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -11,12 +12,14 @@ import kotlinx.coroutines.withContext
 
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(private val root: File) {
+    private val canonicalRoot = root.canonicalFile
+
     init {
-        root.mkdirs()
+        canonicalRoot.mkdirs()
     }
 
     /** Stable app-private workspace root. */
-    val path: String get() = root.absolutePath
+    val path: String get() = canonicalRoot.absolutePath
 
     /** Read a UTF-8 text range, bounded to keep one result out of the model's entire context. */
     fun read(relativePath: String, startLine: Int = 1, endLine: Int = startLine + 399): String {
@@ -62,8 +65,8 @@ class LocalWorkspace(private val root: File) {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val matcher = globRegex(pattern.replace('\\', '/'))
-        val rows = directory.walkTopDown().asSequence()
-            .filter { it.isFile }
+        val rows = safeWalk(directory)
+            .filter { it.isFile && isInsideWorkspace(it) }
             .map { it.relativeTo(directory).invariantSeparatorsPath }
             .filter { matcher.matches(it) }
             .take(MAX_LIST_ROWS)
@@ -76,13 +79,15 @@ class LocalWorkspace(private val root: File) {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val baseDepth = directory.toPath().nameCount
-        val rows = directory.walkTopDown()
-            .onEnter { it.canonicalFile.path.startsWith(root.canonicalFile.path) }
-            .filter { it != directory && it.toPath().nameCount - baseDepth <= depth.coerceIn(1, 8) }
+        val rows = safeWalk(directory)
+            .filter {
+                it != directory && isInsideWorkspace(it) &&
+                    it.toPath().nameCount - baseDepth <= depth.coerceIn(1, 8)
+            }
             .take(MAX_LIST_ROWS)
             .map { file ->
                 val suffix = if (file.isDirectory) "/" else " (${file.length()} B)"
-                file.relativeTo(root).invariantSeparatorsPath + suffix
+                file.relativeTo(canonicalRoot).invariantSeparatorsPath + suffix
             }
             .toList()
         return if (rows.isEmpty()) "目录为空" else rows.joinToString("\n")
@@ -93,14 +98,14 @@ class LocalWorkspace(private val root: File) {
         require(query.isNotBlank()) { "搜索内容不能为空" }
         val directory = resolve(relativePath)
         require(directory.exists()) { "路径不存在：$relativePath" }
-        val files = if (directory.isFile) sequenceOf(directory) else directory.walkTopDown().asSequence()
+        val files = if (directory.isFile) sequenceOf(directory) else safeWalk(directory)
         val matches = mutableListOf<String>()
-        files.filter { it.isFile && it.length() <= MAX_TEXT_BYTES }.forEach { file ->
+        files.filter { it.isFile && isInsideWorkspace(it) && it.length() <= MAX_TEXT_BYTES }.forEach { file ->
             if (matches.size >= MAX_SEARCH_ROWS) return@forEach
             runCatching { file.useLines { lines ->
                 lines.forEachIndexed { index, line ->
                     if (matches.size < MAX_SEARCH_ROWS && line.contains(query, ignoreCase = true)) {
-                        matches += "${file.relativeTo(root).invariantSeparatorsPath}:${index + 1}: $line"
+                        matches += "${file.relativeTo(canonicalRoot).invariantSeparatorsPath}:${index + 1}: $line"
                     }
                 }
             } }
@@ -109,16 +114,20 @@ class LocalWorkspace(private val root: File) {
     }
 
     /** Execute Android's system shell in the workspace with a hard timeout. */
-    suspend fun shell(command: String, timeoutSeconds: Int): String = withContext(Dispatchers.IO) {
+    suspend fun shell(
+        command: String,
+        timeoutSeconds: Int,
+        onProgress: ((String) -> Unit)? = null,
+    ): String = withContext(Dispatchers.IO) {
         require(command.isNotBlank()) { "命令不能为空" }
         val process = ProcessBuilder("/system/bin/sh", "-c", command)
-            .directory(root)
+            .directory(canonicalRoot)
             .redirectErrorStream(true)
             .start()
         try {
             coroutineScope {
                 val output = async {
-                    process.inputStream.bufferedReader().use(::readBounded)
+                    process.inputStream.bufferedReader().use { readBounded(it, onProgress) }
                 }
                 val finished = runInterruptible {
                     process.waitFor(timeoutSeconds.coerceIn(1, 120).toLong(), TimeUnit.SECONDS)
@@ -126,8 +135,7 @@ class LocalWorkspace(private val root: File) {
                 if (!finished) {
                     process.destroyForcibly()
                     process.waitFor()
-                    output.await()
-                    return@coroutineScope "命令执行超时，已终止"
+                    return@coroutineScope "命令执行超时，已终止\n${output.await()}".trimEnd()
                 }
                 "退出码：${process.exitValue()}\n${output.await()}"
             }
@@ -157,13 +165,24 @@ class LocalWorkspace(private val root: File) {
 
     private fun resolve(relativePath: String): File {
         require(relativePath.isNotBlank()) { "路径不能为空" }
-        val canonicalRoot = root.canonicalFile
         val candidate = File(canonicalRoot, relativePath).canonicalFile
         require(candidate == canonicalRoot || candidate.path.startsWith(canonicalRoot.path + File.separator)) {
             "拒绝访问工作区之外的路径"
         }
         return candidate
     }
+
+    private fun safeWalk(directory: File): Sequence<File> =
+        directory.walkTopDown()
+            .onEnter { candidate ->
+                isInsideWorkspace(candidate) && !Files.isSymbolicLink(candidate.toPath())
+            }
+            .asSequence()
+
+    private fun isInsideWorkspace(candidate: File): Boolean = runCatching {
+        val canonical = candidate.canonicalFile
+        canonical == canonicalRoot || canonical.path.startsWith(canonicalRoot.path + File.separator)
+    }.getOrDefault(false)
 
     private fun globRegex(glob: String): Regex {
         val output = StringBuilder("^")
@@ -185,7 +204,7 @@ class LocalWorkspace(private val root: File) {
         return Regex(output.append('$').toString())
     }
 
-    private fun readBounded(reader: Reader): String {
+    private fun readBounded(reader: Reader, onProgress: ((String) -> Unit)?): String {
         val output = StringBuilder()
         val buffer = CharArray(8_192)
         while (true) {
@@ -193,6 +212,7 @@ class LocalWorkspace(private val root: File) {
             if (read < 0) break
             if (output.length < MAX_SHELL_CHARS) {
                 output.append(buffer, 0, minOf(read, MAX_SHELL_CHARS - output.length))
+                onProgress?.invoke(output.toString())
             }
         }
         return output.toString()

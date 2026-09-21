@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,9 +87,13 @@ fun ConnectScreen(
     onOpenSettings: () -> Unit,
     onOpenLocalHarness: () -> Unit,
     onPair: (prefillUrl: String?) -> Unit,
+    initialMode: String? = null,
     viewModel: ConnectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(initialMode) {
+        initialMode?.let(viewModel::setMode)
+    }
     val colors = DsTheme.colors
     // Saveable: a rotation mid-connect used to wipe a hand-typed address.
     var host by rememberSaveable { mutableStateOf("") }

@@ -23,7 +23,8 @@
 
     <application
         android:name=".DshApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:intentMatchingFlags="enforceIntentFilter"

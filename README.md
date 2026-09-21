@@ -11,10 +11,10 @@
 
 ## 777 phase 2: on-device Harness
 
-Version `0.12.0-777.3` targets Android 16+ and expands the native Android agent loop. The **Local
+Version `0.12.0-777.4` targets Android 16+ and expands the native Android agent loop. The **Local
 Harness** entry runs multi-session durable history, workspace file/edit/search tools, Android shell
 and background jobs, official DeepSeek web search, goals, todos, skills, user questions, subagents,
-and parallel workflows entirely on the phone. It stores the model key in Android Keystore and asks
+and parallel or pipeline workflows entirely on the phone. It stores the model key in Android Keystore and asks
 for approval before file writes, edits, or shell execution.
 
 See the [Android 16 on-device Harness parity audit](docs/ANDROID16-HARNESS-PARITY.zh-CN.md) for the

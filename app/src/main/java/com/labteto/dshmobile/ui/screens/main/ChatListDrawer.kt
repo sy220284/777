@@ -93,6 +93,7 @@ private const val SORT_UPDATED = "updated"
 fun ChatListDrawer(
     onClose: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenLocalHarness: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val store = rememberSessionStore()
@@ -226,6 +227,16 @@ fun ChatListDrawer(
             icon = Icons.Filled.Add,
             onClick = { newSessionOpen = true },
             variant = DsButtonVariant.Info,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        DsButton(
+            text = "本机 Harness",
+            onClick = {
+                onClose()
+                onOpenLocalHarness()
+            },
+            variant = DsButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
 

@@ -23,12 +23,16 @@ class LocalJobManager(
     private val lock = Any()
     private val records = linkedMapOf<String, Record>()
 
-    fun start(label: String, block: suspend (String) -> String): String {
+    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String {
         val record = Record(UUID.randomUUID().toString().take(8), label.take(160))
         synchronized(lock) { records[record.id] = record }
         record.job = scope.launch {
             try {
-                val result = block(record.id).take(MAX_OUTPUT)
+                val report: (String) -> Unit = { output ->
+                    synchronized(lock) { record.output = output.takeLast(MAX_OUTPUT) }
+                    publish()
+                }
+                val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 synchronized(lock) {
                     record.output = result
                     record.status = "completed"

@@ -27,6 +27,13 @@ data class LocalHarnessSession(
     val planMode: Boolean = false,
 )
 
+data class LocalImportedAttachment(
+    val name: String,
+    val relativePath: String,
+    val mediaType: String,
+    val bytes: Long,
+)
+
 data class LocalSessionSummary(
     val id: String,
     val title: String,

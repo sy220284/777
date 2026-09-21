@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
  * never conflict.
  */
 @Composable
-fun MainScreen(onOpenSettings: () -> Unit) {
+fun MainScreen(onOpenSettings: () -> Unit, onOpenLocalHarness: () -> Unit) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var detailsOpen by remember { mutableStateOf(false) }
@@ -55,6 +55,7 @@ fun MainScreen(onOpenSettings: () -> Unit) {
             ChatListDrawer(
                 onClose = { scope.launch { drawerState.close() } },
                 onOpenSettings = onOpenSettings,
+                onOpenLocalHarness = onOpenLocalHarness,
             )
         },
     ) {

@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,22 +23,31 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -45,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -56,50 +68,160 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.launch
 
-/** Standalone Harness UI backed by the native Android agent loop. */
+/** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
-    onClose: () -> Unit,
+    onOpenLan: () -> Unit,
+    onOpenRelay: () -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     var editingConfig by rememberSaveable { mutableStateOf(false) }
-    BackHandler {
+    var showDiagnostic by rememberSaveable { mutableStateOf(false) }
+    var showEnvironment by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+    BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
+    BackHandler(enabled = state.pendingQuestion != null) { viewModel.answerQuestion("用户取消了问题") }
+    BackHandler(enabled = editingConfig && state.configured) { editingConfig = false }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            LocalModeDrawer(
+                onLocal = { scope.launch { drawerState.close() } },
+                onLan = {
+                    scope.launch { drawerState.close() }
+                    onOpenLan()
+                },
+                onRelay = {
+                    scope.launch { drawerState.close() }
+                    onOpenRelay()
+                },
+                onNetworkDiagnostic = {
+                    scope.launch { drawerState.close() }
+                    showDiagnostic = true
+                },
+                onEnvironment = {
+                    scope.launch { drawerState.close() }
+                    showEnvironment = true
+                },
+                onSettings = {
+                    scope.launch { drawerState.close() }
+                    onOpenSettings()
+                },
+            )
+        },
+    ) {
         when {
-            state.pendingApproval != null -> viewModel.deny()
-            state.pendingQuestion != null -> viewModel.answerQuestion("用户取消了问题")
-            editingConfig && state.configured -> editingConfig = false
-            else -> onClose()
+            state.loading -> LoadingScreen()
+            !state.configured || editingConfig -> LocalConfiguration(
+                state = state,
+                canCancel = state.configured,
+                onOpenMenu = { scope.launch { drawerState.open() } },
+                onCancel = { editingConfig = false },
+                onSave = { key, model, base ->
+                    viewModel.configure(key, model, base)
+                    editingConfig = false
+                },
+                onClearCredential = viewModel::clearCredential,
+            )
+            else -> LocalChat(
+                state = state,
+                onOpenMenu = { scope.launch { drawerState.open() } },
+                onConfigure = { editingConfig = true },
+                onSend = viewModel::send,
+                onImportAttachment = viewModel::importAttachment,
+                onStop = viewModel::stop,
+                onNewSession = viewModel::newSession,
+                onPlanModeChange = viewModel::setPlanMode,
+                onSwitchSession = viewModel::switchSession,
+                onApprove = viewModel::approve,
+                onDeny = viewModel::deny,
+                onAnswerQuestion = viewModel::answerQuestion,
+            )
         }
     }
 
-    when {
-        state.loading -> LoadingScreen()
-        !state.configured || editingConfig -> LocalConfiguration(
-            state = state,
-            canCancel = state.configured,
-            onCancel = { editingConfig = false },
-            onClose = onClose,
-            onSave = { key, model, base ->
-                viewModel.configure(key, model, base)
-                editingConfig = false
-            },
-            onClearCredential = viewModel::clearCredential,
+    if (showDiagnostic) {
+        NetworkDiagnosticDialog(
+            onDismiss = { showDiagnostic = false },
+            diagnose = viewModel::diagnoseNetwork,
         )
-        else -> LocalChat(
-            state = state,
-            onClose = onClose,
-            onConfigure = { editingConfig = true },
-            onSend = viewModel::send,
-            onStop = viewModel::stop,
-            onNewSession = viewModel::newSession,
-            onPlanModeChange = viewModel::setPlanMode,
-            onSwitchSession = viewModel::switchSession,
-            onApprove = viewModel::approve,
-            onDeny = viewModel::deny,
-            onAnswerQuestion = viewModel::answerQuestion,
+    }
+
+    if (showEnvironment) {
+        EnvironmentInfoDialog(
+            text = viewModel.environmentInfo(),
+            onDismiss = { showEnvironment = false },
         )
+    }
+}
+
+@Composable
+private fun LocalModeDrawer(
+    onLocal: () -> Unit,
+    onLan: () -> Unit,
+    onRelay: () -> Unit,
+    onNetworkDiagnostic: () -> Unit,
+    onEnvironment: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    ModalDrawerSheet(
+        drawerContainerColor = colors.bgLayer1,
+        modifier = Modifier.safeDrawingPadding(),
+    ) {
+        Column(
+            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
+            Text(
+                "默认在手机本机运行。向右滑动可随时打开这里。",
+                style = DsType.small13,
+                color = colors.labelTertiary,
+            )
+            Spacer(Modifier.height(DsSpacing.small))
+            NavigationDrawerItem(
+                label = { Text("本机 Harness") },
+                selected = true,
+                onClick = onLocal,
+            )
+            NavigationDrawerItem(
+                label = { Text("局域网 Harness") },
+                selected = false,
+                onClick = onLan,
+            )
+            NavigationDrawerItem(
+                label = { Text("中继连接") },
+                selected = false,
+                onClick = onRelay,
+            )
+            HorizontalDivider()
+            NavigationDrawerItem(
+                label = { Text("网络诊断") },
+                selected = false,
+                onClick = onNetworkDiagnostic,
+            )
+            NavigationDrawerItem(
+                label = { Text("环境能力") },
+                selected = false,
+                onClick = onEnvironment,
+            )
+            NavigationDrawerItem(
+                label = { Text("设置") },
+                selected = false,
+                onClick = onSettings,
+            )
+        }
     }
 }
 
@@ -114,13 +236,13 @@ private fun LoadingScreen() {
 private fun LocalConfiguration(
     state: LocalHarnessState,
     canCancel: Boolean,
+    onOpenMenu: () -> Unit,
     onCancel: () -> Unit,
-    onClose: () -> Unit,
     onSave: (String, String, String) -> Unit,
     onClearCredential: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    var apiKey by rememberSaveable { mutableStateOf("") }
+    var apiKey by remember { mutableStateOf("") }
     var model by rememberSaveable(state.model) { mutableStateOf(state.model) }
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
@@ -129,16 +251,24 @@ private fun LocalConfiguration(
             .padding(DsSpacing.xlarge),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            DsButton("返回", if (canCancel) onCancel else onClose, variant = DsButtonVariant.Ghost)
-            Text("本机 Harness 配置", style = DsType.large20, color = colors.labelPrimary)
-            Spacer(Modifier.size(56.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsButton("菜单", onOpenMenu, variant = DsButtonVariant.Ghost)
+            Text("本机 Harness", style = DsType.large20, color = colors.labelPrimary)
+            if (canCancel) {
+                DsButton("取消", onCancel, variant = DsButtonVariant.Ghost)
+            } else {
+                Spacer(Modifier.size(56.dp))
+            }
         }
 
         DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Text("手机直接执行", style = DsType.base16Strong, color = colors.labelPrimary)
             Text(
-                "模型循环、工具调用、文件、命令、技能与子代理都在这台手机内运行。电脑关闭后仍可工作。",
+                "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。局域网与中继已经移到侧边菜单。",
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )
@@ -179,9 +309,7 @@ private fun LocalConfiguration(
             singleLine = true,
         )
 
-        state.error?.let {
-            Text(it, style = DsType.small13, color = colors.error)
-        }
+        state.error?.let { Text(it, style = DsType.small13, color = colors.error) }
 
         DsButton(
             text = "保存并进入本机 Harness",
@@ -216,9 +344,10 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalChat(
     state: LocalHarnessState,
-    onClose: () -> Unit,
+    onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (String, List<LocalImportedAttachment>) -> Unit,
+    onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -228,9 +357,38 @@ private fun LocalChat(
     onAnswerQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    val scope = rememberCoroutineScope()
     var input by rememberSaveable { mutableStateOf("") }
     var showSessions by rememberSaveable { mutableStateOf(false) }
+    var attachmentError by remember { mutableStateOf<String?>(null) }
+    val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching { onImportAttachment(uri) }
+                    .onSuccess {
+                        attachments += it
+                        attachmentError = null
+                    }
+                    .onFailure { attachmentError = it.message ?: "图片导入失败" }
+            }
+        }
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching { onImportAttachment(uri) }
+                    .onSuccess {
+                        attachments += it
+                        attachmentError = null
+                    }
+                    .onFailure { attachmentError = it.message ?: "文件导入失败" }
+            }
+        }
+    }
+
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
     }
@@ -246,13 +404,13 @@ private fun LocalChat(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsButton("返回", onClose, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                DsButton("菜单", onOpenMenu, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("本机 Harness", style = DsType.base16Strong, color = colors.labelPrimary)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StateDot(if (state.running) StateDotState.Running else StateDotState.Done)
                         Text(
-                            if (state.running) " 手机正在执行" else " 可离线于电脑运行",
+                            if (state.running) " 手机正在执行" else " 本机模式",
                             style = DsType.caption11,
                             color = colors.labelTertiary,
                         )
@@ -274,12 +432,6 @@ private fun LocalChat(
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
                 DsButton(
                     "会话",
                     { showSessions = true },
@@ -287,7 +439,6 @@ private fun LocalChat(
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
-                Spacer(Modifier.size(DsSpacing.small))
                 DsButton("新会话", onNewSession, variant = DsButtonVariant.Outline, size = DsButtonSize.Small)
             }
         }
@@ -339,9 +490,7 @@ private fun LocalChat(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             if (state.messages.isEmpty()) {
-                item {
-                    EmptyLocalHarness(state.workspacePath)
-                }
+                item { EmptyLocalHarness(state.workspacePath) }
             }
             items(state.messages, key = { it.id }) { message ->
                 LocalMessageRow(message)
@@ -350,11 +499,7 @@ private fun LocalChat(
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text(
-                            " 代理循环正在运行…",
-                            style = DsType.small13,
-                            color = colors.labelTertiary,
-                        )
+                        Text(" 代理循环正在运行…", style = DsType.small13, color = colors.labelTertiary)
                     }
                 }
             }
@@ -368,43 +513,76 @@ private fun LocalChat(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
             )
         }
+        attachmentError?.let {
+            Text(
+                it,
+                style = DsType.small13,
+                color = colors.error,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+            )
+        }
 
-        Row(
-            Modifier.fillMaxWidth().background(colors.bgLayer1)
-                .padding(DsSpacing.medium),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalAlignment = Alignment.Bottom,
+        Column(
+            Modifier.fillMaxWidth().background(colors.bgLayer1).padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
+            if (attachments.isNotEmpty()) {
+                attachments.forEachIndexed { index, attachment ->
+                    ImportedAttachmentRow(
+                        attachment = attachment,
+                        onRemove = { attachments.removeAt(index) },
+                    )
+                }
+            }
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("交给手机上的 Harness…") },
                 minLines = 1,
                 maxLines = 5,
             )
-            if (state.running) {
-                DsButton("停止", onStop, variant = DsButtonVariant.Danger)
-            } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 DsButton(
-                    "发送",
-                    onClick = {
-                        val text = input
-                        input = ""
-                        onSend(text)
-                    },
-                    enabled = input.isNotBlank(),
+                    "图片",
+                    { imagePicker.launch(arrayOf("image/*")) },
+                    variant = DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
                 )
+                DsButton(
+                    "文件",
+                    { filePicker.launch(arrayOf("*/*")) },
+                    variant = DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
+                )
+                Spacer(Modifier.weight(1f))
+                if (state.running) {
+                    DsButton("停止", onStop, variant = DsButtonVariant.Danger)
+                } else {
+                    DsButton(
+                        "发送",
+                        onClick = {
+                            val text = input
+                            val selected = attachments.toList()
+                            input = ""
+                            attachments.clear()
+                            onSend(text, selected)
+                        },
+                        enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                    )
+                }
             }
         }
     }
 
-    state.pendingApproval?.let {
-        ApprovalDialog(it, onApprove, onDeny)
-    }
-    state.pendingQuestion?.let {
-        QuestionDialog(it.question, it.options, onAnswerQuestion)
-    }
+    state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny) }
+    state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
     if (showSessions) {
         DsDialog(title = "本机会话", onDismiss = { showSessions = false }) {
             if (state.sessions.isEmpty()) {
@@ -426,12 +604,37 @@ private fun LocalChat(
 }
 
 @Composable
+private fun ImportedAttachmentRow(
+    attachment: LocalImportedAttachment,
+    onRemove: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsCard {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(
+                    "${attachment.relativePath} · ${attachment.bytes} B",
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+            }
+            DsButton("移除", onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+        }
+    }
+}
+
+@Composable
 private fun EmptyLocalHarness(workspacePath: String) {
     val colors = DsTheme.colors
     DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text("完整能力已在手机内启动", style = DsType.large20, color = colors.labelPrimary)
+        Text("手机就是 Harness 主机", style = DsType.large20, color = colors.labelPrimary)
         Text(
-            "可以直接让它整理资料、创建文件、搜索文本、调用网页、执行安卓命令、读取技能或拆分子任务。写文件和命令执行会先向你确认。",
+            "直接聊天、处理工作区文件、搜索网页、执行安卓命令、拆分子任务。需要电脑时，从左侧菜单切换局域网或中继。",
             style = DsType.std14,
             color = colors.labelSecondary,
         )
@@ -446,6 +649,7 @@ private fun EmptyLocalHarness(workspacePath: String) {
 @Composable
 private fun LocalMessageRow(message: LocalHarnessMessage) {
     val colors = DsTheme.colors
+    val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val isTool = message.role == "tool"
     val isReasoning = message.role == "reasoning"
@@ -465,17 +669,29 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             },
         ) {
             Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(
-                    when {
-                        isUser -> "你"
-                        isTool -> "工具 · ${message.toolName}"
-                        isReasoning -> "推理"
-                        message.role == "system" -> "系统"
-                        else -> "Harness"
-                    },
-                    style = DsType.caption11Strong,
-                    color = colors.labelTertiary,
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        when {
+                            isUser -> "你"
+                            isTool -> "工具 · ${message.toolName}"
+                            isReasoning -> "推理"
+                            message.role == "system" -> "系统"
+                            else -> "Harness"
+                        },
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    DsButton(
+                        "复制",
+                        { clipboard.setText(AnnotatedString(message.content)) },
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
                 SelectionContainer {
                     Text(
                         message.content,
@@ -484,6 +700,77 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NetworkDiagnosticDialog(
+    onDismiss: () -> Unit,
+    diagnose: suspend (String) -> String,
+) {
+    val colors = DsTheme.colors
+    val scope = rememberCoroutineScope()
+    var target by rememberSaveable { mutableStateOf("https://github.com") }
+    var result by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    DsDialog(title = "网络诊断", onDismiss = onDismiss) {
+        Text(
+            "检查实际解析地址、系统代理、VPN/TUN，以及是否被安全策略主动拦截。",
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        OutlinedTextField(
+            value = target,
+            onValueChange = { target = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("网址或域名") },
+            singleLine = true,
+        )
+        DsButton(
+            if (running) "诊断中…" else "开始诊断",
+            onClick = {
+                running = true
+                scope.launch {
+                    result = runCatching { diagnose(target) }.getOrElse { it.message ?: "诊断失败" }
+                    running = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = target.isNotBlank() && !running,
+        )
+        result?.let {
+            SelectionContainer {
+                Text(
+                    it,
+                    style = DsType.mdCode,
+                    color = colors.labelPrimary,
+                    modifier = Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnvironmentInfoDialog(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsDialog(title = "环境能力", onDismiss = onDismiss) {
+        Text(
+            "这里展示手机本机 Harness 当前可依赖的系统能力和沙箱限制。",
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        SelectionContainer {
+            Text(
+                text,
+                style = DsType.mdCode,
+                color = colors.labelPrimary,
+                modifier = Modifier.fillMaxWidth().height(260.dp).verticalScroll(rememberScrollState()),
+            )
         }
     }
 }
