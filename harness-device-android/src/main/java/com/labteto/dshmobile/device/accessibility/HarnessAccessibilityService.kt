@@ -88,9 +88,15 @@ class HarnessAccessibilityService : AccessibilityService() {
     fun scrollForward(): Boolean =
         rootInActiveWindow?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) == true
 
-    fun tap(x: Float, y: Float, durationMillis: Long = 60L): Boolean {
+    fun tap(
+        x: Float,
+        y: Float,
+        durationMillis: Long = 60L,
+        displayId: Int = Display.DEFAULT_DISPLAY,
+    ): Boolean {
         val path = Path().apply { moveTo(x, y) }
         val gesture = GestureDescription.Builder()
+            .setDisplayId(displayId)
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMillis.coerceAtLeast(1L)))
             .build()
         return dispatchGesture(gesture, null, null)
@@ -102,12 +108,14 @@ class HarnessAccessibilityService : AccessibilityService() {
         endX: Float,
         endY: Float,
         durationMillis: Long = 350L,
+        displayId: Int = Display.DEFAULT_DISPLAY,
     ): Boolean {
         val path = Path().apply {
             moveTo(startX, startY)
             lineTo(endX, endY)
         }
         val gesture = GestureDescription.Builder()
+            .setDisplayId(displayId)
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMillis.coerceAtLeast(1L)))
             .build()
         return dispatchGesture(gesture, null, null)
