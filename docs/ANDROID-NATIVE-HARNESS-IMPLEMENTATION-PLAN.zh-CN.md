@@ -37,7 +37,7 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 - 模型可见的状态必须来自可持久化的 Session Event。
 - 文件、进程、终端、网络、设备控制全部通过能力接口接入。
 - 官方行为兼容以“输入/事件/状态/输出一致”为准，不追求类名或代码结构逐行相似。
-- 上游更新必须经过自动差异分析和一致性测试，禁止凭感觉手工跟版本。
+- 官方版本对齐由人工发起；更新官方基线前必须完成差分测试并明确兼容影响。
 - 不能保持官方语义的能力必须显式标记“Android 替代实现”或“平台不支持”，禁止伪装兼容。
 
 ### 2.2 明确不采用的路线
@@ -109,12 +109,11 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 │  ├─ 外部进程协议
 │  └─ Git / Python / Node 工具接入
 │
-└─ upstream-sync
-   ├─ 官方版本锁
-   ├─ 自动差异分析
-   ├─ 代码生成
-   ├─ 参考实现测试
-   └─ 自动同步 PR
+└─ reference-validation
+   ├─ 官方版本基线
+   ├─ 参考实现 Runner
+   ├─ 一致性测试夹具
+   └─ 差异报告
 ```
 
 ---
@@ -509,11 +508,11 @@ android_vscreen_close
 
 ---
 
-## 8. 官方更新跟随机制
+## 8. 官方基线维护
 
-### 8.1 上游锁文件
+官方 Harness 仍作为语义、协议与测试参考，版本基线由人工维护。
 
-新增：
+项目只维护一个明确的“已验证官方基线”：
 
 ```text
 upstream/deepseek-harness.lock.json
@@ -530,101 +529,17 @@ upstream/deepseek-harness.lock.json
 }
 ```
 
-它表示“当前 Android 原生实现已通过验证的官方语义基线”。
+规则：
 
-### 8.2 自动监测
-
-新增工作流：
-
-```text
-.github/workflows/upstream-watch.yml
-```
-
-周期检查：
-
-- 官方 Release / npm 版本；
-- 官方 `master`；
-- Node 最低要求；
-- Session 格式；
-- Tool Catalog；
-- Config Catalog；
-- Cordis API；
-- Agent Loop；
-- Persistence；
-- Workflow / Subagent。
-
-默认只对正式发布或显式标记的官方版本生成同步 PR；`master` 变化生成观察报告，防止每天追逐不稳定提交。
-
-### 8.3 差异分级
-
-#### 绿色
-
-- 文档；
-- UI；
-- 无关平台；
-- 不改变公开 schema 的内部重构。
-
-动作：
-
-自动更新锁定信息或报告，不触发 Core 移植。
-
-#### 黄色
-
-- Tool Schema；
-- RPC；
-- Config；
-- 新工具；
-- Subagent 参数；
-- Workflow 参数；
-- 模型适配器。
-
-动作：
-
-自动生成 DTO / Schema 变更，建立同步 PR，要求全量兼容测试。
-
-#### 红色
-
-- Agent Loop；
-- Session Event；
-- Session 格式；
-- Persistence；
-- Prompt 组装；
-- Compaction；
-- Approval；
-- 插件生命周期；
-- 安全策略。
-
-动作：
-
-禁止自动合并，必须完成语义移植和差分测试。
+- 该文件只表示当前 777 已验证兼容的官方参考版本；
+- 只有在人工决定“对齐某个官方版本”时，才更新基线并执行完整差分验证；
+- 对齐失败时继续保留上一份已验证基线，不影响当前 APK 开发与发布。
 
 ---
 
-## 9. 自动代码生成
+## 9. 官方一致性差分测试
 
-对“结构变化”尽可能自动生成，降低人工复制错误。
-
-建议生成：
-
-- Kotlin Tool Schema；
-- Session Event 类型；
-- RPC DTO；
-- Config DTO；
-- Tool Catalog；
-- Capability Catalog；
-- Compatibility Manifest。
-
-来源优先使用官方仓库自身生成的 Catalog / API 输出，而不是正则扫描源码。
-
-生成代码必须标注官方 commit，禁止人工直接编辑。
-
----
-
-## 10. 官方一致性差分测试
-
-这是整个项目长期可维护的核心。
-
-官方 Harness 只在 CI 参考环境运行，不进入 APK。
+官方 Harness 只在开发/CI 参考环境运行，不进入 APK。
 
 ```text
 测试向量
@@ -633,7 +548,7 @@ upstream/deepseek-harness.lock.json
 ├─ Mock Tool
 └─ 初始 Session
        │
-       ├─ Official Harness Runner（Linux CI）
+       ├─ Official Harness Runner（参考环境）
        │
        └─ 777 Native Harness（JVM）
                  ↓
@@ -661,7 +576,7 @@ upstream/deepseek-harness.lock.json
 
 对时间戳、UUID、临时路径等非确定字段先做 Canonicalize，再比较。
 
-### 10.1 必须覆盖的黄金案例
+### 9.1 必须覆盖的黄金案例
 
 - 无工具普通对话；
 - 单工具；
@@ -686,74 +601,13 @@ upstream/deepseek-harness.lock.json
 - 大工具输出；
 - 旧 Session 迁移。
 
-官方一旦更新，全部重跑。
+人工决定切换官方参考基线时，以上案例全部重跑；差异必须先解释并完成移植，之后才能更新锁定版本。
 
 ---
 
-## 11. 自动同步 PR
+## 10. APK 自动更新
 
-工作流检测到新官方版本后自动生成：
-
-```text
-sync/deepseek-harness-<version>
-```
-
-PR 内容必须包含：
-
-```text
-官方版本：
-旧版本 → 新版本
-
-变化摘要：
-Agent
-Session
-Tools
-Workflow
-Subagent
-Persistence
-Config
-Node/runtime
-
-自动生成：
-✓ DTO
-✓ Tool Schema
-✓ Catalog
-
-差分测试：
-通过 / 失败
-
-需要人工移植：
-具体 Kotlin 模块与官方文件
-
-风险级别：
-绿色 / 黄色 / 红色
-```
-
-禁止只写“更新到最新版”。
-
----
-
-## 12. 自动更新 APK
-
-这里区分两种“自动更新”。
-
-### 12.1 官方功能自动跟随
-
-由于 Harness Core 是 APK 原生代码，官方出现语义变化后仍需要：
-
-```text
-官方更新
-→ 自动分析
-→ 自动生成结构代码
-→ AI/开发者移植语义
-→ 差分测试
-→ 合并
-→ 构建新 APK
-```
-
-不能承诺官方任意逻辑修改都能自动翻译为 Kotlin。
-
-### 12.2 用户设备上的 APK 更新
+这一部分仅指 **777 自己向用户设备发布新版 APK**，与官方 Harness 版本同步无关。
 
 App 内更新器可以：
 
@@ -776,7 +630,7 @@ App 内更新器可以：
 
 ---
 
-## 13. 数据与回滚
+## 11. 数据与回滚
 
 Harness Core 升级比普通 UI 升级风险更高。
 
@@ -795,9 +649,9 @@ Harness Core 升级比普通 UI 升级风险更高。
 
 ---
 
-## 14. 安全模型
+## 12. 安全模型
 
-### 14.1 权限层级
+### 12.1 权限层级
 
 建议统一分级：
 
@@ -812,7 +666,7 @@ Harness Core 升级比普通 UI 升级风险更高。
 
 工具必须声明能力级别。
 
-### 14.2 默认策略
+### 12.2 默认策略
 
 - read/search：工作区内默认允许；
 - write/edit：审批；
@@ -827,7 +681,7 @@ Harness Core 升级比普通 UI 升级风险更高。
 
 ---
 
-## 15. CI 最终门禁
+## 13. CI 最终门禁
 
 每个 PR 至少执行：
 
@@ -842,10 +696,10 @@ Android 16 instrumentation
 Security regression
 Session migration
 Tool contract
-Upstream compatibility fixtures
+Compatibility fixtures
 ```
 
-涉及 Harness Core 时增加：
+涉及 Harness Core 或人工切换官方参考基线时增加：
 
 ```text
 Official reference runner
@@ -856,7 +710,7 @@ Differential conformance suite
 
 ---
 
-## 16. 推荐仓库模块演进
+## 14. 推荐仓库模块演进
 
 第一阶段避免一次性大搬家，可按顺序迁移：
 
@@ -875,23 +729,23 @@ app
 
 阶段 3
 :harness-interop
-:upstream-sync
 ```
+
+官方参考实现、测试夹具与版本锁可继续放在 `tools/`、`docs/` 或单独的测试目录中。
 
 每迁移一个能力都保持主线可构建、可安装、可回滚。
 
 ---
 
-## 17. 实施里程碑
+## 15. 实施里程碑
 
 ### M0：规划与基线
 
 - 本文档入库；
-- 锁定官方 commit；
-- 建立能力矩阵；
-- 建立上游变化分类表。
+- 记录当前官方参考 commit；
+- 建立能力矩阵。
 
-完成标准：团队对“原生内核、不内嵌官方 Harness 主运行时”无歧义。
+完成标准：团队对“原生内核、不内嵌官方 Harness 主运行时、官方基线由人工维护”无歧义。
 
 ### M1：Core 拆分
 
@@ -909,9 +763,9 @@ app
 - Reference Runner；
 - Canonicalizer；
 - 黄金案例；
-- CI 阻断。
+- CI 验证入口。
 
-完成标准：核心语义变化能够自动被发现。
+完成标准：人工对齐官方版本时能够精确识别行为差异。
 
 ### M3：Plugin / Capability
 
@@ -943,7 +797,7 @@ app
 
 ---
 
-## 18. 第一批具体开发任务
+## 16. 第一批具体开发任务
 
 接下来建议按下面顺序创建实施 PR：
 
@@ -957,27 +811,25 @@ app
 8. `feat: add accessibility and screen provider`
 9. `feat: add vision interaction loop`
 10. `feat: add virtual display agent runtime`
-11. `ci: automate upstream semantic sync`
-12. `feat: add signed in-app updater`
+11. `feat: add signed in-app updater`
 
 不得把 P0～P9 全塞进一个巨型 PR。
 
 ---
 
-## 19. 成功判据
+## 17. 成功判据
 
 项目完成这一阶段演进后，应同时满足：
 
 - 没有电脑也能完成完整 Agent 任务；
 - Harness Core 不依赖 Node/Ubuntu；
-- 官方 Harness 新增核心行为时能自动发现差异；
-- 大部分 schema/protocol 变化自动生成 Kotlin 代码；
-- 语义变化有明确移植位置；
+- 官方版本只在人工决定对齐时更新参考基线；
 - 同一测试向量下官方参考实现与 777 结果一致；
+- 语义差异能够通过差分测试定位到具体模块；
 - Git / Python / Node 是工具，不是 Harness 宿主；
 - MCP / LSP 原生接入；
 - Agent 可以操作 Android 系统和 App；
-- 官方更新不会重新演变为一次全面人工审计。
+- 官方版本变动不影响当前发布节奏；需要对齐时由人工单独发起。
 
 最终目标：
 
