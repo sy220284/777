@@ -147,9 +147,6 @@ class PrivilegedCommandService() : Binder() {
             .start()
         return try {
             val output = process.inputStream.bufferedReader()
-            val collector = Thread {
-                runCatching { output.readText() }
-            }
             var text = ""
             val reader = Thread {
                 text = runCatching { output.readText() }.getOrDefault("")
