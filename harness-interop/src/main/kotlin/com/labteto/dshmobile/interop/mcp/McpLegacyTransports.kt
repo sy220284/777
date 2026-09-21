@@ -121,7 +121,7 @@ class McpLegacyStreamableHttpTransport(
         if (includeProtocol) builder.header("MCP-Protocol-Version", LEGACY_MCP_PROTOCOL_VERSION)
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
 
-        http.newCall(builder.build()).execute().use { response ->
+        http.newCall(builder.build()).awaitResponseCancellable().use { response ->
             val bodyText = response.body?.string().orEmpty()
             if (!response.isSuccessful) throw McpHttpException(response.code, bodyText)
             if (notification || response.code == 202 || bodyText.isBlank()) {
@@ -164,7 +164,7 @@ class McpLegacyHttpSseTransport(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val connectMutex = Mutex()
     private val requestMutex = Mutex()
-    private val endpoint = CompletableDeferred<String>()
+    private var endpoint = CompletableDeferred<String>()
     private val pending = ConcurrentHashMap<Long, CompletableDeferred<JsonObject>>()
     @Volatile private var sseResponse: Response? = null
     @Volatile private var initialized = false
@@ -201,15 +201,14 @@ class McpLegacyHttpSseTransport(
 
     private suspend fun ensureConnected() = connectMutex.withLock {
         if (sseResponse != null && endpoint.isCompleted && !endpoint.isCancelled) return@withLock
-        val response = withContext(Dispatchers.IO) {
-            http.newCall(
-                Request.Builder()
-                    .url(sseUrl)
-                    .get()
-                    .header("Accept", "text/event-stream")
-                    .build(),
-            ).execute()
-        }
+        endpoint = CompletableDeferred()
+        val response = http.newCall(
+            Request.Builder()
+                .url(sseUrl)
+                .get()
+                .header("Accept", "text/event-stream")
+                .build(),
+        ).awaitResponseCancellable()
         if (!response.isSuccessful) {
             val body = response.body?.string().orEmpty()
             val code = response.code
@@ -231,9 +230,16 @@ class McpLegacyHttpSseTransport(
             } finally {
                 response.close()
                 sseResponse = null
+                initialized = false
             }
         }
-        withTimeout(CONNECT_TIMEOUT_MILLIS) { endpoint.await() }
+        try {
+            withTimeout(CONNECT_TIMEOUT_MILLIS) { endpoint.await() }
+        } catch (error: Exception) {
+            response.close()
+            sseResponse = null
+            throw error
+        }
     }
 
     private suspend fun rawRequest(method: String, params: JsonObject): JsonObject {
@@ -275,7 +281,7 @@ class McpLegacyHttpSseTransport(
             )
             .header("Content-Type", "application/json")
             .build()
-        http.newCall(request).execute().use { response ->
+        http.newCall(request).awaitResponseCancellable().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) throw McpHttpException(response.code, body)
             if (
@@ -393,20 +399,17 @@ class McpLegacyStdioTransport(
 ) : McpTransport {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
-    private var process: Process? = null
-    private var writer: java.io.BufferedWriter? = null
-    private var reader: java.io.BufferedReader? = null
+    private val lineProcess = McpLineProcess(command, workingDirectory)
     private var initialized = false
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        withContext(Dispatchers.IO) {
-            ensureStarted()
-            ensureInitialized()
-            requestRaw(method, params)
-        }
+        val restarted = lineProcess.ensureStarted()
+        if (restarted) initialized = false
+        ensureInitialized()
+        requestRaw(method, params)
     }
 
-    private fun ensureInitialized() {
+    private suspend fun ensureInitialized() {
         if (initialized) return
         val response = requestRaw(
             "initialize",
@@ -434,7 +437,7 @@ class McpLegacyStdioTransport(
         initialized = true
     }
 
-    private fun requestRaw(method: String, params: JsonObject): JsonObject {
+    private suspend fun requestRaw(method: String, params: JsonObject): JsonObject {
         val id = ids.getAndIncrement()
         writeMessage(
             buildJsonObject {
@@ -445,7 +448,7 @@ class McpLegacyStdioTransport(
             },
         )
         while (true) {
-            val line = reader!!.readLine() ?: error("MCP stdio 进程已结束")
+            val line = lineProcess.readLine()
             if (line.isBlank()) continue
             val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
                 ?: continue
@@ -453,33 +456,13 @@ class McpLegacyStdioTransport(
         }
     }
 
-    private fun writeMessage(message: JsonObject) {
-        writer!!.apply {
-            write(json.encodeToString(JsonObject.serializer(), message))
-            newLine()
-            flush()
-        }
-    }
-
-    private fun ensureStarted() {
-        if (process?.isAlive == true) return
-        require(command.isNotEmpty()) { "MCP stdio 命令不能为空" }
-        val next = ProcessBuilder(command)
-            .directory(workingDirectory)
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .start()
-        process = next
-        writer = next.outputStream.bufferedWriter()
-        reader = next.inputStream.bufferedReader()
+    private suspend fun writeMessage(message: JsonObject) {
+        lineProcess.writeLine(json.encodeToString(JsonObject.serializer(), message))
     }
 
     override fun close() {
-        runCatching { writer?.close() }
-        runCatching { reader?.close() }
-        process?.takeIf(Process::isAlive)?.destroyForcibly()
-        process = null
-        writer = null
-        reader = null
+        initialized = false
+        lineProcess.close()
     }
 }
 
