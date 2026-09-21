@@ -1,0 +1,23 @@
+{
+  "id": "single-tool",
+  "input": "调用工具",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "ping"
+          }
+        }
+      ]
+    },
+    {
+      "content": "已完成"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "pong"
+  }
+}
