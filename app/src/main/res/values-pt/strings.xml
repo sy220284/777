@@ -382,7 +382,7 @@
     <string name="update_open">Baixar e instalar</string>
     <string name="update_later">Depois</string>
     <string name="settings_update_check">Procurar atualizações</string>
-    <string name="settings_update_check_hint">Consulta no GitHub a versão mais recente ao iniciar o app.</string>
+    <string name="settings_update_check_hint">Toque para verificar o GitHub agora. Se houver um APK assinado mais recente, o download começa automaticamente.</string>
     <string name="connect_mode_title">Como conectar</string>
     <string name="connect_mode_lan">Rede local</string>
     <string name="connect_mode_relay">Relay</string>
