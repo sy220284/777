@@ -18,6 +18,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
     suspend fun diagnoseNetwork(target: String): String = engine.diagnoseNetwork(target)
+    fun environmentInfo(): String = engine.environmentInfoForUi()
     fun approve() = engine.answerApproval(true)
     fun deny() = engine.answerApproval(false)
     fun answerQuestion(answer: String) = engine.answerQuestion(answer)
