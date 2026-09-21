@@ -21,8 +21,6 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -264,22 +262,11 @@ class HarnessWebhookService : Service() {
     private suspend fun handle(socket: Socket, token: String) {
         socket.use { client ->
             client.soTimeout = 10_000
-            val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
-            val requestLine = reader.readLine() ?: return
-            val parts = requestLine.split(' ')
-            if (parts.size < 2) return respond(client, 400, """{"error":"bad request"}""")
-            val method = parts[0].uppercase()
-            val path = parts[1]
-            val headers = linkedMapOf<String, String>()
-            while (true) {
-                val line = reader.readLine() ?: break
-                if (line.isEmpty()) break
-                val index = line.indexOf(':')
-                if (index > 0) {
-                    headers[line.substring(0, index).trim().lowercase()] =
-                        line.substring(index + 1).trim()
-                }
-            }
+            val request = readHttpRequest(client)
+                ?: return respond(client, 400, """{"error":"bad request"}""")
+            val method = request.method
+            val path = request.path
+            val headers = request.headers
 
             val provided = headers["authorization"]
                 ?.removePrefix("Bearer ")
@@ -306,20 +293,10 @@ class HarnessWebhookService : Service() {
             if (method != "POST" || path != "/run") {
                 return respond(client, 404, """{"error":"not found"}""")
             }
-            val length = headers["content-length"]?.toIntOrNull() ?: 0
-            if (length !in 1..MAX_BODY_BYTES) {
-                return respond(client, 413, """{"error":"invalid body size"}""")
+            if (headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true) {
+                return respond(client, 400, """{"error":"chunked encoding unsupported"}""")
             }
-            val chars = CharArray(length)
-            var offset = 0
-            while (offset < length) {
-                val read = reader.read(chars, offset, length - offset)
-                if (read < 0) break
-                offset += read
-            }
-            if (offset != length) return respond(client, 400, """{"error":"incomplete body"}""")
-            val body = String(chars)
-            val prompt = parsePrompt(body, headers["content-type"])
+            val prompt = parsePrompt(request.body.toString(Charsets.UTF_8), headers["content-type"])
             if (prompt.isBlank()) return respond(client, 400, """{"error":"empty prompt"}""")
 
             val requestId = UUID.randomUUID().toString()
@@ -343,6 +320,65 @@ class HarnessWebhookService : Service() {
             }
         }
     }
+
+    private fun readHttpRequest(socket: Socket): HttpRequest? {
+        val input = socket.getInputStream()
+        val headerBytes = ArrayList<Byte>(512)
+        var state = 0
+        while (headerBytes.size < MAX_HEADER_BYTES) {
+            val value = input.read()
+            if (value < 0) return null
+            val byte = value.toByte()
+            headerBytes += byte
+            state = when {
+                state == 0 && value == '\r'.code -> 1
+                state == 1 && value == '\n'.code -> 2
+                state == 2 && value == '\r'.code -> 3
+                state == 3 && value == '\n'.code -> 4
+                value == '\r'.code -> 1
+                else -> 0
+            }
+            if (state == 4) break
+        }
+        if (state != 4) return null
+
+        val headerText = headerBytes.toByteArray().toString(Charsets.US_ASCII)
+        val lines = headerText.split("\r\n")
+        val requestLine = lines.firstOrNull()?.split(' ') ?: return null
+        if (requestLine.size < 2) return null
+        val headers = linkedMapOf<String, String>()
+        lines.drop(1).forEach { line ->
+            if (line.isBlank()) return@forEach
+            val index = line.indexOf(':')
+            if (index > 0) {
+                headers[line.substring(0, index).trim().lowercase()] =
+                    line.substring(index + 1).trim()
+            }
+        }
+
+        val length = headers["content-length"]?.toIntOrNull() ?: 0
+        if (length !in 0..MAX_BODY_BYTES) return null
+        val body = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val read = input.read(body, offset, length - offset)
+            if (read < 0) return null
+            offset += read
+        }
+        return HttpRequest(
+            method = requestLine[0].uppercase(),
+            path = requestLine[1],
+            headers = headers,
+            body = body,
+        )
+    }
+
+    private data class HttpRequest(
+        val method: String,
+        val path: String,
+        val headers: Map<String, String>,
+        val body: ByteArray,
+    )
 
     private fun parsePrompt(body: String, contentType: String?): String {
         if (contentType?.contains("application/json", ignoreCase = true) == true) {
@@ -386,6 +422,7 @@ class HarnessWebhookService : Service() {
     companion object {
         private const val CHANNEL_ID = "harness_webhook"
         private const val NOTIFICATION_ID = 7711
+        private const val MAX_HEADER_BYTES = 16 * 1024
         private const val MAX_BODY_BYTES = 64 * 1024
     }
 }
