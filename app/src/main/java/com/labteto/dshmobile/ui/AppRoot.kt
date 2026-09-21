@@ -74,7 +74,10 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 onOpenRelay = { surface = "relay" },
                 onOpenSettings = { showSettings = true },
             )
-            showMain && selectedRemoteMatches -> MainScreen(onOpenSettings = { showSettings = true })
+            showMain && selectedRemoteMatches -> MainScreen(
+                onOpenSettings = { showSettings = true },
+                onOpenLocalHarness = { surface = "local" },
+            )
             else -> ConnectScreen(
                 onOpenSettings = { showSettings = true },
                 onOpenLocalHarness = { surface = "local" },
