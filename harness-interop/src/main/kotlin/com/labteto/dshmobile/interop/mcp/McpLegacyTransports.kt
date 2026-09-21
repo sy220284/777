@@ -403,10 +403,16 @@ class McpLegacyStdioTransport(
     private var initialized = false
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        val restarted = lineProcess.ensureStarted()
-        if (restarted) initialized = false
-        ensureInitialized()
-        requestRaw(method, params)
+        try {
+            val restarted = lineProcess.ensureStarted()
+            if (restarted) initialized = false
+            ensureInitialized()
+            requestRaw(method, params)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            initialized = false
+            lineProcess.abort()
+            throw error
+        }
     }
 
     private suspend fun ensureInitialized() {
