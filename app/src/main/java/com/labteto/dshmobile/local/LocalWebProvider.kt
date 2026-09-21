@@ -90,15 +90,16 @@ class LocalWebProvider @Inject constructor(
     suspend fun diagnose(input: String): String = withContext(Dispatchers.IO) {
         val normalized = normalizeInput(input)
         val uri = parseUri(normalized)
+        val host = requireNotNull(uri.host)
         val proxy = systemHttpProxy()
         val vpn = isVpnActive()
         val interfaces = activeTunnelInterfaces()
-        val addresses = resolve(uri.host)
-        val blocked = addresses.filterNot { isPublicAddress(it) || isAllowedVpnFakeAddress(uri.host, it, vpn) }
+        val addresses = resolve(host)
+        val blocked = addresses.filterNot { isPublicAddress(it) || isAllowedVpnFakeAddress(host, it, vpn) }
         buildString {
             appendLine("网络诊断")
             appendLine("目标：$normalized")
-            appendLine("域名：${uri.host}")
+            appendLine("域名：$host")
             appendLine("解析：${addresses.joinToString { it.hostAddress ?: it.toString() }}")
             appendLine("系统代理：${proxy?.let { "${it.host}:${it.port}" } ?: "未检测到"}")
             appendLine("VPN/TUN：${if (vpn) "已启用" else "未检测到"}${if (interfaces.isNotEmpty()) "（${interfaces.joinToString()}）" else ""}")
@@ -106,7 +107,7 @@ class LocalWebProvider @Inject constructor(
                 append("结论：地址通过安全检查，可尝试直接抓取。")
             } else {
                 appendLine("命中受保护地址：${blocked.joinToString { it.hostAddress ?: it.toString() }}")
-                append("结论：安全策略会主动拦截。${blockedHint(uri.host, blocked, vpn)}")
+                append("结论：安全策略会主动拦截.${blockedHint(host, blocked, vpn)}")
             }
         }.trimEnd()
     }
@@ -221,17 +222,18 @@ class LocalWebProvider @Inject constructor(
     private fun validateTarget(input: String): ValidatedTarget {
         val normalized = normalizeInput(input)
         val uri = parseUri(normalized)
-        val addresses = resolve(uri.host)
+        val host = requireNotNull(uri.host)
+        val addresses = resolve(host)
         val vpn = isVpnActive()
-        val blocked = addresses.filterNot { isPublicAddress(it) || isAllowedVpnFakeAddress(uri.host, it, vpn) }
+        val blocked = addresses.filterNot { isPublicAddress(it) || isAllowedVpnFakeAddress(host, it, vpn) }
         if (blocked.isNotEmpty()) {
             throw LocalWebException(
                 "SSRF_BLOCKED",
                 buildString {
-                    append("目标域名被解析为受保护地址：${uri.host} → ")
+                    append("目标域名被解析为受保护地址：$host → ")
                     append(blocked.joinToString { it.hostAddress ?: it.toString() })
                     append("。")
-                    append(blockedHint(uri.host, blocked, vpn))
+                    append(blockedHint(host, blocked, vpn))
                 },
             )
         }
@@ -310,7 +312,7 @@ class LocalWebProvider @Inject constructor(
     }
 
     private fun activeTunnelInterfaces(): List<String> = runCatching {
-        NetworkInterface.getNetworkInterfaces().toList()
+        java.util.Collections.list(NetworkInterface.getNetworkInterfaces())
             .filter { it.isUp && (it.name.startsWith("tun") || it.name.startsWith("wg") || it.name.startsWith("ppp")) }
             .map { it.name }
     }.getOrDefault(emptyList())
