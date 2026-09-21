@@ -18,6 +18,12 @@
     "arguments": "{\"n\":1}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "A"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c2",
@@ -25,23 +31,17 @@
     "arguments": "{\"n\":2}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c2",
+    "content": "B"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c3",
     "name": "c",
     "arguments": "{\"n\":3}"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c1",
-    "content": "A"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c2",
-    "content": "B"
   },
   {
     "type": "tool/result",
