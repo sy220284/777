@@ -15,7 +15,14 @@ plugins {
  * upgrade at all. The code is derived from the name so it rises with semver on its own; the
  * fallback is what a local `assembleRelease` builds.
  */
-val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "0.12.0-777.2"
+val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "0.12.0-777.3"
+
+val dshForkRevision: Int = dshVersionName
+    .substringAfter('-', "")
+    .substringAfterLast('.', "")
+    .toIntOrNull()
+    ?.coerceIn(0, 999)
+    ?: 0
 
 val dshVersionCode: Int = dshVersionName
     .substringBefore('-')
@@ -25,19 +32,20 @@ val dshVersionCode: Int = dshVersionName
         val major = parts.getOrElse(0) { 0 }
         val minor = parts.getOrElse(1) { 0 }
         val patch = parts.getOrElse(2) { 0 }
-        major * 10_000 + minor * 100 + patch
+        (major * 10_000 + minor * 100 + patch) * 1_000 + dshForkRevision
     }
     .coerceAtLeast(1)
 
 android {
     namespace = "com.labteto.dshmobile"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         // Keep this fork installable alongside the upstream DSH Mobile app.
         applicationId = "com.sy220284.dshmobile"
-        minSdk = 26
-        targetSdk = 35
+        // This fork deliberately uses Android 16 platform behavior directly.
+        minSdk = 36
+        targetSdk = 36
         versionCode = dshVersionCode
         versionName = dshVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -1,6 +1,5 @@
 package com.labteto.dshmobile
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,18 +31,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         notifications.ensureChannels()
-        if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
         // Apply the persisted in-app language (11 locales, incl. Thai/RTL).
-        //
-        // This only handles a *change* made while the app is running. Restoring the choice on
-        // launch is AppCompat's job, via the `autoStoreLocales` service declared in the manifest:
-        // it re-applies the stored locale in `attachBaseContext`, before anything is composed. That
-        // ordering is the point. Below API 33 the per-app locale lives on the AppCompatActivity's
-        // base context, and any window built from a context captured earlier keeps the device
-        // language — which is how bottom sheets and dialogs ended up disagreeing with the rest of
-        // the app. Setting it from here alone could never fix that; this call is deliberately after
-        // onCreate, which is where the AppCompat contract requires it.
         //
         // Only set the locale when it actually differs, or the recreate it triggers loops.
         lifecycleScope.launch {

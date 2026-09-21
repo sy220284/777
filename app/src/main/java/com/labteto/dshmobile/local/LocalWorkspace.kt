@@ -1,9 +1,13 @@
 package com.labteto.dshmobile.local
 
 import java.io.File
+import java.io.Reader
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(private val root: File) {
@@ -34,6 +38,37 @@ class LocalWorkspace(private val root: File) {
         file.parentFile?.mkdirs()
         file.writeText(content)
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
+    }
+
+    /** Replace one unique literal after the caller has observed the file. */
+    fun edit(relativePath: String, oldText: String, newText: String): String {
+        require(oldText.isNotEmpty()) { "待替换内容不能为空" }
+        val file = resolve(relativePath)
+        require(file.isFile) { "文件不存在：$relativePath" }
+        require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
+        val source = file.readText()
+        val first = source.indexOf(oldText)
+        require(first >= 0) { "文件中没有找到待替换内容" }
+        require(source.indexOf(oldText, first + oldText.length) < 0) { "待替换内容出现多次，请提供更长的唯一片段" }
+        val result = source.replaceRange(first, first + oldText.length, newText)
+        require(result.toByteArray().size <= MAX_WRITE_BYTES) { "编辑结果超过 ${MAX_WRITE_BYTES / 1024} KB" }
+        file.writeText(result)
+        return "已编辑 $relativePath"
+    }
+
+    /** Glob-style file discovery without relying on a bundled desktop ripgrep binary. */
+    fun glob(pattern: String, relativePath: String = "."): String {
+        require(pattern.isNotBlank()) { "匹配模式不能为空" }
+        val directory = resolve(relativePath)
+        require(directory.isDirectory) { "目录不存在：$relativePath" }
+        val matcher = globRegex(pattern.replace('\\', '/'))
+        val rows = directory.walkTopDown().asSequence()
+            .filter { it.isFile }
+            .map { it.relativeTo(directory).invariantSeparatorsPath }
+            .filter { matcher.matches(it) }
+            .take(MAX_LIST_ROWS)
+            .toList()
+        return if (rows.isEmpty()) "未找到匹配文件" else rows.joinToString("\n")
     }
 
     /** List descendants without following a path outside the app workspace. */
@@ -81,10 +116,20 @@ class LocalWorkspace(private val root: File) {
             .redirectErrorStream(true)
             .start()
         try {
-            withTimeout(timeoutSeconds.coerceIn(1, 120) * 1_000L) {
-                val output = process.inputStream.bufferedReader().use { it.readText() }
-                val code = process.waitFor()
-                "退出码：$code\n${output.take(MAX_SHELL_CHARS)}"
+            coroutineScope {
+                val output = async {
+                    process.inputStream.bufferedReader().use(::readBounded)
+                }
+                val finished = runInterruptible {
+                    process.waitFor(timeoutSeconds.coerceIn(1, 120).toLong(), TimeUnit.SECONDS)
+                }
+                if (!finished) {
+                    process.destroyForcibly()
+                    process.waitFor()
+                    output.await()
+                    return@coroutineScope "命令执行超时，已终止"
+                }
+                "退出码：${process.exitValue()}\n${output.await()}"
             }
         } finally {
             if (process.isAlive) process.destroyForcibly()
@@ -103,6 +148,13 @@ class LocalWorkspace(private val root: File) {
     /** Read one installed skill instruction file. */
     fun readSkill(name: String): String = read(".dsh/skills/$name/SKILL.md", 1, 800)
 
+    /** Validate a deliverable before the model presents it. */
+    fun present(relativePath: String): String {
+        val file = resolve(relativePath)
+        require(file.isFile) { "成果文件不存在：$relativePath" }
+        return "成果已确认：$relativePath（${file.length()} 字节）"
+    }
+
     private fun resolve(relativePath: String): File {
         require(relativePath.isNotBlank()) { "路径不能为空" }
         val canonicalRoot = root.canonicalFile
@@ -111,6 +163,39 @@ class LocalWorkspace(private val root: File) {
             "拒绝访问工作区之外的路径"
         }
         return candidate
+    }
+
+    private fun globRegex(glob: String): Regex {
+        val output = StringBuilder("^")
+        var index = 0
+        while (index < glob.length) {
+            when (val char = glob[index]) {
+                '*' -> {
+                    if (index + 1 < glob.length && glob[index + 1] == '*') {
+                        output.append(".*")
+                        index++
+                    } else output.append("[^/]*")
+                }
+                '?' -> output.append("[^/]")
+                '.', '(', ')', '+', '|', '^', '$', '@', '%' -> output.append('\\').append(char)
+                else -> output.append(char)
+            }
+            index++
+        }
+        return Regex(output.append('$').toString())
+    }
+
+    private fun readBounded(reader: Reader): String {
+        val output = StringBuilder()
+        val buffer = CharArray(8_192)
+        while (true) {
+            val read = reader.read(buffer)
+            if (read < 0) break
+            if (output.length < MAX_SHELL_CHARS) {
+                output.append(buffer, 0, minOf(read, MAX_SHELL_CHARS - output.length))
+            }
+        }
+        return output.toString()
     }
 
     private companion object {

@@ -11,9 +11,10 @@
 
 ## 777 第二阶段：手机内置 Harness
 
-`0.12.0-777.2` 新增原生安卓执行核心。连接页可直接进入“本机 Harness”，模型循环、会话日志、
-文件读写、文本搜索、安卓 shell、网页获取、计划、技能和只读子代理都在 APK 内运行，不需要电脑端
-保持在线。DeepSeek API 密钥由 Android Keystore 加密；写文件和执行命令必须逐次取得用户批准。
+`0.12.0-777.3` 面向 Android 16+ 扩展原生安卓执行核心。连接页可直接进入“本机 Harness”，模型循环、
+多会话追加日志、文件读写与编辑、搜索、安卓 shell、后台任务、网页搜索与获取、计划、目标、任务清单、
+技能、用户问答、子代理和并行工作流都在 APK 内运行，不需要电脑端保持在线。DeepSeek API 密钥由
+Android Keystore 加密；写文件、编辑文件和执行命令必须逐次取得用户批准。
 
 本机执行被限制在应用私有工作区。安卓不会允许普通应用读取其他应用的私有目录；系统也不自带
 Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续按架构和许可证单独内置，或继续使用
@@ -29,7 +30,7 @@ Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续
   <a href="https://dshm.zyphite.com"><img alt="Website" src="https://img.shields.io/badge/website-dshm.zyphite.com-4176E6?style=flat-square"></a>
   <a href="https://github.com/sorsama/deepseek-harness-mobile/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sorsama/deepseek-harness-mobile?style=flat-square"></a>
   <a href="https://github.com/sorsama/deepseek-harness-mobile/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/sorsama/deepseek-harness-mobile/ci.yml?branch=main&style=flat-square"></a>
-  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square">
+  <img alt="Android 16+" src="https://img.shields.io/badge/Android-16%2B-3DDC84?style=flat-square">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
 
@@ -98,7 +99,7 @@ harness，而不是对着一个敞开的端口。参见
 
 ## 环境要求
 
-- Android 8.0 及以上（minSdk 26）。
+- Android 16 及以上（minSdk 36）；低于 Android 16 的设备无法安装。
 - 一个正在运行的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
   （已针对 `0.1.3-alpha.1` 测试）。**0.10.0 需要 harness 0.1.3** —— 该版本不再把回复的增量写入日志，
   改为通过 App 必须主动订阅的实时流传输，因此 App 与 harness 必须同时升级：旧版 App 在 0.1.3 上看不到

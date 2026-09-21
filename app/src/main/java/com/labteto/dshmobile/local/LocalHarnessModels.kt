@@ -16,8 +16,36 @@ data class LocalHarnessMessage(
 /** Persisted model history and its user-facing projection. */
 @Serializable
 data class LocalHarnessSession(
+    val id: String = "",
+    val title: String = "新会话",
+    val updatedAt: Long = 0L,
     val messages: List<LocalHarnessMessage> = emptyList(),
     val modelHistory: List<JsonObject> = emptyList(),
+    val plan: List<String> = emptyList(),
+    val todos: List<LocalTodoItem> = emptyList(),
+    val goal: LocalGoal? = null,
+    val planMode: Boolean = false,
+)
+
+data class LocalSessionSummary(
+    val id: String,
+    val title: String,
+    val updatedAt: Long,
+)
+
+/** One persisted implementation task, aligned with the official todo tool. */
+@Serializable
+data class LocalTodoItem(
+    val content: String,
+    val status: String,
+)
+
+/** The current durable session goal. */
+@Serializable
+data class LocalGoal(
+    val description: String,
+    val status: String = "active",
+    val note: String? = null,
 )
 
 /** A destructive or command-execution tool call waiting for the operator. */
@@ -28,6 +56,20 @@ data class LocalApproval(
     val arguments: String,
 )
 
+/** A model question that pauses the current turn until the user answers it. */
+data class LocalQuestion(
+    val callId: String,
+    val question: String,
+    val options: List<String> = emptyList(),
+)
+
+/** User-visible state for a background command. */
+data class LocalJobInfo(
+    val id: String,
+    val label: String,
+    val status: String,
+)
+
 /** State rendered by the standalone, on-device Harness screen. */
 data class LocalHarnessState(
     val loading: Boolean = true,
@@ -35,10 +77,17 @@ data class LocalHarnessState(
     val model: String = "deepseek-chat",
     val baseUrl: String = "https://api.deepseek.com",
     val workspacePath: String = "",
+    val sessionId: String = "",
+    val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val plan: List<String> = emptyList(),
+    val todos: List<LocalTodoItem> = emptyList(),
+    val goal: LocalGoal? = null,
+    val planMode: Boolean = false,
+    val jobs: List<LocalJobInfo> = emptyList(),
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
+    val pendingQuestion: LocalQuestion? = null,
     val error: String? = null,
 )
 

@@ -121,8 +121,6 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
     val view = remember {
         WebView.setWebContentsDebuggingEnabled(com.labteto.dshmobile.BuildConfig.DEBUG)
         WebView(context).apply {
-            // Legacy WebViews can lose the containing Compose dialog's surface with GPU drawing.
-            if (android.os.Build.VERSION.SDK_INT <= 30) setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
             settings.javaScriptEnabled = true
             settings.allowFileAccess = false; settings.allowContentAccess = false
             settings.blockNetworkLoads = true
@@ -142,19 +140,11 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
                 <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
                 <style>html,body,#terminal{width:100%;height:100%;margin:0;overflow:hidden} $css</style></head><body><div id="terminal"></div>
                 <script>
-                // Android 11 can ship a WebView older than replaceChildren (Chrome 86).
-                for (const proto of [Element.prototype,DocumentFragment.prototype]) {
-                    if (!proto.replaceChildren) proto.replaceChildren=function(...children){
-                        while(this.firstChild)this.removeChild(this.firstChild);
-                        for(const child of children)this.appendChild(typeof child==='string'?document.createTextNode(child):child);
-                    };
-                }
                 </script><script>$js</script><script>$fit</script><script>
                 const term = new Terminal({fontSize:14,scrollback:1000,disableStdin:true});
                 const fit = new FitAddon.FitAddon();term.loadAddon(fit);term.open(document.getElementById('terminal'));
                 function post(value){TerminalHost.postMessage(JSON.stringify(value))}
                 function measure(){
-                    // Older Android WebViews resolve percentage/vh heights to zero in a dialog.
                     const height=Math.max(1,window.innerHeight)+'px';
                     document.documentElement.style.height=height;document.body.style.height=height;
                     document.getElementById('terminal').style.height=height;

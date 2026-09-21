@@ -11,11 +11,11 @@
 
 ## 777 phase 2: on-device Harness
 
-Version `0.12.0-777.2` adds a native Android agent loop. The new **Local Harness** entry runs model
-turns, durable history, workspace file tools, text search, Android shell commands, web fetches,
-plans, skills and read-only subagents in the APK itself. It stores the model key in Android
-Keystore and asks for approval before file writes or shell execution. Android's application
-sandbox still limits this mode to its own workspace and the commands shipped by the device.
+Version `0.12.0-777.3` targets Android 16+ and expands the native Android agent loop. The **Local
+Harness** entry runs multi-session durable history, workspace file/edit/search tools, Android shell
+and background jobs, official DeepSeek web search, goals, todos, skills, user questions, subagents,
+and parallel workflows entirely on the phone. It stores the model key in Android Keystore and asks
+for approval before file writes, edits, or shell execution.
 
 <p align="center">
   An open-source Android companion that puts your <b>DeepSeek Harness</b> in your pocket.<br>
@@ -27,7 +27,7 @@ sandbox still limits this mode to its own workspace and the commands shipped by 
   <a href="https://dshm.zyphite.com"><img alt="Website" src="https://img.shields.io/badge/website-dshm.zyphite.com-4176E6?style=flat-square"></a>
   <a href="https://github.com/sorsama/deepseek-harness-mobile/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sorsama/deepseek-harness-mobile?style=flat-square"></a>
   <a href="https://github.com/sorsama/deepseek-harness-mobile/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/sorsama/deepseek-harness-mobile/ci.yml?branch=main&style=flat-square"></a>
-  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square">
+  <img alt="Android 16+" src="https://img.shields.io/badge/Android-16%2B-3DDC84?style=flat-square">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
 
@@ -106,7 +106,7 @@ a [feature tour](https://github.com/sorsama/deepseek-harness-mobile/wiki/Feature
 
 ## Requirements
 
-- Android 8.0+ (minSdk 26).
+- Android 16+ (minSdk 36); earlier versions cannot install this build.
 - A running [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
   at `0.1.6-alpha.1` plus master commit
   `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` for DSH Mobile `0.11.0`.

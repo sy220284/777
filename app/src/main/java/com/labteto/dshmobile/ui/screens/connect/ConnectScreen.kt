@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.connect
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +34,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.ConnectMode
@@ -87,6 +93,30 @@ fun ConnectScreen(
     // Saveable: a rotation mid-connect used to wipe a hand-typed address.
     var host by rememberSaveable { mutableStateOf("") }
     var port by rememberSaveable { mutableStateOf("3080") }
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
+    var pendingLanAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val context = LocalContext.current
+    val nearbyPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        permissionDenied = !granted
+        val action = pendingLanAction
+        pendingLanAction = null
+        if (granted) action?.invoke()
+    }
+    fun withLocalNetworkAccess(action: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.NEARBY_WIFI_DEVICES,
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionDenied = false
+            action()
+        } else {
+            pendingLanAction = action
+            nearbyPermission.launch(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+    }
     val relayMode = state.mode == ConnectMode.RELAY
     val paired = state.visibleHosts
 
@@ -192,7 +222,10 @@ fun ConnectScreen(
                             RecentHarnessCard(
                                 host = saved,
                                 probe = state.recentStatus[saved.authority],
-                                onConnect = { viewModel.connectTo(saved) },
+                                onConnect = {
+                                    if (saved.isRelay) viewModel.connectTo(saved)
+                                    else withLocalNetworkAccess { viewModel.connectTo(saved) }
+                                },
                                 onForget = { viewModel.forget(saved) },
                             )
                         }
@@ -209,7 +242,7 @@ fun ConnectScreen(
                     action = stringResource(
                         if (relayMode) R.string.connect_relay_scan else R.string.connect_scan,
                     ),
-                    onAction = { viewModel.scan() },
+                    onAction = { withLocalNetworkAccess { viewModel.scan() } },
                 )
                 val unknown = state.unknownDiscovered
                 // Results and progress coexist: the sweep streams, so a host found in the first
@@ -233,7 +266,8 @@ fun ConnectScreen(
                             // A relay will not answer `/api` to a device it has never seen, so
                             // "Connect" on one of these cards could only ever produce a 403. It
                             // carries the address into pairing instead.
-                            if (found.isRelay) onPair(found.baseUrl) else viewModel.connectDiscovered(found)
+                            if (found.isRelay) onPair(found.baseUrl)
+                            else withLocalNetworkAccess { viewModel.connectDiscovered(found) }
                         }
                     }
                 }
@@ -269,12 +303,20 @@ fun ConnectScreen(
                     }
                     DsButton(
                         text = stringResource(R.string.connect_button),
-                        onClick = { viewModel.connectManual(host, port) },
+                        onClick = { withLocalNetworkAccess { viewModel.connectManual(host, port) } },
                         enabled = !state.connecting,
                         variant = DsButtonVariant.Info,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+
+            if (permissionDenied) {
+                Text(
+                    "Android 16 已阻止本地网络访问。请允许“附近的设备”权限后重试；本机 Harness 和互联网中继不受影响。",
+                    style = DsType.small13,
+                    color = colors.error,
+                )
             }
 
             // Progress and failure are shared: an attempt reports the same way whichever mode

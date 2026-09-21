@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,14 @@ fun LocalHarnessScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var editingConfig by rememberSaveable { mutableStateOf(false) }
+    BackHandler {
+        when {
+            state.pendingApproval != null -> viewModel.deny()
+            state.pendingQuestion != null -> viewModel.answerQuestion("用户取消了问题")
+            editingConfig && state.configured -> editingConfig = false
+            else -> onClose()
+        }
+    }
 
     when {
         state.loading -> LoadingScreen()
@@ -85,8 +94,11 @@ fun LocalHarnessScreen(
             onSend = viewModel::send,
             onStop = viewModel::stop,
             onNewSession = viewModel::newSession,
+            onPlanModeChange = viewModel::setPlanMode,
+            onSwitchSession = viewModel::switchSession,
             onApprove = viewModel::approve,
             onDeny = viewModel::deny,
+            onAnswerQuestion = viewModel::answerQuestion,
         )
     }
 }
@@ -142,7 +154,12 @@ private fun LocalConfiguration(
             onValueChange = { apiKey = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(if (state.configured) "新的 API 密钥" else "DeepSeek API 密钥") },
-            supportingText = { Text("密钥由安卓系统密钥库加密，不写入会话或工作区。") },
+            supportingText = {
+                Text(
+                    if (state.configured) "留空可保留现有密钥；新密钥仍由安卓系统密钥库加密。"
+                    else "密钥由安卓系统密钥库加密，不写入会话或工作区。",
+                )
+            },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
         )
@@ -170,7 +187,7 @@ private fun LocalConfiguration(
             text = "保存并进入本机 Harness",
             onClick = { onSave(apiKey, model, baseUrl) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = apiKey.isNotBlank() && baseUrl.isNotBlank(),
+            enabled = (state.configured || apiKey.isNotBlank()) && baseUrl.isNotBlank(),
         )
         if (state.configured) {
             DsButton(
@@ -204,11 +221,15 @@ private fun LocalChat(
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
+    onPlanModeChange: (Boolean) -> Unit,
+    onSwitchSession: (String) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
+    onAnswerQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     var input by rememberSaveable { mutableStateOf("") }
+    var showSessions by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
@@ -239,8 +260,34 @@ private fun LocalChat(
                 }
                 DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(state.model, style = DsType.xsmall12, color = colors.labelTertiary)
+                Spacer(Modifier.weight(1f))
+                DsButton(
+                    if (state.planMode) "退出规划" else "规划模式",
+                    { onPlanModeChange(!state.planMode) },
+                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DsButton(
+                    "会话",
+                    { showSessions = true },
+                    variant = DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
+                )
+                Spacer(Modifier.size(DsSpacing.small))
                 DsButton("新会话", onNewSession, variant = DsButtonVariant.Outline, size = DsButtonSize.Small)
             }
         }
@@ -252,6 +299,37 @@ private fun LocalChat(
                     Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
                 }
             }
+        }
+
+        state.goal?.let { goal ->
+            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
+                Text("当前目标 · ${goal.status}", style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
+                goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
+            }
+        }
+
+        if (state.todos.isNotEmpty()) {
+            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
+                Text("任务清单", style = DsType.small13Strong, color = colors.labelPrimary)
+                state.todos.forEach { item ->
+                    val mark = when (item.status) {
+                        "completed" -> "✓"
+                        "in_progress" -> "●"
+                        else -> "○"
+                    }
+                    Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
+                }
+            }
+        }
+
+        if (state.jobs.isNotEmpty()) {
+            Text(
+                "后台任务：" + state.jobs.joinToString { "${it.id}[${it.status}]" },
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+            )
         }
 
         LazyColumn(
@@ -323,6 +401,27 @@ private fun LocalChat(
 
     state.pendingApproval?.let {
         ApprovalDialog(it, onApprove, onDeny)
+    }
+    state.pendingQuestion?.let {
+        QuestionDialog(it.question, it.options, onAnswerQuestion)
+    }
+    if (showSessions) {
+        DsDialog(title = "本机会话", onDismiss = { showSessions = false }) {
+            if (state.sessions.isEmpty()) {
+                Text("暂无已保存会话", style = DsType.small13, color = colors.labelSecondary)
+            }
+            state.sessions.take(12).forEach { session ->
+                DsButton(
+                    text = if (session.id == state.sessionId) "● ${session.title}" else session.title,
+                    onClick = {
+                        onSwitchSession(session.id)
+                        showSessions = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = if (session.id == state.sessionId) DsButtonVariant.Info else DsButtonVariant.Outline,
+                )
+            }
+        }
     }
 }
 
@@ -406,5 +505,35 @@ private fun ApprovalDialog(approval: LocalApproval, onApprove: () -> Unit, onDen
             DsButton("允许", onApprove)
             DsButton("拒绝", onDeny, variant = DsButtonVariant.Outline)
         }
+    }
+}
+
+@Composable
+private fun QuestionDialog(question: String, options: List<String>, onAnswer: (String) -> Unit) {
+    val colors = DsTheme.colors
+    var answer by rememberSaveable(question) { mutableStateOf("") }
+    DsDialog(title = "Harness 需要你的决定", onDismiss = { onAnswer("用户取消了问题") }) {
+        Text(question, style = DsType.base16Strong, color = colors.labelPrimary)
+        options.forEach { option ->
+            DsButton(
+                text = option,
+                onClick = { onAnswer(option) },
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Outline,
+            )
+        }
+        OutlinedTextField(
+            value = answer,
+            onValueChange = { answer = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("自定义回答") },
+            maxLines = 4,
+        )
+        DsButton(
+            text = "提交回答",
+            onClick = { onAnswer(answer) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = answer.isNotBlank(),
+        )
     }
 }

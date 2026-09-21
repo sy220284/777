@@ -16,7 +16,10 @@ class LocalHarnessViewModel @Inject constructor(
     fun send(text: String) = engine.send(text)
     fun approve() = engine.answerApproval(true)
     fun deny() = engine.answerApproval(false)
+    fun answerQuestion(answer: String) = engine.answerQuestion(answer)
     fun stop() = engine.stop()
     fun newSession() = engine.newSession()
+    fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
+    fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     fun clearCredential() = engine.clearCredential()
 }

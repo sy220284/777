@@ -208,7 +208,6 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
                     .path("/workspace/" + tab.path.replace('\\', '/').removePrefix("/")).build()
                 AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx ->
                     WebView(ctx).apply {
-                        if (android.os.Build.VERSION.SDK_INT <= 30) setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
                         settings.javaScriptEnabled = false
                         settings.allowFileAccess = false; settings.allowContentAccess = false
                         settings.blockNetworkLoads = true
