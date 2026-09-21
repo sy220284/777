@@ -447,36 +447,46 @@ private fun LocalChat(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StateDot(if (state.running) StateDotState.Running else StateDotState.Done)
                         Text(
-                            if (state.running) " 手机正在执行" else " 本机模式",
+                            if (state.running) " 执行中" else " 已就绪",
                             style = DsType.caption11,
                             color = colors.labelTertiary,
                         )
                     }
                 }
-                DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                DsButton("新建", onNewSession, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(state.model, style = DsType.xsmall12, color = colors.labelTertiary)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = colors.bgModulePlatform,
+                ) {
+                    Text(
+                        state.model.removePrefix("deepseek-"),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 DsButton(
-                    if (state.planMode) "退出规划" else "规划模式",
+                    if (state.planMode) "规划中" else "规划",
                     { onPlanModeChange(!state.planMode) },
-                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Outline,
+                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
                 DsButton(
                     "会话",
                     { showSessions = true },
-                    variant = DsButtonVariant.Outline,
+                    variant = DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
-                DsButton("新会话", onNewSession, variant = DsButtonVariant.Outline, size = DsButtonSize.Small)
+                DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             }
         }
 
@@ -510,43 +520,10 @@ private fun LocalChat(
             }
         }
 
-        if (state.plan.isNotEmpty()) {
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("执行计划", style = DsType.small13Strong, color = colors.labelPrimary)
-                state.plan.forEachIndexed { index, item ->
-                    Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
-                }
-            }
-        }
-
-        state.goal?.let { goal ->
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("当前目标 · ${goal.status}", style = DsType.small13Strong, color = colors.labelPrimary)
-                Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
-                goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
-            }
-        }
-
-        if (state.todos.isNotEmpty()) {
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("任务清单", style = DsType.small13Strong, color = colors.labelPrimary)
-                state.todos.forEach { item ->
-                    val mark = when (item.status) {
-                        "completed" -> "✓"
-                        "in_progress" -> "●"
-                        else -> "○"
-                    }
-                    Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
-                }
-            }
-        }
-
-        if (state.jobs.isNotEmpty()) {
-            Text(
-                "后台任务：" + state.jobs.joinToString { "${it.id}[${it.status}]" },
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+        if (state.plan.isNotEmpty() || state.goal != null || state.todos.isNotEmpty() || state.jobs.isNotEmpty()) {
+            ExecutionStatusCard(
+                state = state,
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
             )
         }
 
@@ -733,18 +710,97 @@ private fun ImportedAttachmentRow(
 @Composable
 private fun EmptyLocalHarness(workspacePath: String) {
     val colors = DsTheme.colors
-    DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text("手机就是 Harness 主机", style = DsType.large20, color = colors.labelPrimary)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text("今天想做点什么？", style = DsType.display24, color = colors.labelPrimary)
         Text(
-            "直接聊天、处理工作区文件、搜索网页、执行安卓命令、拆分子任务。需要电脑时，从左侧菜单切换局域网或中继。",
+            "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
             style = DsType.std14,
             color = colors.labelSecondary,
         )
         Text(
             workspacePath,
             style = DsType.caption11.copy(fontFamily = FontFamily.Monospace),
-            color = colors.labelTertiary,
+            color = colors.labelDimmed,
         )
+    }
+}
+
+@Composable
+private fun ExecutionStatusCard(
+    state: LocalHarnessState,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    var expanded by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    val completed = state.todos.count { it.status == "completed" }
+    val total = state.todos.size
+    val summary = buildList {
+        state.goal?.let { add("目标 ${it.status}") }
+        if (state.plan.isNotEmpty()) add("计划 ${state.plan.size} 步")
+        if (total > 0) add("任务 $completed/$total")
+        if (state.jobs.isNotEmpty()) add("后台 ${state.jobs.size}")
+    }.joinToString(" · ")
+
+    Surface(
+        modifier = modifier.fillMaxWidth()
+            .clickable(onClickLabel = if (expanded) "收起执行状态" else "展开执行状态") {
+                expanded = !expanded
+            },
+        shape = RoundedCornerShape(12.dp),
+        color = colors.bgModulePlatform,
+    ) {
+        Column(
+            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (expanded) "⌄" else "›",
+                    style = DsType.base16Strong,
+                    color = colors.labelTertiary,
+                )
+                Spacer(Modifier.size(DsSpacing.small))
+                Column(Modifier.weight(1f)) {
+                    Text("执行状态", style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
+                }
+            }
+            if (expanded) {
+                state.goal?.let { goal ->
+                    Text("目标 · ${goal.status}", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
+                    goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
+                }
+                if (state.plan.isNotEmpty()) {
+                    Text("计划", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.plan.forEachIndexed { index, item ->
+                        Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
+                if (state.todos.isNotEmpty()) {
+                    Text("任务", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.todos.forEach { item ->
+                        val mark = when (item.status) {
+                            "completed" -> "✓"
+                            "in_progress" -> "●"
+                            else -> "○"
+                        }
+                        Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
+                if (state.jobs.isNotEmpty()) {
+                    Text(
+                        "后台 · " + state.jobs.joinToString { "${it.label}[${it.status}]" },
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                }
+            }
+        }
     }
 }
 
