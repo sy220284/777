@@ -1,0 +1,9 @@
+{
+  "id": "plain-text",
+  "input": "开始",
+  "modelReplies": [
+    {
+      "content": "完成"
+    }
+  ]
+}

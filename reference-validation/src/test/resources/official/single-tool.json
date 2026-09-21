@@ -1,0 +1,31 @@
+[
+  {
+    "type": "turn/start"
+  },
+  {
+    "type": "assistant/message",
+    "step": 1
+  },
+  {
+    "type": "tool/call",
+    "step": 1,
+    "callId": "c1",
+    "name": "echo",
+    "arguments": "{\"text\":\"ping\"}"
+  },
+  {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "pong"
+  },
+  {
+    "type": "assistant/message",
+    "step": 2,
+    "content": "已完成"
+  },
+  {
+    "type": "turn/end",
+    "reason": "completed"
+  }
+]

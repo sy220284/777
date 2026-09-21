@@ -1,0 +1,14 @@
+[
+  {
+    "type": "turn/start"
+  },
+  {
+    "type": "assistant/message",
+    "step": 1,
+    "content": "完成"
+  },
+  {
+    "type": "turn/end",
+    "reason": "completed"
+  }
+]

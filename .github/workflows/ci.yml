@@ -27,9 +27,10 @@ jobs:
           # The legacy `tools` package is no longer published on current runners.
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
-      # :app was missing here, so nothing under app/src/test ever ran on CI.
       - name: Unit tests
         run: ./gradlew :core:test :harness-core:test :mock-harness:test :app:testDebugUnitTest --stacktrace
+      - name: Official Harness conformance
+        run: ./gradlew :reference-validation:test --stacktrace
       - name: Lint
         run: ./gradlew :app:lintDebug --stacktrace
       - name: Assemble optimized APK
