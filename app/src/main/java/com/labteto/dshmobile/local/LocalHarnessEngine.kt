@@ -415,26 +415,21 @@ class LocalHarnessEngine @Inject constructor(
             }
             "web_fetch" -> {
                 val input = args.string("url")
-                try {
-                    web.fetch(input)
-                } catch (error: LocalWebException) {
-                    if (error.code in FALLBACK_WEB_ERRORS) {
-                        val key = apiKeys.get()
-                        if (key == null) {
-                            "${error.message}\n\n无法执行搜索降级：本机模型密钥不可用。可把文件通过输入栏附件放入本机工作区。"
-                        } else {
-                            runCatching {
-                                val fallback = web.search(key, listOf(web.fallbackQuery(input)))
-                                "直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
-                            }.getOrElse { fallbackError ->
-                                "${error.message}\n\n搜索降级也失败：${fallbackError.message}\n可把目标文件通过输入栏附件放入本机工作区后继续。"
-                            }
-                        }
-                    } else {
-                        throw error
+                val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
+                val format = args.optionalString("format") ?: "text"
+                if (args.boolean("run_in_background", false)) {
+                    jobs.start("网页抓取：${input.take(120)}") { _, report ->
+                        report("正在抓取：$input")
+                        fetchWebWithFallback(input, maxBytes, format)
                     }
+                } else {
+                    fetchWebWithFallback(input, maxBytes, format)
                 }
             }
+            "json_query" -> jsonQuery(
+                path = args.string("path"),
+                query = args.optionalString("query").orEmpty(),
+            )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfo()
             "update_plan" -> updatePlan(args)
@@ -455,25 +450,33 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = args.optionalString("model")
+                val maxSteps = args.int("max_steps", MAX_SUBAGENT_STEPS).coerceIn(1, MAX_CONFIGURABLE_SUBAGENT_STEPS)
                 if (args.boolean("run_in_background", false)) {
                     jobs.start("子代理：${task.take(100)}") { jobId, _ ->
                         runSubagent(
-                            task,
+                            task = task,
                             inheritHistory = false,
                             allowMutation = false,
                             backgroundJobId = jobId,
                             modelOverride = model,
+                            maxSteps = maxSteps,
                         )
                     }
                 } else runSubagent(
-                    task,
+                    task = task,
                     inheritHistory = false,
-                    allowMutation = allowMutation,
+                    allowMutation = false,
                     modelOverride = model,
+                    maxSteps = maxSteps,
                 )
             }
             "subagent_fork", "fork_subagent" ->
-                runSubagent(args.string("task"), inheritHistory = true, allowMutation = allowMutation)
+                runSubagent(
+                    args.string("task"),
+                    inheritHistory = true,
+                    allowMutation = allowMutation,
+                    maxSteps = MAX_SUBAGENT_STEPS,
+                )
             "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
             "list_agents" -> jobs.listAgents()
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
@@ -495,6 +498,96 @@ class LocalHarnessEngine @Inject constructor(
             "present" -> workspace.present(args.string("path"))
             else -> "未知工具：${call.name}"
         }
+    }
+
+    private suspend fun fetchWebWithFallback(input: String, maxBytes: Int, format: String): String {
+        return try {
+            formatFetchedWeb(web.fetch(input, maxBytes = maxBytes, format = format), format)
+        } catch (error: LocalWebException) {
+            if (error.code !in FALLBACK_WEB_ERRORS) throw error
+            val key = apiKeys.get()
+            if (key == null) {
+                "[web_fetch][${error.code}] ${error.message}\n搜索降级不可用：本机模型密钥不可用。可把文件通过输入栏附件放入本机工作区。"
+            } else {
+                runCatching {
+                    val fallback = web.search(key, listOf(web.fallbackQuery(input)))
+                    "[web_fetch][${error.code}] 直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
+                }.getOrElse { fallbackError ->
+                    "[web_fetch][${error.code}] ${error.message}\n搜索降级也失败：${fallbackError.message}\n建议：先运行 network_diagnose，或把目标文件通过附件放入本机工作区。"
+                }
+            }
+        }
+    }
+
+    private fun formatFetchedWeb(result: LocalWebFetchResult, format: String): String {
+        val total = result.totalBytes?.let { "$it 字节" } ?: "服务器未提供 Content-Length"
+        val shouldSpill = result.content.length > WEB_FETCH_INLINE_CHARS || result.truncated
+        if (!shouldSpill) {
+            return buildString {
+                appendLine("URL: ${result.url}")
+                appendLine("Content-Type: ${result.mediaType}")
+                appendLine("读取：${result.bytesRead} 字节；总大小：$total")
+                append(result.content)
+            }.trimEnd()
+        }
+
+        val extension = when {
+            format == "raw" && result.mediaType.contains("json", ignoreCase = true) -> "json"
+            format == "raw" && result.mediaType.contains("xml", ignoreCase = true) -> "xml"
+            format == "raw" && result.mediaType.contains("html", ignoreCase = true) -> "html"
+            else -> "txt"
+        }
+        val path = ".dsh/fetches/fetch-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.$extension"
+        val saved = workspace.writeToolArtifact(path, result.content)
+        val completeness = if (result.truncated) {
+            "响应超过本次 max_bytes，上限处被截断；文件保存的是已读取的 ${result.bytesRead} 字节。可提高 max_bytes 后重试。"
+        } else {
+            "完整抓取内容已落盘，未进行头尾/中段裁剪。"
+        }
+        return buildString {
+            appendLine("URL: ${result.url}")
+            appendLine("Content-Type: ${result.mediaType}")
+            appendLine("读取：${result.bytesRead} 字节；总大小：$total")
+            appendLine(completeness)
+            appendLine("工作区文件：$saved")
+            appendLine("建议：使用 grep 搜关键词，或 read 按行分片读取；JSON 可直接调用 json_query。")
+            appendLine()
+            appendLine("内容预览：")
+            append(result.content.take(WEB_FETCH_PREVIEW_CHARS))
+        }.trimEnd()
+    }
+
+    private fun jsonQuery(path: String, query: String): String {
+        var current: kotlinx.serialization.json.JsonElement = json.parseToJsonElement(workspace.readRaw(path))
+        val clean = query.trim()
+        if (clean.isNotEmpty()) {
+            val token = Regex("""([^.\\[\\]]+)|\\[(\\d+)]""")
+            var consumed = 0
+            token.findAll(clean).forEach { match ->
+                if (match.range.first != consumed && clean.substring(consumed, match.range.first).trim('.').isNotEmpty()) {
+                    error("json_query 路径格式无效：$query")
+                }
+                val key = match.groups[1]?.value
+                val index = match.groups[2]?.value?.toIntOrNull()
+                current = when {
+                    key != null -> current.jsonObject[key]
+                        ?: error("JSON 字段不存在：$key")
+                    index != null -> current.jsonArray.getOrNull(index)
+                        ?: error("JSON 数组下标越界：$index")
+                    else -> current
+                }
+                consumed = match.range.last + 1
+                if (consumed < clean.length && clean[consumed] == '.') consumed++
+            }
+            require(consumed >= clean.length) { "json_query 路径格式无效：$query" }
+        }
+        val output = current.toString()
+        if (output.length <= MAX_TOOL_RESULT_CHARS) return output
+        val saved = workspace.writeToolArtifact(
+            ".dsh/queries/query-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.json",
+            output,
+        )
+        return "JSON 查询结果过大，完整结果已保存：$saved\n字符数：${output.length}\n预览：\n${output.take(WEB_FETCH_PREVIEW_CHARS)}"
     }
 
     private suspend fun approve(call: LocalToolCall, summary: String): Boolean {
