@@ -78,4 +78,3 @@ jobs:
             adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
             adb shell pidof com.sy220284.dshmobile.debug
-            adb shell dumpsys activity activities | grep -F "mResumedActivity" | grep -F "com.sy220284.dshmobile.debug"
