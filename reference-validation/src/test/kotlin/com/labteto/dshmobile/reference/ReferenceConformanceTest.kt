@@ -39,6 +39,29 @@ class ReferenceConformanceTest {
             .readText()
 
     private companion object {
-        val CASES = listOf("plain-text", "single-tool")
+        val CASES = listOf(
+            "plain-text",
+            "single-tool",
+            "unicode-text",
+            "empty-text",
+            "tool-with-text",
+            "nested-arguments",
+            "empty-tool-output",
+            "two-tools",
+            "three-tools",
+            "same-tool-twice",
+            "two-tool-steps",
+            "three-tool-steps",
+            "text-on-each-tool-step",
+            "mixed-json-arguments",
+            "unicode-tool-arguments",
+            "numeric-arguments",
+            "empty-arguments",
+            "final-unicode",
+            "four-tools",
+            "five-tool-steps",
+            "newline-text",
+            "emoji-text",
+        )
     }
 }
