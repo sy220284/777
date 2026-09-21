@@ -32,6 +32,7 @@ import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -416,7 +417,7 @@ class AutomationPlugin(
                                     put(key, buildJsonObject { put("type", type) })
                                 }
                             })
-                            put("required", buildJsonArray { required.forEach(::add) })
+                            put("required", buildJsonArray { required.forEach { add(JsonPrimitive(it)) } })
                             put("additionalProperties", false)
                         })
                     })
