@@ -24,6 +24,8 @@ class LspProcessClient(
     private val command: List<String>,
     private val json: Json,
     private val workingDirectory: File? = null,
+    private val commandResolver: (List<String>) -> List<String> = { it },
+    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : Closeable {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
@@ -173,9 +175,12 @@ class LspProcessClient(
     private fun ensureStarted() {
         if (process?.isAlive == true) return
         require(command.isNotEmpty()) { "语言服务器命令不能为空" }
-        val next = ProcessBuilder(command)
+        val resolvedCommand = commandResolver(command)
+        require(resolvedCommand.isNotEmpty()) { "语言服务器解析后的命令不能为空" }
+        val next = ProcessBuilder(resolvedCommand)
             .directory(workingDirectory)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .apply { environment().putAll(environmentProvider()) }
             .start()
         process = next
         input = BufferedInputStream(next.inputStream)
