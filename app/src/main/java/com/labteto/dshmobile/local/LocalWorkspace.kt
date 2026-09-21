@@ -43,6 +43,28 @@ class LocalWorkspace(private val root: File) {
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
     }
 
+    /** Store tool-owned artifacts (for example large web responses) without a second approval prompt. */
+    fun writeToolArtifact(relativePath: String, content: String): String {
+        val bytes = content.toByteArray()
+        require(bytes.size <= MAX_TOOL_ARTIFACT_BYTES) {
+            "工具产物超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
+        }
+        val file = resolve(relativePath)
+        file.parentFile?.mkdirs()
+        file.writeText(content)
+        return file.relativeTo(canonicalRoot).invariantSeparatorsPath
+    }
+
+    /** Read raw UTF-8 content for structured parsers. */
+    fun readRaw(relativePath: String): String {
+        val file = resolve(relativePath)
+        require(file.isFile) { "文件不存在：$relativePath" }
+        require(file.length() <= MAX_TOOL_ARTIFACT_BYTES) {
+            "文件超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
+        }
+        return file.readText()
+    }
+
     /** Replace one unique literal after the caller has observed the file. */
     fun edit(relativePath: String, oldText: String, newText: String): String {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
@@ -135,7 +157,10 @@ class LocalWorkspace(private val root: File) {
                 if (!finished) {
                     process.destroyForcibly()
                     process.waitFor()
-                    return@coroutineScope "命令执行超时，已终止\n${output.await()}".trimEnd()
+                    return@coroutineScope (
+                        "[shell][TOOL_TIMEOUT] 命令执行超时（${timeoutSeconds.coerceIn(1, 120)} 秒），已终止。" +
+                            "\n已产生输出：\n${output.await()}"
+                        ).trimEnd()
                 }
                 "退出码：${process.exitValue()}\n${output.await()}"
             }
@@ -219,8 +244,9 @@ class LocalWorkspace(private val root: File) {
     }
 
     private companion object {
-        const val MAX_TEXT_BYTES = 1_048_576L
+        const val MAX_TEXT_BYTES = 5_242_880L
         const val MAX_WRITE_BYTES = 2_097_152
+        const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024
         const val MAX_LIST_ROWS = 400
         const val MAX_SEARCH_ROWS = 200
         const val MAX_SHELL_CHARS = 65_536
