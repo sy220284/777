@@ -19,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.ConnectionPhase
+import com.labteto.dshmobile.connection.ConnectMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -56,17 +57,23 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         // back to an empty address field would lose the one thing the user had already supplied.
         var showPair by rememberSaveable { mutableStateOf(false) }
         var pairUrl by rememberSaveable { mutableStateOf<String?>(null) }
-        var showLocalHarness by rememberSaveable { mutableStateOf(false) }
+        // Local Harness is the product home. Remote transports are explicit detours from its drawer.
+        var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
             showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
-            showLocalHarness -> LocalHarnessScreen(onClose = { showLocalHarness = false })
+            surface == "local" -> LocalHarnessScreen(
+                onOpenLan = { surface = "lan" },
+                onOpenRelay = { surface = "relay" },
+                onOpenSettings = { showSettings = true },
+            )
             showMain -> MainScreen(onOpenSettings = { showSettings = true })
             else -> ConnectScreen(
                 onOpenSettings = { showSettings = true },
-                onOpenLocalHarness = { showLocalHarness = true },
+                onOpenLocalHarness = { surface = "local" },
+                initialMode = if (surface == "relay") ConnectMode.RELAY else ConnectMode.LAN,
                 onPair = { url ->
                     pairUrl = url
                     showPair = true
