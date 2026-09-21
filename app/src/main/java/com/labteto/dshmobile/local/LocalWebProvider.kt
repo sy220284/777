@@ -87,7 +87,7 @@ class LocalWebProvider @Inject constructor(
                             truncated = false,
                         )
                     val mediaType = body.contentType()?.toString().orEmpty()
-                    if (mediaType.isNotBlank() && !isTextualMediaType(mediaType)) {
+                    if (mediaType.isNotBlank() && !isTextualWebMediaType(mediaType)) {
                         throw LocalWebException(
                             "UNSUPPORTED_MEDIA",
                             "web_fetch 仅处理文本/JSON/XML；目标返回 $mediaType。请使用文件下载/附件流程处理二进制内容。",
@@ -358,7 +358,7 @@ class LocalWebProvider @Inject constructor(
         // 代理仍然使用，但 CONNECT/请求目标固定到已通过安全检查的 IP，
         // 防止代理侧重新解析同一域名后把请求导向 localhost/LAN/保留地址。
         val address = target.addresses.first()
-        val pinnedUri = pinnedUri(target.uri, address)
+        val pinnedUri = pinUriToAddress(target.uri, address)
         val builder = http.newBuilder()
             .followRedirects(false)
             .followSslRedirects(false)
@@ -384,37 +384,9 @@ class LocalWebProvider @Inject constructor(
         )
     }
 
-    internal fun pinnedUri(uri: URI, address: InetAddress): URI =
-        URI(
-            uri.scheme,
-            null,
-            address.hostAddress,
-            uri.port,
-            uri.rawPath?.ifEmpty { "/" } ?: "/",
-            uri.rawQuery,
-            null,
-        )
-
     private fun hostHeader(uri: URI): String {
         val defaultPort = if (uri.scheme.equals("https", true)) 443 else 80
         return if (uri.port == -1 || uri.port == defaultPort) uri.host else "${uri.host}:${uri.port}"
-    }
-
-    private fun isTextualMediaType(mediaType: String): Boolean {
-        val type = mediaType.substringBefore(';').trim().lowercase()
-        return type.startsWith("text/") ||
-            type in setOf(
-                "application/json",
-                "application/ld+json",
-                "application/xml",
-                "application/xhtml+xml",
-                "application/rss+xml",
-                "application/atom+xml",
-                "application/javascript",
-                "application/x-javascript",
-            ) ||
-            type.endsWith("+json") ||
-            type.endsWith("+xml")
     }
 
     private fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
@@ -426,21 +398,8 @@ class LocalWebProvider @Inject constructor(
                 .head()
             route.hostHeader?.let { builder.header("Host", it) }
             route.client.newCall(builder.build()).execute().use { response ->
-                when (response.code) {
-                    407 -> ConnectivityProbe(false, "系统代理可达，但要求代理认证（HTTP 407）")
-                    502, 503, 504 -> ConnectivityProbe(
-                        false,
-                        "已连接到代理/网关，但其无法正常连接目标（HTTP ${response.code}）",
-                    )
-                    in 500..599 -> ConnectivityProbe(
-                        true,
-                        "目标 HTTP/TLS 路径已建立，但服务端返回错误（HTTP ${response.code}）",
-                    )
-                    else -> ConnectivityProbe(
-                        true,
-                        "已建立目标 HTTP/TLS 连接（HTTP ${response.code}）",
-                    )
-                }
+                val classification = classifyProbeStatus(response.code)
+                ConnectivityProbe(classification.first, classification.second)
             }
         } catch (error: SocketTimeoutException) {
             ConnectivityProbe(false, "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}")
@@ -631,6 +590,40 @@ class LocalWebProvider @Inject constructor(
         const val MAX_RESULTS = 10
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
+}
+internal fun pinUriToAddress(uri: URI, address: InetAddress): URI =
+    URI(
+        uri.scheme,
+        null,
+        address.hostAddress,
+        uri.port,
+        uri.rawPath?.ifEmpty { "/" } ?: "/",
+        uri.rawQuery,
+        null,
+    )
+
+internal fun classifyProbeStatus(code: Int): Pair<Boolean, String> = when (code) {
+    407 -> false to "系统代理可达，但要求代理认证（HTTP 407）"
+    502, 503, 504 -> false to "已连接到代理/网关，但其无法正常连接目标（HTTP $code）"
+    in 500..599 -> true to "目标 HTTP/TLS 路径已建立，但服务端返回错误（HTTP $code）"
+    else -> true to "已建立目标 HTTP/TLS 连接（HTTP $code）"
+}
+
+internal fun isTextualWebMediaType(mediaType: String): Boolean {
+    val type = mediaType.substringBefore(';').trim().lowercase()
+    return type.startsWith("text/") ||
+        type in setOf(
+            "application/json",
+            "application/ld+json",
+            "application/xml",
+            "application/xhtml+xml",
+            "application/rss+xml",
+            "application/atom+xml",
+            "application/javascript",
+            "application/x-javascript",
+        ) ||
+        type.endsWith("+json") ||
+        type.endsWith("+xml")
 }
 
 data class LocalWebFetchResult(
