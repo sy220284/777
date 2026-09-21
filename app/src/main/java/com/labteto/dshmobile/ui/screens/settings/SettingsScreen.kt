@@ -298,7 +298,11 @@ private fun SettingsCard(
     val colors = DsTheme.colors
     Column(Modifier.fillMaxWidth().animateContentSize()) {
         Row(
-            Modifier.padding(horizontal = DsSpacing.small, bottom = DsSpacing.small),
+            Modifier.padding(
+                start = DsSpacing.small,
+                end = DsSpacing.small,
+                bottom = DsSpacing.small,
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
