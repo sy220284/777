@@ -475,6 +475,7 @@ class LocalHarnessEngine @Inject constructor(
                     allowMutation = true,
                 ).map { (_, result) -> result }
             },
+            isParallelTool = { call -> call.name in PARALLEL_SUBAGENT_TOOLS },
             eventSink = AgentEventSink { event ->
                 when (event) {
                     is AgentEvent.TurnStarted -> {
