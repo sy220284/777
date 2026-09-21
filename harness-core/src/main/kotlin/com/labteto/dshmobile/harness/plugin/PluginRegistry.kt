@@ -28,7 +28,7 @@ class PluginRegistry(
     suspend fun install(plugin: HarnessPlugin) {
         require(plugin.id.isNotBlank()) { "插件编号不能为空" }
         synchronized(this) {
-            require(plugin.id !in installed) { "插件已安装：\${plugin.id}" }
+            require(plugin.id !in installed) { "插件已安装：${plugin.id}" }
         }
         plugin.install(context)
         synchronized(this) {
