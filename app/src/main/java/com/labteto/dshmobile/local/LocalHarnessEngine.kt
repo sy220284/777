@@ -113,7 +113,13 @@ class LocalHarnessEngine @Inject constructor(
         processRuntime = runtimeProcess,
         terminalProvider = runtimeTerminal,
     )
-    private val mcpPlugin = McpToolBridgePlugin(http, json, workspaceRoot = File(workspace.path))
+    private val mcpPlugin = McpToolBridgePlugin(
+        http = http,
+        json = json,
+        workspaceRoot = File(workspace.path),
+        stdioCommandResolver = runtimeProcess::resolveCommand,
+        stdioEnvironmentProvider = runtimeProcess::processEnvironment,
+    )
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
