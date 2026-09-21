@@ -332,43 +332,115 @@ class LocalWebProvider @Inject constructor(
         throw LocalWebException("DNS_FAILED", "无法解析域名 $host", error)
     }
 
-    private fun pinnedClient(target: ValidatedTarget): OkHttpClient {
+    private fun requestRoute(target: ValidatedTarget, timeoutSeconds: Long): RequestRoute {
+        val timeout = timeoutSeconds.coerceIn(MIN_FETCH_TIMEOUT_SECONDS, MAX_FETCH_TIMEOUT_SECONDS)
+        val proxy = systemHttpProxy()
+        val fakeIp = target.addresses.any { isAllowedVpnFakeAddress(target.uri.host, it, target.vpn) }
+        if (proxy == null || fakeIp) {
+            val client = http.newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .dns(object : Dns {
+                    override fun lookup(hostname: String): List<InetAddress> {
+                        if (!hostname.equals(target.uri.host, ignoreCase = true)) {
+                            throw UnknownHostException("主机发生变化")
+                        }
+                        return target.addresses
+                    }
+                })
+                .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(timeout, TimeUnit.SECONDS)
+                .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+                .build()
+            return RequestRoute(client, target.uri.toString(), null)
+        }
+
+        // 代理仍然使用，但 CONNECT/请求目标固定到已通过安全检查的 IP，
+        // 防止代理侧重新解析同一域名后把请求导向 localhost/LAN/保留地址。
+        val address = target.addresses.first()
+        val pinnedUri = pinnedUri(target.uri, address)
         val builder = http.newBuilder()
             .followRedirects(false)
             .followSslRedirects(false)
-        val proxy = systemHttpProxy()
-        if (proxy != null) {
-            builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host, proxy.port)))
-        } else {
-            builder.dns(object : Dns {
-                override fun lookup(hostname: String): List<InetAddress> {
-                    if (!hostname.equals(target.uri.host, ignoreCase = true)) {
-                        throw UnknownHostException("主机发生变化")
-                    }
-                    return target.addresses
-                }
-            })
+            .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host, proxy.port)))
+            .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(timeout, TimeUnit.SECONDS)
+            .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+
+        if (target.uri.scheme.equals("https", ignoreCase = true)) {
+            val originalHost = target.uri.host
+            val verifier = HttpsURLConnection.getDefaultHostnameVerifier()
+            builder.sslSocketFactory(
+                SniSocketFactory(http.sslSocketFactory, originalHost),
+                http.x509TrustManager,
+            )
+            builder.hostnameVerifier { _, session -> verifier.verify(originalHost, session) }
         }
-        return builder.build()
+
+        return RequestRoute(
+            client = builder.build(),
+            url = pinnedUri.toString(),
+            hostHeader = hostHeader(target.uri),
+        )
+    }
+
+    internal fun pinnedUri(uri: URI, address: InetAddress): URI =
+        URI(
+            uri.scheme,
+            null,
+            address.hostAddress,
+            uri.port,
+            uri.rawPath.ifEmpty { "/" },
+            uri.rawQuery,
+            null,
+        )
+
+    private fun hostHeader(uri: URI): String {
+        val defaultPort = if (uri.scheme.equals("https", true)) 443 else 80
+        return if (uri.port == -1 || uri.port == defaultPort) uri.host else "${uri.host}:${uri.port}"
+    }
+
+    private fun isTextualMediaType(mediaType: String): Boolean {
+        val type = mediaType.substringBefore(';').trim().lowercase()
+        return type.startsWith("text/") ||
+            type in setOf(
+                "application/json",
+                "application/ld+json",
+                "application/xml",
+                "application/xhtml+xml",
+                "application/rss+xml",
+                "application/atom+xml",
+                "application/javascript",
+                "application/x-javascript",
+            ) ||
+            type.endsWith("+json") ||
+            type.endsWith("+xml")
     }
 
     private fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
-        val client = pinnedClient(target).newBuilder()
-            .connectTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .callTimeout(PROBE_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .build()
-        val request = Request.Builder()
-            .url(target.uri.toString())
-            .header("User-Agent", USER_AGENT)
-            .header("Range", "bytes=0-0")
-            .build()
         return try {
-            client.newCall(request).execute().use { response ->
-                ConnectivityProbe(
-                    reachable = true,
-                    detail = "已建立 HTTP/TLS 连接（HTTP ${response.code}）",
-                )
+            val route = requestRoute(target, PROBE_CALL_TIMEOUT_SECONDS)
+            val builder = Request.Builder()
+                .url(route.url)
+                .header("User-Agent", USER_AGENT)
+                .head()
+            route.hostHeader?.let { builder.header("Host", it) }
+            route.client.newCall(builder.build()).execute().use { response ->
+                when (response.code) {
+                    407 -> ConnectivityProbe(false, "系统代理可达，但要求代理认证（HTTP 407）")
+                    502, 503, 504 -> ConnectivityProbe(
+                        false,
+                        "已连接到代理/网关，但其无法正常连接目标（HTTP ${response.code}）",
+                    )
+                    in 500..599 -> ConnectivityProbe(
+                        true,
+                        "目标 HTTP/TLS 路径已建立，但服务端返回错误（HTTP ${response.code}）",
+                    )
+                    else -> ConnectivityProbe(
+                        true,
+                        "已建立目标 HTTP/TLS 连接（HTTP ${response.code}）",
+                    )
+                }
             }
         } catch (error: SocketTimeoutException) {
             ConnectivityProbe(false, "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}")
@@ -376,7 +448,6 @@ class LocalWebProvider @Inject constructor(
             ConnectivityProbe(false, "探测失败（PROBE_FAILED）：${error.message ?: error::class.java.simpleName}")
         }
     }
-
     private fun systemHttpProxy(): ProxyEndpoint? {
         val manager = context.getSystemService(ConnectivityManager::class.java) ?: return null
         val network = manager.activeNetwork ?: return null
@@ -497,6 +568,12 @@ class LocalWebProvider @Inject constructor(
 
     private data class ConnectivityProbe(val reachable: Boolean, val detail: String)
 
+    private data class RequestRoute(
+        val client: OkHttpClient,
+        val url: String,
+        val hostHeader: String?,
+    )
+
     private data class ValidatedTarget(
         val uri: URI,
         val addresses: List<InetAddress>,
@@ -505,6 +582,36 @@ class LocalWebProvider @Inject constructor(
 
     private data class ProxyEndpoint(val host: String, val port: Int)
 
+    private class SniSocketFactory(
+        private val delegate: SSLSocketFactory,
+        private val serverName: String,
+    ) : SSLSocketFactory() {
+        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
+        override fun createSocket(socket: Socket, host: String, port: Int, autoClose: Boolean): Socket =
+            delegate.createSocket(socket, serverName, port, autoClose)
+
+        override fun createSocket(host: String, port: Int): Socket =
+            delegate.createSocket(serverName, port)
+
+        override fun createSocket(
+            host: String,
+            port: Int,
+            localHost: InetAddress,
+            localPort: Int,
+        ): Socket = delegate.createSocket(serverName, port, localHost, localPort)
+
+        override fun createSocket(host: InetAddress, port: Int): Socket =
+            delegate.createSocket(host, port)
+
+        override fun createSocket(
+            address: InetAddress,
+            port: Int,
+            localAddress: InetAddress,
+            localPort: Int,
+        ): Socket = delegate.createSocket(address, port, localAddress, localPort)
+    }
     private companion object {
         const val SEARCH_ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"
         const val SEARCH_MODEL = "deepseek-v4-flash"
@@ -515,6 +622,11 @@ class LocalWebProvider @Inject constructor(
         const val MAX_FETCH_BYTES = 4 * 1024 * 1024
         const val PROBE_TIMEOUT_SECONDS = 6L
         const val PROBE_CALL_TIMEOUT_SECONDS = 8L
+        const val DEFAULT_FETCH_TIMEOUT_SECONDS = 45L
+        const val MIN_FETCH_TIMEOUT_SECONDS = 5L
+        const val MAX_FETCH_TIMEOUT_SECONDS = 300L
+        const val FETCH_CONNECT_TIMEOUT_SECONDS = 10L
+        const val FETCH_CALL_GRACE_SECONDS = 10L
         const val MAX_QUERIES = 4
         const val MAX_RESULTS = 10
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
