@@ -29,8 +29,11 @@ class LocalWorkspace(private val root: File) {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
+        val before = fingerprint(file)
         val lines = file.readLines()
-        observations[file.path] = fingerprint(file)
+        val after = fingerprint(file)
+        require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+        observations[file.path] = after
         val from = (startLine.coerceAtLeast(1) - 1).coerceAtMost(lines.size)
         val to = endLine.coerceAtLeast(startLine).coerceAtMost(lines.size)
         return lines.subList(from, to).mapIndexed { index, line ->
@@ -67,12 +70,16 @@ class LocalWorkspace(private val root: File) {
         require(file.length() <= MAX_TOOL_ARTIFACT_BYTES) {
             "文件超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
         }
-        observations[file.path] = fingerprint(file)
-        return file.readText()
+        val before = fingerprint(file)
+        val content = file.readText()
+        val after = fingerprint(file)
+        require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+        observations[file.path] = after
+        return content
     }
 
     /** Verify that the model observed the current file version before asking the user to approve an edit. */
-    fun requireFreshObservation(relativePath: String) {
+    fun requireFreshObservation(relativePath: String): String {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         val observed = observations[file.path]
@@ -80,6 +87,7 @@ class LocalWorkspace(private val root: File) {
         require(observed == fingerprint(file)) {
             "文件在读取后已发生变化，请重新读取再编辑：$relativePath"
         }
+        return observed
     }
     /** Replace one unique literal after the caller has observed the file. */
     fun edit(relativePath: String, oldText: String, newText: String): String {
@@ -87,8 +95,11 @@ class LocalWorkspace(private val root: File) {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
-        requireFreshObservation(relativePath)
+        val observed = requireFreshObservation(relativePath)
         val source = file.readText()
+        require(observed == fingerprint(file)) {
+            "文件在准备编辑时发生变化，请重新读取再编辑：$relativePath"
+        }
         val first = source.indexOf(oldText)
         require(first >= 0) { "文件中没有找到待替换内容" }
         require(source.indexOf(oldText, first + oldText.length) < 0) { "待替换内容出现多次，请提供更长的唯一片段" }
