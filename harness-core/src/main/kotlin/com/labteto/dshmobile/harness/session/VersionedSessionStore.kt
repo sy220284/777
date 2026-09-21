@@ -122,7 +122,7 @@ class VersionedSessionStore(
     fun delete(id: String): Boolean = fileFor(id).delete()
 
     fun list(): List<SessionLoadResult> = root.listFiles().orEmpty()
-        .filter { it.isFile && it.name.endsWith(SESSION_SUFFIX) && !it.name.endsWith(TEMP_SUFFIX) }
+        .filter { file ->\n            file.isFile &&\n                file.name.endsWith(SESSION_SUFFIX) &&\n                !file.name.endsWith(TEMP_SUFFIX) &&\n                !file.name.contains(CHECKPOINT_MARKER)\n        }
         .mapNotNull { file ->
             val id = file.name.removeSuffix(SESSION_SUFFIX)
             runCatching { read(id) }.getOrNull()
@@ -177,6 +177,6 @@ class VersionedSessionStore(
 
     private companion object {
         const val SESSION_SUFFIX = ".json"
-        const val TEMP_SUFFIX = ".json.tmp"
+        const val TEMP_SUFFIX = ".json.tmp"\n        const val CHECKPOINT_MARKER = ".checkpoint-v"
     }
 }
