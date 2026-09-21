@@ -1051,7 +1051,7 @@ class LocalHarnessEngine @Inject constructor(
                     append("\n已完成的最近进度：\n")
                     append(partial)
                 }
-                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 $MAX_CONFIGURABLE_SUBAGENT_STEPS。")
+                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 40。")
             }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
@@ -1087,7 +1087,7 @@ class LocalHarnessEngine @Inject constructor(
         step: Int,
     ): LocalModelReply {
         var lastError: LocalModelException? = null
-        val maxAttempts = snapshot.modelAttempts.coerceIn(1, 5)
+        val maxAttempts = _state.value.modelAttempts.coerceIn(1, 5)
         repeat(maxAttempts) { attempt ->
             try {
                 return modelClient.complete(key, baseUrl, model, history, tools)
@@ -1096,7 +1096,7 @@ class LocalHarnessEngine @Inject constructor(
                 throw cancelled
             } catch (error: LocalModelException) {
                 lastError = error
-                if (!error.retryable || attempt == MAX_MODEL_ATTEMPTS - 1) throw error
+                if (!error.retryable || attempt == maxAttempts - 1) throw error
                 eventLog.append("subagent/retry", buildJsonObject {
                     put("agent_id", subagentId)
                     put("step", step)
@@ -1258,7 +1258,8 @@ class LocalHarnessEngine @Inject constructor(
         messages: List<JsonObject>,
     ): LocalModelReply {
         var lastError: Exception? = null
-        repeat(MAX_MODEL_ATTEMPTS) { attempt ->
+        val maxAttempts = snapshot.modelAttempts.coerceIn(1, 5)
+        repeat(maxAttempts) { attempt ->
             eventLog.append("request/header", buildJsonObject {
                 put("model", snapshot.model); put("base_url", snapshot.baseUrl); put("attempt", attempt + 1)
                 put("message_count", messages.size)
