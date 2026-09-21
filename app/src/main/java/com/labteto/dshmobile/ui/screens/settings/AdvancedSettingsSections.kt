@@ -51,7 +51,7 @@ private data class DynamicSettingField(
     val title: String,
     val description: String?,
     val type: String,
-    val enumValues: List<String>,
+    val enumValues: List<JsonElement>,
     val value: JsonElement?,
     val secret: Boolean,
     val secretSet: Boolean,
@@ -167,7 +167,7 @@ private fun DynamicSettingEditor(
                 }
             }
             field.enumValues.isNotEmpty() -> {
-                val selected = (field.value as? JsonPrimitive)?.contentOrNull.orEmpty()
+                val selected = field.value?.let(::displayJsonScalar).orEmpty()
                 DsMenu(
                     anchor = {
                         Surface(
@@ -184,8 +184,8 @@ private fun DynamicSettingEditor(
                         }
                     },
                     items = field.enumValues.map { option ->
-                        MenuItem(option) {
-                            viewModel.setRemoteSetting(namespace, field.path, JsonPrimitive(option)) { error ->
+                        MenuItem(displayJsonScalar(option)) {
+                            viewModel.setRemoteSetting(namespace, field.path, option) { error ->
                                 report(error ?: "已更新 ${field.title}")
                             }
                         }
@@ -422,11 +422,27 @@ internal fun DeviceCapabilitiesCard(
         CapabilityRow("无障碍控制", state.accessibility)
         CapabilityRow("通知读取", state.notifications)
         CapabilityRow("虚拟屏幕", state.virtualDisplay)
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (!state.shizukuGranted) {
                 DsButton(
                     text = "请求 Shizuku 授权",
                     onClick = viewModel::requestShizukuPermission,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Outline,
+                )
+            }
+            if (!state.accessibility) {
+                DsButton(
+                    text = "开启无障碍控制",
+                    onClick = viewModel::openAccessibilitySettings,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Outline,
+                )
+            }
+            if (!state.notifications) {
+                DsButton(
+                    text = "开启通知读取",
+                    onClick = viewModel::openNotificationAccessSettings,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Outline,
                 )
@@ -490,7 +506,6 @@ private fun flattenSchema(
             flattenSchema(childSchema, childValue, path, secrets)
         } else {
             val enums = (childSchema["enum"] as? JsonArray).orEmpty()
-                .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
             listOf(
                 DynamicSettingField(
                     path = path,
