@@ -165,8 +165,6 @@ internal fun Composer(
     onOpenTools: () -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
-    onPickImage: () -> Unit = {},
-    onPickFile: () -> Unit = {},
     modifier: Modifier = Modifier,
     preparing: Boolean = false,
 ) {
