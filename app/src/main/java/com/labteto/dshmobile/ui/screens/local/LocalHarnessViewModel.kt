@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -13,7 +15,9 @@ class LocalHarnessViewModel @Inject constructor(
     val state = engine.state
 
     fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
-    fun send(text: String) = engine.send(text)
+    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
+    suspend fun diagnoseNetwork(target: String): String = engine.diagnoseNetwork(target)
     fun approve() = engine.answerApproval(true)
     fun deny() = engine.answerApproval(false)
     fun answerQuestion(answer: String) = engine.answerQuestion(answer)
