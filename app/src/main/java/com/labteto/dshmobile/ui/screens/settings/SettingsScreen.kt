@@ -106,10 +106,19 @@ fun SettingsScreen(
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
+    val projectSettings by viewModel.projectSettings.collectAsStateWithLifecycle()
+    val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
+    val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
+    val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var showDisconnectDialog by remember { mutableStateOf(false) }
     BackHandler(onBack = onClose)
+    LaunchedEffect(connectionState.phase) {
+        if (connectionState.phase == ConnectionPhase.CONNECTED) {
+            viewModel.refreshRemoteSettings()
+        }
+    }
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
     val sessionsCleared = stringResource(R.string.settings_clear_last_sessions_done)
@@ -181,6 +190,28 @@ fun SettingsScreen(
                         stringResource(R.string.settings_notifications_action_hint),
                     ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
                 }
+
+                ProjectSettingsCard(
+                    state = projectSettings,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
+
+                ModelServicesCard(
+                    state = modelServices,
+                    viewModel = viewModel,
+                )
+
+                LocalHarnessSettingsCard(
+                    local = localHarness,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
+
+                DeviceCapabilitiesCard(
+                    state = deviceCapabilities,
+                    viewModel = viewModel,
+                )
 
                 SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
                     DsButton(
@@ -266,7 +297,7 @@ fun SettingsScreen(
 
 /** One settings group as a raised card, so groups read as blocks rather than a running list. */
 @Composable
-private fun SettingsCard(
+internal fun SettingsCard(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable () -> Unit,
