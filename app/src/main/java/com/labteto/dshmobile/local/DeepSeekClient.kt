@@ -21,6 +21,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 /** OpenAI-compatible DeepSeek transport used by the on-device agent loop. */
 @Singleton
@@ -28,6 +29,12 @@ class DeepSeekClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
 ) {
+    private val modelHttp = http.newBuilder()
+        .connectTimeout(MODEL_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(MODEL_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(MODEL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
     /** Run one model step and preserve its raw assistant message for tool continuation. */
     suspend fun complete(
         apiKey: String,
@@ -52,7 +59,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { http.newCall(request).execute() }.use { response ->
+            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     val detail = runCatching {
@@ -118,6 +125,10 @@ class DeepSeekClient @Inject constructor(
 
     private companion object {
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+        const val MODEL_CONNECT_TIMEOUT_SECONDS = 15L
+        const val MODEL_READ_TIMEOUT_SECONDS = 180L
+        const val MODEL_WRITE_TIMEOUT_SECONDS = 60L
+        const val MODEL_CALL_TIMEOUT_SECONDS = 210L
     }
 }
 
