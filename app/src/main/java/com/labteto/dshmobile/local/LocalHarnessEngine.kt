@@ -29,6 +29,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -64,6 +65,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.OkHttpClient
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -78,6 +80,7 @@ class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
+    private val http: OkHttpClient,
     private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
@@ -93,6 +96,7 @@ class LocalHarnessEngine @Inject constructor(
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val runtimePlugin = AndroidRuntimePlugin(File(workspace.path))
+    private val mcpPlugin = McpToolBridgePlugin(http, json)
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
@@ -185,6 +189,7 @@ class LocalHarnessEngine @Inject constructor(
             runCatching {
                 pluginRegistry.install(builtinPlugin)
                 pluginRegistry.install(runtimePlugin)
+                pluginRegistry.install(mcpPlugin)
                 pluginRegistry.install(devicePlugin)
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
@@ -1594,6 +1599,7 @@ class LocalHarnessEngine @Inject constructor(
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_rotate_token",
+            "mcp_http_connect", "mcp_disconnect",
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
