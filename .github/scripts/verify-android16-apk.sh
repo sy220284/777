@@ -13,6 +13,11 @@ esac
 
 "$build_tools_dir/zipalign" -c -P 16 -v 4 "$apk"
 
+# Android refuses to install unsigned APKs. Treat signature validity as part of
+# installability instead of allowing a release to look healthy while shipping
+# app-release-unsigned.apk.
+"$build_tools_dir/apksigner" verify --verbose --print-certs "$apk"
+
 native_dir="$(mktemp -d)"
 trap 'rm -rf "$native_dir"' EXIT
 unzip -qq "$apk" 'lib/*/*.so' -d "$native_dir" || true
