@@ -572,7 +572,8 @@ private fun LocalChat(
                 ScrollShortcut(
                     text = "↓",
                     description = "直达底部",
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = DsSpacing.medium),
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
                 ) {
                     scope.launch {
                         val target = (state.messages.size - 1).coerceAtLeast(0)
