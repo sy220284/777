@@ -382,7 +382,7 @@
     <string name="update_open">डाउनलोड और इंस्टॉल करें</string>
     <string name="update_later">बाद में</string>
     <string name="settings_update_check">अपडेट जाँचें</string>
-    <string name="settings_update_check_hint">ऐप शुरू होने पर GitHub से नवीनतम रिलीज़ पूछता है।</string>
+    <string name="settings_update_check_hint">अभी GitHub पर अपडेट जाँचने के लिए टैप करें। नया हस्ताक्षरित APK मिलने पर डाउनलोड अपने-आप शुरू हो जाएगा।</string>
     <string name="connect_mode_title">कैसे कनेक्ट करें</string>
     <string name="connect_mode_lan">लोकल नेटवर्क</string>
     <string name="connect_mode_relay">रिले</string>
