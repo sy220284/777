@@ -168,11 +168,11 @@ holds only the receipt the harness answered with until the message is sent.
 Every connection is to an endpoint you entered, scanned, or picked from a scan,
 with one exception:
 
-- **The update check.** On start the app asks `api.github.com` for this
-  repository's latest release, over HTTPS, so it can tell you when a newer APK
-  exists. It sends no identifying information beyond what any HTTPS request
-  carries, and it is the only request that leaves your network. Turn it off in
-  **Settings → About → Check for updates**.
+- **The update check.** The app does not contact GitHub on launch. Only when you
+  tap **Settings → About → Check for updates** does it ask `api.github.com` for
+  this repository's latest release over HTTPS. If a newer signed APK exists,
+  the app immediately downloads it, verifies its checksum, package name and
+  signing certificate, then hands it to Android's system installer.
 - **Scanning** probes only your own device's IPv4 /24 — with a TCP connect
   followed by one argument-free `session/canOpenWorkspacePath` call in
   local-network mode, or by `/relay/health` in relay mode. Relay mode browses mDNS `_dsh._tcp` first and only sweeps if that
