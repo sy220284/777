@@ -96,7 +96,7 @@ class LocalHarnessEngine @Inject constructor(
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val runtimePlugin = AndroidRuntimePlugin(File(workspace.path))
-    private val mcpPlugin = McpToolBridgePlugin(http, json)
+    private val mcpPlugin = McpToolBridgePlugin(http, json, workspaceRoot = File(workspace.path))
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
@@ -1599,7 +1599,7 @@ class LocalHarnessEngine @Inject constructor(
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_rotate_token",
-            "mcp_http_connect", "mcp_disconnect",
+            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")

@@ -389,6 +389,7 @@ class McpLegacyStdioTransport(
     private val workingDirectory: File? = null,
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
+    private val protocolVersion: String = LEGACY_MCP_PROTOCOL_VERSION,
 ) : McpTransport {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
@@ -410,7 +411,7 @@ class McpLegacyStdioTransport(
         val response = requestRaw(
             "initialize",
             buildJsonObject {
-                put("protocolVersion", LEGACY_MCP_PROTOCOL_VERSION)
+                put("protocolVersion", protocolVersion)
                 put("capabilities", buildJsonObject { })
                 put("clientInfo", buildJsonObject {
                     put("name", clientName)
@@ -421,8 +422,8 @@ class McpLegacyStdioTransport(
         val negotiated = response["result"]?.jsonObject
             ?.get("protocolVersion")?.jsonPrimitive?.content
             ?: error("MCP stdio initialize 缺少 protocolVersion")
-        require(negotiated == LEGACY_MCP_PROTOCOL_VERSION) {
-            "MCP stdio 服务端协商到不支持的版本：$negotiated"
+        require(negotiated == protocolVersion) {
+            "MCP stdio 服务端协商到不支持的版本：$negotiated；请求版本：$protocolVersion"
         }
         writeMessage(
             buildJsonObject {
@@ -479,5 +480,52 @@ class McpLegacyStdioTransport(
         process = null
         writer = null
         reader = null
+    }
+}
+
+
+/** Current stdio lifecycle first, then the 2025 lifecycle used by older MCP servers. */
+class McpNegotiatingStdioTransport(
+    command: List<String>,
+    json: Json,
+    workingDirectory: File? = null,
+) : McpTransport {
+    private val current = McpLegacyStdioTransport(
+        command = command,
+        json = json,
+        workingDirectory = workingDirectory,
+        protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+    )
+    private val legacy = McpLegacyStdioTransport(
+        command = command,
+        json = json,
+        workingDirectory = workingDirectory,
+        protocolVersion = LEGACY_MCP_PROTOCOL_VERSION,
+    )
+    private val selectionMutex = Mutex()
+    @Volatile private var selected: McpTransport? = null
+
+    override suspend fun request(method: String, params: JsonObject): JsonObject {
+        selected?.let { return it.request(method, params) }
+        return selectionMutex.withLock {
+            selected?.let { return@withLock it.request(method, params) }
+            try {
+                current.request(method, params).also { selected = current }
+            } catch (currentError: Exception) {
+                current.close()
+                try {
+                    legacy.request(method, params).also { selected = legacy }
+                } catch (legacyError: Exception) {
+                    legacy.close()
+                    legacyError.addSuppressed(currentError)
+                    throw legacyError
+                }
+            }
+        }
+    }
+
+    override fun close() {
+        current.close()
+        legacy.close()
     }
 }
