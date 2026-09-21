@@ -18,17 +18,17 @@
     "arguments": "{\"text\":\"a\"}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "pong"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c2",
     "name": "read",
     "arguments": "{\"path\":\"a.txt\"}"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c1",
-    "content": "pong"
   },
   {
     "type": "tool/result",
