@@ -307,11 +307,12 @@ class McpToolBridgePlugin(
     private fun JsonObject.requiredStringArray(key: String): List<String> =
         (this[key] as? JsonArray)
             ?.map { element -> element.jsonPrimitive.content }
-            ?.takeIf(List<String>::isNotEmpty)
+            ?.takeIf { it.isNotEmpty() }
             ?: error("缺少参数：$key")
 
     private fun JsonObject.optional(key: String): String? =
         this[key]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotEmpty)
+
     private fun validateServerId(raw: String): String {
         val id = raw.trim()
         require(id.matches(Regex("[A-Za-z0-9_-]{1,24}"))) {
