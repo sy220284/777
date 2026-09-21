@@ -28,6 +28,8 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
           RELEASE_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          LEGACY_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          LEGACY_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
           if [ -z "$KEYSTORE_B64" ] || [ -z "$RELEASE_PASSWORD" ]; then
             echo "::error::正式 APK 只需配置两个仓库 Secret：RELEASE_KEYSTORE 与 RELEASE_KEY_PASSWORD。"
@@ -76,9 +78,39 @@ jobs:
           PASSWORD_VALUE="${PASSWORD_VALUE%\"}"
           PASSWORD_VALUE="$(printf '%s' "$PASSWORD_VALUE" | tr -d '\r\n')"
 
-          keytool -list             -keystore "$RUNNER_TEMP/release.keystore"             -storepass "$PASSWORD_VALUE"             -alias "777-release" >/dev/null
+          STORE_PASSWORD="$PASSWORD_VALUE"
+          if ! keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$STORE_PASSWORD" >/dev/null 2>&1; then
+            if [ -n "$LEGACY_STORE_PASSWORD" ] && keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$LEGACY_STORE_PASSWORD" >/dev/null 2>&1; then
+              STORE_PASSWORD="$LEGACY_STORE_PASSWORD"
+            else
+              echo "::error::密钥库已成功解码，但无法使用当前或旧版仓库密码打开。请核对 RELEASE_KEY_PASSWORD / RELEASE_KEYSTORE_PASSWORD 与该密钥库是否匹配。"
+              exit 1
+            fi
+          fi
 
-          echo "DSH_RELEASE_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
+          KEY_ALIAS=""
+          for CANDIDATE_ALIAS in "$LEGACY_KEY_ALIAS" "777-release"; do
+            if [ -n "$CANDIDATE_ALIAS" ] && keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$STORE_PASSWORD" -alias "$CANDIDATE_ALIAS" >/dev/null 2>&1; then
+              KEY_ALIAS="$CANDIDATE_ALIAS"
+              break
+            fi
+          done
+
+          if [ -z "$KEY_ALIAS" ]; then
+            mapfile -t PRIVATE_ALIASES < <(LC_ALL=C keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$STORE_PASSWORD" | awk -F',' '/PrivateKeyEntry/ { gsub(/^[ \\t]+|[ \\t]+$/, "", $1); print $1 }')
+            if [ "${#PRIVATE_ALIASES[@]}" -eq 1 ]; then
+              KEY_ALIAS="${PRIVATE_ALIASES[0]}"
+            else
+              echo "::error::密钥库可以打开，但无法唯一确定签名私钥别名。请配置 RELEASE_KEY_ALIAS，或保证密钥库只有一个 PrivateKeyEntry。"
+              exit 1
+            fi
+          fi
+
+          keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
+          echo "DSH_RELEASE_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "DSH_RELEASE_KEY_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
+          echo "DSH_RELEASE_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
 
       # The tag is the single source of the shipped version; see app/build.gradle.kts.
       - name: Derive version from tag
@@ -90,9 +122,9 @@ jobs:
       - name: Build release APK
         env:
           DSH_KEYSTORE: ${{ runner.temp }}/release.keystore
-          DSH_KEYSTORE_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
-          DSH_KEY_ALIAS: 777-release
-          DSH_KEY_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
+          DSH_KEYSTORE_PASSWORD: ${{ env.DSH_RELEASE_STORE_PASSWORD }}
+          DSH_KEY_ALIAS: ${{ env.DSH_RELEASE_ALIAS }}
+          DSH_KEY_PASSWORD: ${{ env.DSH_RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Verify Android 16 APK
