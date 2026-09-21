@@ -18,17 +18,17 @@
     "arguments": "{\"text\":\"first\"}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "same-output"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c2",
     "name": "echo",
     "arguments": "{\"text\":\"second\"}"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c1",
-    "content": "same-output"
   },
   {
     "type": "tool/result",
