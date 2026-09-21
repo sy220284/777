@@ -382,7 +382,7 @@
     <string name="update_open">تنزيل وتثبيت</string>
     <string name="update_later">لاحقًا</string>
     <string name="settings_update_check">التحقق من التحديثات</string>
-    <string name="settings_update_check_hint">يسأل GitHub عن أحدث إصدار عند بدء التطبيق.</string>
+    <string name="settings_update_check_hint">اضغط للتحقق من GitHub الآن. إذا توفر APK موقّع أحدث فسيبدأ التنزيل تلقائيًا.</string>
     <string name="connect_mode_title">طريقة الاتصال</string>
     <string name="connect_mode_lan">الشبكة المحلية</string>
     <string name="connect_mode_relay">مُرحِّل</string>
