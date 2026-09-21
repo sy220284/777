@@ -72,6 +72,7 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
@@ -414,6 +415,12 @@ private fun LocalChat(
         }
     }
 
+    LaunchedEffect(state.sessionId) {
+        if (state.messages.isNotEmpty()) {
+            listState.scrollToItem(state.messages.lastIndex)
+        }
+    }
+
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -576,7 +583,8 @@ private fun LocalChat(
                 ScrollShortcut(
                     text = "↑",
                     description = "回到顶部",
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = DsSpacing.medium),
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
                 ) {
                     scope.launch {
                         listState.animateScrollToItem(0)
