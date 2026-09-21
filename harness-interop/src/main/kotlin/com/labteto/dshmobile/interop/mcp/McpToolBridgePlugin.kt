@@ -68,7 +68,40 @@ class McpToolBridgePlugin(
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = CONNECT_TIMEOUT_MILLIS,
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(connect(context, input.required("server_id"), input.required("endpoint")))
+                    ToolResult(connectHttp(context, input.required("server_id"), input.required("endpoint")))
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
+                name = "mcp_stdio_connect",
+                schema = functionSchema(
+                    name = "mcp_stdio_connect",
+                    description = "启动设备上已存在的 stdio MCP 进程，发现工具并注册到当前 Harness",
+                    properties = buildJsonObject {
+                        put("server_id", stringSchema("短标识，只允许字母、数字、下划线和横线"))
+                        put("command", buildJsonObject {
+                            put("type", "array")
+                            put("items", buildJsonObject { put("type", "string") })
+                            put("minItems", 1)
+                            put("maxItems", MAX_COMMAND_ARGS)
+                        })
+                        put("working_directory", stringSchema("可选工作目录；必须位于本机 Harness 工作区内"))
+                    },
+                    required = setOf("server_id", "command"),
+                ),
+                access = ToolAccess.PRIVILEGED,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                timeoutMillis = CONNECT_TIMEOUT_MILLIS,
+                executor = HarnessToolExecutor { _, input, _ ->
+                    ToolResult(
+                        connectStdio(
+                            context = context,
+                            rawId = input.required("server_id"),
+                            command = input.requiredStringArray("command"),
+                            workingDirectory = input.optional("working_directory"),
+                        ),
+                    )
                 },
             ),
         )
@@ -77,7 +110,7 @@ class McpToolBridgePlugin(
                 name = "mcp_server_list",
                 schema = functionSchema(
                     name = "mcp_server_list",
-                    description = "列出当前已连接的 HTTP MCP 服务与已注册工具",
+                    description = "列出当前已连接的 HTTP/stdio MCP 服务与已注册工具",
                 ),
                 access = ToolAccess.READ_ONLY,
                 timeoutMillis = 5_000L,
@@ -91,7 +124,7 @@ class McpToolBridgePlugin(
                 name = "mcp_disconnect",
                 schema = functionSchema(
                     name = "mcp_disconnect",
-                    description = "断开一个 HTTP MCP 服务并卸载它注册的工具",
+                    description = "断开一个 MCP 服务并卸载它注册的工具",
                     properties = buildJsonObject {
                         put("server_id", stringSchema("已连接 MCP 服务标识"))
                     },
