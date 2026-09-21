@@ -52,6 +52,15 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "::error::/dev/kvm is unavailable on this runner"
+            exit 1
+          fi
       - name: Android 16 instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
