@@ -58,7 +58,7 @@ class ComposerRegressionTest {
         var stops = 0
         compose.setContent {
             DshTheme { Composer(text, { text = it }, emptyList(), {}, {}, null, null, {}, null, null,
-                running = running, enabled = true, onOpenSheet = {}, onStop = { stops++ },
+                running = running, enabled = true, onOpenAttachments = {}, onOpenTools = {}, onStop = { stops++ },
                 onSend = { sent.add(it) }) }
         }
         val send = context.getString(R.string.chat_composer_send)
