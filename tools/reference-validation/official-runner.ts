@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
@@ -35,6 +35,39 @@ interface CanonicalEvent {
   arguments?: string
   content?: string
   reason?: string
+}
+
+function toolCallsResponse(calls: ToolCallFixture[], text?: string): StreamChunk[] {
+  const chunks: StreamChunk[] = []
+  let index = 0
+  if (text) {
+    chunks.push(
+      { type: 'block-start', index, blockType: 'text' },
+      { type: 'text-delta', index, text },
+      { type: 'block-end', index, block: { type: 'text', text } },
+    )
+    index += 1
+  }
+  for (const call of calls) {
+    const id = ToolCallId(call.id)
+    const argumentsJson = JSON.stringify(call.arguments)
+    chunks.push(
+      { type: 'block-start', index, blockType: 'tool-call' },
+      { type: 'tool-call-delta', index, id, name: call.name, argumentsDelta: argumentsJson.slice(0, 5) },
+      { type: 'tool-call-delta', index, id, argumentsDelta: argumentsJson.slice(5) },
+      {
+        type: 'block-end',
+        index,
+        block: { type: 'tool-call', id, name: call.name, arguments: argumentsJson },
+      },
+    )
+    index += 1
+  }
+  chunks.push(
+    { type: 'usage', usage: { inputTokens: 10, outputTokens: Math.max(5, calls.length * 5) } },
+    { type: 'finish', reason: { kind: 'tool-calls' } },
+  )
+  return chunks
 }
 
 function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
@@ -115,12 +148,8 @@ async function main(): Promise<void> {
   const vector = JSON.parse(readFileSync(vectorPath, 'utf8')) as ConformanceVector
   const script = vector.modelReplies.map((reply) => {
     const calls = reply.toolCalls ?? []
-    if (calls.length > 1) {
-      throw new Error(`${vector.id}: initial runner supports at most one tool call per model reply`)
-    }
-    if (calls.length === 1) {
-      const call = calls[0]!
-      return toolCallResponse(call.id, call.name, call.arguments, reply.content)
+    if (calls.length > 0) {
+      return toolCallsResponse(calls, reply.content)
     }
     return textResponse(reply.content ?? '')
   })
