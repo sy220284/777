@@ -124,6 +124,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":harness-core"))
+    implementation(project(":harness-runtime-android"))
     implementation(project(":harness-device-android"))
 
     implementation(libs.androidx.core.ktx)

@@ -13,6 +13,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -107,6 +108,26 @@ class CoreArchitectureTest {
         assertEquals(1, executions)
     }
 
+    @Test
+    fun registeredToolTimeoutReturnsErrorWithoutHangingCaller() = runTest {
+        val registry = PluginRegistry()
+        registry.context.tools.register(
+            HarnessTool(
+                name = "slow",
+                schema = buildJsonObject { put("name", "slow") },
+                timeoutMillis = 25L,
+                executor = HarnessToolExecutor { _, _, _ ->
+                    delay(5_000L)
+                    ToolResult("late")
+                },
+            ),
+        )
+
+        val result = registry.context.tools.execute("slow", buildJsonObject { })
+
+        assertTrue(result.isError)
+        assertTrue(result.content.contains("工具执行超时"))
+    }
     @Test
     fun legacySessionMigratesWithCheckpointAndRestarts() {
         val root = createTempDir(prefix = "session-store-")

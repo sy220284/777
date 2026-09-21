@@ -29,6 +29,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -91,6 +92,7 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionStore = VersionedSessionStore(sessionsRoot, json)
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
+    private val runtimePlugin = AndroidRuntimePlugin(File(workspace.path))
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
@@ -180,11 +182,21 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         scope.launch {
-            pluginRegistry.install(builtinPlugin)
-            pluginRegistry.install(devicePlugin)
-            pluginRegistry.install(automationPlugin)
-            pluginRegistry.install(webhookPlugin)
-            load()
+            runCatching {
+                pluginRegistry.install(builtinPlugin)
+                pluginRegistry.install(runtimePlugin)
+                pluginRegistry.install(devicePlugin)
+                pluginRegistry.install(automationPlugin)
+                pluginRegistry.install(webhookPlugin)
+                load()
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        error = "本机 Harness 初始化失败：${error.message ?: error::class.java.simpleName}",
+                    )
+                }
+            }
         }
     }
 
@@ -232,7 +244,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
-        if ((prompt.isEmpty() && attachments.isEmpty()) || activeJob?.isActive == true || !_state.value.configured) return
+        if ((prompt.isEmpty() && attachments.isEmpty()) || activeJob?.isActive == true || _state.value.loading || !_state.value.configured) return
         val attachmentBlock = attachments.joinToString("\n") { attachment ->
             val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
             "- $kind：${attachment.name} → ${attachment.relativePath}（${attachment.bytes} B）"
@@ -644,6 +656,12 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeRegistered(call: LocalToolCall, allowMutation: Boolean): String {
         val registered = toolRegistry.get(call.name)
         if (registered == null) return executeLegacy(call, allowMutation)
+        if (
+            _state.value.planMode &&
+            registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        ) {
+            return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
+        }
         return toolRegistry.execute(
             name = call.name,
             input = call.arguments,
@@ -661,6 +679,16 @@ class LocalHarnessEngine @Inject constructor(
             ),
         ).content
     }
+
+    private fun subagentToolSchemas(allowMutation: Boolean): JsonArray = JsonArray(
+        toolRegistry.names()
+            .mapNotNull(toolRegistry::get)
+            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
+            .filter { tool ->
+                allowMutation || tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+            }
+            .map(HarnessTool::schema),
+    )
 
     private suspend fun executeLegacy(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
@@ -922,7 +950,7 @@ class LocalHarnessEngine @Inject constructor(
         val stepLimit = maxSteps.coerceIn(1, 40)
         val snapshot = _state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
-        val tools = if (allowMutation) SUBAGENT_TOOLS else READ_ONLY_TOOLS
+        val tools = subagentToolSchemas(allowMutation)
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
 
@@ -1559,28 +1587,13 @@ class LocalHarnessEngine @Inject constructor(
 
         val FALLBACK_WEB_ERRORS = setOf("DNS_FAILED", "TIMEOUT", "NETWORK_ERROR", "HTTP_4XX", "HTTP_5XX", "HTTP_REDIRECT")
 
-        val READ_ONLY_TOOLS = JsonArray(
-            LocalToolCatalog.specs.filter { spec ->
-                spec.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull in
-                    setOf(
-                        "read", "list_files", "glob", "grep", "web_search", "web_fetch", "json_query", "network_diagnose",
-                        "environment_info", "skill",
-                        "session_search", "session_event_search", "session_trace", "session_event_trace",
-                        "session_event_read", "list_subagent_models", "list_agents",
-                    )
-            },
-        )
-
-        val SUBAGENT_TOOLS = JsonArray(
-            LocalToolCatalog.specs.filter { spec ->
-                spec.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull !in
-                    setOf(
-                        "subagent", "subagent_fork", "workflow", "ask_user_question",
-                        "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
-                        "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
-                        "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
-                    )
-            },
+        val SUBAGENT_EXCLUDED_TOOLS = setOf(
+            "subagent", "subagent_fork", "workflow", "ask_user_question",
+            "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
+            "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
+            "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
+            "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
+            "webhook_start", "webhook_stop", "webhook_rotate_token",
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
