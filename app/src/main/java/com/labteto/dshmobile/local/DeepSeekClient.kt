@@ -154,6 +154,10 @@ object LocalToolCatalog {
         add(tool("web_fetch", "通过 HTTPS 或 HTTP 获取网页文本", properties(
             "url" to string("完整网址"),
         ), listOf("url")))
+        add(tool("network_diagnose", "诊断域名解析、系统代理、VPN/TUN 与安全拦截原因", properties(
+            "url" to string("要诊断的网址或域名"),
+        ), listOf("url")))
+        add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
         add(tool("update_plan", "更新当前任务计划", properties(
             "items" to buildJsonObject {
                 put("type", "array")
