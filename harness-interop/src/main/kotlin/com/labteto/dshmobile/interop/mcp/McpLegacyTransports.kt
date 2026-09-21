@@ -65,7 +65,7 @@ class McpLegacyStreamableHttpTransport(
             put("id", id)
             put("method", "initialize")
             put("params", buildJsonObject {
-                put("protocolVersion", protocolVersion)
+                put("protocolVersion", LEGACY_MCP_PROTOCOL_VERSION)
                 put("capabilities", clientCapabilities)
                 put("clientInfo", buildJsonObject {
                     put("name", clientName)
@@ -411,7 +411,7 @@ class McpLegacyStdioTransport(
         val response = requestRaw(
             "initialize",
             buildJsonObject {
-                put("protocolVersion", LEGACY_MCP_PROTOCOL_VERSION)
+                put("protocolVersion", protocolVersion)
                 put("capabilities", buildJsonObject { })
                 put("clientInfo", buildJsonObject {
                     put("name", clientName)
