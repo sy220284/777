@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">กรองปลั๊กอิน</string>
     <string name="update_available_title">มีอัปเดตใหม่</string>
     <string name="update_available_body">เวอร์ชัน %1$s ออกแล้ว คุณใช้ %2$s อยู่</string>
-    <string name="update_open">ดูรุ่นที่ออก</string>
+    <string name="update_open">ดาวน์โหลดและติดตั้ง</string>
     <string name="update_later">ไว้ทีหลัง</string>
     <string name="settings_update_check">ตรวจหาอัปเดต</string>
     <string name="settings_update_check_hint">สอบถาม GitHub เพื่อหารุ่นล่าสุดเมื่อเปิดแอป</string>
