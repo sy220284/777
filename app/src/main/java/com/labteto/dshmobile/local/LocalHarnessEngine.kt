@@ -239,6 +239,9 @@ class LocalHarnessEngine @Inject constructor(
     ): String {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
+        withTimeout(15_000L) {
+            while (_state.value.loading) delay(50)
+        }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
         require(activeJob?.isActive != true) { "本机 Harness 正在执行其他任务" }
 
