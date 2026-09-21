@@ -18,11 +18,23 @@
     "arguments": "{}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "A"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c2",
     "name": "b",
     "arguments": "{}"
+  },
+  {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c2",
+    "content": "B"
   },
   {
     "type": "tool/call",
@@ -32,29 +44,17 @@
     "arguments": "{}"
   },
   {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c3",
+    "content": "C"
+  },
+  {
     "type": "tool/call",
     "step": 1,
     "callId": "c4",
     "name": "d",
     "arguments": "{}"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c1",
-    "content": "A"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c2",
-    "content": "B"
-  },
-  {
-    "type": "tool/result",
-    "step": 1,
-    "callId": "c3",
-    "content": "C"
   },
   {
     "type": "tool/result",
