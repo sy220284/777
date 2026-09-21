@@ -64,10 +64,13 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun clickText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        return root.findAccessibilityNodeInfosByText(text)
-            .firstOrNull { it.isVisibleToUser && (it.isClickable || clickableAncestor(it) != null) }
-            ?.let { node -> (if (node.isClickable) node else clickableAncestor(node))?.performAction(AccessibilityNodeInfo.ACTION_CLICK) }
-            == true
+        val node = root.findAccessibilityNodeInfosByText(text)
+            .firstOrNull { candidate ->
+                candidate.isVisibleToUser && (candidate.isClickable || clickableAncestor(candidate) != null)
+            }
+            ?: return false
+        val target = if (node.isClickable) node else clickableAncestor(node) ?: return false
+        return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
     fun setText(searchText: String, value: String): Boolean {
