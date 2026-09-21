@@ -203,6 +203,7 @@ object LocalToolCatalog {
         )))
         add(tool("subagent", "启动一个只读子代理处理独立子任务", properties(
             "task" to string("交给子代理的完整任务"),
+            "model" to string("可选模型路由；留空继承父代理模型"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
@@ -217,10 +218,18 @@ object LocalToolCatalog {
         add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
             "agent_id" to string("后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("workflow", "并行执行 1 到 4 个彼此独立的子任务", properties(
+        add(tool("workflow", "并行执行独立子任务，或按顺序把前一步结果交给下一步", properties(
             "tasks" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
+            },
+            "mode" to buildJsonObject {
+                put("type", "string")
+                put("description", "parallel 并行或 pipeline 顺序执行，默认 parallel")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("parallel"))
+                    add(JsonPrimitive("pipeline"))
+                })
             },
         ), listOf("tasks")))
         add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(

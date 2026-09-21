@@ -150,8 +150,12 @@ holds only the receipt the harness answered with until the message is sent.
   Keystore and never leaves it; only ciphertext reaches DataStore. Forgetting a
   host drops its token in the same act, and Settings → clear data drops all of
   them. Revoking the relay's own record of the device happens on the relay.
-- No session content is persisted to disk (chat history lives in memory and is
-  re-fetched on connect).
+- Remote-mode chat history is re-fetched from its harness. Local Harness mode
+  persists its session snapshots, bounded JSONL audit logs, and workspace files
+  under the app-private `filesDir/local-harness` directory so work survives a
+  process restart. Android backup and device-to-device extraction are disabled
+  for the whole app, so those files and encrypted credential ciphertext do not
+  leave the device through the platform backup service.
 - Cleartext HTTP remains permitted app-wide, alongside user-installed CAs
   (`app/src/main/res/xml/network_security_config.xml`). Cleartext cannot be
   narrowed: a bare harness serves plain HTTP on a LAN address not known at build

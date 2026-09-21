@@ -10,6 +10,7 @@ import org.junit.Test
 
 class LocalWorkspaceTest {
     private lateinit var root: java.io.File
+    private var external: java.io.File? = null
     private lateinit var workspace: LocalWorkspace
 
     @Before
@@ -21,6 +22,7 @@ class LocalWorkspaceTest {
     @After
     fun tearDown() {
         root.deleteRecursively()
+        external?.deleteRecursively()
     }
 
     @Test
@@ -50,5 +52,17 @@ class LocalWorkspaceTest {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.edit("src/two.txt", "before", "after")
         }
+    }
+
+    @Test
+    fun recursiveDiscoveryDoesNotFollowSymlinksOutsideWorkspace() {
+        external = Files.createTempDirectory("local-harness-external").toFile().apply {
+            resolve("secret.txt").writeText("outside-secret")
+        }
+        Files.createSymbolicLink(root.toPath().resolve("escape"), external!!.toPath())
+
+        assertTrue(!workspace.list().contains("secret.txt"))
+        assertTrue(!workspace.glob("**/*.txt").contains("secret.txt"))
+        assertEquals("未找到匹配内容", workspace.search("outside-secret"))
     }
 }

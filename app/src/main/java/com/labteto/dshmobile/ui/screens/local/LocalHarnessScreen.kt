@@ -120,7 +120,8 @@ private fun LocalConfiguration(
     onClearCredential: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    var apiKey by rememberSaveable { mutableStateOf("") }
+    // Never place an unsaved credential in saved-instance-state or a process recreation bundle.
+    var apiKey by remember { mutableStateOf("") }
     var model by rememberSaveable(state.model) { mutableStateOf(state.model) }
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
