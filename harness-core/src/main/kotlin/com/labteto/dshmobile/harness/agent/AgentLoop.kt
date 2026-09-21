@@ -10,6 +10,7 @@ data class AgentToolCall(
     val id: String,
     val name: String,
     val arguments: JsonObject,
+    val rawArguments: String = arguments.toString(),
 )
 
 data class AgentMessage(
@@ -25,11 +26,17 @@ data class AgentModelReply(
     val toolCalls: List<AgentToolCall> = emptyList(),
 )
 
+enum class AgentStopReason {
+    COMPLETED,
+    STEP_LIMIT,
+}
+
 data class AgentRunResult(
     val turnId: String,
     val answer: String,
     val messages: List<AgentMessage>,
     val steps: Int,
+    val stopReason: AgentStopReason,
 )
 
 sealed interface AgentEvent {
@@ -38,6 +45,11 @@ sealed interface AgentEvent {
     data class TurnStarted(
         override val turnId: String,
         val input: String,
+    ) : AgentEvent
+
+    data class StepStarted(
+        override val turnId: String,
+        val step: Int,
     ) : AgentEvent
 
     data class AssistantObserved(
@@ -60,10 +72,20 @@ sealed interface AgentEvent {
         val output: String,
     ) : AgentEvent
 
+    data class StepFinished(
+        override val turnId: String,
+        val step: Int,
+    ) : AgentEvent
+
     data class TurnCompleted(
         override val turnId: String,
         val steps: Int,
         val answer: String,
+    ) : AgentEvent
+
+    data class TurnStepLimit(
+        override val turnId: String,
+        val steps: Int,
     ) : AgentEvent
 
     data class TurnFailed(
@@ -84,6 +106,10 @@ fun interface AgentToolExecutor {
     suspend fun execute(call: AgentToolCall): String
 }
 
+fun interface AgentToolBatchExecutor {
+    suspend fun execute(calls: List<AgentToolCall>): List<String>
+}
+
 fun interface AgentEventSink {
     suspend fun append(event: AgentEvent)
 }
@@ -92,11 +118,16 @@ fun interface AgentEventSink {
  * Platform-neutral turn/step loop.
  *
  * Every model-visible mutation is appended to [eventSink] before the next step starts. Cancellation
- * records a cancellation fact and never fabricates a completion event.
+ * records a cancellation fact and never fabricates a completion event. Android/runtime adapters may
+ * provide [toolBatch] to preserve their own bounded parallel scheduling while this core owns the
+ * durable turn/step lifecycle.
  */
 class AgentLoop(
     private val model: AgentModel,
     private val tools: AgentToolExecutor,
+    private val toolBatch: AgentToolBatchExecutor = AgentToolBatchExecutor { calls ->
+        calls.map { tools.execute(it) }
+    },
     private val eventSink: AgentEventSink = AgentEventSink { },
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
@@ -120,6 +151,7 @@ class AgentLoop(
         try {
             repeat(maxSteps) { stepIndex ->
                 val step = stepIndex + 1
+                eventSink.append(AgentEvent.StepStarted(turnId, step))
                 val reply = model.complete(messages.toList())
                 requireUniqueCallIds(reply.toolCalls)
                 messages += AgentMessage(
@@ -137,13 +169,25 @@ class AgentLoop(
                 )
 
                 if (reply.toolCalls.isEmpty()) {
+                    eventSink.append(AgentEvent.StepFinished(turnId, step))
                     eventSink.append(AgentEvent.TurnCompleted(turnId, step, reply.content))
-                    return AgentRunResult(turnId, reply.content, messages.toList(), step)
+                    return AgentRunResult(
+                        turnId = turnId,
+                        answer = reply.content,
+                        messages = messages.toList(),
+                        steps = step,
+                        stopReason = AgentStopReason.COMPLETED,
+                    )
                 }
 
                 reply.toolCalls.forEach { call ->
                     eventSink.append(AgentEvent.ToolStarted(turnId, step, call))
-                    val output = tools.execute(call)
+                }
+                val outputs = toolBatch.execute(reply.toolCalls)
+                require(outputs.size == reply.toolCalls.size) {
+                    "工具批次结果数量不匹配：调用 ${reply.toolCalls.size}，结果 ${outputs.size}"
+                }
+                reply.toolCalls.zip(outputs).forEach { (call, output) ->
                     eventSink.append(AgentEvent.ToolFinished(turnId, step, call, output))
                     messages += AgentMessage(
                         role = "tool",
@@ -152,8 +196,17 @@ class AgentLoop(
                         toolName = call.name,
                     )
                 }
+                eventSink.append(AgentEvent.StepFinished(turnId, step))
             }
-            error("代理超过最大步数：$maxSteps")
+
+            eventSink.append(AgentEvent.TurnStepLimit(turnId, maxSteps))
+            return AgentRunResult(
+                turnId = turnId,
+                answer = messages.lastOrNull { it.role == "assistant" }?.content.orEmpty(),
+                messages = messages.toList(),
+                steps = maxSteps,
+                stopReason = AgentStopReason.STEP_LIMIT,
+            )
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
                 eventSink.append(AgentEvent.TurnCancelled(turnId))
