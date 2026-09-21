@@ -118,7 +118,7 @@ class LocalHarnessEngine @Inject constructor(
         json = json,
         workspaceRoot = File(workspace.path),
         stdioCommandResolver = runtimeProcess::resolveCommand,
-        stdioEnvironmentProvider = runtimeProcess::processEnvironment,
+        stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
     )
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
