@@ -50,36 +50,13 @@ import com.labteto.dshmobile.ui.theme.DsType
  * a command the host will reject is worse than a menu that admits it does not know.
  */
 @Composable
-internal fun CommandSheet(
-    commands: List<CommandDescriptor>,
-    commandsAvailable: Boolean,
-    skills: List<SkillEntry>,
-    mode: String,
-    running: Boolean,
+internal fun AttachmentSheet(
     canAttach: Boolean,
-    currentTab: ChatTab,
-    subagentCount: Int,
-    onModeChange: (String) -> Unit,
-    onOpenModels: () -> Unit,
-    onOpenPresets: () -> Unit,
-    onOpenSubagents: () -> Unit,
-    onOpenWorkspace: () -> Unit,
-    onTabChange: (ChatTab) -> Unit,
     onAttach: () -> Unit,
     onAttachFile: () -> Unit,
-    onRunCommand: (String) -> Unit,
-    onPrefillDraft: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
-    var query by remember { mutableStateOf("") }
-    val filteredCommands = remember(commands, query) { commands.filterByQuery(query) { it.name to it.description } }
-    val filteredSkills = remember(skills, query) { skills.filterByQuery(query) { it.name to it.description } }
-    val searchable = commands.size + skills.size > 12
-
-    DsBottomSheet(title = stringResource(R.string.chat_context_tools), onDismiss = onDismiss) {
-        // High-frequency sources sit in thumb-sized tiles; deeper capabilities remain grouped
-        // below, matching the hierarchy of the refreshed mobile home.
+    DsBottomSheet(title = "添加附件", onDismiss = onDismiss) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
@@ -105,7 +82,35 @@ internal fun CommandSheet(
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+}
 
+@Composable
+internal fun CommandSheet(
+    commands: List<CommandDescriptor>,
+    commandsAvailable: Boolean,
+    skills: List<SkillEntry>,
+    mode: String,
+    running: Boolean,
+    currentTab: ChatTab,
+    subagentCount: Int,
+    onModeChange: (String) -> Unit,
+    onOpenModels: () -> Unit,
+    onOpenPresets: () -> Unit,
+    onOpenSubagents: () -> Unit,
+    onOpenWorkspace: () -> Unit,
+    onTabChange: (ChatTab) -> Unit,
+    onRunCommand: (String) -> Unit,
+    onPrefillDraft: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var query by remember { mutableStateOf("") }
+    val filteredCommands = remember(commands, query) { commands.filterByQuery(query) { it.name to it.description } }
+    val filteredSkills = remember(skills, query) { skills.filterByQuery(query) { it.name to it.description } }
+    val searchable = commands.size + skills.size > 12
+
+    DsBottomSheet(title = stringResource(R.string.chat_context_tools), onDismiss = onDismiss) {
         // Session capabilities ----------------------------------------------
         SectionHeader(stringResource(R.string.chat_details_title))
         DsGroupCard {
