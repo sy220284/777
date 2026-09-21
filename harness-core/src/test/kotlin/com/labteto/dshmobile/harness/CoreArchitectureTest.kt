@@ -14,6 +14,7 @@ import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,6 +77,28 @@ class CoreArchitectureTest {
             assertFalse(requireNotNull(restarted).legacy)
             assertEquals(1, restarted.document.formatVersion)
             assertEquals(123L, restarted.document.updatedAt)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun corruptPrimaryRecoversFromLastGoodBackup() {
+        val root = createTempDir(prefix = "recover-session-")
+        try {
+            val store = VersionedSessionStore(root, json, clock = { 999L })
+            store.write("s1", buildJsonObject { put("value", 1) }, updatedAt = 1L)
+            store.write("s1", buildJsonObject { put("value", 2) }, updatedAt = 2L)
+            File(root, "s1.json").writeText("{broken")
+
+            val loaded = requireNotNull(store.read("s1"))
+            assertTrue(loaded.recovered)
+            assertEquals("1", loaded.document.payload["value"]?.jsonPrimitive?.content)
+            assertTrue(root.listFiles().orEmpty().any { it.name.startsWith("s1.corrupt-") })
+
+            val restarted = requireNotNull(VersionedSessionStore(root, json).read("s1"))
+            assertFalse(restarted.recovered)
+            assertEquals("1", restarted.document.payload["value"]?.jsonPrimitive?.content)
         } finally {
             root.deleteRecursively()
         }
