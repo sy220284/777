@@ -237,4 +237,55 @@ class McpClientTest {
         }
     }
 
+
+    @Test
+    fun stdioProcessUsesResolvedCommandAndSharedEnvironment() = runBlocking {
+        val dir = Files.createTempDirectory("mcp-shared-env-").toFile()
+        val script = File(dir, "server.sh")
+        script.writeText(
+            """
+            [ "§DSH_RUNTIME_FLAG" = "ready" ] || exit 21
+            initialized=0
+            while IFS= read -r line; do
+              case "§line" in
+                *'"method":"initialize"'*)
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2026-07-28"}}\n' "§id"
+                  ;;
+                *'"method":"notifications/initialized"'*)
+                  initialized=1
+                  ;;
+                *'"method":"tools/list"'*)
+                  [ "§initialized" -eq 1 ] || exit 22
+                  id=§(printf '%s\n' "§line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"tools":[]}}\n' "§id"
+                  ;;
+              esac
+            done
+            """.trimIndent().replace('§', '$'),
+        )
+
+        var resolved = false
+        val transport = McpLegacyStdioTransport(
+            command = listOf("bundled-node", "ignored"),
+            json = Json,
+            protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+            commandResolver = {
+                resolved = true
+                listOf("sh", script.absolutePath)
+            },
+            environmentProvider = { mapOf("DSH_RUNTIME_FLAG" to "ready") },
+        )
+        try {
+            val response = withTimeout(3_000L) {
+                transport.request("tools/list")
+            }
+            assertTrue(resolved)
+            assertTrue(response["result"] != null)
+        } finally {
+            transport.close()
+            dir.deleteRecursively()
+        }
+    }
+
 }
