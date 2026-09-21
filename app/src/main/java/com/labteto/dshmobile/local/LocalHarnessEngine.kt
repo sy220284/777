@@ -190,6 +190,8 @@ class LocalHarnessEngine @Inject constructor(
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
+    fun environmentInfoForUi(): String = environmentInfo()
+
     /** Resolve the current write or shell approval. */
     fun answerApproval(approved: Boolean) {
         approvalResponse?.complete(approved)
