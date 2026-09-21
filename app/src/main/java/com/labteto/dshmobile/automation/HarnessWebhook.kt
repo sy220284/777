@@ -198,6 +198,7 @@ class WebhookController @Inject constructor(
 class HarnessWebhookService : Service() {
     @Inject lateinit var engine: LocalHarnessEngine
     @Inject lateinit var tokenStore: WebhookTokenStore
+    @Inject lateinit var resultStore: WebhookResultStore
     @Inject lateinit var json: Json
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -291,6 +292,17 @@ class HarnessWebhookService : Service() {
                 return respond(client, 200, """{"ok":true}""")
             }
 
+            if (method == "GET" && path.startsWith("/result/")) {
+                val id = path.removePrefix("/result/").substringBefore('?')
+                if (!id.matches(Regex("[A-Za-z0-9._-]{1,80}"))) {
+                    return respond(client, 400, """{"error":"invalid request id"}""")
+                }
+                val stored = resultStore.get(id)
+                    ?: return respond(client, 404, """{"error":"result not found"}""")
+                val body = json.encodeToString(WebhookRunResult.serializer(), stored)
+                return respond(client, 200, body)
+            }
+
             if (method != "POST" || path != "/run") {
                 return respond(client, 404, """{"error":"not found"}""")
             }
@@ -311,10 +323,22 @@ class HarnessWebhookService : Service() {
             if (prompt.isBlank()) return respond(client, 400, """{"error":"empty prompt"}""")
 
             val requestId = UUID.randomUUID().toString()
-            respond(client, 202, """{"accepted":true,"request_id":"$requestId"}""")
+            resultStore.update(requestId, status = "queued")
+            respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
             scope.launch {
                 executionMutex.withLock {
+                    resultStore.update(requestId, status = "running")
                     runCatching { engine.runAutomationPrompt(prompt) }
+                        .onSuccess { result ->
+                            resultStore.update(requestId, status = "completed", result = result)
+                        }
+                        .onFailure { error ->
+                            resultStore.update(
+                                requestId,
+                                status = "failed",
+                                error = error.message ?: error::class.java.simpleName,
+                            )
+                        }
                 }
             }
         }
