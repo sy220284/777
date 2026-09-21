@@ -73,15 +73,9 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew :app:connectedDebugAndroidTest :app:assembleOptimized --stacktrace
-            PACKAGE="com.sy220284.dshmobile.debug"
-            adb shell am force-stop "$PACKAGE" || true
+            adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-            COMPONENT="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE" | tr -d '\r' | tail -n 1)"
-            echo "Resolved launcher: $COMPONENT"
-            test -n "$COMPONENT"
-            echo "$COMPONENT" | grep -q "/"
-            START_OUTPUT="$(adb shell am start -W -n "$COMPONENT")"
-            echo "$START_OUTPUT"
-            echo "$START_OUTPUT" | grep -q "Status: ok"
+            adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
-            adb shell pidof "$PACKAGE"
+            adb shell pidof com.sy220284.dshmobile.debug
+            adb shell dumpsys activity activities | grep -F "mResumedActivity" | grep -F "com.sy220284.dshmobile.debug"
