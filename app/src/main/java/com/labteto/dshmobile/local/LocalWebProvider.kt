@@ -14,7 +14,10 @@ import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
+import java.net.Socket
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLSocketFactory
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -47,18 +50,20 @@ class LocalWebProvider @Inject constructor(
         input: String,
         maxBytes: Int = DEFAULT_FETCH_BYTES,
         format: String = "text",
+        timeoutSeconds: Long = DEFAULT_FETCH_TIMEOUT_SECONDS,
     ): LocalWebFetchResult = withContext(Dispatchers.IO) {
         require(format in setOf("text", "raw")) { "web_fetch format 仅支持 text 或 raw" }
         val byteLimit = maxBytes.coerceIn(MIN_FETCH_BYTES, MAX_FETCH_BYTES)
         var current = validateTarget(input)
         try {
             repeat(MAX_REDIRECTS + 1) { redirectCount ->
-                val request = Request.Builder()
-                    .url(current.uri.toString())
+                val route = requestRoute(current, timeoutSeconds)
+                val requestBuilder = Request.Builder()
+                    .url(route.url)
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.5")
-                    .build()
-                pinnedClient(current).newCall(request).execute().use { response ->
+                route.hostHeader?.let { requestBuilder.header("Host", it) }
+                route.client.newCall(requestBuilder.build()).execute().use { response ->
                     if (response.isRedirect) {
                         if (redirectCount >= MAX_REDIRECTS) {
                             throw LocalWebException("HTTP_REDIRECT", "网页重定向次数过多")
@@ -82,6 +87,12 @@ class LocalWebProvider @Inject constructor(
                             truncated = false,
                         )
                     val mediaType = body.contentType()?.toString().orEmpty()
+                    if (mediaType.isNotBlank() && !isTextualMediaType(mediaType)) {
+                        throw LocalWebException(
+                            "UNSUPPORTED_MEDIA",
+                            "web_fetch 仅处理文本/JSON/XML；目标返回 $mediaType。请使用文件下载/附件流程处理二进制内容。",
+                        )
+                    }
                     val totalBytes = body.contentLength().takeIf { it >= 0L }
                     val bounded = body.byteStream().use { readBounded(it, byteLimit) }
                     val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
