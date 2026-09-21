@@ -164,7 +164,7 @@ class WebhookController @Inject constructor(
             .putExtra(EXTRA_ALLOW_LAN, allowLan)
         context.startForegroundService(intent)
         val host = if (allowLan) "0.0.0.0" else "127.0.0.1"
-        return "Webhook 已启动：http://$host:$port/run\\nAuthorization: Bearer $token"
+        return "Webhook 已启动：http://$host:$port/run\nAuthorization: Bearer $token"
     }
 
     fun stop(): Boolean {
