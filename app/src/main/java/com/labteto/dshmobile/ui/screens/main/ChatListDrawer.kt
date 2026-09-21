@@ -56,9 +56,7 @@ import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -420,21 +418,29 @@ fun ChatListDrawer(
             )
         }
 
-        DsGroupCard {
-            DsCategoryRow(
-                icon = Icons.Outlined.PhoneAndroid,
-                title = "本机 Harness",
-                subtitle = "在手机上直接运行完整代理能力",
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            DsButton(
+                text = "本机 Harness",
                 onClick = {
                     onClose()
                     onOpenLocalHarness()
                 },
+                modifier = Modifier.weight(1f),
+                variant = DsButtonVariant.Ghost,
+                icon = Icons.Outlined.PhoneAndroid,
             )
-            DsCategoryRow(
+            DsButton(
+                text = stringResource(R.string.settings_title),
+                onClick = {
+                    onClose()
+                    onOpenSettings()
+                },
+                modifier = Modifier.weight(1f),
+                variant = DsButtonVariant.Ghost,
                 icon = Icons.Filled.Settings,
-                title = stringResource(R.string.settings_title),
-                subtitle = "连接、通知、外观与数据",
-                onClick = onOpenSettings,
             )
         }
 
