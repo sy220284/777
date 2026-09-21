@@ -108,49 +108,15 @@ data class DiscoveredHost(
     val trusted: Boolean get() = description != null
 }
 
-/** App-level persisted settings (DataStore). */
+/** App-level persisted settings (DataStore). Remote control is relay-only. */
 data class AppSettings(
-    val autoConnectLast: Boolean = true,
-    val autoConnectLan: Boolean = false,
-    val autoConnectLoopback: Boolean = true,
-    /** Relay mode's counterpart to [autoConnectLan]: connect to a paired relay that mDNS finds. */
-    val autoConnectRelay: Boolean = false,
     val keepConnectedInBackground: Boolean = false,
     val notifyTurnComplete: Boolean = true,
     val notifyGoal: Boolean = true,
     val notifyNeedsAction: Boolean = true,
-    /**
-     * Which way the user chose to reach a harness: `lan` or `relay`.
-     *
-     * Not a detected value. The two paths have different trust models — an unauthenticated LAN
-     * harness against a credentialed relay — and auto-connect never crosses between them, so the
-     * app connects only the way that was actually picked. Defaults to `lan` so an install that
-     * predates relay support comes back where it was.
-     */
-    val connectMode: String = ConnectMode.LAN,
     val themePreference: String = "system", // light | dark | system
     val localeOverride: String? = null, // null = system
-    val knownPorts: List<Int> = listOf(3080),
-    /**
-     * Whether to ask GitHub for the latest release on start.
-     *
-     * The only request this app makes to anything other than the harness the user pointed it at,
-     * so it is worth being able to switch off — on a restricted network, or by anyone who would
-     * rather it stayed local-only.
-     */
     val updateCheckEnabled: Boolean = true,
     /** A release the user has already declined, so it is offered once rather than every launch. */
     val dismissedUpdate: String? = null,
 )
-
-/** The two ways the app can reach a harness. Persisted as [AppSettings.connectMode]. */
-object ConnectMode {
-    /** Straight at a harness on the local network, over plain HTTP, with no credential. */
-    const val LAN: String = "lan"
-
-    /** Through a `dsh-relay`, holding a device token and pinning the relay's key. */
-    const val RELAY: String = "relay"
-
-    /** Read a stored value back, falling back to [LAN] for anything unrecognised. */
-    fun of(value: String?): String = if (value == RELAY) RELAY else LAN
-}

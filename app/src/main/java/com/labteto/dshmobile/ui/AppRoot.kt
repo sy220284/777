@@ -1,8 +1,12 @@
 package com.labteto.dshmobile.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -11,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -22,7 +27,6 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.screens.connect.ConnectScreen
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
@@ -50,36 +54,65 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
 
     DshTheme(preference = themePreference) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
-        // Pairing is a detour off the connect screen rather than a mode of it: it owns the camera,
-        // it can succeed against an address the connect screen never listed, and it ends by
-        // connecting — at which point the routing below carries on as if the relay had always been
-        // remembered. `pairUrl` is saveable because the scan launches another activity, and coming
-        // back to an empty address field would lose the one thing the user had already supplied.
+        // Local Harness is always the product home. Remote control has exactly one transport:
+        // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
+        // carries the user into the remote session, while Back returns to the local home.
         var showPair by rememberSaveable { mutableStateOf(false) }
-        var pairUrl by rememberSaveable { mutableStateOf<String?>(null) }
-        // Local Harness is the product home. Remote transports are explicit detours from its drawer.
+        var relayClaimed by rememberSaveable { mutableStateOf(false) }
         var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         val selectedRemoteMatches = surface == "remote" && connection.host != null
         when {
             showSettings -> SettingsScreen(onClose = { showSettings = false })
-            showPair -> PairScreen(onClose = { showPair = false }, prefillUrl = pairUrl)
+            showPair -> PairScreen(
+                onClose = {
+                    showPair = false
+                    relayClaimed = false
+                    surface = "local"
+                },
+                onPaired = {
+                    showPair = false
+                    relayClaimed = true
+                    surface = "remote"
+                },
+            )
             surface == "local" -> LocalHarnessScreen(
-                onOpenRemote = { surface = "remote" },
+                onOpenRemote = {
+                    relayClaimed = false
+                    surface = "remote"
+                    showPair = true
+                },
                 onOpenSettings = { showSettings = true },
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = { showSettings = true },
-                onOpenLocalHarness = { surface = "local" },
+                onOpenLocalHarness = {
+                    relayClaimed = false
+                    surface = "local"
+                },
             )
-            else -> ConnectScreen(
-                onOpenSettings = { showSettings = true },
-                onOpenLocalHarness = { surface = "local" },
-                initialMode = null,
-                onPair = { url ->
-                    pairUrl = url
+            surface == "remote" && relayClaimed -> RemoteRelayStatus(
+                failed = connection.failure != null,
+                onRetryPairing = {
+                    viewModel.disconnectRemote()
+                    relayClaimed = false
                     showPair = true
+                },
+                onBack = {
+                    viewModel.disconnectRemote()
+                    relayClaimed = false
+                    surface = "local"
+                },
+            )
+            else -> PairScreen(
+                onClose = {
+                    relayClaimed = false
+                    surface = "local"
+                },
+                onPaired = {
+                    relayClaimed = true
+                    surface = "remote"
                 },
             )
         }
@@ -96,6 +129,37 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                     viewModel.dismissUpdate(it.version)
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun RemoteRelayStatus(
+    failed: Boolean,
+    onRetryPairing: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            if (!failed) CircularProgressIndicator(color = colors.accent)
+            Text(
+                if (failed) "中继连接失败" else "正在连接中继…",
+                style = DsType.large20,
+                color = colors.labelPrimary,
+            )
+            Text(
+                if (failed) "请重新配对中继，或返回本机 Harness。" else "配对已完成，正在建立远程控制连接。",
+                style = DsType.std14,
+                color = colors.labelSecondary,
+            )
+            if (failed) {
+                DsButton("重新配对", onRetryPairing, variant = DsButtonVariant.Info)
+            }
+            DsButton("返回本机", onBack, variant = DsButtonVariant.Ghost)
         }
     }
 }

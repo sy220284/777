@@ -57,6 +57,12 @@ class SettingsViewModel @Inject constructor(
         ConnectionUiState()
     )
 
+    val sessionSort: StateFlow<String> = hostsStore.sessionSort.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        "manual",
+    )
+
     init {
         viewModelScope.launch {
             hostsStore.settings.collect { _state.value = it }
@@ -71,6 +77,12 @@ class SettingsViewModel @Inject constructor(
 
     fun disconnect() {
         connectionManager.disconnect()
+    }
+
+    fun setSessionSortByRecency(enabled: Boolean) {
+        viewModelScope.launch {
+            hostsStore.setSessionSort(if (enabled) "updated" else "manual")
+        }
     }
 
     /**

@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AppViewModel @Inject constructor(
     hostsStore: HostsStore,
-    connectionManager: ConnectionManager,
+    private val connectionManager: ConnectionManager,
     private val updateChecker: UpdateChecker,
     private val updateInstaller: UpdateInstaller,
 ) : ViewModel() {
@@ -62,5 +62,9 @@ class AppViewModel @Inject constructor(
 
     fun clearUpdateInstallStatus() {
         _updateInstallStatus.value = null
+    }
+
+    fun disconnectRemote() {
+        connectionManager.disconnect()
     }
 }

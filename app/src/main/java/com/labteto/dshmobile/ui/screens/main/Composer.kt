@@ -217,6 +217,17 @@ internal fun Composer(
                         color = colors.labelTertiary,
                     )
                 },
+                leadingIcon = {
+                    CircleAction(
+                        icon = Icons.Filled.Add,
+                        description = stringResource(R.string.chat_composer_attach_file),
+                        size = 30,
+                        background = colors.hoverSolid,
+                        tint = colors.labelPrimary,
+                        enabled = enabled && !preparing,
+                        onClick = onOpenAttachments,
+                    )
+                },
                 minLines = 1,
                 maxLines = 8,
                 textStyle = DsType.std14,
@@ -243,16 +254,6 @@ internal fun Composer(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.compact),
             ) {
-                CircleAction(
-                    icon = Icons.Filled.Add,
-                    description = stringResource(R.string.chat_composer_attach_file),
-                    size = 30,
-                    background = colors.hoverSolid,
-                    tint = colors.labelPrimary,
-                    enabled = enabled && !preparing,
-                    onClick = onOpenAttachments,
-                )
-
                 CircleAction(
                     icon = FeatherIcons.Tool,
                     description = stringResource(R.string.chat_context_tools),

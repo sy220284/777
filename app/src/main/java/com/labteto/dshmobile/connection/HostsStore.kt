@@ -29,18 +29,12 @@ class HostsStore @Inject constructor(
 ) {
     private object Keys {
         val HOSTS = stringPreferencesKey("hosts_json")
-        val AUTO_LAST = booleanPreferencesKey("auto_last")
-        val AUTO_LAN = booleanPreferencesKey("auto_lan")
-        val AUTO_LOOPBACK = booleanPreferencesKey("auto_loopback")
-        val AUTO_RELAY = booleanPreferencesKey("auto_relay")
-        val CONNECT_MODE = stringPreferencesKey("connect_mode")
         val BACKGROUND = booleanPreferencesKey("background")
         val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
         val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
         val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
         val THEME = stringPreferencesKey("theme")
         val LOCALE = stringPreferencesKey("locale")
-        val PORTS = stringPreferencesKey("ports_json")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
         val SESSION_SORT = stringPreferencesKey("session_sort")
         val UPDATE_CHECK = booleanPreferencesKey("update_check")
@@ -58,24 +52,13 @@ class HostsStore @Inject constructor(
     }
 
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
-        val ports = prefs[Keys.PORTS]
-            ?.split(',')
-            ?.mapNotNull { it.trim().toIntOrNull() }
-            ?.takeIf { it.isNotEmpty() }
-            ?: listOf(3080)
         AppSettings(
-            autoConnectLast = prefs[Keys.AUTO_LAST] ?: true,
-            autoConnectLan = prefs[Keys.AUTO_LAN] ?: false,
-            autoConnectLoopback = prefs[Keys.AUTO_LOOPBACK] ?: true,
-            autoConnectRelay = prefs[Keys.AUTO_RELAY] ?: false,
-            connectMode = ConnectMode.of(prefs[Keys.CONNECT_MODE]),
             keepConnectedInBackground = prefs[Keys.BACKGROUND] ?: false,
             notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
             notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
             localeOverride = prefs[Keys.LOCALE],
-            knownPorts = ports,
             updateCheckEnabled = prefs[Keys.UPDATE_CHECK] ?: true,
             dismissedUpdate = prefs[Keys.DISMISSED_UPDATE],
         )
@@ -202,23 +185,12 @@ class HostsStore @Inject constructor(
         dataStore.edit { it[Keys.DISMISSED_UPDATE] = version }
     }
 
-    suspend fun addKnownPort(port: Int) {
-        val s = settingsOnce()
-        val ports = (s.knownPorts + port).distinct().take(8)
-        dataStore.edit { it[Keys.PORTS] = ports.joinToString(",") }
-    }
-
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
         val next = transform(settingsOnce())
         // Mirrored out to SharedPreferences as well: the scheme has to be readable before any
         // activity exists, and DataStore cannot be read from there. See DshApplication.
         DshApplication.storeThemePreference(context, next.themePreference)
         dataStore.edit { prefs ->
-            prefs[Keys.AUTO_LAST] = next.autoConnectLast
-            prefs[Keys.AUTO_LAN] = next.autoConnectLan
-            prefs[Keys.AUTO_LOOPBACK] = next.autoConnectLoopback
-            prefs[Keys.AUTO_RELAY] = next.autoConnectRelay
-            prefs[Keys.CONNECT_MODE] = next.connectMode
             prefs[Keys.BACKGROUND] = next.keepConnectedInBackground
             prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
@@ -234,7 +206,7 @@ class HostsStore @Inject constructor(
     }
 
     private companion object {
-        /** Bound on the remembered-session map, matching the known-port cap. */
+        /** Bound on the remembered-session map. */
         const val MAX_REMEMBERED_HOSTS = 8
     }
 }
