@@ -564,30 +564,8 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun jsonQuery(path: String, query: String): String {
-        var current: kotlinx.serialization.json.JsonElement = json.parseToJsonElement(workspace.readRaw(path))
-        val clean = query.trim()
-        if (clean.isNotEmpty()) {
-            val token = Regex("""([^.\\[\\]]+)|\\[(\\d+)]""")
-            var consumed = 0
-            token.findAll(clean).forEach { match ->
-                if (match.range.first != consumed && clean.substring(consumed, match.range.first).trim('.').isNotEmpty()) {
-                    error("json_query 路径格式无效：$query")
-                }
-                val key = match.groups[1]?.value
-                val index = match.groups[2]?.value?.toIntOrNull()
-                current = when {
-                    key != null -> current.jsonObject[key]
-                        ?: error("JSON 字段不存在：$key")
-                    index != null -> current.jsonArray.getOrNull(index)
-                        ?: error("JSON 数组下标越界：$index")
-                    else -> current
-                }
-                consumed = match.range.last + 1
-                if (consumed < clean.length && clean[consumed] == '.') consumed++
-            }
-            require(consumed >= clean.length) { "json_query 路径格式无效：$query" }
-        }
-        val output = current.toString()
+        val root = json.parseToJsonElement(workspace.readRaw(path))
+        val output = resolveJsonPath(root, query).toString()
         if (output.length <= MAX_TOOL_RESULT_CHARS) return output
         val saved = workspace.writeToolArtifact(
             ".dsh/queries/query-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.json",
