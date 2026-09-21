@@ -35,21 +35,51 @@ data class AvailableUpdate(
 
 /** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    // This repository ships versions such as 0.12.0-777.16. Treat every numeric component as
-    // ordered version data so 777.17 correctly follows 777.16 instead of both collapsing to
-    // 0.12.0. The leading v and build metadata are presentation-only.
-    fun parts(value: String): List<Int> = Regex("""\d+""")
-        .findAll(value.trim().removePrefix("v").substringBefore('+'))
-        .mapNotNull { it.value.toIntOrNull() }
-        .toList()
+    data class ParsedVersion(
+        val core: List<Int>,
+        val releaseRevision: List<Int>?,
+    )
 
-    val a = parts(candidate)
-    val b = parts(current)
-    if (a.isEmpty()) return false
-    for (i in 0 until maxOf(a.size, b.size)) {
-        val left = a.getOrElse(i) { 0 }
-        val right = b.getOrElse(i) { 0 }
-        if (left != right) return left > right
+    fun parse(value: String): ParsedVersion? {
+        val normalized = value.trim().removePrefix("v").substringBefore('+')
+        if (normalized.isBlank()) return null
+        val coreText = normalized.substringBefore('-')
+        val core = coreText.split('.').map { part ->
+            part.toIntOrNull() ?: return null
+        }
+        if (core.isEmpty()) return null
+
+        // 777.N is this app's release revision, not a generic semantic-version pre-release label.
+        // Other suffixes (rc/beta/etc.) keep the previous behavior: they do not make an otherwise
+        // equal core version count as an upgrade.
+        val suffix = normalized.substringAfter('-', missingDelimiterValue = "")
+        val revision = suffix
+            .takeIf { it.matches(Regex("""777(?:\.\d+)*""")) }
+            ?.split('.')
+            ?.map { it.toInt() }
+
+        return ParsedVersion(core = core, releaseRevision = revision)
+    }
+
+    fun compareParts(left: List<Int>, right: List<Int>): Int {
+        for (i in 0 until maxOf(left.size, right.size)) {
+            val a = left.getOrElse(i) { 0 }
+            val b = right.getOrElse(i) { 0 }
+            if (a != b) return a.compareTo(b)
+        }
+        return 0
+    }
+
+    val candidateVersion = parse(candidate) ?: return false
+    val currentVersion = parse(current) ?: return true
+
+    val coreComparison = compareParts(candidateVersion.core, currentVersion.core)
+    if (coreComparison != 0) return coreComparison > 0
+
+    val candidateRevision = candidateVersion.releaseRevision
+    val currentRevision = currentVersion.releaseRevision
+    if (candidateRevision != null || currentRevision != null) {
+        return compareParts(candidateRevision.orEmpty(), currentRevision.orEmpty()) > 0
     }
     return false
 }
