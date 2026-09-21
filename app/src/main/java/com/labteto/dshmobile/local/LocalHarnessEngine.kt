@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -17,6 +19,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,7 +46,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 class LocalHarnessEngine @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
     private val web: LocalWebProvider,
@@ -103,18 +106,86 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    /** Queue one human turn for the on-device agent. */
-    fun send(text: String) {
+    /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
+    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
-        if (prompt.isEmpty() || activeJob?.isActive == true || !_state.value.configured) return
-        appendMessage("user", prompt)
+        if ((prompt.isEmpty() && attachments.isEmpty()) || activeJob?.isActive == true || !_state.value.configured) return
+        val attachmentBlock = attachments.joinToString("\n") { attachment ->
+            val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
+            "- $kind：${attachment.name} → ${attachment.relativePath}（${attachment.bytes} B）"
+        }
+        val content = buildString {
+            if (prompt.isNotEmpty()) append(prompt)
+            if (attachments.isNotEmpty()) {
+                if (isNotEmpty()) append("\n\n")
+                append("本次附件已导入本机工作区：\n").append(attachmentBlock)
+                if (attachments.any { it.mediaType.startsWith("image/") }) {
+                    append("\n提示：当前 DeepSeek 文本路由不能直接理解图片像素；图片已保存，可交给设备现有工具或后续视觉模型处理。")
+                }
+            }
+        }
+        appendMessage("user", content)
         modelHistory += buildJsonObject {
             put("role", "user")
-            put("content", prompt)
+            put("content", content)
         }
-        eventLog.append("user/message", buildJsonObject { put("content", prompt) })
+        eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
         activeJob = scope.launch { runTurn() }
+    }
+
+    /** Copy a picked image/file into the app-private workspace before the model sees it. */
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        var displayName: String? = null
+        var declaredSize: Long? = null
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0) displayName = cursor.getString(nameIndex)
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) declaredSize = cursor.getLong(sizeIndex)
+            }
+        }
+        if ((declaredSize ?: 0L) > MAX_ATTACHMENT_BYTES) {
+            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
+        }
+        val safeName = (displayName ?: "attachment-${System.currentTimeMillis()}")
+            .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
+            .take(120)
+            .ifBlank { "attachment-${System.currentTimeMillis()}" }
+        val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
+        var target = File(dir, safeName)
+        var suffix = 1
+        while (target.exists()) {
+            val dot = safeName.lastIndexOf('.')
+            val stem = if (dot > 0) safeName.substring(0, dot) else safeName
+            val ext = if (dot > 0) safeName.substring(dot) else ""
+            target = File(dir, "$stem-${suffix++}$ext")
+        }
+        val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
+        input.use { source ->
+            target.outputStream().use { output ->
+                val buffer = ByteArray(32 * 1024)
+                var total = 0L
+                while (true) {
+                    val read = source.read(buffer)
+                    if (read < 0) break
+                    total += read
+                    if (total > MAX_ATTACHMENT_BYTES) {
+                        target.delete()
+                        error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
+                    }
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+        LocalImportedAttachment(
+            name = displayName ?: target.name,
+            relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
+            mediaType = resolver.getType(uri) ?: "application/octet-stream",
+            bytes = target.length(),
+        )
     }
 
     /** Resolve the current write or shell approval. */
@@ -798,6 +869,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_HISTORY_CHARS = 500_000
         const val HISTORY_TAIL_CHARS = 240_000
+        const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
 
         val FALLBACK_WEB_ERRORS = setOf("DNS_FAILED", "TIMEOUT", "NETWORK_ERROR", "HTTP_4XX", "HTTP_5XX", "HTTP_REDIRECT")
 
