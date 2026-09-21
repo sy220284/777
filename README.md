@@ -17,6 +17,9 @@ and background jobs, official DeepSeek web search, goals, todos, skills, user qu
 and parallel workflows entirely on the phone. It stores the model key in Android Keystore and asks
 for approval before file writes, edits, or shell execution.
 
+See the [Android 16 on-device Harness parity audit](docs/ANDROID16-HARNESS-PARITY.zh-CN.md) for the
+official-source baseline, feature matrix, and platform-specific exclusions.
+
 <p align="center">
   An open-source Android companion that puts your <b>DeepSeek Harness</b> in your pocket.<br>
   Drive sessions, review plans and goals, answer approvals and questions, and get notified
