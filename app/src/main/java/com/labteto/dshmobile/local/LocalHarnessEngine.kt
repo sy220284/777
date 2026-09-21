@@ -3,6 +3,14 @@ package com.labteto.dshmobile.local
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.labteto.dshmobile.harness.agent.AgentEvent
+import com.labteto.dshmobile.harness.agent.AgentEventSink
+import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentModel
+import com.labteto.dshmobile.harness.agent.AgentModelReply
+import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
+import com.labteto.dshmobile.harness.agent.AgentToolCall
+import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -151,7 +159,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
-        activeJob = scope.launch { runTurn() }
+        activeJob = scope.launch { runTurn(content) }
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
@@ -305,44 +313,134 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private suspend fun runTurn() {
+    private suspend fun runTurn(input: String) {
         _state.update { it.copy(running = true, error = null) }
-        eventLog.append("turn/start", buildJsonObject { put("model", _state.value.model) })
-        try {
-            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
-            ensureSystemMessage()
-            compactHistoryIfNeeded()
-            repeat(MAX_STEPS) {
+        val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+        var modelStep = 0
+        var requestPrepared = false
+
+        val loop = AgentLoop(
+            model = AgentModel {
+                // Session/model history remains in the Android adapter until M1 Session migration.
+                // The shared AgentLoop owns scheduling; this adapter only translates one model step.
+                if (!requestPrepared) {
+                    ensureSystemMessage()
+                    compactHistoryIfNeeded()
+                    requestPrepared = true
+                }
+                val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val reply = completeWithRetry(key, snapshot, modelHistory.toList())
-                modelHistory += reply.message
-                eventLog.append("assistant/message", reply.message)
-                reply.reasoning?.takeIf { it.isNotBlank() }?.let {
-                    appendMessage("reasoning", it)
-                }
-                reply.content?.takeIf { it.isNotBlank() }?.let {
-                    appendMessage("assistant", it)
-                }
-                if (reply.toolCalls.isEmpty()) return
-                reply.toolCalls.forEach { call ->
-                    eventLog.append("tool/call", buildJsonObject {
-                        put("id", call.id); put("name", call.name); put("arguments", call.arguments)
-                    })
-                }
-                executeToolBatch(reply.toolCalls, allowMutation = true).forEach { (call, result) ->
-                    appendMessage("tool", result, call.name)
-                    eventLog.append("tool/result", buildJsonObject {
-                        put("id", call.id); put("name", call.name); put("content", result.take(MAX_EVENT_CHARS))
-                    })
-                    modelHistory += buildJsonObject {
-                        put("role", "tool")
-                        put("tool_call_id", call.id)
-                        put("content", pruneToolResult(result))
+                modelStep += 1
+                repliesByStep[modelStep] = reply
+                AgentModelReply(
+                    content = reply.content.orEmpty(),
+                    toolCalls = reply.toolCalls.map { call ->
+                        AgentToolCall(
+                            id = call.id,
+                            name = call.name,
+                            arguments = call.arguments,
+                            rawArguments = call.rawArguments,
+                        )
+                    },
+                )
+            },
+            tools = AgentToolExecutor { call ->
+                executeSafely(call.toLocalToolCall(), allowMutation = true)
+            },
+            toolBatch = AgentToolBatchExecutor { calls ->
+                executeToolBatch(
+                    calls = calls.map(AgentToolCall::toLocalToolCall),
+                    allowMutation = true,
+                ).map { (_, result) -> result }
+            },
+            eventSink = AgentEventSink { event ->
+                when (event) {
+                    is AgentEvent.TurnStarted -> {
+                        eventLog.append("turn/start", buildJsonObject {
+                            put("model", _state.value.model)
+                        })
                     }
-                    persist()
+                    is AgentEvent.StepStarted -> {
+                        eventLog.append("step/start", buildJsonObject {
+                            put("step", event.step)
+                        })
+                    }
+                    is AgentEvent.AssistantObserved -> {
+                        val reply = repliesByStep.remove(event.step)
+                            ?: error("缺少第 ${event.step} 步模型响应")
+                        modelHistory += reply.message
+                        eventLog.append("assistant/message", reply.message)
+                        reply.reasoning?.takeIf { it.isNotBlank() }?.let {
+                            appendMessage("reasoning", it)
+                        }
+                        reply.content?.takeIf { it.isNotBlank() }?.let {
+                            appendMessage("assistant", it)
+                        }
+                    }
+                    is AgentEvent.ToolStarted -> {
+                        eventLog.append("tool/call", buildJsonObject {
+                            put("step", event.step)
+                            put("id", event.call.id)
+                            put("name", event.call.name)
+                            put("arguments", event.call.arguments)
+                        })
+                    }
+                    is AgentEvent.ToolFinished -> {
+                        appendMessage("tool", event.output, event.call.name)
+                        eventLog.append("tool/result", buildJsonObject {
+                            put("step", event.step)
+                            put("id", event.call.id)
+                            put("name", event.call.name)
+                            put("content", event.output.take(MAX_EVENT_CHARS))
+                        })
+                        modelHistory += buildJsonObject {
+                            put("role", "tool")
+                            put("tool_call_id", event.call.id)
+                            put("content", pruneToolResult(event.output))
+                        }
+                        persist()
+                    }
+                    is AgentEvent.StepFinished -> {
+                        eventLog.append("step/end", buildJsonObject {
+                            put("step", event.step)
+                        })
+                    }
+                    is AgentEvent.TurnCompleted -> {
+                        eventLog.append("turn/end", buildJsonObject {
+                            put("reason", "completed")
+                            put("steps", event.steps)
+                            put("messages", _state.value.messages.size)
+                        })
+                    }
+                    is AgentEvent.TurnStepLimit -> {
+                        appendMessage("system", "本轮达到 $MAX_STEPS 步安全上限，请继续发送消息以恢复任务。")
+                        eventLog.append("turn/end", buildJsonObject {
+                            put("reason", "step_limit")
+                            put("steps", event.steps)
+                            put("messages", _state.value.messages.size)
+                        })
+                    }
+                    is AgentEvent.TurnFailed -> {
+                        eventLog.append("turn/end", buildJsonObject {
+                            put("reason", "error")
+                            put("detail", event.reason.take(2_000))
+                            put("messages", _state.value.messages.size)
+                        })
+                    }
+                    is AgentEvent.TurnCancelled -> {
+                        eventLog.append("turn/end", buildJsonObject {
+                            put("reason", "aborted")
+                            put("messages", _state.value.messages.size)
+                        })
+                    }
                 }
-            }
-            appendMessage("system", "本轮达到 $MAX_STEPS 步安全上限，请继续发送消息以恢复任务。")
+            },
+            maxSteps = MAX_STEPS,
+        )
+
+        try {
+            loop.run(input)
         } catch (_: CancellationException) {
             appendMessage("system", "本轮已停止。")
         } catch (error: Exception) {
@@ -352,10 +450,16 @@ class LocalHarnessEngine @Inject constructor(
             approvalResponse = null
             questionResponse = null
             _state.update { it.copy(running = false, pendingApproval = null, pendingQuestion = null) }
-            eventLog.append("turn/end", buildJsonObject { put("messages", _state.value.messages.size) })
             persist()
         }
     }
+
+    private fun AgentToolCall.toLocalToolCall(): LocalToolCall = LocalToolCall(
+        id = id,
+        name = name,
+        arguments = arguments,
+        rawArguments = rawArguments,
+    )
 
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
