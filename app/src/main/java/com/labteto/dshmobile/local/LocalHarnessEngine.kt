@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.labteto.dshmobile.device.AndroidDevicePlugin
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
@@ -81,6 +82,7 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionStore = VersionedSessionStore(sessionsRoot, json)
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
+    private val devicePlugin = AndroidDevicePlugin(context)
     private val builtinPlugin = object : HarnessPlugin {
         override val id = "android-local-builtins"
 
@@ -168,6 +170,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             pluginRegistry.install(builtinPlugin)
+            pluginRegistry.install(devicePlugin)
             load()
         }
     }
@@ -570,6 +573,12 @@ class LocalHarnessEngine @Inject constructor(
                 sessionId = currentSessionId,
                 allowMutation = allowMutation,
                 attributes = mapOf("call_id" to call.id),
+                approval = { tool ->
+                    approve(
+                        call,
+                        "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）",
+                    )
+                },
             ),
         ).content
     }
@@ -1388,10 +1397,8 @@ class LocalHarnessEngine @Inject constructor(
         else -> ToolAccess.READ_ONLY
     }
 
-    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy = when (name) {
-        "write", "edit", "bash" -> ToolApprovalPolicy.MUTATION
-        else -> ToolApprovalPolicy.NEVER
-    }
+    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy =
+        ToolApprovalPolicy.NEVER
 
     private fun JsonObject.string(key: String): String =
         optionalString(key)?.takeIf { it.isNotBlank() } ?: error("缺少参数：$key")

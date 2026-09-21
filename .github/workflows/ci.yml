@@ -28,7 +28,7 @@ jobs:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests
-        run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :mock-harness:test :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
       - name: Official Harness conformance
         run: ./gradlew :reference-validation:test --stacktrace
       - name: Lint

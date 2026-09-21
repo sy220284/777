@@ -24,6 +24,7 @@ data class ToolContext(
     val sessionId: String? = null,
     val allowMutation: Boolean = true,
     val attributes: Map<String, Any?> = emptyMap(),
+    val approval: (suspend (HarnessTool) -> Boolean)? = null,
 )
 
 data class ToolResult(
@@ -78,6 +79,16 @@ class ToolRegistry {
         )
         if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
             return ToolResult("当前作用域禁止执行会改变状态的工具：$name", isError = true)
+        }
+        val needsApproval = when (tool.approvalPolicy) {
+            ToolApprovalPolicy.NEVER -> false
+            ToolApprovalPolicy.ALWAYS -> true
+            ToolApprovalPolicy.MUTATION -> tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        }
+        if (needsApproval) {
+            val approval = context.approval
+                ?: return ToolResult("工具需要人工审批：$name", isError = true)
+            if (!approval(tool)) return ToolResult("用户拒绝执行工具：$name", isError = true)
         }
         return tool.executor.execute(context, input, rawArguments)
     }
