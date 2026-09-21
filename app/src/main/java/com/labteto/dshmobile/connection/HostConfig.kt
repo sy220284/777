@@ -112,7 +112,7 @@ data class DiscoveredHost(
 data class AppSettings(
     val autoConnectLast: Boolean = true,
     val autoConnectLan: Boolean = false,
-    val autoConnectLoopback: Boolean = true,
+    val autoConnectLoopback: Boolean = false,
     /** Relay mode's counterpart to [autoConnectLan]: connect to a paired relay that mDNS finds. */
     val autoConnectRelay: Boolean = false,
     val keepConnectedInBackground: Boolean = false,
@@ -127,7 +127,7 @@ data class AppSettings(
      * app connects only the way that was actually picked. Defaults to `lan` so an install that
      * predates relay support comes back where it was.
      */
-    val connectMode: String = ConnectMode.LAN,
+    val connectMode: String = ConnectMode.RELAY,
     val themePreference: String = "system", // light | dark | system
     val localeOverride: String? = null, // null = system
     val knownPorts: List<Int> = listOf(3080),
@@ -151,6 +151,6 @@ object ConnectMode {
     /** Through a `dsh-relay`, holding a device token and pinning the relay's key. */
     const val RELAY: String = "relay"
 
-    /** Read a stored value back, falling back to [LAN] for anything unrecognised. */
-    fun of(value: String?): String = if (value == RELAY) RELAY else LAN
+    /** Remote control is relay-only. Legacy LAN values migrate to relay on read. */
+    fun of(value: String?): String = RELAY
 }
