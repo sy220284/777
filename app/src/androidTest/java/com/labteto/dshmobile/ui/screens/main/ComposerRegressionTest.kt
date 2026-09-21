@@ -31,7 +31,7 @@ class ComposerRegressionTest {
         compose.setContent {
             val target = selected
             DshTheme { Composer(target.text, { target.text = it }, target.attachments, {}, {}, null, null, {}, null, null,
-                running = false, enabled = true, onOpenSheet = {}, onStop = {},
+                running = false, enabled = true, onOpenAttachments = {}, onOpenTools = {}, onStop = {},
                 onSend = { sent.add(target.key.sessionId to target.attachments.toList()) }, preparing = target.preparing) }
         }
         compose.runOnIdle { selected = second; second.preparing = true }
