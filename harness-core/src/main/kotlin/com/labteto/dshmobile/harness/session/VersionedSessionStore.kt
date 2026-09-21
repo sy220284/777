@@ -23,7 +23,7 @@ data class SessionLoadResult(
 )
 
 class FutureSessionVersionException(version: Int, current: Int) :
-    IllegalStateException("会话格式版本 \$version 高于当前支持版本 \$current，拒绝写入以避免破坏数据")
+    IllegalStateException("会话格式版本 $version 高于当前支持版本 $current，拒绝写入以避免破坏数据")
 
 class SessionMigrationRegistry(
     val currentVersion: Int = CURRENT_FORMAT_VERSION,
@@ -37,7 +37,7 @@ class SessionMigrationRegistry(
 
     @Synchronized
     fun register(fromVersion: Int, migration: (JsonObject) -> JsonObject) {
-        require(fromVersion in 0 until currentVersion) { "迁移起始版本超出范围：\$fromVersion" }
+        require(fromVersion in 0 until currentVersion) { "迁移起始版本超出范围：$fromVersion" }
         migrations[fromVersion] = migration
     }
 
@@ -47,7 +47,7 @@ class SessionMigrationRegistry(
         var current = payload
         while (version < currentVersion) {
             val migration = synchronized(this) { migrations[version] }
-                ?: error("缺少会话迁移：\$version -> \${version + 1}")
+                ?: error("缺少会话迁移：$version -> ${version + 1}")
             current = migration(current)
             version += 1
         }
@@ -82,7 +82,7 @@ class VersionedSessionStore(
         val payload = if (legacy) {
             element
         } else {
-            element["payload"]?.jsonObject ?: error("会话文档缺少 payload：\$id")
+            element["payload"]?.jsonObject ?: error("会话文档缺少 payload：$id")
         }
         val migratedPayload = migrations.migrate(version, payload)
         val updatedAt = if (legacy) {
@@ -122,7 +122,12 @@ class VersionedSessionStore(
     fun delete(id: String): Boolean = fileFor(id).delete()
 
     fun list(): List<SessionLoadResult> = root.listFiles().orEmpty()
-        .filter { file ->\n            file.isFile &&\n                file.name.endsWith(SESSION_SUFFIX) &&\n                !file.name.endsWith(TEMP_SUFFIX) &&\n                !file.name.contains(CHECKPOINT_MARKER)\n        }
+        .filter { file ->
+            file.isFile &&
+                file.name.endsWith(SESSION_SUFFIX) &&
+                !file.name.endsWith(TEMP_SUFFIX) &&
+                !file.name.contains(CHECKPOINT_MARKER)
+        }
         .mapNotNull { file ->
             val id = file.name.removeSuffix(SESSION_SUFFIX)
             try {
@@ -136,7 +141,7 @@ class VersionedSessionStore(
         .sortedByDescending { it.document.updatedAt }
 
     fun export(id: String): String {
-        val loaded = read(id) ?: error("会话不存在：\$id")
+        val loaded = read(id) ?: error("会话不存在：$id")
         return json.encodeToString(SessionDocument.serializer(), loaded.document)
     }
 
@@ -146,14 +151,14 @@ class VersionedSessionStore(
             throw FutureSessionVersionException(document.formatVersion, migrations.currentVersion)
         }
         val target = fileFor(document.id)
-        require(overwrite || !target.exists()) { "会话已存在：\${document.id}" }
+        require(overwrite || !target.exists()) { "会话已存在：${document.id}" }
         val payload = migrations.migrate(document.formatVersion, document.payload)
         return write(document.id, payload, document.updatedAt)
     }
 
     fun checkpoint(id: String, version: Int = migrations.currentVersion): File {
         val source = fileFor(id)
-        require(source.isFile) { "会话不存在：\$id" }
+        require(source.isFile) { "会话不存在：$id" }
         val target = checkpointFor(id, version)
         source.copyTo(target, overwrite = true)
         return target
@@ -161,19 +166,19 @@ class VersionedSessionStore(
 
     private fun fileFor(id: String): File {
         validateId(id)
-        return File(root, "\$id\$SESSION_SUFFIX")
+        return File(root, "$id$SESSION_SUFFIX")
     }
 
     private fun checkpointFor(id: String, version: Int): File =
-        File(root, "\$id.checkpoint-v\$version.json")
+        File(root, "$id.checkpoint-v$version.json")
 
     private fun validateId(id: String) {
-        require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：\$id" }
+        require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：$id" }
     }
 
     private fun atomicWrite(file: File, content: String) {
         file.parentFile?.mkdirs()
-        val temporary = File(file.parentFile, "\${file.name}.tmp")
+        val temporary = File(file.parentFile, "${file.name}.tmp")
         temporary.writeText(content)
         if (!temporary.renameTo(file)) {
             file.writeText(temporary.readText())
@@ -183,6 +188,7 @@ class VersionedSessionStore(
 
     private companion object {
         const val SESSION_SUFFIX = ".json"
-        const val TEMP_SUFFIX = ".json.tmp"\n        const val CHECKPOINT_MARKER = ".checkpoint-v"
+        const val TEMP_SUFFIX = ".json.tmp"
+        const val CHECKPOINT_MARKER = ".checkpoint-v"
     }
 }
