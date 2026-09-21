@@ -63,7 +63,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -796,7 +795,7 @@ private fun ImportedAttachmentRow(
             Column(Modifier.weight(1f)) {
                 Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
                 Text(
-                    "${attachment.relativePath} · ${attachment.bytes} B",
+                    "${attachment.mediaType} · ${attachment.bytes} B",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
