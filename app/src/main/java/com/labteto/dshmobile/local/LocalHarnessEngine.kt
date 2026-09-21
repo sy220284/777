@@ -1404,7 +1404,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun bundledRuntimeSearchPaths(): List<File> =
         (bundledNodeRuntime.searchPaths() + bundledPythonRuntime.searchPaths())
-            .distinctBy(File::getPath)
+            .distinctBy { it.path }
 
     private fun bundledRuntimeEnvironment(): Map<String, String> {
         val environments = listOf(
