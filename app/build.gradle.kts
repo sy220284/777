@@ -36,6 +36,23 @@ val dshVersionCode: Int = dshVersionName
     }
     .coerceAtLeast(1)
 
+val generatedNodeRuntime = layout.buildDirectory.dir("generated/nodeRuntime")
+val prepareBundledNodeRuntime = tasks.register<Exec>("prepareBundledNodeRuntime") {
+    group = "build setup"
+    description = "Fetches and verifies the bundled Android Node.js runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/prepare-termux-node.sh"))
+    outputs.dir(generatedNodeRuntime)
+    environment(
+        "TERMUX_RUNTIME_CACHE",
+        rootProject.file(".gradle/runtime-cache/termux-node").absolutePath,
+    )
+    commandLine(
+        "bash",
+        rootProject.file("tools/runtime/prepare-termux-node.sh").absolutePath,
+        generatedNodeRuntime.get().asFile.absolutePath,
+    )
+}
+
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 36
@@ -105,7 +122,17 @@ android {
         buildConfig = true
     }
 
+    sourceSets.getByName("main").apply {
+        jniLibs.srcDir(generatedNodeRuntime.map { it.dir("jniLibs") })
+        assets.srcDir(generatedNodeRuntime.map { it.dir("assets") })
+    }
+
     packaging {
+        // Android target 29+ may only exec app binaries from nativeLibraryDir. Force extraction
+        // instead of leaving the bundled executable mapped directly from the APK.
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -119,6 +146,19 @@ android {
         // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
         // none. Compose string literals have to be caught in review.
     }
+}
+
+tasks.matching {
+    it.name.startsWith("merge") &&
+        (it.name.endsWith("JniLibFolders") || it.name.endsWith("Assets"))
+}.configureEach {
+    dependsOn(prepareBundledNodeRuntime)
+}
+
+// Lint model writers inspect the merged asset source set directly. Without this explicit edge
+// Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
+tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
+    dependsOn(prepareBundledNodeRuntime)
 }
 
 dependencies {
