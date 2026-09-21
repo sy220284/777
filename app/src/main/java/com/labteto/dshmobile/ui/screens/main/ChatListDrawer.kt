@@ -36,7 +36,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,6 +77,39 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+
+internal data class DrawerSessionSections(
+    val current: SessionRow?,
+    val history: List<SessionRow>,
+)
+
+/**
+ * Split the harness's existing session-list records for the drawer.
+ *
+ * The current row is the exact record selected by [currentSessionId]. Historical rows are the
+ * remaining durable, non-archived records; no workspace grouping or synthetic row decides whether
+ * a record is visible. Blank scratch rows stay out of history, while the selected current record is
+ * still shown even when it is blank so the drawer accurately reflects what is open.
+ */
+internal fun drawerSessionSections(
+    sessions: List<SessionRow>,
+    archivedIds: Set<String>,
+    currentSessionId: String?,
+    sortByRecency: Boolean,
+): DrawerSessionSections {
+    val current = currentSessionId?.let { id ->
+        sessions.firstOrNull { it.sessionId == id && it.sessionId !in archivedIds }
+    }
+    val history = sessions.filter {
+        it.sessionId !in archivedIds &&
+            it.sessionId != currentSessionId &&
+            !it.blank
+    }.let { rows ->
+        if (sortByRecency) rows.sortedByDescending(SessionRow::updatedAt) else rows
+    }
+    return DrawerSessionSections(current = current, history = history)
+}
+
 /** [com.labteto.dshmobile.connection.HostsStore.sessionSort]: the workspace's own row order. */
 private const val SORT_MANUAL = "manual"
 
@@ -117,7 +149,6 @@ fun ChatListDrawer(
     val sortByRecency = sessionSort == SORT_UPDATED
     var newWorkspaceOpen by remember { mutableStateOf(false) }
     var newSessionOpen by remember { mutableStateOf(false) }
-    val collapsed = remember { mutableStateMapOf<String, Boolean>() }
 
     LaunchedEffect(query) {
         delay(250)
@@ -136,58 +167,21 @@ fun ChatListDrawer(
         )
     }
 
-    // Blank sessions are scratch space the harness reuses; subagent transcripts belong under their
-    // parent, not as top-level rows.
-    val currentListSession = sessions.firstOrNull {
-        it.sessionId == currentSessionId && it.sessionId !in archivedIds && !it.blank
+    // Current/history are projections of the existing session-list records. The drawer must never
+    // manufacture a second source of truth or hide a durable row behind workspace expansion.
+    val sections = remember(sessions, archivedIds, currentSessionId, sortByRecency) {
+        drawerSessionSections(
+            sessions = sessions,
+            archivedIds = archivedIds,
+            currentSessionId = currentSessionId,
+            sortByRecency = sortByRecency,
+        )
     }
-    val listable = sessions.filter {
-        it.sessionId !in archivedIds && !it.blank && it.sessionId != currentSessionId
-    }
-    val sessionsById = sessions.associateBy { it.sessionId }
+    val currentListSession = sections.current
+    val historySessions = sections.history
     val archivedSessions = sessions.filter { it.sessionId in archivedIds }
-    val workspaceSessionIds = workspaces.flatMap { it.sessionIds }.toSet()
-
-    // Subagents nest under the session that spawned them. `origin` is the discriminator, not
-    // `parentSessionId` — an ordinary fork sets a parent too, and a fork is a session in its own
-    // right that belongs at the top level. Grouping is by *immediate* parent so a subagent that
-    // spawned its own subagents nests to whatever depth the run actually reached; a child whose
-    // parent is archived or blank attaches to the nearest ancestor still on screen instead of
-    // disappearing with it.
-    val childrenByParent = remember(listable) { indexSubagents(listable, sessionsById) }
-    val nestedIds = remember(childrenByParent) {
-        childrenByParent.values.flatten().mapTo(HashSet()) { it.sessionId }
-    }
-    // Every session between the open one and the root, so a subtree holding it opens by default.
-    val openPath = remember(currentSessionId, sessionsById) {
-        buildSet {
-            var cursor = currentSessionId?.let { sessionsById[it] }
-            while (cursor != null && add(cursor.sessionId)) {
-                cursor = cursor.parentSessionId?.let { sessionsById[it] }
-            }
-        }
-    }
-
-    // `collapsed` holds explicit choices only; the default is closed unless the subtree holds the
-    // session you are looking at, so opening the drawer mid-run shows you where you are.
-    fun isExpanded(sessionId: String): Boolean = collapsed[sessionId]?.not() ?: (sessionId in openPath)
-    fun toggleChildren(sessionId: String) {
-        collapsed[sessionId] = isExpanded(sessionId)
-    }
-
-    /** Depth-first expansion of one top-level session, honouring each row's collapse state. */
-    fun subtree(root: SessionRow): List<Pair<SessionRow, Int>> {
-        val out = mutableListOf<Pair<SessionRow, Int>>()
-        fun walk(row: SessionRow, depth: Int) {
-            out += row to depth
-            val children = childrenByParent[row.sessionId].orEmpty()
-            if (children.isEmpty() || !isExpanded(row.sessionId)) return
-            val ordered = if (sortByRecency) children.sortedByDescending(SessionRow::updatedAt) else children
-            ordered.forEach { walk(it, depth + 1) }
-        }
-        walk(root, 0)
-        return out
-    }
+    val hasVisibleSessions =
+        currentListSession != null || historySessions.isNotEmpty() || archivedSessions.isNotEmpty()
 
     Column(
         modifier = Modifier
@@ -309,94 +303,26 @@ fun ChatListDrawer(
                     )
                 }
             }
-            if (listable.isNotEmpty() || archivedSessions.isNotEmpty()) {
+
+            if (historySessions.isNotEmpty()) {
                 item(key = "history-session-header") {
                     Spacer(Modifier.height(DsSpacing.small))
                     SectionHeader("历史会话")
                 }
-            }
-
-            var anyShown = false
-            for (workspace in workspaces) {
-                val roots = workspace.sessionIds
-                    .mapNotNull { id -> listable.firstOrNull { it.sessionId == id } }
-                    .filterNot { it.sessionId in nestedIds }
-                    .let { if (sortByRecency) it.sortedByDescending(SessionRow::updatedAt) else it }
-                if (roots.isEmpty()) continue
-                anyShown = true
-                // Only the workspace you are working in is open by default. With twenty sessions
-                // and their subagents in one group, expanding everything buries the list you came
-                // for; the explicit map entry then remembers whatever you choose.
-                val holdsCurrent = roots.any { it.sessionId in openPath }
-                val isCollapsed = collapsed[workspace.workspaceId] ?: !holdsCurrent
-                item(key = "ws-${workspace.workspaceId}") {
-                    WorkspaceHeader(
-                        workspace = workspace,
-                        collapsed = isCollapsed,
-                        // Sessions, not sessions-plus-their-subagents: a subagent count belongs on
-                        // the row that spawned them, where it says something.
-                        sessionCount = roots.size,
-                        onToggle = { collapsed[workspace.workspaceId] = !isCollapsed },
-                        store = store,
-                        scope = scope,
-                        onNewSession = {
-                            scope.launch {
-                                store.createSession(workspaceId = workspace.workspaceId)
-                                onClose()
-                            }
-                        },
-                    )
-                }
-                if (!isCollapsed) {
-                    val flat = roots.flatMap { subtree(it) }
-                    items(flat, key = { it.first.sessionId }) { (session, depth) ->
-                        Box(Modifier.animateItem()) {
-                            SessionRowItem(
-                                session = session,
-                                isCurrent = session.sessionId == currentSessionId,
-                                store = store,
-                                scope = scope,
-                                onClose = onClose,
-                                depth = depth,
-                                childCount = childrenByParent[session.sessionId].orEmpty().size,
-                                childrenExpanded = isExpanded(session.sessionId),
-                                onToggleChildren = { toggleChildren(session.sessionId) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Sessions the harness never registered in a workspace, plus any subagent whose whole
-            // ancestry is archived or blank — those have no row left to nest under.
-            val ungrouped = listable.filter {
-                it.sessionId !in workspaceSessionIds && it.sessionId !in nestedIds
-            }
-            if (ungrouped.isNotEmpty()) {
-                anyShown = true
-                item(key = "sessions-header") { SectionHeader(stringResource(R.string.chatlist_sessions)) }
-                val flat = ungrouped
-                    .let { if (sortByRecency) it.sortedByDescending(SessionRow::updatedAt) else it }
-                    .flatMap { subtree(it) }
-                items(flat, key = { it.first.sessionId }) { (session, depth) ->
+                items(historySessions, key = { it.sessionId }) { session ->
                     Box(Modifier.animateItem()) {
                         SessionRowItem(
                             session = session,
-                            isCurrent = session.sessionId == currentSessionId,
+                            isCurrent = false,
                             store = store,
                             scope = scope,
                             onClose = onClose,
-                            depth = depth,
-                            childCount = childrenByParent[session.sessionId].orEmpty().size,
-                            childrenExpanded = isExpanded(session.sessionId),
-                            onToggleChildren = { toggleChildren(session.sessionId) },
                         )
                     }
                 }
             }
 
             if (archivedSessions.isNotEmpty()) {
-                anyShown = true
                 item(key = "archived") {
                     var archivedExpanded by remember { mutableStateOf(false) }
                     DisclosureRow(
@@ -412,7 +338,7 @@ fun ChatListDrawer(
                 }
             }
 
-            if (!anyShown) {
+            if (!hasVisibleSessions) {
                 item(key = "empty") {
                     EmptyHero(
                         headline = stringResource(R.string.chatlist_empty),
