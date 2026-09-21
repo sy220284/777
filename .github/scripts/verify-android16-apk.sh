@@ -17,8 +17,10 @@ native_dir="$(mktemp -d)"
 trap 'rm -rf "$native_dir"' EXIT
 unzip -qq "$apk" 'lib/*/*.so' -d "$native_dir" || true
 while IFS= read -r -d '' library; do
-  if ! readelf -lW "$library" | awk '$1 == "LOAD" && ($NF + 0) < 16384 { bad = 1 } END { exit bad }'; then
-    echo "Native library is not 16 KB ELF-aligned: $library" >&2
-    exit 1
-  fi
+  while IFS= read -r alignment; do
+    case "$alignment" in
+      0x4000|0x8000|0x10000|0x20000|0x40000|0x80000|0x100000) ;;
+      *) echo "Native library is not 16 KB ELF-aligned: $library ($alignment)" >&2; exit 1 ;;
+    esac
+  done < <(readelf -lW "$library" | awk '$1 == "LOAD" { print $NF }')
 done < <(find "$native_dir" -type f -name '*.so' -print0)
