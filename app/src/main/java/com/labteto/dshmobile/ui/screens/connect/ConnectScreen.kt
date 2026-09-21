@@ -87,7 +87,7 @@ fun ConnectScreen(
     onOpenSettings: () -> Unit,
     onOpenLocalHarness: () -> Unit,
     onPair: (prefillUrl: String?) -> Unit,
-    initialMode: ConnectMode? = null,
+    initialMode: String? = null,
     viewModel: ConnectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
