@@ -14,7 +14,7 @@ class LocalJsonQueryTest {
             """{"items":[{"name":"first"},{"name":"second"}],"meta":{"count":2}}""",
         )
 
-        assertEquals(""second"", resolveJsonPath(root, "items[1].name").toString())
+        assertEquals("\\"second\\"", resolveJsonPath(root, "items[1].name").toString())
         assertEquals("2", resolveJsonPath(root, "meta.count").toString())
     }
 
