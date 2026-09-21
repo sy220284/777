@@ -17,7 +17,11 @@
 Android Keystore 加密；写文件、编辑文件和执行命令必须逐次取得用户批准。
 
 完整功能对照和 Android 16 适配边界见
-[Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)。\n\n后续将把当前本机实现升级为真正的 Android 原生 Harness 内核：官方源码作为语义、协议和测试基线，\nAgent / Session / Tool / Workflow 等核心能力由 APK 原生实现；完整路线见\n[Android 原生 Harness 内核完整规划与实施方案](docs/ANDROID-NATIVE-HARNESS-IMPLEMENTATION-PLAN.zh-CN.md)。
+[Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)。
+
+后续将把当前本机实现升级为真正的 Android 原生 Harness 内核：官方源码作为语义、协议和测试基线，
+Agent / Session / Tool / Workflow 等核心能力由 APK 原生实现；完整路线见
+[Android 原生 Harness 内核完整规划与实施方案](docs/ANDROID-NATIVE-HARNESS-IMPLEMENTATION-PLAN.zh-CN.md)。
 
 本机执行被限制在应用私有工作区。安卓不会允许普通应用读取其他应用的私有目录；系统也不自带
 Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续按架构和许可证单独内置，或继续使用
