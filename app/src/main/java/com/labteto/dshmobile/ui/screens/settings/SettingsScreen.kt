@@ -100,20 +100,14 @@ import java.util.Locale
 fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
-    val store = rememberSessionStore()
-    val plugins by store.plugins.collectAsStateWithLifecycle()
+    val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var showDisconnectDialog by remember { mutableStateOf(false) }
-    var pluginsOpen by remember { mutableStateOf(false) }
     BackHandler(onBack = onClose)
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
     val sessionsCleared = stringResource(R.string.settings_clear_last_sessions_done)
-
-    // Fetched on open rather than kept live: the inventory only changes when the harness is
-    // restarted with a different composition, and nothing pushes that over the wire.
-    LaunchedEffect(Unit) { store.refreshPlugins() }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         Box {
@@ -143,13 +137,17 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                     Spacer(Modifier.width(48.dp))
                 }
 
-                SettingsCard(stringResource(R.string.archived_title), Icons.Outlined.History) {
-                    com.labteto.dshmobile.ui.screens.main.ArchivedSessions(store)
-                }
-
                 SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                     LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                     AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                }
+
+                SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
+                    ToggleRow(
+                        stringResource(R.string.chatlist_sort_updated),
+                        sessionSort == "updated",
+                        stringResource(R.string.chatlist_sort_manual),
+                    ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                 }
 
                 SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
@@ -159,13 +157,9 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                         settings.autoConnectLast,
                     ) { viewModel.set { it.copy(autoConnectLast = !it.autoConnectLast) } }
                     ToggleRow(
-                        stringResource(R.string.connect_auto_lan),
-                        settings.autoConnectLan,
-                    ) { viewModel.set { it.copy(autoConnectLan = !it.autoConnectLan) } }
-                    ToggleRow(
-                        stringResource(R.string.connect_auto_loopback),
-                        settings.autoConnectLoopback,
-                    ) { viewModel.set { it.copy(autoConnectLoopback = !it.autoConnectLoopback) } }
+                        stringResource(R.string.connect_auto_relay),
+                        settings.autoConnectRelay,
+                    ) { viewModel.set { it.copy(autoConnectRelay = !it.autoConnectRelay) } }
                 }
 
                 SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
@@ -190,28 +184,6 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                         stringResource(R.string.settings_background_hint),
                     ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
                 }
-
-                SettingsCard(stringResource(R.string.settings_harness), Icons.Outlined.Cloud) {
-                    connectionState.description?.let { host ->
-                        // Only the home directory survives from `host.describe`; the version and
-                        // attached-session count are not published by 0.1.2 at all. About already
-                        // shows the protocol baseline, so it is not repeated here.
-                        LabelledValue(
-                            stringResource(R.string.settings_host_info),
-                            host.home,
-                        )
-                    }
-                    Text(
-                        stringResource(R.string.settings_readonly_banner),
-                        style = DsType.caption11,
-                        color = colors.warnLabel,
-                    )
-                }
-
-                // Its own card rather than an addition to the harness one above: that card's
-                // read-only banner is scoped to the facts it shows, and plugins are a different
-                // subject that happens to also be read-only.
-                plugins?.let { PluginsCard(it) { pluginsOpen = true } }
 
                 SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
                     DsButton(
@@ -251,10 +223,6 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
-    }
-
-    plugins?.takeIf { pluginsOpen }?.let {
-        PluginsSheet(inventory = it, onDismiss = { pluginsOpen = false })
     }
 
     if (showDisconnectDialog) {
