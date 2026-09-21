@@ -45,6 +45,8 @@ class LocalWorkspaceTest {
     fun editRequiresUniqueObservationAndGlobFindsFiles() {
         workspace.write("src/one.kt", "val before = 1\n")
         workspace.write("src/two.txt", "before before\n")
+        workspace.read("src/one.kt")
+        workspace.read("src/two.txt")
 
         assertEquals("已编辑 src/one.kt", workspace.edit("src/one.kt", "before", "after"))
         assertTrue(workspace.read("src/one.kt").contains("after"))
@@ -52,6 +54,24 @@ class LocalWorkspaceTest {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.edit("src/two.txt", "before", "after")
         }
+    }
+
+    @Test
+    fun editRequiresFreshObservationAndRejectsStaleReads() {
+        workspace.write("src/fresh.txt", "before")
+
+        assertThrows(IllegalStateException::class.java) {
+            workspace.edit("src/fresh.txt", "before", "after")
+        }
+
+        workspace.read("src/fresh.txt")
+        workspace.writeToolArtifact("src/fresh.txt", "changed elsewhere")
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.edit("src/fresh.txt", "changed", "after")
+        }
+
+        workspace.read("src/fresh.txt")
+        assertEquals("已编辑 src/fresh.txt", workspace.edit("src/fresh.txt", "changed", "after"))
     }
 
     @Test

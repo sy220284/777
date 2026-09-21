@@ -62,7 +62,10 @@ class LocalHarnessEngine @Inject constructor(
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
     private val modelHistory = mutableListOf<JsonObject>()
-    private val persistenceQueue = Channel<Pair<String, LocalHarnessSession>>(Channel.UNLIMITED)
+    private val persistenceLock = Any()
+    private val pendingPersistence = mutableMapOf<String, LocalHarnessSession>()
+    private val queuedPersistenceIds = mutableSetOf<String>()
+    private val persistenceQueue = Channel<String>(Channel.UNLIMITED)
     private val _state = MutableStateFlow(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
@@ -80,7 +83,23 @@ class LocalHarnessEngine @Inject constructor(
         seedWorkspace()
         migrateLegacySession()
         scope.launch {
-            for ((sessionId, snapshot) in persistenceQueue) writeSession(sessionId, snapshot)
+            for (sessionId in persistenceQueue) {
+                while (true) {
+                    val snapshot = synchronized(persistenceLock) {
+                        pendingPersistence.remove(sessionId)
+                    } ?: break
+                    writeSession(sessionId, snapshot)
+                }
+                val reschedule = synchronized(persistenceLock) {
+                    queuedPersistenceIds.remove(sessionId)
+                    if (pendingPersistence.containsKey(sessionId) && queuedPersistenceIds.add(sessionId)) {
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (reschedule) persistenceQueue.trySend(sessionId)
+            }
         }
         scope.launch { load() }
     }
@@ -396,6 +415,7 @@ class LocalHarnessEngine @Inject constructor(
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
+                workspace.requireFreshObservation(path)
                 if (!approve(call, "编辑文件：$path")) return "用户拒绝编辑 $path"
                 workspace.edit(path, args.string("old_text"), args.string("new_text"))
             }
@@ -406,10 +426,19 @@ class LocalHarnessEngine @Inject constructor(
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")
                 if (!approve(call, "执行命令：${command.take(160)}")) return "用户拒绝执行命令"
-                val timeout = args.int("timeout_seconds", 30)
-                if (args.boolean("run_in_background", false)) {
+                val background = args.boolean("run_in_background", false)
+                val timeout = args.int(
+                    "timeout_seconds",
+                    if (background) DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS else DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS,
+                ).coerceIn(
+                    1,
+                    if (background) MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
+                )
+                if (background) {
                     jobs.start(command) { _, report -> workspace.shell(command, timeout, report) }
-                } else workspace.shell(command, timeout)
+                } else {
+                    workspace.shell(command, timeout)
+                }
             }
             "job_list" -> jobs.list()
             "job_output" -> jobs.output(args.string("job_id"))
@@ -423,13 +452,15 @@ class LocalHarnessEngine @Inject constructor(
                 val input = args.string("url")
                 val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
                 val format = args.optionalString("format") ?: "text"
-                if (args.boolean("run_in_background", false)) {
+                val background = args.boolean("run_in_background", false)
+                val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
+                if (background) {
                     jobs.start("网页抓取：${input.take(120)}") { _, report ->
                         report("正在抓取：$input")
-                        fetchWebWithFallback(input, maxBytes, format)
+                        fetchWebWithFallback(input, maxBytes, format, timeout)
                     }
                 } else {
-                    fetchWebWithFallback(input, maxBytes, format)
+                    fetchWebWithFallback(input, maxBytes, format, timeout)
                 }
             }
             "json_query" -> jsonQuery(
@@ -506,9 +537,22 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun fetchWebWithFallback(input: String, maxBytes: Int, format: String): String {
+    private suspend fun fetchWebWithFallback(
+        input: String,
+        maxBytes: Int,
+        format: String,
+        timeoutSeconds: Long,
+    ): String {
         return try {
-            formatFetchedWeb(web.fetch(input, maxBytes = maxBytes, format = format), format)
+            formatFetchedWeb(
+                web.fetch(
+                    input,
+                    maxBytes = maxBytes,
+                    format = format,
+                    timeoutSeconds = timeoutSeconds,
+                ),
+                format,
+            )
         } catch (error: LocalWebException) {
             if (error.code !in FALLBACK_WEB_ERRORS) throw error
             val key = apiKeys.get()
@@ -524,7 +568,6 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
     }
-
     private fun formatFetchedWeb(result: LocalWebFetchResult, format: String): String {
         val total = result.totalBytes?.let { "$it 字节" } ?: "服务器未提供 Content-Length"
         val shouldSpill = result.content.length > WEB_FETCH_INLINE_CHARS || result.truncated
@@ -1069,7 +1112,12 @@ class LocalHarnessEngine @Inject constructor(
             planMode = state.planMode,
             autoApproveMutations = state.autoApproveMutations,
         )
-        persistenceQueue.trySend(currentSessionId to snapshot)
+        val sessionId = currentSessionId
+        val shouldQueue = synchronized(persistenceLock) {
+            pendingPersistence[sessionId] = snapshot
+            queuedPersistenceIds.add(sessionId)
+        }
+        if (shouldQueue) persistenceQueue.trySend(sessionId)
     }
 
     private fun writeSession(sessionId: String, snapshot: LocalHarnessSession) {
@@ -1150,6 +1198,12 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_MODEL_ATTEMPTS = 3
         const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
+        const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
+        const val BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS = 240L
+        const val DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS = 30
+        const val DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS = 300
+        const val MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS = 120
+        const val MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS = 900
         const val WEB_FETCH_INLINE_CHARS = 40_000
         const val WEB_FETCH_PREVIEW_CHARS = 6_000
         const val MAX_TOOL_RESULT_CHARS = 50_000

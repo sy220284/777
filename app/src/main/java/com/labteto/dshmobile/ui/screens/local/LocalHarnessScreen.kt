@@ -824,7 +824,7 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
 
         isTool -> CollapsibleTranscriptRow(
             title = "工具 · ${message.toolName ?: "执行结果"}",
-            meta = "已完成，点击查看详情",
+            meta = toolResultMeta(message.content),
             content = message.content,
             code = true,
             onCopy = { clipboard.setText(AnnotatedString(message.content)) },
@@ -894,6 +894,14 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
     }
 }
 
+private fun toolResultMeta(content: String): String = when {
+    "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
+        "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content ->
+        "执行失败，点击查看详情"
+    "已自动降级" in content || ("达到" in content && "步上限" in content) ->
+        "已降级/未完整结束，点击查看详情"
+    else -> "已完成，点击查看详情"
+}
 @Composable
 private fun CollapsibleTranscriptRow(
     title: String,

@@ -14,7 +14,10 @@ import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
+import java.net.Socket
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLSocketFactory
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -47,18 +50,20 @@ class LocalWebProvider @Inject constructor(
         input: String,
         maxBytes: Int = DEFAULT_FETCH_BYTES,
         format: String = "text",
+        timeoutSeconds: Long = DEFAULT_FETCH_TIMEOUT_SECONDS,
     ): LocalWebFetchResult = withContext(Dispatchers.IO) {
         require(format in setOf("text", "raw")) { "web_fetch format 仅支持 text 或 raw" }
         val byteLimit = maxBytes.coerceIn(MIN_FETCH_BYTES, MAX_FETCH_BYTES)
         var current = validateTarget(input)
         try {
             repeat(MAX_REDIRECTS + 1) { redirectCount ->
-                val request = Request.Builder()
-                    .url(current.uri.toString())
+                val route = requestRoute(current, timeoutSeconds)
+                val requestBuilder = Request.Builder()
+                    .url(route.url)
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.5")
-                    .build()
-                pinnedClient(current).newCall(request).execute().use { response ->
+                route.hostHeader?.let { requestBuilder.header("Host", it) }
+                route.client.newCall(requestBuilder.build()).execute().use { response ->
                     if (response.isRedirect) {
                         if (redirectCount >= MAX_REDIRECTS) {
                             throw LocalWebException("HTTP_REDIRECT", "网页重定向次数过多")
@@ -82,6 +87,12 @@ class LocalWebProvider @Inject constructor(
                             truncated = false,
                         )
                     val mediaType = body.contentType()?.toString().orEmpty()
+                    if (mediaType.isNotBlank() && !isTextualWebMediaType(mediaType)) {
+                        throw LocalWebException(
+                            "UNSUPPORTED_MEDIA",
+                            "web_fetch 仅处理文本/JSON/XML；目标返回 $mediaType。请使用文件下载/附件流程处理二进制内容。",
+                        )
+                    }
                     val totalBytes = body.contentLength().takeIf { it >= 0L }
                     val bounded = body.byteStream().use { readBounded(it, byteLimit) }
                     val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
@@ -321,43 +332,75 @@ class LocalWebProvider @Inject constructor(
         throw LocalWebException("DNS_FAILED", "无法解析域名 $host", error)
     }
 
-    private fun pinnedClient(target: ValidatedTarget): OkHttpClient {
+    private fun requestRoute(target: ValidatedTarget, timeoutSeconds: Long): RequestRoute {
+        val timeout = timeoutSeconds.coerceIn(MIN_FETCH_TIMEOUT_SECONDS, MAX_FETCH_TIMEOUT_SECONDS)
+        val proxy = systemHttpProxy()
+        val fakeIp = target.addresses.any { isAllowedVpnFakeAddress(target.uri.host, it, target.vpn) }
+        if (proxy == null || fakeIp) {
+            val client = http.newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .proxy(Proxy.NO_PROXY)
+                .dns(object : Dns {
+                    override fun lookup(hostname: String): List<InetAddress> {
+                        if (!hostname.equals(target.uri.host, ignoreCase = true)) {
+                            throw UnknownHostException("主机发生变化")
+                        }
+                        return target.addresses
+                    }
+                })
+                .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(timeout, TimeUnit.SECONDS)
+                .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+                .build()
+            return RequestRoute(client, target.uri.toString(), null)
+        }
+
+        // 代理仍然使用，但 CONNECT/请求目标固定到已通过安全检查的 IP，
+        // 防止代理侧重新解析同一域名后把请求导向 localhost/LAN/保留地址。
+        val address = target.addresses.firstOrNull { it is Inet4Address } ?: target.addresses.first()
+        val pinnedUri = pinUriToAddress(target.uri, address)
         val builder = http.newBuilder()
             .followRedirects(false)
             .followSslRedirects(false)
-        val proxy = systemHttpProxy()
-        if (proxy != null) {
-            builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host, proxy.port)))
-        } else {
-            builder.dns(object : Dns {
-                override fun lookup(hostname: String): List<InetAddress> {
-                    if (!hostname.equals(target.uri.host, ignoreCase = true)) {
-                        throw UnknownHostException("主机发生变化")
-                    }
-                    return target.addresses
-                }
-            })
+            .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host, proxy.port)))
+            .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(timeout, TimeUnit.SECONDS)
+            .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+
+        if (target.uri.scheme.equals("https", ignoreCase = true)) {
+            val originalHost = target.uri.host
+            val verifier = HttpsURLConnection.getDefaultHostnameVerifier()
+            builder.sslSocketFactory(
+                SniSocketFactory(http.sslSocketFactory, originalHost),
+                http.x509TrustManager,
+            )
+            builder.hostnameVerifier { _, session -> verifier.verify(originalHost, session) }
         }
-        return builder.build()
+
+        return RequestRoute(
+            client = builder.build(),
+            url = pinnedUri.toString(),
+            hostHeader = hostHeader(target.uri),
+        )
+    }
+
+    private fun hostHeader(uri: URI): String {
+        val defaultPort = if (uri.scheme.equals("https", true)) 443 else 80
+        return if (uri.port == -1 || uri.port == defaultPort) uri.host else "${uri.host}:${uri.port}"
     }
 
     private fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
-        val client = pinnedClient(target).newBuilder()
-            .connectTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .callTimeout(PROBE_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .build()
-        val request = Request.Builder()
-            .url(target.uri.toString())
-            .header("User-Agent", USER_AGENT)
-            .header("Range", "bytes=0-0")
-            .build()
         return try {
-            client.newCall(request).execute().use { response ->
-                ConnectivityProbe(
-                    reachable = true,
-                    detail = "已建立 HTTP/TLS 连接（HTTP ${response.code}）",
-                )
+            val route = requestRoute(target, PROBE_CALL_TIMEOUT_SECONDS)
+            val builder = Request.Builder()
+                .url(route.url)
+                .header("User-Agent", USER_AGENT)
+                .head()
+            route.hostHeader?.let { builder.header("Host", it) }
+            route.client.newCall(builder.build()).execute().use { response ->
+                val classification = classifyProbeStatus(response.code)
+                ConnectivityProbe(classification.first, classification.second)
             }
         } catch (error: SocketTimeoutException) {
             ConnectivityProbe(false, "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}")
@@ -365,7 +408,6 @@ class LocalWebProvider @Inject constructor(
             ConnectivityProbe(false, "探测失败（PROBE_FAILED）：${error.message ?: error::class.java.simpleName}")
         }
     }
-
     private fun systemHttpProxy(): ProxyEndpoint? {
         val manager = context.getSystemService(ConnectivityManager::class.java) ?: return null
         val network = manager.activeNetwork ?: return null
@@ -486,6 +528,12 @@ class LocalWebProvider @Inject constructor(
 
     private data class ConnectivityProbe(val reachable: Boolean, val detail: String)
 
+    private data class RequestRoute(
+        val client: OkHttpClient,
+        val url: String,
+        val hostHeader: String?,
+    )
+
     private data class ValidatedTarget(
         val uri: URI,
         val addresses: List<InetAddress>,
@@ -494,6 +542,36 @@ class LocalWebProvider @Inject constructor(
 
     private data class ProxyEndpoint(val host: String, val port: Int)
 
+    private class SniSocketFactory(
+        private val delegate: SSLSocketFactory,
+        private val serverName: String,
+    ) : SSLSocketFactory() {
+        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
+        override fun createSocket(socket: Socket, host: String, port: Int, autoClose: Boolean): Socket =
+            delegate.createSocket(socket, serverName, port, autoClose)
+
+        override fun createSocket(host: String, port: Int): Socket =
+            delegate.createSocket(serverName, port)
+
+        override fun createSocket(
+            host: String,
+            port: Int,
+            localHost: InetAddress,
+            localPort: Int,
+        ): Socket = delegate.createSocket(serverName, port, localHost, localPort)
+
+        override fun createSocket(host: InetAddress, port: Int): Socket =
+            delegate.createSocket(host, port)
+
+        override fun createSocket(
+            address: InetAddress,
+            port: Int,
+            localAddress: InetAddress,
+            localPort: Int,
+        ): Socket = delegate.createSocket(address, port, localAddress, localPort)
+    }
     private companion object {
         const val SEARCH_ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"
         const val SEARCH_MODEL = "deepseek-v4-flash"
@@ -504,12 +582,16 @@ class LocalWebProvider @Inject constructor(
         const val MAX_FETCH_BYTES = 4 * 1024 * 1024
         const val PROBE_TIMEOUT_SECONDS = 6L
         const val PROBE_CALL_TIMEOUT_SECONDS = 8L
+        const val DEFAULT_FETCH_TIMEOUT_SECONDS = 45L
+        const val MIN_FETCH_TIMEOUT_SECONDS = 5L
+        const val MAX_FETCH_TIMEOUT_SECONDS = 300L
+        const val FETCH_CONNECT_TIMEOUT_SECONDS = 10L
+        const val FETCH_CALL_GRACE_SECONDS = 10L
         const val MAX_QUERIES = 4
         const val MAX_RESULTS = 10
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
 }
-
 data class LocalWebFetchResult(
     val url: String,
     val mediaType: String,

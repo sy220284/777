@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local
 import java.io.File
 import java.io.Reader
 import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -13,6 +15,7 @@ import kotlinx.coroutines.withContext
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(private val root: File) {
     private val canonicalRoot = root.canonicalFile
+    private val observations = ConcurrentHashMap<String, String>()
 
     init {
         canonicalRoot.mkdirs()
@@ -26,7 +29,11 @@ class LocalWorkspace(private val root: File) {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
+        val before = fingerprint(file)
         val lines = file.readLines()
+        val after = fingerprint(file)
+        require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+        observations[file.path] = after
         val from = (startLine.coerceAtLeast(1) - 1).coerceAtMost(lines.size)
         val to = endLine.coerceAtLeast(startLine).coerceAtMost(lines.size)
         return lines.subList(from, to).mapIndexed { index, line ->
@@ -40,6 +47,7 @@ class LocalWorkspace(private val root: File) {
         val file = resolve(relativePath)
         file.parentFile?.mkdirs()
         file.writeText(content)
+        observations.remove(file.path)
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
     }
 
@@ -62,22 +70,43 @@ class LocalWorkspace(private val root: File) {
         require(file.length() <= MAX_TOOL_ARTIFACT_BYTES) {
             "文件超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
         }
-        return file.readText()
+        val before = fingerprint(file)
+        val content = file.readText()
+        val after = fingerprint(file)
+        require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+        observations[file.path] = after
+        return content
     }
 
+    /** Verify that the model observed the current file version before asking the user to approve an edit. */
+    fun requireFreshObservation(relativePath: String): String {
+        val file = resolve(relativePath)
+        require(file.isFile) { "文件不存在：$relativePath" }
+        val observed = observations[file.path]
+            ?: error("编辑前必须先读取文件：$relativePath")
+        require(observed == fingerprint(file)) {
+            "文件在读取后已发生变化，请重新读取再编辑：$relativePath"
+        }
+        return observed
+    }
     /** Replace one unique literal after the caller has observed the file. */
     fun edit(relativePath: String, oldText: String, newText: String): String {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
+        val observed = requireFreshObservation(relativePath)
         val source = file.readText()
+        require(observed == fingerprint(file)) {
+            "文件在准备编辑时发生变化，请重新读取再编辑：$relativePath"
+        }
         val first = source.indexOf(oldText)
         require(first >= 0) { "文件中没有找到待替换内容" }
         require(source.indexOf(oldText, first + oldText.length) < 0) { "待替换内容出现多次，请提供更长的唯一片段" }
         val result = source.replaceRange(first, first + oldText.length, newText)
         require(result.toByteArray().size <= MAX_WRITE_BYTES) { "编辑结果超过 ${MAX_WRITE_BYTES / 1024} KB" }
         file.writeText(result)
+        observations[file.path] = fingerprint(file)
         return "已编辑 $relativePath"
     }
 
@@ -152,13 +181,13 @@ class LocalWorkspace(private val root: File) {
                     process.inputStream.bufferedReader().use { readBounded(it, onProgress) }
                 }
                 val finished = runInterruptible {
-                    process.waitFor(timeoutSeconds.coerceIn(1, 120).toLong(), TimeUnit.SECONDS)
+                    process.waitFor(timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS).toLong(), TimeUnit.SECONDS)
                 }
                 if (!finished) {
                     process.destroyForcibly()
                     process.waitFor()
                     return@coroutineScope (
-                        "[shell][TOOL_TIMEOUT] 命令执行超时（${timeoutSeconds.coerceIn(1, 120)} 秒），已终止。" +
+                        "[shell][TOOL_TIMEOUT] 命令执行超时（${timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS)} 秒），已终止。" +
                             "\n已产生输出：\n${output.await()}"
                         ).trimEnd()
                 }
@@ -186,6 +215,19 @@ class LocalWorkspace(private val root: File) {
         val file = resolve(relativePath)
         require(file.isFile) { "成果文件不存在：$relativePath" }
         return "成果已确认：$relativePath（${file.length()} 字节）"
+    }
+
+    private fun fingerprint(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun resolve(relativePath: String): File {
@@ -250,5 +292,6 @@ class LocalWorkspace(private val root: File) {
         const val MAX_LIST_ROWS = 400
         const val MAX_SEARCH_ROWS = 200
         const val MAX_SHELL_CHARS = 65_536
+        const val MAX_SHELL_TIMEOUT_SECONDS = 900
     }
 }

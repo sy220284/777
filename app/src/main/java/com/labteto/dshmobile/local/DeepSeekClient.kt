@@ -21,6 +21,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 /** OpenAI-compatible DeepSeek transport used by the on-device agent loop. */
 @Singleton
@@ -28,6 +29,12 @@ class DeepSeekClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
 ) {
+    private val modelHttp = http.newBuilder()
+        .connectTimeout(MODEL_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(MODEL_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(MODEL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
     /** Run one model step and preserve its raw assistant message for tool continuation. */
     suspend fun complete(
         apiKey: String,
@@ -52,7 +59,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { http.newCall(request).execute() }.use { response ->
+            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     val detail = runCatching {
@@ -118,6 +125,10 @@ class DeepSeekClient @Inject constructor(
 
     private companion object {
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+        const val MODEL_CONNECT_TIMEOUT_SECONDS = 15L
+        const val MODEL_READ_TIMEOUT_SECONDS = 180L
+        const val MODEL_WRITE_TIMEOUT_SECONDS = 60L
+        const val MODEL_CALL_TIMEOUT_SECONDS = 210L
     }
 }
 
@@ -159,7 +170,7 @@ object LocalToolCatalog {
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell；执行前需要用户批准", properties(
             "command" to string("shell 命令"),
-            "timeout_seconds" to integer("超时秒数，默认 30，最大 120"),
+            "timeout_seconds" to integer("超时秒数；前台默认 30/最大 120，后台默认 300/最大 900"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("command")))
         add(tool("job_list", "列出本机会话创建的后台任务", properties()))
@@ -184,7 +195,7 @@ object LocalToolCatalog {
                 put("description", "text 提取可读文本，raw 保留原始响应；默认 text")
                 put("enum", buildJsonArray { add(JsonPrimitive("text")); add(JsonPrimitive("raw")) })
             },
-            "run_in_background" to boolean("是否转为后台抓取任务，默认 false"),
+            "run_in_background" to boolean("是否转为后台抓取任务；后台模式使用更长网络时限，默认 false"),
         ), listOf("url")))
         add(tool("json_query", "从工作区 JSON 文件读取一个字段/数组片段，无需 jq；支持 a.b[0].c 形式", properties(
             "path" to string("JSON 文件的工作区相对路径"),
