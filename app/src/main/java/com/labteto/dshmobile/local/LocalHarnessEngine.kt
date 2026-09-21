@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.labteto.dshmobile.device.AndroidDevicePlugin
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
@@ -81,6 +82,7 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionStore = VersionedSessionStore(sessionsRoot, json)
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
+    private val devicePlugin = AndroidDevicePlugin(context)
     private val builtinPlugin = object : HarnessPlugin {
         override val id = "android-local-builtins"
 
@@ -168,6 +170,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             pluginRegistry.install(builtinPlugin)
+            pluginRegistry.install(devicePlugin)
             load()
         }
     }
