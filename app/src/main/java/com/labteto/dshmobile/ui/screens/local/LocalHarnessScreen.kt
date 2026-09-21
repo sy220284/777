@@ -253,7 +253,9 @@ private fun LocalModeDrawer(
                 }
             }
 
-            val history = sessions.filterNot { it.id == currentSessionId }
+            val history = sessions
+                .filterNot { it.id == currentSessionId }
+                .sortedByDescending(LocalSessionSummary::updatedAt)
             if (history.isNotEmpty()) {
                 Text("历史会话", style = DsType.std14, color = colors.labelTertiary)
                 DsGroupCard {
