@@ -12,6 +12,7 @@ import java.net.URI
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -276,6 +277,41 @@ class McpToolBridgePlugin(
         }.toString()
     }
 
+    private fun validateCommand(command: List<String>): List<String> {
+        require(command.isNotEmpty()) { "MCP stdio 命令不能为空" }
+        require(command.size <= MAX_COMMAND_ARGS) { "MCP stdio 参数过多，上限 $MAX_COMMAND_ARGS" }
+        val normalized = command.map { argument ->
+            require(argument.length <= MAX_COMMAND_ARG_LENGTH) {
+                "MCP stdio 单个参数过长，上限 $MAX_COMMAND_ARG_LENGTH 字符"
+            }
+            argument
+        }
+        require(normalized.first().isNotBlank()) { "MCP stdio 可执行命令不能为空" }
+        return normalized
+    }
+
+    private fun resolveWorkingDirectory(raw: String?): File? {
+        val root = workspaceRoot?.canonicalFile
+        if (raw.isNullOrBlank()) return root
+        val input = File(raw)
+        val resolved = (if (input.isAbsolute) input else File(root ?: File("."), raw)).canonicalFile
+        require(resolved.isDirectory) { "MCP stdio 工作目录不存在：${resolved.path}" }
+        if (root != null) {
+            require(resolved == root || resolved.path.startsWith(root.path + File.separator)) {
+                "MCP stdio 工作目录必须位于本机 Harness 工作区内"
+            }
+        }
+        return resolved
+    }
+
+    private fun JsonObject.requiredStringArray(key: String): List<String> =
+        (this[key] as? JsonArray)
+            ?.map { element -> element.jsonPrimitive.content }
+            ?.takeIf(List<String>::isNotEmpty)
+            ?: error("缺少参数：$key")
+
+    private fun JsonObject.optional(key: String): String? =
+        this[key]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotEmpty)
     private fun validateServerId(raw: String): String {
         val id = raw.trim()
         require(id.matches(Regex("[A-Za-z0-9_-]{1,24}"))) {
@@ -367,8 +403,11 @@ class McpToolBridgePlugin(
         const val MAX_TOOL_NAME_LENGTH = 64
         const val CONNECT_TIMEOUT_MILLIS = 65_000L
         const val REMOTE_TOOL_TIMEOUT_MILLIS = 65_000L
+        const val MAX_COMMAND_ARGS = 32
+        const val MAX_COMMAND_ARG_LENGTH = 4_096
         val MANAGEMENT_TOOLS = listOf(
             "mcp_http_connect",
+            "mcp_stdio_connect",
             "mcp_server_list",
             "mcp_disconnect",
         )
