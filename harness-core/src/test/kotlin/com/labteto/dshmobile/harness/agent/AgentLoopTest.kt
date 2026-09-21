@@ -28,10 +28,13 @@ class AgentLoopTest {
 
         assertEquals("完成", result.answer)
         assertEquals(1, result.steps)
+        assertEquals(AgentStopReason.COMPLETED, result.stopReason)
         assertEquals(
             listOf(
                 AgentEvent.TurnStarted::class,
+                AgentEvent.StepStarted::class,
                 AgentEvent.AssistantObserved::class,
+                AgentEvent.StepFinished::class,
                 AgentEvent.TurnCompleted::class,
             ),
             events.map { it::class },
@@ -67,9 +70,81 @@ class AgentLoopTest {
 
         assertEquals(2, result.steps)
         assertEquals("已读取", result.answer)
+        assertEquals(2, events.count { it is AgentEvent.StepStarted })
+        assertEquals(2, events.count { it is AgentEvent.StepFinished })
         assertEquals(1, events.count { it is AgentEvent.ToolStarted })
         assertEquals(1, events.count { it is AgentEvent.ToolFinished })
         assertTrue(events.last() is AgentEvent.TurnCompleted)
+    }
+
+    @Test
+    fun batchExecutorPreservesRawArgumentsAndModelOrder() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        var observedCalls = emptyList<AgentToolCall>()
+        val first = AgentToolCall(
+            id = "call-a",
+            name = "subagent",
+            arguments = buildJsonObject { put("task", "甲") },
+            rawArguments = "{ \"task\": \"甲\" }",
+        )
+        val second = AgentToolCall(
+            id = "call-b",
+            name = "subagent",
+            arguments = buildJsonObject { put("task", "乙") },
+            rawArguments = "{\"task\":\"乙\"}",
+        )
+        val loop = AgentLoop(
+            model = AgentModel { messages ->
+                request += 1
+                if (request == 1) {
+                    AgentModelReply(toolCalls = listOf(first, second))
+                } else {
+                    assertEquals(listOf("结果甲", "结果乙"), messages.takeLast(2).map { it.content })
+                    AgentModelReply(content = "汇总")
+                }
+            },
+            tools = AgentToolExecutor { error("批量执行器存在时不应走单调用执行器") },
+            toolBatch = AgentToolBatchExecutor { calls ->
+                observedCalls = calls
+                listOf("结果甲", "结果乙")
+            },
+            eventSink = AgentEventSink { events += it },
+            idFactory = { "turn-batch" },
+        )
+
+        val result = loop.run("并行处理")
+
+        assertEquals("汇总", result.answer)
+        assertEquals("{ \"task\": \"甲\" }", observedCalls.first().rawArguments)
+        assertEquals(
+            listOf("call-a", "call-b"),
+            events.filterIsInstance<AgentEvent.ToolFinished>().map { it.call.id },
+        )
+    }
+
+    @Test
+    fun stepLimitIsAControlledStopInsteadOfFailure() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        val loop = AgentLoop(
+            model = AgentModel {
+                AgentModelReply(
+                    toolCalls = listOf(
+                        AgentToolCall("call-limit", "read", buildJsonObject { put("path", "x") }),
+                    ),
+                )
+            },
+            tools = AgentToolExecutor { "继续" },
+            eventSink = AgentEventSink { events += it },
+            maxSteps = 1,
+            idFactory = { "turn-limit" },
+        )
+
+        val result = loop.run("执行")
+
+        assertEquals(AgentStopReason.STEP_LIMIT, result.stopReason)
+        assertTrue(events.last() is AgentEvent.TurnStepLimit)
+        assertFalse(events.any { it is AgentEvent.TurnFailed })
     }
 
     @Test
