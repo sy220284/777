@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">پلگ ان فلٹر کریں</string>
     <string name="update_available_title">اپ ڈیٹ دستیاب ہے</string>
     <string name="update_available_body">ورژن %1$s آ گیا ہے۔ آپ کے پاس %2$s ہے۔</string>
-    <string name="update_open">ریلیز دیکھیں</string>
+    <string name="update_open">ڈاؤن لوڈ اور انسٹال کریں</string>
     <string name="update_later">بعد میں</string>
     <string name="settings_update_check">اپ ڈیٹس چیک کریں</string>
     <string name="settings_update_check_hint">ایپ شروع ہونے پر GitHub سے تازہ ترین ریلیز پوچھتا ہے۔</string>
