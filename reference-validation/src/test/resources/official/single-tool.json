@@ -3,6 +3,10 @@
     "type": "turn/start"
   },
   {
+    "type": "step/start",
+    "step": 1
+  },
+  {
     "type": "assistant/message",
     "step": 1
   },
@@ -20,9 +24,21 @@
     "content": "pong"
   },
   {
+    "type": "step/end",
+    "step": 1
+  },
+  {
+    "type": "step/start",
+    "step": 2
+  },
+  {
     "type": "assistant/message",
     "step": 2,
     "content": "已完成"
+  },
+  {
+    "type": "step/end",
+    "step": 2
   },
   {
     "type": "turn/end",
