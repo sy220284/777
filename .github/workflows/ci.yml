@@ -71,4 +71,12 @@ jobs:
           api-level: 36
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest :app:assembleOptimized --stacktrace
+            adb uninstall com.sy220284.dshmobile.debug || true
+            adb install app/build/outputs/apk/optimized/app-optimized.apk
+            START_OUTPUT="$(adb shell am start -W -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainActivity)"
+            echo "$START_OUTPUT"
+            echo "$START_OUTPUT" | grep -q "Status: ok"
+            sleep 2
+            adb shell pidof com.sy220284.dshmobile.debug
