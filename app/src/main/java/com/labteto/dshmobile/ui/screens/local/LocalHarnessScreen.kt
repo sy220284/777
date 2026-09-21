@@ -34,8 +34,10 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -165,7 +167,6 @@ fun LocalHarnessScreen(
                 onStop = viewModel::stop,
                 onNewSession = viewModel::newSession,
                 onPlanModeChange = viewModel::setPlanMode,
-                onSwitchSession = viewModel::switchSession,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
                 onAutoApprove = viewModel::enableAutoApproval,
@@ -432,7 +433,6 @@ private fun LocalChat(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
-    onSwitchSession: (String) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
     onAutoApprove: () -> Unit,
@@ -753,7 +753,7 @@ private fun LocalChat(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsQuickActionTile(
-                    icon = androidx.compose.material.icons.Icons.Outlined.Image,
+                    icon = Icons.Outlined.Image,
                     label = "图片",
                     onClick = {
                         showAttachmentPicker = false
@@ -762,7 +762,7 @@ private fun LocalChat(
                     modifier = Modifier.weight(1f),
                 )
                 DsQuickActionTile(
-                    icon = androidx.compose.material.icons.Icons.Outlined.AttachFile,
+                    icon = Icons.Outlined.AttachFile,
                     label = "文件",
                     onClick = {
                         showAttachmentPicker = false
