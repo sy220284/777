@@ -28,7 +28,7 @@ class AndroidDevicePlugin(
         val properties: Map<String, String> = emptyMap(),
         val required: Set<String> = emptySet(),
         val access: ToolAccess = ToolAccess.DEVICE,
-        val approval: ToolApprovalPolicy = ToolApprovalPolicy.NEVER,
+        val approval: ToolApprovalPolicy = ToolApprovalPolicy.MUTATION,
     )
 
     private val specs = listOf(

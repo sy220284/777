@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.tools
 
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -90,6 +91,14 @@ class ToolRegistry {
                 ?: return ToolResult("工具需要人工审批：$name", isError = true)
             if (!approval(tool)) return ToolResult("用户拒绝执行工具：$name", isError = true)
         }
-        return tool.executor.execute(context, input, rawArguments)
+        val timeoutMillis = tool.timeoutMillis
+        if (timeoutMillis == null) return tool.executor.execute(context, input, rawArguments)
+        require(timeoutMillis > 0L) { "工具超时必须大于 0：$name" }
+        return withTimeoutOrNull(timeoutMillis) {
+            tool.executor.execute(context, input, rawArguments)
+        } ?: ToolResult(
+            content = "工具执行超时：$name（${timeoutMillis} ms）",
+            isError = true,
+        )
     }
 }

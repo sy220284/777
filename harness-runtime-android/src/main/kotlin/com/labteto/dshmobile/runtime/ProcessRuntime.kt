@@ -29,9 +29,13 @@ class AndroidProcessRuntime(
             "工作目录不存在：${workingDirectory.path}"
         }
 
-        val process = ProcessBuilder(request.command)
+        val resolvedCommand = resolveCommand(request.command)
+        val process = ProcessBuilder(resolvedCommand)
             .directory(workingDirectory)
-            .apply { environment().putAll(request.environment) }
+            .apply {
+                environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
+                environment().putAll(request.environment)
+            }
             .start()
 
         try {
@@ -67,6 +71,17 @@ class AndroidProcessRuntime(
         } finally {
             if (process.isAlive) process.destroyForcibly()
         }
+    }
+
+    private fun resolveCommand(command: List<String>): List<String> {
+        val executable = command.first()
+        if (executable.contains(File.separatorChar)) return command
+        val resolved = searchPaths()
+            .asSequence()
+            .map { directory -> File(directory, executable) }
+            .firstOrNull(File::canExecute)
+            ?: return command
+        return listOf(resolved.absolutePath) + command.drop(1)
     }
 
     private fun searchPaths(): List<File> {
