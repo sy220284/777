@@ -125,7 +125,13 @@ class VersionedSessionStore(
         .filter { file ->\n            file.isFile &&\n                file.name.endsWith(SESSION_SUFFIX) &&\n                !file.name.endsWith(TEMP_SUFFIX) &&\n                !file.name.contains(CHECKPOINT_MARKER)\n        }
         .mapNotNull { file ->
             val id = file.name.removeSuffix(SESSION_SUFFIX)
-            runCatching { read(id) }.getOrNull()
+            try {
+                read(id)
+            } catch (future: FutureSessionVersionException) {
+                throw future
+            } catch (_: Exception) {
+                null
+            }
         }
         .sortedByDescending { it.document.updatedAt }
 
