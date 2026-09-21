@@ -27,17 +27,15 @@ jobs:
       - name: Validate release signing material
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
-          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "::error::正式 APK 必须使用稳定签名。请配置 RELEASE_KEYSTORE、RELEASE_KEYSTORE_PASSWORD、RELEASE_KEY_ALIAS、RELEASE_KEY_PASSWORD。"
-            echo "::error::没有签名密钥时可使用 CI 的 dsh-mobile-optimized 安装测试包，但不得发布 unsigned Release。"
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$RELEASE_PASSWORD" ]; then
+            echo "::error::正式 APK 只需配置两个仓库 Secret：RELEASE_KEYSTORE 与 RELEASE_KEY_PASSWORD。"
+            echo "::error::没有稳定签名时禁止发布，以免再次生成无法安装或无法持续升级的 APK。"
             exit 1
           fi
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          keytool -list -keystore "$RUNNER_TEMP/release.keystore" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          keytool -list             -keystore "$RUNNER_TEMP/release.keystore"             -storepass "$RELEASE_PASSWORD"             -alias "777-release" >/dev/null
 
       # The tag is the single source of the shipped version; see app/build.gradle.kts.
       - name: Derive version from tag
@@ -49,8 +47,8 @@ jobs:
       - name: Build release APK
         env:
           DSH_KEYSTORE: ${{ runner.temp }}/release.keystore
-          DSH_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          DSH_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          DSH_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          DSH_KEY_ALIAS: 777-release
           DSH_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
