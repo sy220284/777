@@ -415,6 +415,7 @@ class LocalHarnessEngine @Inject constructor(
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
+                workspace.requireFreshObservation(path)
                 if (!approve(call, "编辑文件：$path")) return "用户拒绝编辑 $path"
                 workspace.edit(path, args.string("old_text"), args.string("new_text"))
             }
