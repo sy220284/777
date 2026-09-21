@@ -256,12 +256,13 @@ class LocalWebProvider @Inject constructor(
 
     private fun normalizeInput(input: String): String {
         val trimmed = input.trim()
+        val candidate = if ("://" in trimmed) trimmed else "https://$trimmed"
         return runCatching {
-            val uri = URI(trimmed)
+            val uri = URI(candidate)
             if (uri.host.equals("github.com", ignoreCase = true) && uri.path.endsWith(".git")) {
                 URI(uri.scheme, uri.authority, uri.path.removeSuffix(".git"), uri.query, uri.fragment).toString()
-            } else trimmed
-        }.getOrDefault(trimmed)
+            } else candidate
+        }.getOrDefault(candidate)
     }
 
     private fun resolve(host: String): List<InetAddress> = try {
