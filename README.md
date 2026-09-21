@@ -1,29 +1,36 @@
 <p align="center">
-  <img src="docs/images/banner.jpg" alt="DSH Mobile — the DeepSeek Harness in your pocket" width="100%">
+  <img src="docs/images/banner.jpg" alt="DSH Mobile — 装进口袋的 DeepSeek Harness" width="100%">
 </p>
 
-<h1 align="center">DSH Mobile — DeepSeek Harness Remote</h1>
+<h1 align="center">DSH Mobile — DeepSeek Harness 远程端</h1>
 
-> **777 Android build:** this repository tracks the Android client at upstream commit
+> **777 安卓构建版：**本仓库基于上游提交
 > [`sorsama/deepseek-harness-mobile@e5f8c2f`](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)
-> and uses the independent application ID `com.sy220284.dshmobile`, so it can be installed beside
-> the upstream app. The original MIT license and third-party notices are retained in full.
+> 整理，使用独立应用标识 `com.sy220284.dshmobile`，可与上游版本同时安装。原 MIT 许可证和
+> 第三方声明均完整保留。
 
-## 777 phase 2: on-device Harness
+## 777 第二阶段：手机内置 Harness
 
-Version `0.12.0-777.4` targets Android 16+ and expands the native Android agent loop. The **Local
-Harness** entry runs multi-session durable history, workspace file/edit/search tools, Android shell
-and background jobs, official DeepSeek web search, goals, todos, skills, user questions, subagents,
-and parallel or pipeline workflows entirely on the phone. It stores the model key in Android Keystore and asks
-for approval before file writes, edits, or shell execution.
+`0.12.0-777.5` 面向 Android 16+ 扩展原生安卓执行核心。连接页可直接进入“本机 Harness”，模型循环、
+多会话追加日志、文件读写与编辑、搜索、安卓 shell、后台任务、网页搜索与获取、计划、目标、任务清单、
+技能、用户问答、可选模型子代理以及并行/流水线工作流都在 APK 内运行，不需要电脑端保持在线。DeepSeek API 密钥由
+Android Keystore 加密；写文件、编辑文件和执行命令必须逐次取得用户批准。
 
-See the [Android 16 on-device Harness parity audit](docs/ANDROID16-HARNESS-PARITY.zh-CN.md) for the
-official-source baseline, feature matrix, and platform-specific exclusions.
+完整功能对照和 Android 16 适配边界见
+[Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)。
+
+后续将把当前本机实现升级为真正的 Android 原生 Harness 内核：官方源码作为语义、协议和测试基线，
+Agent / Session / Tool / Workflow 等核心能力由 APK 原生实现；完整路线见
+[Android 原生 Harness 内核完整规划与实施方案](docs/ANDROID-NATIVE-HARNESS-IMPLEMENTATION-PLAN.zh-CN.md)。
+
+本机执行被限制在应用私有工作区。安卓不会允许普通应用读取其他应用的私有目录；系统也不自带
+Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续按架构和许可证单独内置，或继续使用
+原有的电脑远程模式。
 
 <p align="center">
-  An open-source Android companion that puts your <b>DeepSeek Harness</b> in your pocket.<br>
-  Drive sessions, review plans and goals, answer approvals and questions, and get notified
-  when the harness finishes — from your phone, over your network or a relay.
+  一款开源的 Android 伴侣应用，把你的 <b>DeepSeek Harness</b> 装进口袋。<br>
+  在局域网内用手机驱动会话、查看计划与目标、回应审批与提问，
+  并在 harness 干完活时收到通知。
 </p>
 
 <p align="center">
@@ -34,168 +41,141 @@ official-source baseline, feature matrix, and platform-specific exclusions.
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
 </p>
 
-<p align="center">
-  <b>English</b> ·
-  <a href="README.zh-CN.md">中文</a> ·
-  <a href="README.hi.md">हिन्दी</a> ·
-  <a href="README.es.md">Español</a> ·
-  <a href="README.fr.md">Français</a> ·
-  <a href="README.th.md">ไทย</a>
-</p>
 
-DSH Mobile is an **unofficial companion app** for the
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT). It mirrors the web GUI
-feature for feature and uses the harness's own visual language. Android only, Kotlin + Jetpack
-Compose.
+DSH Mobile 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（MIT）的
+**非官方伴侣应用**，用 harness 自己的视觉语言逐项还原它的网页 GUI。仅支持 Android，使用
+Kotlin + Jetpack Compose。
 
-Its companion on the other end is
-[**dsh-relay**](https://github.com/sorsama/deepseek-harness-relay), a harness plugin that adds the
-authentication layer the harness says it lacks, so this app can reach a harness with a real
-credential and a pinned key instead of an open port. See
-[Relay](https://github.com/sorsama/deepseek-harness-mobile/wiki/Relay).
+另一端的搭档是 [**dsh-relay**](https://github.com/sorsama/deepseek-harness-relay) —— 一个 harness
+插件，补上 harness 自己承认缺失的那层身份验证，让这个应用能凭真正的凭据和固定的密钥去连接
+harness，而不是对着一个敞开的端口。参见
+[Relay](https://github.com/sorsama/deepseek-harness-mobile/wiki/Relay)。
 
-**[dshm.zyphite.com](https://dshm.zyphite.com)** is the project site: what the app is, what it looks
-like, and how to get it running, on one page.
+**[dshm.zyphite.com](https://dshm.zyphite.com)** 是项目主页 —— 一页讲清这个应用是什么、
+长什么样、怎么跑起来。
 
-The [**wiki**](https://github.com/sorsama/deepseek-harness-mobile/wiki) is the user-facing guide:
-[getting started](https://github.com/sorsama/deepseek-harness-mobile/wiki/Getting-Started),
-[connecting](https://github.com/sorsama/deepseek-harness-mobile/wiki/Connecting),
-[troubleshooting](https://github.com/sorsama/deepseek-harness-mobile/wiki/Troubleshooting),
-a [feature tour](https://github.com/sorsama/deepseek-harness-mobile/wiki/Feature-Tour) and an
-[FAQ](https://github.com/sorsama/deepseek-harness-mobile/wiki/FAQ).
+[**wiki**](https://github.com/sorsama/deepseek-harness-mobile/wiki) 是面向用户的指南：
+[入门](https://github.com/sorsama/deepseek-harness-mobile/wiki/Getting-Started)、
+[连接](https://github.com/sorsama/deepseek-harness-mobile/wiki/Connecting)、
+[疑难解答](https://github.com/sorsama/deepseek-harness-mobile/wiki/Troubleshooting)、
+[功能巡览](https://github.com/sorsama/deepseek-harness-mobile/wiki/Feature-Tour) 和
+[常见问题](https://github.com/sorsama/deepseek-harness-mobile/wiki/FAQ)。
 
 ---
 
-## Screenshots
+## 截图
 
-| Connect | Chat | Trajectory |
+| 连接 | 聊天 | 轨迹 |
 |:--:|:--:|:--:|
-| <img src="docs/images/home.png" width="240" alt="Connect screen: recent harnesses with live reachability, discovery, manual entry and auto-connect toggles"> | <img src="docs/images/chat.png" width="240" alt="Chat: streamed turns with per-tool icons, tool cards, goal dock and composer"> | <img src="docs/images/trajectory.png" width="240" alt="Trajectory: a per-turn ledger with usage totals"> |
-| Recent harnesses with live reachability, LAN discovery, manual `host:port`, auto-connect. | Streamed turns, a glyph per tool, expandable tool cards, permission picker. | The same session as a per-turn ledger with usage totals. |
+| <img src="docs/images/home.png" width="240" alt="连接界面：最近使用的 harness 及其实时可达性、发现、手动输入与自动连接开关"> | <img src="docs/images/chat.png" width="240" alt="聊天：流式输出的回合、每种工具的图标、工具卡片、目标停靠栏与输入框"> | <img src="docs/images/trajectory.png" width="240" alt="轨迹：按回合排列的账本，附带用量合计"> |
+| 最近使用的 harness 及实时可达性、局域网发现、手动 `host:port`、自动连接。 | 流式输出的回合、每种工具一个字形、可展开的工具卡片、权限选择器。 | 同一个会话，以按回合排列的账本呈现，并给出用量合计。 |
 
-| Session details | Subagents |
+| 会话详情 | 子代理 |
 |:--:|:--:|
-| <img src="docs/images/session-info.png" width="240" alt="Details panel: context breakdown, goal, plan mode, jobs, queue, subagents, host information"> | <img src="docs/images/subagent.png" width="240" alt="Subagent catalog with continuable children"> |
-| Context breakdown, goal, plan mode, background jobs, queued turns, host info, session-log export. | The subagent catalog — open a child's transcript, follow up, or interrupt it. |
+| <img src="docs/images/session-info.png" width="240" alt="详情面板：上下文构成、目标、计划模式、任务、队列、子代理、主机信息"> | <img src="docs/images/subagent.png" width="240" alt="子代理目录，可继续与子代理对话"> |
+| 上下文构成、目标、计划模式、后台任务、排队的回合、主机信息、会话日志导出。 | 子代理目录 —— 打开子代理的对话记录、追问，或将其中断。 |
 
-## Features
+## 功能
 
-- Connecting — finds a harness on your Wi-Fi with an active subnet scan and a readiness
-  handshake, remembers hosts and probes them for liveness on the way in, takes a manual
-  `host:port`, handles loopback for same-device setups, and auto-connects when you tell it to
-  (last used, LAN, or same device).
-- Navigation — the drawers work like Discord's: swipe right from the left edge for the
-  workspace-grouped chat list, swipe left to close it, swipe left from the right edge for the
-  session details panel.
-- Chat — streamed turns with reasoning disclosure, markdown, terminal/diff/read/search/web tool
-  cards, a queue dock where you can edit, remove or steer a queued turn, history paging, and
-  multi-photo and file attachments. Drafts are kept per host and session.
-- Workspace panels — tabbed text, Markdown, image, PDF and isolated HTML previews; native
-  terminal controls with a bundled xterm renderer; archived-session restore in Settings.
-- Message feedback — confirmed ratings and retraction, with version-conflict handling.
-- Slash commands and skills — the composer checks a `/` line against the session's own command
-  catalog and runs it through the harness's command gateway. Anything the catalog does not claim
-  is sent as a prompt, which is how skills get invoked.
-- Everything the GUI does — goals (phases, rounds, pause/resume/edit), plan mode and plan review,
-  permission approvals, user questions, todo dock, subagents (catalog, follow-ups, interrupt),
-  background jobs, workflow runs, skills, model selection, agent presets, session search,
-  trajectory ledger, session export, message feedback.
-- Notifications — turn complete, goal complete or blocked, review or question waiting for you.
-  A foreground service keeps the connection alive in the background.
-- Harness look — the exact DeepSeek Harness design tokens (colors, type, radii, disclosure rows,
-  shimmer, ink buttons), with light, dark and system themes.
-- 11 languages — English, 中文, हिन्दी, Español, Français, العربية, বাংলা, Português, Русский,
-  اردو, ไทย (RTL aware).
+- **轻松连接** —— 自动发现同一 Wi-Fi 下的 harness（主动子网扫描 + 就绪握手），
+  记住用过的主机并在进入时探测其存活状态，支持手动输入 `host:port`、同设备回环连接，
+  以及自动连接开关（上次使用 / 局域网 / 同一设备）。
+- **Discord 式导航** —— 从屏幕左缘右滑打开按工作区分组的聊天列表，左滑关闭；
+  从右缘左滑打开会话详情面板。
+- **完整的聊天体验** —— 流式输出的回合与可展开的推理过程、Markdown、
+  终端/差异/读取/搜索/网页工具卡片、队列停靠栏（编辑 / 移除 / 引导）、历史分页、图片与文件附件。
+- **斜杠命令与技能** —— 输入框会先拿 `/` 开头的一行去比对会话自己的命令目录，
+  命中就交给 harness 的命令网关执行；目录不认领的内容按普通提示发送，技能就是这样被调用的。
+- **GUI 有的都有** —— 目标（阶段、轮次、暂停/继续/编辑）、计划模式与计划审阅、
+  权限审批、用户提问、待办停靠栏、子代理（目录、追问、中断）、后台任务、工作流运行、技能、
+  模型选择、代理预设、会话搜索、轨迹账本、会话导出、消息反馈。
+- **通知** —— 回合完成、目标完成 / 受阻、有审阅或提问在等你；
+  通过前台服务维持后台连接。
+- **和 harness 长得一样** —— 完全采用 DeepSeek Harness 的设计令牌（颜色、字体、圆角、
+  披露行、微光、墨水按钮），支持浅色 / 深色 / 跟随系统主题。
+- **11 种语言** —— English、中文、हिन्दी、Español、Français、العربية、বাংলা、Português、
+  Русский、اردو、ไทย（支持 RTL）。
 
-## Requirements
+## 环境要求
 
-- Android 16+ (minSdk 36); earlier versions cannot install this build.
-- A running [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
-  at `0.1.6-alpha.1` plus master commit
-  `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` for DSH Mobile `0.11.0`.
-  See [compatibility](docs/COMPATIBILITY.md) and [validation results](docs/VALIDATION-0.11.0.md).
+- Android 16 及以上（minSdk 36）；低于 Android 16 的设备无法安装。
+- 一个正在运行的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+  （已针对 `0.1.3-alpha.1` 测试）。**0.10.0 需要 harness 0.1.3** —— 该版本不再把回复的增量写入日志，
+  改为通过 App 必须主动订阅的实时流传输，因此 App 与 harness 必须同时升级：旧版 App 在 0.1.3 上看不到
+  正在生成的回答，而本版 App 在 0.1.2 上无法执行斜杠命令。参见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
 
-## Quick start
+## 快速开始
 
-1. Install the latest APK from
-   [Releases](https://github.com/sorsama/deepseek-harness-mobile/releases/latest).
-2. Open the app and choose how to connect. Relay and local network are two different setups, not
-   two settings of one, so pick the one that matches what you installed on the computer. The last
-   two entries below are ways of running local-network mode.
+1. 从 [Releases](https://github.com/sorsama/deepseek-harness-mobile/releases/latest)
+   安装最新的 APK。
+2. 打开应用，选择连接方式。这几种不是同一个设置的不同变体 ——
+   挑与你在电脑上配置好的那一种。
 
-   **Relay** — encrypted, authenticated, and works from outside your Wi-Fi.
-   Install [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay) into
-   the harness web profile:
+   **中继** —— 加密、有身份验证，在 Wi-Fi 之外也能用。把
+   [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay) 装进 harness 的 web 配置：
 
    ```sh
    dsh plugin --profile web add dsh-relay
    dsh web
    ```
 
-   Open the printed URL **on that computer**, set a password, then open
-   `/relay/pair`. In the app: **Relay → Pair a relay**, scan the QR. Once every
-   client you use has paired, turn off the relay's `compat.addressGrants`;
-   nothing here needs it.
+   **在那台电脑上**打开打印出来的 URL，设置密码，然后打开 `/relay/pair`。
+   在应用里：**中继 → 配对中继**，扫描二维码。等你用的每台客户端都配对完，
+   就关掉中继的 `compat.addressGrants` —— 这里没有任何东西需要它。
 
-   **Local network** — apply the one-file LAN patch in
-   [`harness/README.md`](harness/README.md), restart `dsh web`, then tap
-   **Scan network**. The harness signs each device in once: paste the link it
-   prints at startup when the app asks. That link authenticates the phone, but
-   it does not encrypt the connection and it does not stop anyone already on the
-   network from reaching the port, so use it only on networks you trust.
+   **局域网** —— 手机上不用配置，也完全没有身份验证。按
+   [`harness/README.md`](harness/README.md) 打上单文件局域网补丁，重启 `dsh web`，
+   然后点**扫描网络**。只在你信任的网络上用。
 
-   **Behind your own HTTPS reverse proxy** — paste the `https://` address into
-   local-network mode. The proxy can forward to loopback, so the harness needs
-   no patch, but it encrypts the link without authenticating anyone. See
-   [`harness/README.md`](harness/README.md).
+   **走你自己的 HTTPS 反向代理** —— 把 `https://` 地址粘进局域网模式。
+   代理可以转发到回环地址，所以 harness 不需要打补丁；但它只加密链路，不验证任何人的身份。
+   参见 [`harness/README.md`](harness/README.md)。
 
-   **USB / emulator** — `dsh web`, then `adb reverse tcp:3080 tcp:3080`, and
-   connect to `127.0.0.1:3080` in local-network mode. No patch needed; the app
-   still asks for the startup link once.
-3. Pick a session, chat, and get notified when the harness is done.
+   **USB / 模拟器** —— 运行 `dsh web`，再执行 `adb reverse tcp:3080 tcp:3080`，
+   然后在局域网模式下连接 `127.0.0.1:3080`。不需要打补丁。
+3. 选一个会话开始聊，harness 干完活会通知你。
 
-If a connect attempt fails, the app names the cause, and the wiki's
-[Troubleshooting](https://github.com/sorsama/deepseek-harness-mobile/wiki/Troubleshooting) page is
-keyed on that exact sentence.
+如果连接失败，应用会直接说明原因；wiki 的
+[疑难解答](https://github.com/sorsama/deepseek-harness-mobile/wiki/Troubleshooting)
+页面就是按那一句话组织的。
 
-## Compatibility & security
+## 兼容性与安全
 
-- See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the harness version matrix and what
-  0.1.3 and 0.1.2 changed.
-- **Read [docs/SECURITY.md](docs/SECURITY.md) first.** From harness 0.1.2 the harness authenticates
-  its whole API, and a signed-in device reaches all of it; there is no longer a reduced tier for
-  a caller that is not on the machine itself. Signing in grants the same power as a shell on that
-  computer, because the agent runs commands there. Local-network mode authenticates but does not
-  encrypt; relay mode adds a pinned certificate on top.
+> **0.1.2:** 从 harness 0.1.2 起，harness 会对整个 API 进行认证：在 App 询问时，把它启动时打印的链接粘贴一次。这会认证本机，但不会加密连接，因此仍然只应在可信网络上使用。
 
-## Building
+- harness 版本矩阵和仅回环可用的接口见
+  [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+- **请先读 [docs/SECURITY.md](docs/SECURITY.md)。** 裸的 harness 没有任何身份验证，
+  所以局域网模式只适合在你信任的网络上用 —— 应用在连接界面这么提醒也是出于同样的原因。
+  中继模式加上了真正的凭据和固定证书，但即便通过了验证，拿到的权力仍然等同于在那台电脑上
+  开一个 shell，因为代理就是在那里执行命令的。
+
+## 构建
 
 ```sh
-./gradlew :app:assembleDebug      # debug APK
-./gradlew :app:assembleRelease    # release APK (signed when keystore env is set)
+./gradlew :app:assembleDebug      # 调试版 APK
+./gradlew :app:assembleRelease    # 发布版 APK（设置了 keystore 环境变量时会签名）
 ```
 
-The shipped version comes from the git tag: the release workflow exports `DSH_VERSION_NAME` from
-the tag name and derives `versionCode` from it. A local build falls back to the literal in
-`app/build.gradle.kts`.
+发布的版本号来自 git 标签：发布工作流从标签名导出 `DSH_VERSION_NAME`，`versionCode` 由它推导。
+本地构建则回退到 `app/build.gradle.kts` 里写死的值。
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development loop against a real harness, the module
-layout, and the release workflow.
+针对真实 harness 的开发流程、模块划分和发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## Repository
+## 仓库结构
 
-| Path | What |
+| 路径 | 内容 |
 |---|---|
-| `core/` | Pure-JVM protocol core: wire DTOs, RPC client, WebSocket downlinks, reconnect loop, session folding, notification classifier |
-| `app/` | Android UI: screens, discovery/connection, foreground service, notifications, i18n |
-| `mock-harness/` | Ktor mock of the harness `/api` server for tests |
-| `tools/capture/` | Records real harness traffic into conformance fixtures |
-| `harness/` | Companion patch + guide for LAN mode |
-| — | The relay itself lives in [sorsama/deepseek-harness-relay](https://github.com/sorsama/deepseek-harness-relay) |
-| `docs/` | [Architecture](docs/ARCHITECTURE.md), [protocol notes](docs/PROTOCOL.md), [compatibility](docs/COMPATIBILITY.md), [security](docs/SECURITY.md) |
+| `core/` | 纯 JVM 协议核心：线路 DTO、RPC 客户端、WebSocket 下行流、重连循环、会话折叠、通知分类器 |
+| `app/` | Android UI：各界面、发现与连接、前台服务、通知、国际化 |
+| `mock-harness/` | 用于测试的 harness `/api` 服务端 Ktor 模拟实现 |
+| `tools/capture/` | 把真实 harness 流量录制成一致性测试夹具 |
+| `harness/` | 局域网模式的配套补丁与指南 |
+| — | 中继本身在 [sorsama/deepseek-harness-relay](https://github.com/sorsama/deepseek-harness-relay) |
+| `docs/` | [架构](docs/ARCHITECTURE.md)、[协议说明](docs/PROTOCOL.md)、[兼容性](docs/COMPATIBILITY.md)、[安全](docs/SECURITY.md) |
 
-## License
+## 许可证
 
-[MIT](LICENSE). Bundled third-party material is listed in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The DeepSeek Harness and its brand are property
-of their respective owners; this project is an independent, community-built remote.
+[MIT](LICENSE)。随附的第三方材料列在
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。DeepSeek Harness 及其品牌归各自所有者所有；
+本项目是一个独立的、由社区构建的远程端。
