@@ -69,7 +69,6 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -748,53 +747,162 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
     val isUser = message.role == "user"
     val isTool = message.role == "tool"
     val isReasoning = message.role == "reasoning"
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(if (isUser) 0.86f else 0.96f),
-            shape = DsShapes.block,
-            color = when {
-                isUser -> colors.brandPrimary.copy(alpha = 0.14f)
-                isTool -> colors.bgLayer2
-                isReasoning -> colors.hover
-                message.role == "system" -> colors.warnTertiary
-                else -> colors.bgLayer1
-            },
+
+    when {
+        isReasoning -> CollapsibleTranscriptRow(
+            title = "思考过程",
+            meta = "已思考 ${message.content.length} 字",
+            content = message.content,
+            code = false,
+            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
+        )
+
+        isTool -> CollapsibleTranscriptRow(
+            title = "工具 · ${message.toolName ?: "执行结果"}",
+            meta = "已完成，点击查看详情",
+            content = message.content,
+            code = true,
+            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
+        )
+
+        isUser -> Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
         ) {
-            Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.86f),
+                shape = RoundedCornerShape(18.dp),
+                color = colors.userBubble,
+            ) {
+                Column(
+                    Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
+                    SelectionContainer {
+                        Text(message.content, style = DsType.bubbleText, color = colors.labelPrimary)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        DsButton(
+                            "复制",
+                            { clipboard.setText(AnnotatedString(message.content)) },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
+            }
+        }
+
+        message.role == "system" -> Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = colors.warnTertiary,
+        ) {
+            Text(
+                message.content,
+                style = DsType.small13,
+                color = colors.labelSecondary,
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            )
+        }
+
+        else -> Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            SelectionContainer {
+                Text(
+                    message.content,
+                    style = DsType.mdBody,
+                    color = colors.labelPrimary,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DsButton(
+                    "复制",
+                    { clipboard.setText(AnnotatedString(message.content)) },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsibleTranscriptRow(
+    title: String,
+    meta: String,
+    content: String,
+    code: Boolean,
+    onCopy: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var expanded by rememberSaveable(title, content.hashCode()) { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth()
+            .clickable(onClickLabel = if (expanded) "收起" else "展开") { expanded = !expanded },
+        shape = RoundedCornerShape(12.dp),
+        color = colors.bgModulePlatform,
+    ) {
+        Column(
+            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Text(
+                    if (expanded) "⌄" else "›",
+                    style = DsType.base16Strong,
+                    color = colors.labelTertiary,
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = DsType.small13Strong, color = colors.labelSecondary)
+                    Text(meta, style = DsType.caption11, color = colors.labelTertiary)
+                }
+            }
+            if (expanded) {
+                SelectionContainer {
                     Text(
-                        when {
-                            isUser -> "你"
-                            isTool -> "工具 · ${message.toolName}"
-                            isReasoning -> "推理"
-                            message.role == "system" -> "系统"
-                            else -> "Harness"
-                        },
-                        style = DsType.caption11Strong,
-                        color = colors.labelTertiary,
+                        content,
+                        style = if (code) DsType.mdCode else DsType.mdSmall,
+                        color = colors.labelSecondary,
                     )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     DsButton(
                         "复制",
-                        { clipboard.setText(AnnotatedString(message.content)) },
+                        onCopy,
                         variant = DsButtonVariant.Ghost,
                         size = DsButtonSize.Small,
                     )
                 }
-                SelectionContainer {
-                    Text(
-                        message.content,
-                        style = if (isTool) DsType.mdCode else DsType.bubbleText,
-                        color = colors.labelPrimary,
-                    )
-                }
             }
+        }
+    }
+}
+
+@Composable
+private fun ScrollShortcut(
+    text: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        modifier = modifier.size(42.dp)
+            .clickable(onClickLabel = description, onClick = onClick),
+        shape = CircleShape,
+        color = colors.bgLayer2,
+        shadowElevation = 4.dp,
+        tonalElevation = 2.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, style = DsType.large20, color = colors.labelPrimary)
         }
     }
 }
@@ -871,23 +979,79 @@ private fun EnvironmentInfoDialog(
 }
 
 @Composable
-private fun ApprovalDialog(approval: LocalApproval, onApprove: () -> Unit, onDeny: () -> Unit) {
+private fun ApprovalDialog(
+    approval: LocalApproval,
+    onApprove: () -> Unit,
+    onDeny: () -> Unit,
+    onAutoApprove: () -> Unit,
+) {
     val colors = DsTheme.colors
-    DsDialog(title = "需要你的批准", onDismiss = onDeny) {
+    DsDialog(title = "执行前确认", onDismiss = onDeny) {
         Text(approval.summary, style = DsType.base16Strong, color = colors.labelPrimary)
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = colors.bgModulePlatform,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                Modifier.padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text("这项操作是做什么的？", style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(
+                    approvalPurpose(approval),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                )
+            }
+        }
+
+        Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
         SelectionContainer {
             Text(
                 approval.arguments,
                 style = DsType.mdCode,
                 color = colors.labelSecondary,
-                modifier = Modifier.fillMaxWidth().height(160.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().height(140.dp).verticalScroll(rememberScrollState()),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton("允许", onApprove)
-            DsButton("拒绝", onDeny, variant = DsButtonVariant.Outline)
-        }
+
+        Text(
+            "“自动批准”只对当前会话生效。开启后，后续写文件、编辑文件和执行命令将直接运行，顶部会持续显示提示，可随时关闭。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+
+        DsButton(
+            "批准",
+            onApprove,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DsButton(
+            "自动批准",
+            onAutoApprove,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Info,
+        )
+        DsButton(
+            "拒绝",
+            onDeny,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Outline,
+        )
     }
+}
+
+private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
+    "bash", "run_shell" ->
+        "Harness 准备在手机的本机执行环境中运行一条系统命令，用来完成当前任务中的检查、构建、文件处理或其他自动化步骤。命令可能读写工作区、访问网络或启动进程，具体影响取决于下方命令内容。"
+    "write", "write_file" ->
+        "Harness 准备创建或完整写入一个工作区文件，用来保存代码、配置、文档或任务产物。批准后会实际改变工作区内容。"
+    "edit", "edit_file" ->
+        "Harness 准备修改现有工作区文件，用来落实当前任务要求。批准后会对目标文件产生真实改动。"
+    else ->
+        "Harness 请求执行一项会改变本机状态的操作。批准后会真实执行；拒绝则跳过这一步并把结果返回给模型。"
 }
 
 @Composable
