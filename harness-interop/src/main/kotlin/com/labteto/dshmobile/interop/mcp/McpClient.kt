@@ -132,7 +132,7 @@ class McpStreamableHttpTransport(
                 builder.header("Mcp-Name", encodeHeaderValue(it))
             }
 
-            http.newCall(builder.build()).awaitResponseCancellable().use { response ->
+            http.newCall(builder.build()).executeCancellable { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     throw McpHttpException(response.code, body)
@@ -257,8 +257,10 @@ internal class McpLineProcess(
     suspend fun readLine(): String {
         val channel = lines ?: error("MCP stdio 进程未启动")
         val result = channel.receiveCatching()
-        return result.getOrNull()
-            ?: throw (result.exceptionOrNull() ?: IllegalStateException("MCP stdio 进程已结束"))
+        result.getOrNull()?.let { return it }
+        val error = result.exceptionOrNull() ?: IllegalStateException("MCP stdio 进程已结束")
+        abort()
+        throw error
     }
 
     fun abort() {
@@ -288,6 +290,32 @@ internal class McpLineProcess(
         scope.cancel()
     }
 }
+
+internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
+    suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation { cancel() }
+        enqueue(
+            object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    val token = continuation.tryResumeWithException(error)
+                    if (token != null) continuation.completeResume(token)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        response.use {
+                            val value = block(it)
+                            val token = continuation.tryResume(value)
+                            if (token != null) continuation.completeResume(token)
+                        }
+                    } catch (error: Throwable) {
+                        val token = continuation.tryResumeWithException(error)
+                        if (token != null) continuation.completeResume(token)
+                    }
+                }
+            },
+        )
+    }
 
 internal suspend fun Call.awaitResponseCancellable(): Response =
     suspendCancellableCoroutine { continuation ->
