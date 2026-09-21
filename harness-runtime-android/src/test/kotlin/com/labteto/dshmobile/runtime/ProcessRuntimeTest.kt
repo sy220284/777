@@ -57,4 +57,28 @@ class ProcessRuntimeTest {
         assertTrue(result.timedOut)
         assertEquals(-1, result.exitCode)
     }
+
+    @Test
+    fun sharedResolverAndEnvironmentExposeBundledRuntimeToOtherProcessClients() {
+        val dir = createTempDir(prefix = "runtime-shared-")
+        try {
+            val command = File(dir, "bundled-tool").apply {
+                writeText("#!/bin/sh\nprintf shared")
+                assertTrue(setExecutable(true))
+            }
+            val runtime = AndroidProcessRuntime(
+                dynamicSearchPaths = { listOf(dir) },
+                baseEnvironment = { mapOf("DSH_RUNTIME_FLAG" to "ready") },
+            )
+
+            assertEquals(command.absolutePath, runtime.resolveCommand(listOf("bundled-tool")).first())
+            val environment = runtime.processEnvironment(mapOf("EXTRA_FLAG" to "ok"))
+            assertTrue(environment["PATH"].orEmpty().split(File.pathSeparator).contains(dir.path))
+            assertEquals("ready", environment["DSH_RUNTIME_FLAG"])
+            assertEquals("ok", environment["EXTRA_FLAG"])
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
 }
