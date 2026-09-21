@@ -382,7 +382,7 @@
     <string name="update_open">ডাউনলোড ও ইনস্টল</string>
     <string name="update_later">পরে</string>
     <string name="settings_update_check">আপডেট পরীক্ষা করুন</string>
-    <string name="settings_update_check_hint">অ্যাপ চালু হলে GitHub-এ সর্বশেষ রিলিজ জিজ্ঞাসা করে।</string>
+    <string name="settings_update_check_hint">এখনই GitHub-এ আপডেট দেখতে ট্যাপ করুন। নতুন স্বাক্ষরিত APK থাকলে ডাউনলোড স্বয়ংক্রিয়ভাবে শুরু হবে।</string>
     <string name="connect_mode_title">কীভাবে সংযোগ করবেন</string>
     <string name="connect_mode_lan">লোকাল নেটওয়ার্ক</string>
     <string name="connect_mode_relay">রিলে</string>

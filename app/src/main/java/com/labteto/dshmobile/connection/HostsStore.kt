@@ -37,8 +37,6 @@ class HostsStore @Inject constructor(
         val LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
         val SESSION_SORT = stringPreferencesKey("session_sort")
-        val UPDATE_CHECK = booleanPreferencesKey("update_check")
-        val DISMISSED_UPDATE = stringPreferencesKey("dismissed_update")
     }
 
     private val hostsSerializer = ListSerializer(HostConfig.serializer())
@@ -59,8 +57,6 @@ class HostsStore @Inject constructor(
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
             localeOverride = prefs[Keys.LOCALE],
-            updateCheckEnabled = prefs[Keys.UPDATE_CHECK] ?: true,
-            dismissedUpdate = prefs[Keys.DISMISSED_UPDATE],
         )
     }
 
@@ -180,11 +176,6 @@ class HostsStore @Inject constructor(
         dataStore.edit { it[Keys.SESSION_SORT] = value }
     }
 
-    /** Remember that this release was declined, so it is not offered again. */
-    suspend fun setDismissedUpdate(version: String) {
-        dataStore.edit { it[Keys.DISMISSED_UPDATE] = version }
-    }
-
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
         val next = transform(settingsOnce())
         // Mirrored out to SharedPreferences as well: the scheme has to be readable before any
@@ -196,7 +187,6 @@ class HostsStore @Inject constructor(
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
             prefs[Keys.NOTIFY_ACTION] = next.notifyNeedsAction
             prefs[Keys.THEME] = next.themePreference
-            prefs[Keys.UPDATE_CHECK] = next.updateCheckEnabled
             next.localeOverride?.let { prefs[Keys.LOCALE] = it } ?: prefs.remove(Keys.LOCALE)
         }
     }

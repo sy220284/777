@@ -80,4 +80,16 @@ class UpdateVersionTest {
     fun `a release is still offered when the running version is unparseable`() {
         assertTrue(isNewerVersion("0.2.1", "unknown"))
     }
+
+    @Test
+    fun `777 release revision is compared`() {
+        assertTrue(isNewerVersion("0.12.0-777.17", "0.12.0-777.16"))
+        assertFalse(isNewerVersion("0.12.0-777.16", "0.12.0-777.16"))
+        assertFalse(isNewerVersion("0.12.0-777.15", "0.12.0-777.16"))
+    }
+
+    @Test
+    fun `v prefix and build metadata do not hide 777 revision`() {
+        assertTrue(isNewerVersion("v0.12.0-777.18+release", "0.12.0-777.17"))
+    }
 }

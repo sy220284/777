@@ -1,10 +1,6 @@
 package com.labteto.dshmobile.update
 
-import com.labteto.dshmobile.connection.HostsStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -37,72 +33,79 @@ data class AvailableUpdate(
     val checksumUrl: String? = null,
 )
 
-/**
- * Is [candidate] a later version than [current]?
- *
- * Compares the numeric core only, so a `v` prefix and any `-rc1`/`-beta` suffix are ignored — which
- * also means a pre-release of a version already installed does not count as newer. Anything
- * unparseable in a component reads as 0 rather than throwing: a malformed tag should mean "no
- * update", never a crash on a screen the user did not ask for.
- *
- * A free function so the comparison can be tested without a network.
- */
+/** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun parts(value: String): List<Int> = value.trim()
-        .removePrefix("v")
-        .substringBefore('-')
-        .substringBefore('+')
-        .split('.')
-        .map { it.trim().toIntOrNull() ?: 0 }
+    data class ParsedVersion(
+        val core: List<Int>,
+        val releaseRevision: List<Int>?,
+    )
 
-    val a = parts(candidate)
-    val b = parts(current)
-    if (a.all { it == 0 }) return false
-    for (i in 0 until maxOf(a.size, b.size)) {
-        val left = a.getOrElse(i) { 0 }
-        val right = b.getOrElse(i) { 0 }
-        if (left != right) return left > right
+    fun parse(value: String): ParsedVersion? {
+        val normalized = value.trim().removePrefix("v").substringBefore('+')
+        if (normalized.isBlank()) return null
+        val coreText = normalized.substringBefore('-')
+        val core = coreText.split('.').map { part ->
+            part.toIntOrNull() ?: return null
+        }
+        if (core.isEmpty()) return null
+
+        // 777.N is this app's release revision, not a generic semantic-version pre-release label.
+        // Other suffixes (rc/beta/etc.) keep the previous behavior: they do not make an otherwise
+        // equal core version count as an upgrade.
+        val suffix = normalized.substringAfter('-', missingDelimiterValue = "")
+        val revision = suffix
+            .takeIf { it.matches(Regex("""777(?:\.\d+)*""")) }
+            ?.split('.')
+            ?.map { it.toInt() }
+
+        return ParsedVersion(core = core, releaseRevision = revision)
+    }
+
+    fun compareParts(left: List<Int>, right: List<Int>): Int {
+        for (i in 0 until maxOf(left.size, right.size)) {
+            val a = left.getOrElse(i) { 0 }
+            val b = right.getOrElse(i) { 0 }
+            if (a != b) return a.compareTo(b)
+        }
+        return 0
+    }
+
+    val candidateVersion = parse(candidate) ?: return false
+    val currentVersion = parse(current) ?: return true
+
+    val coreComparison = compareParts(candidateVersion.core, currentVersion.core)
+    if (coreComparison != 0) return coreComparison > 0
+
+    val candidateRevision = candidateVersion.releaseRevision
+    val currentRevision = currentVersion.releaseRevision
+    if (candidateRevision != null || currentRevision != null) {
+        return compareParts(candidateRevision.orEmpty(), currentRevision.orEmpty()) > 0
     }
     return false
 }
 
 /**
- * Asks GitHub whether a newer release exists.
+ * Manual GitHub release checker.
  *
- * This is the only request the app makes to anything other than the harness the user pointed it at,
- * which is why it is behind a setting and why it never blocks anything: a failure — offline, rate
- * limited, no releases yet — leaves [available] null and is not reported. A release the user has
- * already declined stays declined until a later one appears.
+ * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request,
+ * so a user can retry after a failed connection or re-check while the app stays open.
  */
 @Singleton
 class UpdateChecker @Inject constructor(
     private val client: OkHttpClient,
-    private val hostsStore: HostsStore,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val _available = MutableStateFlow<AvailableUpdate?>(null)
-
-    /** The update to offer, or null when there is none, none wanted, or none confirmed yet. */
-    val available: StateFlow<AvailableUpdate?> = _available.asStateFlow()
-
-    /** Run at most once per process; the release list does not change while the app is open. */
-    @Volatile
-    private var checked = false
-
-    suspend fun checkOnce(currentVersion: String) {
-        if (checked) return
-        checked = true
-        val settings = runCatching { hostsStore.settingsOnce() }.getOrNull() ?: return
-        if (!settings.updateCheckEnabled) return
-
-        val release = fetchLatest() ?: return
+    suspend fun checkNow(currentVersion: String): AvailableUpdate? {
+        val release = fetchLatest() ?: error("无法获取最新发行版")
         val version = release.tagName.trim().removePrefix("v")
-        if (version.isEmpty() || !isNewerVersion(version, currentVersion)) return
-        if (settings.dismissedUpdate == version) return
+        if (version.isEmpty() || !isNewerVersion(version, currentVersion)) return null
+
         val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-        val checksums = release.assets.firstOrNull { it.name.equals("SHA256SUMS.txt", ignoreCase = true) }
-        _available.value = AvailableUpdate(
+        val checksums = release.assets.firstOrNull {
+            it.name.equals("SHA256SUMS.txt", ignoreCase = true)
+        }
+        return AvailableUpdate(
             version = version,
             url = release.htmlUrl.ifBlank { RELEASES_URL },
             apkUrl = apk?.downloadUrl?.takeIf(String::isNotBlank),
@@ -111,25 +114,17 @@ class UpdateChecker @Inject constructor(
         )
     }
 
-    /** Stop offering [version]; a later release will still be offered. */
-    suspend fun dismiss(version: String) {
-        _available.value = null
-        runCatching { hostsStore.setDismissedUpdate(version) }
-    }
-
     private suspend fun fetchLatest(): GithubRelease? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(LATEST_RELEASE_API)
             .header("Accept", "application/vnd.github+json")
             .get()
             .build()
-        runCatching {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
-                val body = response.body?.string() ?: return@use null
-                json.decodeFromString(GithubRelease.serializer(), body)
-            }
-        }.getOrNull()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val body = response.body?.string() ?: return@use null
+            json.decodeFromString(GithubRelease.serializer(), body)
+        }
     }
 
     private companion object {

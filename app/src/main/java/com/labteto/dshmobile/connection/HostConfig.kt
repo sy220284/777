@@ -116,7 +116,4 @@ data class AppSettings(
     val notifyNeedsAction: Boolean = true,
     val themePreference: String = "system", // light | dark | system
     val localeOverride: String? = null, // null = system
-    val updateCheckEnabled: Boolean = true,
-    /** A release the user has already declined, so it is offered once rather than every launch. */
-    val dismissedUpdate: String? = null,
 )

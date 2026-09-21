@@ -97,7 +97,12 @@ import java.util.Locale
  * cannot be changed when they plainly can.
  */
 @Composable
-fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    onClose: () -> Unit,
+    updateStatus: String?,
+    onCheckUpdate: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
@@ -193,13 +198,24 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                 }
 
                 SettingsCard(stringResource(R.string.settings_about), Icons.Outlined.Info) {
-                    // Beside the version, because that is what it is about — and off-switchable,
-                    // since it is the one request this app makes to anything but the harness.
-                    ToggleRow(
-                        stringResource(R.string.settings_update_check),
-                        settings.updateCheckEnabled,
-                        stringResource(R.string.settings_update_check_hint),
-                    ) { viewModel.set { it.copy(updateCheckEnabled = !it.updateCheckEnabled) } }
+                    DsButton(
+                        text = stringResource(R.string.settings_update_check),
+                        onClick = onCheckUpdate,
+                        variant = DsButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_update_check_hint),
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                    updateStatus?.let { status ->
+                        Text(
+                            text = status,
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                        )
+                    }
                     Text(
                         stringResource(
                             R.string.settings_about_version,
