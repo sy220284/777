@@ -55,6 +55,24 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun editRequiresFreshObservationAndRejectsStaleReads() {
+        workspace.write("src/fresh.txt", "before")
+
+        assertThrows(IllegalStateException::class.java) {
+            workspace.edit("src/fresh.txt", "before", "after")
+        }
+
+        workspace.read("src/fresh.txt")
+        workspace.writeToolArtifact("src/fresh.txt", "changed elsewhere")
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.edit("src/fresh.txt", "changed", "after")
+        }
+
+        workspace.read("src/fresh.txt")
+        assertEquals("已编辑 src/fresh.txt", workspace.edit("src/fresh.txt", "changed", "after"))
+    }
+
+    @Test
     fun recursiveDiscoveryDoesNotFollowSymlinksOutsideWorkspace() {
         external = Files.createTempDirectory("local-harness-external").toFile().apply {
             resolve("secret.txt").writeText("outside-secret")
