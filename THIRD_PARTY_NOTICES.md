@@ -61,3 +61,19 @@ additional notices for its bundled dependencies.
 The APK also carries the runtime shared libraries required by that Termux Node build.
 Their package copyright/license notices are copied from the verified Termux packages into
 `assets/runtime/node/notices/` during the build and ship inside the APK.
+
+
+## Bundled Python runtime
+
+The Android Harness bundles Python 3.14.6 from the official Termux `termux-main`
+`python` package. The build verifies Termux's signed package index and every selected
+runtime package SHA-256 before packaging.
+
+Python is distributed under the Python Software Foundation License. The APK also carries
+the native libraries required by the verified Termux Python dependency closure. Package
+copyright and license notices are copied from the verified Termux packages into
+`assets/runtime/python/notices/` during the build and ship inside the APK.
+
+The packaged standard library is relocated into the app-private runtime directory. The
+Termux-specific default subprocess shell path is rewritten to Android `/system/bin/sh`
+so Python `subprocess(..., shell=True)` does not depend on a Termux installation.
