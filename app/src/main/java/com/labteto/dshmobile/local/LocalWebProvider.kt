@@ -158,9 +158,11 @@ class LocalWebProvider @Inject constructor(
         return http.newBuilder()
             .followRedirects(false)
             .followSslRedirects(false)
-            .dns(Dns { requested ->
-                if (!requested.equals(host, ignoreCase = true)) throw UnknownHostException("主机发生变化")
-                addresses.toList()
+            .dns(object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> {
+                    if (!hostname.equals(host, ignoreCase = true)) throw UnknownHostException("主机发生变化")
+                    return addresses.toList()
+                }
             })
             .build()
     }
