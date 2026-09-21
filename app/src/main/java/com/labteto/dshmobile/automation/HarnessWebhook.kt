@@ -240,7 +240,7 @@ class HarnessWebhookService : Service() {
     private fun restartServer(port: Int, allowLan: Boolean) {
         runCatching { server?.close() }
         scope.launch {
-            val token = tokenStore.getOrCreate()
+            tokenStore.getOrCreate()
             val socket = ServerSocket().apply {
                 reuseAddress = true
                 bind(
@@ -254,13 +254,14 @@ class HarnessWebhookService : Service() {
             server = socket
             while (!socket.isClosed) {
                 val client = runCatching { socket.accept() }.getOrNull() ?: break
-                launch { handle(client, token) }
+                launch { handle(client) }
             }
         }
     }
 
-    private suspend fun handle(socket: Socket, token: String) {
+    private suspend fun handle(socket: Socket) {
         socket.use { client ->
+            val token = tokenStore.getOrCreate()
             client.soTimeout = 10_000
             val request = readHttpRequest(client)
                 ?: return respond(client, 400, """{"error":"bad request"}""")
