@@ -46,10 +46,30 @@ jobs:
             fi
           }
 
+          normalize_base64() {
+            value="$(printf '%s' "$1" | tr -d '[:space:]')"
+            remainder=$((${#value} % 4))
+            case "$remainder" in
+              0) ;;
+              2) value="${value}==" ;;
+              3) value="${value}=" ;;
+              *)
+                echo "::error::RELEASE_KEYSTORE 的 Base64 长度非法，无法通过补齐填充修复。"
+                return 1
+                ;;
+            esac
+            printf '%s' "$value"
+          }
+
           KEYSTORE_VALUE="$(extract_secret "$KEYSTORE_B64" "RELEASE_KEYSTORE")"
           KEYSTORE_VALUE="${KEYSTORE_VALUE#\"}"
           KEYSTORE_VALUE="${KEYSTORE_VALUE%\"}"
-          printf '%s' "$KEYSTORE_VALUE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/release.keystore"
+          KEYSTORE_VALUE="$(normalize_base64 "$KEYSTORE_VALUE")"
+
+          if ! printf '%s' "$KEYSTORE_VALUE" | base64 -d > "$RUNNER_TEMP/release.keystore"; then
+            echo "::error::RELEASE_KEYSTORE 无法解码，请检查仓库 Secret 内容。"
+            exit 1
+          fi
 
           PASSWORD_VALUE="$(extract_secret "$RELEASE_PASSWORD" "RELEASE_KEY_PASSWORD")"
           PASSWORD_VALUE="${PASSWORD_VALUE#\"}"
