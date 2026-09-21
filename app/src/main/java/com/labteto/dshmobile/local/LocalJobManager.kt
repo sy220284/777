@@ -8,9 +8,12 @@ class LocalJobManager(
     scope: CoroutineScope,
     onChanged: (List<LocalJobInfo>) -> Unit,
 ) {
-    private val delegate = HarnessJobManager(scope) { jobs ->
-        onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status) })
-    }
+    private val delegate = HarnessJobManager(
+        scope = scope,
+        onChanged = { jobs ->
+            onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status) })
+        },
+    )
 
     fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
         delegate.start(label, block)
@@ -29,4 +32,3 @@ class LocalJobManager(
 
     fun stopAll() = delegate.stopAll()
 }
-
