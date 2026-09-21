@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -223,6 +224,48 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
         activeJob = scope.launch { runTurn(content) }
+    }
+
+    /**
+     * Execute one persisted background prompt through the same AgentLoop used by the UI.
+     *
+     * Background work cannot approve destructive actions or answer interactive questions. If the
+     * model reaches either boundary, the run is stopped and WorkManager can surface the task as
+     * blocked instead of silently granting power.
+     */
+    suspend fun runAutomationPrompt(
+        text: String,
+        timeoutMillis: Long = 5 * 60_000L,
+    ): String {
+        val prompt = text.trim()
+        require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
+        require(_state.value.configured) { "本机 Harness 尚未配置模型" }
+        require(activeJob?.isActive != true) { "本机 Harness 正在执行其他任务" }
+
+        val beforeCount = _state.value.messages.size
+        send(prompt)
+        val job = activeJob ?: error("后台任务未能启动")
+        withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
+            while (job.isActive) {
+                val snapshot = _state.value
+                if (snapshot.pendingApproval != null) {
+                    stop()
+                    error("后台任务需要人工审批，已安全停止")
+                }
+                if (snapshot.pendingQuestion != null) {
+                    stop()
+                    error("后台任务需要人工回答，已安全停止")
+                }
+                delay(100)
+            }
+            job.join()
+        }
+
+        val newMessages = _state.value.messages.drop(beforeCount)
+        _state.value.error?.let { error("后台任务失败：$it") }
+        return newMessages.lastOrNull { it.role == "assistant" }?.content
+            ?: newMessages.lastOrNull { it.role == "system" }?.content
+            ?: "后台任务已完成"
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
