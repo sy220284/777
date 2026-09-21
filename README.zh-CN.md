@@ -16,6 +16,9 @@
 技能、用户问答、子代理和并行工作流都在 APK 内运行，不需要电脑端保持在线。DeepSeek API 密钥由
 Android Keystore 加密；写文件、编辑文件和执行命令必须逐次取得用户批准。
 
+完整功能对照和 Android 16 适配边界见
+[Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)。
+
 本机执行被限制在应用私有工作区。安卓不会允许普通应用读取其他应用的私有目录；系统也不自带
 Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续按架构和许可证单独内置，或继续使用
 原有的电脑远程模式。
