@@ -20,7 +20,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -347,10 +346,17 @@ class LocalHarnessEngine @Inject constructor(
         if (!parallelSubagents) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
         }
-        return supervisorScope {
-            calls.map { call ->
-                async { call to executeSafely(call, allowMutation) }
-            }.map { it.await() }
+        return isolatedParallelMap(calls) { call ->
+            call to executeSafely(call, allowMutation)
+        }.mapIndexed { index, result ->
+            result.getOrElse { error ->
+                val call = calls[index]
+                call to formatToolFailure(
+                    call,
+                    "PARALLEL_TASK_ERROR",
+                    error.message ?: error::class.java.simpleName,
+                )
+            }
         }
     }
 
@@ -894,28 +900,19 @@ class LocalHarnessEngine @Inject constructor(
             }.joinToString("\n\n")
         }
 
-        return supervisorScope {
-            clean.mapIndexed { index, task ->
-                async {
-                    val result = runSubagent(
-                        task,
-                        inheritHistory = false,
-                        allowMutation = false,
-                        maxSteps = MAX_SUBAGENT_STEPS,
-                    )
-                    "子任务 ${index + 1}：$task\n$result"
-                }
-            }.map { deferred ->
-                try {
-                    deferred.await()
-                } catch (cancelled: CancellationException) {
-                    if (!currentCoroutineContext().isActive) throw cancelled
-                    "并行子任务自身被取消；其他子任务继续执行。"
-                } catch (error: Exception) {
-                    "并行子任务失败：${error.message ?: error::class.java.simpleName}；其他子任务继续执行。"
-                }
-            }.joinToString("\n\n")
-        }
+        return isolatedParallelMap(clean.withIndex().toList()) { indexed ->
+            val result = runSubagent(
+                indexed.value,
+                inheritHistory = false,
+                allowMutation = false,
+                maxSteps = MAX_SUBAGENT_STEPS,
+            )
+            "子任务 ${indexed.index + 1}：${indexed.value}\n$result"
+        }.mapIndexed { index, result ->
+            result.getOrElse { error ->
+                "子任务 ${index + 1} 失败：${error.message ?: error::class.java.simpleName}；同批其他子任务不受影响。"
+            }
+        }.joinToString("\n\n")
     }
 
     private fun searchSessions(query: String): String {
