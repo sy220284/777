@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -34,7 +32,9 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.CommandDescriptor
 import com.labteto.dshmobile.core.wire.dto.SkillEntry
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -71,72 +71,64 @@ internal fun CommandSheet(
     val searchable = commands.size + skills.size > 12
 
     DsBottomSheet(title = stringResource(R.string.chat_composer_commands), onDismiss = onDismiss) {
-        // Attach ------------------------------------------------------------
-        SheetRow(
-            leading = {
-                Icon(
-                    Icons.Filled.Image,
-                    contentDescription = null,
-                    tint = colors.labelSecondary,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
-            title = stringResource(R.string.chat_composer_attach),
-            subtitle = if (canAttach) null else stringResource(R.string.err_attachment_failed),
-            enabled = canAttach,
-            onClick = {
-                onDismiss()
-                onAttach()
-            },
-        )
-        // Harness 0.1.3 takes any file, not only pictures. The bytes go up as soon as one is
-        // picked and the message cites the receipt, so the row stays enabled exactly when the
-        // image one is: both need an open session to upload against.
-        SheetRow(
-            leading = {
-                Icon(
-                    Icons.Filled.AttachFile,
-                    contentDescription = null,
-                    tint = colors.labelSecondary,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
-            title = stringResource(R.string.chat_composer_attach_file),
-            subtitle = null,
-            enabled = canAttach,
-            onClick = {
-                onDismiss()
-                onAttachFile()
-            },
-        )
+        // High-frequency sources sit in thumb-sized tiles; deeper capabilities remain grouped
+        // below, matching the hierarchy of the refreshed mobile home.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            DsQuickActionTile(
+                icon = Icons.Filled.Image,
+                label = stringResource(R.string.chat_composer_attach),
+                enabled = canAttach,
+                onClick = {
+                    onDismiss()
+                    onAttach()
+                },
+                modifier = Modifier.weight(1f),
+            )
+            DsQuickActionTile(
+                icon = Icons.Filled.AttachFile,
+                label = stringResource(R.string.chat_composer_attach_file),
+                enabled = canAttach,
+                onClick = {
+                    onDismiss()
+                    onAttachFile()
+                },
+                modifier = Modifier.weight(1f),
+            )
+        }
 
         // Send mode ---------------------------------------------------------
         SectionHeader(stringResource(R.string.chat_composer_mode))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsPill(
-                text = stringResource(R.string.chat_composer_queue),
-                selected = mode != "steer",
-                onClick = { onModeChange("queue") },
-            )
-            // Steering splices into a turn that is already running; with an idle agent there is
-            // nothing to steer, so the option stays visible but inert rather than silently failing.
-            DsPill(
-                text = stringResource(R.string.chat_composer_steer),
-                selected = mode == "steer",
-                onClick = if (running) ({ onModeChange("steer") }) else null,
+        DsGroupCard {
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                DsPill(
+                    text = stringResource(R.string.chat_composer_queue),
+                    selected = mode != "steer",
+                    onClick = { onModeChange("queue") },
+                )
+                // Steering splices into a turn that is already running; with an idle agent there is
+                // nothing to steer, so the option stays visible but inert rather than silently failing.
+                DsPill(
+                    text = stringResource(R.string.chat_composer_steer),
+                    selected = mode == "steer",
+                    onClick = if (running) ({ onModeChange("steer") }) else null,
+                )
+            }
+            Text(
+                stringResource(
+                    when {
+                        !running && mode == "steer" -> R.string.chat_composer_steer_idle
+                        mode == "steer" -> R.string.chat_composer_mode_steer_hint
+                        else -> R.string.chat_composer_mode_queue_hint
+                    },
+                ),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                modifier = Modifier.padding(top = DsSpacing.small),
             )
         }
-        Text(
-            stringResource(
-                when {
-                    !running && mode == "steer" -> R.string.chat_composer_steer_idle
-                    mode == "steer" -> R.string.chat_composer_mode_steer_hint
-                    else -> R.string.chat_composer_mode_queue_hint
-                },
-            ),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
 
         if (searchable) {
             TextField(

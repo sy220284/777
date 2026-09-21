@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.main
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -29,9 +28,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,7 +56,9 @@ import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -65,6 +68,7 @@ import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.relativeTime
+import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.rememberHostsStore
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -109,7 +113,6 @@ fun ChatListDrawer(
     val hostInfo by store.hostInfo.collectAsStateWithLifecycle()
 
     var query by remember { mutableStateOf("") }
-    var searchOpen by remember { mutableStateOf(false) }
     // Persisted, not remembered: the order you read your sessions in is a preference, and it used
     // to reset every time the drawer was closed.
     val sessionSort by hostsStore.sessionSort.collectAsStateWithLifecycle(initialValue = SORT_MANUAL)
@@ -191,77 +194,56 @@ fun ChatListDrawer(
             .padding(horizontal = DsSpacing.medium),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.small),
+            modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.chatlist_title),
-                style = DsType.large20,
-                color = colors.labelPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            DsIconButton(
-                icon = Icons.Filled.Search,
-                contentDescription = stringResource(R.string.common_search),
-                // Closing the field clears the query too: a hidden field holding text left the list
-                // filtered by something no longer on screen.
-                onClick = {
-                    searchOpen = !searchOpen
-                    if (!searchOpen) query = ""
-                },
-                tint = if (searchOpen) colors.accent else colors.labelTertiary,
-            )
-            SortChip(sortByRecency) { next ->
-                scope.launch { hostsStore.setSessionSort(if (next) SORT_UPDATED else SORT_MANUAL) }
+            WhaleMark(Modifier.size(44.dp))
+            Spacer(Modifier.width(DsSpacing.medium))
+            Column(Modifier.weight(1f)) {
+                Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
+                Text(
+                    stringResource(R.string.chatlist_title),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
             }
             DsIconButton(
-                icon = Icons.Filled.Settings,
-                contentDescription = stringResource(R.string.settings_title),
-                onClick = onOpenSettings,
-                tint = colors.labelTertiary,
+                icon = Icons.Filled.Add,
+                contentDescription = stringResource(R.string.chatlist_new_session),
+                onClick = { newSessionOpen = true },
+                tint = colors.labelPrimary,
+                containerColor = colors.bgLayer1,
+                shadowElevation = 2.dp,
             )
         }
 
-        DsButton(
-            text = stringResource(R.string.chatlist_new_session),
-            icon = Icons.Filled.Add,
-            onClick = { newSessionOpen = true },
-            variant = DsButtonVariant.Info,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        DsGroupCard {
+            DsCategoryRow(
+                icon = Icons.Outlined.PhoneAndroid,
+                title = "本机 Harness",
+                subtitle = "在手机上直接运行完整代理能力",
+                onClick = {
+                    onClose()
+                    onOpenLocalHarness()
+                },
+            )
+            DsCategoryRow(
+                icon = Icons.Filled.Settings,
+                title = stringResource(R.string.settings_title),
+                subtitle = "连接、通知、外观与数据",
+                onClick = onOpenSettings,
+            )
+        }
 
-        DsButton(
-            text = "本机 Harness",
-            onClick = {
-                onClose()
-                onOpenLocalHarness()
-            },
-            variant = DsButtonVariant.Outline,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // The search field folds away rather than permanently occupying a row of a phone-height
-        // drawer, which is otherwise pure overhead for the common case.
-        AnimatedVisibility(visible = searchOpen) {
-            Column(modifier = Modifier.padding(top = DsSpacing.small)) {
-                TextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
-                    singleLine = true,
-                    colors = dialogTextFieldColors(),
-                )
-                // Stated once, quietly, and only while searching. Most harnesses ship with the
-                // content index off, so this is a normal capability note — not a failure.
-                if (!contentSearchAvailable && query.isNotBlank()) {
-                    Text(
-                        stringResource(R.string.chatlist_search_content_off),
-                        style = DsType.caption11,
-                        color = colors.labelCaption,
-                        modifier = Modifier.padding(top = DsSpacing.tiny),
-                    )
-                }
+        Row(
+            Modifier.fillMaxWidth().padding(top = DsSpacing.comfortable),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) {
+                SectionHeader(stringResource(R.string.chatlist_sessions))
+            }
+            SortChip(sortByRecency) { next ->
+                scope.launch { hostsStore.setSessionSort(if (next) SORT_UPDATED else SORT_MANUAL) }
             }
         }
 
@@ -421,6 +403,38 @@ fun ChatListDrawer(
                 stringResource(R.string.chatlist_new_workspace),
                 style = DsType.std14,
                 color = colors.labelSecondary,
+            )
+        }
+
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            singleLine = true,
+            shape = DsShapes.pillFull,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = colors.bgLayer1,
+                unfocusedContainerColor = colors.bgLayer1,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                cursorColor = colors.accent,
+            ),
+        )
+        if (!contentSearchAvailable && query.isNotBlank()) {
+            Text(
+                stringResource(R.string.chatlist_search_content_off),
+                style = DsType.caption11,
+                color = colors.labelCaption,
+                modifier = Modifier.padding(bottom = DsSpacing.small),
             )
         }
     }

@@ -28,6 +28,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -44,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,6 +71,7 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -112,32 +122,37 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                     .fillMaxSize()
                     .safeDrawingPadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+                    .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     DsIconButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.common_back),
                         onClick = onClose,
+                        containerColor = colors.bgLayer1,
+                        shadowElevation = 3.dp,
                     )
                     Text(
                         stringResource(R.string.settings_title),
                         style = DsType.large20,
                         color = colors.labelPrimary,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
                     )
+                    Spacer(Modifier.width(48.dp))
                 }
 
-                SettingsCard(stringResource(R.string.archived_title)) {
+                SettingsCard(stringResource(R.string.archived_title), Icons.Outlined.History) {
                     com.labteto.dshmobile.ui.screens.main.ArchivedSessions(store)
                 }
 
-                SettingsCard(stringResource(R.string.settings_general)) {
+                SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                     LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                     AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
                 }
 
-                SettingsCard(stringResource(R.string.settings_connection)) {
+                SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
                     ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
                     ToggleRow(
                         stringResource(R.string.connect_auto_last),
@@ -153,7 +168,7 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                     ) { viewModel.set { it.copy(autoConnectLoopback = !it.autoConnectLoopback) } }
                 }
 
-                SettingsCard(stringResource(R.string.settings_notifications)) {
+                SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
                     ToggleRow(
                         stringResource(R.string.settings_notifications_turn),
                         settings.notifyTurnComplete,
@@ -176,7 +191,7 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                     ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
                 }
 
-                SettingsCard(stringResource(R.string.settings_harness)) {
+                SettingsCard(stringResource(R.string.settings_harness), Icons.Outlined.Cloud) {
                     connectionState.description?.let { host ->
                         // Only the home directory survives from `host.describe`; the version and
                         // attached-session count are not published by 0.1.2 at all. About already
@@ -198,7 +213,7 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                 // subject that happens to also be read-only.
                 plugins?.let { PluginsCard(it) { pluginsOpen = true } }
 
-                SettingsCard(stringResource(R.string.settings_data)) {
+                SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
                     DsButton(
                         text = stringResource(R.string.settings_forget_hosts),
                         onClick = { viewModel.forgetHosts { toast.second(hostsCleared) } },
@@ -213,7 +228,7 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                     )
                 }
 
-                SettingsCard(stringResource(R.string.settings_about)) {
+                SettingsCard(stringResource(R.string.settings_about), Icons.Outlined.Info) {
                     // Beside the version, because that is what it is about — and off-switchable,
                     // since it is the one request this app makes to anything but the harness.
                     ToggleRow(
@@ -275,18 +290,22 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
 
 /** One settings group as a raised card, so groups read as blocks rather than a running list. */
 @Composable
-private fun SettingsCard(title: String, content: @Composable () -> Unit) {
+private fun SettingsCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    content: @Composable () -> Unit,
+) {
     val colors = DsTheme.colors
     Column(Modifier.fillMaxWidth().animateContentSize()) {
-        SectionHeader(title)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(DsShapes.block)
-                .background(colors.bgLayer1)
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        Row(
+            Modifier.padding(horizontal = DsSpacing.small, bottom = DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
+            Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
+            Text(title, style = DsType.std14, color = colors.labelTertiary)
+        }
+        DsGroupCard {
             content()
         }
     }
@@ -307,7 +326,7 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun PluginsCard(inventory: PluginInventorySnapshot, onOpen: () -> Unit) {
     val colors = DsTheme.colors
-    SettingsCard(stringResource(R.string.settings_plugins)) {
+    SettingsCard(stringResource(R.string.settings_plugins), Icons.Outlined.Extension) {
         if (inventory.entries.isEmpty()) {
             Text(
                 stringResource(R.string.plugins_empty),

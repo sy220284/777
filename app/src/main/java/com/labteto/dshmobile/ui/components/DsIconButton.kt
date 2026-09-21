@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
@@ -42,6 +43,8 @@ fun DsIconButton(
     enabled: Boolean = true,
     tint: Color = DsTheme.colors.labelSecondary,
     iconSize: Dp = 20.dp,
+    containerColor: Color = Color.Transparent,
+    shadowElevation: Dp = 0.dp,
 ) {
     val colors = DsTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
@@ -56,9 +59,9 @@ fun DsIconButton(
     
     val background = when {
         !enabled -> Color.Transparent
-        isPressed -> colors.hover
-        isHovered -> colors.hover.copy(alpha = 0.5f)
-        else -> Color.Transparent
+        isPressed -> colors.hover.compositeOver(containerColor)
+        isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(containerColor)
+        else -> containerColor
     }
     
     Surface(
@@ -68,6 +71,7 @@ fun DsIconButton(
         color = background,
         shape = androidx.compose.foundation.shape.CircleShape,
         interactionSource = interactionSource,
+        shadowElevation = shadowElevation,
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
