@@ -87,7 +87,9 @@ function textContent(content: unknown): string | undefined {
     .map((block) => {
       if (block === null || typeof block !== 'object') return ''
       const record = block as Record<string, unknown>
-      return record.type === 'text' && typeof record.text === 'string' ? record.text : ''
+      if (record.type === 'text' && typeof record.text === 'string') return record.text
+      if (record.type === 'tool-result') return textContent(record.content) ?? ''
+      return ''
     })
     .join('')
   return text === '' ? undefined : text
