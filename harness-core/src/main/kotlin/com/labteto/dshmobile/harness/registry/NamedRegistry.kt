@@ -7,7 +7,7 @@ class NamedRegistry<T : Any> {
     @Synchronized
     fun register(id: String, value: T, replace: Boolean = false) {
         require(id.isNotBlank()) { "注册项编号不能为空" }
-        if (!replace) require(id !in entries) { "注册项已存在：\$id" }
+        if (!replace) require(id !in entries) { "注册项已存在：$id" }
         entries[id] = value
     }
 
@@ -18,7 +18,7 @@ class NamedRegistry<T : Any> {
     fun get(id: String): T? = entries[id]
 
     @Synchronized
-    fun require(id: String): T = get(id) ?: error("注册项不存在：\$id")
+    fun require(id: String): T = get(id) ?: error("注册项不存在：$id")
 
     @Synchronized
     fun ids(): List<String> = entries.keys.toList()
