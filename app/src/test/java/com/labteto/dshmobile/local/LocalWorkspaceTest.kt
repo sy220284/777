@@ -45,6 +45,8 @@ class LocalWorkspaceTest {
     fun editRequiresUniqueObservationAndGlobFindsFiles() {
         workspace.write("src/one.kt", "val before = 1\n")
         workspace.write("src/two.txt", "before before\n")
+        workspace.read("src/one.kt")
+        workspace.read("src/two.txt")
 
         assertEquals("已编辑 src/one.kt", workspace.edit("src/one.kt", "before", "after"))
         assertTrue(workspace.read("src/one.kt").contains("after"))
