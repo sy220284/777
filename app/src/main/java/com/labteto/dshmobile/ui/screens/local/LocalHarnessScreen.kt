@@ -83,6 +83,7 @@ fun LocalHarnessScreen(
     val scope = rememberCoroutineScope()
     var editingConfig by rememberSaveable { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
+    var showEnvironment by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -107,6 +108,10 @@ fun LocalHarnessScreen(
                 onNetworkDiagnostic = {
                     scope.launch { drawerState.close() }
                     showDiagnostic = true
+                },
+                onEnvironment = {
+                    scope.launch { drawerState.close() }
+                    showEnvironment = true
                 },
                 onSettings = {
                     scope.launch { drawerState.close() }
@@ -151,6 +156,13 @@ fun LocalHarnessScreen(
             diagnose = viewModel::diagnoseNetwork,
         )
     }
+
+    if (showEnvironment) {
+        EnvironmentInfoDialog(
+            text = viewModel.environmentInfo(),
+            onDismiss = { showEnvironment = false },
+        )
+    }
 }
 
 @Composable
@@ -159,6 +171,7 @@ private fun LocalModeDrawer(
     onLan: () -> Unit,
     onRelay: () -> Unit,
     onNetworkDiagnostic: () -> Unit,
+    onEnvironment: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -197,6 +210,11 @@ private fun LocalModeDrawer(
                 label = { Text("网络诊断") },
                 selected = false,
                 onClick = onNetworkDiagnostic,
+            )
+            NavigationDrawerItem(
+                label = { Text("环境能力") },
+                selected = false,
+                onClick = onEnvironment,
             )
             NavigationDrawerItem(
                 label = { Text("设置") },
@@ -730,6 +748,29 @@ private fun NetworkDiagnosticDialog(
                     modifier = Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun EnvironmentInfoDialog(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsDialog(title = "环境能力", onDismiss = onDismiss) {
+        Text(
+            "这里展示手机本机 Harness 当前可依赖的系统能力和沙箱限制。",
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        SelectionContainer {
+            Text(
+                text,
+                style = DsType.mdCode,
+                color = colors.labelPrimary,
+                modifier = Modifier.fillMaxWidth().height(260.dp).verticalScroll(rememberScrollState()),
+            )
         }
     }
 }
