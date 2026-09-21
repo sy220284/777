@@ -197,6 +197,21 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(approved)
     }
 
+    /** Approve the current mutation and all later mutations in this session. */
+    fun enableAutoApproval() {
+        _state.update { it.copy(autoApproveMutations = true) }
+        eventLog.append("approval/mode", buildJsonObject { put("mode", "auto") })
+        persist()
+        approvalResponse?.complete(true)
+    }
+
+    /** Return the current session to per-operation approval. */
+    fun disableAutoApproval() {
+        _state.update { it.copy(autoApproveMutations = false) }
+        eventLog.append("approval/mode", buildJsonObject { put("mode", "ask") })
+        persist()
+    }
+
     /** Resolve the current model-authored question. */
     fun answerQuestion(answer: String) {
         questionResponse?.complete(answer.trim())
@@ -228,6 +243,7 @@ class LocalHarnessEngine @Inject constructor(
                 todos = emptyList(),
                 goal = null,
                 planMode = false,
+                autoApproveMutations = false,
                 jobs = emptyList(),
                 error = null,
             )
@@ -449,6 +465,13 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun approve(call: LocalToolCall, summary: String): Boolean {
+        if (_state.value.autoApproveMutations) {
+            eventLog.append("approval/auto", buildJsonObject {
+                put("tool", call.name)
+                put("summary", summary)
+            })
+            return true
+        }
         val response = CompletableDeferred<Boolean>()
         approvalResponse = response
         _state.update {
@@ -771,6 +794,7 @@ class LocalHarnessEngine @Inject constructor(
             todos = stored.todos,
             goal = stored.goal,
             planMode = stored.planMode,
+            autoApproveMutations = stored.autoApproveMutations,
         )
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
@@ -790,6 +814,7 @@ class LocalHarnessEngine @Inject constructor(
             todos = state.todos,
             goal = state.goal,
             planMode = state.planMode,
+            autoApproveMutations = state.autoApproveMutations,
         )
         persistenceQueue.trySend(currentSessionId to snapshot)
     }
