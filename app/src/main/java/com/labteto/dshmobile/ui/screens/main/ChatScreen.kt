@@ -532,7 +532,8 @@ fun ChatScreen(
                 running = conversation?.running == true,
                 enabled = currentSessionId != null && !composer.submitting,
                 preparing = composer.preparing,
-                onOpenSheet = { sheet = ChatSheet.Commands },
+                onOpenAttachments = { sheet = ChatSheet.Attachments },
+                onOpenTools = { sheet = ChatSheet.Commands },
                 // A lambda, not `::send`. The composer holds this through rememberUpdatedState,
                 // which keeps what it has when the new value is equal to it, and a reference to a
                 // local function equals every other reference to that function whatever it
@@ -542,18 +543,6 @@ fun ChatScreen(
                 // changes and compares by identity, so the composer always holds the current one.
                 onSend = { text -> send(text) },
                 onStop = { scope.launch { store.cancelTurn() } },
-                onPickImage = {
-                    if (!composer.preparing && store.composers.imagePickTarget == null) {
-                        store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
-                        imagePicker.launch("image/*")
-                    }
-                },
-                onPickFile = {
-                    if (!composer.preparing) {
-                        store.composers.filePickTarget = composer
-                        filePicker.launch(arrayOf("*/*"))
-                    }
-                },
             )
 
         }
@@ -564,13 +553,28 @@ fun ChatScreen(
     panelKey?.let { key -> WorkspacePanels(store, store.panels.get(key), onDismiss = { panelKey = null }) }
     feedback?.let { (key, id, positive) -> FeedbackDialog(store, key, id, positive) { feedback = null } }
     when (sheet) {
+        ChatSheet.Attachments -> AttachmentSheet(
+            canAttach = currentSessionId != null && !composer.preparing && !composer.submitting,
+            onAttach = {
+                if (!composer.preparing && store.composers.imagePickTarget == null) {
+                    store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
+                    imagePicker.launch("image/*")
+                }
+            },
+            onAttachFile = {
+                if (!composer.preparing) {
+                    store.composers.filePickTarget = composer
+                    filePicker.launch(arrayOf("*/*"))
+                }
+            },
+            onDismiss = { sheet = null },
+        )
         ChatSheet.Commands -> CommandSheet(
             commands = commands,
             commandsAvailable = commandsAvailable,
             skills = skills,
             mode = mode,
             running = conversation?.running == true,
-            canAttach = currentSessionId != null && !composer.preparing && !composer.submitting,
             currentTab = tab,
             subagentCount = subagents.size,
             onModeChange = { mode = it },
@@ -582,13 +586,6 @@ fun ChatScreen(
             onOpenSubagents = { sheet = ChatSheet.Subagents },
             onOpenWorkspace = { panelKey = composer.key },
             onTabChange = { tab = it },
-            onAttach = {
-                if (!composer.preparing && store.composers.imagePickTarget == null) {
-                    store.composers.imagePickTarget = composer to (imageLimits ?: ImageLimitsView())
-                    imagePicker.launch("image/*")
-                }
-            },
-            onAttachFile = { store.composers.filePickTarget = composer; filePicker.launch(arrayOf("*/*")) },
             // The sheet only auto-runs commands that take no input at all, and a command that
             // takes no input takes no attachments either — so a pending attachment refuses here
             // for the same reason it refuses at the composer, rather than being silently dropped.
@@ -623,7 +620,7 @@ fun ChatScreen(
 }
 
 /** Which sheet, if any, is open over the chat surface. */
-private enum class ChatSheet { Commands, Models, Presets, Subagents }
+private enum class ChatSheet { Attachments, Commands, Models, Presets, Subagents }
 
 /**
  * A picked document's display name and size, as its provider reports them.
