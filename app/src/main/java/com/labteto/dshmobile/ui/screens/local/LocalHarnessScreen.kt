@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,6 +45,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -145,6 +150,8 @@ fun LocalHarnessScreen(
                 onSwitchSession = viewModel::switchSession,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
+                onAutoApprove = viewModel::enableAutoApproval,
+                onDisableAutoApprove = viewModel::disableAutoApproval,
                 onAnswerQuestion = viewModel::answerQuestion,
             )
         }
@@ -354,6 +361,8 @@ private fun LocalChat(
     onSwitchSession: (String) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
+    onAutoApprove: () -> Unit,
+    onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -361,8 +370,25 @@ private fun LocalChat(
     var input by rememberSaveable { mutableStateOf("") }
     var showSessions by rememberSaveable { mutableStateOf(false) }
     var attachmentError by remember { mutableStateOf<String?>(null) }
+    var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        var previousIndex = listState.firstVisibleItemIndex
+        var previousOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val movingTowardBottom = index > previousIndex || (index == previousIndex && offset > previousOffset)
+                val movingTowardTop = index < previousIndex || (index == previousIndex && offset < previousOffset)
+                if (movingTowardBottom && listState.canScrollBackward) scrollShortcut = "top"
+                if (movingTowardTop && listState.canScrollForward) scrollShortcut = "bottom"
+                if (!listState.canScrollBackward && scrollShortcut == "top") scrollShortcut = null
+                if (!listState.canScrollForward && scrollShortcut == "bottom") scrollShortcut = null
+                previousIndex = index
+                previousOffset = offset
+            }
+    }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -390,7 +416,12 @@ private fun LocalChat(
     }
 
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+        if (state.messages.isNotEmpty()) {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            if (lastVisible >= state.messages.lastIndex - 2) {
+                listState.animateScrollToItem(state.messages.lastIndex)
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding().background(colors.bgBase)) {
@@ -443,6 +474,36 @@ private fun LocalChat(
             }
         }
 
+        if (state.autoApproveMutations) {
+            Surface(
+                color = colors.warnTertiary,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("自动批准已开启", style = DsType.small13Strong, color = colors.warnLabel)
+                        Text(
+                            "当前会话中的文件写入、编辑和命令将直接执行。",
+                            style = DsType.caption11,
+                            color = colors.labelSecondary,
+                        )
+                    }
+                    DsButton(
+                        "关闭",
+                        onDisableAutoApprove,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
+            }
+        }
+
         if (state.plan.isNotEmpty()) {
             DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
                 Text("执行计划", style = DsType.small13Strong, color = colors.labelPrimary)
@@ -483,23 +544,56 @@ private fun LocalChat(
             )
         }
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            if (state.messages.isEmpty()) {
-                item { EmptyLocalHarness(state.workspacePath) }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = DsSpacing.medium,
+                    end = DsSpacing.medium,
+                    top = DsSpacing.comfortable,
+                    bottom = DsSpacing.xlarge,
+                ),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+            ) {
+                if (state.messages.isEmpty()) {
+                    item { EmptyLocalHarness(state.workspacePath) }
+                }
+                items(state.messages, key = { it.id }) { message ->
+                    LocalMessageRow(message)
+                }
+                if (state.running) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text(" 代理正在处理…", style = DsType.small13, color = colors.labelTertiary)
+                        }
+                    }
+                }
             }
-            items(state.messages, key = { it.id }) { message ->
-                LocalMessageRow(message)
-            }
-            if (state.running) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text(" 代理循环正在运行…", style = DsType.small13, color = colors.labelTertiary)
+
+            val shortcut = scrollShortcut
+            if (shortcut == "top" && listState.canScrollBackward) {
+                ScrollShortcut(
+                    text = "↑",
+                    description = "回到顶部",
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = DsSpacing.medium),
+                ) {
+                    scope.launch {
+                        listState.animateScrollToItem(0)
+                        scrollShortcut = null
+                    }
+                }
+            } else if (shortcut == "bottom" && listState.canScrollForward) {
+                ScrollShortcut(
+                    text = "↓",
+                    description = "直达底部",
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = DsSpacing.medium),
+                ) {
+                    scope.launch {
+                        val target = (state.messages.size - 1).coerceAtLeast(0)
+                        listState.animateScrollToItem(target)
+                        scrollShortcut = null
                     }
                 }
             }
@@ -538,7 +632,8 @@ private fun LocalChat(
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("交给手机上的 Harness…") },
+                placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
+                shape = RoundedCornerShape(20.dp),
                 minLines = 1,
                 maxLines = 5,
             )
@@ -581,7 +676,7 @@ private fun LocalChat(
         }
     }
 
-    state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny) }
+    state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny, onAutoApprove) }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
     if (showSessions) {
         DsDialog(title = "本机会话", onDismiss = { showSessions = false }) {
