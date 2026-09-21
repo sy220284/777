@@ -2,9 +2,17 @@ package com.labteto.dshmobile.interop.mcp
 
 import java.io.Closeable
 import java.io.File
+import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -15,10 +23,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 const val CURRENT_MCP_PROTOCOL_VERSION = "2026-07-28"
 const val LEGACY_MCP_PROTOCOL_VERSION = "2025-06-18"
@@ -120,7 +131,7 @@ class McpStreamableHttpTransport(
                 builder.header("Mcp-Name", encodeHeaderValue(it))
             }
 
-            http.newCall(builder.build()).execute().use { response ->
+            http.newCall(builder.build()).awaitResponseCancellable().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     throw McpHttpException(response.code, body)
@@ -151,67 +162,144 @@ class McpStdioTransport(
 ) : McpTransport {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
-    private var process: Process? = null
-    private var writer: java.io.BufferedWriter? = null
-    private var reader: java.io.BufferedReader? = null
+    private val lineProcess = McpLineProcess(command, workingDirectory)
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        withContext(Dispatchers.IO) {
-            ensureStarted()
-            val id = ids.getAndIncrement()
-            val payload = buildJsonObject {
-                put("jsonrpc", "2.0")
-                put("id", id)
-                put("method", method)
-                put(
-                    "params",
-                    params.withMetadata(
-                        protocolVersion = protocolVersion,
-                        clientName = clientName,
-                        clientVersion = clientVersion,
-                        clientCapabilities = JsonObject(emptyMap()),
-                    ),
-                )
-            }
-            writer!!.apply {
-                write(json.encodeToString(JsonObject.serializer(), payload))
-                newLine()
-                flush()
-            }
-            while (true) {
-                val line = reader!!.readLine() ?: error("MCP stdio 进程已结束")
-                if (line.isBlank()) continue
-                val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                    ?: continue
-                if (message["id"]?.jsonPrimitive?.content == id.toString()) {
-                    return@withContext message
-                }
-            }
-            error("不可达")
+        lineProcess.ensureStarted()
+        val id = ids.getAndIncrement()
+        val payload = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", id)
+            put("method", method)
+            put(
+                "params",
+                params.withMetadata(
+                    protocolVersion = protocolVersion,
+                    clientName = clientName,
+                    clientVersion = clientVersion,
+                    clientCapabilities = JsonObject(emptyMap()),
+                ),
+            )
         }
+        lineProcess.writeLine(json.encodeToString(JsonObject.serializer(), payload))
+        while (true) {
+            val line = lineProcess.readLine()
+            if (line.isBlank()) continue
+            val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                ?: continue
+            if (message["id"]?.jsonPrimitive?.content == id.toString()) return@withLock message
+        }
+        error("不可达")
     }
 
-    override fun close() {
-        runCatching { writer?.close() }
-        runCatching { reader?.close() }
-        process?.takeIf(Process::isAlive)?.destroyForcibly()
-        process = null
-        writer = null
-        reader = null
-    }
+    override fun close() = lineProcess.close()
+}
 
-    private fun ensureStarted() {
-        if (process?.isAlive == true) return
+internal class McpLineProcess(
+    private val command: List<String>,
+    private val workingDirectory: File? = null,
+) : Closeable {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var process: Process? = null
+    private var writer: java.io.BufferedWriter? = null
+    private var lines: Channel<String>? = null
+    private var readerJob: Job? = null
+    private var closed = false
+
+    /**
+     * Ensures a child process exists.
+     *
+     * @return true when a new process was started, including restart after a crash.
+     */
+    fun ensureStarted(): Boolean {
+        check(!closed) { "MCP stdio 传输已关闭" }
+        if (process?.isAlive == true) return false
+        resetProcess()
         require(command.isNotEmpty()) { "MCP stdio 命令不能为空" }
+
         val next = ProcessBuilder(command)
             .directory(workingDirectory)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
+        val channel = Channel<String>(Channel.UNLIMITED)
         process = next
         writer = next.outputStream.bufferedWriter()
-        reader = next.inputStream.bufferedReader()
+        lines = channel
+        readerJob = scope.launch {
+            try {
+                next.inputStream.bufferedReader().use { input ->
+                    while (true) {
+                        val line = input.readLine() ?: break
+                        if (channel.trySend(line).isFailure) break
+                    }
+                }
+                channel.close(IllegalStateException("MCP stdio 进程已结束"))
+            } catch (error: Throwable) {
+                channel.close(error)
+            }
+        }
+        return true
+    }
+
+    suspend fun writeLine(line: String) = withContext(Dispatchers.IO) {
+        val output = writer ?: error("MCP stdio 进程未启动")
+        output.write(line)
+        output.newLine()
+        output.flush()
+    }
+
+    suspend fun readLine(): String {
+        val channel = lines ?: error("MCP stdio 进程未启动")
+        val result = channel.receiveCatching()
+        return result.getOrNull()
+            ?: throw (result.exceptionOrNull() ?: IllegalStateException("MCP stdio 进程已结束"))
+    }
+
+    private fun resetProcess() {
+        readerJob?.cancel()
+        readerJob = null
+        runCatching { writer?.close() }
+        writer = null
+        lines?.cancel()
+        lines = null
+        process?.let { child ->
+            runCatching { child.inputStream.close() }
+            runCatching { child.errorStream.close() }
+            runCatching { child.outputStream.close() }
+            if (child.isAlive) child.destroyForcibly()
+        }
+        process = null
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        resetProcess()
+        scope.cancel()
     }
 }
+
+internal suspend fun Call.awaitResponseCancellable(): Response =
+    suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation { cancel() }
+        enqueue(
+            object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    val token = continuation.tryResumeWithException(error)
+                    if (token != null) continuation.completeResume(token)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val token = continuation.tryResume(response)
+                    if (token != null) {
+                        continuation.completeResume(token)
+                    } else {
+                        response.close()
+                    }
+                }
+            },
+        )
+    }
 
 private fun JsonObject.withMetadata(
     protocolVersion: String,
