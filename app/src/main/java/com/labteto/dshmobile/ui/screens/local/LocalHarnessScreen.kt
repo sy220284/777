@@ -113,7 +113,7 @@ fun LocalHarnessScreen(
     }
     BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
     BackHandler(enabled = state.pendingQuestion != null) { viewModel.answerQuestion("用户取消了问题") }
-    BackHandler(enabled = editingConfig && state.configured) { editingConfig = false }
+    BackHandler(enabled = editingConfig) { editingConfig = false }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -147,9 +147,9 @@ fun LocalHarnessScreen(
     ) {
         when {
             state.loading -> LoadingScreen()
-            !state.configured || editingConfig -> LocalConfiguration(
+            editingConfig -> LocalConfiguration(
                 state = state,
-                canCancel = state.configured,
+                canCancel = true,
                 onOpenMenu = { scope.launch { drawerState.open() } },
                 onCancel = { editingConfig = false },
                 onSave = { key, model, base ->
@@ -234,7 +234,7 @@ private fun LocalModeDrawer(
                 DsCategoryRow(
                     icon = Icons.Outlined.Computer,
                     title = "远程控制",
-                    subtitle = "通过局域网或安全中继连接电脑",
+                    subtitle = "通过安全中继配对并控制电脑",
                     onClick = onRemote,
                 )
             }
@@ -352,11 +352,6 @@ private fun LocalConfiguration(
                 "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。",
                 style = DsType.std14,
                 color = colors.labelSecondary,
-            )
-            Text(
-                "工作区：${state.workspacePath}",
-                style = DsType.xsmall12.copy(fontFamily = FontFamily.Monospace),
-                color = colors.labelTertiary,
             )
         }
 
@@ -540,8 +535,11 @@ private fun LocalChat(
                         Column {
                             Text("本机 Harness", style = DsType.std14Strong, color = colors.labelPrimary)
                             Text(
-                                state.model.removePrefix("deepseek-") +
-                                    if (state.running) " · 执行中" else " · 已就绪",
+                                when {
+                                    !state.configured -> "未配置 · 可稍后设置"
+                                    state.running -> state.model.removePrefix("deepseek-") + " · 执行中"
+                                    else -> state.model.removePrefix("deepseek-") + " · 已就绪"
+                                },
                                 style = DsType.caption11,
                                 color = colors.labelTertiary,
                             )
@@ -625,7 +623,7 @@ private fun LocalChat(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
                 if (state.messages.isEmpty()) {
-                    item { EmptyLocalHarness(state.workspacePath) }
+                    item { EmptyLocalHarness() }
                 }
                 items(state.messages, key = { it.id }) { message ->
                     LocalMessageRow(message)
@@ -709,6 +707,16 @@ private fun LocalChat(
                 onValueChange = { input = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
+                leadingIcon = {
+                    DsIconButton(
+                        icon = Icons.Filled.Add,
+                        contentDescription = "添加附件",
+                        onClick = { showAttachmentPicker = true },
+                        enabled = !state.running,
+                        tint = colors.labelPrimary,
+                        containerColor = colors.bgModulePlatform,
+                    )
+                },
                 shape = DsShapes.block,
                 minLines = 1,
                 maxLines = 5,
@@ -718,14 +726,6 @@ private fun LocalChat(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsIconButton(
-                    icon = Icons.Filled.Add,
-                    contentDescription = "添加附件",
-                    onClick = { showAttachmentPicker = true },
-                    enabled = !state.running,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.bgModulePlatform,
-                )
                 Spacer(Modifier.weight(1f))
                 if (state.running) {
                     DsButton("停止", onStop, variant = DsButtonVariant.Danger)
@@ -733,11 +733,15 @@ private fun LocalChat(
                     DsButton(
                         "发送",
                         onClick = {
-                            val text = input
-                            val selected = attachments.toList()
-                            input = ""
-                            attachments.clear()
-                            onSend(text, selected)
+                            if (!state.configured) {
+                                onConfigure()
+                            } else {
+                                val text = input
+                                val selected = attachments.toList()
+                                input = ""
+                                attachments.clear()
+                                onSend(text, selected)
+                            }
                         },
                         enabled = input.isNotBlank() || attachments.isNotEmpty(),
                     )
@@ -803,7 +807,7 @@ private fun ImportedAttachmentRow(
 }
 
 @Composable
-private fun EmptyLocalHarness(workspacePath: String) {
+private fun EmptyLocalHarness() {
     val colors = DsTheme.colors
     Column(
         Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = 64.dp),
@@ -817,11 +821,6 @@ private fun EmptyLocalHarness(workspacePath: String) {
             "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
             style = DsType.std14,
             color = colors.labelSecondary,
-        )
-        Text(
-            workspacePath,
-            style = DsType.caption11.copy(fontFamily = FontFamily.Monospace),
-            color = colors.labelDimmed,
         )
     }
 }
