@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,7 +29,7 @@ import com.labteto.dshmobile.ui.theme.DshTheme
 
 /**
  * Centered empty state: whale mark, hero headline, optional subtitle, a mono
- * "Preview" pill, and suggestion chips.
+ * product pill, and suggestion chips.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -40,11 +41,11 @@ fun EmptyHero(
 ) {
     val colors = DsTheme.colors
     Column(
-        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        WhaleMark(Modifier.size(64.dp))
+        WhaleMark(Modifier.size(72.dp).shadow(14.dp, CircleShape, clip = false))
         Text(
             headline,
             style = DsType.hero26,
@@ -60,7 +61,7 @@ fun EmptyHero(
             )
         }
         Text(
-            "Preview",
+            "DeepSeek Harness",
             style = DsType.xsmall12.copy(fontFamily = DsType.codeFont, color = colors.accent),
             color = colors.accent,
             modifier = Modifier

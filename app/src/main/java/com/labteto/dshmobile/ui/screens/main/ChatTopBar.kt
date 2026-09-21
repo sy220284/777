@@ -84,8 +84,8 @@ internal fun ChatTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .padding(horizontal = DsSpacing.tiny),
+                .heightIn(min = 64.dp)
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DsIconButton(
@@ -94,7 +94,10 @@ internal fun ChatTopBar(
                 onClick = onOpenDrawer,
                 tint = colors.labelSecondary,
                 iconSize = 18.dp,
+                containerColor = colors.bgLayer1,
+                shadowElevation = 3.dp,
             )
+            Spacer(Modifier.width(DsSpacing.small))
             ModelChip(models = models, onClick = onOpenModels, modifier = Modifier.weight(1f, fill = false))
             Spacer(Modifier.weight(1f))
             StateDot(if (running) StateDotState.Running else StateDotState.Idle)
@@ -105,6 +108,8 @@ internal fun ChatTopBar(
                     onClick = onOpenDetails,
                     tint = colors.labelTertiary,
                     iconSize = 18.dp,
+                    containerColor = colors.bgLayer1,
+                    shadowElevation = 3.dp,
                 )
             }
         }
@@ -183,12 +188,12 @@ private fun ModelChip(
     Row(
         modifier = modifier
             .widthIn(max = 240.dp)
-            .heightIn(min = 28.dp)
+            .heightIn(min = 44.dp)
             .clip(DsShapes.pillFull)
-            .background(colors.hoverSolid)
-            .border(1.dp, colors.borderL2, DsShapes.pillFull)
+            .background(colors.bgLayer1)
+            .border(1.dp, colors.borderL1, DsShapes.pillFull)
             .clickable(onClick = onClick)
-            .padding(horizontal = DsSpacing.compact, vertical = DsSpacing.tiny),
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {

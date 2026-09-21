@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,11 +29,17 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -51,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -66,9 +74,15 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.WhaleMark
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -183,58 +197,74 @@ private fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     ModalDrawerSheet(
-        drawerContainerColor = colors.bgLayer1,
+        drawerContainerColor = colors.sidebar,
         modifier = Modifier.safeDrawingPadding(),
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
         ) {
-            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
-            Text(
-                "默认在手机本机运行。向右滑动可随时打开这里。",
-                style = DsType.small13,
-                color = colors.labelTertiary,
-            )
-            Spacer(Modifier.height(DsSpacing.small))
-            NavigationDrawerItem(
-                label = { Text("本机 Harness") },
-                selected = true,
-                onClick = onLocal,
-            )
-            NavigationDrawerItem(
-                label = { Text("局域网 Harness") },
-                selected = false,
-                onClick = onLan,
-            )
-            NavigationDrawerItem(
-                label = { Text("中继连接") },
-                selected = false,
-                onClick = onRelay,
-            )
-            HorizontalDivider()
-            NavigationDrawerItem(
-                label = { Text("网络诊断") },
-                selected = false,
-                onClick = onNetworkDiagnostic,
-            )
-            NavigationDrawerItem(
-                label = { Text("环境能力") },
-                selected = false,
-                onClick = onEnvironment,
-            )
-            NavigationDrawerItem(
-                label = { Text("设置") },
-                selected = false,
-                onClick = onSettings,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WhaleMark(Modifier.size(44.dp))
+                Spacer(Modifier.size(DsSpacing.medium))
+                Column {
+                    Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
+                    Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
+                }
+            }
+            Text("运行方式", style = DsType.std14, color = colors.labelTertiary)
+            DsGroupCard {
+                DsCategoryRow(
+                    icon = Icons.Outlined.PhoneAndroid,
+                    title = "本机 Harness",
+                    subtitle = "完整能力在手机内运行",
+                    value = "当前",
+                    onClick = onLocal,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Computer,
+                    title = "局域网 Harness",
+                    subtitle = "连接同一网络内的电脑",
+                    onClick = onLan,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Cloud,
+                    title = "中继连接",
+                    subtitle = "加密连接远程电脑",
+                    onClick = onRelay,
+                )
+            }
+            Text("工具与偏好", style = DsType.std14, color = colors.labelTertiary)
+            DsGroupCard {
+                DsCategoryRow(
+                    icon = Icons.Outlined.NetworkCheck,
+                    title = "网络诊断",
+                    subtitle = "检查域名、代理与连通性",
+                    onClick = onNetworkDiagnostic,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Memory,
+                    title = "环境能力",
+                    subtitle = "查看手机可用命令与限制",
+                    onClick = onEnvironment,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Settings,
+                    title = "设置",
+                    subtitle = "外观、通知、连接与数据",
+                    onClick = onSettings,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun LoadingScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().background(DsTheme.colors.bgBase),
+        contentAlignment = Alignment.Center,
+    ) {
         CircularProgressIndicator(color = DsTheme.colors.brandPrimary)
     }
 }
@@ -254,17 +284,25 @@ private fun LocalConfiguration(
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
     Column(
-        Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(colors.bgBase).safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
             .padding(DsSpacing.xlarge),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DsButton("菜单", onOpenMenu, variant = DsButtonVariant.Ghost)
-            Text("本机 Harness", style = DsType.large20, color = colors.labelPrimary)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            DsIconButton(
+                icon = FeatherIcons.Menu,
+                contentDescription = "菜单",
+                onClick = onOpenMenu,
+                containerColor = colors.bgLayer1,
+                shadowElevation = 3.dp,
+            )
+            Text(
+                "本机 Harness",
+                style = DsType.large20,
+                color = colors.labelPrimary,
+                modifier = Modifier.weight(1f),
+            )
             if (canCancel) {
                 DsButton("取消", onCancel, variant = DsButtonVariant.Ghost)
             } else {
@@ -286,35 +324,38 @@ private fun LocalConfiguration(
             )
         }
 
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (state.configured) "新的 API 密钥" else "DeepSeek API 密钥") },
-            supportingText = {
-                Text(
-                    if (state.configured) "留空可保留现有密钥；新密钥仍由安卓系统密钥库加密。"
-                    else "密钥由安卓系统密钥库加密，不写入会话或工作区。",
-                )
-            },
-            visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-            Text("模型", style = DsType.std14Strong, color = colors.labelPrimary)
-            ModelChoice("deepseek-chat", "DeepSeek Chat｜工具执行", model) { model = it }
-            ModelChoice("deepseek-reasoner", "DeepSeek Reasoner｜深度推理", model) { model = it }
+        Text("模型与接口", style = DsType.std14, color = colors.labelTertiary)
+        DsGroupCard {
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (state.configured) "新的 API 密钥" else "DeepSeek API 密钥") },
+                supportingText = {
+                    Text(
+                        if (state.configured) "留空可保留现有密钥；新密钥仍由安卓系统密钥库加密。"
+                        else "密钥由安卓系统密钥库加密，不写入会话或工作区。",
+                    )
+                },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+            )
+            Spacer(Modifier.height(DsSpacing.medium))
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Text("模型", style = DsType.std14Strong, color = colors.labelPrimary)
+                ModelChoice("deepseek-chat", "DeepSeek Chat｜工具执行", model) { model = it }
+                ModelChoice("deepseek-reasoner", "DeepSeek Reasoner｜深度推理", model) { model = it }
+            }
+            Spacer(Modifier.height(DsSpacing.medium))
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("接口地址") },
+                supportingText = { Text("兼容 OpenAI 聊天补全协议的服务也可使用。") },
+                singleLine = true,
+            )
         }
-
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("接口地址") },
-            supportingText = { Text("兼容 OpenAI 聊天补全协议的服务也可使用。") },
-            singleLine = true,
-        )
 
         state.error?.let { Text(it, style = DsType.small13, color = colors.error) }
 
@@ -432,46 +473,61 @@ private fun LocalChat(
 
     Column(Modifier.fillMaxSize().safeDrawingPadding().background(colors.bgBase)) {
         Column(
-            Modifier.fillMaxWidth().background(colors.bgLayer1)
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            Modifier.fillMaxWidth().background(colors.bgBase)
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsButton("菜单", onOpenMenu, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("本机 Harness", style = DsType.base16Strong, color = colors.labelPrimary)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                DsIconButton(
+                    icon = FeatherIcons.Menu,
+                    contentDescription = "菜单",
+                    onClick = onOpenMenu,
+                    tint = colors.labelPrimary,
+                    containerColor = colors.bgLayer1,
+                    shadowElevation = 3.dp,
+                )
+                Spacer(Modifier.width(DsSpacing.small))
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = colors.bgLayer1,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.weight(1f, fill = false),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         StateDot(if (state.running) StateDotState.Running else StateDotState.Done)
-                        Text(
-                            if (state.running) " 执行中" else " 已就绪",
-                            style = DsType.caption11,
-                            color = colors.labelTertiary,
-                        )
+                        Spacer(Modifier.width(DsSpacing.small))
+                        Column {
+                            Text("本机 Harness", style = DsType.std14Strong, color = colors.labelPrimary)
+                            Text(
+                                state.model.removePrefix("deepseek-") +
+                                    if (state.running) " · 执行中" else " · 已就绪",
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                        }
                     }
                 }
-                DsButton("新建", onNewSession, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                Spacer(Modifier.weight(1f))
+                DsIconButton(
+                    icon = Icons.Filled.Add,
+                    contentDescription = "新建会话",
+                    onClick = onNewSession,
+                    tint = colors.labelPrimary,
+                    containerColor = colors.bgLayer1,
+                    shadowElevation = 3.dp,
+                )
             }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = colors.bgModulePlatform,
-                ) {
-                    Text(
-                        state.model.removePrefix("deepseek-"),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    )
-                }
-                Spacer(Modifier.weight(1f))
                 DsButton(
                     if (state.planMode) "规划中" else "规划",
                     { onPlanModeChange(!state.planMode) },
@@ -487,6 +543,7 @@ private fun LocalChat(
                     enabled = !state.running,
                 )
                 DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                Spacer(Modifier.weight(1f))
             }
         }
 
@@ -602,7 +659,13 @@ private fun LocalChat(
         }
 
         Column(
-            Modifier.fillMaxWidth().background(colors.bgLayer1).padding(DsSpacing.medium),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
+                .shadow(8.dp, DsShapes.composer, clip = false)
+                .clip(DsShapes.composer)
+                .background(colors.composerCard)
+                .padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             if (attachments.isNotEmpty()) {
@@ -618,7 +681,7 @@ private fun LocalChat(
                 onValueChange = { input = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
-                shape = RoundedCornerShape(20.dp),
+                shape = DsShapes.block,
                 minLines = 1,
                 maxLines = 5,
             )
@@ -712,11 +775,13 @@ private fun ImportedAttachmentRow(
 private fun EmptyLocalHarness(workspacePath: String) {
     val colors = DsTheme.colors
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium, vertical = 48.dp),
+        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Text("今天想做点什么？", style = DsType.display24, color = colors.labelPrimary)
+        WhaleMark(Modifier.size(72.dp).shadow(14.dp, CircleShape, clip = false))
+        Spacer(Modifier.height(DsSpacing.medium))
+        Text("今天想让手机做点什么？", style = DsType.display24, color = colors.labelPrimary)
         Text(
             "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
             style = DsType.std14,

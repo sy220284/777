@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -19,9 +20,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 /**
  * A grouped surface: rounded, filled, hairline-bordered.
  *
- * The border is not decoration. In the light theme `bgBase` and `bgLayer1` are both pure white, so
- * a card drawn with fill alone is invisible — the only thing separating it from the page is its
- * edge.
+ * A quiet edge and one-dp lift keep it distinct from the neutral page canvas in both themes.
  */
 @Composable
 fun DsCard(
@@ -34,11 +33,12 @@ fun DsCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .shadow(1.dp, DsShapes.block, clip = false)
             .clip(DsShapes.block)
             .background(colors.bgLayer1)
-            .border(1.dp, colors.borderL2, DsShapes.block)
+            .border(1.dp, colors.borderL1, DsShapes.block)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
         verticalArrangement = verticalArrangement,
         content = content,
     )
