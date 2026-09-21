@@ -34,11 +34,7 @@ class AndroidProcessRuntime(
         val resolvedCommand = resolveCommand(request.command)
         val process = ProcessBuilder(resolvedCommand)
             .directory(workingDirectory)
-            .apply {
-                environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
-                environment().putAll(baseEnvironment())
-                environment().putAll(request.environment)
-            }
+            .apply { environment().putAll(processEnvironment(request.environment)) }
             .start()
 
         try {
@@ -76,7 +72,14 @@ class AndroidProcessRuntime(
         }
     }
 
-    private fun resolveCommand(command: List<String>): List<String> {
+    fun processEnvironment(overrides: Map<String, String> = emptyMap()): Map<String, String> =
+        buildMap {
+            put("PATH", searchPaths().joinToString(File.pathSeparator) { it.path })
+            putAll(baseEnvironment())
+            putAll(overrides)
+        }
+
+    fun resolveCommand(command: List<String>): List<String> {
         val executable = command.first()
         if (executable.contains(File.separatorChar)) return command
         val resolved = searchPaths()

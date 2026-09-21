@@ -162,10 +162,17 @@ class McpStdioTransport(
     private val protocolVersion: String = CURRENT_MCP_PROTOCOL_VERSION,
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
+    private val commandResolver: (List<String>) -> List<String> = { it },
+    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : McpTransport {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
-    private val lineProcess = McpLineProcess(command, workingDirectory)
+    private val lineProcess = McpLineProcess(
+        command = command,
+        workingDirectory = workingDirectory,
+        commandResolver = commandResolver,
+        environmentProvider = environmentProvider,
+    )
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
         try {
@@ -206,6 +213,8 @@ class McpStdioTransport(
 internal class McpLineProcess(
     private val command: List<String>,
     private val workingDirectory: File? = null,
+    private val commandResolver: (List<String>) -> List<String> = { it },
+    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : Closeable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var process: Process? = null
@@ -225,9 +234,12 @@ internal class McpLineProcess(
         resetProcess()
         require(command.isNotEmpty()) { "MCP stdio 命令不能为空" }
 
-        val next = ProcessBuilder(command)
+        val resolvedCommand = commandResolver(command)
+        require(resolvedCommand.isNotEmpty()) { "MCP stdio 解析后的命令不能为空" }
+        val next = ProcessBuilder(resolvedCommand)
             .directory(workingDirectory)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .apply { environment().putAll(environmentProvider()) }
             .start()
         val channel = Channel<String>(Channel.UNLIMITED)
         process = next

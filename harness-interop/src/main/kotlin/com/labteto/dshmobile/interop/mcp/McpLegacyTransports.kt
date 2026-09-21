@@ -399,10 +399,17 @@ class McpLegacyStdioTransport(
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
     private val protocolVersion: String = LEGACY_MCP_PROTOCOL_VERSION,
+    private val commandResolver: (List<String>) -> List<String> = { it },
+    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : McpTransport {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
-    private val lineProcess = McpLineProcess(command, workingDirectory)
+    private val lineProcess = McpLineProcess(
+        command = command,
+        workingDirectory = workingDirectory,
+        commandResolver = commandResolver,
+        environmentProvider = environmentProvider,
+    )
     private var initialized = false
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
@@ -481,18 +488,24 @@ class McpNegotiatingStdioTransport(
     command: List<String>,
     json: Json,
     workingDirectory: File? = null,
+    commandResolver: (List<String>) -> List<String> = { it },
+    environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : McpTransport {
     private val current = McpLegacyStdioTransport(
         command = command,
         json = json,
         workingDirectory = workingDirectory,
         protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+        commandResolver = commandResolver,
+        environmentProvider = environmentProvider,
     )
     private val legacy = McpLegacyStdioTransport(
         command = command,
         json = json,
         workingDirectory = workingDirectory,
         protocolVersion = LEGACY_MCP_PROTOCOL_VERSION,
+        commandResolver = commandResolver,
+        environmentProvider = environmentProvider,
     )
     private val selectionMutex = Mutex()
     @Volatile private var selected: McpTransport? = null

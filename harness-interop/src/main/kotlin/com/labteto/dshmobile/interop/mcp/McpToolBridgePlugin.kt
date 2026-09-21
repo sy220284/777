@@ -32,11 +32,19 @@ class McpToolBridgePlugin(
     private val http: OkHttpClient,
     private val json: Json,
     private val workspaceRoot: File? = null,
+    private val stdioCommandResolver: (List<String>) -> List<String> = { it },
+    private val stdioEnvironmentProvider: () -> Map<String, String> = { emptyMap() },
     private val transportFactory: (String) -> McpTransport = { endpoint ->
         McpNegotiatingHttpTransport(endpoint, http, json)
     },
     private val stdioTransportFactory: (List<String>, File?) -> McpTransport = { command, workingDirectory ->
-        McpNegotiatingStdioTransport(command, json, workingDirectory)
+        McpNegotiatingStdioTransport(
+            command = command,
+            json = json,
+            workingDirectory = workingDirectory,
+            commandResolver = stdioCommandResolver,
+            environmentProvider = stdioEnvironmentProvider,
+        )
     },
 ) : HarnessPlugin {
     override val id: String = "mcp-bridge"
