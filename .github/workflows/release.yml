@@ -35,14 +35,23 @@ jobs:
             exit 1
           fi
 
-          KEYSTORE_VALUE="$KEYSTORE_B64"
-          KEYSTORE_VALUE="${KEYSTORE_VALUE#RELEASE_KEYSTORE=}"
+          extract_secret() {
+            raw="$1"
+            key="$2"
+            matched="$(printf '%s\n' "$raw" | sed -n "s/^${key}=//p" | head -n 1)"
+            if [ -n "$matched" ]; then
+              printf '%s' "$matched"
+            else
+              printf '%s' "$raw"
+            fi
+          }
+
+          KEYSTORE_VALUE="$(extract_secret "$KEYSTORE_B64" "RELEASE_KEYSTORE")"
           KEYSTORE_VALUE="${KEYSTORE_VALUE#\"}"
           KEYSTORE_VALUE="${KEYSTORE_VALUE%\"}"
           printf '%s' "$KEYSTORE_VALUE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-          PASSWORD_VALUE="$RELEASE_PASSWORD"
-          PASSWORD_VALUE="${PASSWORD_VALUE#RELEASE_KEY_PASSWORD=}"
+          PASSWORD_VALUE="$(extract_secret "$RELEASE_PASSWORD" "RELEASE_KEY_PASSWORD")"
           PASSWORD_VALUE="${PASSWORD_VALUE#\"}"
           PASSWORD_VALUE="${PASSWORD_VALUE%\"}"
           PASSWORD_VALUE="$(printf '%s' "$PASSWORD_VALUE" | tr -d '\r\n')"
