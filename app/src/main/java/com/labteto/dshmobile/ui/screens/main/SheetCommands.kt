@@ -77,7 +77,7 @@ internal fun CommandSheet(
     val filteredSkills = remember(skills, query) { skills.filterByQuery(query) { it.name to it.description } }
     val searchable = commands.size + skills.size > 12
 
-    DsBottomSheet(title = stringResource(R.string.chat_composer_commands), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chat_context_tools), onDismiss = onDismiss) {
         // High-frequency sources sit in thumb-sized tiles; deeper capabilities remain grouped
         // below, matching the hierarchy of the refreshed mobile home.
         Row(
