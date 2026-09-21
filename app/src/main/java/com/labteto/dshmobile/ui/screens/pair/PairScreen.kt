@@ -61,6 +61,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 fun PairScreen(
     onClose: () -> Unit,
     prefillUrl: String? = null,
+    onPaired: (() -> Unit)? = null,
     viewModel: PairViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,7 +76,7 @@ fun PairScreen(
     LaunchedEffect(state.paired) {
         if (state.paired != null) {
             viewModel.acknowledgePaired()
-            onClose()
+            onPaired?.invoke() ?: onClose()
         }
     }
 
