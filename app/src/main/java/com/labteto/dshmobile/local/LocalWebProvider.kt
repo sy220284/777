@@ -327,7 +327,9 @@ class LocalWebProvider @Inject constructor(
 
     private fun looksLikeIpLiteral(host: String): Boolean =
         host.contains(':') || host.split('.').let { parts ->
-            parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }
+            parts.size == 4 && parts.all { part ->
+                part.toIntOrNull()?.let { value -> value in 0..255 } == true
+            }
         }
 
     private fun blockedHint(host: String, blocked: List<InetAddress>, vpn: Boolean): String {
