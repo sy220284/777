@@ -210,6 +210,25 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /** Persist execution limits exposed from Settings. */
+    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
+        val main = mainMaxSteps.coerceIn(4, 128)
+        val subagent = subagentMaxSteps.coerceIn(1, 40)
+        val attempts = modelAttempts.coerceIn(1, 5)
+        preferences.edit()
+            .putInt(KEY_MAIN_MAX_STEPS, main)
+            .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
+            .putInt(KEY_MODEL_ATTEMPTS, attempts)
+            .apply()
+        _state.update {
+            it.copy(
+                mainMaxSteps = main,
+                subagentMaxSteps = subagent,
+                modelAttempts = attempts,
+            )
+        }
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
@@ -439,6 +458,7 @@ class LocalHarnessEngine @Inject constructor(
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
         var requestPrepared = false
+        val mainMaxSteps = _state.value.mainMaxSteps
 
         val loop = AgentLoop(
             model = AgentModel {
@@ -536,7 +556,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnStepLimit -> {
-                        appendMessage("system", "本轮达到 $MAX_STEPS 步安全上限，请继续发送消息以恢复任务。")
+                        appendMessage("system", "本轮达到 $mainMaxSteps 步安全上限，请继续发送消息以恢复任务。")
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
                             put("steps", event.steps)
@@ -558,7 +578,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                 }
             },
-            maxSteps = MAX_STEPS,
+            maxSteps = mainMaxSteps,
         )
 
         try {
@@ -734,7 +754,7 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = args.optionalString("model")
-                val maxSteps = args.int("max_steps", MAX_SUBAGENT_STEPS).coerceIn(1, MAX_CONFIGURABLE_SUBAGENT_STEPS)
+                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 40)
                 if (args.boolean("run_in_background", false)) {
                     jobs.start("子代理：${task.take(100)}") { jobId, _ ->
                         runSubagent(
@@ -759,7 +779,7 @@ class LocalHarnessEngine @Inject constructor(
                     args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
-                    maxSteps = MAX_SUBAGENT_STEPS,
+                    maxSteps = _state.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
             "list_agents" -> jobs.listAgents()
@@ -893,13 +913,13 @@ class LocalHarnessEngine @Inject constructor(
         allowMutation: Boolean,
         backgroundJobId: String? = null,
         modelOverride: String? = null,
-        maxSteps: Int = MAX_SUBAGENT_STEPS,
+        maxSteps: Int = _state.value.subagentMaxSteps,
     ): String {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val key = apiKeys.get() ?: return "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
         val history = if (inheritHistory) modelHistory.toMutableList() else mutableListOf()
         val progress = ArrayDeque<String>()
-        val stepLimit = maxSteps.coerceIn(1, MAX_CONFIGURABLE_SUBAGENT_STEPS)
+        val stepLimit = maxSteps.coerceIn(1, 40)
         val snapshot = _state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
         val tools = if (allowMutation) SUBAGENT_TOOLS else READ_ONLY_TOOLS
@@ -1031,7 +1051,7 @@ class LocalHarnessEngine @Inject constructor(
                     append("\n已完成的最近进度：\n")
                     append(partial)
                 }
-                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 $MAX_CONFIGURABLE_SUBAGENT_STEPS。")
+                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 40。")
             }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
@@ -1067,7 +1087,8 @@ class LocalHarnessEngine @Inject constructor(
         step: Int,
     ): LocalModelReply {
         var lastError: LocalModelException? = null
-        repeat(MAX_MODEL_ATTEMPTS) { attempt ->
+        val maxAttempts = _state.value.modelAttempts.coerceIn(1, 5)
+        repeat(maxAttempts) { attempt ->
             try {
                 return modelClient.complete(key, baseUrl, model, history, tools)
             } catch (cancelled: CancellationException) {
@@ -1075,7 +1096,7 @@ class LocalHarnessEngine @Inject constructor(
                 throw cancelled
             } catch (error: LocalModelException) {
                 lastError = error
-                if (!error.retryable || attempt == MAX_MODEL_ATTEMPTS - 1) throw error
+                if (!error.retryable || attempt == maxAttempts - 1) throw error
                 eventLog.append("subagent/retry", buildJsonObject {
                     put("agent_id", subagentId)
                     put("step", step)
@@ -1194,7 +1215,7 @@ class LocalHarnessEngine @Inject constructor(
                     prompt,
                     inheritHistory = false,
                     allowMutation = false,
-                    maxSteps = MAX_SUBAGENT_STEPS,
+                    maxSteps = _state.value.subagentMaxSteps,
                 )
                 previous = result
                 "阶段 ${index + 1}：$task\n$result"
@@ -1206,7 +1227,7 @@ class LocalHarnessEngine @Inject constructor(
                 indexed.value,
                 inheritHistory = false,
                 allowMutation = false,
-                maxSteps = MAX_SUBAGENT_STEPS,
+                maxSteps = _state.value.subagentMaxSteps,
             )
             "子任务 ${indexed.index + 1}：${indexed.value}\n$result"
         }.mapIndexed { index, result ->
@@ -1237,7 +1258,8 @@ class LocalHarnessEngine @Inject constructor(
         messages: List<JsonObject>,
     ): LocalModelReply {
         var lastError: Exception? = null
-        repeat(MAX_MODEL_ATTEMPTS) { attempt ->
+        val maxAttempts = snapshot.modelAttempts.coerceIn(1, 5)
+        repeat(maxAttempts) { attempt ->
             eventLog.append("request/header", buildJsonObject {
                 put("model", snapshot.model); put("base_url", snapshot.baseUrl); put("attempt", attempt + 1)
                 put("message_count", messages.size)
@@ -1255,7 +1277,7 @@ class LocalHarnessEngine @Inject constructor(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 val retryable = (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-                if (!retryable || attempt == MAX_MODEL_ATTEMPTS - 1) throw error
+                if (!retryable || attempt == maxAttempts - 1) throw error
                 lastError = error
                 delay(1_000L shl attempt)
             }
@@ -1378,6 +1400,9 @@ class LocalHarnessEngine @Inject constructor(
             configured = apiKeys.get() != null,
             model = model,
             baseUrl = baseUrl,
+            mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
+            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 40),
+            modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             workspacePath = workspace.path,
             sessionId = sessionId,
             sessions = sessionSummaries(),
@@ -1506,13 +1531,15 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MODEL = "model"
         const val KEY_BASE_URL = "base_url"
         const val KEY_SESSION_ID = "session_id"
+        const val KEY_MAIN_MAX_STEPS = "main_max_steps"
+        const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
+        const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val DEFAULT_MODEL = "deepseek-chat"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-        const val MAX_STEPS = 16
-        const val MAX_SUBAGENT_STEPS = 20
-        const val MAX_CONFIGURABLE_SUBAGENT_STEPS = 40
+        const val DEFAULT_MAIN_MAX_STEPS = 16
+        const val DEFAULT_SUBAGENT_MAX_STEPS = 20
+        const val DEFAULT_MODEL_ATTEMPTS = 3
         const val SUBAGENT_PROGRESS_ITEMS = 6
-        const val MAX_MODEL_ATTEMPTS = 3
         const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
