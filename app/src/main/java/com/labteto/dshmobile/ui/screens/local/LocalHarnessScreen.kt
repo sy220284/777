@@ -984,7 +984,7 @@ private fun NetworkDiagnosticDialog(
     var running by remember { mutableStateOf(false) }
     DsDialog(title = "网络诊断", onDismiss = onDismiss) {
         Text(
-            "检查实际解析地址、系统代理、VPN/TUN，以及是否被安全策略主动拦截。",
+            "检查实际解析地址、系统代理、VPN/TUN、安全策略，并发起受限 HTTP/TLS 探测验证真实连通性。",
             style = DsType.small13,
             color = colors.labelSecondary,
         )
