@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local
 
-import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
