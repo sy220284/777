@@ -902,6 +902,8 @@ class LocalHarnessEngine @Inject constructor(
         val snapshot = _state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
         val tools = if (allowMutation) SUBAGENT_TOOLS else READ_ONLY_TOOLS
+        val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+        var modelStep = 0
 
         eventLog.append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
@@ -925,55 +927,103 @@ class LocalHarnessEngine @Inject constructor(
             }
             history += buildJsonObject { put("role", "user"); put("content", task) }
 
-            repeat(stepLimit) { stepIndex ->
-                val step = stepIndex + 1
-                backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
-                    history += buildJsonObject { put("role", "user"); put("content", message) }
-                }
-
-                val reply = completeSubagentStep(
-                    key = key,
-                    baseUrl = snapshot.baseUrl,
-                    model = routeModel,
-                    history = history,
-                    tools = tools,
-                    subagentId = subagentId,
-                    step = step,
-                )
-                history += reply.message
-                reply.content?.takeIf(String::isNotBlank)?.let { content ->
-                    rememberSubagentProgress(progress, "第 $step 步回复：${content.take(1_500)}")
-                }
-                if (reply.toolCalls.isEmpty()) {
-                    val result = reply.content ?: "子代理已结束，但没有返回文字。"
-                    eventLog.append("subagent/end", buildJsonObject {
-                        put("agent_id", subagentId)
-                        put("status", "completed")
-                        put("steps", step)
-                    })
-                    return result
-                }
-
-                reply.toolCalls.forEach { call ->
-                    val result = executeSafely(call, allowMutation = allowMutation)
-                    rememberSubagentProgress(
-                        progress,
-                        "第 $step 步 · ${call.name}：${result.take(1_500)}",
-                    )
-                    history += buildJsonObject {
-                        put("role", "tool")
-                        put("tool_call_id", call.id)
-                        put("content", pruneToolResult(result))
+            val loop = AgentLoop(
+                model = AgentModel {
+                    backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
+                        history += buildJsonObject {
+                            put("role", "user")
+                            put("content", message)
+                        }
                     }
-                }
+                    modelStep += 1
+                    val reply = completeSubagentStep(
+                        key = key,
+                        baseUrl = snapshot.baseUrl,
+                        model = routeModel,
+                        history = history.toList(),
+                        tools = tools,
+                        subagentId = subagentId,
+                        step = modelStep,
+                    )
+                    repliesByStep[modelStep] = reply
+                    AgentModelReply(
+                        content = reply.content.orEmpty(),
+                        toolCalls = reply.toolCalls.map { call ->
+                            AgentToolCall(
+                                id = call.id,
+                                name = call.name,
+                                arguments = call.arguments,
+                                rawArguments = call.rawArguments,
+                            )
+                        },
+                    )
+                },
+                tools = AgentToolExecutor { call ->
+                    executeSafely(call.toLocalToolCall(), allowMutation = allowMutation)
+                },
+                eventSink = AgentEventSink { event ->
+                    when (event) {
+                        is AgentEvent.AssistantObserved -> {
+                            val reply = repliesByStep.remove(event.step)
+                                ?: error("缺少子代理第 ${event.step} 步模型响应")
+                            history += reply.message
+                            reply.content?.takeIf(String::isNotBlank)?.let { content ->
+                                rememberSubagentProgress(
+                                    progress,
+                                    "第 ${event.step} 步回复：${content.take(1_500)}",
+                                )
+                            }
+                        }
+                        is AgentEvent.ToolFinished -> {
+                            rememberSubagentProgress(
+                                progress,
+                                "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
+                            )
+                            history += buildJsonObject {
+                                put("role", "tool")
+                                put("tool_call_id", event.call.id)
+                                put("content", pruneToolResult(event.output))
+                            }
+                        }
+                        is AgentEvent.TurnCompleted -> {
+                            eventLog.append("subagent/end", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("status", "completed")
+                                put("steps", event.steps)
+                            })
+                        }
+                        is AgentEvent.TurnStepLimit -> {
+                            eventLog.append("subagent/end", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("status", "step_limit")
+                                put("steps", event.steps)
+                            })
+                        }
+                        is AgentEvent.TurnCancelled -> {
+                            eventLog.append("subagent/end", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("status", "cancelled")
+                            })
+                        }
+                        is AgentEvent.TurnFailed -> {
+                            eventLog.append("subagent/end", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("status", "failed")
+                                put("detail", event.reason.take(2_000))
+                            })
+                        }
+                        else -> Unit
+                    }
+                },
+                maxSteps = stepLimit,
+            )
+
+            val result = loop.run(task)
+            if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
+                return result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
             }
 
             val partial = progress.joinToString("\n")
-            eventLog.append("subagent/end", buildJsonObject {
-                put("agent_id", subagentId)
-                put("status", "step_limit")
-                put("steps", stepLimit)
-            })
             return buildString {
                 append("[subagent][$subagentId][STEP_LIMIT] 达到 $stepLimit 步上限，任务未完整结束。")
                 if (partial.isNotBlank()) {
@@ -985,11 +1035,6 @@ class LocalHarnessEngine @Inject constructor(
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             val partial = progress.joinToString("\n")
-            eventLog.append("subagent/end", buildJsonObject {
-                put("agent_id", subagentId)
-                put("status", "cancelled")
-                put("detail", cancelled.message ?: "cancelled")
-            })
             return buildString {
                 append("[subagent][$subagentId][TASK_CANCELLED] 子代理自身被取消；同批其他子代理不会被级联取消。")
                 cancelled.message?.takeIf(String::isNotBlank)?.let { append("\n原因：$it") }
@@ -997,12 +1042,6 @@ class LocalHarnessEngine @Inject constructor(
             }
         } catch (error: LocalModelException) {
             val partial = progress.joinToString("\n")
-            eventLog.append("subagent/end", buildJsonObject {
-                put("agent_id", subagentId)
-                put("status", "failed")
-                put("code", error.code)
-                put("detail", error.message ?: "")
-            })
             return buildString {
                 append("[subagent][$subagentId][${error.code}] 模型阶段失败：${error.message}")
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
@@ -1010,12 +1049,6 @@ class LocalHarnessEngine @Inject constructor(
             }
         } catch (error: Exception) {
             val partial = progress.joinToString("\n")
-            eventLog.append("subagent/end", buildJsonObject {
-                put("agent_id", subagentId)
-                put("status", "failed")
-                put("code", "SUBAGENT_ERROR")
-                put("detail", error.message ?: error::class.java.simpleName)
-            })
             return buildString {
                 append("[subagent][$subagentId][SUBAGENT_ERROR] ${error.message ?: error::class.java.simpleName}")
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
