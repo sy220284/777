@@ -128,6 +128,7 @@ class AgentLoop(
     private val toolBatch: AgentToolBatchExecutor = AgentToolBatchExecutor { calls ->
         calls.map { tools.execute(it) }
     },
+    private val isParallelTool: (AgentToolCall) -> Boolean = { false },
     private val eventSink: AgentEventSink = AgentEventSink { },
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
@@ -180,21 +181,43 @@ class AgentLoop(
                     )
                 }
 
-                reply.toolCalls.forEach { call ->
-                    eventSink.append(AgentEvent.ToolStarted(turnId, step, call))
-                }
-                val outputs = toolBatch.execute(reply.toolCalls)
-                require(outputs.size == reply.toolCalls.size) {
-                    "工具批次结果数量不匹配：调用 ${reply.toolCalls.size}，结果 ${outputs.size}"
-                }
-                reply.toolCalls.zip(outputs).forEach { (call, output) ->
-                    eventSink.append(AgentEvent.ToolFinished(turnId, step, call, output))
-                    messages += AgentMessage(
-                        role = "tool",
-                        content = output,
-                        toolCallId = call.id,
-                        toolName = call.name,
-                    )
+                var callIndex = 0
+                while (callIndex < reply.toolCalls.size) {
+                    val first = reply.toolCalls[callIndex]
+                    if (!isParallelTool(first)) {
+                        eventSink.append(AgentEvent.ToolStarted(turnId, step, first))
+                        val output = tools.execute(first)
+                        eventSink.append(AgentEvent.ToolFinished(turnId, step, first, output))
+                        messages += AgentMessage(
+                            role = "tool",
+                            content = output,
+                            toolCallId = first.id,
+                            toolName = first.name,
+                        )
+                        callIndex += 1
+                        continue
+                    }
+
+                    val group = reply.toolCalls
+                        .drop(callIndex)
+                        .takeWhile(isParallelTool)
+                    group.forEach { call ->
+                        eventSink.append(AgentEvent.ToolStarted(turnId, step, call))
+                    }
+                    val outputs = toolBatch.execute(group)
+                    require(outputs.size == group.size) {
+                        "工具批次结果数量不匹配：调用 ${group.size}，结果 ${outputs.size}"
+                    }
+                    group.zip(outputs).forEach { (call, output) ->
+                        eventSink.append(AgentEvent.ToolFinished(turnId, step, call, output))
+                        messages += AgentMessage(
+                            role = "tool",
+                            content = output,
+                            toolCallId = call.id,
+                            toolName = call.name,
+                        )
+                    }
+                    callIndex += group.size
                 }
                 eventSink.append(AgentEvent.StepFinished(turnId, step))
             }
