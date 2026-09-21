@@ -155,13 +155,15 @@ async function main(): Promise<void> {
   })
 
   const ctx = new Context()
-  await ctx.plugin(LlmRuntime)
-  await ctx.plugin(SessionStore)
-  await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime)
-  await ctx.plugin(AgentRegistry)
-  await ctx.plugin(AgentLoop, { agents: [] })
+  const fibers = [
+    await ctx.plugin(LlmRuntime),
+    await ctx.plugin(SessionStore),
+    await ctx.plugin(SessionProjectionRegistry),
+    await ctx.plugin(SystemPrompt),
+    await ctx.plugin(ToolRuntime),
+    await ctx.plugin(AgentRegistry),
+    await ctx.plugin(AgentLoop, { agents: [] }),
+  ]
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
 
   const toolNames = new Set(
@@ -191,7 +193,7 @@ async function main(): Promise<void> {
   await waitForIdle(ctx, agent)
 
   process.stdout.write(`${JSON.stringify(canonicalize(agent.session.snapshotEvents()), null, 2)}\n`)
-  await ctx.dispose()
+  for (const fiber of fibers.reverse()) await fiber.dispose()
 }
 
 await main()
