@@ -19,7 +19,7 @@ class LocalToolCatalogTest {
             names.containsAll(
                 setOf(
                     "read", "write", "edit", "glob", "grep", "bash", "job_list",
-                    "web_search", "web_fetch", "network_diagnose", "environment_info",
+                    "web_search", "web_fetch", "json_query", "network_diagnose", "environment_info",
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
                     "session_search", "session_event_search", "session_trace",
@@ -43,5 +43,19 @@ class LocalToolCatalogTest {
 
         assertEquals(setOf("parallel", "pipeline"), modes.toSet())
         assertTrue("model" in subagentProperties)
+        assertTrue("max_steps" in subagentProperties)
+    } 
+    @Test
+    fun webFetchExposesBoundedLargeResponseControls() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val properties = functions.getValue("web_fetch").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertTrue("max_bytes" in properties)
+        assertTrue("format" in properties)
+        assertTrue("run_in_background" in properties)
     }
+
 }
