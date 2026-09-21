@@ -4,9 +4,9 @@ import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.intOrNull
 
 @Serializable
 data class SessionDocument(
@@ -20,6 +20,7 @@ data class SessionLoadResult(
     val document: SessionDocument,
     val migrated: Boolean,
     val legacy: Boolean,
+    val recovered: Boolean = false,
 )
 
 class FutureSessionVersionException(version: Int, current: Int) :
@@ -72,42 +73,38 @@ class VersionedSessionStore(
     fun read(id: String): SessionLoadResult? {
         val file = fileFor(id)
         if (!file.isFile) return null
-        val element = json.parseToJsonElement(file.readText()).jsonObject
-        val wrappedVersion = element["formatVersion"]?.jsonPrimitive?.intOrNull
-        val legacy = wrappedVersion == null
-        val version = wrappedVersion ?: 0
-        if (version > migrations.currentVersion) {
-            throw FutureSessionVersionException(version, migrations.currentVersion)
+        return try {
+            readFromFile(id, file)
+        } catch (future: FutureSessionVersionException) {
+            throw future
+        } catch (primaryError: Exception) {
+            val backup = backupFor(id)
+            if (!backup.isFile) throw primaryError
+            val recovered = try {
+                readFromFile(id, backup)
+            } catch (future: FutureSessionVersionException) {
+                throw future
+            } catch (_: Exception) {
+                throw primaryError
+            }
+            runCatching { file.copyTo(corruptFor(id), overwrite = true) }
+            atomicWrite(file, backup.readText())
+            recovered.copy(recovered = true)
         }
-        val payload = if (legacy) {
-            element
-        } else {
-            element["payload"]?.jsonObject ?: error("会话文档缺少 payload：$id")
-        }
-        val migratedPayload = migrations.migrate(version, payload)
-        val updatedAt = if (legacy) {
-            file.lastModified().takeIf { it > 0L } ?: clock()
-        } else {
-            element["updatedAt"]?.jsonPrimitive?.content?.toLongOrNull() ?: file.lastModified()
-        }
-        return SessionLoadResult(
-            document = SessionDocument(
-                formatVersion = migrations.currentVersion,
-                id = id,
-                updatedAt = updatedAt,
-                payload = migratedPayload,
-            ),
-            migrated = version != migrations.currentVersion,
-            legacy = legacy,
-        )
     }
+
+    fun repair(id: String): SessionLoadResult? = read(id)
 
     fun write(id: String, payload: JsonObject, updatedAt: Long = clock()): SessionDocument {
         validateId(id)
+        val source = fileFor(id)
         val existing = read(id)
         if (existing?.legacy == true) {
             val checkpoint = checkpointFor(id, 0)
-            if (!checkpoint.exists()) fileFor(id).copyTo(checkpoint, overwrite = false)
+            if (!checkpoint.exists()) source.copyTo(checkpoint, overwrite = false)
+        }
+        if (source.isFile) {
+            source.copyTo(backupFor(id), overwrite = true)
         }
         val document = SessionDocument(
             formatVersion = migrations.currentVersion,
@@ -115,18 +112,31 @@ class VersionedSessionStore(
             updatedAt = updatedAt,
             payload = payload,
         )
-        atomicWrite(fileFor(id), json.encodeToString(SessionDocument.serializer(), document))
+        atomicWrite(source, json.encodeToString(SessionDocument.serializer(), document))
         return document
     }
 
-    fun delete(id: String): Boolean = fileFor(id).delete()
+    fun delete(id: String): Boolean {
+        validateId(id)
+        var changed = fileFor(id).delete()
+        changed = backupFor(id).delete() || changed
+        root.listFiles().orEmpty()
+            .filter { file ->
+                file.name.startsWith("$id.checkpoint-v") ||
+                    file.name.startsWith("$id.corrupt-")
+            }
+            .forEach { file -> changed = file.delete() || changed }
+        return changed
+    }
 
     fun list(): List<SessionLoadResult> = root.listFiles().orEmpty()
         .filter { file ->
             file.isFile &&
                 file.name.endsWith(SESSION_SUFFIX) &&
                 !file.name.endsWith(TEMP_SUFFIX) &&
-                !file.name.contains(CHECKPOINT_MARKER)
+                !file.name.endsWith(BACKUP_SUFFIX) &&
+                !file.name.contains(CHECKPOINT_MARKER) &&
+                !file.name.contains(CORRUPT_MARKER)
         }
         .mapNotNull { file ->
             val id = file.name.removeSuffix(SESSION_SUFFIX)
@@ -164,13 +174,50 @@ class VersionedSessionStore(
         return target
     }
 
+    private fun readFromFile(id: String, file: File): SessionLoadResult {
+        val element = json.parseToJsonElement(file.readText()).jsonObject
+        val wrappedVersion = element["formatVersion"]?.jsonPrimitive?.intOrNull
+        val legacy = wrappedVersion == null
+        val version = wrappedVersion ?: 0
+        if (version > migrations.currentVersion) {
+            throw FutureSessionVersionException(version, migrations.currentVersion)
+        }
+        val payload = if (legacy) {
+            element
+        } else {
+            element["payload"]?.jsonObject ?: error("会话文档缺少 payload：$id")
+        }
+        val migratedPayload = migrations.migrate(version, payload)
+        val updatedAt = if (legacy) {
+            file.lastModified().takeIf { it > 0L } ?: clock()
+        } else {
+            element["updatedAt"]?.jsonPrimitive?.content?.toLongOrNull() ?: file.lastModified()
+        }
+        return SessionLoadResult(
+            document = SessionDocument(
+                formatVersion = migrations.currentVersion,
+                id = id,
+                updatedAt = updatedAt,
+                payload = migratedPayload,
+            ),
+            migrated = version != migrations.currentVersion,
+            legacy = legacy,
+        )
+    }
+
     private fun fileFor(id: String): File {
         validateId(id)
         return File(root, "$id$SESSION_SUFFIX")
     }
 
+    private fun backupFor(id: String): File =
+        File(root, "$id$BACKUP_SUFFIX")
+
     private fun checkpointFor(id: String, version: Int): File =
         File(root, "$id.checkpoint-v$version.json")
+
+    private fun corruptFor(id: String): File =
+        File(root, "$id.corrupt-${clock()}.json")
 
     private fun validateId(id: String) {
         require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：$id" }
@@ -189,6 +236,8 @@ class VersionedSessionStore(
     private companion object {
         const val SESSION_SUFFIX = ".json"
         const val TEMP_SUFFIX = ".json.tmp"
+        const val BACKUP_SUFFIX = ".backup.json"
         const val CHECKPOINT_MARKER = ".checkpoint-v"
+        const val CORRUPT_MARKER = ".corrupt-"
     }
 }
