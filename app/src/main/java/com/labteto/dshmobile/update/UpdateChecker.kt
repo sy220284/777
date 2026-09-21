@@ -35,16 +35,17 @@ data class AvailableUpdate(
 
 /** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun parts(value: String): List<Int> = value.trim()
-        .removePrefix("v")
-        .substringBefore('-')
-        .substringBefore('+')
-        .split('.')
-        .map { it.trim().toIntOrNull() ?: 0 }
+    // This repository ships versions such as 0.12.0-777.16. Treat every numeric component as
+    // ordered version data so 777.17 correctly follows 777.16 instead of both collapsing to
+    // 0.12.0. The leading v and build metadata are presentation-only.
+    fun parts(value: String): List<Int> = Regex("""\d+""")
+        .findAll(value.trim().removePrefix("v").substringBefore('+'))
+        .mapNotNull { it.value.toIntOrNull() }
+        .toList()
 
     val a = parts(candidate)
     val b = parts(current)
-    if (a.all { it == 0 }) return false
+    if (a.isEmpty()) return false
     for (i in 0 until maxOf(a.size, b.size)) {
         val left = a.getOrElse(i) { 0 }
         val right = b.getOrElse(i) { 0 }
