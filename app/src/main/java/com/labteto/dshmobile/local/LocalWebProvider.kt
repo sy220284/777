@@ -371,9 +371,12 @@ class LocalWebProvider @Inject constructor(
         if (target.uri.scheme.equals("https", ignoreCase = true)) {
             val originalHost = target.uri.host
             val verifier = HttpsURLConnection.getDefaultHostnameVerifier()
+            val trustManager = requireNotNull(http.x509TrustManager) {
+                "当前 HTTP 客户端没有可用的 X509TrustManager"
+            }
             builder.sslSocketFactory(
                 SniSocketFactory(http.sslSocketFactory, originalHost),
-                http.x509TrustManager,
+                trustManager,
             )
             builder.hostnameVerifier { _, session -> verifier.verify(originalHost, session) }
         }
