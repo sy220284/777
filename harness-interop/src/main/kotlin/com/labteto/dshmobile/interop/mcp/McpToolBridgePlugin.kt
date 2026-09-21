@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
+import java.io.File
 import java.net.URI
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,24 +22,28 @@ import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
 /**
- * Bridges HTTP MCP servers into the native Harness Tool Registry.
+ * Bridges HTTP and stdio MCP servers into the native Harness Tool Registry.
  *
- * Remote tool declarations are treated as untrusted metadata: every discovered MCP tool is
+ * Remote/local-process tool declarations are treated as untrusted metadata: every discovered MCP tool is
  * registered as PRIVILEGED + ALWAYS approval regardless of server annotations.
  */
 class McpToolBridgePlugin(
     private val http: OkHttpClient,
     private val json: Json,
+    private val workspaceRoot: File? = null,
     private val transportFactory: (String) -> McpTransport = { endpoint ->
         McpNegotiatingHttpTransport(endpoint, http, json)
     },
+    private val stdioTransportFactory: (List<String>, File?) -> McpTransport = { command, workingDirectory ->
+        McpNegotiatingStdioTransport(command, json, workingDirectory)
+    },
 ) : HarnessPlugin {
-    override val id: String = "mcp-http-bridge"
+    override val id: String = "mcp-bridge"
 
     private data class ServerBinding(
         val id: String,
-        val endpoint: String,
-        val displayEndpoint: String,
+        val transport: String,
+        val displayTarget: String,
         val client: McpClient,
         val toolNames: List<String>,
     )
