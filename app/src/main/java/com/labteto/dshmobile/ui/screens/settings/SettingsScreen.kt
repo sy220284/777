@@ -160,6 +160,11 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                         stringResource(R.string.connect_auto_relay),
                         settings.autoConnectRelay,
                     ) { viewModel.set { it.copy(autoConnectRelay = !it.autoConnectRelay) } }
+                    ToggleRow(
+                        stringResource(R.string.settings_background),
+                        settings.keepConnectedInBackground,
+                        stringResource(R.string.settings_background_hint),
+                    ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
                 }
 
                 SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
@@ -178,11 +183,6 @@ fun SettingsScreen(onClose: () -> Unit, viewModel: SettingsViewModel = hiltViewM
                         settings.notifyNeedsAction,
                         stringResource(R.string.settings_notifications_action_hint),
                     ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
-                    ToggleRow(
-                        stringResource(R.string.settings_background),
-                        settings.keepConnectedInBackground,
-                        stringResource(R.string.settings_background_hint),
-                    ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
                 }
 
                 SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
