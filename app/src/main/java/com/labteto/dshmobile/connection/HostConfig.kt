@@ -110,8 +110,6 @@ data class DiscoveredHost(
 
 /** App-level persisted settings (DataStore). Remote control is relay-only. */
 data class AppSettings(
-    val autoConnectLast: Boolean = true,
-    val autoConnectRelay: Boolean = false,
     val keepConnectedInBackground: Boolean = false,
     val notifyTurnComplete: Boolean = true,
     val notifyGoal: Boolean = true,
