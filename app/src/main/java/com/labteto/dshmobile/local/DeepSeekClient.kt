@@ -178,7 +178,7 @@ object LocalToolCatalog {
         ), listOf("queries")))
         add(tool("web_fetch", "通过 HTTPS 或 HTTP 获取网页内容；大响应会自动完整落盘并返回工作区路径", properties(
             "url" to string("完整网址"),
-            "max_bytes" to integer("最多读取字节数，默认 2097152，最大 4194304"),
+            "max_bytes" to integer("最多读取字节数，默认 4194304，最大 4194304"),
             "format" to buildJsonObject {
                 put("type", "string")
                 put("description", "text 提取可读文本，raw 保留原始响应；默认 text")
@@ -241,9 +241,10 @@ object LocalToolCatalog {
         add(tool("skill", "列出技能，或读取指定技能的 SKILL.md", properties(
             "name" to string("可选；留空列出技能，填写后读取技能"),
         )))
-        add(tool("subagent", "启动一个只读子代理处理独立子任务", properties(
+        add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),
             "model" to string("可选模型路由；留空继承父代理模型"),
+            "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 40"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
