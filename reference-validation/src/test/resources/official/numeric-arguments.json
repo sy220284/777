@@ -1,0 +1,47 @@
+[
+  {
+    "type": "turn/start"
+  },
+  {
+    "type": "step/start",
+    "step": 1
+  },
+  {
+    "type": "assistant/message",
+    "step": 1
+  },
+  {
+    "type": "tool/call",
+    "step": 1,
+    "callId": "c1",
+    "name": "math",
+    "arguments": "{\"integer\":42,\"negative\":-7,\"float\":3.5,\"zero\":0}"
+  },
+  {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "38.5"
+  },
+  {
+    "type": "step/end",
+    "step": 1
+  },
+  {
+    "type": "step/start",
+    "step": 2
+  },
+  {
+    "type": "assistant/message",
+    "step": 2,
+    "content": "done"
+  },
+  {
+    "type": "step/end",
+    "step": 2
+  },
+  {
+    "type": "turn/end",
+    "reason": "completed"
+  }
+]

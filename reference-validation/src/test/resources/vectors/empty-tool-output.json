@@ -1,0 +1,21 @@
+{
+  "id": "empty-tool-output",
+  "input": "空工具输出",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "empty",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "empty": ""
+  }
+}

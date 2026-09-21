@@ -1,0 +1,10 @@
+{
+  "id": "unicode-text",
+  "input": "你好",
+  "modelReplies": [
+    {
+      "content": "完成：中文"
+    }
+  ],
+  "toolOutputs": {}
+}

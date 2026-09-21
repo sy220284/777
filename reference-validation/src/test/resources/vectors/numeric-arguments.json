@@ -1,0 +1,26 @@
+{
+  "id": "numeric-arguments",
+  "input": "数字参数",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "math",
+          "arguments": {
+            "integer": 42,
+            "negative": -7,
+            "float": 3.5,
+            "zero": 0
+          }
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "math": "38.5"
+  }
+}

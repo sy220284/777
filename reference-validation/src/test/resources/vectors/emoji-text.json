@@ -1,0 +1,10 @@
+{
+  "id": "emoji-text",
+  "input": "emoji",
+  "modelReplies": [
+    {
+      "content": "完成 ✅ 🚀"
+    }
+  ],
+  "toolOutputs": {}
+}

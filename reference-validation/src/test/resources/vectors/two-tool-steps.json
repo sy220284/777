@@ -1,0 +1,31 @@
+{
+  "id": "two-tool-steps",
+  "input": "两步工具",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "one",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "id": "c2",
+          "name": "two",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "one": "1",
+    "two": "2"
+  }
+}
