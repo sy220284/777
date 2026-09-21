@@ -67,6 +67,9 @@ function canonicalize(events: readonly any[]): CanonicalEvent[] {
       case 'turn/start':
         result.push({ type: 'turn/start' })
         break
+      case 'step/start':
+        result.push({ type: 'step/start', step: event.data.step })
+        break
       case 'assistant/message':
         result.push({
           type: 'assistant/message',
@@ -90,6 +93,9 @@ function canonicalize(events: readonly any[]): CanonicalEvent[] {
           callId: event.data.message?.source?.callId,
           content: textContent(event.data.message?.content),
         })
+        break
+      case 'step/end':
+        result.push({ type: 'step/end', step: event.data.step })
         break
       case 'turn/end':
         result.push({
