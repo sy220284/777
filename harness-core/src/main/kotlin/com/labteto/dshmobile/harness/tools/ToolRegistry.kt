@@ -50,7 +50,7 @@ class ToolRegistry {
     @Synchronized
     fun register(tool: HarnessTool, replace: Boolean = false) {
         require(tool.name.isNotBlank()) { "工具名不能为空" }
-        if (!replace) require(tool.name !in tools) { "工具已注册：\${tool.name}" }
+        if (!replace) require(tool.name !in tools) { "工具已注册：${tool.name}" }
         tools[tool.name] = tool
     }
 
@@ -73,11 +73,11 @@ class ToolRegistry {
         context: ToolContext = ToolContext(),
     ): ToolResult {
         val tool = synchronized(this) { tools[name] } ?: return ToolResult(
-            content = "未知工具：\$name",
+            content = "未知工具：$name",
             isError = true,
         )
         if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
-            return ToolResult("当前作用域禁止执行会改变状态的工具：\$name", isError = true)
+            return ToolResult("当前作用域禁止执行会改变状态的工具：$name", isError = true)
         }
         return tool.executor.execute(context, input, rawArguments)
     }
