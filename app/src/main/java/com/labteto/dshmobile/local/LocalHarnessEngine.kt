@@ -350,7 +350,7 @@ class LocalHarnessEngine @Inject constructor(
             },
             toolBatch = AgentToolBatchExecutor { calls ->
                 executeToolBatch(
-                    calls = calls.map(AgentToolCall::toLocalToolCall),
+                    calls = calls.map { it.toLocalToolCall() },
                     allowMutation = true,
                 ).map { (_, result) -> result }
             },
