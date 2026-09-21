@@ -24,8 +24,13 @@ class LocalJobManager(
     private val records = linkedMapOf<String, Record>()
 
     fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String {
-        val record = Record(UUID.randomUUID().toString().take(8), label.take(160))
-        synchronized(lock) { records[record.id] = record }
+        val record = synchronized(lock) {
+            var id: String
+            do {
+                id = "job-" + UUID.randomUUID().toString().replace("-", "").take(16)
+            } while (records.containsKey(id))
+            Record(id, label.take(160)).also { records[id] = it }
+        }
         record.job = scope.launch {
             try {
                 val report: (String) -> Unit = { output ->
@@ -80,10 +85,16 @@ class LocalJobManager(
     }
 
     fun kill(id: String): String {
-        val record = synchronized(lock) { records[id] } ?: return "后台任务不存在：$id"
-        if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
-        record.job?.cancel()
-        return "已请求停止后台任务：$id"
+        val job = synchronized(lock) {
+            val record = records[id] ?: return "后台任务不存在：$id"
+            if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
+            record.status = "cancelled"
+            record.output = "任务已取消"
+            record.job
+        }
+        job?.cancel()
+        publish()
+        return "已停止后台任务：$id"
     }
 
     fun send(id: String, message: String): String {
@@ -105,7 +116,14 @@ class LocalJobManager(
     }
 
     fun stopAll() {
-        synchronized(lock) { records.values.mapNotNull { it.job } }.forEach { it.cancel() }
+        val jobs = synchronized(lock) {
+            records.values.filter { it.status == "running" }.onEach {
+                it.status = "cancelled"
+                it.output = "任务已取消"
+            }.mapNotNull { it.job }
+        }
+        jobs.forEach { it.cancel() }
+        publish()
     }
 
     private fun publish() {

@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,6 +45,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,10 +69,10 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
@@ -145,6 +150,8 @@ fun LocalHarnessScreen(
                 onSwitchSession = viewModel::switchSession,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
+                onAutoApprove = viewModel::enableAutoApproval,
+                onDisableAutoApprove = viewModel::disableAutoApproval,
                 onAnswerQuestion = viewModel::answerQuestion,
             )
         }
@@ -354,6 +361,8 @@ private fun LocalChat(
     onSwitchSession: (String) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
+    onAutoApprove: () -> Unit,
+    onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -361,8 +370,25 @@ private fun LocalChat(
     var input by rememberSaveable { mutableStateOf("") }
     var showSessions by rememberSaveable { mutableStateOf(false) }
     var attachmentError by remember { mutableStateOf<String?>(null) }
+    var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        var previousIndex = listState.firstVisibleItemIndex
+        var previousOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val movingTowardBottom = index > previousIndex || (index == previousIndex && offset > previousOffset)
+                val movingTowardTop = index < previousIndex || (index == previousIndex && offset < previousOffset)
+                if (movingTowardBottom && listState.canScrollBackward) scrollShortcut = "top"
+                if (movingTowardTop && listState.canScrollForward) scrollShortcut = "bottom"
+                if (!listState.canScrollBackward && scrollShortcut == "top") scrollShortcut = null
+                if (!listState.canScrollForward && scrollShortcut == "bottom") scrollShortcut = null
+                previousIndex = index
+                previousOffset = offset
+            }
+    }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -389,8 +415,19 @@ private fun LocalChat(
         }
     }
 
+    LaunchedEffect(state.sessionId) {
+        if (state.messages.isNotEmpty()) {
+            listState.scrollToItem(state.messages.lastIndex)
+        }
+    }
+
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+        if (state.messages.isNotEmpty()) {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            if (lastVisible >= state.messages.lastIndex - 2) {
+                listState.animateScrollToItem(state.messages.lastIndex)
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding().background(colors.bgBase)) {
@@ -410,96 +447,138 @@ private fun LocalChat(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StateDot(if (state.running) StateDotState.Running else StateDotState.Done)
                         Text(
-                            if (state.running) " 手机正在执行" else " 本机模式",
+                            if (state.running) " 执行中" else " 已就绪",
                             style = DsType.caption11,
                             color = colors.labelTertiary,
                         )
                     }
                 }
-                DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                DsButton("新建", onNewSession, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(state.model, style = DsType.xsmall12, color = colors.labelTertiary)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = colors.bgModulePlatform,
+                ) {
+                    Text(
+                        state.model.removePrefix("deepseek-"),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 DsButton(
-                    if (state.planMode) "退出规划" else "规划模式",
+                    if (state.planMode) "规划中" else "规划",
                     { onPlanModeChange(!state.planMode) },
-                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Outline,
+                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
                 DsButton(
                     "会话",
                     { showSessions = true },
-                    variant = DsButtonVariant.Outline,
+                    variant = DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                     enabled = !state.running,
                 )
-                DsButton("新会话", onNewSession, variant = DsButtonVariant.Outline, size = DsButtonSize.Small)
+                DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             }
         }
 
-        if (state.plan.isNotEmpty()) {
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("执行计划", style = DsType.small13Strong, color = colors.labelPrimary)
-                state.plan.forEachIndexed { index, item ->
-                    Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
-                }
-            }
-        }
-
-        state.goal?.let { goal ->
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("当前目标 · ${goal.status}", style = DsType.small13Strong, color = colors.labelPrimary)
-                Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
-                goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
-            }
-        }
-
-        if (state.todos.isNotEmpty()) {
-            DsCard(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                Text("任务清单", style = DsType.small13Strong, color = colors.labelPrimary)
-                state.todos.forEach { item ->
-                    val mark = when (item.status) {
-                        "completed" -> "✓"
-                        "in_progress" -> "●"
-                        else -> "○"
+        if (state.autoApproveMutations) {
+            Surface(
+                color = colors.warnTertiary,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("自动批准已开启", style = DsType.small13Strong, color = colors.warnLabel)
+                        Text(
+                            "当前会话中的文件写入、编辑和命令将直接执行。",
+                            style = DsType.caption11,
+                            color = colors.labelSecondary,
+                        )
                     }
-                    Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
+                    DsButton(
+                        "关闭",
+                        onDisableAutoApprove,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
                 }
             }
         }
 
-        if (state.jobs.isNotEmpty()) {
-            Text(
-                "后台任务：" + state.jobs.joinToString { "${it.id}[${it.status}]" },
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+        if (state.plan.isNotEmpty() || state.goal != null || state.todos.isNotEmpty() || state.jobs.isNotEmpty()) {
+            ExecutionStatusCard(
+                state = state,
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
             )
         }
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            if (state.messages.isEmpty()) {
-                item { EmptyLocalHarness(state.workspacePath) }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = DsSpacing.medium,
+                    end = DsSpacing.medium,
+                    top = DsSpacing.comfortable,
+                    bottom = DsSpacing.xlarge,
+                ),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+            ) {
+                if (state.messages.isEmpty()) {
+                    item { EmptyLocalHarness(state.workspacePath) }
+                }
+                items(state.messages, key = { it.id }) { message ->
+                    LocalMessageRow(message)
+                }
+                if (state.running) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text(" 代理正在处理…", style = DsType.small13, color = colors.labelTertiary)
+                        }
+                    }
+                }
             }
-            items(state.messages, key = { it.id }) { message ->
-                LocalMessageRow(message)
-            }
-            if (state.running) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text(" 代理循环正在运行…", style = DsType.small13, color = colors.labelTertiary)
+
+            val shortcut = scrollShortcut
+            if (shortcut == "top" && listState.canScrollBackward) {
+                ScrollShortcut(
+                    text = "↑",
+                    description = "回到顶部",
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
+                ) {
+                    scope.launch {
+                        listState.animateScrollToItem(0)
+                        scrollShortcut = null
+                    }
+                }
+            } else if (shortcut == "bottom" && listState.canScrollForward) {
+                ScrollShortcut(
+                    text = "↓",
+                    description = "直达底部",
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
+                ) {
+                    scope.launch {
+                        val target = (state.messages.size - 1).coerceAtLeast(0)
+                        listState.animateScrollToItem(target)
+                        scrollShortcut = null
                     }
                 }
             }
@@ -538,7 +617,8 @@ private fun LocalChat(
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("交给手机上的 Harness…") },
+                placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
+                shape = RoundedCornerShape(20.dp),
                 minLines = 1,
                 maxLines = 5,
             )
@@ -581,7 +661,7 @@ private fun LocalChat(
         }
     }
 
-    state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny) }
+    state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny, onAutoApprove) }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
     if (showSessions) {
         DsDialog(title = "本机会话", onDismiss = { showSessions = false }) {
@@ -631,18 +711,97 @@ private fun ImportedAttachmentRow(
 @Composable
 private fun EmptyLocalHarness(workspacePath: String) {
     val colors = DsTheme.colors
-    DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text("手机就是 Harness 主机", style = DsType.large20, color = colors.labelPrimary)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text("今天想做点什么？", style = DsType.display24, color = colors.labelPrimary)
         Text(
-            "直接聊天、处理工作区文件、搜索网页、执行安卓命令、拆分子任务。需要电脑时，从左侧菜单切换局域网或中继。",
+            "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
             style = DsType.std14,
             color = colors.labelSecondary,
         )
         Text(
             workspacePath,
             style = DsType.caption11.copy(fontFamily = FontFamily.Monospace),
-            color = colors.labelTertiary,
+            color = colors.labelDimmed,
         )
+    }
+}
+
+@Composable
+private fun ExecutionStatusCard(
+    state: LocalHarnessState,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    var expanded by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    val completed = state.todos.count { it.status == "completed" }
+    val total = state.todos.size
+    val summary = buildList {
+        state.goal?.let { add("目标 ${it.status}") }
+        if (state.plan.isNotEmpty()) add("计划 ${state.plan.size} 步")
+        if (total > 0) add("任务 $completed/$total")
+        if (state.jobs.isNotEmpty()) add("后台 ${state.jobs.size}")
+    }.joinToString(" · ")
+
+    Surface(
+        modifier = modifier.fillMaxWidth()
+            .clickable(onClickLabel = if (expanded) "收起执行状态" else "展开执行状态") {
+                expanded = !expanded
+            },
+        shape = RoundedCornerShape(12.dp),
+        color = colors.bgModulePlatform,
+    ) {
+        Column(
+            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (expanded) "⌄" else "›",
+                    style = DsType.base16Strong,
+                    color = colors.labelTertiary,
+                )
+                Spacer(Modifier.size(DsSpacing.small))
+                Column(Modifier.weight(1f)) {
+                    Text("执行状态", style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
+                }
+            }
+            if (expanded) {
+                state.goal?.let { goal ->
+                    Text("目标 · ${goal.status}", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
+                    goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
+                }
+                if (state.plan.isNotEmpty()) {
+                    Text("计划", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.plan.forEachIndexed { index, item ->
+                        Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
+                if (state.todos.isNotEmpty()) {
+                    Text("任务", style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.todos.forEach { item ->
+                        val mark = when (item.status) {
+                            "completed" -> "✓"
+                            "in_progress" -> "●"
+                            else -> "○"
+                        }
+                        Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
+                if (state.jobs.isNotEmpty()) {
+                    Text(
+                        "后台 · " + state.jobs.joinToString { "${it.label}[${it.status}]" },
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -653,53 +812,162 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
     val isUser = message.role == "user"
     val isTool = message.role == "tool"
     val isReasoning = message.role == "reasoning"
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(if (isUser) 0.86f else 0.96f),
-            shape = DsShapes.block,
-            color = when {
-                isUser -> colors.brandPrimary.copy(alpha = 0.14f)
-                isTool -> colors.bgLayer2
-                isReasoning -> colors.hover
-                message.role == "system" -> colors.warnTertiary
-                else -> colors.bgLayer1
-            },
+
+    when {
+        isReasoning -> CollapsibleTranscriptRow(
+            title = "思考过程",
+            meta = "已思考 ${message.content.length} 字",
+            content = message.content,
+            code = false,
+            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
+        )
+
+        isTool -> CollapsibleTranscriptRow(
+            title = "工具 · ${message.toolName ?: "执行结果"}",
+            meta = "已完成，点击查看详情",
+            content = message.content,
+            code = true,
+            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
+        )
+
+        isUser -> Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
         ) {
-            Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.86f),
+                shape = RoundedCornerShape(18.dp),
+                color = colors.userBubble,
+            ) {
+                Column(
+                    Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
+                    SelectionContainer {
+                        Text(message.content, style = DsType.bubbleText, color = colors.labelPrimary)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        DsButton(
+                            "复制",
+                            { clipboard.setText(AnnotatedString(message.content)) },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
+            }
+        }
+
+        message.role == "system" -> Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = colors.warnTertiary,
+        ) {
+            Text(
+                message.content,
+                style = DsType.small13,
+                color = colors.labelSecondary,
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            )
+        }
+
+        else -> Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            SelectionContainer {
+                Text(
+                    message.content,
+                    style = DsType.mdBody,
+                    color = colors.labelPrimary,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DsButton(
+                    "复制",
+                    { clipboard.setText(AnnotatedString(message.content)) },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsibleTranscriptRow(
+    title: String,
+    meta: String,
+    content: String,
+    code: Boolean,
+    onCopy: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var expanded by rememberSaveable(title, content.hashCode()) { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth()
+            .clickable(onClickLabel = if (expanded) "收起" else "展开") { expanded = !expanded },
+        shape = RoundedCornerShape(12.dp),
+        color = colors.bgModulePlatform,
+    ) {
+        Column(
+            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Text(
+                    if (expanded) "⌄" else "›",
+                    style = DsType.base16Strong,
+                    color = colors.labelTertiary,
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = DsType.small13Strong, color = colors.labelSecondary)
+                    Text(meta, style = DsType.caption11, color = colors.labelTertiary)
+                }
+            }
+            if (expanded) {
+                SelectionContainer {
                     Text(
-                        when {
-                            isUser -> "你"
-                            isTool -> "工具 · ${message.toolName}"
-                            isReasoning -> "推理"
-                            message.role == "system" -> "系统"
-                            else -> "Harness"
-                        },
-                        style = DsType.caption11Strong,
-                        color = colors.labelTertiary,
+                        content,
+                        style = if (code) DsType.mdCode else DsType.mdSmall,
+                        color = colors.labelSecondary,
                     )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     DsButton(
                         "复制",
-                        { clipboard.setText(AnnotatedString(message.content)) },
+                        onCopy,
                         variant = DsButtonVariant.Ghost,
                         size = DsButtonSize.Small,
                     )
                 }
-                SelectionContainer {
-                    Text(
-                        message.content,
-                        style = if (isTool) DsType.mdCode else DsType.bubbleText,
-                        color = colors.labelPrimary,
-                    )
-                }
             }
+        }
+    }
+}
+
+@Composable
+private fun ScrollShortcut(
+    text: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        modifier = modifier.size(42.dp)
+            .clickable(onClickLabel = description, onClick = onClick),
+        shape = CircleShape,
+        color = colors.bgLayer2,
+        shadowElevation = 4.dp,
+        tonalElevation = 2.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, style = DsType.large20, color = colors.labelPrimary)
         }
     }
 }
@@ -716,7 +984,7 @@ private fun NetworkDiagnosticDialog(
     var running by remember { mutableStateOf(false) }
     DsDialog(title = "网络诊断", onDismiss = onDismiss) {
         Text(
-            "检查实际解析地址、系统代理、VPN/TUN，以及是否被安全策略主动拦截。",
+            "检查实际解析地址、系统代理、VPN/TUN、安全策略，并发起受限 HTTP/TLS 探测验证真实连通性。",
             style = DsType.small13,
             color = colors.labelSecondary,
         )
@@ -776,23 +1044,79 @@ private fun EnvironmentInfoDialog(
 }
 
 @Composable
-private fun ApprovalDialog(approval: LocalApproval, onApprove: () -> Unit, onDeny: () -> Unit) {
+private fun ApprovalDialog(
+    approval: LocalApproval,
+    onApprove: () -> Unit,
+    onDeny: () -> Unit,
+    onAutoApprove: () -> Unit,
+) {
     val colors = DsTheme.colors
-    DsDialog(title = "需要你的批准", onDismiss = onDeny) {
+    DsDialog(title = "执行前确认", onDismiss = onDeny) {
         Text(approval.summary, style = DsType.base16Strong, color = colors.labelPrimary)
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = colors.bgModulePlatform,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                Modifier.padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text("这项操作是做什么的？", style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(
+                    approvalPurpose(approval),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                )
+            }
+        }
+
+        Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
         SelectionContainer {
             Text(
                 approval.arguments,
                 style = DsType.mdCode,
                 color = colors.labelSecondary,
-                modifier = Modifier.fillMaxWidth().height(160.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().height(140.dp).verticalScroll(rememberScrollState()),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton("允许", onApprove)
-            DsButton("拒绝", onDeny, variant = DsButtonVariant.Outline)
-        }
+
+        Text(
+            "“自动批准”只对当前会话生效。开启后，后续写文件、编辑文件和执行命令将直接运行，顶部会持续显示提示，可随时关闭。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+
+        DsButton(
+            "批准",
+            onApprove,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DsButton(
+            "自动批准",
+            onAutoApprove,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Info,
+        )
+        DsButton(
+            "拒绝",
+            onDeny,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Outline,
+        )
     }
+}
+
+private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
+    "bash", "run_shell" ->
+        "Harness 准备在手机的本机执行环境中运行一条系统命令，用来完成当前任务中的检查、构建、文件处理或其他自动化步骤。命令可能读写工作区、访问网络或启动进程，具体影响取决于下方命令内容。"
+    "write", "write_file" ->
+        "Harness 准备创建或完整写入一个工作区文件，用来保存代码、配置、文档或任务产物。批准后会实际改变工作区内容。"
+    "edit", "edit_file" ->
+        "Harness 准备修改现有工作区文件，用来落实当前任务要求。批准后会对目标文件产生真实改动。"
+    else ->
+        "Harness 请求执行一项会改变本机状态的操作。批准后会真实执行；拒绝则跳过这一步并把结果返回给模型。"
 }
 
 @Composable

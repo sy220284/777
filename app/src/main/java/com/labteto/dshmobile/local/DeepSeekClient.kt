@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.net.SocketTimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -50,19 +51,38 @@ class DeepSeekClient @Inject constructor(
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
-        runInterruptible { http.newCall(request).execute() }.use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                val detail = runCatching {
-                    json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
-                        ?.get("message")?.jsonPrimitive?.content
-                }.getOrNull()
-                throw LocalModelException(
-                    message = "模型请求失败（${response.code}）：${detail ?: body.take(500)}",
-                    retryable = response.code == 408 || response.code == 429 || response.code >= 500,
-                )
+        try {
+            runInterruptible { http.newCall(request).execute() }.use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    val detail = runCatching {
+                        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
+                            ?.get("message")?.jsonPrimitive?.content
+                    }.getOrNull()
+                    throw LocalModelException(
+                        code = "MODEL_HTTP_${response.code}",
+                        message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
+                        retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                    )
+                }
+                parse(body)
             }
-            parse(body)
+        } catch (error: LocalModelException) {
+            throw error
+        } catch (error: SocketTimeoutException) {
+            throw LocalModelException(
+                code = "MODEL_TIMEOUT",
+                message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
+                retryable = true,
+                cause = error,
+            )
+        } catch (error: java.io.IOException) {
+            throw LocalModelException(
+                code = "MODEL_NETWORK",
+                message = "模型网络请求失败：${error.message ?: "网络异常"}",
+                retryable = true,
+                cause = error,
+            )
         }
     }
 
@@ -101,7 +121,12 @@ class DeepSeekClient @Inject constructor(
     }
 }
 
-class LocalModelException(message: String, val retryable: Boolean) : Exception(message)
+class LocalModelException(
+    val code: String,
+    message: String,
+    val retryable: Boolean,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 /** Model-facing tools mirroring the official Harness capability families on Android. */
 object LocalToolCatalog {
@@ -151,10 +176,21 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("queries")))
-        add(tool("web_fetch", "通过 HTTPS 或 HTTP 获取网页文本", properties(
+        add(tool("web_fetch", "通过 HTTPS 或 HTTP 获取网页内容；大响应会自动完整落盘并返回工作区路径", properties(
             "url" to string("完整网址"),
+            "max_bytes" to integer("最多读取字节数，默认 4194304，最大 4194304"),
+            "format" to buildJsonObject {
+                put("type", "string")
+                put("description", "text 提取可读文本，raw 保留原始响应；默认 text")
+                put("enum", buildJsonArray { add(JsonPrimitive("text")); add(JsonPrimitive("raw")) })
+            },
+            "run_in_background" to boolean("是否转为后台抓取任务，默认 false"),
         ), listOf("url")))
-        add(tool("network_diagnose", "诊断域名解析、系统代理、VPN/TUN 与安全拦截原因", properties(
+        add(tool("json_query", "从工作区 JSON 文件读取一个字段/数组片段，无需 jq；支持 a.b[0].c 形式", properties(
+            "path" to string("JSON 文件的工作区相对路径"),
+            "query" to string("字段路径，例如 items[0].name；留空返回根节点摘要"),
+        ), listOf("path")))
+        add(tool("network_diagnose", "诊断域名解析、系统代理、VPN/TUN、安全策略并实际探测 HTTP/TLS 连通性", properties(
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
@@ -205,9 +241,10 @@ object LocalToolCatalog {
         add(tool("skill", "列出技能，或读取指定技能的 SKILL.md", properties(
             "name" to string("可选；留空列出技能，填写后读取技能"),
         )))
-        add(tool("subagent", "启动一个只读子代理处理独立子任务", properties(
+        add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),
             "model" to string("可选模型路由；留空继承父代理模型"),
+            "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 40"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(

@@ -21,6 +21,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun environmentInfo(): String = engine.environmentInfoForUi()
     fun approve() = engine.answerApproval(true)
     fun deny() = engine.answerApproval(false)
+    fun enableAutoApproval() = engine.enableAutoApproval()
+    fun disableAutoApproval() = engine.disableAutoApproval()
     fun answerQuestion(answer: String) = engine.answerQuestion(answer)
     fun stop() = engine.stop()
     fun newSession() = engine.newSession()

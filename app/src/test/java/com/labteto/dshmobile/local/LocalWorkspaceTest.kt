@@ -65,4 +65,25 @@ class LocalWorkspaceTest {
         assertTrue(!workspace.glob("**/*.txt").contains("secret.txt"))
         assertEquals("未找到匹配内容", workspace.search("outside-secret"))
     }
+    @Test
+    fun toolArtifactsPreserveLargeStructuredContentForLaterSearch() {
+        val middleMarker = "critical-middle-record"
+        val content = buildString {
+            append("{\"items\":[")
+            repeat(12_000) { index ->
+                if (index > 0) append(',')
+                append("{\"id\":").append(index).append(",\"name\":\"")
+                append(if (index == 6_000) middleMarker else "item-$index")
+                append("\"}")
+            }
+            append("]}")
+        }
+
+        val path = workspace.writeToolArtifact(".dsh/fetches/large.json", content)
+
+        assertEquals(".dsh/fetches/large.json", path)
+        assertEquals(content, workspace.readRaw(path))
+        assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
+    }
+
 }
