@@ -22,7 +22,7 @@ class HarnessNotificationListenerService : NotificationListenerService() {
     }
 
     fun snapshots(): List<NotificationSnapshot> =
-        activeNotifications.orEmpty().map(StatusBarNotification::toSnapshot)
+        activeNotifications.orEmpty().map { notification -> notification.toSnapshot() }
 
     private fun StatusBarNotification.toSnapshot(): NotificationSnapshot {
         val extras = notification.extras
