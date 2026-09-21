@@ -115,9 +115,7 @@ fun SettingsScreen(
     var showDisconnectDialog by remember { mutableStateOf(false) }
     BackHandler(onBack = onClose)
     LaunchedEffect(connectionState.phase) {
-        if (connectionState.phase == ConnectionPhase.CONNECTED) {
-            viewModel.refreshRemoteSettings()
-        }
+        viewModel.refreshRemoteSettings()
     }
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
