@@ -340,6 +340,7 @@ class LocalWebProvider @Inject constructor(
             val client = http.newBuilder()
                 .followRedirects(false)
                 .followSslRedirects(false)
+                .proxy(Proxy.NO_PROXY)
                 .dns(object : Dns {
                     override fun lookup(hostname: String): List<InetAddress> {
                         if (!hostname.equals(target.uri.host, ignoreCase = true)) {
@@ -357,7 +358,7 @@ class LocalWebProvider @Inject constructor(
 
         // 代理仍然使用，但 CONNECT/请求目标固定到已通过安全检查的 IP，
         // 防止代理侧重新解析同一域名后把请求导向 localhost/LAN/保留地址。
-        val address = target.addresses.first()
+        val address = target.addresses.firstOrNull { it is Inet4Address } ?: target.addresses.first()
         val pinnedUri = pinUriToAddress(target.uri, address)
         val builder = http.newBuilder()
             .followRedirects(false)
