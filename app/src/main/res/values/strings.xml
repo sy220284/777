@@ -380,7 +380,7 @@
     <string name="plugins_search_hint">Filter plugins</string>
     <string name="update_available_title">Update available</string>
     <string name="update_available_body">Version %1$s is out. You have %2$s.</string>
-    <string name="update_open">View release</string>
+    <string name="update_open">Download &amp; install</string>
     <string name="update_later">Later</string>
     <string name="settings_update_check">Check for updates</string>
     <string name="settings_update_check_hint">Asks GitHub for the latest release when the app starts.</string>

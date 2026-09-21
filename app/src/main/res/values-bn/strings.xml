@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">প্লাগইন ফিল্টার করুন</string>
     <string name="update_available_title">আপডেট উপলব্ধ</string>
     <string name="update_available_body">সংস্করণ %1$s প্রকাশিত হয়েছে। আপনার আছে %2$s।</string>
-    <string name="update_open">রিলিজ দেখুন</string>
+    <string name="update_open">ডাউনলোড ও ইনস্টল</string>
     <string name="update_later">পরে</string>
     <string name="settings_update_check">আপডেট পরীক্ষা করুন</string>
     <string name="settings_update_check_hint">অ্যাপ চালু হলে GitHub-এ সর্বশেষ রিলিজ জিজ্ঞাসা করে।</string>

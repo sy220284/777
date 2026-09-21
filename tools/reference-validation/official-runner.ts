@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
@@ -37,6 +37,39 @@ interface CanonicalEvent {
   reason?: string
 }
 
+function toolCallsResponse(calls: ToolCallFixture[], text?: string): StreamChunk[] {
+  const chunks: StreamChunk[] = []
+  let index = 0
+  if (text) {
+    chunks.push(
+      { type: 'block-start', index, blockType: 'text' },
+      { type: 'text-delta', index, text },
+      { type: 'block-end', index, block: { type: 'text', text } },
+    )
+    index += 1
+  }
+  for (const call of calls) {
+    const id = ToolCallId(call.id)
+    const argumentsJson = JSON.stringify(call.arguments)
+    chunks.push(
+      { type: 'block-start', index, blockType: 'tool-call' },
+      { type: 'tool-call-delta', index, id, name: call.name, argumentsDelta: argumentsJson.slice(0, 5) },
+      { type: 'tool-call-delta', index, id, argumentsDelta: argumentsJson.slice(5) },
+      {
+        type: 'block-end',
+        index,
+        block: { type: 'tool-call', id, name: call.name, arguments: argumentsJson },
+      },
+    )
+    index += 1
+  }
+  chunks.push(
+    { type: 'usage', usage: { inputTokens: 10, outputTokens: Math.max(5, calls.length * 5) } },
+    { type: 'finish', reason: { kind: 'tool-calls' } },
+  )
+  return chunks
+}
+
 function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
   return new Promise((resolve) => {
     const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
@@ -54,7 +87,9 @@ function textContent(content: unknown): string | undefined {
     .map((block) => {
       if (block === null || typeof block !== 'object') return ''
       const record = block as Record<string, unknown>
-      return record.type === 'text' && typeof record.text === 'string' ? record.text : ''
+      if (record.type === 'text' && typeof record.text === 'string') return record.text
+      if (record.type === 'tool-result') return textContent(record.content) ?? ''
+      return ''
     })
     .join('')
   return text === '' ? undefined : text
@@ -115,24 +150,22 @@ async function main(): Promise<void> {
   const vector = JSON.parse(readFileSync(vectorPath, 'utf8')) as ConformanceVector
   const script = vector.modelReplies.map((reply) => {
     const calls = reply.toolCalls ?? []
-    if (calls.length > 1) {
-      throw new Error(`${vector.id}: initial runner supports at most one tool call per model reply`)
-    }
-    if (calls.length === 1) {
-      const call = calls[0]!
-      return toolCallResponse(call.id, call.name, call.arguments, reply.content)
+    if (calls.length > 0) {
+      return toolCallsResponse(calls, reply.content)
     }
     return textResponse(reply.content ?? '')
   })
 
   const ctx = new Context()
-  await ctx.plugin(LlmRuntime)
-  await ctx.plugin(SessionStore)
-  await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime)
-  await ctx.plugin(AgentRegistry)
-  await ctx.plugin(AgentLoop, { agents: [] })
+  const fibers = [
+    await ctx.plugin(LlmRuntime),
+    await ctx.plugin(SessionStore),
+    await ctx.plugin(SessionProjectionRegistry),
+    await ctx.plugin(SystemPrompt),
+    await ctx.plugin(ToolRuntime),
+    await ctx.plugin(AgentRegistry),
+    await ctx.plugin(AgentLoop, { agents: [] }),
+  ]
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
 
   const toolNames = new Set(
@@ -162,7 +195,7 @@ async function main(): Promise<void> {
   await waitForIdle(ctx, agent)
 
   process.stdout.write(`${JSON.stringify(canonicalize(agent.session.snapshotEvents()), null, 2)}\n`)
-  await ctx.dispose()
+  for (const fiber of fibers.reverse()) await fiber.dispose()
 }
 
 await main()

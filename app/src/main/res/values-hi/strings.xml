@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">प्लगइन फ़िल्टर करें</string>
     <string name="update_available_title">अपडेट उपलब्ध</string>
     <string name="update_available_body">संस्करण %1$s आ गया है। आपके पास %2$s है।</string>
-    <string name="update_open">रिलीज़ देखें</string>
+    <string name="update_open">डाउनलोड और इंस्टॉल करें</string>
     <string name="update_later">बाद में</string>
     <string name="settings_update_check">अपडेट जाँचें</string>
     <string name="settings_update_check_hint">ऐप शुरू होने पर GitHub से नवीनतम रिलीज़ पूछता है।</string>

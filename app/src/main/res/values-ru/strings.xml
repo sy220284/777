@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">Фильтр плагинов</string>
     <string name="update_available_title">Доступно обновление</string>
     <string name="update_available_body">Вышла версия %1$s. У вас %2$s.</string>
-    <string name="update_open">Открыть релиз</string>
+    <string name="update_open">Скачать и установить</string>
     <string name="update_later">Позже</string>
     <string name="settings_update_check">Проверять обновления</string>
     <string name="settings_update_check_hint">При запуске запрашивает у GitHub последний релиз.</string>

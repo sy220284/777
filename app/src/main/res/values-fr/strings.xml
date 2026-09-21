@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">Filtrer les plugins</string>
     <string name="update_available_title">Mise à jour disponible</string>
     <string name="update_available_body">La version %1$s est sortie. Vous avez la %2$s.</string>
-    <string name="update_open">Voir la version</string>
+    <string name="update_open">Télécharger et installer</string>
     <string name="update_later">Plus tard</string>
     <string name="settings_update_check">Rechercher les mises à jour</string>
     <string name="settings_update_check_hint">Interroge GitHub sur la dernière version au démarrage de l’app.</string>

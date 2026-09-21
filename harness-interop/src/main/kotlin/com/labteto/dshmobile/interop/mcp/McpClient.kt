@@ -22,6 +22,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 const val CURRENT_MCP_PROTOCOL_VERSION = "2026-07-28"
 const val LEGACY_MCP_PROTOCOL_VERSION = "2025-06-18"
+const val LEGACY_SSE_MCP_PROTOCOL_VERSION = "2024-11-05"
+
+class McpHttpException(
+    val statusCode: Int,
+    val responseBody: String,
+) : IllegalStateException("MCP HTTP $statusCode：${responseBody.take(2_000)}")
 
 data class McpToolDefinition(
     val name: String,
@@ -116,8 +122,8 @@ class McpStreamableHttpTransport(
 
             http.newCall(builder.build()).execute().use { response ->
                 val body = response.body?.string().orEmpty()
-                require(response.isSuccessful) {
-                    "MCP HTTP ${response.code}：${body.take(2_000)}"
+                if (!response.isSuccessful) {
+                    throw McpHttpException(response.code, body)
                 }
                 val contentType = response.header("Content-Type").orEmpty()
                 if (contentType.startsWith("text/event-stream", ignoreCase = true)) {
@@ -224,7 +230,7 @@ private fun JsonObject.withMetadata(
     })
 }
 
-private fun parseSseResponse(body: String, id: Long, json: Json): JsonObject {
+internal fun parseSseResponse(body: String, id: Long, json: Json): JsonObject {
     var matching: JsonObject? = null
     body.lineSequence().forEach { line ->
         if (!line.startsWith("data:")) return@forEach

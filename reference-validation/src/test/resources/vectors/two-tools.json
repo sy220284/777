@@ -1,0 +1,31 @@
+{
+  "id": "two-tools",
+  "input": "两个工具",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "a"
+          }
+        },
+        {
+          "id": "c2",
+          "name": "read",
+          "arguments": {
+            "path": "a.txt"
+          }
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "pong",
+    "read": "file"
+  }
+}

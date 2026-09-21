@@ -16,13 +16,26 @@ import javax.inject.Singleton
 
 /** The subset of a GitHub release this app reads. */
 @Serializable
+private data class GithubAsset(
+    val name: String = "",
+    @SerialName("browser_download_url") val downloadUrl: String = "",
+)
+
+@Serializable
 private data class GithubRelease(
     @SerialName("tag_name") val tagName: String = "",
     @SerialName("html_url") val htmlUrl: String = "",
+    val assets: List<GithubAsset> = emptyList(),
 )
 
-/** A release newer than the running build. */
-data class AvailableUpdate(val version: String, val url: String)
+/** A release newer than the running build, including a directly verifiable APK when published. */
+data class AvailableUpdate(
+    val version: String,
+    val url: String,
+    val apkUrl: String? = null,
+    val apkName: String? = null,
+    val checksumUrl: String? = null,
+)
 
 /**
  * Is [candidate] a later version than [current]?
@@ -87,7 +100,15 @@ class UpdateChecker @Inject constructor(
         val version = release.tagName.trim().removePrefix("v")
         if (version.isEmpty() || !isNewerVersion(version, currentVersion)) return
         if (settings.dismissedUpdate == version) return
-        _available.value = AvailableUpdate(version, release.htmlUrl.ifBlank { RELEASES_URL })
+        val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
+        val checksums = release.assets.firstOrNull { it.name.equals("SHA256SUMS.txt", ignoreCase = true) }
+        _available.value = AvailableUpdate(
+            version = version,
+            url = release.htmlUrl.ifBlank { RELEASES_URL },
+            apkUrl = apk?.downloadUrl?.takeIf(String::isNotBlank),
+            apkName = apk?.name?.takeIf(String::isNotBlank),
+            checksumUrl = checksums?.downloadUrl?.takeIf(String::isNotBlank),
+        )
     }
 
     /** Stop offering [version]; a later release will still be offered. */
@@ -112,7 +133,7 @@ class UpdateChecker @Inject constructor(
     }
 
     private companion object {
-        const val REPO = "sorsama/deepseek-harness-mobile"
+        const val REPO = "sy220284/777"
         const val LATEST_RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
     }

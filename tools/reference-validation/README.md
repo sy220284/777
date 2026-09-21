@@ -9,13 +9,14 @@
 - 日常 CI 不自动跟踪官方 master，只比较已提交的固定黄金结果。
 - Kotlin 原生实现的输出由 `:reference-validation:test` 生成并比较。
 
-当前首批覆盖：
+当前固定黄金集为 22 个官方参考案例，覆盖普通文本、多语言与空文本、单/多工具同一步、
+连续多工具步骤、同名工具重复调用、正文与工具并存、嵌套/混合 JSON 参数、空工具输出等
+AgentLoop 核心调度语义。
 
-1. 无工具普通对话；
-2. 单工具调用后继续下一步。
+取消、审批、Ask User、Plan、Goal、Todo、Job、Subagent、Workflow、Session 迁移与自愈
+由对应模块的确定性单元/集成测试覆盖；这些状态不塞进无法表达它们的模型回复向量。
 
-后续按规划扩展并行工具、失败、超时、重试、取消、审批、Ask User、Plan、Goal、Todo、
-Job、Subagent、Workflow、fork/resume、compaction 与旧 Session 迁移。
+CI 会从锁定的官方提交重新生成全部黄金结果并检查工作树无差异，防止手写 fixture 冒充官方基线。
 
 刷新命令：
 

@@ -27,6 +27,14 @@ jobs:
           # The legacy `tools` package is no longer published on current runners.
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify official golden fixture provenance
+        run: |
+          corepack enable
+          bash tools/reference-validation/refresh-official-fixtures.sh
+          git diff --exit-code -- reference-validation/src/test/resources/official
       - name: Unit tests
         run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
       - name: Official Harness conformance

@@ -379,7 +379,7 @@
     <string name="plugins_search_hint">Filtrar complementos</string>
     <string name="update_available_title">Actualización disponible</string>
     <string name="update_available_body">La versión %1$s ya está disponible. Tienes la %2$s.</string>
-    <string name="update_open">Ver la versión</string>
+    <string name="update_open">Descargar e instalar</string>
     <string name="update_later">Más tarde</string>
     <string name="settings_update_check">Buscar actualizaciones</string>
     <string name="settings_update_check_hint">Consulta en GitHub la última versión al iniciar la app.</string>

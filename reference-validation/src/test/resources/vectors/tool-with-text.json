@@ -1,0 +1,24 @@
+{
+  "id": "tool-with-text",
+  "input": "边说边调用",
+  "modelReplies": [
+    {
+      "content": "先调用",
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "ping"
+          }
+        }
+      ]
+    },
+    {
+      "content": "完成"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "pong"
+  }
+}

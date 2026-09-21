@@ -9,11 +9,14 @@ import com.labteto.dshmobile.harness.session.SessionDocument
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,6 +63,51 @@ class CoreArchitectureTest {
     }
 
     @Test
+    fun alwaysApprovalPolicyBlocksWithoutApprovalAndHonorsDecision() = runTest {
+        val registry = PluginRegistry()
+        var executions = 0
+        registry.context.tools.register(
+            HarnessTool(
+                name = "danger",
+                schema = buildJsonObject { put("name", "danger") },
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                executor = HarnessToolExecutor { _, _, _ ->
+                    executions += 1
+                    ToolResult("executed")
+                },
+            ),
+        )
+
+        val missing = registry.context.tools.execute("danger", buildJsonObject { })
+        assertTrue(missing.isError)
+        assertEquals(0, executions)
+
+        var asked = 0
+        val denied = registry.context.tools.execute(
+            "danger",
+            buildJsonObject { },
+            context = ToolContext(
+                approval = {
+                    asked += 1
+                    false
+                },
+            ),
+        )
+        assertTrue(denied.isError)
+        assertEquals(1, asked)
+        assertEquals(0, executions)
+
+        val allowed = registry.context.tools.execute(
+            "danger",
+            buildJsonObject { },
+            context = ToolContext(approval = { true }),
+        )
+        assertFalse(allowed.isError)
+        assertEquals("executed", allowed.content)
+        assertEquals(1, executions)
+    }
+
+    @Test
     fun legacySessionMigratesWithCheckpointAndRestarts() {
         val root = createTempDir(prefix = "session-store-")
         try {
@@ -76,6 +124,28 @@ class CoreArchitectureTest {
             assertFalse(requireNotNull(restarted).legacy)
             assertEquals(1, restarted.document.formatVersion)
             assertEquals(123L, restarted.document.updatedAt)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun corruptPrimaryRecoversFromLastGoodBackup() {
+        val root = createTempDir(prefix = "recover-session-")
+        try {
+            val store = VersionedSessionStore(root, json, clock = { 999L })
+            store.write("s1", buildJsonObject { put("value", 1) }, updatedAt = 1L)
+            store.write("s1", buildJsonObject { put("value", 2) }, updatedAt = 2L)
+            File(root, "s1.json").writeText("{broken")
+
+            val loaded = requireNotNull(store.read("s1"))
+            assertTrue(loaded.recovered)
+            assertEquals("1", loaded.document.payload["value"]?.jsonPrimitive?.content)
+            assertTrue(root.listFiles().orEmpty().any { it.name.startsWith("s1.corrupt-") })
+
+            val restarted = requireNotNull(VersionedSessionStore(root, json).read("s1"))
+            assertFalse(restarted.recovered)
+            assertEquals("1", restarted.document.payload["value"]?.jsonPrimitive?.content)
         } finally {
             root.deleteRecursively()
         }
