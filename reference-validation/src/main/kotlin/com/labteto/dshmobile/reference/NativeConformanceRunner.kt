@@ -7,10 +7,6 @@ import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 
 class NativeConformanceRunner {
     suspend fun run(vector: ConformanceVector): List<CanonicalEvent> {
@@ -51,12 +47,14 @@ class NativeConformanceRunner {
 }
 
 object AgentEventCanonicalizer {
-    private val json = Json
-
     fun canonicalize(events: List<AgentEvent>): List<CanonicalEvent> =
         events.map { event ->
             when (event) {
                 is AgentEvent.TurnStarted -> CanonicalEvent(type = "turn/start")
+                is AgentEvent.StepStarted -> CanonicalEvent(
+                    type = "step/start",
+                    step = event.step,
+                )
                 is AgentEvent.AssistantObserved -> CanonicalEvent(
                     type = "assistant/message",
                     step = event.step,
@@ -67,7 +65,7 @@ object AgentEventCanonicalizer {
                     step = event.step,
                     callId = event.call.id,
                     name = event.call.name,
-                    arguments = canonicalJson(event.call.arguments),
+                    arguments = event.call.rawArguments,
                 )
                 is AgentEvent.ToolFinished -> CanonicalEvent(
                     type = "tool/result",
@@ -75,9 +73,17 @@ object AgentEventCanonicalizer {
                     callId = event.call.id,
                     content = event.output.takeIf { it.isNotEmpty() },
                 )
+                is AgentEvent.StepFinished -> CanonicalEvent(
+                    type = "step/end",
+                    step = event.step,
+                )
                 is AgentEvent.TurnCompleted -> CanonicalEvent(
                     type = "turn/end",
                     reason = "completed",
+                )
+                is AgentEvent.TurnStepLimit -> CanonicalEvent(
+                    type = "turn/end",
+                    reason = "step_limit",
                 )
                 is AgentEvent.TurnFailed -> CanonicalEvent(
                     type = "turn/end",
@@ -89,17 +95,4 @@ object AgentEventCanonicalizer {
                 )
             }
         }
-
-    private fun canonicalJson(value: JsonElement): String =
-        json.encodeToString(JsonElement.serializer(), sortJson(value))
-
-    private fun sortJson(value: JsonElement): JsonElement = when (value) {
-        is JsonObject -> JsonObject(
-            value.entries
-                .sortedBy { it.key }
-                .associate { (key, child) -> key to sortJson(child) },
-        )
-        is JsonArray -> JsonArray(value.map(::sortJson))
-        else -> value
-    }
 }
