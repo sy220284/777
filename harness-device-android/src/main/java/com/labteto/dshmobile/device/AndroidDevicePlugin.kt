@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -104,7 +105,7 @@ class AndroidDevicePlugin(
                     }
                 })
                 put("required", buildJsonArray {
-                    spec.required.forEach(::add)
+                    spec.required.forEach { add(JsonPrimitive(it)) }
                 })
                 put("additionalProperties", false)
             })
