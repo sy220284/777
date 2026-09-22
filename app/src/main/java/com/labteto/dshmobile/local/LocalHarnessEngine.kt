@@ -172,6 +172,8 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { it.copy(jobs = snapshot) }
     }
 
+    private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
+
     private val subagents by lazy {
         LocalSubagentRunner(apiKeys, modelClient, state, jobs,
             historySnapshot = { modelHistory.toList() }, eventLog = { eventLog },
@@ -1043,76 +1045,7 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("mode") ?: "parallel",
             )
             "session_search" -> searchSessions(args.string("query"))
-            "memory_search" -> {
-                val state = _state.value
-                val records = memoryStore.search(
-                    query = args.string("query"),
-                    allowedScopes = allowedMemoryScopes(state.conversationMode),
-                    projectId = state.projectId,
-                    lineageId = state.lineageId,
-                    maxItems = 12,
-                    maxChars = 8_000,
-                )
-                if (records.isEmpty()) {
-                    "未找到当前作用域内的相关长期记忆"
-                } else {
-                    records.joinToString("\n") {
-                        "[${it.scope.name.lowercase()}/${it.kind.name.lowercase()}] ${it.content}"
-                    }
-                }
-            }
-            "memory_list" -> {
-                val state = _state.value
-                val records = memoryStore.listActive(
-                    allowedScopes = allowedMemoryScopes(state.conversationMode),
-                    projectId = state.projectId,
-                    lineageId = state.lineageId,
-                    limit = 20,
-                )
-                if (records.isEmpty()) {
-                    "当前作用域没有长期记忆"
-                } else {
-                    records.joinToString("\n") {
-                        "[${it.scope.name.lowercase()}/${it.kind.name.lowercase()}] ${it.content.take(500)}"
-                    }.take(10_000)
-                }
-            }
-            "memory_remember" -> {
-                if (!allowMutation) return "该子任务无权写入长期记忆"
-                val state = _state.value
-                val scope = when (args.string("scope").lowercase()) {
-                    "global" -> MemoryScope.GLOBAL
-                    "project" -> MemoryScope.PROJECT
-                    "lineage" -> MemoryScope.LINEAGE
-                    else -> return "记忆作用域必须为 global、project 或 lineage"
-                }
-                if (scope == MemoryScope.PROJECT && state.projectId == null) {
-                    return "当前是独立对话，没有可写入的项目作用域"
-                }
-                if (
-                    scope == MemoryScope.LINEAGE &&
-                    state.conversationMode != LocalConversationMode.CONTINUATION
-                ) {
-                    return "只有“继续当前任务”对话可以写入 lineage 记忆，避免产生无法召回的幽灵记忆"
-                }
-                val kind = runCatching {
-                    MemoryKind.valueOf((args.optionalString("kind") ?: "fact").uppercase())
-                }.getOrDefault(MemoryKind.FACT)
-                val record = runCatching {
-                    memoryManager.remember(
-                        content = args.string("content"),
-                        scope = scope,
-                        kind = kind,
-                        projectId = state.projectId,
-                        lineageId = state.lineageId,
-                        sourceSessionId = currentSessionId,
-                        importance = if (kind in setOf(MemoryKind.RULE, MemoryKind.CONSTRAINT, MemoryKind.DECISION)) 85 else 60,
-                    )
-                }.getOrElse { error ->
-                    return error.message ?: "长期记忆写入失败"
-                }
-                "已保存长期记忆：${record.content}"
-            }
+            "memory_search", "memory_list", "memory_remember" -> memoryTools.execute(call.name, args, allowMutation)
             "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
             "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
             "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
@@ -1394,13 +1327,6 @@ class LocalHarnessEngine @Inject constructor(
             history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
         ) 1 else 0
         return history.toMutableList().apply { add(index, insertion) }
-    }
-
-    private fun allowedMemoryScopes(mode: LocalConversationMode): Set<MemoryScope> = when (mode) {
-        LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
-        LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
-        LocalConversationMode.CONTINUATION ->
-            setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
     }
 
     private fun bundledRuntimeSearchPaths(): List<File> =

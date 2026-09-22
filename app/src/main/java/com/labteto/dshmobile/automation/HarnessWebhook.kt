@@ -329,20 +329,11 @@ class HarnessWebhookService : Service() {
             resultStore.update(requestId, status = "queued")
             respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
             scope.launch {
-                executionMutex.withLock {
-                    resultStore.update(requestId, status = "running")
-                    runCatching { engine.runAutomationPrompt(prompt) }
-                        .onSuccess { result ->
-                            resultStore.update(requestId, status = "completed", result = result)
-                        }
-                        .onFailure { error ->
-                            resultStore.update(
-                                requestId,
-                                status = "failed",
-                                error = error.message ?: error::class.java.simpleName,
-                            )
-                        }
-                }
+                executeWebhookRun(
+                    executionMutex,
+                    update = { status, result, error -> resultStore.update(requestId, status, result, error) },
+                    run = { engine.runAutomationPrompt(prompt) },
+                )
             }
         }
     }

@@ -88,9 +88,8 @@ object RelayPairing {
     /**
      * Claim a pairing code, minting this device's bearer token.
      *
-     * [baseUrl] must be the relay's **primary** origin. The plain-HTTP compatibility listener serves
-     * no relay route but `/relay/health`, so a claim addressed to it answers 404 — which is why a
-     * payload's `plainUrl` is ignored here and everywhere else.
+     * [baseUrl] must be the relay's HTTPS primary origin. Plaintext compatibility
+     * addresses are not used for pairing or authenticated traffic.
      *
      * `Content-Type: application/json` is not cosmetic: it is how the relay decides to answer with
      * JSON rather than with an HTML page.

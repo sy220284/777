@@ -150,8 +150,11 @@ class OkHttpRpcTransport(
                                 resp,
                                 if (resp.isSuccessful) MAX_RPC_RESPONSE_BYTES else MAX_ERROR_RESPONSE_BYTES,
                             )
-                        } catch (error: RpcTransportException) {
-                            if (continuation.isActive) continuation.resumeWithException(error)
+                        } catch (error: IOException) {
+                            if (continuation.isActive) continuation.resumeWithException(
+                                if (error is RpcTransportException) error else
+                                    RpcTransportException(resp.code, "transport failure: ${error.message}", error),
+                            )
                             return
                         }
                         if (!continuation.isActive) return

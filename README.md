@@ -29,7 +29,7 @@ Node、Python、Git 等桌面程序。需要这些运行时的任务仍需后续
 
 <p align="center">
   一款开源的 Android 伴侣应用，把你的 <b>DeepSeek Harness</b> 装进口袋。<br>
-  在局域网内用手机驱动会话、查看计划与目标、回应审批与提问，
+  通过加密中继用手机驱动会话、查看计划与目标、回应审批与提问，
   并在 harness 干完活时收到通知。
 </p>
 
@@ -68,7 +68,7 @@ harness，而不是对着一个敞开的端口。参见
 | 连接 | 聊天 | 轨迹 |
 |:--:|:--:|:--:|
 | <img src="docs/images/home.png" width="240" alt="连接界面：最近使用的 harness 及其实时可达性、发现、手动输入与自动连接开关"> | <img src="docs/images/chat.png" width="240" alt="聊天：流式输出的回合、每种工具的图标、工具卡片、目标停靠栏与输入框"> | <img src="docs/images/trajectory.png" width="240" alt="轨迹：按回合排列的账本，附带用量合计"> |
-| 最近使用的 harness 及实时可达性、局域网发现、手动 `host:port`、自动连接。 | 流式输出的回合、每种工具一个字形、可展开的工具卡片、权限选择器。 | 同一个会话，以按回合排列的账本呈现，并给出用量合计。 |
+| 已配对的中继、实时连接状态与自动连接。 | 流式输出的回合、每种工具一个字形、可展开的工具卡片、权限选择器。 | 同一个会话，以按回合排列的账本呈现，并给出用量合计。 |
 
 | 会话详情 | 子代理 |
 |:--:|:--:|
@@ -79,7 +79,7 @@ harness，而不是对着一个敞开的端口。参见
 
 - **轻松连接** —— 自动发现同一 Wi-Fi 下的 harness（主动子网扫描 + 就绪握手），
   记住用过的主机并在进入时探测其存活状态，支持手动输入 `host:port`、同设备回环连接，
-  以及自动连接开关（上次使用 / 局域网 / 同一设备）。
+  以及已配对中继的自动连接开关。
 - **Discord 式导航** —— 从屏幕左缘右滑打开按工作区分组的聊天列表，左滑关闭；
   从右缘左滑打开会话详情面板。
 - **完整的聊天体验** —— 流式输出的回合与可展开的推理过程、Markdown、
@@ -122,16 +122,8 @@ harness，而不是对着一个敞开的端口。参见
    在应用里：**中继 → 配对中继**，扫描二维码。等你用的每台客户端都配对完，
    就关掉中继的 `compat.addressGrants` —— 这里没有任何东西需要它。
 
-   **局域网** —— 手机上不用配置，也完全没有身份验证。按
-   [`harness/README.md`](harness/README.md) 打上单文件局域网补丁，重启 `dsh web`，
-   然后点**扫描网络**。只在你信任的网络上用。
+   远程控制仅支持 HTTPS 中继配对。旧的局域网扫描和直连入口已移除，明文中继需要升级为 HTTPS 后重新配对。
 
-   **走你自己的 HTTPS 反向代理** —— 把 `https://` 地址粘进局域网模式。
-   代理可以转发到回环地址，所以 harness 不需要打补丁；但它只加密链路，不验证任何人的身份。
-   参见 [`harness/README.md`](harness/README.md)。
-
-   **USB / 模拟器** —— 运行 `dsh web`，再执行 `adb reverse tcp:3080 tcp:3080`，
-   然后在局域网模式下连接 `127.0.0.1:3080`。不需要打补丁。
 3. 选一个会话开始聊，harness 干完活会通知你。
 
 如果连接失败，应用会直接说明原因；wiki 的
@@ -140,14 +132,9 @@ harness，而不是对着一个敞开的端口。参见
 
 ## 兼容性与安全
 
-> **0.1.2:** 从 harness 0.1.2 起，harness 会对整个 API 进行认证：在 App 询问时，把它启动时打印的链接粘贴一次。这会认证本机，但不会加密连接，因此仍然只应在可信网络上使用。
-
-- harness 版本矩阵和仅回环可用的接口见
-  [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
-- **请先读 [docs/SECURITY.md](docs/SECURITY.md)。** 裸的 harness 没有任何身份验证，
-  所以局域网模式只适合在你信任的网络上用 —— 应用在连接界面这么提醒也是出于同样的原因。
-  中继模式加上了真正的凭据和固定证书，但即便通过了验证，拿到的权力仍然等同于在那台电脑上
-  开一个 shell，因为代理就是在那里执行命令的。
+- 协议兼容性见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+- 远程访问需要配对的 HTTPS 中继，详见 [docs/SECURITY.md](docs/SECURITY.md)。代理可在远端执行命令，请只配对可信服务。
+- 本机 Webhook 仅监听回环地址。语言服务器需在设置中配置已安装服务器的启动命令，启动前执行权限审批。
 
 ## 构建
 
@@ -169,7 +156,7 @@ harness，而不是对着一个敞开的端口。参见
 | `app/` | Android UI：各界面、发现与连接、前台服务、通知、国际化 |
 | `mock-harness/` | 用于测试的 harness `/api` 服务端 Ktor 模拟实现 |
 | `tools/capture/` | 把真实 harness 流量录制成一致性测试夹具 |
-| `harness/` | 局域网模式的配套补丁与指南 |
+| `harness/` | 加密中继配对指南 |
 | — | 中继本身在 [sorsama/deepseek-harness-relay](https://github.com/sorsama/deepseek-harness-relay) |
 | `docs/` | [架构](docs/ARCHITECTURE.md)、[协议说明](docs/PROTOCOL.md)、[兼容性](docs/COMPATIBILITY.md)、[安全](docs/SECURITY.md) |
 

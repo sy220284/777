@@ -9,10 +9,33 @@ import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.Buffer
 import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import org.junit.Assert.*
 import org.junit.Test
 
 class RpcResponseLimitTest {
+    @Test fun bodyReadFailureCompletesCallerInsteadOfHanging() = runBlocking {
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("test").body(object : ResponseBody() {
+                    override fun contentType(): MediaType? = null
+                    override fun contentLength() = -1L
+                    override fun source(): BufferedSource = object : Source {
+                        override fun read(sink: Buffer, byteCount: Long): Long = throw java.io.IOException("broken stream")
+                        override fun timeout() = Timeout.NONE
+                        override fun close() = Unit
+                    }.buffer()
+                }).build()
+        }.build()
+        val error = runCatching {
+            kotlinx.coroutines.withTimeout(2_000) { OkHttpRpcTransport("http://stub", http).post("/api/test", "{}") }
+        }.exceptionOrNull()
+        assertTrue(error is RpcTransportException)
+        assertTrue(error!!.message!!.contains("broken stream"))
+    }
+
     private fun transport(size: Int, declared: Long, status: Int = 200): OkHttpRpcTransport {
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
