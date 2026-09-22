@@ -1049,6 +1049,7 @@ class LocalHarnessEngine @Inject constructor(
                 if (!allowMutation) return "该子任务处于只读模式"
                 val patch = args.string("patch")
                 require(patch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                validateWorkspacePatchPaths(patch)
                 val check = runtimeProcess.execute(
                     ProcessRequest(
                         command = listOf("git", "apply", "--check", "--whitespace=nowarn", "-"),
