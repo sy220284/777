@@ -17,8 +17,9 @@ class WebhookListenerTest {
         val listener = WebhookListener(scope) { it.getOutputStream().write(42) }
         try {
             repeat(10) {
-                listener.restart(InetSocketAddress("127.0.0.1", port))
-                Socket("127.0.0.1", port).use { client ->
+                val currentPort = ServerSocket(0).use { it.localPort }
+                listener.restart(InetSocketAddress("127.0.0.1", currentPort))
+                Socket("127.0.0.1", currentPort).use { client ->
                     client.soTimeout = 3000
                     assertEquals(42, client.getInputStream().read())
                 }
