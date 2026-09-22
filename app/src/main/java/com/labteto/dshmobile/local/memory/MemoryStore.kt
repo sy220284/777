@@ -139,9 +139,11 @@ class MemoryStore @Inject constructor(
             queryTerms.isNotEmpty() &&
             queryTerms.any { record.content.contains(it, ignoreCase = true) }
         ) 8 else 0
+        val relevance = overlap * 12 + direct
+        if (relevance == 0 && !record.pinned) return 0
         val pinned = if (record.pinned) 12 else 0
         val importance = record.importance / 10
-        return overlap * 12 + direct + pinned + importance
+        return relevance + pinned + importance
     }
 
     private fun terms(text: String): Set<String> {
