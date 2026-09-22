@@ -1242,6 +1242,7 @@ class LocalHarnessEngine @Inject constructor(
                         eventLog.append("request/error", buildJsonObject {
                             put("attempt", event.attempt)
                             put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
                         })
                     }
