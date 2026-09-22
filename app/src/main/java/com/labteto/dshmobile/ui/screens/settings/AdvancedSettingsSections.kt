@@ -335,6 +335,8 @@ internal fun LocalHarnessSettingsCard(
     var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
     var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
     var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
+    var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
+    var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
 
     SettingsCard("本机 Harness", Icons.Outlined.Memory) {
         Text(
@@ -352,6 +354,26 @@ internal fun LocalHarnessSettingsCard(
             label = { Text(if (local.configured) "替换模型密钥（可留空）" else "模型密钥") },
             visualTransformation = PasswordVisualTransformation(),
         )
+        OutlinedTextField(
+            value = userRules,
+            onValueChange = { userRules = it.take(6_000) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("用户长期规则") },
+            supportingText = { Text("最多保存 6000 字，每轮最多注入 3000 字；适合长期工作规则与回答偏好。") },
+            minLines = 3,
+            maxLines = 6,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("自动召回长期记忆", style = DsType.small13Strong, color = colors.labelPrimary)
+                Text("按当前问题检索少量相关记忆，不把整个记忆库塞进上下文。", style = DsType.caption11, color = colors.labelTertiary)
+            }
+            Switch(checked = autoRecall, onCheckedChange = { autoRecall = it })
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
                 value = mainSteps,
@@ -391,6 +413,8 @@ internal fun LocalHarnessSettingsCard(
                         mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
                         subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
                         modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
+                        userRules = userRules,
+                        autoRecall = autoRecall,
                     )
                     apiKey = ""
                     report("本机 Harness 配置已保存")
