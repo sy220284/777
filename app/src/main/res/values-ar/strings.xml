@@ -219,6 +219,8 @@
     <string name="presets_user">مخصص</string>
     <string name="settings_title">الإعدادات</string>
     <string name="settings_general">عام</string>
+    <string name="settings_advanced">الإمكانات المتقدمة</string>
+    <string name="settings_advanced_hint">المشاريع والنماذج والتشغيل المحلي والوصول إلى الجهاز</string>
     <string name="settings_models">النماذج</string>
     <string name="settings_plugins">الإضافات</string>
     <string name="settings_plugins_inventory">جرد الإضافات</string>
