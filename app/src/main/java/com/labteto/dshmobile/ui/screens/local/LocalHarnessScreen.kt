@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.LocalApproval
+import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
@@ -113,6 +114,7 @@ fun LocalHarnessScreen(
     var editingConfig by rememberSaveable { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
+    var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -171,7 +173,7 @@ fun LocalHarnessScreen(
                 onSend = viewModel::send,
                 onImportAttachment = viewModel::importAttachment,
                 onStop = viewModel::stop,
-                onNewSession = viewModel::newSession,
+                onNewSession = { showNewSessionMode = true },
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -186,6 +188,16 @@ fun LocalHarnessScreen(
         NetworkDiagnosticDialog(
             onDismiss = { showDiagnostic = false },
             diagnose = viewModel::diagnoseNetwork,
+        )
+    }
+
+    if (showNewSessionMode) {
+        NewSessionModeDialog(
+            onDismiss = { showNewSessionMode = false },
+            onSelect = { mode ->
+                showNewSessionMode = false
+                viewModel.createSession(mode)
+            },
         )
     }
 
@@ -1128,6 +1140,53 @@ private fun ScrollShortcut(
         Box(contentAlignment = Alignment.Center) {
             Text(text, style = DsType.large20, color = colors.labelPrimary)
         }
+    }
+}
+
+@Composable
+private fun NewSessionModeDialog(
+    onDismiss: () -> Unit,
+    onSelect: (LocalConversationMode) -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsDialog(title = "新建对话", onDismiss = onDismiss) {
+        Text(
+            "选择新对话可以使用哪些已有上下文。长期规则始终保留，其他内容按作用域隔离。",
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        DsButton(
+            text = "继续当前任务",
+            onClick = { onSelect(LocalConversationMode.CONTINUATION) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            "继承当前项目、对话链记忆和精简交接摘要，不复制整段旧聊天。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        DsButton(
+            text = "同项目新对话",
+            onClick = { onSelect(LocalConversationMode.PROJECT) },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Outline,
+        )
+        Text(
+            "保留全局和当前项目记忆，不带上一条对话的临时任务状态。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        DsButton(
+            text = "独立新对话",
+            onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
+        Text(
+            "只使用全局规则和全局长期记忆。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
     }
 }
 
