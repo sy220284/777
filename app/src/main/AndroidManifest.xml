@@ -45,6 +45,12 @@
             it, switching to Arabic or Urdu would still tear the activity down.
         -->
         <activity
+            android:name=".ui.screens.pair.PortraitCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/zxing_CaptureTheme" />
+
+        <activity
             android:name=".MainActivity"
             android:configChanges="locale|layoutDirection"
             android:exported="true"
