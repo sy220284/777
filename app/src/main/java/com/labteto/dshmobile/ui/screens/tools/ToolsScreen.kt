@@ -186,7 +186,7 @@ fun ToolsScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(server.id, style = DsType.std14Strong, color = colors.labelPrimary)
                                 Text(
-                                    "\${server.transport.uppercase()} · \${server.target} · \${server.tools.size} 个工具",
+                                    "${server.transport.uppercase()} · ${server.target} · ${server.tools.size} 个工具",
                                     style = DsType.caption11,
                                     color = colors.labelTertiary,
                                 )
@@ -233,7 +233,7 @@ fun ToolsScreen(
             Text("本机能力", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
                 Text(
-                    "已加载 \${state.localPlugins.size} 个本机能力模块",
+                    "已加载 ${state.localPlugins.size} 个本机能力模块",
                     style = DsType.small13,
                     color = colors.labelSecondary,
                 )
@@ -253,7 +253,7 @@ fun ToolsScreen(
                 Text("远程 Harness 扩展", style = DsType.std14, color = colors.labelTertiary)
                 DsGroupCard {
                     Text(
-                        "\${inventory.entries.size} 个扩展，仅显示当前加载状态",
+                        "${inventory.entries.size} 个扩展，仅显示当前加载状态",
                         style = DsType.caption11,
                         color = colors.labelTertiary,
                     )
