@@ -678,6 +678,17 @@ class LocalHarnessEngine @Inject constructor(
                             handoffSummary = snapshot.handoffSummary,
                         ),
                     )
+                    if (ephemeralContext.isNotBlank()) {
+                        eventLog.append("request/context", buildJsonObject {
+                            put("role", "system")
+                            put("scope", "turn")
+                            put("content", ephemeralContext.take(MAX_EPHEMERAL_CONTEXT_CHARS))
+                            put("conversation_mode", snapshot.conversationMode.name.lowercase())
+                            snapshot.projectId?.let { projectId -> put("project_id", projectId) }
+                            snapshot.lineageId.takeIf(String::isNotBlank)
+                                ?.let { lineageId -> put("lineage_id", lineageId) }
+                        })
+                    }
                     if (snapshot.autoMemory && memoryInput.isNotBlank()) {
                         runCatching {
                             memoryManager.captureExplicitUserDirective(
@@ -702,7 +713,12 @@ class LocalHarnessEngine @Inject constructor(
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val requestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
-                val reply = completeWithRetry(key, snapshot, requestMessages)
+                val reply = completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = modelStep + 1,
+                )
                 modelStep += 1
                 repliesByStep[modelStep] = reply
                 AgentModelReply(
@@ -1219,7 +1235,17 @@ class LocalHarnessEngine @Inject constructor(
         key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
+        step: Int,
     ): LocalModelReply {
+        eventLog.append("request/header", buildJsonObject {
+            put("model", snapshot.model)
+            put("base_url", snapshot.baseUrl)
+            put("step", step)
+            put("message_count", messages.size)
+            put("context_chars", messages.sumOf { it.toString().length })
+            put("tool_count", toolRegistry.names().size)
+            put("plan_mode", snapshot.planMode)
+        })
         val executor = AgentRequestExecutor(
             maxAttempts = snapshot.modelAttempts.coerceIn(1, 5),
             retryable = { error ->
@@ -1227,19 +1253,10 @@ class LocalHarnessEngine @Inject constructor(
             },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
-                    is AgentRequestEvent.AttemptStarted -> {
-                        eventLog.append("request/header", buildJsonObject {
-                            put("model", snapshot.model)
-                            put("base_url", snapshot.baseUrl)
-                            put("attempt", event.attempt)
-                            put("max_attempts", event.maxAttempts)
-                            put("message_count", messages.size)
-                            put("context_chars", messages.sumOf { it.toString().length })
-                            put("plan_mode", snapshot.planMode)
-                        })
-                    }
+                    is AgentRequestEvent.AttemptStarted -> Unit
                     is AgentRequestEvent.AttemptFailed -> {
                         eventLog.append("request/error", buildJsonObject {
+                            put("step", step)
                             put("attempt", event.attempt)
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
@@ -1248,6 +1265,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                     is AgentRequestEvent.RetryScheduled -> {
                         eventLog.append("llm/retry", buildJsonObject {
+                            put("step", step)
                             put("attempt", event.attempt)
                             put("next_attempt", event.nextAttempt)
                             put("delay_ms", event.delayMillis)
