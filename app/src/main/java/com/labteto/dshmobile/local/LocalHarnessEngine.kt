@@ -131,7 +131,11 @@ class LocalHarnessEngine @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
-    private val workspace = LocalWorkspace(File(root, "workspace"))
+    private val workspace = LocalWorkspace(
+        root = File(root, "workspace"),
+        extraSearchPaths = ::bundledRuntimeSearchPaths,
+        environmentProvider = ::bundledRuntimeEnvironment,
+    )
     private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
@@ -1068,7 +1072,8 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("mode") ?: "parallel",
             )
             "session_search" -> searchSessions(args.string("query"))
-            "memory_search", "memory_list", "memory_remember" -> memoryTools.execute(call.name, args, allowMutation)
+            "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
+                memoryTools.execute(call.name, args, allowMutation)
             "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
             "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
             "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
@@ -1359,7 +1364,8 @@ class LocalHarnessEngine @Inject constructor(
         安卓系统限制访问其他应用私有目录。当前 APK 内置 Node、Python 与 Git 运行时；其他命令仍以 runtime_command_status / environment_info 的实际检测结果为准。Git hooks 默认禁用，避免 Android 可写目录执行限制和未审批脚本执行。遇到缺失命令时，说明限制并使用现有工具完成可行部分。
         若视觉模型已配置，可用 vision_analyze_screen 或 vision_analyze_vscreen 理解真实画面；主屏截图外发必须等待用户批准，虚拟屏分析用于已授权的独立 Agent 显示。不要把截图 base64 当文字分析。
         遇到联网失败先使用 network_diagnose 判断 DNS、系统代理、VPN/TUN、安全拦截和实际 HTTP/TLS 连通性；直接抓取会在可恢复网络错误时自动降级网页搜索。.git 仓库地址会自动转换为网页地址。
-        把实施步骤写入计划或任务清单，重大长期工作写入目标。memory_search 用于按主题查询当前会话允许作用域内的记忆；memory_list 只在用户明确要求查看已保存记忆时使用；memory_remember 只保存明确长期规则、稳定偏好、项目决定或用户明确要求记住的内容，禁止保存密钥、口令、验证码和一次性临时信息。
+        把实施步骤写入计划或任务清单，重大长期工作写入目标。memory_search 用于按主题查询当前会话允许作用域内的记忆；memory_list 只在用户明确要求查看已保存记忆时使用；memory_remember 只保存明确长期规则、稳定偏好、项目决定或用户明确要求记住的内容；需要纠正或停用旧记忆时使用 memory_update / memory_forget，禁止保存密钥、口令、验证码和一次性临时信息。
+        涉及“本机是否具备某项能力、某命令是否可用、某权限是否已授权”等自身能力边界时，必须先调用对应状态/诊断工具核实，再向用户下结论；不要只依据系统提示或历史描述推断。
         结果以清晰中文回复。
         ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
     """.trimIndent()
@@ -1416,7 +1422,8 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("工作区：${workspace.path}")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
-            appendLine("限制：应用沙箱无法访问其他 App 私有目录；Git hooks 默认禁用；语言服务器等以实际检测结果为准。")
+            appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
+            appendLine("限制：应用沙箱无法访问其他 App 私有目录；语言服务器等以实际检测结果为准。")
             append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；web_fetch 大响应会自动落盘。外部文件可从输入栏附件导入工作区。")
         }
     }
@@ -1618,7 +1625,7 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "subagent_fork", "workflow", "ask_user_question",
             "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
             "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
-            "memory_remember", "vision_analyze_screen",
+            "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",

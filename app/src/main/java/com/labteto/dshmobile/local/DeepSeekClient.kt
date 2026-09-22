@@ -354,6 +354,22 @@ object LocalToolCatalog {
                 })
             },
         ), listOf("content", "scope")))
+        add(tool("memory_update", "按稳定记忆 id 更新当前作用域内的一条长期记忆；执行前需要用户批准", properties(
+            "id" to string("memory_search 或 memory_list 返回的完整 id，也可使用唯一前缀"),
+            "content" to string("可选；新的记忆内容"),
+            "kind" to buildJsonObject {
+                put("type", "string")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("rule")); add(JsonPrimitive("preference")); add(JsonPrimitive("fact"))
+                    add(JsonPrimitive("decision")); add(JsonPrimitive("constraint")); add(JsonPrimitive("state")); add(JsonPrimitive("summary"))
+                })
+            },
+            "importance" to integer("可选；0 到 100"),
+            "pinned" to boolean("可选；是否固定提高召回优先级"),
+        ), listOf("id")))
+        add(tool("memory_forget", "按稳定记忆 id 停用当前作用域内的一条长期记忆；执行前需要用户批准", properties(
+            "id" to string("memory_search 或 memory_list 返回的完整 id，也可使用唯一前缀"),
+        ), listOf("id")))
         add(tool("session_trace", "读取一个会话最近的事件轨迹", properties(
             "session_id" to string("可选；留空使用当前会话"),
             "limit" to integer("返回条数，默认 40，最大 200"),

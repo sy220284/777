@@ -101,6 +101,46 @@ class MemoryStore internal constructor(
     }
 
     @Synchronized
+    fun update(
+        id: String,
+        content: String? = null,
+        kind: MemoryKind? = null,
+        importance: Int? = null,
+        pinned: Boolean? = null,
+    ): MemoryRecord {
+        val records = readDocument().records.toMutableList()
+        val index = records.indexOfFirst { it.id == id && it.active }
+        require(index >= 0) { "长期记忆不存在或已停用：$id" }
+        val current = records[index]
+        val clean = content?.trim()?.take(MAX_MEMORY_CONTENT_CHARS) ?: current.content
+        require(clean.isNotEmpty()) { "记忆内容不能为空" }
+        val updated = current.copy(
+            content = clean,
+            kind = kind ?: current.kind,
+            importance = (importance ?: current.importance).coerceIn(0, 100),
+            pinned = pinned ?: current.pinned,
+            updatedAt = System.currentTimeMillis(),
+        )
+        records[index] = updated
+        writeDocument(MemoryDocument(records = records))
+        return updated
+    }
+
+    @Synchronized
+    fun forget(id: String): Boolean {
+        val records = readDocument().records.toMutableList()
+        val index = records.indexOfFirst { it.id == id && it.active }
+        if (index < 0) return false
+        records[index] = records[index].copy(
+            active = false,
+            supersededBy = null,
+            updatedAt = System.currentTimeMillis(),
+        )
+        writeDocument(MemoryDocument(records = records))
+        return true
+    }
+
+    @Synchronized
     fun search(
         query: String,
         allowedScopes: Set<MemoryScope>,

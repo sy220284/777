@@ -15,7 +15,7 @@ internal object LocalToolPolicy {
     fun access(name: String): ToolAccess = when (canonical(name)) {
         "write", "edit", "present" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
-        "ask_user_question", "memory_remember" -> ToolAccess.SESSION_WRITE
+        "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
@@ -27,7 +27,8 @@ internal object LocalToolPolicy {
     }
 
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
-        "write", "edit", "bash", "job_kill", "send_message", "interrupt_agent" -> ToolApprovalPolicy.ALWAYS
+        "write", "edit", "bash", "job_kill", "send_message", "interrupt_agent",
+        "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
     }
 

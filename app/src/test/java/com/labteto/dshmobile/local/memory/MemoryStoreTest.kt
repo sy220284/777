@@ -57,4 +57,22 @@ class MemoryStoreTest {
         val replacement = store().remember("apples new", MemoryScope.GLOBAL, replaceIds = setOf(old.id))
         assertEquals(listOf(replacement), all(store()))
     }
+
+    @Test fun updateAndForgetPersistAcrossRestart() {
+        val original = store().remember("remember apples", MemoryScope.GLOBAL, importance = 50)
+        val updated = store().update(
+            id = original.id,
+            content = "remember oranges",
+            importance = 90,
+            pinned = true,
+        )
+        assertEquals(original.id, updated.id)
+        assertEquals("remember oranges", all(store()).single().content)
+        assertEquals(90, all(store()).single().importance)
+        assertTrue(all(store()).single().pinned)
+
+        assertTrue(store().forget(original.id))
+        assertTrue(all(store()).isEmpty())
+        assertFalse(store().forget(original.id))
+    }
 }

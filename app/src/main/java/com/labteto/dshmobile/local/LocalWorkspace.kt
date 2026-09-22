@@ -13,7 +13,12 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
-class LocalWorkspace(private val root: File) {
+class LocalWorkspace(
+    private val root: File,
+    private val extraSearchPaths: () -> List<File> = { emptyList() },
+    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
+    private val shellExecutable: String = "/system/bin/sh",
+) {
     private val canonicalRoot = root.canonicalFile
     private val observations = ConcurrentHashMap<String, String>()
 
@@ -171,10 +176,25 @@ class LocalWorkspace(private val root: File) {
         onProgress: ((String) -> Unit)? = null,
     ): String = withContext(Dispatchers.IO) {
         require(command.isNotBlank()) { "命令不能为空" }
-        val process = ProcessBuilder("/system/bin/sh", "-c", command)
+        val builder = ProcessBuilder(shellExecutable, "-c", command)
             .directory(canonicalRoot)
             .redirectErrorStream(true)
-            .start()
+        builder.environment().apply {
+            putAll(environmentProvider())
+            val inheritedPath = get("PATH").orEmpty()
+            val runtimePath = extraSearchPaths()
+                .filter(File::isDirectory)
+                .joinToString(File.pathSeparator) { it.absolutePath }
+            if (runtimePath.isNotBlank()) {
+                put(
+                    "PATH",
+                    listOf(runtimePath, inheritedPath)
+                        .filter(String::isNotBlank)
+                        .joinToString(File.pathSeparator),
+                )
+            }
+        }
+        val process = builder.start()
         try {
             coroutineScope {
                 val output = async {

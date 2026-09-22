@@ -23,7 +23,8 @@ class LocalToolCatalogTest {
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
                     "session_search", "session_event_search", "session_trace",
-                    "session_event_trace", "session_event_read", "memory_search", "memory_list", "memory_remember", "present",
+                    "session_event_trace", "session_event_read", "memory_search", "memory_list", "memory_remember",
+                    "memory_update", "memory_forget", "present",
                 ),
             ),
         )
