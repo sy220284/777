@@ -219,6 +219,7 @@ internal class LocalSubagentRunner(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
                         })
                     }
