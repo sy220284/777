@@ -1,0 +1,93 @@
+package com.labteto.dshmobile.harness.agent
+
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+
+sealed interface AgentRequestEvent {
+    val attempt: Int
+
+    data class AttemptStarted(
+        override val attempt: Int,
+        val maxAttempts: Int,
+    ) : AgentRequestEvent
+
+    data class AttemptFailed(
+        override val attempt: Int,
+        val maxAttempts: Int,
+        val retryable: Boolean,
+        val reason: String,
+    ) : AgentRequestEvent
+
+    data class RetryScheduled(
+        override val attempt: Int,
+        val nextAttempt: Int,
+        val delayMillis: Long,
+    ) : AgentRequestEvent
+
+    data class AttemptSucceeded(
+        override val attempt: Int,
+    ) : AgentRequestEvent
+}
+
+fun interface AgentRequestEventSink {
+    suspend fun append(event: AgentRequestEvent)
+}
+
+/**
+ * Platform-neutral model-request retry policy shared by parent agents and subagents.
+ *
+ * Cancellation is never converted into a retry. Every failed attempt is observable before a retry
+ * is scheduled, which keeps durable diagnostics and UI state in agreement with the actual request
+ * lifecycle.
+ */
+class AgentRequestExecutor(
+    maxAttempts: Int,
+    private val retryable: (Exception) -> Boolean,
+    private val eventSink: AgentRequestEventSink = AgentRequestEventSink { },
+    private val backoffMillis: (failedAttempt: Int) -> Long = { failedAttempt ->
+        1_000L shl (failedAttempt - 1).coerceIn(0, 20)
+    },
+    private val sleeper: suspend (Long) -> Unit = { delay(it) },
+) {
+    private val maxAttempts = maxAttempts.coerceIn(1, MAX_ATTEMPTS)
+
+    suspend fun <T> execute(block: suspend (attempt: Int) -> T): T {
+        var lastError: Exception? = null
+        for (attempt in 1..maxAttempts) {
+            eventSink.append(AgentRequestEvent.AttemptStarted(attempt, maxAttempts))
+            try {
+                return block(attempt).also {
+                    eventSink.append(AgentRequestEvent.AttemptSucceeded(attempt))
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                lastError = error
+                val canRetry = retryable(error) && attempt < maxAttempts
+                eventSink.append(
+                    AgentRequestEvent.AttemptFailed(
+                        attempt = attempt,
+                        maxAttempts = maxAttempts,
+                        retryable = canRetry,
+                        reason = error.message ?: error::class.java.simpleName,
+                    ),
+                )
+                if (!canRetry) throw error
+                val delayMillis = backoffMillis(attempt).coerceAtLeast(0L)
+                eventSink.append(
+                    AgentRequestEvent.RetryScheduled(
+                        attempt = attempt,
+                        nextAttempt = attempt + 1,
+                        delayMillis = delayMillis,
+                    ),
+                )
+                if (delayMillis > 0L) sleeper(delayMillis)
+            }
+        }
+        throw lastError ?: IllegalStateException("模型请求失败")
+    }
+
+    private companion object {
+        const val MAX_ATTEMPTS = 8
+    }
+}
