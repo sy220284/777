@@ -41,8 +41,6 @@
     <string name="connect_port_label">Port</string>
     <string name="connect_port_hint">3080</string>
     <string name="connect_button">Connect</string>
-    <string name="connect_scanning">Scanning your network…</string>
-    <string name="connect_scan">Scan network</string>
     <string name="connect_discovered">Discovered harnesses</string>
     <string name="connect_discovered_hint">No harnesses found yet — make sure the harness is running and your phone is on the same Wi-Fi.</string>
     <string name="connect_remembered">Recent</string>
@@ -61,7 +59,6 @@
     <string name="connect_stage_connected">Connected</string>
     <string name="connect_cancel">Cancel</string>
     <string name="connect_fail_invalid">Enter the computer\'s IP address and a port between 1 and 65535.</string>
-    <string name="connect_fail_subnet">%1$s is not on this phone\'s network. This phone is on %2$s — connect both devices to the same router network. A guest or IoT Wi-Fi is usually kept separate, and Scan network only searches %2$s.</string>
     <string name="connect_fail_timeout">Nothing answered at %1$s. Usually the computer\'s firewall is blocking incoming connections on port %2$d — allow it and try again. Some routers also stop Wi-Fi devices from reaching wired ones.</string>
     <string name="connect_fail_refused">%1$s refused the connection. The harness only listens on the computer itself unless LAN mode is enabled — enable it and restart the harness. If you changed the port, check it matches.</string>
     <string name="connect_fail_fence_title">The harness rejected this address</string>
@@ -86,7 +83,6 @@
     <string name="connect_fail_unauthenticated">%1$s is a harness, but it has not signed this phone in. Open the harness startup link on this device once, then connect again.</string>
     <string name="connect_checking">Checking…</string>
     <string name="connect_remembered_empty">Harnesses you connect to appear here.</string>
-    <string name="connect_scan_progress">Scanning your network… %1$d of %2$d</string>
     <string name="connect_sessions_short">%1$d session(s)</string>
     <string name="connect_never">Never connected</string>
     <string name="connect_harness_version_only">Harness %1$s</string>
@@ -471,4 +467,7 @@
     <string name="system_prompt">System prompt</string>
     <string name="image_offload">Historical images omitted from request</string>
     <string name="panel_open_host">Open on host</string>
+    <string name="settings_lsp_command">Language server command</string>
+    <string name="settings_lsp_hint">JSON argument array, for example [node, server.js, --stdio] with each item quoted. Install a compatible server first. Leave blank to disable.</string>
+    <string name="settings_lsp_save">Save language server</string>
 </resources>

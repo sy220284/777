@@ -117,9 +117,15 @@ class LocalHarnessEngine @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val workspace = LocalWorkspace(File(root, "workspace"))
+    private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
-    private val sessionStore = VersionedSessionStore(sessionsRoot, json)
+    private val sessionRepository by lazy {
+        LocalSessionRepository(sessionsRoot, json, scope,
+            onWritten = { _state.update { it.copy(sessions = sessionSummaries()) } },
+            onError = { error -> _state.update { it.copy(error = error.message ?: "会话写入失败") } },
+        )
+    }
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val runtimeProcess = AndroidProcessRuntime(
@@ -144,65 +150,35 @@ class LocalHarnessEngine @Inject constructor(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
     )
+    private val lspPlugin = com.labteto.dshmobile.interop.lsp.LspPlugin(
+        root = File(workspace.path), json = json,
+        command = { parseLanguageServerCommand(preferences.getString("language_server_command", "").orEmpty()) },
+        commandResolver = runtimeProcess::resolveCommand,
+        environment = { runtimeProcess.processEnvironment() },
+    )
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
-    private val builtinPlugin = object : HarnessPlugin {
-        override val id = "android-local-builtins"
-
-        override suspend fun install(context: HarnessContext) {
-            LocalToolCatalog.specs.forEach { element ->
-                val schema = element.jsonObject
-                val function = schema["function"]?.jsonObject ?: return@forEach
-                val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                context.tools.register(
-                    HarnessTool(
-                        name = name,
-                        schema = schema,
-                        access = toolAccess(name),
-                        approvalPolicy = toolApprovalPolicy(name),
-                        executor = HarnessToolExecutor { toolContext, input, rawArguments ->
-                            val callId = toolContext.attributes["call_id"] as? String
-                                ?: "registry-" + UUID.randomUUID().toString().take(8)
-                            ToolResult(
-                                this@LocalHarnessEngine.executeLegacy(
-                                    LocalToolCall(
-                                        id = callId,
-                                        name = name,
-                                        arguments = input,
-                                        rawArguments = rawArguments,
-                                    ),
-                                    allowMutation = toolContext.allowMutation,
-                                ),
-                            )
-                        },
-                    ),
-                )
-            }
-        }
-
-        override suspend fun uninstall(context: HarnessContext) {
-            LocalToolCatalog.specs.forEach { element ->
-                element.jsonObject["function"]?.jsonObject
-                    ?.get("name")?.jsonPrimitive?.contentOrNull
-                    ?.let(context.tools::unregister)
-            }
-        }
-    }
+    private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
     private val modelHistory = mutableListOf<JsonObject>()
-    private val persistenceLock = Any()
-    private val pendingPersistence = mutableMapOf<String, LocalHarnessSession>()
-    private val queuedPersistenceIds = mutableSetOf<String>()
-    private val persistenceQueue = Channel<String>(Channel.UNLIMITED)
     private val _state = MutableStateFlow(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     private val jobs = LocalJobManager(scope) { snapshot ->
         _state.update { it.copy(jobs = snapshot) }
+    }
+
+    private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
+
+    private val subagents by lazy {
+        LocalSubagentRunner(apiKeys, modelClient, state, jobs,
+            historySnapshot = { modelHistory.toList() }, eventLog = { eventLog },
+            schemas = ::subagentToolSchemas, execute = ::executeSafely, pruneToolResult = ::pruneToolResult,
+        )
     }
 
     private val runStateLock = Any()
@@ -217,31 +193,13 @@ class LocalHarnessEngine @Inject constructor(
         seedWorkspace()
         migrateLegacySession()
         scope.launch {
-            for (sessionId in persistenceQueue) {
-                while (true) {
-                    val snapshot = synchronized(persistenceLock) {
-                        pendingPersistence.remove(sessionId)
-                    } ?: break
-                    writeSession(sessionId, snapshot)
-                }
-                val reschedule = synchronized(persistenceLock) {
-                    queuedPersistenceIds.remove(sessionId)
-                    if (pendingPersistence.containsKey(sessionId) && queuedPersistenceIds.add(sessionId)) {
-                        true
-                    } else {
-                        false
-                    }
-                }
-                if (reschedule) persistenceQueue.trySend(sessionId)
-            }
-        }
-        scope.launch {
             runCatching {
                 bundledNodeRuntime.prepare()
                 bundledPythonRuntime.prepare()
                 pluginRegistry.install(builtinPlugin)
                 pluginRegistry.install(runtimePlugin)
                 pluginRegistry.install(mcpPlugin)
+                pluginRegistry.install(lspPlugin)
                 pluginRegistry.install(devicePlugin)
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
@@ -255,6 +213,19 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
         }
+    }
+
+    fun configureLanguageServer(command: String): String {
+        if (isRunBusy()) return "请等待当前任务结束后修改语言服务器配置"
+        runCatching { parseLanguageServerCommand(command) }.getOrElse {
+            return "启动命令格式无效，请填写 JSON 字符串数组，例如 [\"node\",\"server.js\",\"--stdio\"]"
+        }
+        scope.launch {
+            lspPlugin.stop()
+            preferences.edit().putString("language_server_command", command.trim()).apply()
+            _state.update { it.copy(languageServerCommand = command.trim()) }
+        }
+        return "语言服务器配置已提交；启动时仍需批准进程执行"
     }
 
     /** Save the local model route and its encrypted credential. */
@@ -311,6 +282,7 @@ class LocalHarnessEngine @Inject constructor(
                 userRules = profile.customRules,
                 autoRecall = profile.autoRecall,
                 autoMemory = profile.autoMemory,
+            languageServerCommand = preferences.getString("language_server_command", "").orEmpty(),
             )
         }
         scope.launch {
@@ -376,6 +348,7 @@ class LocalHarnessEngine @Inject constructor(
         val beforeCount = _state.value.messages.size
         val job = queueTurn(prompt) ?: error("后台任务未能启动")
         job.start()
+        com.labteto.dshmobile.automation.owningAutomationRun(job) {
         try {
             withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
                 while (!job.isCompleted) {
@@ -399,8 +372,8 @@ class LocalHarnessEngine @Inject constructor(
             job.cancelAndJoin()
             throw IllegalStateException("后台任务执行超时，已停止本轮任务", timeout)
         } catch (cancelled: CancellationException) {
-            job.cancelAndJoin()
             throw cancelled
+        }
         }
 
         val newMessages = _state.value.messages.drop(beforeCount)
@@ -904,12 +877,13 @@ class LocalHarnessEngine @Inject constructor(
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
 
-    private suspend fun executeRegistered(call: LocalToolCall, allowMutation: Boolean): String {
+    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): String {
+        val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
-        if (registered == null) return executeLegacy(call, allowMutation)
+        if (registered == null) return "未知工具：${call.name}"
         if (
             _state.value.planMode &&
-            registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+            !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
@@ -924,7 +898,11 @@ class LocalHarnessEngine @Inject constructor(
                 approval = { tool ->
                     approve(
                         call,
-                        "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）",
+                        when (tool.name) {
+                            "write", "edit" -> "${tool.name}：${call.arguments.optionalString("path").orEmpty()}"
+                            "bash" -> "执行命令：${call.arguments.optionalString("command").orEmpty().take(160)}"
+                            else -> "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）"
+                        },
                         tool.access,
                     )
                 },
@@ -942,7 +920,7 @@ class LocalHarnessEngine @Inject constructor(
             .map(HarnessTool::schema),
     )
 
-    private suspend fun executeLegacy(call: LocalToolCall, allowMutation: Boolean): String {
+    private suspend fun executeBuiltin(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
         if (_state.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
@@ -956,14 +934,12 @@ class LocalHarnessEngine @Inject constructor(
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
                 val path = args.string("path")
-                if (!approve(call, "写入文件：$path", ToolAccess.WORKSPACE_WRITE)) return "用户拒绝写入 $path"
                 workspace.write(path, args.string("content"))
             }
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
-                if (!approve(call, "编辑文件：$path", ToolAccess.WORKSPACE_WRITE)) return "用户拒绝编辑 $path"
                 workspace.edit(path, args.string("old_text"), args.string("new_text"))
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
@@ -972,7 +948,6 @@ class LocalHarnessEngine @Inject constructor(
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")
-                if (!approve(call, "执行命令：${command.take(160)}", ToolAccess.PROCESS)) return "用户拒绝执行命令"
                 val background = args.boolean("run_in_background", false)
                 val timeout = args.int(
                     "timeout_seconds",
@@ -1004,13 +979,13 @@ class LocalHarnessEngine @Inject constructor(
                 if (background) {
                     jobs.start("网页抓取：${input.take(120)}") { _, report ->
                         report("正在抓取：$input")
-                        fetchWebWithFallback(input, maxBytes, format, timeout)
+                        webTools.fetch(input, maxBytes, format, timeout)
                     }
                 } else {
-                    fetchWebWithFallback(input, maxBytes, format, timeout)
+                    webTools.fetch(input, maxBytes, format, timeout)
                 }
             }
-            "json_query" -> jsonQuery(
+            "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
             )
@@ -1037,7 +1012,7 @@ class LocalHarnessEngine @Inject constructor(
                 val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 40)
                 if (args.boolean("run_in_background", false)) {
                     jobs.start("子代理：${task.take(100)}") { jobId, _ ->
-                        runSubagent(
+                        subagents.run(
                             task = task,
                             inheritHistory = false,
                             allowMutation = false,
@@ -1046,7 +1021,7 @@ class LocalHarnessEngine @Inject constructor(
                             maxSteps = maxSteps,
                         )
                     }
-                } else runSubagent(
+                } else subagents.run(
                     task = task,
                     inheritHistory = false,
                     allowMutation = false,
@@ -1055,7 +1030,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             "subagent_fork", "fork_subagent" ->
-                runSubagent(
+                subagents.run(
                     args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
@@ -1070,76 +1045,7 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("mode") ?: "parallel",
             )
             "session_search" -> searchSessions(args.string("query"))
-            "memory_search" -> {
-                val state = _state.value
-                val records = memoryStore.search(
-                    query = args.string("query"),
-                    allowedScopes = allowedMemoryScopes(state.conversationMode),
-                    projectId = state.projectId,
-                    lineageId = state.lineageId,
-                    maxItems = 12,
-                    maxChars = 8_000,
-                )
-                if (records.isEmpty()) {
-                    "未找到当前作用域内的相关长期记忆"
-                } else {
-                    records.joinToString("\n") {
-                        "[${it.scope.name.lowercase()}/${it.kind.name.lowercase()}] ${it.content}"
-                    }
-                }
-            }
-            "memory_list" -> {
-                val state = _state.value
-                val records = memoryStore.listActive(
-                    allowedScopes = allowedMemoryScopes(state.conversationMode),
-                    projectId = state.projectId,
-                    lineageId = state.lineageId,
-                    limit = 20,
-                )
-                if (records.isEmpty()) {
-                    "当前作用域没有长期记忆"
-                } else {
-                    records.joinToString("\n") {
-                        "[${it.scope.name.lowercase()}/${it.kind.name.lowercase()}] ${it.content.take(500)}"
-                    }.take(10_000)
-                }
-            }
-            "memory_remember" -> {
-                if (!allowMutation) return "该子任务无权写入长期记忆"
-                val state = _state.value
-                val scope = when (args.string("scope").lowercase()) {
-                    "global" -> MemoryScope.GLOBAL
-                    "project" -> MemoryScope.PROJECT
-                    "lineage" -> MemoryScope.LINEAGE
-                    else -> return "记忆作用域必须为 global、project 或 lineage"
-                }
-                if (scope == MemoryScope.PROJECT && state.projectId == null) {
-                    return "当前是独立对话，没有可写入的项目作用域"
-                }
-                if (
-                    scope == MemoryScope.LINEAGE &&
-                    state.conversationMode != LocalConversationMode.CONTINUATION
-                ) {
-                    return "只有“继续当前任务”对话可以写入 lineage 记忆，避免产生无法召回的幽灵记忆"
-                }
-                val kind = runCatching {
-                    MemoryKind.valueOf((args.optionalString("kind") ?: "fact").uppercase())
-                }.getOrDefault(MemoryKind.FACT)
-                val record = runCatching {
-                    memoryManager.remember(
-                        content = args.string("content"),
-                        scope = scope,
-                        kind = kind,
-                        projectId = state.projectId,
-                        lineageId = state.lineageId,
-                        sourceSessionId = currentSessionId,
-                        importance = if (kind in setOf(MemoryKind.RULE, MemoryKind.CONSTRAINT, MemoryKind.DECISION)) 85 else 60,
-                    )
-                }.getOrElse { error ->
-                    return error.message ?: "长期记忆写入失败"
-                }
-                "已保存长期记忆：${record.content}"
-            }
+            "memory_search", "memory_list", "memory_remember" -> memoryTools.execute(call.name, args, allowMutation)
             "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
             "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
             "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
@@ -1152,86 +1058,6 @@ class LocalHarnessEngine @Inject constructor(
             "present" -> workspace.present(args.string("path"))
             else -> "未知工具：${call.name}"
         }
-    }
-
-    private suspend fun fetchWebWithFallback(
-        input: String,
-        maxBytes: Int,
-        format: String,
-        timeoutSeconds: Long,
-    ): String {
-        return try {
-            formatFetchedWeb(
-                web.fetch(
-                    input,
-                    maxBytes = maxBytes,
-                    format = format,
-                    timeoutSeconds = timeoutSeconds,
-                ),
-                format,
-            )
-        } catch (error: LocalWebException) {
-            if (error.code !in FALLBACK_WEB_ERRORS) throw error
-            val key = apiKeys.get()
-            if (key == null) {
-                "[web_fetch][${error.code}] ${error.message}\n搜索降级不可用：本机模型密钥不可用。可把文件通过输入栏附件放入本机工作区。"
-            } else {
-                runCatching {
-                    val fallback = web.search(key, listOf(web.fallbackQuery(input)))
-                    "[web_fetch][${error.code}] 直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
-                }.getOrElse { fallbackError ->
-                    "[web_fetch][${error.code}] ${error.message}\n搜索降级也失败：${fallbackError.message}\n建议：先运行 network_diagnose，或把目标文件通过附件放入本机工作区。"
-                }
-            }
-        }
-    }
-    private fun formatFetchedWeb(result: LocalWebFetchResult, format: String): String {
-        val total = result.totalBytes?.let { "$it 字节" } ?: "服务器未提供 Content-Length"
-        val shouldSpill = result.content.length > WEB_FETCH_INLINE_CHARS || result.truncated
-        if (!shouldSpill) {
-            return buildString {
-                appendLine("URL: ${result.url}")
-                appendLine("Content-Type: ${result.mediaType}")
-                appendLine("读取：${result.bytesRead} 字节；总大小：$total")
-                append(result.content)
-            }.trimEnd()
-        }
-
-        val extension = when {
-            format == "raw" && result.mediaType.contains("json", ignoreCase = true) -> "json"
-            format == "raw" && result.mediaType.contains("xml", ignoreCase = true) -> "xml"
-            format == "raw" && result.mediaType.contains("html", ignoreCase = true) -> "html"
-            else -> "txt"
-        }
-        val path = ".dsh/fetches/fetch-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.$extension"
-        val saved = workspace.writeToolArtifact(path, result.content)
-        val completeness = if (result.truncated) {
-            "响应超过本次 max_bytes，上限处被截断；文件保存的是已读取的 ${result.bytesRead} 字节。可提高 max_bytes 后重试。"
-        } else {
-            "完整抓取内容已落盘，未进行头尾/中段裁剪。"
-        }
-        return buildString {
-            appendLine("URL: ${result.url}")
-            appendLine("Content-Type: ${result.mediaType}")
-            appendLine("读取：${result.bytesRead} 字节；总大小：$total")
-            appendLine(completeness)
-            appendLine("工作区文件：$saved")
-            appendLine("建议：使用 grep 搜关键词，或 read 按行分片读取；JSON 可直接调用 json_query。")
-            appendLine()
-            appendLine("内容预览：")
-            append(result.content.take(WEB_FETCH_PREVIEW_CHARS))
-        }.trimEnd()
-    }
-
-    private fun jsonQuery(path: String, query: String): String {
-        val root = json.parseToJsonElement(workspace.readRaw(path))
-        val output = resolveJsonPath(root, query).toString()
-        if (output.length <= MAX_TOOL_RESULT_CHARS) return output
-        val saved = workspace.writeToolArtifact(
-            ".dsh/queries/query-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.json",
-            output,
-        )
-        return "JSON 查询结果过大，完整结果已保存：$saved\n字符数：${output.length}\n预览：\n${output.take(WEB_FETCH_PREVIEW_CHARS)}"
     }
 
     private suspend fun approve(
@@ -1260,217 +1086,6 @@ class LocalHarnessEngine @Inject constructor(
             approvalResponse = null
             _state.update { it.copy(pendingApproval = null) }
         }
-    }
-
-    private suspend fun runSubagent(
-        task: String,
-        inheritHistory: Boolean,
-        allowMutation: Boolean,
-        backgroundJobId: String? = null,
-        modelOverride: String? = null,
-        maxSteps: Int = _state.value.subagentMaxSteps,
-    ): String {
-        val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
-        val key = apiKeys.get() ?: return "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
-        val history = if (inheritHistory) modelHistory.toMutableList() else mutableListOf()
-        val progress = ArrayDeque<String>()
-        val stepLimit = maxSteps.coerceIn(1, 40)
-        val snapshot = _state.value
-        val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
-        val tools = subagentToolSchemas(allowMutation)
-        val repliesByStep = mutableMapOf<Int, LocalModelReply>()
-        var modelStep = 0
-
-        eventLog.append("subagent/start", buildJsonObject {
-            put("agent_id", subagentId)
-            put("background_job_id", backgroundJobId ?: "")
-            put("model", routeModel)
-            put("max_steps", stepLimit)
-            put("task", task.take(2_000))
-        })
-
-        try {
-            if (!inheritHistory) history += buildJsonObject {
-                put("role", "system")
-                put(
-                    "content",
-                    if (allowMutation) {
-                        "你是安卓本机 Harness 的子代理。完成指定子任务，可使用工作区、命令、网页和技能；修改与命令仍需用户批准。"
-                    } else {
-                        "你是安卓本机 Harness 的只读子代理。完成指定子任务，可读取和搜索工作区、读取技能、获取网页与解析 JSON；禁止修改用户文件和执行命令。"
-                    },
-                )
-            }
-            history += buildJsonObject { put("role", "user"); put("content", task) }
-
-            val loop = AgentLoop(
-                model = AgentModel {
-                    backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
-                        history += buildJsonObject {
-                            put("role", "user")
-                            put("content", message)
-                        }
-                    }
-                    modelStep += 1
-                    val reply = completeSubagentStep(
-                        key = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = routeModel,
-                        history = history.toList(),
-                        tools = tools,
-                        subagentId = subagentId,
-                        step = modelStep,
-                    )
-                    repliesByStep[modelStep] = reply
-                    AgentModelReply(
-                        content = reply.content.orEmpty(),
-                        toolCalls = reply.toolCalls.map { call ->
-                            AgentToolCall(
-                                id = call.id,
-                                name = call.name,
-                                arguments = call.arguments,
-                                rawArguments = call.rawArguments,
-                            )
-                        },
-                    )
-                },
-                tools = AgentToolExecutor { call ->
-                    executeSafely(call.toLocalToolCall(), allowMutation = allowMutation)
-                },
-                eventSink = AgentEventSink { event ->
-                    when (event) {
-                        is AgentEvent.AssistantObserved -> {
-                            val reply = repliesByStep.remove(event.step)
-                                ?: error("缺少子代理第 ${event.step} 步模型响应")
-                            history += reply.message
-                            reply.content?.takeIf(String::isNotBlank)?.let { content ->
-                                rememberSubagentProgress(
-                                    progress,
-                                    "第 ${event.step} 步回复：${content.take(1_500)}",
-                                )
-                            }
-                        }
-                        is AgentEvent.ToolFinished -> {
-                            rememberSubagentProgress(
-                                progress,
-                                "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
-                            )
-                            history += buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", event.call.id)
-                                put("content", pruneToolResult(event.output))
-                            }
-                        }
-                        is AgentEvent.TurnCompleted -> {
-                            eventLog.append("subagent/end", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("status", "completed")
-                                put("steps", event.steps)
-                            })
-                        }
-                        is AgentEvent.TurnStepLimit -> {
-                            eventLog.append("subagent/end", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("status", "step_limit")
-                                put("steps", event.steps)
-                            })
-                        }
-                        is AgentEvent.TurnCancelled -> {
-                            eventLog.append("subagent/end", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("status", "cancelled")
-                            })
-                        }
-                        is AgentEvent.TurnFailed -> {
-                            eventLog.append("subagent/end", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("status", "failed")
-                                put("detail", event.reason.take(2_000))
-                            })
-                        }
-                        else -> Unit
-                    }
-                },
-                maxSteps = stepLimit,
-            )
-
-            val result = loop.run(task)
-            if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
-                return result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
-            }
-
-            val partial = progress.joinToString("\n")
-            return buildString {
-                append("[subagent][$subagentId][STEP_LIMIT] 达到 $stepLimit 步上限，任务未完整结束。")
-                if (partial.isNotBlank()) {
-                    append("\n已完成的最近进度：\n")
-                    append(partial)
-                }
-                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 40。")
-            }
-        } catch (cancelled: CancellationException) {
-            if (!currentCoroutineContext().isActive) throw cancelled
-            val partial = progress.joinToString("\n")
-            return buildString {
-                append("[subagent][$subagentId][TASK_CANCELLED] 子代理自身被取消；同批其他子代理不会被级联取消。")
-                cancelled.message?.takeIf(String::isNotBlank)?.let { append("\n原因：$it") }
-                if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
-            }
-        } catch (error: LocalModelException) {
-            val partial = progress.joinToString("\n")
-            return buildString {
-                append("[subagent][$subagentId][${error.code}] 模型阶段失败：${error.message}")
-                if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
-                append("\n建议：模型超时可重试；网页/工具超时请查看对应工具错误码。")
-            }
-        } catch (error: Exception) {
-            val partial = progress.joinToString("\n")
-            return buildString {
-                append("[subagent][$subagentId][SUBAGENT_ERROR] ${error.message ?: error::class.java.simpleName}")
-                if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
-            }
-        }
-    }
-
-    private suspend fun completeSubagentStep(
-        key: String,
-        baseUrl: String,
-        model: String,
-        history: List<JsonObject>,
-        tools: JsonArray,
-        subagentId: String,
-        step: Int,
-    ): LocalModelReply {
-        var lastError: LocalModelException? = null
-        val maxAttempts = _state.value.modelAttempts.coerceIn(1, 5)
-        repeat(maxAttempts) { attempt ->
-            try {
-                return modelClient.complete(key, baseUrl, model, history, tools)
-            } catch (cancelled: CancellationException) {
-                if (!currentCoroutineContext().isActive) throw cancelled
-                throw cancelled
-            } catch (error: LocalModelException) {
-                lastError = error
-                if (!error.retryable || attempt == maxAttempts - 1) throw error
-                eventLog.append("subagent/retry", buildJsonObject {
-                    put("agent_id", subagentId)
-                    put("step", step)
-                    put("attempt", attempt + 1)
-                    put("code", error.code)
-                })
-                delay(1_000L shl attempt)
-            }
-        }
-        throw lastError ?: LocalModelException(
-            code = "MODEL_ERROR",
-            message = "子代理模型请求失败",
-            retryable = false,
-        )
-    }
-
-    private fun rememberSubagentProgress(progress: ArrayDeque<String>, item: String) {
-        progress.addLast(item)
-        while (progress.size > SUBAGENT_PROGRESS_ITEMS) progress.removeFirst()
     }
 
     private fun updatePlan(args: JsonObject): String {
@@ -1566,7 +1181,7 @@ class LocalHarnessEngine @Inject constructor(
                 val prompt = if (previous.isBlank()) task else {
                     "上一步结果：\n${pruneToolResult(previous)}\n\n当前阶段：\n$task"
                 }
-                val result = runSubagent(
+                val result = subagents.run(
                     prompt,
                     inheritHistory = false,
                     allowMutation = false,
@@ -1578,7 +1193,7 @@ class LocalHarnessEngine @Inject constructor(
         }
 
         return isolatedParallelMap(clean.withIndex().toList()) { indexed ->
-            val result = runSubagent(
+            val result = subagents.run(
                 indexed.value,
                 inheritHistory = false,
                 allowMutation = false,
@@ -1714,13 +1329,6 @@ class LocalHarnessEngine @Inject constructor(
         return history.toMutableList().apply { add(index, insertion) }
     }
 
-    private fun allowedMemoryScopes(mode: LocalConversationMode): Set<MemoryScope> = when (mode) {
-        LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
-        LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
-        LocalConversationMode.CONTINUATION ->
-            setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
-    }
-
     private fun bundledRuntimeSearchPaths(): List<File> =
         (bundledNodeRuntime.searchPaths() + bundledPythonRuntime.searchPaths())
             .distinctBy { it.path }
@@ -1786,7 +1394,7 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
         val loaded = try {
-            sessionStore.read(sessionId)
+            sessionRepository.read(sessionId)
         } catch (future: FutureSessionVersionException) {
             _state.update {
                 it.copy(
@@ -1797,9 +1405,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
-        val stored = loaded?.document?.payload?.let { payload ->
-            json.decodeFromString(LocalHarnessSession.serializer(), payload.toString())
-        } ?: LocalHarnessSession(id = sessionId)
+        val stored = loaded ?: LocalHarnessSession(id = sessionId)
         modelHistory.clear()
         modelHistory += stored.modelHistory
         val profile = userProfileStore.read()
@@ -1827,6 +1433,7 @@ class LocalHarnessEngine @Inject constructor(
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
+            languageServerCommand = preferences.getString("language_server_command", "").orEmpty(),
             sessions = sessionSummaries(),
             messages = stored.messages,
             plan = stored.plan,
@@ -1860,28 +1467,7 @@ class LocalHarnessEngine @Inject constructor(
             planMode = state.planMode,
             autoApproveMutations = state.autoApproveMutations,
         )
-        val sessionId = currentSessionId
-        val shouldQueue = synchronized(persistenceLock) {
-            pendingPersistence[sessionId] = snapshot
-            queuedPersistenceIds.add(sessionId)
-        }
-        if (shouldQueue) persistenceQueue.trySend(sessionId)
-    }
-
-    private fun writeSession(sessionId: String, snapshot: LocalHarnessSession) {
-        runCatching {
-            val payload = json.parseToJsonElement(
-                json.encodeToString(LocalHarnessSession.serializer(), snapshot),
-            ).jsonObject
-            sessionStore.write(
-                id = sessionId,
-                payload = payload,
-                updatedAt = snapshot.updatedAt,
-            )
-            _state.update { it.copy(sessions = sessionSummaries()) }
-        }.onFailure { error ->
-            _state.update { it.copy(error = error.message ?: "会话写入失败") }
-        }
+        sessionRepository.enqueue(snapshot)
     }
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
@@ -1889,19 +1475,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun eventLogFor(id: String) = LocalSessionEventLog(File(sessionsRoot, "$id.events.jsonl"), json)
 
     private fun sessionSummaries(): List<LocalSessionSummary> = try {
-        sessionStore.list().mapNotNull { loaded ->
-            runCatching {
-                val session = json.decodeFromString(
-                    LocalHarnessSession.serializer(),
-                    loaded.document.payload.toString(),
-                )
-                LocalSessionSummary(
-                    id = session.id.ifBlank { loaded.document.id },
-                    title = session.title,
-                    updatedAt = session.updatedAt.takeIf { it > 0 } ?: loaded.document.updatedAt,
-                )
-            }.getOrNull()
-        }
+        sessionRepository.summaries()
     } catch (future: FutureSessionVersionException) {
         _state.update { it.copy(error = future.message) }
         emptyList()
@@ -1931,19 +1505,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun toolAccess(name: String): ToolAccess = when (name) {
-        "write", "edit", "present" -> ToolAccess.WORKSPACE_WRITE
-        "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal", "ask_user_question",
-        "memory_remember" -> ToolAccess.SESSION_WRITE
-        "bash", "job_kill" -> ToolAccess.PROCESS
-        "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
-        "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
-        else -> ToolAccess.READ_ONLY
-    }
-
-    private fun toolApprovalPolicy(name: String): ToolApprovalPolicy =
-        ToolApprovalPolicy.NEVER
-
     private fun JsonObject.string(key: String): String =
         optionalString(key)?.takeIf { it.isNotBlank() } ?: error("缺少参数：$key")
 
@@ -1966,7 +1527,6 @@ class LocalHarnessEngine @Inject constructor(
         const val DEFAULT_MAIN_MAX_STEPS = 16
         const val DEFAULT_SUBAGENT_MAX_STEPS = 20
         const val DEFAULT_MODEL_ATTEMPTS = 3
-        const val SUBAGENT_PROGRESS_ITEMS = 6
         const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
@@ -1975,8 +1535,6 @@ class LocalHarnessEngine @Inject constructor(
         const val DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS = 300
         const val MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS = 120
         const val MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS = 900
-        const val WEB_FETCH_INLINE_CHARS = 40_000
-        const val WEB_FETCH_PREVIEW_CHARS = 6_000
         const val MAX_TOOL_RESULT_CHARS = 50_000
         const val TOOL_RESULT_TAIL_CHARS = 4_000
         const val MAX_EVENT_CHARS = 65_536
@@ -1987,7 +1545,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
 
-        val FALLBACK_WEB_ERRORS = setOf("DNS_FAILED", "TIMEOUT", "NETWORK_ERROR", "HTTP_4XX", "HTTP_5XX", "HTTP_REDIRECT")
 
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
             "subagent", "subagent_fork", "workflow", "ask_user_question",
@@ -1997,7 +1554,7 @@ class LocalHarnessEngine @Inject constructor(
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
-            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
+            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect", "lsp_start", "lsp_stop",
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")

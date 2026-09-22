@@ -160,18 +160,19 @@ class WebhookController @Inject constructor(
         context.getSharedPreferences("local_harness_webhook", Context.MODE_PRIVATE)
 
     suspend fun start(port: Int = DEFAULT_PORT, allowLan: Boolean = false): String {
+        require(!allowLan) { "Webhook 仅允许本机回环监听；远程访问请使用加密中继" }
         require(port in 1024..65535) { "Webhook 端口必须在 1024..65535" }
         val token = tokenStore.getOrCreate()
         preferences.edit()
             .putBoolean(KEY_ENABLED, true)
             .putInt(KEY_PORT, port)
-            .putBoolean(KEY_ALLOW_LAN, allowLan)
+            .putBoolean(KEY_ALLOW_LAN, false)
             .apply()
         val intent = Intent(context, HarnessWebhookService::class.java)
             .putExtra(EXTRA_PORT, port)
-            .putExtra(EXTRA_ALLOW_LAN, allowLan)
+            .putExtra(EXTRA_ALLOW_LAN, false)
         context.startForegroundService(intent)
-        val host = if (allowLan) "0.0.0.0" else "127.0.0.1"
+        val host = "127.0.0.1"
         return "Webhook 已启动：http://$host:$port/run\n令牌：${tokenHint(token)}。完整令牌不会进入会话记录；需要时请使用 webhook_copy_token。"
     }
 
@@ -199,7 +200,7 @@ class WebhookController @Inject constructor(
     fun runtimeConfig(): WebhookRuntimeConfig = WebhookRuntimeConfig(
         enabled = preferences.getBoolean(KEY_ENABLED, false),
         port = preferences.getInt(KEY_PORT, DEFAULT_PORT),
-        allowLan = preferences.getBoolean(KEY_ALLOW_LAN, false),
+        allowLan = false,
     )
 
     suspend fun status(): WebhookStatus {
@@ -207,7 +208,7 @@ class WebhookController @Inject constructor(
         return WebhookStatus(
             enabled = preferences.getBoolean(KEY_ENABLED, false),
             port = preferences.getInt(KEY_PORT, DEFAULT_PORT),
-            allowLan = preferences.getBoolean(KEY_ALLOW_LAN, false),
+            allowLan = false,
             tokenHint = token?.let(::tokenHint),
         )
     }
@@ -235,7 +236,7 @@ class HarnessWebhookService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val executionMutex = Mutex()
-    @Volatile private var server: ServerSocket? = null
+    private val listener by lazy { WebhookListener(scope, ::handle) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -247,14 +248,16 @@ class HarnessWebhookService : Service() {
             return START_NOT_STICKY
         }
         val port = intent?.getIntExtra(WebhookController.EXTRA_PORT, persisted.port) ?: persisted.port
-        val allowLan = intent?.getBooleanExtra(WebhookController.EXTRA_ALLOW_LAN, persisted.allowLan)
-            ?: persisted.allowLan
-        restartServer(port, allowLan)
+        // Ignore persisted legacy LAN settings and intent extras on service restoration.
+        try { restartServer(port) } catch (_: Exception) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        runCatching { server?.close() }
+        listener.close()
         scope.cancel()
         super.onDestroy()
     }
@@ -277,26 +280,8 @@ class HarnessWebhookService : Service() {
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun restartServer(port: Int, allowLan: Boolean) {
-        runCatching { server?.close() }
-        scope.launch {
-            tokenStore.getOrCreate()
-            val socket = ServerSocket().apply {
-                reuseAddress = true
-                bind(
-                    InetSocketAddress(
-                        if (allowLan) InetAddress.getByName("0.0.0.0")
-                        else InetAddress.getByName("127.0.0.1"),
-                        port,
-                    ),
-                )
-            }
-            server = socket
-            while (!socket.isClosed) {
-                val client = runCatching { socket.accept() }.getOrNull() ?: break
-                launch { handle(client) }
-            }
-        }
+    private fun restartServer(port: Int) {
+        listener.restart(InetSocketAddress("127.0.0.1", port))
     }
 
     private suspend fun handle(socket: Socket) {
@@ -344,20 +329,11 @@ class HarnessWebhookService : Service() {
             resultStore.update(requestId, status = "queued")
             respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
             scope.launch {
-                executionMutex.withLock {
-                    resultStore.update(requestId, status = "running")
-                    runCatching { engine.runAutomationPrompt(prompt) }
-                        .onSuccess { result ->
-                            resultStore.update(requestId, status = "completed", result = result)
-                        }
-                        .onFailure { error ->
-                            resultStore.update(
-                                requestId,
-                                status = "failed",
-                                error = error.message ?: error::class.java.simpleName,
-                            )
-                        }
-                }
+                executeWebhookRun(
+                    executionMutex,
+                    update = { status, result, error -> resultStore.update(requestId, status, result, error) },
+                    run = { engine.runAutomationPrompt(prompt) },
+                )
             }
         }
     }
@@ -480,7 +456,7 @@ class WebhookPlugin(
                 schema = schema(
                     "webhook_start",
                     "启动受令牌保护的 Harness Webhook；默认仅监听 127.0.0.1",
-                    mapOf("port" to "integer", "allow_lan" to "boolean"),
+                    mapOf("port" to "integer"),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,

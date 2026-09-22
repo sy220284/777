@@ -36,16 +36,16 @@ class RelayPairingPayloadTest {
         assertFalse(payload.isPlaintext)
     }
 
-    /** Both are absent on a relay serving plaintext, and neither is required to pair. */
+    /** Optional metadata is not required for an HTTPS relay. */
     @Test
     fun `the optional halves may be missing`() {
         val result = RelayPairing.parsePayload(
-            """{"v":1,"kind":"dsh-relay-pair","url":"http://10.0.0.4:3444","code":"11112222","expiresAt":1}""",
+            """{"v":1,"kind":"dsh-relay-pair","url":"https://10.0.0.4:3444","code":"11112222","expiresAt":1}""",
         )
         val payload = (result as PairingPayloadResult.Valid).payload
         assertNull(payload.plainUrl)
         assertNull(payload.fingerprint)
-        assertTrue(payload.isPlaintext)
+        assertFalse(payload.isPlaintext)
     }
 
     @Test

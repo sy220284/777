@@ -1,191 +1,33 @@
 # Security
 
-DSH Mobile is a remote control for the **DeepSeek Harness**. Understand the
-trust model before using it — and note that the app now offers two, which is why
-the connect screen makes you pick one rather than choosing for you.
+777 runs a local coding agent and can also control a remote Harness through an HTTPS relay.
+Agent tools can read and modify workspace files and run processes. Approving a process grants the command access available to the app or remote host.
 
-## The thing to understand first
+## Remote connections
 
-The harness is a coding agent. It runs shell commands, reads and writes files,
-and can install software on the computer it runs on. **Anything that can reach
-it can do all of that.** There is no lesser tier of access. Both modes below
-grant the same power; they differ only in what has to be true before someone
-gets it.
+- Remote control supports relay pairing only. LAN scanning, mDNS discovery and direct Harness connections have been removed.
+- Pairing payloads, typed addresses and authenticated relay transports require HTTPS. Old plaintext endpoints require new secure pairing; credentials are not sent to them.
+- A scanned pairing code can supply the relay certificate fingerprint. Typed pairing uses trust on first use, so verify the address and prefer a trusted QR code.
+- Paired relay credentials are encrypted using Android Keystore. A changed pinned certificate requires renewed trust; credentials are not silently sent to a replacement key.
+- HTTPS-to-HTTP redirect downgrade is disabled on authenticated relay clients. Relay pairing does not follow credential-bearing redirects.
+- Revocation is managed on the relay. Pairing authenticates the device; relay and Harness policies determine the operations available to it.
 
-## Local network mode
+## Local execution and automation
 
-The harness web server (`dsh web`) serves plain HTTP with a *trust fence*, not
-authentication:
+- Built-in tools use the same registry permission checks as plugin tools. Read-only subagents cannot invoke state-changing tools. Unknown tools fail closed.
+- Automatic approval covers workspace writes only. Process, device and privileged operations keep their explicit approval policies.
+- Background runs stop at interactive approval or question boundaries. External cancellation cancels and waits for the owned agent run.
+- Webhook only listens on `127.0.0.1`, uses a bearer token and limits request sizes. Legacy LAN preferences cannot enable an external plaintext listener.
+- Language servers use a user-configured command, start only after process approval, and receive files within the workspace. The server must be installed separately. Queries have a response deadline and bounded notification storage.
 
-- Every `/api` request is accepted only when its `Host` header is loopback or a
-  configured trusted authority (LAN IP literals are auto-derived when the server
-  binds `0.0.0.0`).
-- There are no tokens, cookies, or TLS. Any device on the same network can send
-  requests with a trusted `Host` and drive the agent — including running
-  commands on the host computer. TLS can be added from outside by fronting the
-  harness with a reverse proxy — see **HTTPS through a reverse proxy** below —
-  but that encrypts the link without authenticating anyone; only a relay does
-  both.
+## Local storage and network requests
 
-**Consequences:**
+- Local conversations, workspace files, user rules and scoped memories are stored in app-private storage. Platform backup and device extraction are disabled.
+- Memory files keep a recovery backup and preserve corrupt primary files for diagnosis. Sensitive-data filtering reduces accidental credential retention; it is not a complete secret detector.
+- Relay and model credentials are encrypted at rest. Model requests and web tools contact configured services or requested websites. Generic web fetching can use HTTP; this does not permit plaintext remote-control pairing.
+- Updates are requested explicitly from Settings. Downloads are checked for checksum, package identity and signing certificate before opening the Android installer.
+- Remote attachments are uploaded to the paired host. Local attachments are copied into the local workspace.
 
-- Only bind the harness to `0.0.0.0` on networks you fully trust (home network,
-  your own lab). Never on public or guest Wi-Fi.
-- DSH Mobile states this on the connect screen whenever local-network mode is
-  selected.
-- Sensitive surfaces (settings, credentials, agent-preset authoring, host file
-  pickers) are **no longer loopback-only**. Harness 0.1.2 deleted that method
-  tier and replaced it with one uniform rule: whoever holds a browser session
-  reaches the complete tool-capable API. Behind a relay, what gates those
-  surfaces is the relay's own `privilegedMethods` policy — set it to
-  `loopback-only` if a paired phone should not reach them.
+## Reporting
 
-## Relay mode
-
-[`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay) is a harness
-plugin that mounts a second listener beside the harness rather than inside it.
-The harness keeps its loopback bind; the relay terminates TLS, authenticates,
-and forwards. A relay that fails to start therefore leaves the harness
-**unreachable** from the network — never open to it.
-
-What that gets you, and what it does not:
-
-- **A real credential.** The app holds a bearer token issued once, at pairing,
-  and sends it on every `/api` call and both WebSocket upgrades. The relay stores
-  only a keyed hash of it.
-- **Real transport security.** Traffic is encrypted, and the app pins the
-  relay's public key by SHA-256 of its DER SubjectPublicKeyInfo. Pinning
-  *replaces* CA validation rather than following it, so a self-signed relay is
-  verified rather than merely accepted.
-- **Revocation you control.** Each device is individually revocable from the
-  relay's own device list, and "sign out everywhere" invalidates every token at
-  once. Either one surfaces in the app as "pair again" on the next request.
-- **It does not reduce what an authenticated client can do.** Signing in grants
-  the same power as a shell on that machine. The question the relay answers is
-  "is the remote user you", not "how much can the remote user do".
-
-### How the key is established
-
-Two pairing routes, and they do not prove the same thing. The app says which one
-happened rather than reporting "paired" twice:
-
-- **Scanning the QR** carries the relay's key in the payload, so the very first
-  byte the app sends is verified against it.
-- **Typing the code** carries no key — the relay only reveals one in its answer
-  to the claim — so the certificate is trusted on first contact. An attacker able
-  to answer at that address during pairing would end up holding the enrolment.
-
-Prefer the QR. The typed route exists because it is the one that works when the
-camera does not.
-
-### When the key changes
-
-The relay regenerates its certificate — with a **new key** — whenever the set of
-addresses it covers changes. A harness laptop that moves between networks
-therefore rotates its pin, and paired devices stop connecting until they pair
-again. That is indistinguishable from something else answering at the address,
-so the app reports it as a changed key and refuses to proceed on its own.
-
-### What is not defended
-
-- **A weak relay password.** Ten characters is the enforced floor, not a
-  recommendation.
-- **A relay running `tls: off`, or its plain-HTTP compatibility listener.** The
-  token and everything you send travel in the clear. The app says so on the
-  pairing screen and on the endpoint's card.
-- **Source-address grants.** The relay's `compat.addressGrants` accepts requests
-  from an address a paired device was last seen on, as a bridge for clients that
-  cannot hold a token. A source address is not authentication: it is shared
-  behind NAT, reassigned by DHCP, rotated by IPv6 privacy extensions, and
-  spoofable on the same Wi-Fi. **This app no longer needs it** — set
-  `compat.addressGrants: false` once every client you use has paired.
-
-## HTTPS through a reverse proxy
-
-The harness itself never serves TLS, but the app can reach one behind a
-reverse proxy that does (Caddy at `https://agent.home`, say). Typing
-`https://…` into the connect screen — or a bare address with port 443 —
-makes the whole connection TLS: every `/api` call, both event streams, and
-session-log downloads.
-
-Certificate verification is standard Android, with one addition:
-
-- The app trusts the system CA set **plus CAs the user has installed** on the
-  phone (`<certificates src="user" />`). A LAN proxy is almost always signed
-  by a local CA — Caddy's internal CA, mkcert, a homelab CA — which only
-  works if the phone's owner has deliberately installed that CA, an act
-  Android itself warns about and marks. The app adds no CAs of its own.
-- Verification is never relaxed beyond that. There is no "accept this
-  certificate anyway" flow, no hostname-check bypass, and no pinning UI: an
-  untrusted certificate fails the connection with a message naming the CA
-  install as the fix.
-- Relay mode is the exception, and it goes the other way. There the app pins a
-  key it was handed at pairing and ignores the CA set entirely — stricter than
-  this path, not looser, and never something the user is asked to approve.
-- The trust fence still applies through a proxy. The app sends the authority
-  it was given as the `Host` header, so the harness must be started with
-  `--trusted-host <that name>` (a proxy that preserves `Host`, as Caddy does
-  by default, changes nothing about this).
-
-## File attachments
-
-Since harness 0.1.3 the app can attach any file to a message. The bytes are
-streamed to the harness the moment the file is picked — over whichever
-connection is in use, with the same credential and the same encryption, or
-lack of it, as everything else — and the harness writes them **verbatim** into
-its attachment store on the computer it runs on, where the agent's file tools
-can read them. A file you attach is therefore a file you have copied onto that
-computer, into a directory the agent reads. In local-network mode that copy
-travels in the clear.
-
-The app keeps no copy: it reads the picked document once, at upload time, and
-holds only the receipt the harness answered with until the message is sent.
-
-## What DSH Mobile stores
-
-- Remembered endpoints (host, port, whether to use HTTPS, display name, and —
-  for a relay — its device id and certificate pin) plus app preferences, in
-  app-private storage only.
-- **Relay bearer tokens, encrypted.** The key is generated in the Android
-  Keystore and never leaves it; only ciphertext reaches DataStore. Forgetting a
-  host drops its token in the same act, and Settings → clear data drops all of
-  them. Revoking the relay's own record of the device happens on the relay.
-- Remote-mode chat history is re-fetched from its harness. Local Harness mode
-  persists its session snapshots, bounded JSONL audit logs, and workspace files
-  under the app-private `filesDir/local-harness` directory so work survives a
-  process restart. Android backup and device-to-device extraction are disabled
-  for the whole app, so those files and encrypted credential ciphertext do not
-  leave the device through the platform backup service.
-- Cleartext HTTP remains permitted app-wide, alongside user-installed CAs
-  (`app/src/main/res/xml/network_security_config.xml`). Cleartext cannot be
-  narrowed: a bare harness serves plain HTTP on a LAN address not known at build
-  time. The app answers this by naming the transport wherever an endpoint
-  appears rather than by pretending every connection is encrypted. A pinned
-  relay bypasses that trust store entirely — the pin *is* the trust decision.
-
-## What DSH Mobile connects to
-
-Every connection is to an endpoint you entered, scanned, or picked from a scan,
-with one exception:
-
-- **The update check.** The app does not contact GitHub on launch. Only when you
-  tap **Settings → About → Check for updates** does it ask `api.github.com` for
-  this repository's latest release over HTTPS. If a newer signed APK exists,
-  the app immediately downloads it, verifies its checksum, package name and
-  signing certificate, then hands it to Android's system installer.
-- **Scanning** probes only your own device's IPv4 /24 — with a TCP connect
-  followed by one argument-free `session/canOpenWorkspacePath` call in
-  local-network mode, or by `/relay/health` in relay mode. Relay mode browses mDNS `_dsh._tcp` first and only sweeps if that
-  finds nothing.
-
-## Reporting a vulnerability
-
-Report security issues privately, either through **Report a vulnerability** on
-the repository's Security tab or by email to **sor@zyphite.com**. Do not open a
-public issue for a vulnerability. Include what an attacker can do, the steps to
-reproduce it, the app and harness versions, and how the app was connected.
-
-The facts documented above — that the bare harness has no authentication, that
-authenticating to a relay grants shell-equivalent access, and that typed pairing
-is trust-on-first-use — are the model, not vulnerability reports. A way around
-the trust fence, the bearer check, or the certificate pin is.
+Use the repository Security tab to report a suspected vulnerability privately. Include the app version, reproduction steps and affected execution mode.

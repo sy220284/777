@@ -11,11 +11,14 @@ import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 @Singleton
-class MemoryStore @Inject constructor(
-    @ApplicationContext context: Context,
+class MemoryStore internal constructor(
+    private val root: File,
     private val json: Json,
 ) {
-    private val root = File(context.filesDir, "local-harness/memory").apply { mkdirs() }
+    @Inject constructor(@ApplicationContext context: Context, json: Json) :
+        this(File(context.filesDir, "local-harness/memory"), json)
+
+    init { root.mkdirs() }
     private val file = File(root, "memories.json")
     private val backup = File(root, "memories.json.bak")
 
@@ -224,10 +227,9 @@ class MemoryStore @Inject constructor(
                 StandardCopyOption.ATOMIC_MOVE,
             )
         }.getOrElse {
-            temporary.copyTo(file, overwrite = true)
-            temporary.delete()
+            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
-        if (!backup.isFile && decodeDocument(file) != null) {
+        if (decodeDocument(backup) == null && decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
     }

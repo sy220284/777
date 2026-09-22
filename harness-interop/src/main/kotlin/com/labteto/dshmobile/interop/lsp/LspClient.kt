@@ -6,6 +6,10 @@ import java.io.Closeable
 import java.io.File
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,7 +40,7 @@ class LspProcessClient(
 
     suspend fun initialize(rootUri: String?, capabilities: JsonObject = JsonObject(emptyMap())): JsonObject {
         val params = buildJsonObject {
-            put("processId", ProcessHandle.current().pid())
+            put("processId", JsonNull)
             if (rootUri != null) put("rootUri", rootUri) else put("rootUri", JsonNull)
             put("capabilities", capabilities)
         }
@@ -123,7 +127,7 @@ class LspProcessClient(
     }
 
     suspend fun notify(method: String, params: JsonObject) = mutex.withLock {
-        withContext(Dispatchers.IO) {
+        boundedIo {
             ensureStarted()
             val payload = buildJsonObject {
                 put("jsonrpc", "2.0")
@@ -140,17 +144,26 @@ class LspProcessClient(
         }
     }
 
-    override fun close() {
+    @Synchronized override fun close() {
+        process?.takeIf(Process::isAlive)?.destroyForcibly()
         runCatching { output?.close() }
         runCatching { input?.close() }
-        process?.takeIf(Process::isAlive)?.destroyForcibly()
         process = null
         input = null
         output = null
     }
 
     private suspend fun requestMessage(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        withContext(Dispatchers.IO) {
+        boundedIo { requestBlocking(method, params) }
+    }
+
+    private suspend fun <T> boundedIo(block: () -> T): T = coroutineScope {
+        val pending = async(Dispatchers.IO) { block() }
+        try { withTimeout(30_000L) { pending.await() } }
+        catch (cancelled: CancellationException) { close(); throw cancelled }
+    }
+
+    private fun requestBlocking(method: String, params: JsonObject): JsonObject {
             ensureStarted()
             val id = ids.getAndIncrement()
             val payload = buildJsonObject {
@@ -163,16 +176,20 @@ class LspProcessClient(
             while (true) {
                 val message = json.parseToJsonElement(LspFraming.read(input!!)).jsonObject
                 val messageId = message["id"]?.jsonPrimitive?.content
-                if (messageId == id.toString()) return@withContext message
-                synchronized(pendingNotifications) {
+                if (messageId == id.toString()) return message
+                if (messageId != null && message["method"] != null) {
+                    LspFraming.write(output!!, buildJsonObject {
+                        put("jsonrpc", "2.0"); put("id", message["id"]!!)
+                        put("error", buildJsonObject { put("code", -32601); put("message", "Client method unsupported") })
+                    }.toString())
+                } else synchronized(pendingNotifications) {
+                    if (pendingNotifications.size >= 256) pendingNotifications.removeFirst()
                     pendingNotifications.addLast(message)
                 }
             }
-            error("不可达")
-        }
     }
 
-    private fun ensureStarted() {
+    @Synchronized private fun ensureStarted() {
         if (process?.isAlive == true) return
         require(command.isNotEmpty()) { "语言服务器命令不能为空" }
         val resolvedCommand = commandResolver(command)

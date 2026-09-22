@@ -4,22 +4,20 @@ Thanks for your interest in DSH Mobile!
 
 ## Setup
 
-- Android Studio (Koala or newer) with JDK 17+ and Android SDK 35.
+- Android Studio (Koala or newer) with JDK 17+ and Android SDK 36.
 - `./gradlew :app:assembleDebug` builds the debug APK.
 
 ## Development against a real harness
 
-1. Run the DeepSeek Harness: `dsh web` on your computer (default port 3080).
-2. Device/emulator via USB: `adb reverse tcp:3080 tcp:3080`, then connect to
-   `127.0.0.1:3080` in the app.
-3. Wi-Fi LAN mode: apply `harness/cordis.patch.lan.yml` as described in
-   `harness/README.md`.
+1. Run DeepSeek Harness on the computer with its default loopback listener.
+2. Configure an HTTPS relay and pair the app through Remote control.
+3. See `harness/README.md`. Direct LAN connections and network scanning are no longer supported.
 
 ## Repository layout
 
 - `core/` — pure JVM: wire protocol (DTOs, RPC client, WebSocket downlinks,
   reconnect loop), session event folding, notification classifier.
-- `app/` — Android UI: Compose screens, connection/discovery, foreground
+- `app/` — Android UI: Compose screens, relay connection, foreground
   service, notifications, i18n.
 - `mock-harness/` — Ktor mock of the harness `/api` server for tests.
 - `tools/capture/` — Node script that records real harness traffic into JSON

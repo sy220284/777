@@ -32,8 +32,6 @@
     <string name="connect_port_label">端口</string>
     <string name="connect_port_hint">3080</string>
     <string name="connect_button">连接</string>
-    <string name="connect_scanning">正在扫描你的网络…</string>
-    <string name="connect_scan">扫描网络</string>
     <string name="connect_discovered">发现到的 Harness</string>
     <string name="connect_discovered_hint">还没有找到 Harness — 请确保 Harness 正在运行，并且手机与它连接的是同一个 Wi-Fi。</string>
     <string name="connect_remembered">最近使用</string>
@@ -52,7 +50,6 @@
     <string name="connect_stage_connected">已连接</string>
     <string name="connect_cancel">取消</string>
     <string name="connect_fail_invalid">请输入电脑的 IP 地址，以及 1 到 65535 之间的端口。</string>
-    <string name="connect_fail_subnet">%1$s 不在本机所在的网络上。本机在 %2$s — 请将两台设备连到同一路由器网络。访客 Wi-Fi 通常是隔离的，而扫描网络只会搜索 %2$s。</string>
     <string name="connect_fail_timeout">%1$s 没有任何响应。通常是电脑的防火墙拦截了端口 %2$d 的入站连接 — 允许后重试。部分路由器也会阻止 Wi-Fi 设备访问有线设备。</string>
     <string name="connect_fail_refused">%1$s 拒绝了连接。未启用 LAN 模式时，harness 只在电脑本机监听 — 请启用并重启 harness。如果改过端口，请确认是否一致。</string>
     <string name="connect_fail_fence_title">harness 拒绝了该地址</string>
@@ -77,7 +74,6 @@
     <string name="connect_fail_unauthenticated">%1$s 是一个 harness，但尚未为本机登录。请在本设备上打开一次 harness 的启动链接，然后重新连接。</string>
     <string name="connect_checking">正在检查…</string>
     <string name="connect_remembered_empty">你连接过的 harness 会显示在这里。</string>
-    <string name="connect_scan_progress">正在扫描你的网络… %1$d / %2$d</string>
     <string name="connect_sessions_short">%1$d 个会话</string>
     <string name="connect_never">从未连接</string>
     <string name="connect_harness_version_only">Harness %1$s</string>
@@ -469,4 +465,7 @@
     <string name="system_prompt">系统提示词</string>
     <string name="image_offload">请求中已省略历史图片</string>
     <string name="panel_open_host">在主机上打开</string>
+    <string name="settings_lsp_command">语言服务器启动命令</string>
+    <string name="settings_lsp_hint">填写 JSON 字符串数组，每项用双引号包裹。需先安装兼容的语言服务器；留空停用。</string>
+    <string name="settings_lsp_save">保存语言服务器</string>
 </resources>

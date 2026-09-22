@@ -177,7 +177,7 @@ class PairViewModel @Inject constructor(
     fun submit() {
         val current = _state.value
         val url = current.url.trim()
-        if (url.toHttpUrlOrNull() == null) {
+        if (url.toHttpUrlOrNull()?.scheme != "https") {
             _state.update { it.copy(failure = PairFailure.InvalidUrl) }
             return
         }
@@ -206,7 +206,7 @@ class PairViewModel @Inject constructor(
                 else -> url
             }
             val parsed = effective.toHttpUrlOrNull()
-            if (parsed == null) {
+            if (parsed == null || parsed.scheme != "https") {
                 fail(PairFailure.InvalidUrl)
                 return@launch
             }

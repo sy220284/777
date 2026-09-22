@@ -286,6 +286,8 @@ class SettingsViewModel @Inject constructor(
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
     }
 
+    fun configureLanguageServer(command: String): String = localHarness.configureLanguageServer(command)
+
     fun clearLocalCredential() {
         localHarness.clearCredential()
     }

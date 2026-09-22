@@ -22,6 +22,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -329,6 +331,7 @@ internal fun LocalHarnessSettingsCard(
     report: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    var languageServerCommand by remember(local.languageServerCommand) { mutableStateOf(local.languageServerCommand) }
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
@@ -386,6 +389,18 @@ internal fun LocalHarnessSettingsCard(
             }
             Switch(checked = autoMemory, onCheckedChange = { autoMemory = it })
         }
+        OutlinedTextField(
+            value = languageServerCommand,
+            onValueChange = { languageServerCommand = it.take(4_000) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.settings_lsp_command)) },
+            supportingText = { Text(stringResource(R.string.settings_lsp_hint)) },
+        )
+        DsButton(
+            text = stringResource(R.string.settings_lsp_save),
+            onClick = { report(viewModel.configureLanguageServer(languageServerCommand)) },
+            variant = DsButtonVariant.Outline,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
                 value = mainSteps,
