@@ -13,12 +13,24 @@ data class LocalHarnessMessage(
     val createdAt: Long,
 )
 
+@Serializable
+enum class LocalConversationMode {
+    INDEPENDENT,
+    PROJECT,
+    CONTINUATION,
+}
+
 /** Persisted model history and its user-facing projection. */
 @Serializable
 data class LocalHarnessSession(
     val id: String = "",
     val title: String = "新会话",
     val updatedAt: Long = 0L,
+    val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
+    val parentSessionId: String? = null,
+    val lineageId: String = "",
+    val projectId: String? = null,
+    val handoffSummary: String? = null,
     val messages: List<LocalHarnessMessage> = emptyList(),
     val modelHistory: List<JsonObject> = emptyList(),
     val plan: List<String> = emptyList(),
@@ -89,6 +101,13 @@ data class LocalHarnessState(
     val modelAttempts: Int = 3,
     val workspacePath: String = "",
     val sessionId: String = "",
+    val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
+    val parentSessionId: String? = null,
+    val lineageId: String = "",
+    val projectId: String? = null,
+    val handoffSummary: String? = null,
+    val userRules: String = "",
+    val autoRecall: Boolean = true,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val plan: List<String> = emptyList(),
