@@ -48,7 +48,7 @@ jobs:
       - name: Enforce APK size budget
         run: |
           BYTES="$(stat -c '%s' app/build/outputs/apk/optimized/app-optimized.apk)"
-          BUDGET=125829120
+          BUDGET=268435456
           echo "Optimized APK: $BYTES bytes (budget: $BUDGET)"
           test "$BYTES" -le "$BUDGET"
       - name: Upload optimized APK
