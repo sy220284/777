@@ -182,9 +182,8 @@ android {
     }
 
     lint {
-        // The 11-language claim is only true while every base string has a translation, and the
-        // gap is invisible in review — this is the check that actually enforces it, so it is
-        // pinned rather than left to the default severity.
+        // English is the base resource set and Simplified Chinese is the maintained translation.
+        // MissingTranslation stays fatal so the two language surfaces cannot silently drift.
         error += listOf("MissingTranslation", "ImpliedQuantity")
         // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
         // none. Compose string literals have to be caught in review.

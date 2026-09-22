@@ -31,11 +31,9 @@ core/           pure JVM — no Android imports
                   events with dedup keys
 
 app/            Android UI
-  connection/   HostsStore (remembered hosts + settings, DataStore),
-                  DiscoveryEngine (Wi-Fi subnet sweep +
-                  session/canOpenWorkspacePath probe), ConnectionManager
-                  (owns the ConnectionLoop, exposes the host event flow
-                  and the current generation), ConnectionService
+  connection/   HostsStore (remembered relay endpoints + settings, DataStore),
+                  ConnectionManager (owns the ConnectionLoop, exposes the host
+                  event flow and the current generation), ConnectionService
                   (foreground service), KeepAliveWorker (15-min fallback)
   data/         SessionStore — the live mirror of the harness: session
                   list/workspaces/folds per session, queue/jobs/

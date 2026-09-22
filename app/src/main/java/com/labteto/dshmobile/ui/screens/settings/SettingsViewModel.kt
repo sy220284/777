@@ -35,22 +35,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 
-/** App-language choices: the 11 shipped locales, plus following the system. */
-data class LanguageOption(val tag: String?, val label: String?, val labelRes: Int? = null)
+/** App-language choices deliberately limited to the two maintained translations. */
+data class LanguageOption(val tag: String, val label: String)
 
 val LanguageOptions = listOf(
-    LanguageOption(null, null, com.labteto.dshmobile.R.string.settings_language_system),
     LanguageOption("en", "English"),
-    LanguageOption("zh", "中文"),
-    LanguageOption("hi", "हिन्दी"),
-    LanguageOption("es", "Español"),
-    LanguageOption("fr", "Français"),
-    LanguageOption("ar", "العربية"),
-    LanguageOption("bn", "বাংলা"),
-    LanguageOption("pt", "Português"),
-    LanguageOption("ru", "Русский"),
-    LanguageOption("ur", "اردو"),
-    LanguageOption("th", "ไทย"),
+    LanguageOption("zh-CN", "中文"),
 )
 
 data class RemoteProjectSettingsState(

@@ -432,7 +432,7 @@ fun ChatListDrawer(
  * It used to be a bare ⇅ icon whose only label was a content description, which told a sighted user
  * nothing: two arrows over a chat list could as easily mean sync, move, or reorder. Naming the
  * current order and offering the other one is the whole fix — and the strings for both modes were
- * already translated in all eleven locales, waiting for a control to use them.
+ * kept in both maintained languages.
  */
 @Composable
 private fun SortChip(byRecency: Boolean, onPick: (byRecency: Boolean) -> Unit) {

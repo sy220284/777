@@ -73,6 +73,8 @@ class MemoryPolicy @Inject constructor() {
         if (BEARER.containsMatchIn(text)) return true
         if (PRIVATE_KEY.containsMatchIn(text)) return true
         if (LONG_SECRET.containsMatchIn(text)) return true
+        if (KNOWN_CREDENTIAL.containsMatchIn(text)) return true
+        if (JWT.containsMatchIn(text)) return true
         return false
     }
 
@@ -105,6 +107,12 @@ class MemoryPolicy @Inject constructor() {
         val BEARER = Regex("""(?i)bearer\s+[a-z0-9._~+/=-]{16,}""")
         val PRIVATE_KEY = Regex("""(?i)-----BEGIN [A-Z ]*PRIVATE KEY-----""")
         val LONG_SECRET = Regex("""(?i)(?:sk-|key[-_:]?|token[-_:]?|secret[-_:]?)[a-z0-9._~+/=-]{12,}""")
+        val KNOWN_CREDENTIAL = Regex(
+            """(?i)\b(?:gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|AIza[a-z0-9_-]{35}|xox[baprs]-[a-z0-9-]{10,})\b""",
+        )
+        val JWT = Regex(
+            """(?i)\beyJ[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\b""",
+        )
         val SENSITIVE_ASSIGNMENT = Regex(
             """(?i)(?:密码|口令|验证码|密钥|私钥|助记词|password|passwd|api\s*key|apikey|access\s*token|refresh\s*token)\s*(?:是|为|[:=])\s*\S{4,}""",
         )

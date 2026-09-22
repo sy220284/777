@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.core.wire
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -143,7 +144,17 @@ class OkHttpRpcTransport(
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use { resp ->
-                        val responseBody = resp.body?.string().orEmpty()
+                        if (!continuation.isActive) return
+                        val responseBody = try {
+                            readResponseBody(
+                                resp,
+                                if (resp.isSuccessful) MAX_RPC_RESPONSE_BYTES else MAX_ERROR_RESPONSE_BYTES,
+                            )
+                        } catch (error: RpcTransportException) {
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                            return
+                        }
+                        if (!continuation.isActive) return
                         if (resp.isSuccessful) {
                             continuation.resume(RpcHttpResponse(resp.code, responseBody))
                         } else {
@@ -236,13 +247,55 @@ class OkHttpRpcTransport(
             throw RpcTransportException(0, "transport failure: ${e.message}", e)
         }
         response.use { resp ->
-            val responseBody = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw RpcTransportException(resp.code, carrierMessage(resp.code))
+            val responseBody = readResponseBody(
+                resp,
+                if (resp.isSuccessful) MAX_RPC_RESPONSE_BYTES else MAX_ERROR_RESPONSE_BYTES,
+            )
+            if (!resp.isSuccessful) throw RpcTransportException(
+                resp.code,
+                carrierMessage(resp.code, responseBody),
+            )
             RpcHttpResponse(resp.code, responseBody)
         }
     }
 
+    private fun readResponseBody(response: Response, maxBytes: Int): String {
+        val body = response.body ?: return ""
+        val declared = body.contentLength()
+        if (declared > maxBytes) {
+            throw RpcTransportException(
+                response.code,
+                "carrier response exceeds ${maxBytes} byte limit",
+            )
+        }
+        val output = ByteArrayOutputStream(
+            when {
+                declared in 1..maxBytes.toLong() -> declared.toInt()
+                else -> minOf(maxBytes, 64 * 1024)
+            },
+        )
+        body.byteStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                if (total > maxBytes) {
+                    throw RpcTransportException(
+                        response.code,
+                        "carrier response exceeds ${maxBytes} byte limit",
+                    )
+                }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+
     private companion object {
+        const val MAX_RPC_RESPONSE_BYTES = 8 * 1024 * 1024
+        const val MAX_ERROR_RESPONSE_BYTES = 256 * 1024
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

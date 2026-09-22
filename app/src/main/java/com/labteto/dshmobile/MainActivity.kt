@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
         notifications.ensureChannels()
         notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
-        // Apply the persisted in-app language (11 locales, incl. Thai/RTL).
+        // Apply the persisted in-app language (English or Simplified Chinese).
         //
         // Only set the locale when it actually differs, or the recreate it triggers loops.
         lifecycleScope.launch {

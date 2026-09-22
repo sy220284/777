@@ -85,6 +85,9 @@ import okhttp3.OkHttpClient
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
 
+internal fun canAutoApprove(access: ToolAccess): Boolean =
+    access == ToolAccess.WORKSPACE_WRITE
+
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -395,6 +398,9 @@ class LocalHarnessEngine @Inject constructor(
             stop()
             job.cancelAndJoin()
             throw IllegalStateException("后台任务执行超时，已停止本轮任务", timeout)
+        } catch (cancelled: CancellationException) {
+            job.cancelAndJoin()
+            throw cancelled
         }
 
         val newMessages = _state.value.messages.drop(beforeCount)
@@ -919,6 +925,7 @@ class LocalHarnessEngine @Inject constructor(
                     approve(
                         call,
                         "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）",
+                        tool.access,
                     )
                 },
             ),
@@ -949,14 +956,14 @@ class LocalHarnessEngine @Inject constructor(
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
                 val path = args.string("path")
-                if (!approve(call, "写入文件：$path")) return "用户拒绝写入 $path"
+                if (!approve(call, "写入文件：$path", ToolAccess.WORKSPACE_WRITE)) return "用户拒绝写入 $path"
                 workspace.write(path, args.string("content"))
             }
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
-                if (!approve(call, "编辑文件：$path")) return "用户拒绝编辑 $path"
+                if (!approve(call, "编辑文件：$path", ToolAccess.WORKSPACE_WRITE)) return "用户拒绝编辑 $path"
                 workspace.edit(path, args.string("old_text"), args.string("new_text"))
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
@@ -965,7 +972,7 @@ class LocalHarnessEngine @Inject constructor(
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")
-                if (!approve(call, "执行命令：${command.take(160)}")) return "用户拒绝执行命令"
+                if (!approve(call, "执行命令：${command.take(160)}", ToolAccess.PROCESS)) return "用户拒绝执行命令"
                 val background = args.boolean("run_in_background", false)
                 val timeout = args.int(
                     "timeout_seconds",
@@ -1109,6 +1116,12 @@ class LocalHarnessEngine @Inject constructor(
                 if (scope == MemoryScope.PROJECT && state.projectId == null) {
                     return "当前是独立对话，没有可写入的项目作用域"
                 }
+                if (
+                    scope == MemoryScope.LINEAGE &&
+                    state.conversationMode != LocalConversationMode.CONTINUATION
+                ) {
+                    return "只有“继续当前任务”对话可以写入 lineage 记忆，避免产生无法召回的幽灵记忆"
+                }
                 val kind = runCatching {
                     MemoryKind.valueOf((args.optionalString("kind") ?: "fact").uppercase())
                 }.getOrDefault(MemoryKind.FACT)
@@ -1221,11 +1234,16 @@ class LocalHarnessEngine @Inject constructor(
         return "JSON 查询结果过大，完整结果已保存：$saved\n字符数：${output.length}\n预览：\n${output.take(WEB_FETCH_PREVIEW_CHARS)}"
     }
 
-    private suspend fun approve(call: LocalToolCall, summary: String): Boolean {
-        if (_state.value.autoApproveMutations) {
+    private suspend fun approve(
+        call: LocalToolCall,
+        summary: String,
+        access: ToolAccess,
+    ): Boolean {
+        if (_state.value.autoApproveMutations && canAutoApprove(access)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
+                put("access", access.name.lowercase())
             })
             return true
         }

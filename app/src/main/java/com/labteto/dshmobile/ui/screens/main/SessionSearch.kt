@@ -44,7 +44,7 @@ internal const val SEARCH_RESULT_LIMIT = 30
  * Archived sessions never match either — they are out of the list the query is asking about.
  *
  * A free function so the ordering and dedup rules can be tested without a device, in the same
- * spirit as `sameSubnet` in the discovery engine.
+ * spirit as the other small pure projection helpers in this module.
  */
 internal fun deriveSearchResults(
     sessions: List<SessionRow>,
