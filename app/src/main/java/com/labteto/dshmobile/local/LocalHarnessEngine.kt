@@ -32,6 +32,7 @@ import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -1439,7 +1440,7 @@ class LocalHarnessEngine @Inject constructor(
             put("tools", tools)
             put("plan_mode", snapshot.planMode)
         })
-        eventLog.append("local/request-snapshot", buildJsonObject {
+        eventLog.append("request/context", buildJsonObject {
             put("step", step)
             put("model", snapshot.model)
             put("messages", JsonArray(messages))
@@ -1461,6 +1462,14 @@ class LocalHarnessEngine @Inject constructor(
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
                         })
+                        eventLog.append("assistant/attempt", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("status", "failed")
+                            put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
+                            put("detail", event.reason.take(2_000))
+                        })
                     }
                     is AgentRequestEvent.RetryScheduled -> {
                         eventLog.append("llm/retry", buildJsonObject {
@@ -1468,6 +1477,15 @@ class LocalHarnessEngine @Inject constructor(
                             put("attempt", event.attempt)
                             put("next_attempt", event.nextAttempt)
                             put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptCancelled -> {
+                        eventLog.append("assistant/attempt", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("status", "cancelled")
+                            put("will_retry", false)
+                            event.reason?.let { put("detail", it.take(2_000)) }
                         })
                     }
                     is AgentRequestEvent.AttemptSucceeded -> Unit
@@ -1630,6 +1648,7 @@ class LocalHarnessEngine @Inject constructor(
         model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
+        val recovery = eventLog.repairInterruptedTail()
         val loaded = try {
             sessionRepository.read(sessionId)
         } catch (future: FutureSessionVersionException) {
@@ -1645,6 +1664,7 @@ class LocalHarnessEngine @Inject constructor(
         val stored = loaded ?: LocalHarnessSession(id = sessionId)
         modelHistory.clear()
         modelHistory += restoreModelHistory(sessionId, stored.modelHistory)
+        applyRecoveredToolResults(recovery)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
@@ -1683,6 +1703,26 @@ class LocalHarnessEngine @Inject constructor(
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
             checkpointModelHistory("load/system-refresh")
         }
+    }
+
+    private fun applyRecoveredToolResults(recovery: SessionRepairResult) {
+        if (recovery.toolResults.isEmpty()) return
+        var changed = false
+        recovery.toolResults.forEach { recovered ->
+            val alreadyPresent = modelHistory.any { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
+                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
+            }
+            if (!alreadyPresent) {
+                modelHistory += buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", recovered.callId)
+                    put("content", recovered.content)
+                }
+                changed = true
+            }
+        }
+        if (changed) checkpointModelHistory("session/recovery")
     }
 
     private fun checkpointModelHistory(reason: String) {

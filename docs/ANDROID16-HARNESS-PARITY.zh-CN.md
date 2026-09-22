@@ -1,8 +1,8 @@
 # Android 16 本机 Harness 适配审计
 
-审计基线：`deepseek-ai/deepseek-harness@ddefc45fbc7f8e46dd73185e68295696d1297887`
-（官方 `master`，`0.1.6-alpha.2`）。本文件只评价 APK 内的本机模式；电脑远程模式继续使用官方
-网页协议，范围见 `COMPATIBILITY.md`。
+审计基线：`deepseek-ai/deepseek-harness@00102833dfaee1da9f48a3a8eae9d34005a75218`
+（官方 `master`，`0.1.7-alpha.2`）。本文件只评价 APK 内的本机模式；电脑远程模式继续使用官方
+网页协议，范围见 `COMPATIBILITY.md`。官方该基线的 Session 写入格式为 V4；本机侧以语义等价为目标，不直接复刻其物理载体。
 
 ## 结论
 
@@ -85,3 +85,11 @@
 会话快照与有界事件日志保存在应用私有目录，系统备份和设备迁移提取已关闭。网页抓取拒绝环回、私网、链路本地、组播、保留地址、
 用户信息网址和非常用端口，并在每次重定向后重新解析和固定地址。Shell 继承 Android 应用身份，无法越过
 系统沙箱；设备是否带有某个命令由厂商系统决定。
+
+
+## 0.1.7-alpha.2 基线补强
+
+- 本机会话事件日志改为分段追加：单段仍受大小限制，但历史段永久保留，不再为新事件裁掉旧事实。
+- 启动/切换会话时会修复中断的开放轮次：已记录开始但无结果的工具标记为 `TOOL_OUTCOME_UNKNOWN`；尚未记录开始的调用标记为 `TOOL_NOT_STARTED`。
+- 模型请求的完整消息与工具视图使用 `request/context` 落盘；失败或取消的模型尝试使用 `assistant/attempt` 结算。
+- `modelHistory` 现阶段仍保留为兼容缓存；后续目标是由 Session 事件投影完全替代其权威地位。
