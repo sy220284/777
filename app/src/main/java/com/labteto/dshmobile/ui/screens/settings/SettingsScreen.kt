@@ -111,6 +111,7 @@ fun SettingsScreen(
     val projectSettings by viewModel.projectSettings.collectAsStateWithLifecycle()
     val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
+    val visionSettings by viewModel.visionSettings.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
@@ -236,6 +237,12 @@ fun SettingsScreen(
 
                         LocalHarnessSettingsCard(
                             local = localHarness,
+                            viewModel = viewModel,
+                            report = toast.second,
+                        )
+
+                        LocalVisionSettingsCard(
+                            vision = visionSettings,
                             viewModel = viewModel,
                             report = toast.second,
                         )

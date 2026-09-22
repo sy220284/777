@@ -5,16 +5,15 @@ import androidx.datastore.preferences.core.Preferences
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** DeepSeek API key encrypted with the original non-exportable Android Keystore key. */
+/** Separately encrypted credential for the optional multimodal vision provider. */
 @Singleton
-class LocalApiKeyStore @Inject constructor(
+class LocalVisionApiKeyStore @Inject constructor(
     dataStore: DataStore<Preferences>,
 ) {
-    // Keep both identifiers stable so existing encrypted credentials remain readable after refactor.
     private val delegate = KeystorePreferenceSecretStore(
         dataStore = dataStore,
-        preferenceName = "local_harness_api_key",
-        alias = "dsh_local_harness_api_key",
+        preferenceName = "local_harness_vision_api_key",
+        alias = "dsh_local_harness_vision_api_key",
     )
 
     suspend fun get(): String? = delegate.get()

@@ -23,6 +23,8 @@ import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalVisionSettings
+import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -74,6 +76,7 @@ class SettingsViewModel @Inject constructor(
     private val credentials: RelayCredentialStore,
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalHarnessEngine,
+    private val localVisionSettings: LocalVisionSettings,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
@@ -84,6 +87,9 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
     val localHarnessState: StateFlow<LocalHarnessState> = localHarness.state
+
+    private val _visionSettings = MutableStateFlow(LocalVisionSettingsSnapshot())
+    val visionSettings: StateFlow<LocalVisionSettingsSnapshot> = _visionSettings.asStateFlow()
 
     private val _projectSettings = MutableStateFlow(RemoteProjectSettingsState())
     val projectSettings: StateFlow<RemoteProjectSettingsState> = _projectSettings.asStateFlow()
@@ -131,6 +137,14 @@ class SettingsViewModel @Inject constructor(
     fun refreshAdvancedSettings() {
         refreshRemoteSettings()
         refreshDeviceCapabilities()
+        refreshVisionSettings()
+    }
+
+    fun refreshVisionSettings() {
+        viewModelScope.launch {
+            _visionSettings.value = runCatching { localVisionSettings.snapshot() }
+                .getOrElse { LocalVisionSettingsSnapshot() }
+        }
     }
 
     fun refreshRemoteSettings() {
@@ -284,6 +298,35 @@ class SettingsViewModel @Inject constructor(
         localHarness.configure(apiKey, model, baseUrl)
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
+    }
+
+    fun configureLocalVision(
+        apiKey: String,
+        model: String,
+        baseUrl: String,
+        onDone: (String?) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                localVisionSettings.configure(apiKey, model, baseUrl)
+            }.onSuccess { snapshot ->
+                _visionSettings.value = snapshot
+                onDone(null)
+            }.onFailure { error ->
+                onDone(error.message ?: "视觉模型配置失败")
+            }
+        }
+    }
+
+    fun clearLocalVisionCredential(onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { localVisionSettings.clearCredential() }
+                .onSuccess { snapshot ->
+                    _visionSettings.value = snapshot
+                    onDone(null)
+                }
+                .onFailure { error -> onDone(error.message ?: "清除视觉模型密钥失败") }
+        }
     }
 
     fun configureLanguageServer(command: String): String = localHarness.configureLanguageServer(command)
