@@ -2,6 +2,7 @@
 set -euo pipefail
 
 OUT_ROOT="${1:?usage: prepare-termux-python.sh <generated-output-dir>}"
+RUNTIME_ABIS="${DSH_RUNTIME_ABIS:-arm64-v8a}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CACHE_DIR="${TERMUX_RUNTIME_CACHE:-$ROOT_DIR/.gradle/runtime-cache/termux-python}"
 TERMUX_REPO="${TERMUX_REPO:-https://packages-cf.termux.dev/apt/termux-main}"
@@ -392,13 +393,23 @@ prepare_arch() {
   verify_dependency_closure "$jni_dir/libdsh_python.so" "$lib_dir" "$stdlib_dir"
 }
 
-prepare_arch aarch64 arm64-v8a
-prepare_arch x86_64 x86_64
+IFS=',' read -r -a requested_abis <<< "$RUNTIME_ABIS"
+for android_abi in "${requested_abis[@]}"; do
+  case "$android_abi" in
+    arm64-v8a) prepare_arch aarch64 arm64-v8a ;;
+    x86_64) prepare_arch x86_64 x86_64 ;;
+    *)
+      echo "不支持的运行时 ABI：$android_abi" >&2
+      exit 1
+      ;;
+  esac
+done
 
 printf '%s\n' "$PYTHON_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/python/python-version.txt"
 cat > "$OUT_ROOT/assets/runtime/python/README.txt" <<EOF
 Bundled Python runtime
 Python: $PYTHON_RUNTIME_VERSION
+ABIs: $RUNTIME_ABIS
 Source packages: Termux termux-main, signature verified with $TERMUX_KEY_FINGERPRINT
 Executable: APK native library libdsh_python.so
 Standard library: assets/runtime/python/<abi>/home/lib/python$PYTHON_MAJOR_MINOR
