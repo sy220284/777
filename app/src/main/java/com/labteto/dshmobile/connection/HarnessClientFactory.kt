@@ -102,21 +102,6 @@ class HarnessClientFactory @Inject constructor(
         }
     }
 
-    /**
-     * A client for an address nothing is remembered about yet — the LAN sweep and the manual field.
-     *
-     * Deliberately unauthenticated: an address that has not been paired has no credential to send,
-     * and a relay answers such a probe with the 403 that routes the user to pairing.
-     */
-    fun anonymousClient(baseUrl: String, timeouts: ProbeTimeouts): DshApiClient = DshApiClient(
-        transport = OkHttpRpcTransport(
-            baseUrl = baseUrl,
-            client = okHttpClient,
-            connectTimeoutMs = timeouts.connectMs,
-            readTimeoutMs = timeouts.readMs,
-        ),
-    )
-
     private companion object {
         /** The transport's own default, restated so a null [ProbeTimeouts] is explicit rather than magic. */
         const val DEFAULT_TIMEOUT_MS = 30_000L
