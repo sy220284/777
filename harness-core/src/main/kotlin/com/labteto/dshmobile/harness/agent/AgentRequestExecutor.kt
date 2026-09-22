@@ -56,9 +56,9 @@ class AgentRequestExecutor(
         for (attempt in 1..maxAttempts) {
             eventSink.append(AgentRequestEvent.AttemptStarted(attempt, maxAttempts))
             try {
-                return block(attempt).also {
-                    eventSink.append(AgentRequestEvent.AttemptSucceeded(attempt))
-                }
+                val result = block(attempt)
+                eventSink.append(AgentRequestEvent.AttemptSucceeded(attempt))
+                return result
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
