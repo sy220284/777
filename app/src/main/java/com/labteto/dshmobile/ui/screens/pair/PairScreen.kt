@@ -128,8 +128,9 @@ fun PairScreen(
                             .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                             .setPrompt(scanPrompt)
                             .setBeepEnabled(false)
-                            // Keep relay scanning portrait-first on phones so opening the camera
-                            // does not rotate the pairing flow into landscape.
+                            .setCaptureActivity(PortraitCaptureActivity::class.java)
+                            // The dedicated capture activity is portrait-only; keep ZXing's
+                            // orientation lock enabled so the preview cannot rotate mid-scan.
                             .setOrientationLocked(true),
                     )
                 },
