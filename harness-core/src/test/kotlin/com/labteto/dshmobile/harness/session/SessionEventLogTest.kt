@@ -40,6 +40,22 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun rejectedOversizedEventDoesNotConsumeSequence() {
+        val directory = Files.createTempDirectory("harness-event-sequence").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 512, clock = { 1L })
+            runCatching {
+                log.append("too-large", buildJsonObject { put("value", "x".repeat(2_000)) })
+            }
+            val accepted = log.append("accepted", buildJsonObject { put("value", "ok") })
+            assertEquals(0L, accepted.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun latestTypedEventSkipsMalformedRowsAndKeepsNewestCompleteMatch() {
         val directory = Files.createTempDirectory("harness-event-latest").toFile()
         val file = directory.resolve("session.events.jsonl")
