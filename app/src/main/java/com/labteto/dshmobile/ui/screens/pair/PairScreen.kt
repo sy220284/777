@@ -128,9 +128,9 @@ fun PairScreen(
                             .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                             .setPrompt(scanPrompt)
                             .setBeepEnabled(false)
-                            // The pairing page is often read off a laptop held at an angle; locking
-                            // to portrait makes that harder for no benefit.
-                            .setOrientationLocked(false),
+                            // Keep relay scanning portrait-first on phones so opening the camera
+                            // does not rotate the pairing flow into landscape.
+                            .setOrientationLocked(true),
                     )
                 },
                 enabled = !state.busy,
