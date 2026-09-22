@@ -291,6 +291,35 @@ object LocalToolCatalog {
         add(tool("session_search", "跨本机历史会话搜索事件", properties(
             "query" to string("搜索内容"),
         ), listOf("query")))
+        add(tool("memory_search", "搜索当前会话允许作用域内的长期记忆", properties(
+            "query" to string("搜索内容"),
+        ), listOf("query")))
+        add(tool("memory_list", "列出当前会话允许查看的最近长期记忆，仅在用户明确要求查看记忆时使用", properties()))
+        add(tool("memory_remember", "保存一条长期记忆；只用于明确长期规则、偏好、项目决定或用户明确要求记住的内容", properties(
+            "content" to string("需要长期保存的精炼内容"),
+            "scope" to buildJsonObject {
+                put("type", "string")
+                put("description", "global 全局、project 当前项目、lineage 当前连续任务")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("global"))
+                    add(JsonPrimitive("project"))
+                    add(JsonPrimitive("lineage"))
+                })
+            },
+            "kind" to buildJsonObject {
+                put("type", "string")
+                put("description", "rule / preference / fact / decision / constraint / state / summary")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("rule"))
+                    add(JsonPrimitive("preference"))
+                    add(JsonPrimitive("fact"))
+                    add(JsonPrimitive("decision"))
+                    add(JsonPrimitive("constraint"))
+                    add(JsonPrimitive("state"))
+                    add(JsonPrimitive("summary"))
+                })
+            },
+        ), listOf("content", "scope")))
         add(tool("session_trace", "读取一个会话最近的事件轨迹", properties(
             "session_id" to string("可选；留空使用当前会话"),
             "limit" to integer("返回条数，默认 40，最大 200"),

@@ -287,9 +287,12 @@ class SettingsViewModel @Inject constructor(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
         modelAttempts: Int,
+        userRules: String,
+        autoRecall: Boolean,
     ) {
         localHarness.configure(apiKey, model, baseUrl)
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
+        localHarness.configurePersonalization(userRules, autoRecall)
     }
 
     fun clearLocalCredential() {
