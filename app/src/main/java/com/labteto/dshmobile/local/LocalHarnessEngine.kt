@@ -487,6 +487,13 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(true)
     }
 
+    /** Approve ordinary DEVICE actions for the remainder of the current agent turn only. */
+    fun enableDeviceApprovalLease() {
+        _state.update { it.copy(deviceApprovalLease = true) }
+        eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
+        approvalResponse?.complete(true)
+    }
+
     /** Return the current session to per-operation approval. */
     fun disableAutoApproval() {
         _state.update { it.copy(autoApproveMutations = false) }
@@ -569,6 +576,7 @@ class LocalHarnessEngine @Inject constructor(
                             goal = null,
                             planMode = false,
                             autoApproveMutations = false,
+                            deviceApprovalLease = false,
                             jobs = emptyList(),
                             error = null,
                         )
@@ -677,7 +685,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
-        _state.update { it.copy(running = true, error = null) }
+        _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
         var requestPrepared = false
@@ -852,7 +860,14 @@ class LocalHarnessEngine @Inject constructor(
         } finally {
             approvalResponse = null
             questionResponse = null
-            _state.update { it.copy(running = false, pendingApproval = null, pendingQuestion = null) }
+            _state.update {
+                it.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    deviceApprovalLease = false,
+                )
+            }
             persist()
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) {
@@ -1122,6 +1137,15 @@ class LocalHarnessEngine @Inject constructor(
         summary: String,
         access: ToolAccess,
     ): Boolean {
+        if (_state.value.deviceApprovalLease && access == ToolAccess.DEVICE) {
+            eventLog.append("approval/auto", buildJsonObject {
+                put("tool", call.name)
+                put("summary", summary)
+                put("access", access.name.lowercase())
+                put("mode", "device-turn-lease")
+            })
+            return true
+        }
         if (_state.value.autoApproveMutations && canAutoApprove(access)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
@@ -1134,7 +1158,13 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse = response
         _state.update {
             it.copy(
-                pendingApproval = LocalApproval(call.id, call.name, summary, call.rawArguments),
+                pendingApproval = LocalApproval(
+                    call.id,
+                    call.name,
+                    summary,
+                    call.rawArguments,
+                    access.name.lowercase(),
+                ),
             )
         }
         return try {
