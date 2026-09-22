@@ -28,6 +28,11 @@ sealed interface AgentRequestEvent {
     data class AttemptSucceeded(
         override val attempt: Int,
     ) : AgentRequestEvent
+
+    data class AttemptCancelled(
+        override val attempt: Int,
+        val reason: String?,
+    ) : AgentRequestEvent
 }
 
 fun interface AgentRequestEventSink {
@@ -61,6 +66,12 @@ class AgentRequestExecutor(
                 eventSink.append(AgentRequestEvent.AttemptSucceeded(attempt))
                 return result
             } catch (cancelled: CancellationException) {
+                eventSink.append(
+                    AgentRequestEvent.AttemptCancelled(
+                        attempt = attempt,
+                        reason = cancelled.message,
+                    ),
+                )
                 throw cancelled
             } catch (error: Exception) {
                 lastError = error

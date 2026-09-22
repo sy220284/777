@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.serialization.Serializable
@@ -15,7 +18,13 @@ data class SessionEvent(
     val data: JsonObject,
 )
 
-/** Append-only source of truth for model-visible session facts. */
+/**
+ * Append-only source of truth for model-visible session facts.
+ *
+ * [maxBytes] is a segment bound, not a retention bound. Once the active JSONL file reaches the
+ * bound it is moved to an immutable numbered segment and a fresh active file is opened. Historical
+ * rows are never discarded merely to make room for newer rows.
+ */
 class SessionEventLog(
     private val file: File,
     private val json: Json,
@@ -23,7 +32,7 @@ class SessionEventLog(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     init {
-        require(maxBytes >= MIN_MAX_BYTES) { "事件日志上限至少为 $MIN_MAX_BYTES 字节" }
+        require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
     }
 
     private val lock = Any()
@@ -39,55 +48,66 @@ class SessionEventLog(
         )
         val encoded = json.encodeToString(SessionEvent.serializer(), event) + "\n"
         val incomingBytes = encoded.toByteArray().size.toLong()
-        require(incomingBytes <= maxBytes) { "单条会话事件超过日志上限" }
+        require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
         file.parentFile?.mkdirs()
-        if (file.length() + incomingBytes > maxBytes) trimToFit(incomingBytes)
+        if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
         file.appendText(encoded)
         event
     }
 
+    fun snapshot(): List<SessionEvent> = synchronized(lock) { readEventsUnsafe() }
+
     fun search(query: String, limit: Int = 50): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
+        val wanted = limit.coerceIn(1, MAX_READ_LINES)
         val matches = synchronized(lock) {
-            if (!file.isFile) return "会话事件日志为空"
-            file.useLines { lines ->
-                lines.mapIndexedNotNull { index, line ->
-                    line.takeIf { it.contains(query, ignoreCase = true) }?.let { "${index + 1}: $it" }
-                }.take(limit.coerceIn(1, MAX_READ_LINES)).toList()
+            val result = mutableListOf<String>()
+            var row = 0
+            for (source in orderedFilesUnsafe()) {
+                source.forEachLine { line ->
+                    row += 1
+                    if (result.size < wanted && line.contains(query, ignoreCase = true)) {
+                        result += "$row: $line"
+                    }
+                }
+                if (result.size >= wanted) break
             }
+            result
         }
         return if (matches.isEmpty()) "未找到会话事件" else matches.joinToString("\n")
     }
 
     fun tail(limit: Int = 40): String {
+        val wanted = limit.coerceIn(1, MAX_READ_LINES)
         val lines = synchronized(lock) {
-            if (!file.isFile) return "会话事件日志为空"
-            file.readLines()
+            val retained = ArrayDeque<String>(wanted)
+            for (source in orderedFilesUnsafe()) {
+                source.forEachLine { line ->
+                    if (retained.size == wanted) retained.removeFirst()
+                    retained.addLast(line)
+                }
+            }
+            retained.toList()
         }
-        return lines.takeLast(limit.coerceIn(1, MAX_READ_LINES)).joinToString("\n")
+        return if (lines.isEmpty()) "会话事件日志为空" else lines.joinToString("\n")
     }
 
     fun read(sequence: Long, before: Int = 0, after: Int = 0): String {
-        val lines = synchronized(lock) {
-            if (!file.isFile) return "会话事件日志为空"
-            file.readLines()
-        }
-        val target = lines.indexOfFirst { line ->
-            runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence == sequence }
-                .getOrDefault(false)
-        }
+        val events = snapshot()
+        if (events.isEmpty()) return "会话事件日志为空"
+        val target = events.indexOfFirst { it.sequence == sequence }
         if (target < 0) return "事件不存在：$sequence"
         val from = (target - before.coerceIn(0, MAX_CONTEXT_LINES)).coerceAtLeast(0)
-        val to = (target + after.coerceIn(0, MAX_CONTEXT_LINES) + 1).coerceAtMost(lines.size)
-        return lines.subList(from, to).joinToString("\n")
+        val to = (target + after.coerceIn(0, MAX_CONTEXT_LINES) + 1).coerceAtMost(events.size)
+        return events.subList(from, to)
+            .joinToString("\n") { json.encodeToString(SessionEvent.serializer(), it) }
     }
 
     fun latest(type: String): SessionEvent? = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
-        if (!file.isFile) return@synchronized null
         var latest: SessionEvent? = null
-        file.useLines { lines ->
-            lines.forEach { line ->
+        for (source in orderedFilesUnsafe()) {
+            source.forEachLine { line ->
                 val event = runCatching {
                     json.decodeFromString(SessionEvent.serializer(), line)
                 }.getOrNull()
@@ -99,44 +119,54 @@ class SessionEventLog(
 
     fun clear() {
         synchronized(lock) {
+            segmentFilesUnsafe().forEach(File::delete)
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
         }
     }
 
-    private fun readNextSequence(): Long = runCatching {
-        if (!file.isFile) 0L else file.useLines { lines ->
-            lines.mapNotNull { line ->
-                runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
-            }.maxOrNull()?.plus(1) ?: 0L
-        }
-    }.getOrDefault(0L)
+    private fun readNextSequence(): Long =
+        readEventsUnsafe().maxOfOrNull(SessionEvent::sequence)?.plus(1L) ?: 0L
 
-    /** Retains only complete newest JSONL rows and reserves space for the incoming event. */
-    private fun trimToFit(incomingBytes: Long) {
-        if (!file.isFile) return
-        val budget = (maxBytes - incomingBytes).coerceAtLeast(0L)
-        val retained = ArrayDeque<Pair<String, Int>>()
-        var retainedBytes = 0L
-        file.forEachLine { line ->
-            val bytes = line.toByteArray().size + 1
-            retained.addLast(line to bytes)
-            retainedBytes += bytes
-            while (retainedBytes > budget && retained.isNotEmpty()) {
-                retainedBytes -= retained.removeFirst().second
+    private fun readEventsUnsafe(): List<SessionEvent> {
+        val events = mutableListOf<SessionEvent>()
+        for (source in orderedFilesUnsafe()) {
+            source.forEachLine { line ->
+                runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
+                    .getOrNull()
+                    ?.let(events::add)
             }
         }
-        val temporary = File(file.parentFile, "${file.name}.tmp")
-        temporary.bufferedWriter().use { writer ->
-            retained.forEach { (line, _) ->
-                writer.write(line)
-                writer.newLine()
-            }
-        }
-        if (!temporary.renameTo(file)) {
-            file.writeText(temporary.readText())
-            temporary.delete()
+        return events
+    }
+
+    private fun orderedFilesUnsafe(): List<File> =
+        segmentFilesUnsafe() + listOfNotNull(file.takeIf(File::isFile))
+
+    private fun segmentFilesUnsafe(): List<File> {
+        val parent = file.parentFile ?: return emptyList()
+        val prefix = "${file.name}.part-"
+        return parent.listFiles().orEmpty()
+            .filter { it.isFile && it.name.startsWith(prefix) }
+            .sortedBy { it.name.removePrefix(prefix).toIntOrNull() ?: Int.MAX_VALUE }
+    }
+
+    private fun rotateActiveSegment() {
+        if (!file.isFile || file.length() == 0L) return
+        val parent = file.parentFile ?: error("事件日志缺少父目录")
+        parent.mkdirs()
+        val prefix = "${file.name}.part-"
+        val nextIndex = segmentFilesUnsafe()
+            .mapNotNull { it.name.removePrefix(prefix).toIntOrNull() }
+            .maxOrNull()
+            ?.plus(1)
+            ?: 1
+        val target = File(parent, "$prefix${nextIndex.toString().padStart(6, '0')}")
+        try {
+            Files.move(file.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(file.toPath(), target.toPath())
         }
     }
 

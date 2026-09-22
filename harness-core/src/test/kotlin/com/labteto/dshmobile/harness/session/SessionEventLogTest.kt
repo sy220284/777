@@ -12,7 +12,7 @@ class SessionEventLogTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun rotatesOnlyAtCompleteRowsAndContinuesSequenceAfterRestart() {
+    fun rotatesWithoutDiscardingRowsAndContinuesSequenceAfterRestart() {
         val directory = Files.createTempDirectory("harness-event-log").toFile()
         val file = directory.resolve("session.events.jsonl")
         try {
@@ -22,19 +22,23 @@ class SessionEventLogTest {
             }
 
             assertTrue(file.length() <= 700)
-            val retained = file.readLines().map { json.decodeFromString(SessionEvent.serializer(), it) }
+            assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("session.events.jsonl.part-") })
+            val retained = log.snapshot()
+            assertEquals(20, retained.size)
+            assertEquals(0L, retained.first().sequence)
             assertEquals(19L, retained.last().sequence)
-            assertTrue(retained.first().sequence > 0L)
 
-            SessionEventLog(file, json, maxBytes = 700, clock = { 456L })
-                .append("test/restarted", buildJsonObject { put("value", "latest") })
-            val latest = json.decodeFromString(SessionEvent.serializer(), file.readLines().last())
+            val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 456L })
+            restarted.append("test/restarted", buildJsonObject { put("value", "latest") })
+            val latest = requireNotNull(restarted.latest("test/restarted"))
             assertEquals(20L, latest.sequence)
             assertEquals(456L, latest.createdAt)
+            assertEquals(21, restarted.snapshot().size)
         } finally {
             directory.deleteRecursively()
         }
     }
+
     @Test
     fun latestTypedEventSkipsMalformedRowsAndKeepsNewestCompleteMatch() {
         val directory = Files.createTempDirectory("harness-event-latest").toFile()
@@ -53,5 +57,4 @@ class SessionEventLogTest {
             directory.deleteRecursively()
         }
     }
-
 }
