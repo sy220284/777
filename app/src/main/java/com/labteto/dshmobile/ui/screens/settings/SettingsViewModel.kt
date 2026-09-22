@@ -25,6 +25,10 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalVisionSettings
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
+import com.labteto.dshmobile.local.memory.MemoryManager
+import com.labteto.dshmobile.local.memory.MemoryRecord
+import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.memory.MemoryStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -77,6 +81,8 @@ class SettingsViewModel @Inject constructor(
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalHarnessEngine,
     private val localVisionSettings: LocalVisionSettings,
+    private val memoryStore: MemoryStore,
+    private val memoryManager: MemoryManager,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
@@ -87,6 +93,9 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
     val localHarnessState: StateFlow<LocalHarnessState> = localHarness.state
+
+    private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
+    val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
 
     private val _visionSettings = MutableStateFlow(LocalVisionSettingsSnapshot())
     val visionSettings: StateFlow<LocalVisionSettingsSnapshot> = _visionSettings.asStateFlow()
@@ -306,6 +315,59 @@ class SettingsViewModel @Inject constructor(
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
+    }
+
+    fun refreshMemories() {
+        val local = localHarness.state.value
+        val scopes = when (local.conversationMode) {
+            com.labteto.dshmobile.local.LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
+            com.labteto.dshmobile.local.LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
+            com.labteto.dshmobile.local.LocalConversationMode.CONTINUATION ->
+                setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
+        }
+        _memories.value = memoryStore.listActive(
+            allowedScopes = scopes,
+            projectId = local.projectId,
+            lineageId = local.lineageId,
+            limit = 100,
+        )
+    }
+
+    fun updateMemory(
+        id: String,
+        content: String,
+        pinned: Boolean,
+        importance: Int,
+        onDone: (String?) -> Unit = {},
+    ) {
+        val current = _memories.value.firstOrNull { it.id == id }
+        if (current == null) {
+            onDone("记忆已经不存在")
+            refreshMemories()
+            return
+        }
+        runCatching {
+            memoryManager.update(
+                existing = current,
+                content = content,
+                importance = importance,
+                pinned = pinned,
+            )
+        }.onSuccess {
+            refreshMemories()
+            onDone(null)
+        }.onFailure { error ->
+            onDone(error.message ?: "更新记忆失败")
+        }
+    }
+
+    fun forgetMemory(id: String, onDone: (String?) -> Unit = {}) {
+        runCatching { memoryStore.forget(id) }
+            .onSuccess {
+                refreshMemories()
+                onDone(null)
+            }
+            .onFailure { error -> onDone(error.message ?: "停用记忆失败") }
     }
 
     fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
