@@ -179,6 +179,7 @@ fun LocalHarnessScreen(
                 onDeny = viewModel::deny,
                 onAutoApprove = viewModel::enableAutoApproval,
                 onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
+                onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
                 onDisableAutoApprove = viewModel::disableAutoApproval,
                 onAnswerQuestion = viewModel::answerQuestion,
             )
@@ -474,6 +475,7 @@ private fun LocalChat(
     onDeny: () -> Unit,
     onAutoApprove: () -> Unit,
     onApproveDeviceTurn: () -> Unit,
+    onDisableDeviceTurn: () -> Unit,
     onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String) -> Unit,
 ) {
@@ -629,16 +631,24 @@ private fun LocalChat(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("自动批准已开启", style = DsType.small13Strong, color = colors.warnLabel)
                         Text(
-                            "当前会话中的文件写入和编辑会直接执行；命令及高权限操作仍需确认。",
+                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "自动批准已开启",
+                            style = DsType.small13Strong,
+                            color = colors.warnLabel,
+                        )
+                        Text(
+                            if (state.deviceApprovalLease) {
+                                "当前代理回合中的普通界面点击、输入和滑动会直接执行；Shizuku、高权限、MCP、凭据和命令仍需逐次确认。"
+                            } else {
+                                "当前会话中的文件写入和编辑会直接执行；命令及高权限操作仍需确认。"
+                            },
                             style = DsType.caption11,
                             color = colors.labelSecondary,
                         )
                     }
                     DsButton(
                         "关闭",
-                        onDisableAutoApprove,
+                        if (state.deviceApprovalLease) onDisableDeviceTurn else onDisableAutoApprove,
                         variant = DsButtonVariant.Ghost,
                         size = DsButtonSize.Small,
                     )
