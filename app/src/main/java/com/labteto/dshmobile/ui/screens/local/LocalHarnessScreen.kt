@@ -632,7 +632,7 @@ private fun LocalChat(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "自动批准已开启",
+                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "工作区自动批准已开启",
                             style = DsType.small13Strong,
                             color = colors.warnLabel,
                         )
@@ -640,7 +640,7 @@ private fun LocalChat(
                             if (state.deviceApprovalLease) {
                                 "当前代理回合中的普通界面点击、输入和滑动会直接执行；Shizuku、高权限、MCP、凭据和命令仍需逐次确认。"
                             } else {
-                                "当前会话中的文件写入和编辑会直接执行；命令及高权限操作仍需确认。"
+                                "当前会话中被工作区沙箱约束的写入、编辑、补丁和下载会直接执行；命令、工作区外写入/删除及其他高风险操作仍需逐次确认。"
                             },
                             style = DsType.caption11,
                             color = colors.labelSecondary,
@@ -1316,10 +1316,13 @@ private fun ApprovalDialog(
         }
 
         Text(
-            when (approval.access) {
-                "device" -> "可只批准本次，或仅在当前代理回合内授权普通设备界面操作；高权限能力仍会逐次确认。"
-                "workspace_write" -> "“自动批准”只对当前会话的文件写入和编辑生效。命令、设备高权限、MCP、自动化和凭据操作仍会逐次确认。"
-                else -> "该操作只支持逐次确认；高风险权限不会被普通自动批准设置绕过。"
+            when {
+                approval.canAutoApproveWorkspace ->
+                    "该操作被严格限制在当前工作区内。可只批准本次，或开启本会话工作区自动批准；工作区外写入、删除、命令和其他高风险操作仍会逐次确认。"
+                approval.canApproveDeviceTurn ->
+                    "可只批准本次，或仅在当前代理回合内授权普通设备界面操作；要求逐次批准的设备能力不会被本轮授权覆盖。"
+                else ->
+                    "该操作只支持逐次确认；工作区外写入、删除、命令、系统级和其他高风险能力不会被自动批准设置绕过。"
             },
             style = DsType.caption11,
             color = colors.labelTertiary,
@@ -1336,14 +1339,14 @@ private fun ApprovalDialog(
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
         )
-        when (approval.access) {
-            "workspace_write" -> DsButton(
-                "本会话后续文件写入自动批准",
+        when {
+            approval.canAutoApproveWorkspace -> DsButton(
+                "本会话工作区操作自动批准",
                 onAutoApprove,
                 modifier = Modifier.fillMaxWidth(),
                 variant = DsButtonVariant.Ghost,
             )
-            "device" -> DsButton(
+            approval.canApproveDeviceTurn -> DsButton(
                 "批准本轮普通设备操作",
                 onApproveDeviceTurn,
                 modifier = Modifier.fillMaxWidth(),
