@@ -40,7 +40,7 @@ class BundledPythonRuntimeTest {
         assertTrue("bundled Python timed out", process.waitFor(30, TimeUnit.SECONDS))
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
 
-        assertEquals(0, process.exitValue())
+        assertEquals("bundled Python failed:\n$output", 0, process.exitValue())
         assertTrue("unexpected Python version: $output", output.startsWith("3.14.6|"))
         assertTrue("Python subprocess shell failed: $output", output.endsWith("shell-ok"))
     }
