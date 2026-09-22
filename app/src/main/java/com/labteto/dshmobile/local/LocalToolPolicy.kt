@@ -3,7 +3,12 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 
-/** Explicit classifications: adding a built-in requires deciding its permissions. */
+internal enum class LocalAutoApprovalScope {
+    NONE,
+    WORKSPACE,
+}
+
+/** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
@@ -32,6 +37,20 @@ internal object LocalToolPolicy {
         "http_request",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
+    }
+
+    /**
+     * Only operations whose implementation is cryptographically/path-wise confined to LocalWorkspace
+     * may inherit the session's workspace auto-approval.
+     *
+     * Everything else fails closed even if its coarse ToolAccess is later changed.
+     */
+    fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
+        "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
+        else -> {
+            access(name)
+            LocalAutoApprovalScope.NONE
+        }
     }
 
     fun allowedInPlan(name: String, access: ToolAccess): Boolean =
