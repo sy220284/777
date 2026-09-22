@@ -51,9 +51,14 @@ class MemoryPolicy @Inject constructor() {
 
         DURABLE_RULE.matchEntire(clean)?.let {
             val body = clean.take(MAX_MEMORY_CHARS)
+            val scope = if (projectId != null && mode != LocalConversationMode.INDEPENDENT) {
+                MemoryScope.PROJECT
+            } else {
+                MemoryScope.GLOBAL
+            }
             return MemoryCandidate(
                 content = body,
-                scope = MemoryScope.GLOBAL,
+                scope = scope,
                 kind = MemoryKind.RULE,
                 importance = 90,
             )
@@ -63,8 +68,7 @@ class MemoryPolicy @Inject constructor() {
     }
 
     fun containsSensitiveData(text: String): Boolean {
-        val lower = text.lowercase()
-        if (SENSITIVE_WORDS.any(lower::contains)) return true
+        if (SENSITIVE_ASSIGNMENT.containsMatchIn(text)) return true
         if (BEARER.containsMatchIn(text)) return true
         if (LONG_SECRET.containsMatchIn(text)) return true
         return false
@@ -95,9 +99,8 @@ class MemoryPolicy @Inject constructor() {
         val DECISION_HINT = Regex("""采用|确定|改为|切换为|发布|构建|架构|方案""")
         val BEARER = Regex("""(?i)bearer\s+[a-z0-9._~+/=-]{16,}""")
         val LONG_SECRET = Regex("""(?i)(?:sk-|key[-_:]?|token[-_:]?|secret[-_:]?)[a-z0-9._~+/=-]{12,}""")
-        val SENSITIVE_WORDS = listOf(
-            "密码", "口令", "验证码", "密钥", "私钥", "助记词",
-            "password", "passwd", "api key", "apikey", "access token", "refresh token",
+        val SENSITIVE_ASSIGNMENT = Regex(
+            """(?i)(?:密码|口令|验证码|密钥|私钥|助记词|password|passwd|api\s*key|apikey|access\s*token|refresh\s*token)\s*(?:是|为|[:=])\s*\S{4,}""",
         )
     }
 }
