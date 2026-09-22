@@ -49,6 +49,13 @@ class BundledPythonRuntime @Inject constructor(
             marker.writeText(version)
         }
 
+        require(File(homeDir, "etc/tls/cert.pem").isFile) {
+            "内置 Python CA 证书未打包"
+        }
+        require(File(homeDir, "etc/tls/openssl.cnf").isFile) {
+            "内置 Python OpenSSL 配置未打包"
+        }
+
         val nativePython = File(context.applicationInfo.nativeLibraryDir, NATIVE_PYTHON_NAME)
         require(nativePython.isFile && nativePython.canExecute()) {
             "内置 Python 可执行文件未从 APK 提取：${nativePython.path}"
@@ -78,6 +85,8 @@ class BundledPythonRuntime @Inject constructor(
         val libraryDir = activeLibraryDir ?: return emptyMap()
         val nativeDir = context.applicationInfo.nativeLibraryDir
         val stdlib = File(homeDir, "lib/python$PYTHON_MAJOR_MINOR")
+        val certFile = File(homeDir, "etc/tls/cert.pem")
+        val opensslConfig = File(homeDir, "etc/tls/openssl.cnf")
         return mapOf(
             "LD_LIBRARY_PATH" to listOf(libraryDir.path, nativeDir).joinToString(File.pathSeparator),
             "PYTHONHOME" to homeDir.path,
@@ -85,6 +94,8 @@ class BundledPythonRuntime @Inject constructor(
                 .joinToString(File.pathSeparator),
             "PYTHONDONTWRITEBYTECODE" to "1",
             "PYTHONNOUSERSITE" to "1",
+            "SSL_CERT_FILE" to certFile.path,
+            "OPENSSL_CONF" to opensslConfig.path,
             "HOME" to context.filesDir.path,
             "TMPDIR" to context.cacheDir.path,
         )
