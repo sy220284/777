@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.device
 
 import android.content.Context
+import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -15,10 +16,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-class AndroidDevicePlugin(
-    context: Context,
-    private val provider: AndroidDeviceProvider = AndroidDeviceProvider(context),
+class AndroidDevicePlugin internal constructor(
+    private val provider: HarnessDeviceProvider,
 ) : HarnessPlugin {
+    constructor(context: Context) : this(AndroidDeviceProvider(context))
     override val id: String = "android-device"
 
     private data class Spec(

@@ -14,13 +14,21 @@ import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
+import com.labteto.dshmobile.harness.agent.AgentRequestEvent
+import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
+import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
+import com.labteto.dshmobile.harness.session.HandoffGoal
+import com.labteto.dshmobile.harness.session.HandoffMessage
+import com.labteto.dshmobile.harness.session.HandoffState
+import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -29,6 +37,8 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
+import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
@@ -138,6 +148,8 @@ class LocalHarnessEngine @Inject constructor(
         extraSearchPaths = ::bundledRuntimeSearchPaths,
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
+    private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
+    private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val runtimePlugin = AndroidRuntimePlugin(
         workspaceRoot = File(workspace.path),
         processRuntime = runtimeProcess,
@@ -552,28 +564,15 @@ class LocalHarnessEngine @Inject constructor(
     /** Backward-compatible entry point: a plain new session is fully independent. */
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
 
-    private fun buildHandoffSummary(state: LocalHarnessState): String = buildString {
-        state.goal?.let { appendLine("当前目标：[${it.status}] ${it.description.take(800)}") }
-        if (state.plan.isNotEmpty()) {
-            appendLine("当前计划：")
-            state.plan.take(8).forEach { appendLine("- ${it.take(400)}") }
-        }
-        val openTodos = state.todos.filter { it.status != "completed" }.take(10)
-        if (openTodos.isNotEmpty()) {
-            appendLine("未完成任务：")
-            openTodos.forEach { appendLine("- [${it.status}] ${it.content.take(400)}") }
-        }
-        val recent = state.messages
-            .filter { it.role == "user" || it.role == "assistant" }
-            .takeLast(6)
-        if (recent.isNotEmpty()) {
-            appendLine("最近关键上下文：")
-            recent.forEach { message ->
-                val label = if (message.role == "user") "用户" else "助手"
-                appendLine("- $label：${message.content.replace("\n", " ").take(600)}")
-            }
-        }
-    }.trim().take(MAX_HANDOFF_CHARS)
+    private fun buildHandoffSummary(state: LocalHarnessState): String =
+        handoffBuilder.build(
+            HandoffState(
+                goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
+                plan = state.plan,
+                todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
+                messages = state.messages.map { message -> HandoffMessage(message.role, message.content) },
+            ),
+        )
 
     fun switchSession(sessionId: String) {
         if (sessionId == currentSessionId) return
@@ -703,7 +702,12 @@ class LocalHarnessEngine @Inject constructor(
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val requestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
-                val reply = completeWithRetry(key, snapshot, requestMessages)
+                val reply = completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = modelStep + 1,
+                )
                 modelStep += 1
                 repliesByStep[modelStep] = reply
                 AgentModelReply(
@@ -1172,39 +1176,33 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runWorkflow(tasks: List<String>, mode: String): String {
-        val clean = tasks.map(String::trim).filter(String::isNotEmpty).take(4)
-        require(clean.isNotEmpty()) { "工作流至少需要一个子任务" }
-        require(mode in setOf("parallel", "pipeline")) { "工作流模式必须为 parallel 或 pipeline" }
-        if (mode == "pipeline") {
-            var previous = ""
-            return clean.mapIndexed { index, task ->
-                val prompt = if (previous.isBlank()) task else {
-                    "上一步结果：\n${pruneToolResult(previous)}\n\n当前阶段：\n$task"
-                }
-                val result = subagents.run(
-                    prompt,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    maxSteps = _state.value.subagentMaxSteps,
-                )
-                previous = result
-                "阶段 ${index + 1}：$task\n$result"
-            }.joinToString("\n\n")
-        }
-
-        return isolatedParallelMap(clean.withIndex().toList()) { indexed ->
-            val result = subagents.run(
-                indexed.value,
+        val workflowMode = HarnessWorkflowMode.parse(mode)
+        val results = workflowRunner.run(tasks, workflowMode) { _, task, previous ->
+            val prompt = if (workflowMode == HarnessWorkflowMode.PIPELINE && !previous.isNullOrBlank()) {
+                "上一步结果：\n" + pruneToolResult(previous) + "\n\n当前阶段：\n" + task
+            } else {
+                task
+            }
+            subagents.run(
+                task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
             )
-            "子任务 ${indexed.index + 1}：${indexed.value}\n$result"
-        }.mapIndexed { index, result ->
-            result.getOrElse { error ->
-                "子任务 ${index + 1} 失败：${error.message ?: error::class.java.simpleName}；同批其他子任务不受影响。"
+        }
+        return results.joinToString("\n\n") { result ->
+            val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
+            if (result.succeeded) {
+                label + " " + (result.index + 1) + "：" + result.task + "\n" + result.output.orEmpty()
+            } else {
+                val suffix = if (workflowMode == HarnessWorkflowMode.PARALLEL) {
+                    "同批其他子任务不受影响。"
+                } else {
+                    "后续阶段已停止。"
+                }
+                label + " " + (result.index + 1) + " 失败：" + result.error.orEmpty() + "；" + suffix
             }
-        }.joinToString("\n\n")
+        }
     }
 
     private fun searchSessions(query: String): String {
@@ -1226,33 +1224,62 @@ class LocalHarnessEngine @Inject constructor(
         key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
+        step: Int,
     ): LocalModelReply {
-        var lastError: Exception? = null
-        val maxAttempts = snapshot.modelAttempts.coerceIn(1, 5)
-        repeat(maxAttempts) { attempt ->
-            eventLog.append("request/header", buildJsonObject {
-                put("model", snapshot.model); put("base_url", snapshot.baseUrl); put("attempt", attempt + 1)
-                put("message_count", messages.size)
-                put("context_chars", messages.sumOf { it.toString().length })
-                put("plan_mode", snapshot.planMode)
-            })
-            try {
-                return modelClient.complete(
-                    apiKey = key,
-                    baseUrl = snapshot.baseUrl,
-                    model = snapshot.model,
-                    messages = messages,
-                    tools = toolRegistry.schemas(),
-                )
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
-                val retryable = (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-                if (!retryable || attempt == maxAttempts - 1) throw error
-                lastError = error
-                delay(1_000L shl attempt)
-            }
+        val tools = toolRegistry.schemas()
+        eventLog.append("request/header", buildJsonObject {
+            put("model", snapshot.model)
+            put("base_url", snapshot.baseUrl)
+            put("step", step)
+            put("message_count", messages.size)
+            put("context_chars", messages.sumOf { it.toString().length })
+            put("tools", tools)
+            put("plan_mode", snapshot.planMode)
+        })
+        eventLog.append("local/request-snapshot", buildJsonObject {
+            put("step", step)
+            put("model", snapshot.model)
+            put("messages", JsonArray(messages))
+            put("tools", tools)
+        })
+        val executor = AgentRequestExecutor(
+            maxAttempts = snapshot.modelAttempts.coerceIn(1, 5),
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            eventSink = AgentRequestEventSink { event ->
+                when (event) {
+                    is AgentRequestEvent.AttemptStarted -> Unit
+                    is AgentRequestEvent.AttemptFailed -> {
+                        eventLog.append("request/error", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
+                            put("detail", event.reason.take(2_000))
+                        })
+                    }
+                    is AgentRequestEvent.RetryScheduled -> {
+                        eventLog.append("llm/retry", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("next_attempt", event.nextAttempt)
+                            put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptSucceeded -> Unit
+                }
+            },
+        )
+        return executor.execute {
+            modelClient.complete(
+                apiKey = key,
+                baseUrl = snapshot.baseUrl,
+                model = snapshot.model,
+                messages = messages,
+                tools = tools,
+            )
         }
-        throw lastError ?: error("模型请求失败")
     }
 
     private fun pruneToolResult(result: String): String {

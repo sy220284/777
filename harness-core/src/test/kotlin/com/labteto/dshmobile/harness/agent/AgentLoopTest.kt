@@ -149,6 +149,49 @@ class AgentLoopTest {
     }
 
     @Test
+    fun modelFailureProducesFailureWithoutCompletion() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        val loop = AgentLoop(
+            model = AgentModel { error("模型失败") },
+            tools = AgentToolExecutor { "" },
+            eventSink = AgentEventSink { events += it },
+            idFactory = { "turn-model-failure" },
+        )
+
+        val result = runCatching { loop.run("开始") }
+
+        assertTrue(result.isFailure)
+        assertTrue(events.last() is AgentEvent.TurnFailed)
+        assertFalse(events.any { it is AgentEvent.TurnCompleted })
+        assertFalse(events.any { it is AgentEvent.StepFinished })
+    }
+
+    @Test
+    fun toolFailureProducesFailureWithoutSyntheticToolResult() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        val loop = AgentLoop(
+            model = AgentModel {
+                AgentModelReply(
+                    toolCalls = listOf(
+                        AgentToolCall("call-fail", "read", buildJsonObject { put("path", "x") }),
+                    ),
+                )
+            },
+            tools = AgentToolExecutor { error("工具失败") },
+            eventSink = AgentEventSink { events += it },
+            idFactory = { "turn-tool-failure" },
+        )
+
+        val result = runCatching { loop.run("开始") }
+
+        assertTrue(result.isFailure)
+        assertEquals(1, events.count { it is AgentEvent.ToolStarted })
+        assertEquals(0, events.count { it is AgentEvent.ToolFinished })
+        assertTrue(events.last() is AgentEvent.TurnFailed)
+        assertFalse(events.any { it is AgentEvent.TurnCompleted })
+    }
+
+    @Test
     fun cancellationNeverProducesCompletion() = runTest {
         val gate = CompletableDeferred<Unit>()
         val events = mutableListOf<AgentEvent>()
