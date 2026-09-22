@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,6 +82,8 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.screens.local.EnvironmentInfoDialog
+import com.labteto.dshmobile.ui.screens.local.NetworkDiagnosticDialog
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -116,7 +117,8 @@ fun SettingsScreen(
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var showDisconnectDialog by remember { mutableStateOf(false) }
-    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var showDiagnostic by rememberSaveable { mutableStateOf(false) }
+    var showEnvironment by rememberSaveable { mutableStateOf(false) }
     BackHandler(onBack = onClose)
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
@@ -193,66 +195,60 @@ fun SettingsScreen(
                     ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
                 }
 
-                SettingsCard(
-                    stringResource(R.string.settings_advanced),
-                    Icons.Outlined.Extension,
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(DsShapes.row)
-                            .clickable { advancedExpanded = !advancedExpanded }
-                            .padding(vertical = DsSpacing.small),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_advanced_hint),
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            if (advancedExpanded) Icons.Filled.KeyboardArrowDown
-                            else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = colors.labelTertiary,
-                        )
-                    }
+                SettingsCard("运行环境", Icons.Outlined.Info) {
+                    DsButton(
+                        text = "网络诊断",
+                        onClick = { showDiagnostic = true },
+                        variant = DsButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    DsButton(
+                        text = "环境能力",
+                        onClick = { showEnvironment = true },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
-                AnimatedVisibility(visible = advancedExpanded) {
-                    Column(
-                        Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
-                    ) {
-                        ProjectSettingsCard(
-                            state = projectSettings,
-                            viewModel = viewModel,
-                            report = toast.second,
-                        )
+                LocalModelSettingsCard(
+                    local = localHarness,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
 
-                        ModelServicesCard(
-                            state = modelServices,
-                            viewModel = viewModel,
-                        )
+                ModelServicesCard(
+                    state = modelServices,
+                    viewModel = viewModel,
+                )
 
-                        LocalHarnessSettingsCard(
-                            local = localHarness,
-                            viewModel = viewModel,
-                            report = toast.second,
-                        )
+                LocalVisionSettingsCard(
+                    vision = visionSettings,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
 
-                        LocalVisionSettingsCard(
-                            vision = visionSettings,
-                            viewModel = viewModel,
-                            report = toast.second,
-                        )
+                LocalMemorySettingsCard(
+                    local = localHarness,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
 
-                        DeviceCapabilitiesCard(
-                            state = deviceCapabilities,
-                            viewModel = viewModel,
-                        )
-                    }
-                }
+                LocalAgentSettingsCard(
+                    local = localHarness,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
+
+                ProjectSettingsCard(
+                    state = projectSettings,
+                    viewModel = viewModel,
+                    report = toast.second,
+                )
+
+                DeviceCapabilitiesCard(
+                    state = deviceCapabilities,
+                    viewModel = viewModel,
+                )
 
                 SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
                     DsButton(
@@ -303,6 +299,20 @@ fun SettingsScreen(
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
+    }
+
+    if (showDiagnostic) {
+        NetworkDiagnosticDialog(
+            onDismiss = { showDiagnostic = false },
+            diagnose = viewModel::diagnoseNetwork,
+        )
+    }
+
+    if (showEnvironment) {
+        EnvironmentInfoDialog(
+            text = viewModel.environmentInfo(),
+            onDismiss = { showEnvironment = false },
+        )
     }
 
     if (showDisconnectDialog) {
