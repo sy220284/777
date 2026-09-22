@@ -109,6 +109,17 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun knownCredentialFormatsAreRejected() {
+        assertTrue(policy.containsSensitiveData("ghp_abcdefghijklmnopqrstuvwxyz123456"))
+        assertTrue(policy.containsSensitiveData("AKIA1234567890ABCDEF"))
+        assertTrue(
+            policy.containsSensitiveData(
+                "eyJabcdefghijk.eyJabcdefghijk.abcdefghijklmnop",
+            ),
+        )
+    }
+
+    @Test
     fun questionsAreNotCapturedAsRules() {
         val candidate = policy.extractExplicitUserDirective(
             text = "以后都只构建 arm64-v8a 可以吗？",
