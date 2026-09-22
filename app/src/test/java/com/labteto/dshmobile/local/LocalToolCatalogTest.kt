@@ -18,8 +18,9 @@ class LocalToolCatalogTest {
         assertTrue(
             names.containsAll(
                 setOf(
-                    "read", "write", "edit", "glob", "grep", "bash", "job_list",
-                    "web_search", "web_fetch", "json_query", "network_diagnose", "environment_info", "capability_search",
+                    "read", "file_inspect", "write", "edit", "apply_patch", "glob", "grep", "bash", "job_list",
+                    "web_search", "web_fetch", "http_request", "download_file", "json_query",
+                    "network_diagnose", "environment_info", "capability_search",
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
                     "session_search", "session_event_search", "session_trace",
