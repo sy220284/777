@@ -104,7 +104,7 @@ class ConnectionManager @Inject constructor(
         if (activeHost == null) eventBufferReset() else scope.launch { reconnectIfNeeded() }
     }
     val eventFrames = eventBuffer.frames
-    private fun eventBufferReset() = eventBuffer.connected()
+    private fun eventBufferReset(): Unit = eventBuffer.connected()
 
     private val sinks = object : LoopSinks {
         override fun onEventFrame(frame: RemoteEventFrame) {
@@ -178,6 +178,11 @@ class ConnectionManager @Inject constructor(
         // transport. This is essential when the service itself is restoring a
         // persisted desired connection after process recreation.
         disconnectRuntime(stopBackgroundService = false)
+        if (!config.isRelay || !config.useTls) {
+            hostsStore.setDesiredHost(null)
+            _state.value = ConnectionUiState(host = config, failure = ConnectFailure.PairingRequired)
+            return
+        }
         activeHost = config
         _state.value = ConnectionUiState(
             phase = ConnectionPhase.CONNECTING,

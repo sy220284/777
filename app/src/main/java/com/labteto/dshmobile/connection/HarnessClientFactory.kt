@@ -70,7 +70,8 @@ class HarnessClientFactory @Inject constructor(
      * a long `session/page` on a big session is not a stalled request.
      */
     suspend fun clientFor(config: HostConfig, timeouts: ProbeTimeouts? = null): DshApiClient {
-        val http = httpClient(config.relayFingerprint)
+        require(config.isRelay && config.useTls) { "远程连接必须使用 HTTPS 中继，请重新配对" }
+        val http = httpClient(config.relayFingerprint).newBuilder().followSslRedirects(false).build()
         val authorization = authorizationFor(config)
         val base = config.baseUrl
         return DshApiClient(
@@ -93,7 +94,8 @@ class HarnessClientFactory @Inject constructor(
      * the unary client outlives both.
      */
     suspend fun muxFor(config: HostConfig): RemoteStreamMux {
-        val http = httpClient(config.relayFingerprint)
+        require(config.isRelay && config.useTls) { "远程连接必须使用 HTTPS 中继，请重新配对" }
+        val http = httpClient(config.relayFingerprint).newBuilder().followSslRedirects(false).build()
         val authorization = authorizationFor(config)
         val base = config.baseUrl
         val cookie = cookieFor(config)

@@ -81,7 +81,7 @@ object RelayPairing {
         }
         if (payload.kind != PAYLOAD_KIND) return PairingPayloadResult.NotAPairingCode
         if (payload.v > PAYLOAD_VERSION) return PairingPayloadResult.TooNew(payload.v)
-        if (payload.url.toHttpUrlOrNull() == null) return PairingPayloadResult.NotAPairingCode
+        if (payload.url.toHttpUrlOrNull()?.scheme != "https") return PairingPayloadResult.NotAPairingCode
         return PairingPayloadResult.Valid(payload)
     }
 
@@ -101,6 +101,9 @@ object RelayPairing {
         name: String,
         client: OkHttpClient,
     ): RelayPairOutcome {
+        if (baseUrl.toHttpUrlOrNull()?.scheme != "https") {
+            return RelayPairOutcome.Unreachable(TransportFailure.TLS, "中继必须使用 HTTPS")
+        }
         val target = relayUrl(baseUrl, PAIR_PATH)
             ?: return RelayPairOutcome.Unreachable(TransportFailure.DNS, "not a usable relay address")
         val body = WireJson.encodeToString(RelayPairRequest.serializer(), RelayPairRequest(code, name))
@@ -154,7 +157,7 @@ object RelayPairing {
             val moved = answered.location?.let { target.resolve(it) } ?: return RelayOrigin.None
             // Only a redirect that still points at this path is the plugin handing us its listener.
             // Anything else is some other server's routing, and following it would be guesswork.
-            if (moved.encodedPath != HEALTH_PATH) return RelayOrigin.None
+            if (moved.encodedPath != HEALTH_PATH || moved.scheme != "https") return RelayOrigin.None
             return RelayOrigin.Redirected(originOf(moved), moved.scheme == "https")
         }
         // A relay that refuses the `Host` it was reached by is still a relay, and saying "nothing
@@ -182,7 +185,7 @@ object RelayPairing {
 
     /** Resolve [path] against a relay origin, or null when the origin is not a usable URL. */
     private fun relayUrl(baseUrl: String, path: String) =
-        baseUrl.trim().trimEnd('/').toHttpUrlOrNull()?.newBuilder()?.encodedPath(path)?.build()
+        baseUrl.trim().trimEnd('/').toHttpUrlOrNull()?.takeIf { it.scheme == "https" }?.newBuilder()?.encodedPath(path)?.build()
 
     private fun readClaim(response: HttpOutcome.Answered): RelayPairOutcome = when (response.status) {
         200 -> runCatching {
