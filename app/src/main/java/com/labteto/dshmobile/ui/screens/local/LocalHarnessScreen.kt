@@ -811,7 +811,6 @@ private fun LocalChat(
                 }
             }
         }
-}
     }
 
     state.pendingApproval?.let { ApprovalDialog(it, onApprove, onDeny, onAutoApprove) }
