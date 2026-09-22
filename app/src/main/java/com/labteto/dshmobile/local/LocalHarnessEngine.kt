@@ -14,6 +14,9 @@ import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
+import com.labteto.dshmobile.harness.agent.AgentRequestEvent
+import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
+import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
@@ -29,6 +32,8 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
+import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
@@ -138,6 +143,7 @@ class LocalHarnessEngine @Inject constructor(
         extraSearchPaths = ::bundledRuntimeSearchPaths,
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
+    private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
     private val runtimePlugin = AndroidRuntimePlugin(
         workspaceRoot = File(workspace.path),
         processRuntime = runtimeProcess,
@@ -1172,39 +1178,33 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runWorkflow(tasks: List<String>, mode: String): String {
-        val clean = tasks.map(String::trim).filter(String::isNotEmpty).take(4)
-        require(clean.isNotEmpty()) { "工作流至少需要一个子任务" }
-        require(mode in setOf("parallel", "pipeline")) { "工作流模式必须为 parallel 或 pipeline" }
-        if (mode == "pipeline") {
-            var previous = ""
-            return clean.mapIndexed { index, task ->
-                val prompt = if (previous.isBlank()) task else {
-                    "上一步结果：\n${pruneToolResult(previous)}\n\n当前阶段：\n$task"
-                }
-                val result = subagents.run(
-                    prompt,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    maxSteps = _state.value.subagentMaxSteps,
-                )
-                previous = result
-                "阶段 ${index + 1}：$task\n$result"
-            }.joinToString("\n\n")
-        }
-
-        return isolatedParallelMap(clean.withIndex().toList()) { indexed ->
-            val result = subagents.run(
-                indexed.value,
+        val workflowMode = HarnessWorkflowMode.parse(mode)
+        val results = workflowRunner.run(tasks, workflowMode) { _, task, previous ->
+            val prompt = if (workflowMode == HarnessWorkflowMode.PIPELINE && !previous.isNullOrBlank()) {
+                "上一步结果：\n" + pruneToolResult(previous) + "\n\n当前阶段：\n" + task
+            } else {
+                task
+            }
+            subagents.run(
+                task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
             )
-            "子任务 ${indexed.index + 1}：${indexed.value}\n$result"
-        }.mapIndexed { index, result ->
-            result.getOrElse { error ->
-                "子任务 ${index + 1} 失败：${error.message ?: error::class.java.simpleName}；同批其他子任务不受影响。"
+        }
+        return results.joinToString("\n\n") { result ->
+            val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
+            if (result.succeeded) {
+                label + " " + (result.index + 1) + "：" + result.task + "\n" + result.output.orEmpty()
+            } else {
+                val suffix = if (workflowMode == HarnessWorkflowMode.PARALLEL) {
+                    "同批其他子任务不受影响。"
+                } else {
+                    "后续阶段已停止。"
+                }
+                label + " " + (result.index + 1) + " 失败：" + result.error.orEmpty() + "；" + suffix
             }
-        }.joinToString("\n\n")
+        }
     }
 
     private fun searchSessions(query: String): String {
@@ -1227,32 +1227,51 @@ class LocalHarnessEngine @Inject constructor(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
     ): LocalModelReply {
-        var lastError: Exception? = null
-        val maxAttempts = snapshot.modelAttempts.coerceIn(1, 5)
-        repeat(maxAttempts) { attempt ->
-            eventLog.append("request/header", buildJsonObject {
-                put("model", snapshot.model); put("base_url", snapshot.baseUrl); put("attempt", attempt + 1)
-                put("message_count", messages.size)
-                put("context_chars", messages.sumOf { it.toString().length })
-                put("plan_mode", snapshot.planMode)
-            })
-            try {
-                return modelClient.complete(
-                    apiKey = key,
-                    baseUrl = snapshot.baseUrl,
-                    model = snapshot.model,
-                    messages = messages,
-                    tools = toolRegistry.schemas(),
-                )
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
-                val retryable = (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-                if (!retryable || attempt == maxAttempts - 1) throw error
-                lastError = error
-                delay(1_000L shl attempt)
-            }
+        val executor = AgentRequestExecutor(
+            maxAttempts = snapshot.modelAttempts.coerceIn(1, 5),
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            eventSink = AgentRequestEventSink { event ->
+                when (event) {
+                    is AgentRequestEvent.AttemptStarted -> {
+                        eventLog.append("request/header", buildJsonObject {
+                            put("model", snapshot.model)
+                            put("base_url", snapshot.baseUrl)
+                            put("attempt", event.attempt)
+                            put("max_attempts", event.maxAttempts)
+                            put("message_count", messages.size)
+                            put("context_chars", messages.sumOf { it.toString().length })
+                            put("plan_mode", snapshot.planMode)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptFailed -> {
+                        eventLog.append("request/error", buildJsonObject {
+                            put("attempt", event.attempt)
+                            put("retryable", event.retryable)
+                            put("detail", event.reason.take(2_000))
+                        })
+                    }
+                    is AgentRequestEvent.RetryScheduled -> {
+                        eventLog.append("llm/retry", buildJsonObject {
+                            put("attempt", event.attempt)
+                            put("next_attempt", event.nextAttempt)
+                            put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptSucceeded -> Unit
+                }
+            },
+        )
+        return executor.execute {
+            modelClient.complete(
+                apiKey = key,
+                baseUrl = snapshot.baseUrl,
+                model = snapshot.model,
+                messages = messages,
+                tools = toolRegistry.schemas(),
+            )
         }
-        throw lastError ?: error("模型请求失败")
     }
 
     private fun pruneToolResult(result: String): String {
