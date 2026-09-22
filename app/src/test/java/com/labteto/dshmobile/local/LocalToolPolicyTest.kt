@@ -12,6 +12,7 @@ class LocalToolPolicyTest {
             val name = it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
             LocalToolPolicy.access(name)
             LocalToolPolicy.approval(name)
+            LocalToolPolicy.autoApprovalScope(name)
         }
         assertTrue(runCatching { LocalToolPolicy.access("new_undeclared_tool") }.isFailure)
     }
@@ -38,6 +39,16 @@ class LocalToolPolicyTest {
             assertEquals(1, approvals)
             assertEquals(1, executed)
         }
+    }
+
+    @Test fun workspaceAutoApprovalScopeIsExplicitAndFailClosed() {
+        for (name in listOf("write", "edit", "apply_patch", "download_file")) {
+            assertEquals(LocalAutoApprovalScope.WORKSPACE, LocalToolPolicy.autoApprovalScope(name))
+        }
+        for (name in listOf("bash", "job_kill", "http_request", "memory_update", "memory_forget", "present")) {
+            assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope(name))
+        }
+        assertTrue(runCatching { LocalToolPolicy.autoApprovalScope("new_undeclared_tool") }.isFailure)
     }
 
     @Test fun planCanBeSubmittedWithoutEnablingExecution() {
