@@ -337,7 +337,6 @@
     <string name="settings_connection_disconnect">断开连接</string>
     <string name="settings_connection_disconnect_confirm">要断开与 Harness 的连接吗？</string>
     <string name="settings_connection_disconnect_message">你将返回连接界面。</string>
-    <string name="settings_language_system">跟随系统</string>
     <string name="settings_harness">Harness</string>
     <string name="settings_data">数据</string>
     <string name="settings_forget_hosts">忘记已记住的 Harness</string>
@@ -385,11 +384,6 @@
     <string name="update_later">稍后</string>
     <string name="settings_update_check">检查更新</string>
     <string name="settings_update_check_hint">点击后立即检查 GitHub；发现更高版本时自动开始下载并校验。</string>
-    <string name="connect_mode_title">连接方式</string>
-    <string name="connect_mode_lan">局域网</string>
-    <string name="connect_mode_relay">中继</string>
-    <string name="connect_mode_lan_hint">直接连接同一 Wi-Fi 下的 harness。它会为本机登录一次，但连接不加密，请只在可信网络中使用。</string>
-    <string name="connect_mode_relay_hint">通过 dsh-relay 连接 harness。本设备保存一次性签发的令牌，连接经过加密，在 Wi-Fi 之外也能使用。</string>
     <string name="connect_relay_banner">中继只验证连接的人是不是你。配对之后，本设备可以在那台电脑上执行命令，与在它上面打开终端完全一样。</string>
     <string name="connect_relay_remembered">已配对的中继</string>
     <string name="connect_relay_remembered_empty">配对过的中继会显示在这里。</string>
