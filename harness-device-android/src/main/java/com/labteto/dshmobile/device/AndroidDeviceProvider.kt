@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Base64
+import com.labteto.dshmobile.device.accessibility.AccessibilityNodeSnapshot
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.shizuku.ShizukuBridge
@@ -294,17 +295,18 @@ class AndroidDeviceProvider(
         val viewId = arguments["id"]?.takeIf(String::isNotBlank)
         require(text != null || viewId != null) { "android_wait 至少需要 text 或 id" }
         val timeout = (arguments["timeout_ms"]?.toLongOrNull() ?: 10_000L).coerceIn(100L, 60_000L)
-        val match = withTimeoutOrNull(timeout) {
-            while (true) {
-                val found = accessibility().snapshot(800).firstOrNull { node ->
+        val match: AccessibilityNodeSnapshot = withTimeoutOrNull(timeout) {
+            var found: AccessibilityNodeSnapshot? = null
+            while (found == null) {
+                found = accessibility().snapshot(800).firstOrNull { node ->
                     (text == null || listOf(node.text, node.contentDescription).any {
                         it?.contains(text, ignoreCase = true) == true
                     }) &&
                         (viewId == null || node.viewId?.contains(viewId, ignoreCase = true) == true)
                 }
-                if (found != null) return@withTimeoutOrNull found
-                delay(150L)
+                if (found == null) delay(150L)
             }
+            found
         } ?: error("等待控件超时（${timeout}ms）")
         return "已找到：node=${match.index} text=${match.text ?: match.contentDescription ?: ""} id=${match.viewId ?: ""} bounds=${match.bounds}"
     }
