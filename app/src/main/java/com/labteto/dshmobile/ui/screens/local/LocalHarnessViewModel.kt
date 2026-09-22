@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -25,7 +26,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun disableAutoApproval() = engine.disableAutoApproval()
     fun answerQuestion(answer: String) = engine.answerQuestion(answer)
     fun stop() = engine.stop()
-    fun newSession() = engine.newSession()
+    fun newSession() = engine.createSession(LocalConversationMode.INDEPENDENT)
+    fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
     fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
     fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     fun clearCredential() = engine.clearCredential()
