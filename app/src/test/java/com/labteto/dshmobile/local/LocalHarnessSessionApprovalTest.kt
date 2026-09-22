@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,40 @@ class LocalHarnessSessionApprovalTest {
         )
 
         assertFalse(session.autoApproveMutations)
+    }
+
+    @Test
+    fun legacySessionDefaultsToIndependentConversation() {
+        val session = json.decodeFromString(
+            LocalHarnessSession.serializer(),
+            """{"id":"legacy-context","title":"旧会话"}""",
+        )
+
+        assertEquals(LocalConversationMode.INDEPENDENT, session.conversationMode)
+        assertEquals(null, session.parentSessionId)
+        assertEquals("", session.lineageId)
+    }
+
+    @Test
+    fun conversationMetadataRoundTrips() {
+        val encoded = json.encodeToString(
+            LocalHarnessSession.serializer(),
+            LocalHarnessSession(
+                id = "child",
+                conversationMode = LocalConversationMode.CONTINUATION,
+                parentSessionId = "parent",
+                lineageId = "lineage",
+                projectId = "project",
+                handoffSummary = "交接摘要",
+            ),
+        )
+        val restored = json.decodeFromString(LocalHarnessSession.serializer(), encoded)
+
+        assertEquals(LocalConversationMode.CONTINUATION, restored.conversationMode)
+        assertEquals("parent", restored.parentSessionId)
+        assertEquals("lineage", restored.lineageId)
+        assertEquals("project", restored.projectId)
+        assertEquals("交接摘要", restored.handoffSummary)
     }
 
     @Test
