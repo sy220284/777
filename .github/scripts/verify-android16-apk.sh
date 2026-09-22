@@ -29,7 +29,7 @@ if [ "${#native_abis[@]}" -ne 1 ] || [ "${native_abis[0]}" != "$expected_abi" ];
   exit 1
 fi
 
-for runtime in node python; do
+for runtime in node python git; do
   mapfile -t runtime_abis < <(
     unzip -Z1 "$apk" | awk -F/ -v runtime="$runtime" '
       $1 == "assets" && $2 == "runtime" && $3 == runtime &&
