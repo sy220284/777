@@ -35,13 +35,26 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class VisionClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
-) {
+) : LocalVisionAnalyzer {
     private val client = http.newBuilder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
+
+    override suspend fun analyze(
+        apiKey: String,
+        route: LocalVisionRoute,
+        prompt: String,
+        imageDataUrl: String,
+    ): String = analyze(
+        apiKey = apiKey,
+        baseUrl = route.baseUrl,
+        model = route.model,
+        prompt = prompt,
+        imageDataUrl = imageDataUrl,
+    )
 
     suspend fun analyze(
         apiKey: String,
