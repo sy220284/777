@@ -346,6 +346,17 @@ prepare_arch() {
       done < <(find "$prefix/lib" -maxdepth 1 \( -type f -o -type l \) -name 'lib*.so*' -print0)
     fi
 
+    if [ -f "$prefix/etc/tls/cert.pem" ]; then
+      mkdir -p "$home_dir/etc/tls"
+      cp "$prefix/etc/tls/cert.pem" "$home_dir/etc/tls/cert.pem"
+      chmod 0644 "$home_dir/etc/tls/cert.pem"
+    fi
+    if [ -f "$prefix/etc/tls/openssl.cnf" ]; then
+      mkdir -p "$home_dir/etc/tls"
+      cp "$prefix/etc/tls/openssl.cnf" "$home_dir/etc/tls/openssl.cnf"
+      chmod 0644 "$home_dir/etc/tls/openssl.cnf"
+    fi
+
     if [ "$apt_arch" = "aarch64" ] && [ -f "$prefix/share/doc/$pkg/copyright" ]; then
       cp "$prefix/share/doc/$pkg/copyright" "$OUT_ROOT/assets/runtime/python/notices/$pkg.txt"
     fi
@@ -358,6 +369,14 @@ prepare_arch() {
   }
   [ -f "$stdlib_dir/os.py" ] || {
     echo "Python 标准库未生成：$android_abi" >&2
+    exit 1
+  }
+  [ -s "$home_dir/etc/tls/cert.pem" ] || {
+    echo "Python CA 证书未生成：$android_abi" >&2
+    exit 1
+  }
+  [ -s "$home_dir/etc/tls/openssl.cnf" ] || {
+    echo "Python OpenSSL 配置未生成：$android_abi" >&2
     exit 1
   }
 
