@@ -130,6 +130,7 @@ fun SettingsScreen(
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val visionSettings by viewModel.visionSettings.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
+    val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var page by rememberSaveable { mutableStateOf(SettingsPage.ROOT) }
@@ -142,6 +143,9 @@ fun SettingsScreen(
     }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
+    }
+    LaunchedEffect(page) {
+        if (page == SettingsPage.MEMORY) viewModel.refreshMemories()
     }
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
@@ -273,11 +277,7 @@ fun SettingsScreen(
 
                     SettingsPage.MEMORY -> {
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
-                        Text(
-                            "记忆列表、编辑和停用将作为独立管理区接入；自动记忆与召回开关继续保留在这里。",
-                            style = DsType.caption11,
-                            color = colors.labelTertiary,
-                        )
+                        MemoryManagementCard(memories, viewModel, toast.second)
                     }
 
                     SettingsPage.PERMISSIONS -> {
