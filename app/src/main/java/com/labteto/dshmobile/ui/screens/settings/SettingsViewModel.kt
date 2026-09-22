@@ -337,7 +337,6 @@ class SettingsViewModel @Inject constructor(
         id: String,
         content: String,
         pinned: Boolean,
-        importance: Int,
         onDone: (String?) -> Unit = {},
     ) {
         val current = _memories.value.firstOrNull { it.id == id }
@@ -350,7 +349,6 @@ class SettingsViewModel @Inject constructor(
             memoryManager.update(
                 existing = current,
                 content = content,
-                importance = importance,
                 pinned = pinned,
             )
         }.onSuccess {
