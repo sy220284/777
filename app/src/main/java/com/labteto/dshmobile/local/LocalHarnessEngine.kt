@@ -678,17 +678,6 @@ class LocalHarnessEngine @Inject constructor(
                             handoffSummary = snapshot.handoffSummary,
                         ),
                     )
-                    if (ephemeralContext.isNotBlank()) {
-                        eventLog.append("request/context", buildJsonObject {
-                            put("role", "system")
-                            put("scope", "turn")
-                            put("content", ephemeralContext.take(MAX_EPHEMERAL_CONTEXT_CHARS))
-                            put("conversation_mode", snapshot.conversationMode.name.lowercase())
-                            snapshot.projectId?.let { projectId -> put("project_id", projectId) }
-                            snapshot.lineageId.takeIf(String::isNotBlank)
-                                ?.let { lineageId -> put("lineage_id", lineageId) }
-                        })
-                    }
                     if (snapshot.autoMemory && memoryInput.isNotBlank()) {
                         runCatching {
                             memoryManager.captureExplicitUserDirective(
@@ -1237,14 +1226,21 @@ class LocalHarnessEngine @Inject constructor(
         messages: List<JsonObject>,
         step: Int,
     ): LocalModelReply {
+        val tools = toolRegistry.schemas()
         eventLog.append("request/header", buildJsonObject {
             put("model", snapshot.model)
             put("base_url", snapshot.baseUrl)
             put("step", step)
             put("message_count", messages.size)
             put("context_chars", messages.sumOf { it.toString().length })
-            put("tool_count", toolRegistry.names().size)
+            put("tools", tools)
             put("plan_mode", snapshot.planMode)
+        })
+        eventLog.append("local/request-snapshot", buildJsonObject {
+            put("step", step)
+            put("model", snapshot.model)
+            put("messages", JsonArray(messages))
+            put("tools", tools)
         })
         val executor = AgentRequestExecutor(
             maxAttempts = snapshot.modelAttempts.coerceIn(1, 5),
@@ -1281,7 +1277,7 @@ class LocalHarnessEngine @Inject constructor(
                 baseUrl = snapshot.baseUrl,
                 model = snapshot.model,
                 messages = messages,
-                tools = toolRegistry.schemas(),
+                tools = tools,
             )
         }
     }
