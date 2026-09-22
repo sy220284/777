@@ -483,8 +483,8 @@ class LocalHarnessEngine @Inject constructor(
         }
         val projectId = when (mode) {
             LocalConversationMode.INDEPENDENT -> null
-            LocalConversationMode.PROJECT,
-            LocalConversationMode.CONTINUATION -> sourceState.projectId ?: LOCAL_PROJECT_ID
+            LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
+            LocalConversationMode.CONTINUATION -> sourceState.projectId
         }
         val handoff = if (mode == LocalConversationMode.CONTINUATION) {
             buildHandoffSummary(sourceState)
