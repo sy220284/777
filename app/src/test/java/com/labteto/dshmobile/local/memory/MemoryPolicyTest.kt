@@ -63,6 +63,30 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun rememberDefaultsToProjectScopeInsideProjectConversation() {
+        val candidate = policy.extractExplicitUserDirective(
+            text = "记住以后只发布 arm64-v8a",
+            mode = LocalConversationMode.PROJECT,
+            projectId = "777",
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.PROJECT, candidate.scope)
+    }
+
+    @Test
+    fun explicitGlobalHintEscapesProjectScope() {
+        val candidate = policy.extractExplicitUserDirective(
+            text = "记住所有项目以后都要先复查再提交",
+            mode = LocalConversationMode.PROJECT,
+            projectId = "777",
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+    }
+
+    @Test
     fun projectDirectiveIsIgnoredInIndependentConversation() {
         val candidate = policy.extractExplicitUserDirective(
             text = "本项目以后只构建 arm64-v8a",
