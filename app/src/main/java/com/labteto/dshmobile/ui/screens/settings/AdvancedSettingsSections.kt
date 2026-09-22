@@ -476,8 +476,6 @@ internal fun MemoryManagementCard(
             var expanded by remember(record.id) { mutableStateOf(false) }
             var content by remember(record.id, record.updatedAt) { mutableStateOf(record.content) }
             var pinned by remember(record.id, record.updatedAt) { mutableStateOf(record.pinned) }
-            var importance by remember(record.id, record.updatedAt) { mutableStateOf(record.importance.toString()) }
-
             DisclosureRow(
                 title = record.content.take(54),
                 summary = memoryScopeLabel(record.scope) + " · " + memoryKindLabel(record.kind) +
@@ -508,13 +506,6 @@ internal fun MemoryManagementCard(
                         }
                         Switch(checked = pinned, onCheckedChange = { pinned = it })
                     }
-                    OutlinedTextField(
-                        value = importance,
-                        onValueChange = { importance = it.filter(Char::isDigit).take(3) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("重要度 0–100") },
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         DsButton(
                             text = "保存",
@@ -523,7 +514,6 @@ internal fun MemoryManagementCard(
                                     id = record.id,
                                     content = content,
                                     pinned = pinned,
-                                    importance = (importance.toIntOrNull() ?: record.importance).coerceIn(0, 100),
                                 ) { error ->
                                     report(error ?: "记忆已更新")
                                 }
