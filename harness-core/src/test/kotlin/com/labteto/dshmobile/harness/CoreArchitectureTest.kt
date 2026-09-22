@@ -178,6 +178,25 @@ class CoreArchitectureTest {
     }
 
     @Test
+    fun firstSuccessfulWriteSeedsRecoverableBackupAndLeavesNoTempFile() {
+        val root = createTempDir(prefix = "seed-session-backup-")
+        try {
+            val store = VersionedSessionStore(root, json, clock = { 10L })
+            store.write("s1", buildJsonObject { put("value", 7) }, updatedAt = 7L)
+
+            assertTrue(File(root, "s1.backup.json").isFile)
+            assertFalse(File(root, "s1.json.tmp").exists())
+
+            File(root, "s1.json").writeText("{broken")
+            val recovered = requireNotNull(store.read("s1"))
+            assertTrue(recovered.recovered)
+            assertEquals("7", recovered.document.payload["value"]?.jsonPrimitive?.content)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun corruptPrimaryRecoversFromLastGoodBackup() {
         val root = createTempDir(prefix = "recover-session-")
         try {
