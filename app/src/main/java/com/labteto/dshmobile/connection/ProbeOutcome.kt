@@ -5,9 +5,8 @@ import com.labteto.dshmobile.core.wire.dto.HostDescription
 /**
  * What answered — or did not — at one `host:port`.
  *
- * [DiscoveryEngine.probe] used to return `HostDescription?`, which made a firewall, a loopback-only
- * bind, a trust-fence rejection and a typo the same event. They need opposite instructions, so the
- * probe keeps the distinction and the connect screen spends it.
+ * Connection diagnosis keeps these outcomes distinct because a firewall, a trust-fence rejection
+ * and a typo require different recovery instructions.
  */
 sealed interface ProbeOutcome {
 
