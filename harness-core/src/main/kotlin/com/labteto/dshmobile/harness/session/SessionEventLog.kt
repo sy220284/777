@@ -82,6 +82,21 @@ class SessionEventLog(
         return lines.subList(from, to).joinToString("\n")
     }
 
+    fun latest(type: String): SessionEvent? = synchronized(lock) {
+        require(type.isNotBlank()) { "事件类型不能为空" }
+        if (!file.isFile) return@synchronized null
+        var latest: SessionEvent? = null
+        file.useLines { lines ->
+            lines.forEach { line ->
+                val event = runCatching {
+                    json.decodeFromString(SessionEvent.serializer(), line)
+                }.getOrNull()
+                if (event?.type == type) latest = event
+            }
+        }
+        latest
+    }
+
     fun clear() {
         synchronized(lock) {
             file.parentFile?.mkdirs()

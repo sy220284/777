@@ -33,6 +33,15 @@ class LocalSessionEventLog(
     fun read(sequence: Long, before: Int = 0, after: Int = 0): String =
         delegate.read(sequence, before, after)
 
+    fun latest(type: String): Event? = delegate.latest(type)?.let { event ->
+        Event(
+            sequence = event.sequence,
+            type = event.type,
+            createdAt = event.createdAt,
+            data = event.data,
+        )
+    }
+
     fun clear() = delegate.clear()
 
     private companion object {

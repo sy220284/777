@@ -40,4 +40,21 @@ class LocalSessionEventLogTest {
             directory.deleteRecursively()
         }
     }
+    @Test
+    fun exposesLatestTypedEventForRecovery() {
+        val directory = Files.createTempDirectory("local-event-latest").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 4_096)
+            log.append("local/model-history-checkpoint", buildJsonObject { put("version", 1) })
+            log.append("other", buildJsonObject { put("value", 2) })
+
+            val latest = requireNotNull(log.latest("local/model-history-checkpoint"))
+            assertEquals("local/model-history-checkpoint", latest.type)
+            assertEquals(1, latest.data["version"]?.toString()?.toInt())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
