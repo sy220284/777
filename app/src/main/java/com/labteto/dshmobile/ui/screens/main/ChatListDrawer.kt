@@ -88,8 +88,8 @@ internal data class DrawerSessionSections(
  *
  * The current row is the exact record selected by [currentSessionId]. Historical rows are the
  * remaining durable, non-archived records; no workspace grouping or synthetic row decides whether
- * a record is visible. Blank scratch rows stay out of history, while the selected current record is
- * still shown even when it is blank so the drawer accurately reflects what is open.
+ * a record is visible. Blank rows stay out of both current and history sections so the sidebar only
+ * shows sessions that contain actual conversation content.
  */
 internal fun drawerSessionSections(
     sessions: List<SessionRow>,
@@ -98,7 +98,9 @@ internal fun drawerSessionSections(
     sortByRecency: Boolean,
 ): DrawerSessionSections {
     val current = currentSessionId?.let { id ->
-        sessions.firstOrNull { it.sessionId == id && it.sessionId !in archivedIds }
+        sessions.firstOrNull {
+            it.sessionId == id && it.sessionId !in archivedIds && !it.blank
+        }
     }
     val history = sessions.filter {
         it.sessionId !in archivedIds &&
@@ -179,7 +181,7 @@ fun ChatListDrawer(
     }
     val currentListSession = sections.current
     val historySessions = sections.history
-    val archivedSessions = sessions.filter { it.sessionId in archivedIds }
+    val archivedSessions = sessions.filter { it.sessionId in archivedIds && !it.blank }
     val hasVisibleSessions =
         currentListSession != null || historySessions.isNotEmpty() || archivedSessions.isNotEmpty()
 
