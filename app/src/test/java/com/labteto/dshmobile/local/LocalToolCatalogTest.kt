@@ -19,7 +19,7 @@ class LocalToolCatalogTest {
             names.containsAll(
                 setOf(
                     "read", "write", "edit", "glob", "grep", "bash", "job_list",
-                    "web_search", "web_fetch", "json_query", "network_diagnose", "environment_info",
+                    "web_search", "web_fetch", "json_query", "network_diagnose", "environment_info", "capability_search",
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
                     "session_search", "session_event_search", "session_trace",

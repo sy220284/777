@@ -5,16 +5,20 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Base64
+import com.labteto.dshmobile.device.accessibility.AccessibilityNodeSnapshot
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.shizuku.ShizukuBridge
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class AndroidDeviceProvider(
     private val context: Context,
@@ -34,6 +38,12 @@ class AndroidDeviceProvider(
         "settings_set",
         "dumpsys",
         "accessibility_tree",
+        "accessibility_find",
+        "accessibility_click_node",
+        "accessibility_set_text_node",
+        "accessibility_scroll",
+        "accessibility_wait",
+        "android_open_uri",
         "accessibility_click_text",
         "accessibility_set_text",
         "accessibility_tap",
@@ -41,6 +51,7 @@ class AndroidDeviceProvider(
         "android_back",
         "android_home",
         "android_screenshot",
+        "notification_status",
         "notification_list",
         "clipboard_get",
         "clipboard_set",
@@ -81,6 +92,17 @@ class AndroidDeviceProvider(
                         ?.let { " " + it } .orEmpty(),
             )
             "accessibility_tree" -> accessibilityTree()
+            "accessibility_find" -> accessibilityFind(arguments)
+            "accessibility_click_node" ->
+                accessibility().clickNode(arguments.required("node").toInt()).toString()
+            "accessibility_set_text_node" ->
+                accessibility().setTextNode(
+                    arguments.required("node").toInt(),
+                    arguments.required("value"),
+                ).toString()
+            "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
+            "accessibility_wait" -> accessibilityWait(arguments)
+            "android_open_uri" -> openUri(arguments.required("uri"))
             "accessibility_click_text" ->
                 accessibility().clickText(arguments.required("text")).toString()
             "accessibility_set_text" ->
@@ -108,6 +130,7 @@ class AndroidDeviceProvider(
                 val png = accessibility().screenshotPng()
                 "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
             }
+            "notification_status" -> notificationStatus()
             "notification_list" -> notificationList()
             "clipboard_get" -> clipboardGet()
             "clipboard_set" -> clipboardSet(arguments.required("text"))
@@ -223,13 +246,84 @@ class AndroidDeviceProvider(
         accessibility().snapshot().joinToString("\n") { node ->
             buildString {
                 repeat(node.depth.coerceAtMost(12)) { append("  ") }
+                append("node=").append(node.index).append(' ')
                 append(node.className ?: "?")
-                append(" text=").append(node.text ?: "")
+                append(" text=").append(node.text ?: node.contentDescription ?: "")
+                append(" desc=").append(node.contentDescription ?: "")
                 append(" id=").append(node.viewId ?: "")
                 append(" bounds=").append(node.bounds)
                 if (node.clickable) append(" clickable")
                 if (node.editable) append(" editable")
             }
+        }
+
+    private fun accessibilityFind(arguments: Map<String, String>): String {
+        val text = arguments["text"]?.takeIf(String::isNotBlank)
+        val viewId = arguments["id"]?.takeIf(String::isNotBlank)
+        val className = arguments["class"]?.takeIf(String::isNotBlank)
+        val clickable = arguments["clickable"]?.toBooleanStrictOrNull()
+        val editable = arguments["editable"]?.toBooleanStrictOrNull()
+        require(
+            text != null || viewId != null || className != null || clickable != null || editable != null,
+        ) { "android_find 至少需要 text、id、class、clickable 或 editable 之一" }
+        val matches = accessibility().snapshot(800).filter { node ->
+            (text == null || listOf(node.text, node.contentDescription).any {
+                it?.contains(text, ignoreCase = true) == true
+            }) &&
+                (viewId == null || node.viewId?.contains(viewId, ignoreCase = true) == true) &&
+                (className == null || node.className?.contains(className, ignoreCase = true) == true) &&
+                (clickable == null || node.clickable == clickable) &&
+                (editable == null || node.editable == editable)
+        }.take(50)
+        if (matches.isEmpty()) return "未找到匹配控件"
+        return matches.joinToString("\n") { node ->
+            buildString {
+                append("node=").append(node.index)
+                append(" text=").append(node.text ?: "")
+                append(" desc=").append(node.contentDescription ?: "")
+                append(" id=").append(node.viewId ?: "")
+                append(" class=").append(node.className ?: "")
+                append(" bounds=").append(node.bounds)
+                if (node.clickable) append(" clickable")
+                if (node.editable) append(" editable")
+            }
+        }
+    }
+
+    private suspend fun accessibilityWait(arguments: Map<String, String>): String {
+        val text = arguments["text"]?.takeIf(String::isNotBlank)
+        val viewId = arguments["id"]?.takeIf(String::isNotBlank)
+        require(text != null || viewId != null) { "android_wait 至少需要 text 或 id" }
+        val timeout = (arguments["timeout_ms"]?.toLongOrNull() ?: 10_000L).coerceIn(100L, 60_000L)
+        val match: AccessibilityNodeSnapshot = withTimeoutOrNull(timeout) {
+            var found: AccessibilityNodeSnapshot? = null
+            while (found == null) {
+                found = accessibility().snapshot(800).firstOrNull { node ->
+                    (text == null || listOf(node.text, node.contentDescription).any {
+                        it?.contains(text, ignoreCase = true) == true
+                    }) &&
+                        (viewId == null || node.viewId?.contains(viewId, ignoreCase = true) == true)
+                }
+                if (found == null) delay(150L)
+            }
+            found
+        } ?: error("等待控件超时（${timeout}ms）")
+        return "已找到：node=${match.index} text=${match.text ?: match.contentDescription ?: ""} id=${match.viewId ?: ""} bounds=${match.bounds}"
+    }
+
+    private fun openUri(raw: String): String {
+        val uri = Uri.parse(raw)
+        require(uri.scheme?.lowercase() in SAFE_VIEW_SCHEMES) { "URI scheme 不在允许列表" }
+        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        return "已打开 URI：${uri.scheme}://"
+    }
+
+    private fun notificationStatus(): String =
+        if (HarnessNotificationListenerService.active() != null) {
+            "authorized=true\nconnected=true"
+        } else {
+            "authorized=false\nconnected=false\n请在 Android 通知使用权设置中授权 777 后重试"
         }
 
     private fun notificationList(): String {
@@ -267,4 +361,8 @@ class AndroidDeviceProvider(
 
     private fun shellQuote(value: String): String =
         "'" + value.replace("'", "'\"'\"'") + "'"
+
+    private companion object {
+        val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
+    }
 }

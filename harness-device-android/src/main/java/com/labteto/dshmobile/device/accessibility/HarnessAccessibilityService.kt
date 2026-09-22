@@ -15,7 +15,9 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 data class AccessibilityNodeSnapshot(
+    val index: Int,
     val text: String?,
+    val contentDescription: String?,
     val viewId: String?,
     val className: String?,
     val clickable: Boolean,
@@ -47,7 +49,9 @@ class HarnessAccessibilityService : AccessibilityService() {
             val (node, depth) = queue.removeFirst()
             val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
             output += AccessibilityNodeSnapshot(
-                text = node.text?.toString() ?: node.contentDescription?.toString(),
+                index = output.size,
+                text = node.text?.toString(),
+                contentDescription = node.contentDescription?.toString(),
                 viewId = node.viewIdResourceName,
                 className = node.className?.toString(),
                 clickable = node.isClickable,
@@ -60,6 +64,20 @@ class HarnessAccessibilityService : AccessibilityService() {
             }
         }
         return output
+    }
+
+    fun clickNode(index: Int): Boolean {
+        val node = nodeAt(index) ?: return false
+        val target = if (node.isClickable) node else clickableAncestor(node) ?: return false
+        return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    fun setTextNode(index: Int, value: String): Boolean {
+        val target = nodeAt(index)?.takeIf(AccessibilityNodeInfo::isEditable) ?: return false
+        val arguments = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        return target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
     }
 
     fun clickText(text: String): Boolean {
@@ -88,8 +106,25 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun globalHome(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
 
-    fun scrollForward(): Boolean =
-        rootInActiveWindow?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) == true
+    fun scroll(direction: String): Boolean {
+        val action = when (direction.lowercase()) {
+            "forward", "down", "next" -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            "backward", "up", "previous" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+            else -> error("滚动方向仅支持 forward/down 或 backward/up")
+        }
+        val root = rootInActiveWindow ?: return false
+        if (root.performAction(action)) return true
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (node.isScrollable && node.performAction(action)) return true
+            for (index in 0 until node.childCount) node.getChild(index)?.let(queue::add)
+        }
+        return false
+    }
+
+    fun scrollForward(): Boolean = scroll("forward")
 
     fun tap(
         x: Float,
@@ -155,6 +190,23 @@ class HarnessAccessibilityService : AccessibilityService() {
                 }
             },
         )
+    }
+
+    private fun nodeAt(index: Int): AccessibilityNodeInfo? {
+        if (index < 0) return null
+        val root = rootInActiveWindow ?: return null
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var current = 0
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (current == index) return node
+            current++
+            for (childIndex in 0 until node.childCount) {
+                node.getChild(childIndex)?.let(queue::add)
+            }
+        }
+        return null
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
