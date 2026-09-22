@@ -359,7 +359,7 @@ internal fun LocalHarnessSettingsCard(
             onValueChange = { userRules = it.take(6_000) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("用户长期规则") },
-            supportingText = { Text("每轮固定注入，最多 6000 字；适合长期工作规则与回答偏好。") },
+            supportingText = { Text("最多保存 6000 字，每轮最多注入 3000 字；适合长期工作规则与回答偏好。") },
             minLines = 3,
             maxLines = 6,
         )
