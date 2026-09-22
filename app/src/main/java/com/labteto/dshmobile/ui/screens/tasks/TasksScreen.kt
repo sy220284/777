@@ -143,7 +143,7 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(task.id, style = DsType.std14Strong, color = colors.labelPrimary)
                 Text(
-                    if (task.recurringMinutes == null) "一次性任务" else "每 \${task.recurringMinutes} 分钟",
+                    if (task.recurringMinutes == null) "一次性任务" else "每 ${task.recurringMinutes} 分钟",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
@@ -157,15 +157,15 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
         }
         Text(task.prompt, style = DsType.small13, color = colors.labelSecondary)
         Text(
-            "下次执行：\${formatTime(task.nextRunAt)}",
+            "下次执行：${formatTime(task.nextRunAt)}",
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
         task.lastResult?.takeIf(String::isNotBlank)?.let {
-            Text("最近结果：\${it.take(240)}", style = DsType.caption11, color = colors.labelSecondary)
+            Text("最近结果：${it.take(240)}", style = DsType.caption11, color = colors.labelSecondary)
         }
         task.lastError?.takeIf(String::isNotBlank)?.let {
-            Text("最近状态：\${it.take(240)}", style = DsType.caption11, color = colors.error)
+            Text("最近状态：${it.take(240)}", style = DsType.caption11, color = colors.error)
         }
     }
 }
