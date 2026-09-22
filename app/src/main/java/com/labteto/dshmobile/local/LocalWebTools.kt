@@ -80,6 +80,44 @@ internal class LocalWebTools(
         }.trimEnd()
     }
 
+    suspend fun httpRequest(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String?,
+        maxBytes: Int,
+        timeoutSeconds: Long,
+    ): String {
+        val result = web.request(method, url, headers, body, maxBytes, timeoutSeconds)
+        return buildString {
+            appendLine("URL: ${result.url}")
+            appendLine("HTTP: ${result.status}")
+            appendLine("Content-Type: ${result.mediaType.ifBlank { "unknown" }}")
+            appendLine("读取：${result.bytesRead} 字节${if (result.truncated) "（已截断）" else ""}")
+            if (result.content.isNotBlank()) {
+                appendLine()
+                append(result.content)
+            }
+        }.trimEnd()
+    }
+
+    suspend fun download(
+        url: String,
+        path: String,
+        maxBytes: Long,
+        timeoutSeconds: Long,
+    ): String {
+        val destination = workspace.toolOutputFile(path)
+        val result = web.downloadTo(url, destination, maxBytes, timeoutSeconds)
+        return buildString {
+            appendLine("下载完成：$path")
+            appendLine("URL: ${result.url}")
+            appendLine("字节：${result.bytes}")
+            appendLine("Content-Type: ${result.mediaType.ifBlank { "unknown" }}")
+            append("SHA-256: ${result.sha256}")
+        }
+    }
+
     fun jsonQuery(path: String, query: String): String {
         val root = json.parseToJsonElement(workspace.readRaw(path))
         val output = resolveJsonPath(root, query).toString()
