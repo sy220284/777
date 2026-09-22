@@ -15,6 +15,8 @@ import javax.inject.Singleton
 private data class GithubAsset(
     val name: String = "",
     @SerialName("browser_download_url") val downloadUrl: String = "",
+    val size: Long = -1L,
+    val digest: String? = null,
 )
 
 @Serializable
@@ -30,8 +32,22 @@ data class AvailableUpdate(
     val url: String,
     val apkUrl: String? = null,
     val apkName: String? = null,
+    val apkSize: Long? = null,
+    val expectedSha256: String? = null,
     val checksumUrl: String? = null,
 )
+
+/** Parse GitHub's release-asset digest field, which is currently shaped like `sha256:<hex>`. */
+internal fun parseGithubSha256(digest: String?): String? {
+    val value = digest?.trim() ?: return null
+    val separator = value.indexOf(':')
+    if (separator <= 0 || !value.substring(0, separator).equals("sha256", ignoreCase = true)) {
+        return null
+    }
+    return value.substring(separator + 1)
+        .takeIf { it.matches(Regex("[0-9a-fA-F]{64}")) }
+        ?.lowercase()
+}
 
 /** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
@@ -110,6 +126,8 @@ class UpdateChecker @Inject constructor(
             url = release.htmlUrl.ifBlank { RELEASES_URL },
             apkUrl = apk?.downloadUrl?.takeIf(String::isNotBlank),
             apkName = apk?.name?.takeIf(String::isNotBlank),
+            apkSize = apk?.size?.takeIf { it > 0L },
+            expectedSha256 = parseGithubSha256(apk?.digest),
             checksumUrl = checksums?.downloadUrl?.takeIf(String::isNotBlank),
         )
     }

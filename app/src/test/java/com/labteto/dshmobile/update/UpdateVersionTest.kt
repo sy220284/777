@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.update
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -91,5 +93,18 @@ class UpdateVersionTest {
     @Test
     fun `v prefix and build metadata do not hide 777 revision`() {
         assertTrue(isNewerVersion("v0.12.0-777.18+release", "0.12.0-777.17"))
+    }
+    @Test
+    fun `GitHub sha256 digest is accepted`() {
+        val digest = "ad11ce90005e2958d6eb504f17a352cdacd1d5566c80c44be7826f33ac690f4e"
+        assertEquals(digest, parseGithubSha256("sha256:$digest"))
+        assertEquals(digest, parseGithubSha256("SHA256:$digest"))
+    }
+
+    @Test
+    fun `invalid GitHub asset digest is rejected`() {
+        assertNull(parseGithubSha256(null))
+        assertNull(parseGithubSha256("md5:deadbeef"))
+        assertNull(parseGithubSha256("sha256:too-short"))
     }
 }
