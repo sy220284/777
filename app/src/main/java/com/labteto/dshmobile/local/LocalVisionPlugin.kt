@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.util.Base64
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
 
 data class LocalVisionRoute(
     val baseUrl: String,
@@ -42,6 +44,7 @@ class LocalVisionPlugin(
     private val keyProvider: suspend () -> String?,
     private val routeProvider: () -> LocalVisionRoute?,
     private val analyzer: LocalVisionAnalyzer,
+    private val workspaceRoot: File? = null,
 ) : HarnessPlugin {
     override val id: String = "local-vision"
 
@@ -103,12 +106,47 @@ class LocalVisionPlugin(
                 },
             ),
         )
+        context.tools.register(
+            HarnessTool(
+                name = "vision_analyze_file",
+                schema = schema(
+                    name = "vision_analyze_file",
+                    description = "分析工作区内的 PNG/JPEG/WebP/GIF 图片；图片会发送到外部视觉模型",
+                    properties = mapOf("path" to "string", "prompt" to "string"),
+                    required = setOf("path", "prompt"),
+                ),
+                access = ToolAccess.NETWORK,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                timeoutMillis = 240_000L,
+                executor = HarnessToolExecutor { _, input, _ ->
+                    if (routeProvider() == null || keyProvider().isNullOrBlank()) {
+                        return@HarnessToolExecutor ToolResult(
+                            "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
+                            isError = true,
+                        )
+                    }
+                    val dataUrl = runCatching { imageFileDataUrl(input.requiredString("path")) }
+                        .getOrElse { error ->
+                            return@HarnessToolExecutor ToolResult(
+                                "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
+                                isError = true,
+                            )
+                        }
+                    analyzeDataUrl(
+                        prompt = input.requiredString("prompt"),
+                        imageDataUrl = dataUrl,
+                        intro = "分析这张用户工作区图片。",
+                    )
+                },
+            ),
+        )
     }
 
     override suspend fun uninstall(context: HarnessContext) {
         context.tools.unregister("vision_status")
         context.tools.unregister("vision_analyze_screen")
         context.tools.unregister("vision_analyze_vscreen")
+        context.tools.unregister("vision_analyze_file")
     }
 
     private suspend fun analyze(
@@ -116,18 +154,35 @@ class LocalVisionPlugin(
         screenshotCapability: String,
         screenshotArguments: Map<String, String>,
     ): ToolResult {
-        val route = routeProvider()
-            ?: return ToolResult("视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥", isError = true)
-        val key = keyProvider()
-            ?: return ToolResult("视觉模型密钥尚未配置", isError = true)
+        if (routeProvider() == null || keyProvider().isNullOrBlank()) {
+            return ToolResult(
+                "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
+                isError = true,
+            )
+        }
         val imageDataUrl = device.invoke(screenshotCapability, screenshotArguments)
         if (!imageDataUrl.startsWith("data:image/")) {
             return ToolResult("设备截图没有返回有效图片", isError = true)
         }
+        return analyzeDataUrl(
+            prompt = prompt,
+            imageDataUrl = imageDataUrl,
+            intro = "分析这张 Android 界面截图。\n若用户要求点击目标，请给出目标中心的原始截图像素坐标 x/y，并描述用于复核的可见特征。",
+        )
+    }
+
+    private suspend fun analyzeDataUrl(
+        prompt: String,
+        imageDataUrl: String,
+        intro: String,
+    ): ToolResult {
+        val route = routeProvider()
+            ?: return ToolResult("视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥", isError = true)
+        val key = keyProvider()
+            ?: return ToolResult("视觉模型密钥尚未配置", isError = true)
         val boundedPrompt = buildString {
-            appendLine("分析这张 Android 界面截图。")
-            appendLine("若用户要求点击目标，请给出目标中心的原始截图像素坐标 x/y，并描述用于复核的可见特征。")
-            appendLine("不要臆测画面外内容。")
+            appendLine(intro)
+            appendLine("只描述可见事实，不要臆测画面外内容。")
             append("任务：")
             append(prompt.take(4_000))
         }
@@ -139,6 +194,26 @@ class LocalVisionPlugin(
                 ToolResult("视觉分析失败：${error.message ?: error::class.java.simpleName}", isError = true)
             },
         )
+    }
+
+    private fun imageFileDataUrl(relativePath: String): String {
+        val root = workspaceRoot?.canonicalFile ?: error("本机工作区未配置")
+        require(!File(relativePath).isAbsolute) { "视觉文件路径必须使用工作区相对路径" }
+        val file = File(root, relativePath).canonicalFile
+        require(file.toPath().startsWith(root.toPath())) { "拒绝读取工作区之外的图片" }
+        require(file.isFile) { "图片文件不存在：$relativePath" }
+        require(file.length() in 1..MAX_IMAGE_FILE_BYTES) {
+            "图片大小必须在 1..${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MiB"
+        }
+        val mime = when (file.extension.lowercase()) {
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            else -> error("视觉文件仅支持 PNG/JPEG/WebP/GIF")
+        }
+        val encoded = Base64.getEncoder().encodeToString(file.readBytes())
+        return "data:$mime;base64,$encoded"
     }
 
     private fun schema(
@@ -169,4 +244,8 @@ class LocalVisionPlugin(
     private fun JsonObject.requiredString(name: String): String =
         this[name]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
             ?: error("缺少参数：$name")
+
+    private companion object {
+        const val MAX_IMAGE_FILE_BYTES = 16L * 1024L * 1024L
+    }
 }

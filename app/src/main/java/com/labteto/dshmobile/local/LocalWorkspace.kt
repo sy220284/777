@@ -68,6 +68,13 @@ class LocalWorkspace(
         return file.relativeTo(canonicalRoot).invariantSeparatorsPath
     }
 
+    /** Resolve a tool-owned output path without letting callers escape the workspace. */
+    fun toolOutputFile(relativePath: String): File {
+        val file = resolve(relativePath)
+        file.parentFile?.mkdirs()
+        return file
+    }
+
     /** Read raw UTF-8 content for structured parsers. */
     fun readRaw(relativePath: String): String {
         val file = resolve(relativePath)

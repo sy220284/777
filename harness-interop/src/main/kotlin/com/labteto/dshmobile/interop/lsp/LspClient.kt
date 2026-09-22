@@ -68,6 +68,9 @@ class LspProcessClient(
     suspend fun hover(uri: String, line: Int, character: Int): JsonElement =
         requestElement("textDocument/hover", positionParams(uri, line, character))
 
+    suspend fun implementation(uri: String, line: Int, character: Int): JsonElement =
+        requestElement("textDocument/implementation", positionParams(uri, line, character))
+
     suspend fun documentSymbols(uri: String): JsonElement =
         requestElement(
             "textDocument/documentSymbol",

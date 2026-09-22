@@ -13,13 +13,14 @@ internal object LocalToolPolicy {
     fun canonical(name: String): String = aliases[name] ?: name
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
-        "write", "edit", "present" -> ToolAccess.WORKSPACE_WRITE
+        "write", "edit", "apply_patch", "download_file", "present" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
-        "read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
+        "http_request" -> ToolAccess.PRIVILEGED
+        "read", "file_inspect", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "environment_info", "capability_search", "get_goal", "skill", "list_subagent_models", "list_agents",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read" -> ToolAccess.READ_ONLY
@@ -27,7 +28,8 @@ internal object LocalToolPolicy {
     }
 
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
-        "write", "edit", "bash", "job_kill", "send_message", "interrupt_agent",
+        "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
+        "http_request",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
     }

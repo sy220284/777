@@ -58,6 +58,12 @@ class LspPlugin(
         }
         if (name == "lsp_status") return ToolResult(if (client == null) "语言服务器未启动" else "语言服务器已启动")
         val active = client ?: return ToolResult("请先调用 lsp_start 启动语言服务器", isError = true)
+        if (name == "lsp_workspace_symbols") {
+            val query = input["query"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+            require(query.isNotEmpty()) { "工作区符号查询不能为空" }
+            val output = active.workspaceSymbols(query).toString()
+            return ToolResult(bounded(output))
+        }
         val file = workspaceFile(root, input["path"]?.jsonPrimitive?.content.orEmpty())
         require(file.isFile && file.length() <= 1024 * 1024) { "文件不存在或超过 1 MiB" }
         val uri = file.toURI().toString()
@@ -75,16 +81,40 @@ class LspPlugin(
                 "lsp_definition" -> active.definition(uri, line, character)
                 "lsp_references" -> active.references(uri, line, character)
                 "lsp_hover" -> active.hover(uri, line, character)
+                "lsp_implementation" -> active.implementation(uri, line, character)
                 "lsp_symbols" -> active.documentSymbols(uri)
+                "lsp_rename_preview" -> {
+                    val newName = input["new_name"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                    require(newName.isNotEmpty()) { "新名称不能为空" }
+                    active.rename(uri, line, character, newName)
+                }
+                "lsp_diagnostics" -> {
+                    val triggerError = runCatching { active.documentSymbols(uri) }.exceptionOrNull()
+                    val notifications = active.drainNotifications()
+                    val published = notifications.filter { notification ->
+                        notification["method"]?.jsonPrimitive?.contentOrNull == "textDocument/publishDiagnostics" &&
+                            notification["params"]?.jsonObject?.get("uri")?.jsonPrimitive?.contentOrNull == uri
+                    }
+                    val latest = published.lastOrNull()?.get("params")?.jsonObject
+                    return ToolResult(
+                        buildJsonObject {
+                            put("published", latest != null)
+                            put("diagnostics", latest?.get("diagnostics") ?: buildJsonArray { })
+                            triggerError?.message?.let { put("pump_warning", it.take(1_000)) }
+                        }.toString(),
+                    )
+                }
                 else -> error("未知语言工具")
             }
-            val output = result.toString()
-            return ToolResult(if (output.length <= 40_000) output else output.take(40_000) + "\n[结果过长，已截断]")
+            return ToolResult(bounded(result.toString()))
         } catch (error: Throwable) {
             closeClient()
             throw error
         }
     }
+
+    private fun bounded(output: String): String =
+        if (output.length <= 40_000) output else output.take(40_000) + "\n[结果过长，已截断]"
 
     private fun schema(name: String) = buildJsonObject {
         put("type", "function")
@@ -97,20 +127,37 @@ class LspPlugin(
                 "lsp_definition" -> "查询代码定义；行号从零开始，列号按 UTF-16 从零开始"
                 "lsp_references" -> "查询代码引用；行号从零开始，列号按 UTF-16 从零开始"
                 "lsp_hover" -> "查询代码类型与说明；行号从零开始，列号按 UTF-16 从零开始"
+                "lsp_implementation" -> "查询接口/抽象成员的实现位置；行号从零开始，列号按 UTF-16 从零开始"
+                "lsp_workspace_symbols" -> "按关键词查询整个工作区的代码符号"
+                "lsp_rename_preview" -> "请求语言服务器计算重命名 WorkspaceEdit，仅返回修改预览，不直接写文件"
+                "lsp_diagnostics" -> "同步当前文件并读取语言服务器发布的诊断；published=false 表示本次未收到诊断发布，不能等同于零错误"
                 else -> "列出文件中的代码符号"
             })
             put("parameters", buildJsonObject {
                 put("type", "object")
                 put("properties", buildJsonObject {
-                    if (name !in setOf("lsp_start", "lsp_stop", "lsp_status")) {
+                    if (name == "lsp_workspace_symbols") {
+                        put("query", buildJsonObject { put("type", "string") })
+                    } else if (name !in setOf("lsp_start", "lsp_stop", "lsp_status")) {
                         put("path", buildJsonObject { put("type", "string") })
                         put("language_id", buildJsonObject { put("type", "string") })
                         put("line", buildJsonObject { put("type", "integer"); put("minimum", 0) })
                         put("character", buildJsonObject { put("type", "integer"); put("minimum", 0) })
+                        if (name == "lsp_rename_preview") {
+                            put("new_name", buildJsonObject { put("type", "string") })
+                        }
                     }
                 })
-                if (name !in setOf("lsp_start", "lsp_stop", "lsp_status")) {
-                    put("required", buildJsonArray { add(JsonPrimitive("path")) })
+                when (name) {
+                    "lsp_workspace_symbols" ->
+                        put("required", buildJsonArray { add(JsonPrimitive("query")) })
+                    "lsp_rename_preview" ->
+                        put("required", buildJsonArray {
+                            add(JsonPrimitive("path")); add(JsonPrimitive("new_name"))
+                        })
+                    else -> if (name !in setOf("lsp_start", "lsp_stop", "lsp_status")) {
+                        put("required", buildJsonArray { add(JsonPrimitive("path")) })
+                    }
                 }
                 put("additionalProperties", false)
             })
@@ -118,7 +165,11 @@ class LspPlugin(
     }
 
     companion object {
-        private val names = listOf("lsp_start", "lsp_stop", "lsp_status", "lsp_definition", "lsp_references", "lsp_hover", "lsp_symbols")
+        private val names = listOf(
+            "lsp_start", "lsp_stop", "lsp_status",
+            "lsp_definition", "lsp_references", "lsp_hover", "lsp_implementation",
+            "lsp_symbols", "lsp_workspace_symbols", "lsp_rename_preview", "lsp_diagnostics",
+        )
         internal fun workspaceFile(root: File, path: String): File {
             require(path.isNotBlank() && !File(path).isAbsolute) { "请使用工作区内的相对路径" }
             val base = root.canonicalFile

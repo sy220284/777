@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
 
 class LocalVisionPluginTest {
     @Test
@@ -71,6 +72,50 @@ class LocalVisionPluginTest {
             device.calls,
         )
         assertEquals(1, analyzer.calls.size)
+    }
+
+    @Test
+    fun workspaceImageAnalysisRequiresApprovalAndStaysInsideWorkspace() = runTest {
+        val root = Files.createTempDirectory("vision-workspace").toFile()
+        try {
+            root.resolve("shot.png").writeBytes(byteArrayOf(1, 2, 3, 4))
+            val device = RecordingDevice()
+            val analyzer = RecordingAnalyzer()
+            val registry = PluginRegistry()
+            registry.install(
+                LocalVisionPlugin(
+                    device = device,
+                    keyProvider = { "secret" },
+                    routeProvider = { LocalVisionRoute("https://vision.example/v1", "vision-model") },
+                    analyzer = analyzer,
+                    workspaceRoot = root,
+                ),
+            )
+
+            val denied = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "shot.png"); put("prompt", "分析") },
+            )
+            assertTrue(denied.isError)
+            assertTrue(analyzer.calls.isEmpty())
+
+            val result = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "shot.png"); put("prompt", "分析") },
+                context = ToolContext(approval = { true }),
+            )
+            assertFalse(result.isError)
+            assertTrue(analyzer.calls.single().image.startsWith("data:image/png;base64,"))
+
+            val escaped = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "../escape.png"); put("prompt", "分析") },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue(escaped.isError)
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

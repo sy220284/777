@@ -190,6 +190,12 @@ object LocalToolCatalog {
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
         ), listOf("path", "old_text", "new_text")))
+        add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用，执行前需要用户批准", properties(
+            "patch" to string("完整 unified diff 文本"),
+        ), listOf("patch")))
+        add(tool("file_inspect", "检查工作区文件元数据；图片返回宽高和可用的常见 EXIF，不解码整张图片", properties(
+            "path" to string("相对工作区的文件路径"),
+        ), listOf("path")))
         add(tool("list_files", "列出工作区目录", properties(
             "path" to string("相对路径，默认 ."),
             "depth" to integer("递归深度，1 到 8"),
@@ -231,6 +237,22 @@ object LocalToolCatalog {
             },
             "run_in_background" to boolean("是否转为后台抓取任务；后台模式使用更长网络时限，默认 false"),
         ), listOf("url")))
+        add(tool("http_request", "向公网 HTTP/HTTPS API 发起受限请求；支持 GET/HEAD/POST/PUT/PATCH/DELETE，认证类请求头禁止写入工具参数，远端变更操作需要用户批准", properties(
+            "method" to string("GET、HEAD、POST、PUT、PATCH 或 DELETE"),
+            "url" to string("完整公网 HTTP/HTTPS 地址"),
+            "headers" to buildJsonObject {
+                put("type", "object")
+                put("description", "可选；仅允许 Accept、Content-Type、If-None-Match、If-Modified-Since")
+                put("additionalProperties", buildJsonObject { put("type", "string") })
+            },
+            "body" to string("可选；请求体，最大 1 MiB"),
+            "max_bytes" to integer("最多读取响应字节数，最大 4194304"),
+        ), listOf("method", "url")))
+        add(tool("download_file", "把公网 HTTP/HTTPS 文件流式下载到工作区并计算 SHA-256；执行前需要用户批准", properties(
+            "url" to string("完整公网 HTTP/HTTPS 地址"),
+            "path" to string("工作区相对目标路径"),
+            "max_bytes" to integer("最大下载字节数，默认 20971520，最高 104857600"),
+        ), listOf("url", "path")))
         add(tool("json_query", "从工作区 JSON 文件读取一个字段/数组片段，无需 jq；支持 a.b[0].c 形式", properties(
             "path" to string("JSON 文件的工作区相对路径"),
             "query" to string("字段路径，例如 items[0].name；留空返回根节点摘要"),
