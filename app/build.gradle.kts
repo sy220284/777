@@ -139,6 +139,14 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // AAPT's default asset filter contains <dir>_* and silently drops Python 3.14's
+        // Lib/compression/_common package. Keep the other default ignores, but allow
+        // underscore-prefixed directories because Python uses them as real packages.
+        ignoreAssetsPattern =
+            "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     sourceSets.getByName("main").apply {
         jniLibs.srcDir(generatedNodeRuntime.map { it.dir("jniLibs") })
         jniLibs.srcDir(generatedPythonRuntime.map { it.dir("jniLibs") })
