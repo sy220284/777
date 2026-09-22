@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -70,6 +71,7 @@ class ConnectionManager @Inject constructor(
     private val hostsStore: HostsStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val desiredIntentVersion = AtomicLong(0L)
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
@@ -166,6 +168,7 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
+        val intentVersion = desiredIntentVersion.incrementAndGet()
         disconnectRuntime()
         activeHost = config
         _state.value = ConnectionUiState(
@@ -178,12 +181,15 @@ class ConnectionManager @Inject constructor(
         this.loop = loop
         loop.start()
         hostsStore.upsertHost(config)
-        hostsStore.setDesiredHost(config.id)
+        if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(config.id)
     }
 
     fun disconnect() {
+        val intentVersion = desiredIntentVersion.incrementAndGet()
         disconnectRuntime()
-        scope.launch { hostsStore.setDesiredHost(null) }
+        scope.launch {
+            if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
+        }
     }
 
     private fun disconnectRuntime() {
@@ -263,7 +269,10 @@ class ConnectionManager @Inject constructor(
     private fun stopRetrying() {
         loop?.stop()
         loop = null
-        scope.launch { hostsStore.setDesiredHost(null) }
+        val intentVersion = desiredIntentVersion.incrementAndGet()
+        scope.launch {
+            if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
+        }
         _state.value = _state.value.copy(
             phase = ConnectionPhase.DISCONNECTED,
             // Back to Idle, not left on whatever handshake step the last generation died at. The

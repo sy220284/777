@@ -46,6 +46,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -72,6 +73,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
+
+class LocalHarnessBusyException(message: String) : IllegalStateException(message)
+class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -330,25 +334,33 @@ class LocalHarnessEngine @Inject constructor(
             while (_state.value.loading) delay(50)
         }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
-        require(!isRunBusy()) { "本机 Harness 正在执行其他任务或切换会话" }
+        if (isRunBusy()) throw LocalHarnessBusyException("本机 Harness 正在执行其他任务或切换会话")
 
         val beforeCount = _state.value.messages.size
         val job = queueTurn(prompt) ?: error("后台任务未能启动")
         job.start()
-        withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
-            while (job.isActive) {
-                val snapshot = _state.value
-                if (snapshot.pendingApproval != null) {
-                    stop()
-                    error("后台任务需要人工审批，已安全停止")
+        try {
+            withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
+                while (!job.isCompleted) {
+                    val snapshot = _state.value
+                    if (snapshot.pendingApproval != null) {
+                        stop()
+                        job.join()
+                        throw LocalHarnessBlockedException("后台任务需要人工审批，已安全停止")
+                    }
+                    if (snapshot.pendingQuestion != null) {
+                        stop()
+                        job.join()
+                        throw LocalHarnessBlockedException("后台任务需要人工回答，已安全停止")
+                    }
+                    delay(100)
                 }
-                if (snapshot.pendingQuestion != null) {
-                    stop()
-                    error("后台任务需要人工回答，已安全停止")
-                }
-                delay(100)
+                job.join()
             }
-            job.join()
+        } catch (timeout: TimeoutCancellationException) {
+            stop()
+            job.cancelAndJoin()
+            throw IllegalStateException("后台任务执行超时，已停止本轮任务", timeout)
         }
 
         val newMessages = _state.value.messages.drop(beforeCount)
