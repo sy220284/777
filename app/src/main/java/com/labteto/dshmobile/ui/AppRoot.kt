@@ -24,6 +24,8 @@ import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
 import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
+import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
+import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -44,6 +46,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
 
     DshTheme(preference = themePreference) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
+        var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         // Local Harness is always the product home. Remote control has exactly one transport:
         // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
         // carries the user into the remote session, while Back returns to the local home.
@@ -55,6 +58,12 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         val selectedRemoteMatches = surface == "remote" && connection.host != null
         when {
+            utilitySurface == "tasks" -> TasksScreen(
+                onClose = { utilitySurface = null },
+            )
+            utilitySurface == "tools" -> ToolsScreen(
+                onClose = { utilitySurface = null },
+            )
             showSettings -> SettingsScreen(
                 onClose = { showSettings = false },
                 updateStatus = updateInstallStatus,
@@ -85,9 +94,13 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                     showPair = true
                 },
                 onOpenSettings = { showSettings = true },
+                onOpenTasks = { utilitySurface = "tasks" },
+                onOpenTools = { utilitySurface = "tools" },
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = { showSettings = true },
+                onOpenTasks = { utilitySurface = "tasks" },
+                onOpenTools = { utilitySurface = "tools" },
                 onOpenLocalHarness = {
                     relayClaimed = false
                     surface = "local"
