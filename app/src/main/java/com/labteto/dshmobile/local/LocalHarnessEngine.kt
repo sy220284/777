@@ -23,7 +23,12 @@ import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
+import com.labteto.dshmobile.harness.session.HandoffGoal
+import com.labteto.dshmobile.harness.session.HandoffMessage
+import com.labteto.dshmobile.harness.session.HandoffState
+import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -144,6 +149,7 @@ class LocalHarnessEngine @Inject constructor(
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
     private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
+    private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val runtimePlugin = AndroidRuntimePlugin(
         workspaceRoot = File(workspace.path),
         processRuntime = runtimeProcess,
@@ -558,28 +564,15 @@ class LocalHarnessEngine @Inject constructor(
     /** Backward-compatible entry point: a plain new session is fully independent. */
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
 
-    private fun buildHandoffSummary(state: LocalHarnessState): String = buildString {
-        state.goal?.let { appendLine("当前目标：[${it.status}] ${it.description.take(800)}") }
-        if (state.plan.isNotEmpty()) {
-            appendLine("当前计划：")
-            state.plan.take(8).forEach { appendLine("- ${it.take(400)}") }
-        }
-        val openTodos = state.todos.filter { it.status != "completed" }.take(10)
-        if (openTodos.isNotEmpty()) {
-            appendLine("未完成任务：")
-            openTodos.forEach { appendLine("- [${it.status}] ${it.content.take(400)}") }
-        }
-        val recent = state.messages
-            .filter { it.role == "user" || it.role == "assistant" }
-            .takeLast(6)
-        if (recent.isNotEmpty()) {
-            appendLine("最近关键上下文：")
-            recent.forEach { message ->
-                val label = if (message.role == "user") "用户" else "助手"
-                appendLine("- $label：${message.content.replace("\n", " ").take(600)}")
-            }
-        }
-    }.trim().take(MAX_HANDOFF_CHARS)
+    private fun buildHandoffSummary(state: LocalHarnessState): String =
+        handoffBuilder.build(
+            HandoffState(
+                goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
+                plan = state.plan,
+                todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
+                messages = state.messages.map { message -> HandoffMessage(message.role, message.content) },
+            ),
+        )
 
     fun switchSession(sessionId: String) {
         if (sessionId == currentSessionId) return
