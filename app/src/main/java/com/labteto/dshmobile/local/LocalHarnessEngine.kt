@@ -329,7 +329,7 @@ class LocalHarnessEngine @Inject constructor(
                 if (isNotEmpty()) append("\n\n")
                 append("本次附件已导入本机工作区：\n").append(attachmentBlock)
                 if (attachments.any { it.mediaType.startsWith("image/") }) {
-                    append("\n提示：当前 DeepSeek 文本路由不能直接理解图片像素；图片已保存，可交给设备现有工具或后续视觉模型处理。")
+                    append("\n提示：当前文字模型不直接理解图片像素；图片已保存。若已配置视觉模型，可使用 vision_analyze_screen / vision_analyze_vscreen 处理实际画面。")
                 }
             }
         }
@@ -1615,7 +1615,7 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "subagent_fork", "workflow", "ask_user_question",
             "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
             "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
-            "memory_remember",
+            "memory_remember", "vision_analyze_screen",
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
