@@ -31,6 +31,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -99,6 +100,147 @@ class AutomationStore @Inject constructor(
 
     private fun read(): AutomationDocument {
         if (!file.isFile) return AutomationDocument()
+        return runCatching {
+            json.decodeFromString(AutomationDocument.serializer(), file.readText())
+        }.getOrElse {
+            val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
+            runCatching { file.copyTo(corrupt, overwrite = true) }
+            AutomationDocument()
+        }
+    }
+
+    private fun write(document: AutomationDocument) {
+        file.parentFile?.mkdirs()
+        val temp = File(file.parentFile, file.name + ".tmp")
+        temp.writeText(json.encodeToString(AutomationDocument.serializer(), document))
+        if (!temp.renameTo(file)) {
+            file.writeText(temp.readText())
+            temp.delete()
+        }
+    }
+}
+
+@Singleton
+class HarnessAutomationScheduler @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val store: AutomationStore,
+) : HarnessScheduler {
+    private val workManager get() = WorkManager.getInstance(context)
+
+    override suspend fun schedule(id: String, triggerAtMillis: Long, payload: String) {
+        scheduleOnce(id, payload, triggerAtMillis, notify = true)
+    }
+
+    override suspend fun cancel(id: String) {
+        workManager.cancelUniqueWork(workName(id))
+        store.remove(id)
+    }
+
+    fun scheduleOnce(
+        id: String,
+        prompt: String,
+        triggerAtMillis: Long,
+        notify: Boolean,
+    ) {
+        validateId(id)
+        require(prompt.isNotBlank()) { "任务提示词不能为空" }
+        val now = System.currentTimeMillis()
+        val runAt = triggerAtMillis.coerceAtLeast(now)
+        store.upsert(
+            AutomationTask(
+                id = id,
+                prompt = prompt,
+                createdAt = now,
+                nextRunAt = runAt,
+                notify = notify,
+            ),
+        )
+        val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
+            .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+            .setInputData(Data.Builder().putString(KEY_TASK_ID, id).build())
+            .addTag(WORK_TAG)
+            .build()
+        workManager.enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
+    }
+
+    fun schedulePeriodic(
+        id: String,
+        prompt: String,
+        intervalMinutes: Long,
+        firstRunAtMillis: Long = System.currentTimeMillis(),
+        notify: Boolean,
+    ) {
+        validateId(id)
+        require(prompt.isNotBlank()) { "任务提示词不能为空" }
+        require(intervalMinutes >= 15L) { "Android 后台周期任务最短间隔为 15 分钟" }
+        val now = System.currentTimeMillis()
+        val firstRun = firstRunAtMillis.coerceAtLeast(now)
+        store.upsert(
+            AutomationTask(
+                id = id,
+                prompt = prompt,
+                createdAt = now,
+                nextRunAt = firstRun,
+                recurringMinutes = intervalMinutes,
+                notify = notify,
+            ),
+        )
+        val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
+            intervalMinutes,
+            TimeUnit.MINUTES,
+        )
+            .setInitialDelay((firstRun - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+            .setInputData(Data.Builder().putString(KEY_TASK_ID, id).build())
+            .addTag(WORK_TAG)
+            .build()
+        workManager.enqueueUniquePeriodicWork(
+            workName(id),
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request,
+        )
+    }
+
+    fun list(): List<AutomationTask> = store.list()
+
+    fun cancelTask(id: String): Boolean {
+        workManager.cancelUniqueWork(workName(id))
+        return store.remove(id)
+    }
+
+    private fun validateId(id: String) {
+        require(id.matches(Regex("[A-Za-z0-9._-]{1,80}"))) { "任务编号仅允许字母、数字、点、下划线和横线" }
+    }
+
+    companion object {
+        const val KEY_TASK_ID = "task_id"
+        const val WORK_TAG = "harness-automation"
+        fun workName(id: String) = "harness-automation-$id"
+    }
+}
+
+class HarnessAutomationWorker(
+    appContext: Context,
+    params: WorkerParameters,
+) : CoroutineWorker(appContext, params) {
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WorkerEntryPoint {
+        fun localHarnessEngine(): LocalHarnessEngine
+        fun automationStore(): AutomationStore
+    }
+
+    override suspend fun doWork(): Result {
+        val id = inputData.getString(HarnessAutomationScheduler.KEY_TASK_ID)
+            ?: return Result.failure()
+        val entry = EntryPointAccessors.fromApplication(
+            applicationContext,
+            WorkerEntryPoint::class.java,
+        )
+        val store = entry.automationStore()
+        val task = store.get(id) ?: return Result.success()
+        val started = System.currentTimeMillis()
+        store.update(id) { it.copy(status = "running", lastRunAt = started, lastError = null) }
+
         return try {
             val result = entry.localHarnessEngine().runAutomationPrompt(task.prompt)
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
@@ -113,6 +255,8 @@ class AutomationStore @Inject constructor(
             }
             if (task.notify) notifyResult(id, result)
             Result.success()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (busy: LocalHarnessBusyException) {
             store.update(id) {
                 it.copy(
