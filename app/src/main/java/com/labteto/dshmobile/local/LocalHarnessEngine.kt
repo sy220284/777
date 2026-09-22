@@ -1667,6 +1667,7 @@ class LocalHarnessEngine @Inject constructor(
         val restoredHistory = restoreModelHistory(sessionId, stored.modelHistory)
         modelHistory.clear()
         modelHistory += restoredHistory.messages
+        applyRecoveredToolResults(recovery)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
@@ -1713,6 +1714,23 @@ class LocalHarnessEngine @Inject constructor(
         val messages: List<JsonObject>,
         val replayedTail: Boolean,
     )
+
+    private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
+        if (recovery.toolResults.isEmpty()) return
+        recovery.toolResults.forEach { recovered ->
+            val alreadyPresent = modelHistory.any { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
+                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
+            }
+            if (!alreadyPresent) {
+                modelHistory += buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", recovered.callId)
+                    put("content", recovered.content)
+                }
+            }
+        }
+    }
 
     private fun checkpointModelHistory(reason: String) {
         eventLog.append(
