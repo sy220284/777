@@ -335,6 +335,11 @@ prepare_arch() {
       chmod 0755 "$jni_dir/libdsh_python.so"
       cp -aL "$prefix/lib/python$PYTHON_MAJOR_MINOR" "$home_dir/lib/"
       patch_python_runtime "$stdlib_dir"
+      # Patched stdlib source must be authoritative. Precompiled bytecode from the
+      # Termux package can otherwise keep compiled-in Termux paths even after the
+      # .py source has been rewritten for this app.
+      find "$stdlib_dir" -type d -name "__pycache__" -prune -exec rm -rf {} +
+      find "$stdlib_dir" -type f -name '*.pyc' -delete
     fi
 
     if [ -d "$prefix/lib" ]; then
@@ -379,6 +384,10 @@ prepare_arch() {
     echo "Python OpenSSL 配置未生成：$android_abi" >&2
     exit 1
   }
+  if find "$stdlib_dir" -type f -name '*.pyc' -print -quit | grep -q .; then
+    echo "Python 标准库仍残留预编译字节码：$android_abi" >&2
+    exit 1
+  fi
 
   verify_dependency_closure "$jni_dir/libdsh_python.so" "$lib_dir" "$stdlib_dir"
 }
