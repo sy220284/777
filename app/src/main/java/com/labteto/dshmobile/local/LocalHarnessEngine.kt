@@ -98,8 +98,14 @@ import okhttp3.OkHttpClient
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
 
-internal fun canAutoApprove(access: ToolAccess): Boolean =
-    access == ToolAccess.WORKSPACE_WRITE
+internal fun canAutoApprove(tool: HarnessTool): Boolean =
+    runCatching {
+        LocalToolPolicy.autoApprovalScope(tool.name) == LocalAutoApprovalScope.WORKSPACE
+    }.getOrDefault(false)
+
+internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
+    tool.access == ToolAccess.DEVICE &&
+        tool.approvalPolicy == ToolApprovalPolicy.MUTATION
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -482,16 +488,33 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(approved)
     }
 
-    /** Approve the current mutation and all later mutations in this session. */
+    /** Approve workspace-confined writes for the current session. */
     fun enableAutoApproval() {
+        val pending = _state.value.pendingApproval
+        if (pending?.canAutoApproveWorkspace != true) {
+            eventLog.append("approval/mode-rejected", buildJsonObject {
+                put("mode", "workspace-auto")
+                put("reason", "pending-tool-outside-workspace-scope")
+                pending?.toolName?.let { put("tool", it) }
+            })
+            return
+        }
         _state.update { it.copy(autoApproveMutations = true) }
-        eventLog.append("approval/mode", buildJsonObject { put("mode", "auto") })
+        eventLog.append("approval/mode", buildJsonObject { put("mode", "workspace-auto") })
         persist()
         approvalResponse?.complete(true)
     }
 
-    /** Approve ordinary DEVICE actions for the remainder of the current agent turn only. */
+    /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
     fun enableDeviceApprovalLease() {
+        val pending = _state.value.pendingApproval
+        if (pending?.canApproveDeviceTurn != true) {
+            eventLog.append("approval/device-lease-rejected", buildJsonObject {
+                put("reason", "pending-tool-requires-explicit-approval")
+                pending?.toolName?.let { put("tool", it) }
+            })
+            return
+        }
         _state.update { it.copy(deviceApprovalLease = true) }
         eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
         approvalResponse?.complete(true)
