@@ -326,31 +326,36 @@ private fun ModelProviderRow(
 }
 
 @Composable
-internal fun LocalHarnessSettingsCard(
+internal fun LocalModelSettingsCard(
     local: LocalHarnessState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
-    var languageServerCommand by remember(local.languageServerCommand) { mutableStateOf(local.languageServerCommand) }
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
-    var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
-    var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
-    var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
-    var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
-    var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
-    var autoMemory by remember(local.autoMemory) { mutableStateOf(local.autoMemory) }
 
-    SettingsCard("本机 Harness", Icons.Outlined.Memory) {
+    SettingsCard("模型设置", Icons.Outlined.Cloud) {
         Text(
-            if (local.configured) "模型密钥已配置。留空密钥可只修改其他参数。" else "尚未配置模型密钥。",
+            if (local.configured) "本机模型密钥已配置。留空密钥可只修改模型和接口地址。" else "尚未配置本机模型密钥。",
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        OutlinedTextField(value = model, onValueChange = { model = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("默认模型") })
-        OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("接口地址") })
+        OutlinedTextField(
+            value = model,
+            onValueChange = { model = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("默认模型") },
+        )
+        OutlinedTextField(
+            value = baseUrl,
+            onValueChange = { baseUrl = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("接口地址") },
+        )
         OutlinedTextField(
             value = apiKey,
             onValueChange = { apiKey = it },
@@ -359,6 +364,46 @@ internal fun LocalHarnessSettingsCard(
             label = { Text(if (local.configured) "替换模型密钥（可留空）" else "模型密钥") },
             visualTransformation = PasswordVisualTransformation(),
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            DsButton(
+                text = "保存模型设置",
+                onClick = {
+                    if (!local.configured && apiKey.isBlank()) {
+                        report("首次使用请先填写模型密钥")
+                        return@DsButton
+                    }
+                    viewModel.configureLocalModel(apiKey, model, baseUrl)
+                    apiKey = ""
+                    report("模型设置已保存")
+                },
+                variant = DsButtonVariant.Outline,
+            )
+            if (local.configured) {
+                DsButton(
+                    text = "清除密钥",
+                    onClick = {
+                        viewModel.clearLocalCredential()
+                        report("本机模型密钥已清除")
+                    },
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LocalMemorySettingsCard(
+    local: LocalHarnessState,
+    viewModel: SettingsViewModel,
+    report: (String) -> Unit,
+) {
+    val colors = DsTheme.colors
+    var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
+    var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
+    var autoMemory by remember(local.autoMemory) { mutableStateOf(local.autoMemory) }
+
+    SettingsCard("记忆设置", Icons.Outlined.Memory) {
         OutlinedTextField(
             value = userRules,
             onValueChange = { userRules = it.take(6_000) },
@@ -390,17 +435,35 @@ internal fun LocalHarnessSettingsCard(
             }
             Switch(checked = autoMemory, onCheckedChange = { autoMemory = it })
         }
+        DsButton(
+            text = "保存记忆设置",
+            onClick = {
+                viewModel.configureLocalMemory(userRules, autoRecall, autoMemory)
+                report("记忆设置已保存")
+            },
+            variant = DsButtonVariant.Outline,
+        )
+    }
+}
+
+@Composable
+internal fun LocalAgentSettingsCard(
+    local: LocalHarnessState,
+    viewModel: SettingsViewModel,
+    report: (String) -> Unit,
+) {
+    var languageServerCommand by remember(local.languageServerCommand) { mutableStateOf(local.languageServerCommand) }
+    var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
+    var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
+    var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
+
+    SettingsCard("智能体设置", Icons.Outlined.Tune) {
         OutlinedTextField(
             value = languageServerCommand,
             onValueChange = { languageServerCommand = it.take(4_000) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.settings_lsp_command)) },
             supportingText = { Text(stringResource(R.string.settings_lsp_hint)) },
-        )
-        DsButton(
-            text = stringResource(R.string.settings_lsp_save),
-            onClick = { report(viewModel.configureLanguageServer(languageServerCommand)) },
-            variant = DsButtonVariant.Outline,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
@@ -426,41 +489,19 @@ internal fun LocalHarnessSettingsCard(
             label = { Text("模型失败重试次数") },
             supportingText = { Text("主循环 4–128；子代理 1–40；重试 1–5。") },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(
-                text = "保存本机配置",
-                onClick = {
-                    if (!local.configured && apiKey.isBlank()) {
-                        report("首次使用请先填写模型密钥")
-                        return@DsButton
-                    }
-                    viewModel.configureLocalHarness(
-                        apiKey = apiKey,
-                        model = model,
-                        baseUrl = baseUrl,
-                        mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
-                        subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
-                        modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
-                        userRules = userRules,
-                        autoRecall = autoRecall,
-                        autoMemory = autoMemory,
-                    )
-                    apiKey = ""
-                    report("本机 Harness 配置已保存")
-                },
-                variant = DsButtonVariant.Outline,
-            )
-            if (local.configured) {
-                DsButton(
-                    text = "清除密钥",
-                    onClick = {
-                        viewModel.clearLocalCredential()
-                        report("本机模型密钥已清除")
-                    },
-                    variant = DsButtonVariant.Ghost,
+        DsButton(
+            text = "保存智能体设置",
+            onClick = {
+                viewModel.configureLocalAgent(
+                    mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
+                    subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
+                    modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
                 )
-            }
-        }
+                val languageServerStatus = viewModel.configureLanguageServer(languageServerCommand)
+                report("智能体设置已保存；$languageServerStatus")
+            },
+            variant = DsButtonVariant.Outline,
+        )
     }
 }
 
