@@ -124,9 +124,11 @@ PY
 
 resolve_runtime_packages() {
   local packages_file="$1"
-  python3 - "$packages_file" "$PYTHON_PACKAGE" <<'PY'
+  shift
+  python3 - "$packages_file" "$@" <<'PY'
 import re, sys
-path, root = sys.argv[1:3]
+path = sys.argv[1]
+roots = sys.argv[2:]
 stanzas = {}
 with open(path, encoding="utf-8", errors="strict") as fh:
     current = {}
@@ -162,7 +164,10 @@ def normalize(alt):
         alt = alt.split(":", 1)[0]
     return alt
 
-queue = [root]
+if not roots:
+    raise SystemExit("runtime package roots are empty")
+
+queue = list(roots)
 seen = set()
 ordered = []
 while queue:
@@ -294,7 +299,12 @@ prepare_arch() {
     exit 1
   fi
 
-  mapfile -t runtime_packages < <(resolve_runtime_packages "$packages_file")
+  # libandroid-support is a real Termux runtime library (not an Android system lib).
+  # Keep it as an explicit root because Python/readline ELF objects require
+  # libandroid-support.so and repository metadata can vary across architectures.
+  mapfile -t runtime_packages < <(
+    resolve_runtime_packages "$packages_file" "$PYTHON_PACKAGE" "libandroid-support"
+  )
   [ "${#runtime_packages[@]}" -gt 0 ] || {
     echo "Python 运行时依赖解析为空：$apt_arch" >&2
     exit 1

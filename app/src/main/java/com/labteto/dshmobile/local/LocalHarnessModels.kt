@@ -108,6 +108,7 @@ data class LocalHarnessState(
     val handoffSummary: String? = null,
     val userRules: String = "",
     val autoRecall: Boolean = true,
+    val autoMemory: Boolean = true,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val plan: List<String> = emptyList(),

@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 data class UserProfile(
     val customRules: String = "",
     val autoRecall: Boolean = true,
+    val autoMemory: Boolean = true,
 )
 
 @Singleton

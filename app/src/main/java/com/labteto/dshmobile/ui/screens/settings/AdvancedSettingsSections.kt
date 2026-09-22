@@ -337,6 +337,7 @@ internal fun LocalHarnessSettingsCard(
     var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
+    var autoMemory by remember(local.autoMemory) { mutableStateOf(local.autoMemory) }
 
     SettingsCard("本机 Harness", Icons.Outlined.Memory) {
         Text(
@@ -373,6 +374,17 @@ internal fun LocalHarnessSettingsCard(
                 Text("按当前问题检索少量相关记忆，不把整个记忆库塞进上下文。", style = DsType.caption11, color = colors.labelTertiary)
             }
             Switch(checked = autoRecall, onCheckedChange = { autoRecall = it })
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("自动记忆明确长期规则", style = DsType.small13Strong, color = colors.labelPrimary)
+                Text("只捕捉“记住、以后、后续都”等明确长期表达；不额外调用模型，敏感信息直接过滤。", style = DsType.caption11, color = colors.labelTertiary)
+            }
+            Switch(checked = autoMemory, onCheckedChange = { autoMemory = it })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
@@ -415,6 +427,7 @@ internal fun LocalHarnessSettingsCard(
                         modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
                         userRules = userRules,
                         autoRecall = autoRecall,
+                        autoMemory = autoMemory,
                     )
                     apiKey = ""
                     report("本机 Harness 配置已保存")

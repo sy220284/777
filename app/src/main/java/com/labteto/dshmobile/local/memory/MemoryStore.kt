@@ -26,6 +26,7 @@ class MemoryStore @Inject constructor(
         sourceSessionId: String? = null,
         importance: Int = 50,
         pinned: Boolean = false,
+        replaceIds: Set<String> = emptySet(),
     ): MemoryRecord {
         val clean = content.trim().take(MAX_MEMORY_CONTENT_CHARS)
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
@@ -49,6 +50,18 @@ class MemoryStore @Inject constructor(
                 updatedAt = now,
             )
             records[duplicateIndex] = refreshed
+            replaceIds.asSequence()
+                .filter { it != refreshed.id }
+                .forEach { replacedId ->
+                    val index = records.indexOfFirst { it.id == replacedId && it.active }
+                    if (index >= 0) {
+                        records[index] = records[index].copy(
+                            active = false,
+                            supersededBy = refreshed.id,
+                            updatedAt = now,
+                        )
+                    }
+                }
             writeDocument(MemoryDocument(records = records))
             return refreshed
         }
@@ -66,6 +79,16 @@ class MemoryStore @Inject constructor(
             createdAt = now,
             updatedAt = now,
         )
+        replaceIds.forEach { replacedId ->
+            val index = records.indexOfFirst { it.id == replacedId && it.active }
+            if (index >= 0) {
+                records[index] = records[index].copy(
+                    active = false,
+                    supersededBy = record.id,
+                    updatedAt = now,
+                )
+            }
+        }
         records += record
         writeDocument(MemoryDocument(records = records.takeLast(MAX_RECORDS)))
         return record
