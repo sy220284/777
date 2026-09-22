@@ -291,15 +291,15 @@ class LocalHarnessEngine @Inject constructor(
             autoRecall = autoRecall,
             autoMemory = autoMemory,
         )
+        _state.update {
+            it.copy(
+                userRules = profile.customRules,
+                autoRecall = profile.autoRecall,
+                autoMemory = profile.autoMemory,
+            )
+        }
         scope.launch {
             userProfileStore.write(profile)
-            _state.update {
-                it.copy(
-                    userRules = profile.customRules,
-                    autoRecall = profile.autoRecall,
-                    autoMemory = profile.autoMemory,
-                )
-            }
         }
     }
 
