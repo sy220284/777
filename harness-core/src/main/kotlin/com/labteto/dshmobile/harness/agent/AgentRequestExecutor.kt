@@ -15,6 +15,7 @@ sealed interface AgentRequestEvent {
         override val attempt: Int,
         val maxAttempts: Int,
         val retryable: Boolean,
+        val willRetry: Boolean,
         val reason: String,
     ) : AgentRequestEvent
 
@@ -63,16 +64,18 @@ class AgentRequestExecutor(
                 throw cancelled
             } catch (error: Exception) {
                 lastError = error
-                val canRetry = retryable(error) && attempt < maxAttempts
+                val isRetryable = retryable(error)
+                val willRetry = isRetryable && attempt < maxAttempts
                 eventSink.append(
                     AgentRequestEvent.AttemptFailed(
                         attempt = attempt,
                         maxAttempts = maxAttempts,
-                        retryable = canRetry,
+                        retryable = isRetryable,
+                        willRetry = willRetry,
                         reason = error.message ?: error::class.java.simpleName,
                     ),
                 )
-                if (!canRetry) throw error
+                if (!willRetry) throw error
                 val delayMillis = backoffMillis(attempt).coerceAtLeast(0L)
                 eventSink.append(
                     AgentRequestEvent.RetryScheduled(
