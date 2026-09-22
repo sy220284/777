@@ -22,6 +22,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
+data class McpServerSnapshot(
+    val id: String,
+    val transport: String,
+    val target: String,
+    val tools: List<String>,
+)
+
 /**
  * Bridges HTTP and stdio MCP servers into the native Harness Tool Registry.
  *
@@ -158,6 +165,30 @@ class McpToolBridgePlugin(
             servers.clear()
         }
         MANAGEMENT_TOOLS.forEach(context.tools::unregister)
+    }
+
+    suspend fun connectHttpFromUi(context: HarnessContext, serverId: String, endpoint: String): String =
+        connectHttp(context, serverId, endpoint)
+
+    suspend fun connectStdioFromUi(
+        context: HarnessContext,
+        serverId: String,
+        command: List<String>,
+        workingDirectory: String? = null,
+    ): String = connectStdio(context, serverId, command, workingDirectory)
+
+    suspend fun disconnectFromUi(context: HarnessContext, serverId: String): String =
+        disconnect(context, serverId)
+
+    suspend fun serverSnapshots(): List<McpServerSnapshot> = mutex.withLock {
+        servers.values.map { binding ->
+            McpServerSnapshot(
+                id = binding.id,
+                transport = binding.transport,
+                target = binding.displayTarget,
+                tools = binding.toolNames.toList(),
+            )
+        }
     }
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
