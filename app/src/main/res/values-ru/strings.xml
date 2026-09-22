@@ -219,6 +219,8 @@
     <string name="presets_user">Свой</string>
     <string name="settings_title">Настройки</string>
     <string name="settings_general">Общие</string>
+    <string name="settings_advanced">Расширенные возможности</string>
+    <string name="settings_advanced_hint">Проекты, модели, локальная среда и доступ к устройству</string>
     <string name="settings_models">Модели</string>
     <string name="settings_plugins">Плагины</string>
     <string name="settings_plugins_inventory">Каталог плагинов</string>
