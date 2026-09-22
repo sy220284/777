@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import java.nio.file.Files
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertEquals
@@ -106,4 +107,24 @@ class LocalWorkspaceTest {
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
     }
 
+}
+
+    @Test
+    fun shellInheritsRuntimePathAndEnvironment() = runBlocking {
+        val runtimeBin = root.resolve("runtime-bin").apply { mkdirs() }
+        runtimeBin.resolve("fake-runtime").apply {
+            writeText("#!/bin/sh\necho runtime-ok\n")
+            setExecutable(true)
+        }
+        val isolated = LocalWorkspace(
+            root = root,
+            extraSearchPaths = { listOf(runtimeBin) },
+            environmentProvider = { mapOf("HARNESS_TEST_ENV" to "ready") },
+            shellExecutable = "/bin/sh",
+        )
+
+        val output = isolated.shell("printf \"\$HARNESS_TEST_ENV:\"; fake-runtime", 5)
+
+        assertTrue(output.contains("ready:runtime-ok"))
+    }
 }
