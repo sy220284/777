@@ -34,7 +34,6 @@ internal class LocalSubagentRunner(
         val stepLimit = maxSteps.coerceIn(1, 40)
         val snapshot = state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
-        val tools = schemas(allowMutation)
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
 
@@ -74,7 +73,7 @@ internal class LocalSubagentRunner(
                         baseUrl = snapshot.baseUrl,
                         model = routeModel,
                         history = history.toList(),
-                        tools = tools,
+                        tools = schemas(allowMutation),
                         subagentId = subagentId,
                         step = modelStep,
                     )
