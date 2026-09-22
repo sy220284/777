@@ -1248,21 +1248,21 @@ private fun ApprovalDialog(
         )
 
         DsButton(
-            "批准",
+            "仅批准本次",
             onApprove,
             modifier = Modifier.fillMaxWidth(),
-        )
-        DsButton(
-            "自动批准",
-            onAutoApprove,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Info,
         )
         DsButton(
             "拒绝",
             onDeny,
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
+        )
+        DsButton(
+            "本会话后续自动批准",
+            onAutoApprove,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
         )
     }
 }
