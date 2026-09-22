@@ -39,6 +39,30 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun durableRuleDefaultsToProjectScopeInsideProjectConversation() {
+        val candidate = policy.extractExplicitUserDirective(
+            text = "以后只发布 arm64-v8a",
+            mode = LocalConversationMode.PROJECT,
+            projectId = "777",
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.PROJECT, candidate.scope)
+    }
+
+    @Test
+    fun safeRuleMayMentionSecretConceptWithoutContainingSecretValue() {
+        val candidate = policy.extractExplicitUserDirective(
+            text = "以后不要把密钥写入日志",
+            mode = LocalConversationMode.INDEPENDENT,
+            projectId = null,
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+    }
+
+    @Test
     fun projectDirectiveIsIgnoredInIndependentConversation() {
         val candidate = policy.extractExplicitUserDirective(
             text = "本项目以后只构建 arm64-v8a",
