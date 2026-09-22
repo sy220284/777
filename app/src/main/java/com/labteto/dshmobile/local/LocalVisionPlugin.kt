@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local
 
-import android.util.Base64
+import java.util.Base64
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
@@ -119,6 +119,12 @@ class LocalVisionPlugin(
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
+                    if (routeProvider() == null || keyProvider().isNullOrBlank()) {
+                        return@HarnessToolExecutor ToolResult(
+                            "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
+                            isError = true,
+                        )
+                    }
                     val dataUrl = runCatching { imageFileDataUrl(input.requiredString("path")) }
                         .getOrElse { error ->
                             return@HarnessToolExecutor ToolResult(
@@ -148,6 +154,12 @@ class LocalVisionPlugin(
         screenshotCapability: String,
         screenshotArguments: Map<String, String>,
     ): ToolResult {
+        if (routeProvider() == null || keyProvider().isNullOrBlank()) {
+            return ToolResult(
+                "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
+                isError = true,
+            )
+        }
         val imageDataUrl = device.invoke(screenshotCapability, screenshotArguments)
         if (!imageDataUrl.startsWith("data:image/")) {
             return ToolResult("设备截图没有返回有效图片", isError = true)
@@ -200,7 +212,7 @@ class LocalVisionPlugin(
             "gif" -> "image/gif"
             else -> error("视觉文件仅支持 PNG/JPEG/WebP/GIF")
         }
-        val encoded = Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
+        val encoded = Base64.getEncoder().encodeToString(file.readBytes())
         return "data:$mime;base64,$encoded"
     }
 
