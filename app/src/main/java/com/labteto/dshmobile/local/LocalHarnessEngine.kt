@@ -972,13 +972,14 @@ class LocalHarnessEngine @Inject constructor(
                 attributes = mapOf("call_id" to call.id),
                 approval = { tool ->
                     approve(
-                        call,
-                        when (tool.name) {
-                            "write", "edit" -> "${tool.name}：${call.arguments.optionalString("path").orEmpty()}"
+                        call = call,
+                        summary = when (tool.name) {
+                            "write", "edit", "apply_patch", "download_file" ->
+                                "${tool.name}：${call.arguments.optionalString("path").orEmpty()}"
                             "bash" -> "执行命令：${call.arguments.optionalString("command").orEmpty().take(160)}"
                             else -> "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）"
                         },
-                        tool.access,
+                        tool = tool,
                     )
                 },
             ),
@@ -1227,22 +1228,23 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
-        access: ToolAccess,
+        tool: HarnessTool,
     ): Boolean {
-        if (_state.value.deviceApprovalLease && access == ToolAccess.DEVICE) {
+        if (_state.value.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
-                put("access", access.name.lowercase())
+                put("access", tool.access.name.lowercase())
                 put("mode", "device-turn-lease")
             })
             return true
         }
-        if (_state.value.autoApproveMutations && canAutoApprove(access)) {
+        if (_state.value.autoApproveMutations && canAutoApprove(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
-                put("access", access.name.lowercase())
+                put("access", tool.access.name.lowercase())
+                put("mode", "workspace-session")
             })
             return true
         }
@@ -1251,11 +1253,13 @@ class LocalHarnessEngine @Inject constructor(
         _state.update {
             it.copy(
                 pendingApproval = LocalApproval(
-                    call.id,
-                    call.name,
-                    summary,
-                    call.rawArguments,
-                    access.name.lowercase(),
+                    callId = call.id,
+                    toolName = call.name,
+                    summary = summary,
+                    arguments = call.rawArguments,
+                    access = tool.access.name.lowercase(),
+                    canAutoApproveWorkspace = canAutoApprove(tool),
+                    canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
                 ),
             )
         }
