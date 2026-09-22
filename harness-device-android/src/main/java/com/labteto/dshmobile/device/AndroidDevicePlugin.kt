@@ -16,7 +16,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-class AndroidDevicePlugin internal constructor(
+class AndroidDevicePlugin(
     private val provider: HarnessDeviceProvider,
 ) : HarnessPlugin {
     constructor(context: Context) : this(AndroidDeviceProvider(context))
