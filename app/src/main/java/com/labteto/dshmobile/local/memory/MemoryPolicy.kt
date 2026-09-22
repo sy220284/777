@@ -97,7 +97,7 @@ class MemoryPolicy @Inject constructor() {
             setOf(RegexOption.DOT_MATCHES_ALL),
         )
         val GLOBAL_HINT = Regex("""全局|所有项目|任何项目|所有对话|任何对话|每个项目""")
-        val RULE_HINT = Regex("""禁止|必须|只能|只用|一律|统一|默认|不要|不得|需要|要求""")
+        val RULE_HINT = Regex("""以后|后续|禁止|必须|只能|只用|一律|统一|默认|不要|不得|需要|要求""")
         val DECISION_HINT = Regex("""采用|确定|改为|切换为|发布|构建|架构|方案""")
         val SECRET_AFTER_LABEL = Regex(
             """(?i)(?:验证码|密码|口令|密钥|api\s*key|apikey|access\s*token|refresh\s*token|token|password)\s+(?:是\s*)?[a-z0-9._~+/=-]{6,}""",
