@@ -13,6 +13,11 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.notify.DshNotifications
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Foreground service that keeps the WebSocket connection alive while the app
@@ -25,6 +30,7 @@ class ConnectionService : Service() {
 
     @Inject lateinit var connectionManager: ConnectionManager
     @Inject lateinit var notifications: DshNotifications
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -34,10 +40,14 @@ class ConnectionService : Service() {
             return START_NOT_STICKY
         }
         startForeground(NOTIFICATION_ID, buildNotification())
+        if (connectionManager.state.value.host == null) {
+            scope.launch { connectionManager.restoreDesiredConnectionIfNeeded() }
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        scope.cancel()
         // The service dying does not tear the connection down; the manager owns it.
         super.onDestroy()
     }

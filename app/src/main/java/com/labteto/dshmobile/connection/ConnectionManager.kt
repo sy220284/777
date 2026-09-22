@@ -166,7 +166,7 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
-        disconnect()
+        disconnectRuntime()
         activeHost = config
         _state.value = ConnectionUiState(
             phase = ConnectionPhase.CONNECTING,
@@ -178,9 +178,15 @@ class ConnectionManager @Inject constructor(
         this.loop = loop
         loop.start()
         hostsStore.upsertHost(config)
+        hostsStore.setDesiredHost(config.id)
     }
 
     fun disconnect() {
+        disconnectRuntime()
+        scope.launch { hostsStore.setDesiredHost(null) }
+    }
+
+    private fun disconnectRuntime() {
         loop?.stop()
         loop = null
         api = null
@@ -188,6 +194,15 @@ class ConnectionManager @Inject constructor(
         activeHost = null
         stopService()
         _state.value = ConnectionUiState()
+    }
+
+    suspend fun restoreDesiredConnectionIfNeeded() {
+        if (activeHost != null) {
+            if (_state.value.phase != ConnectionPhase.CONNECTED) reconnectIfNeeded()
+            return
+        }
+        val desired = hostsStore.desiredHostOnce() ?: return
+        connect(desired)
     }
 
     fun reconnectIfNeeded() {
@@ -248,6 +263,7 @@ class ConnectionManager @Inject constructor(
     private fun stopRetrying() {
         loop?.stop()
         loop = null
+        scope.launch { hostsStore.setDesiredHost(null) }
         _state.value = _state.value.copy(
             phase = ConnectionPhase.DISCONNECTED,
             // Back to Idle, not left on whatever handshake step the last generation died at. The
