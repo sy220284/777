@@ -296,7 +296,6 @@
     <string name="settings_connection_disconnect">Disconnect</string>
     <string name="settings_connection_disconnect_confirm">Disconnect from harness?</string>
     <string name="settings_connection_disconnect_message">You will return to the connection screen.</string>
-    <string name="settings_language_system">System default</string>
     <string name="settings_harness">Harness</string>
     <string name="settings_data">Data</string>
     <string name="settings_forget_hosts">Forget remembered harnesses</string>
@@ -387,11 +386,6 @@
     <string name="settings_update_check">Check for updates</string>
     <string name="settings_update_check_hint">Asks GitHub for the latest release when the app starts.</string>
     <!-- Relay: choosing how to connect, pairing, and the failures that need a different fix. -->
-    <string name="connect_mode_title">How to connect</string>
-    <string name="connect_mode_lan">Local network</string>
-    <string name="connect_mode_relay">Relay</string>
-    <string name="connect_mode_lan_hint">Talk straight to a harness on your Wi-Fi. It signs this device in once, but the connection is not encrypted, so use it only on a network you trust.</string>
-    <string name="connect_mode_relay_hint">Talk to a harness through dsh-relay. This device holds a token it is issued once, the connection is encrypted, and it works from outside your Wi-Fi.</string>
     <string name="connect_relay_banner">A relay checks that it is you, and nothing else. Once paired, this device can run commands on that computer, exactly as a terminal on it could.</string>
     <string name="connect_relay_remembered">Paired relays</string>
     <string name="connect_relay_remembered_empty">Relays you pair with appear here.</string>
