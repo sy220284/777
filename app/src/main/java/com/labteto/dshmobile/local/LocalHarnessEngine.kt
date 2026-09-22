@@ -29,6 +29,7 @@ import com.labteto.dshmobile.harness.session.HandoffGoal
 import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -150,6 +151,7 @@ class LocalHarnessEngine @Inject constructor(
     )
     private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
+    private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val runtimePlugin = AndroidRuntimePlugin(
         workspaceRoot = File(workspace.path),
         processRuntime = runtimeProcess,
@@ -1483,29 +1485,19 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun checkpointModelHistory(reason: String) {
-        eventLog.append(MODEL_HISTORY_CHECKPOINT_EVENT, buildJsonObject {
-            put("version", MODEL_HISTORY_CHECKPOINT_VERSION)
-            put("reason", reason.take(80))
-            put("messages", JsonArray(modelHistory.toList()))
-        })
+        eventLog.append(
+            ModelHistoryCheckpointCodec.EVENT_TYPE,
+            modelHistoryCheckpointCodec.encode(modelHistory.toList(), reason),
+        )
     }
 
     private fun restoreModelHistory(
         sessionId: String,
         fallback: List<JsonObject>,
     ): List<JsonObject> {
-        val checkpoint = eventLogFor(sessionId).latest(MODEL_HISTORY_CHECKPOINT_EVENT) ?: return fallback
-        val version = checkpoint.data["version"]?.jsonPrimitive?.intOrNull ?: return fallback
-        if (version != MODEL_HISTORY_CHECKPOINT_VERSION) return fallback
-        val messages = checkpoint.data["messages"] as? JsonArray ?: return fallback
-        val restored = messages.mapNotNull { element -> element as? JsonObject }
-        if (restored.size != messages.size) return fallback
-        if (restored.any { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
-            }) {
-            return fallback
-        }
-        return restored
+        val checkpoint = eventLogFor(sessionId).latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
+            ?: return fallback
+        return modelHistoryCheckpointCodec.decode(checkpoint.data) ?: fallback
     }
 
     private fun persist() {
@@ -1605,8 +1597,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
-        const val MODEL_HISTORY_CHECKPOINT_EVENT = "local/model-history-checkpoint"
-        const val MODEL_HISTORY_CHECKPOINT_VERSION = 1
 
 
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
