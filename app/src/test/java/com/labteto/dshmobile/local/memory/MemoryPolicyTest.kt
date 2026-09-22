@@ -35,7 +35,7 @@ class MemoryPolicyTest {
 
         requireNotNull(candidate)
         assertEquals(MemoryScope.PROJECT, candidate.scope)
-        assertEquals(MemoryKind.RULE, candidate.kind)
+        assertEquals(MemoryKind.DECISION, candidate.kind)
     }
 
     @Test
