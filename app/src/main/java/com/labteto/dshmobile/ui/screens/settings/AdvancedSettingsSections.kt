@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -456,6 +457,91 @@ internal fun LocalHarnessSettingsCard(
                         viewModel.clearLocalCredential()
                         report("本机模型密钥已清除")
                     },
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LocalVisionSettingsCard(
+    vision: LocalVisionSettingsSnapshot,
+    viewModel: SettingsViewModel,
+    report: (String) -> Unit,
+) {
+    var model by remember(vision.model) { mutableStateOf(vision.model) }
+    var baseUrl by remember(vision.baseUrl) { mutableStateOf(vision.baseUrl) }
+    var apiKey by remember { mutableStateOf("") }
+
+    SettingsCard("视觉模型", Icons.Outlined.Cloud) {
+        Text(
+            if (vision.configured) {
+                "多模态视觉已配置。主屏分析会在发送截图前要求确认；虚拟屏可在已授权设备任务内连续分析。"
+            } else {
+                "可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。"
+            },
+            style = DsType.caption11,
+            color = DsTheme.colors.labelTertiary,
+        )
+        OutlinedTextField(
+            value = model,
+            onValueChange = { model = it.take(200) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("视觉模型") },
+        )
+        OutlinedTextField(
+            value = baseUrl,
+            onValueChange = { baseUrl = it.take(1_000) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("视觉接口地址") },
+            supportingText = {
+                Text("远程地址必须使用 HTTPS；本机 localhost/127.0.0.1/::1 可使用 HTTP。")
+            },
+        )
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it.take(8_000) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(if (vision.configured) "替换视觉密钥（可留空）" else "视觉模型密钥") },
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            DsButton(
+                text = "保存视觉配置",
+                onClick = {
+                    if (!vision.configured && apiKey.isBlank()) {
+                        report("首次启用视觉模型请填写密钥")
+                        return@DsButton
+                    }
+                    viewModel.configureLocalVision(
+                        apiKey = apiKey,
+                        model = model,
+                        baseUrl = baseUrl,
+                    ) { error ->
+                        if (error == null) {
+                            apiKey = ""
+                            report("视觉模型配置已保存")
+                        } else {
+                            report(error)
+                        }
+                    }
+                },
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Outline,
+            )
+            if (vision.configured) {
+                DsButton(
+                    text = "清除视觉密钥",
+                    onClick = {
+                        viewModel.clearLocalVisionCredential { error ->
+                            report(error ?: "视觉模型密钥已清除")
+                        }
+                    },
+                    size = DsButtonSize.Small,
                     variant = DsButtonVariant.Ghost,
                 )
             }
