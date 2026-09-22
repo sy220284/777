@@ -33,6 +33,7 @@ import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.memory.MemoryKind
+import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
@@ -99,6 +100,7 @@ class LocalHarnessEngine @Inject constructor(
     private val webhookController: WebhookController,
     private val userProfileStore: UserProfileStore,
     private val memoryStore: MemoryStore,
+    private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -283,10 +285,11 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Persist user-authored behavioral rules and memory recall preference. */
-    fun configurePersonalization(customRules: String, autoRecall: Boolean) {
+    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         val profile = UserProfile(
             customRules = customRules.trim().take(6_000),
             autoRecall = autoRecall,
+            autoMemory = autoMemory,
         )
         scope.launch {
             userProfileStore.write(profile)
@@ -294,6 +297,7 @@ class LocalHarnessEngine @Inject constructor(
                 it.copy(
                     userRules = profile.customRules,
                     autoRecall = profile.autoRecall,
+                    autoMemory = profile.autoMemory,
                 )
             }
         }
@@ -324,6 +328,28 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
+        val memorySnapshot = _state.value
+        if (memorySnapshot.autoMemory && prompt.isNotEmpty()) {
+            scope.launch {
+                runCatching {
+                    memoryManager.captureExplicitUserDirective(
+                        text = prompt,
+                        mode = memorySnapshot.conversationMode,
+                        projectId = memorySnapshot.projectId,
+                        lineageId = memorySnapshot.lineageId,
+                        sourceSessionId = currentSessionId,
+                    )
+                }.onSuccess { remembered ->
+                    if (remembered != null) {
+                        eventLog.append("memory/auto", buildJsonObject {
+                            put("id", remembered.id)
+                            put("scope", remembered.scope.name.lowercase())
+                            put("kind", remembered.kind.name.lowercase())
+                        })
+                    }
+                }
+            }
+        }
         activeJob = scope.launch { runTurn(content) }
     }
 
@@ -989,15 +1015,19 @@ class LocalHarnessEngine @Inject constructor(
                 val kind = runCatching {
                     MemoryKind.valueOf((args.optionalString("kind") ?: "fact").uppercase())
                 }.getOrDefault(MemoryKind.FACT)
-                val record = memoryStore.remember(
-                    content = args.string("content"),
-                    scope = scope,
-                    kind = kind,
-                    projectId = state.projectId.takeIf { scope == MemoryScope.PROJECT },
-                    lineageId = state.lineageId.takeIf { scope == MemoryScope.LINEAGE },
-                    sourceSessionId = currentSessionId,
-                    importance = if (kind in setOf(MemoryKind.RULE, MemoryKind.CONSTRAINT, MemoryKind.DECISION)) 85 else 60,
-                )
+                val record = runCatching {
+                    memoryManager.remember(
+                        content = args.string("content"),
+                        scope = scope,
+                        kind = kind,
+                        projectId = state.projectId,
+                        lineageId = state.lineageId,
+                        sourceSessionId = currentSessionId,
+                        importance = if (kind in setOf(MemoryKind.RULE, MemoryKind.CONSTRAINT, MemoryKind.DECISION)) 85 else 60,
+                    )
+                }.getOrElse { error ->
+                    return error.message ?: "长期记忆写入失败"
+                }
                 "已保存长期记忆：${record.content}"
             }
             "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
@@ -1681,6 +1711,7 @@ class LocalHarnessEngine @Inject constructor(
             handoffSummary = stored.handoffSummary,
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
+            autoMemory = profile.autoMemory,
             sessions = sessionSummaries(),
             messages = stored.messages,
             plan = stored.plan,
