@@ -107,8 +107,6 @@ class LocalWorkspaceTest {
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
     }
 
-}
-
     @Test
     fun shellInheritsRuntimePathAndEnvironment() = runBlocking {
         val runtimeBin = root.resolve("runtime-bin").apply { mkdirs() }
