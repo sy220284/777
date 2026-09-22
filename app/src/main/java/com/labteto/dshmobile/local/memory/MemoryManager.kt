@@ -18,8 +18,37 @@ class MemoryManager @Inject constructor(
         sourceSessionId: String,
     ): MemoryRecord? {
         val candidate = policy.extractExplicitUserDirective(text, mode, projectId) ?: return null
+        return remember(
+            content = candidate.content,
+            scope = candidate.scope,
+            kind = candidate.kind,
+            projectId = projectId,
+            lineageId = lineageId,
+            sourceSessionId = sourceSessionId,
+            importance = candidate.importance,
+        )
+    }
+
+    fun remember(
+        content: String,
+        scope: MemoryScope,
+        kind: MemoryKind,
+        projectId: String?,
+        lineageId: String?,
+        sourceSessionId: String,
+        importance: Int,
+    ): MemoryRecord {
+        val clean = content.trim()
+        require(clean.isNotEmpty()) { "记忆内容不能为空" }
+        require(!policy.containsSensitiveData(clean)) { "敏感信息禁止写入长期记忆" }
+        val candidate = MemoryCandidate(
+            content = clean,
+            scope = scope,
+            kind = kind,
+            importance = importance.coerceIn(0, 100),
+        )
         val current = store.listActive(
-            allowedScopes = setOf(candidate.scope),
+            allowedScopes = setOf(scope),
             projectId = projectId,
             lineageId = lineageId,
             limit = 200,
