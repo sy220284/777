@@ -48,7 +48,7 @@ jobs:
       - name: Enforce APK size budget
         run: |
           BYTES="$(stat -c '%s' app/build/outputs/apk/optimized/app-optimized.apk)"
-          BUDGET=201326592
+          BUDGET=125829120
           echo "Optimized APK: $BYTES bytes (budget: $BUDGET)"
           test "$BYTES" -le "$BUDGET"
       - name: Upload optimized APK
@@ -82,9 +82,9 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            ./gradlew :app:connectedDebugAndroidTest :app:assembleOptimized --stacktrace
+            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --stacktrace
             adb shell am force-stop com.sy220284.dshmobile.debug || true
-            adb install -r app/build/outputs/apk/optimized/app-optimized.apk
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
             adb shell pidof com.sy220284.dshmobile.debug

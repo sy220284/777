@@ -36,16 +36,29 @@ val dshVersionCode: Int = dshVersionName
     }
     .coerceAtLeast(1)
 
+val bundledRuntimeAbis = (System.getenv("DSH_RUNTIME_ABIS") ?: "arm64-v8a")
+    .split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
+    .distinct()
+val supportedRuntimeAbis = setOf("arm64-v8a", "x86_64")
+require(bundledRuntimeAbis.isNotEmpty() && bundledRuntimeAbis.all(supportedRuntimeAbis::contains)) {
+    "DSH_RUNTIME_ABIS 仅支持 arm64-v8a 或 x86_64：${bundledRuntimeAbis.joinToString()}"
+}
+val bundledRuntimeAbiArgument = bundledRuntimeAbis.joinToString(",")
+
 val generatedNodeRuntime = layout.buildDirectory.dir("generated/nodeRuntime")
 val prepareBundledNodeRuntime = tasks.register<Exec>("prepareBundledNodeRuntime") {
     group = "build setup"
     description = "Fetches and verifies the bundled Android Node.js runtime from Termux."
     inputs.file(rootProject.file("tools/runtime/prepare-termux-node.sh"))
+    inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedNodeRuntime)
     environment(
         "TERMUX_RUNTIME_CACHE",
         rootProject.file(".gradle/runtime-cache/termux-node").absolutePath,
     )
+    environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-termux-node.sh").absolutePath,
@@ -58,11 +71,13 @@ val prepareBundledPythonRuntime = tasks.register<Exec>("prepareBundledPythonRunt
     group = "build setup"
     description = "Fetches and verifies the bundled Android Python runtime from Termux."
     inputs.file(rootProject.file("tools/runtime/prepare-termux-python.sh"))
+    inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedPythonRuntime)
     environment(
         "TERMUX_RUNTIME_CACHE",
         rootProject.file(".gradle/runtime-cache/termux-python").absolutePath,
     )
+    environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-termux-python.sh").absolutePath,
@@ -83,6 +98,7 @@ android {
         versionCode = dshVersionCode
         versionName = dshVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk { abiFilters.addAll(bundledRuntimeAbis) }
         vectorDrawables { useSupportLibrary = true }
     }
 
