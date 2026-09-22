@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.connection
 
-import com.labteto.dshmobile.core.wire.dto.HostDescription
 import kotlinx.serialization.Serializable
 
 /**
@@ -64,48 +63,6 @@ data class HostConfig(
 
     /** Whether traffic to this endpoint travels in the clear. */
     val isPlaintext: Boolean get() = !useTls
-}
-
-/**
- * A harness found by the active LAN scan.
- *
- * Carries the whole probe answer rather than two fields of it: the sweep already paid for the round
- * trip, and the card wants the session count and the default model too.
- *
- * [description] is null when the harness was identified by its static manifest but its trust fence
- * refused `host.describe` from this address. That is a real find, not a miss — it is a harness with
- * a `--trusted-host` still to add — so it is listed and explained rather than dropped.
- */
-data class DiscoveredHost(
-    val host: String,
-    val port: Int,
-    val description: HostDescription?,
-    /** True when the advertisement said the listener terminates TLS. */
-    val useTls: Boolean = false,
-    /** SPKI pin from the mDNS `pin` record, when the listener terminates TLS. */
-    val fingerprint: String? = null,
-    /**
-     * Whether this is a `dsh-relay` rather than a bare harness.
-     *
-     * A relay answers `/relay/health` and refuses `/api` until this device pairs, so it can never be
-     * connected to straight from a discovery card the way a harness can — it routes to pairing.
-     */
-    val isRelay: Boolean = false,
-    /**
-     * The relay answered and its fence refused the address it was reached by.
-     *
-     * Still a find. The relay is running, on the right port, and one entry in its
-     * `publicHostnames` away — hiding it would send someone looking for a fault that is not there.
-     */
-    val hostRefused: Boolean = false,
-) {
-    val authority: String get() = "$host:$port"
-
-    /** Origin to address this endpoint by. */
-    val baseUrl: String get() = harnessBaseUrl(host, port, useTls)
-
-    /** Whether the harness accepted an `/api` call from this device. */
-    val trusted: Boolean get() = description != null
 }
 
 /** App-level persisted settings (DataStore). Remote control is relay-only. */
