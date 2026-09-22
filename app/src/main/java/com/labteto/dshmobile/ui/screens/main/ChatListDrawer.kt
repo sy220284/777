@@ -28,7 +28,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -130,6 +132,8 @@ fun ChatListDrawer(
     onClose: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenLocalHarness: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val store = rememberSessionStore()
@@ -372,30 +376,60 @@ fun ChatListDrawer(
             )
         }
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            DsButton(
-                text = "本机 Harness",
-                onClick = {
-                    onClose()
-                    onOpenLocalHarness()
-                },
-                modifier = Modifier.weight(1f),
-                variant = DsButtonVariant.Ghost,
-                icon = Icons.Outlined.PhoneAndroid,
-            )
-            DsButton(
-                text = stringResource(R.string.settings_title),
-                onClick = {
-                    onClose()
-                    onOpenSettings()
-                },
-                modifier = Modifier.weight(1f),
-                variant = DsButtonVariant.Ghost,
-                icon = Icons.Filled.Settings,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = "任务",
+                    onClick = {
+                        onClose()
+                        onOpenTasks()
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Ghost,
+                    icon = Icons.Outlined.Schedule,
+                )
+                DsButton(
+                    text = "工具与连接",
+                    onClick = {
+                        onClose()
+                        onOpenTools()
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Ghost,
+                    icon = Icons.Outlined.Extension,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = "本机 Harness",
+                    onClick = {
+                        onClose()
+                        onOpenLocalHarness()
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Ghost,
+                    icon = Icons.Outlined.PhoneAndroid,
+                )
+                DsButton(
+                    text = stringResource(R.string.settings_title),
+                    onClick = {
+                        onClose()
+                        onOpenSettings()
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Ghost,
+                    icon = Icons.Filled.Settings,
+                )
+            }
         }
 
     }
