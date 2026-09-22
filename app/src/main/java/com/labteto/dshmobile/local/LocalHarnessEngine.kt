@@ -494,6 +494,11 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(true)
     }
 
+    fun disableDeviceApprovalLease() {
+        _state.update { it.copy(deviceApprovalLease = false) }
+        eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
+    }
+
     /** Return the current session to per-operation approval. */
     fun disableAutoApproval() {
         _state.update { it.copy(autoApproveMutations = false) }
