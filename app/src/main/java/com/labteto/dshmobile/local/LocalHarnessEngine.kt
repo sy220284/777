@@ -328,29 +328,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
-        val memorySnapshot = _state.value
-        if (memorySnapshot.autoMemory && prompt.isNotEmpty()) {
-            scope.launch {
-                runCatching {
-                    memoryManager.captureExplicitUserDirective(
-                        text = prompt,
-                        mode = memorySnapshot.conversationMode,
-                        projectId = memorySnapshot.projectId,
-                        lineageId = memorySnapshot.lineageId,
-                        sourceSessionId = currentSessionId,
-                    )
-                }.onSuccess { remembered ->
-                    if (remembered != null) {
-                        eventLog.append("memory/auto", buildJsonObject {
-                            put("id", remembered.id)
-                            put("scope", remembered.scope.name.lowercase())
-                            put("kind", remembered.kind.name.lowercase())
-                        })
-                    }
-                }
-            }
-        }
-        activeJob = scope.launch { runTurn(content) }
+        activeJob = scope.launch { runTurn(content, prompt) }
     }
 
     /**
@@ -601,7 +579,7 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private suspend fun runTurn(input: String) {
+    private suspend fun runTurn(input: String, memoryInput: String = input) {
         _state.update { it.copy(running = true, error = null) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
@@ -626,6 +604,25 @@ class LocalHarnessEngine @Inject constructor(
                             handoffSummary = snapshot.handoffSummary,
                         ),
                     )
+                    if (snapshot.autoMemory && memoryInput.isNotBlank()) {
+                        runCatching {
+                            memoryManager.captureExplicitUserDirective(
+                                text = memoryInput,
+                                mode = snapshot.conversationMode,
+                                projectId = snapshot.projectId,
+                                lineageId = snapshot.lineageId,
+                                sourceSessionId = currentSessionId,
+                            )
+                        }.onSuccess { remembered ->
+                            if (remembered != null) {
+                                eventLog.append("memory/auto", buildJsonObject {
+                                    put("id", remembered.id)
+                                    put("scope", remembered.scope.name.lowercase())
+                                    put("kind", remembered.kind.name.lowercase())
+                                })
+                            }
+                        }
+                    }
                     requestPrepared = true
                 }
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
