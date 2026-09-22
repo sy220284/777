@@ -45,7 +45,8 @@ class BundledPythonRuntimeTest {
         assertTrue("bundled Python timed out", process.waitFor(30, TimeUnit.SECONDS))
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
 
-        assertEquals("bundled Python failed:\n$output", 0, process.exitValue())
+        val diagnostic = output.replace("\r", "\\r").replace("\n", "\\n")
+        assertEquals("bundled Python failed: $diagnostic", 0, process.exitValue())
         val parts = output.split("|")
         assertEquals("unexpected Python output: $output", 3, parts.size)
         assertEquals("3.14.6", parts[0])
