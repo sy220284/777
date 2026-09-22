@@ -35,12 +35,10 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -112,8 +110,6 @@ fun LocalHarnessScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var editingConfig by rememberSaveable { mutableStateOf(false) }
-    var showDiagnostic by rememberSaveable { mutableStateOf(false) }
-    var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
@@ -137,14 +133,6 @@ fun LocalHarnessScreen(
                 onSwitchSession = { sessionId ->
                     viewModel.switchSession(sessionId)
                     scope.launch { drawerState.close() }
-                },
-                onNetworkDiagnostic = {
-                    scope.launch { drawerState.close() }
-                    showDiagnostic = true
-                },
-                onEnvironment = {
-                    scope.launch { drawerState.close() }
-                    showEnvironment = true
                 },
                 onSettings = {
                     scope.launch { drawerState.close() }
@@ -186,13 +174,6 @@ fun LocalHarnessScreen(
         }
     }
 
-    if (showDiagnostic) {
-        NetworkDiagnosticDialog(
-            onDismiss = { showDiagnostic = false },
-            diagnose = viewModel::diagnoseNetwork,
-        )
-    }
-
     if (showNewSessionMode) {
         NewSessionModeDialog(
             onDismiss = { showNewSessionMode = false },
@@ -203,12 +184,6 @@ fun LocalHarnessScreen(
         )
     }
 
-    if (showEnvironment) {
-        EnvironmentInfoDialog(
-            text = viewModel.environmentInfo(),
-            onDismiss = { showEnvironment = false },
-        )
-    }
 }
 
 @Composable
@@ -218,8 +193,6 @@ private fun LocalModeDrawer(
     onLocal: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
-    onNetworkDiagnostic: () -> Unit,
-    onEnvironment: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -237,10 +210,18 @@ private fun LocalModeDrawer(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 WhaleMark(Modifier.size(44.dp))
                 Spacer(Modifier.size(DsSpacing.medium))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
                     Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
                 }
+                DsIconButton(
+                    icon = Icons.Outlined.QrCodeScanner,
+                    contentDescription = "远程控制",
+                    onClick = onRemote,
+                    tint = colors.labelPrimary,
+                    containerColor = colors.bgLayer1,
+                    shadowElevation = 2.dp,
+                )
             }
 
             Text("运行方式", style = DsType.std14, color = colors.labelTertiary)
@@ -252,15 +233,9 @@ private fun LocalModeDrawer(
                     value = "当前",
                     onClick = onLocal,
                 )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Computer,
-                    title = "远程控制",
-                    subtitle = "通过安全中继配对并控制电脑",
-                    onClick = onRemote,
-                )
             }
 
-            val current = sessions.firstOrNull { it.id == currentSessionId }
+            val current = sessions.firstOrNull { it.id == currentSessionId && !it.blank }
             if (current != null) {
                 Text("当前会话", style = DsType.std14, color = colors.labelTertiary)
                 DsGroupCard {
@@ -275,7 +250,7 @@ private fun LocalModeDrawer(
             }
 
             val history = sessions
-                .filterNot { it.id == currentSessionId }
+                .filter { it.id != currentSessionId && !it.blank }
                 .sortedByDescending(LocalSessionSummary::updatedAt)
             if (history.isNotEmpty()) {
                 Text("历史会话", style = DsType.std14, color = colors.labelTertiary)
@@ -313,18 +288,6 @@ private fun LocalModeDrawer(
 
             Text("工具与偏好", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
-                DsCategoryRow(
-                    icon = Icons.Outlined.NetworkCheck,
-                    title = "网络诊断",
-                    subtitle = "检查域名、代理与连通性",
-                    onClick = onNetworkDiagnostic,
-                )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Memory,
-                    title = "环境能力",
-                    subtitle = "查看手机可用命令与限制",
-                    onClick = onEnvironment,
-                )
                 DsCategoryRow(
                     icon = Icons.Outlined.Settings,
                     title = "设置",
@@ -1205,7 +1168,7 @@ private fun NewSessionModeDialog(
 }
 
 @Composable
-private fun NetworkDiagnosticDialog(
+internal fun NetworkDiagnosticDialog(
     onDismiss: () -> Unit,
     diagnose: suspend (String) -> String,
 ) {
@@ -1253,7 +1216,7 @@ private fun NetworkDiagnosticDialog(
 }
 
 @Composable
-private fun EnvironmentInfoDialog(
+internal fun EnvironmentInfoDialog(
     text: String,
     onDismiss: () -> Unit,
 ) {
