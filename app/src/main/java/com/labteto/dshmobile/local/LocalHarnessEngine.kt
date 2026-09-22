@@ -42,6 +42,7 @@ import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
+import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
@@ -482,6 +483,27 @@ class LocalHarnessEngine @Inject constructor(
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
     fun environmentInfoForUi(): String = environmentInfo()
+
+    suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
+
+    suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
+        mcpPlugin.connectHttpFromUi(pluginRegistry.context, serverId, endpoint)
+
+    suspend fun connectMcpStdioForUi(
+        serverId: String,
+        command: List<String>,
+        workingDirectory: String? = null,
+    ): String = mcpPlugin.connectStdioFromUi(
+        pluginRegistry.context,
+        serverId,
+        command,
+        workingDirectory,
+    )
+
+    suspend fun disconnectMcpForUi(serverId: String): String =
+        mcpPlugin.disconnectFromUi(pluginRegistry.context, serverId)
+
+    fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
     /** Resolve the current write or shell approval. */
     fun answerApproval(approved: Boolean) {

@@ -25,6 +25,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -62,6 +63,7 @@ fun PairScreen(
     onClose: () -> Unit,
     prefillUrl: String? = null,
     onPaired: (() -> Unit)? = null,
+    autoScanOnOpen: Boolean = false,
     viewModel: PairViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,6 +88,17 @@ fun PairScreen(
         result.contents?.let(viewModel::onScanned)
     }
     val scanPrompt = stringResource(R.string.pair_scan_prompt)
+    val scanOptions = remember(scanPrompt) {
+        ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt(scanPrompt)
+            .setBeepEnabled(false)
+            .setCaptureActivity(PortraitCaptureActivity::class.java)
+            .setOrientationLocked(true)
+    }
+    LaunchedEffect(autoScanOnOpen) {
+        if (autoScanOnOpen) scanner.launch(scanOptions)
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         Column(
@@ -123,15 +136,7 @@ fun PairScreen(
             DsButton(
                 text = stringResource(R.string.pair_scan),
                 onClick = {
-                    scanner.launch(
-                        ScanOptions()
-                            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                            .setPrompt(scanPrompt)
-                            .setBeepEnabled(false)
-                            // The pairing page is often read off a laptop held at an angle; locking
-                            // to portrait makes that harder for no benefit.
-                            .setOrientationLocked(false),
-                    )
+                    scanner.launch(scanOptions)
                 },
                 enabled = !state.busy,
                 variant = DsButtonVariant.Info,

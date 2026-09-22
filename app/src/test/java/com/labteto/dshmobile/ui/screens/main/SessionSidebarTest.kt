@@ -57,7 +57,7 @@ class SessionSidebarTest {
     }
 
     @Test
-    fun `selected blank record is still shown but blank scratch history is hidden`() {
+    fun `blank current and history records are hidden`() {
         val current = session("current", blank = true)
 
         val sections = drawerSessionSections(
@@ -67,7 +67,7 @@ class SessionSidebarTest {
             sortByRecency = false,
         )
 
-        assertEquals(current, sections.current)
+        assertNull(sections.current)
         assertEquals(listOf("saved"), sections.history.map { it.sessionId })
     }
 

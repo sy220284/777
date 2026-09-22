@@ -300,6 +300,22 @@ class SettingsViewModel @Inject constructor(
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
     }
 
+    fun configureLocalModel(apiKey: String, model: String, baseUrl: String) {
+        localHarness.configure(apiKey, model, baseUrl)
+    }
+
+    fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
+        localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
+    }
+
+    fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
+        localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
+    }
+
+    suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
+
+    fun environmentInfo(): String = localHarness.environmentInfoForUi()
+
     fun configureLocalVision(
         apiKey: String,
         model: String,

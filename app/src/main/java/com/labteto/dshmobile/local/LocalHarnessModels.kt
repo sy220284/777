@@ -51,6 +51,7 @@ data class LocalSessionSummary(
     val id: String,
     val title: String,
     val updatedAt: Long,
+    val blank: Boolean = false,
 )
 
 /** One persisted implementation task, aligned with the official todo tool. */
