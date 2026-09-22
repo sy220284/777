@@ -119,7 +119,7 @@ class DeepSeekClient @Inject constructor(
     }
 
     private fun endpoint(baseUrl: String): String {
-        val clean = baseUrl.trim().trimEnd('/')
+        val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')
         return if (clean.endsWith("/chat/completions")) clean else "$clean/chat/completions"
     }
 

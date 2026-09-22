@@ -42,14 +42,18 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -182,6 +186,9 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { it.copy(jobs = snapshot) }
     }
 
+    private val runStateLock = Any()
+    private val sessionTransitionMutex = Mutex()
+    private var sessionTransitioning = false
     private var activeJob: Job? = null
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
@@ -237,15 +244,16 @@ class LocalHarnessEngine @Inject constructor(
             runCatching {
                 if (apiKey.isNotBlank()) apiKeys.put(apiKey)
                 else require(apiKeys.get() != null) { "请填写 DeepSeek API 密钥" }
+                val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl.ifBlank { DEFAULT_BASE_URL })
                 preferences.edit()
                     .putString(KEY_MODEL, model.ifBlank { DEFAULT_MODEL })
-                    .putString(KEY_BASE_URL, baseUrl.ifBlank { DEFAULT_BASE_URL })
+                    .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .apply()
                 _state.update {
                     it.copy(
                         configured = true,
                         model = model.ifBlank { DEFAULT_MODEL },
-                        baseUrl = baseUrl.ifBlank { DEFAULT_BASE_URL },
+                        baseUrl = normalizedBaseUrl,
                         error = null,
                     )
                 }
@@ -275,7 +283,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
-        if ((prompt.isEmpty() && attachments.isEmpty()) || activeJob?.isActive == true || _state.value.loading || !_state.value.configured) return
+        if ((prompt.isEmpty() && attachments.isEmpty()) || _state.value.loading || !_state.value.configured) return
         val attachmentBlock = attachments.joinToString("\n") { attachment ->
             val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
             "- $kind：${attachment.name} → ${attachment.relativePath}（${attachment.bytes} B）"
@@ -290,6 +298,11 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
         }
+        queueTurn(content)?.start()
+    }
+
+    private fun queueTurn(content: String): Job? = synchronized(runStateLock) {
+        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
         appendMessage("user", content)
         modelHistory += buildJsonObject {
             put("role", "user")
@@ -297,7 +310,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("user/message", buildJsonObject { put("content", content) })
         persist()
-        activeJob = scope.launch { runTurn(content) }
+        scope.launch(start = CoroutineStart.LAZY) { runTurn(content) }.also { activeJob = it }
     }
 
     /**
@@ -317,11 +330,11 @@ class LocalHarnessEngine @Inject constructor(
             while (_state.value.loading) delay(50)
         }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
-        require(activeJob?.isActive != true) { "本机 Harness 正在执行其他任务" }
+        require(!isRunBusy()) { "本机 Harness 正在执行其他任务或切换会话" }
 
         val beforeCount = _state.value.messages.size
-        send(prompt)
-        val job = activeJob ?: error("后台任务未能启动")
+        val job = queueTurn(prompt) ?: error("后台任务未能启动")
+        job.start()
         withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
             while (job.isActive) {
                 val snapshot = _state.value
@@ -428,64 +441,120 @@ class LocalHarnessEngine @Inject constructor(
         questionResponse?.complete(answer.trim())
     }
 
-    /** Stop the active model/tool turn. */
+    /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
         approvalResponse?.complete(false)
         questionResponse?.cancel()
-        activeJob?.cancel()
-        activeJob = null
+        synchronized(runStateLock) { activeJob }?.cancel()
         _state.update { it.copy(running = false, pendingApproval = null, pendingQuestion = null) }
     }
 
     /** Clear the transcript and model history while retaining configuration and files. */
     fun newSession() {
-        stop()
-        jobs.stopAll()
-        persist()
-        currentSessionId = UUID.randomUUID().toString()
-        preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
-        eventLog = eventLogFor(currentSessionId)
-        modelHistory.clear()
-        _state.update {
-            it.copy(
-                sessionId = currentSessionId,
-                messages = emptyList(),
-                plan = emptyList(),
-                todos = emptyList(),
-                goal = null,
-                planMode = false,
-                autoApproveMutations = false,
-                jobs = emptyList(),
-                error = null,
-            )
+        if (!beginSessionTransition()) return
+        _state.update { it.copy(loading = true, running = false, pendingApproval = null, pendingQuestion = null) }
+        scope.launch {
+            sessionTransitionMutex.withLock {
+                try {
+                    cancelActiveRunAndJoin()
+                    jobs.stopAllAndJoin()
+                    persist()
+                    currentSessionId = UUID.randomUUID().toString()
+                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+                    eventLog = eventLogFor(currentSessionId)
+                    modelHistory.clear()
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            sessionId = currentSessionId,
+                            messages = emptyList(),
+                            plan = emptyList(),
+                            todos = emptyList(),
+                            goal = null,
+                            planMode = false,
+                            autoApproveMutations = false,
+                            jobs = emptyList(),
+                            error = null,
+                        )
+                    }
+                    persist()
+                } finally {
+                    endSessionTransition()
+                    _state.update { it.copy(loading = false) }
+                }
+            }
         }
-        persist()
     }
 
     fun switchSession(sessionId: String) {
-        if (sessionId == currentSessionId || activeJob?.isActive == true) return
+        if (sessionId == currentSessionId) return
+        synchronized(runStateLock) {
+            if (activeJob?.isCompleted == false) return
+        }
+        if (!beginSessionTransition()) return
+        _state.update { it.copy(loading = true) }
         scope.launch {
-            persist()
-            jobs.stopAll()
-            currentSessionId = sessionId
-            preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
-            eventLog = eventLogFor(sessionId)
-            loadSession(sessionId)
+            sessionTransitionMutex.withLock {
+                try {
+                    persist()
+                    jobs.stopAllAndJoin()
+                    currentSessionId = sessionId
+                    preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
+                    eventLog = eventLogFor(sessionId)
+                    loadSession(sessionId)
+                } finally {
+                    endSessionTransition()
+                    _state.update { it.copy(loading = false) }
+                }
+            }
         }
     }
 
-    /** Remove the local API key. */
+    /** Remove the local API key after an in-flight turn has finished cancelling. */
     fun clearCredential() {
-        stop()
+        if (!beginSessionTransition()) return
+        _state.update { it.copy(loading = true) }
         scope.launch {
-            apiKeys.clear()
-            _state.update { it.copy(configured = false) }
+            sessionTransitionMutex.withLock {
+                try {
+                    cancelActiveRunAndJoin()
+                    apiKeys.clear()
+                    _state.update { it.copy(configured = false) }
+                } finally {
+                    endSessionTransition()
+                    _state.update { it.copy(loading = false) }
+                }
+            }
+        }
+    }
+
+    private fun isRunBusy(): Boolean = synchronized(runStateLock) {
+        sessionTransitioning || activeJob?.isCompleted == false
+    }
+
+    private fun beginSessionTransition(): Boolean = synchronized(runStateLock) {
+        if (sessionTransitioning) return@synchronized false
+        sessionTransitioning = true
+        true
+    }
+
+    private fun endSessionTransition() {
+        synchronized(runStateLock) { sessionTransitioning = false }
+    }
+
+    private suspend fun cancelActiveRunAndJoin() {
+        approvalResponse?.complete(false)
+        questionResponse?.cancel()
+        val job = synchronized(runStateLock) { activeJob }
+        job?.cancelAndJoin()
+        synchronized(runStateLock) {
+            if (activeJob === job) activeJob = null
         }
     }
 
     /** Switch between inspection-only planning and normal execution. */
     fun setPlanMode(enabled: Boolean) {
-        if (activeJob?.isActive == true) return
+        if (isRunBusy()) return
         _state.update { it.copy(planMode = enabled) }
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
@@ -636,6 +705,10 @@ class LocalHarnessEngine @Inject constructor(
             questionResponse = null
             _state.update { it.copy(running = false, pendingApproval = null, pendingQuestion = null) }
             persist()
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) {
+                if (activeJob === completedJob) activeJob = null
+            }
         }
     }
 
