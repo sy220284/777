@@ -1738,7 +1738,7 @@ class LocalHarnessEngine @Inject constructor(
             "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
-            "webhook_start", "webhook_stop", "webhook_rotate_token",
+            "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
             "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
         )
 

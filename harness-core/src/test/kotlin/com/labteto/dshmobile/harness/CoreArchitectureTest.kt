@@ -3,6 +3,7 @@ package com.labteto.dshmobile.harness
 import com.labteto.dshmobile.harness.capability.CapabilityDescriptor
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.jobs.HarnessJobManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.SessionDocument
@@ -13,8 +14,10 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -128,6 +131,28 @@ class CoreArchitectureTest {
         assertTrue(result.isError)
         assertTrue(result.content.contains("工具执行超时"))
     }
+    @Test
+    fun stopAllAndJoinWaitsForCancelledJobCleanup() = runTest {
+        var cleaned = false
+        val manager = HarnessJobManager(this) { }
+        manager.start("cleanup") { _, _ ->
+            try {
+                delay(5_000L)
+                "late"
+            } finally {
+                withContext(NonCancellable) {
+                    delay(10L)
+                    cleaned = true
+                }
+            }
+        }
+
+        manager.stopAllAndJoin()
+
+        assertTrue(cleaned)
+        assertTrue(manager.list().contains("[cancelled]"))
+    }
+
     @Test
     fun legacySessionMigratesWithCheckpointAndRestarts() {
         val root = createTempDir(prefix = "session-store-")

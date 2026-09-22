@@ -20,7 +20,12 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -61,6 +66,22 @@ class McpClientTest {
         client.callTool("echo", buildJsonObject { put("text", "hi") })
         assertEquals(listOf("tools/list", "tools/call"), requests.map { it.first })
         assertEquals("echo", requests.last().second["name"].toString().trim('"'))
+    }
+
+    @Test
+    fun oversizedHttpBodyIsRejectedBeforeItCanGrowUnbounded() {
+        val response = Response.Builder()
+            .request(Request.Builder().url("https://example.com/mcp").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body("12345".toResponseBody())
+            .build()
+        response.use {
+            assertThrows(IllegalStateException::class.java) {
+                it.readMcpBodyBounded(maxBytes = 4)
+            }
+        }
     }
 
     @Test
