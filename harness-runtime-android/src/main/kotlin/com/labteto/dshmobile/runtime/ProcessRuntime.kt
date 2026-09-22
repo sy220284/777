@@ -46,8 +46,8 @@ class AndroidProcessRuntime(
             } ?: process.outputStream.close()
 
             coroutineScope {
-                val stdout = async { process.inputStream.bufferedReader().use { it.readText() } }
-                val stderr = async { process.errorStream.bufferedReader().use { it.readText() } }
+                val stdout = async { process.inputStream.readBoundedText(MAX_CAPTURED_PROCESS_CHARS) }
+                val stderr = async { process.errorStream.readBoundedText(MAX_CAPTURED_PROCESS_CHARS) }
                 val completed = runInterruptible {
                     process.waitFor(request.timeoutMillis.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
                 }
@@ -90,6 +90,23 @@ class AndroidProcessRuntime(
         return listOf(resolved.absolutePath) + command.drop(1)
     }
 
+    private fun java.io.InputStream.readBoundedText(maxChars: Int): String {
+        bufferedReader().use { reader ->
+            val output = StringBuilder(minOf(maxChars, 16 * 1024))
+            val buffer = CharArray(8 * 1024)
+            var truncated = false
+            while (true) {
+                val read = reader.read(buffer)
+                if (read < 0) break
+                val remaining = maxChars - output.length
+                if (remaining > 0) output.append(buffer, 0, minOf(read, remaining))
+                if (read > remaining) truncated = true
+            }
+            if (truncated) output.append("\n[输出超过 ${maxChars} 字符，已在读取阶段截断]")
+            return output.toString()
+        }
+    }
+
     private fun searchPaths(): List<File> {
         val envPaths = System.getenv("PATH").orEmpty()
             .split(File.pathSeparatorChar)
@@ -103,6 +120,10 @@ class AndroidProcessRuntime(
         )
         return (extraSearchPaths + dynamicSearchPaths() + envPaths + androidDefaults)
             .distinctBy { it.path }
+    }
+
+    private companion object {
+        const val MAX_CAPTURED_PROCESS_CHARS = 1_048_576
     }
 }
 

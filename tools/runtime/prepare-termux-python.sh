@@ -234,12 +234,19 @@ verify_elf_alignment() {
   done < <(readelf -lW "$file" | awk '$1 == "LOAD" { print $NF }')
 }
 
+is_system_library() {
+  local wanted="$1"
+  local system_library
+  for system_library in "${SYSTEM_LIBS[@]}"; do
+    [ "$system_library" = "$wanted" ] && return 0
+  done
+  return 1
+}
+
 verify_dependency_closure() {
   local executable="$1"
   local lib_dir="$2"
   local stdlib_dir="$3"
-  local available
-  available="$(find "$lib_dir" -maxdepth 1 -type f -printf '%f\n' | sort -u)"
   local missing=0
 
   while IFS= read -r -d '' elf; do
@@ -249,10 +256,10 @@ verify_dependency_closure() {
     verify_elf_alignment "$elf"
     while IFS= read -r needed; do
       [ -z "$needed" ] && continue
-      if printf '%s\n' "${SYSTEM_LIBS[@]}" | grep -Fxq "$needed"; then
+      if is_system_library "$needed"; then
         continue
       fi
-      if ! printf '%s\n' "$available" | grep -Fxq "$needed"; then
+      if [ ! -f "$lib_dir/$needed" ]; then
         echo "Python ELF 缺少运行库：$needed（来源：$elf）" >&2
         missing=1
       fi
@@ -335,6 +342,22 @@ prepare_arch() {
       cp -L "$python_bin" "$jni_dir/libdsh_python.so"
       chmod 0755 "$jni_dir/libdsh_python.so"
       cp -aL "$prefix/lib/python$PYTHON_MAJOR_MINOR" "$home_dir/lib/"
+
+      # Termux may place the unversioned libpython link under the Python config
+      # directory instead of directly under prefix/lib (notably on x86_64).
+      # Extension modules DT_NEEDED that exact basename, while LD_LIBRARY_PATH
+      # only contains our flat runtime lib directory, so collect every packaged
+      # libpython variant there before dependency-closure verification.
+      while IFS= read -r -d '' python_library; do
+        local python_library_name
+        python_library_name="$(basename "$python_library")"
+        cp -L "$python_library" "$lib_dir/$python_library_name"
+        chmod 0644 "$lib_dir/$python_library_name"
+      done < <(
+        find "$prefix/lib" \( -type f -o -type l \) \
+          -name "libpython$PYTHON_MAJOR_MINOR.so*" -print0
+      )
+
       patch_python_runtime "$stdlib_dir"
       # Patched stdlib source must be authoritative. Precompiled bytecode from the
       # Termux package can otherwise keep compiled-in Termux paths even after the

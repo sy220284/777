@@ -31,4 +31,6 @@ class LocalJobManager(
     fun drainMessages(id: String): List<String> = delegate.drainMessages(id)
 
     fun stopAll() = delegate.stopAll()
+
+    suspend fun stopAllAndJoin() = delegate.stopAllAndJoin()
 }

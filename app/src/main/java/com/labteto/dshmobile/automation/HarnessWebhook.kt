@@ -3,9 +3,13 @@ package com.labteto.dshmobile.automation
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.os.PersistableBundle
 import androidx.core.app.NotificationCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -58,6 +62,12 @@ data class WebhookStatus(
     val port: Int,
     val allowLan: Boolean,
     val tokenHint: String?,
+)
+
+data class WebhookRuntimeConfig(
+    val enabled: Boolean,
+    val port: Int,
+    val allowLan: Boolean,
 )
 
 @Singleton
@@ -162,7 +172,7 @@ class WebhookController @Inject constructor(
             .putExtra(EXTRA_ALLOW_LAN, allowLan)
         context.startForegroundService(intent)
         val host = if (allowLan) "0.0.0.0" else "127.0.0.1"
-        return "Webhook 已启动：http://$host:$port/run\nAuthorization: Bearer $token"
+        return "Webhook 已启动：http://$host:$port/run\n令牌：${tokenHint(token)}。完整令牌不会进入会话记录；需要时请使用 webhook_copy_token。"
     }
 
     fun stop(): Boolean {
@@ -170,7 +180,27 @@ class WebhookController @Inject constructor(
         return context.stopService(Intent(context, HarnessWebhookService::class.java))
     }
 
-    suspend fun rotateToken(): String = tokenStore.rotate()
+    suspend fun rotateToken(): String {
+        val token = tokenStore.rotate()
+        return "Webhook 令牌已轮换：${tokenHint(token)}。完整令牌不会进入会话记录；需要时请使用 webhook_copy_token。"
+    }
+
+    suspend fun copyTokenToClipboard(): String {
+        val token = tokenStore.getOrCreate()
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val clip = ClipData.newPlainText("777 Harness Webhook token", token)
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+        }
+        clipboard.setPrimaryClip(clip)
+        return "Webhook 完整令牌已复制到系统剪贴板（${tokenHint(token)}）"
+    }
+
+    fun runtimeConfig(): WebhookRuntimeConfig = WebhookRuntimeConfig(
+        enabled = preferences.getBoolean(KEY_ENABLED, false),
+        port = preferences.getInt(KEY_PORT, DEFAULT_PORT),
+        allowLan = preferences.getBoolean(KEY_ALLOW_LAN, false),
+    )
 
     suspend fun status(): WebhookStatus {
         val token = tokenStore.get()
@@ -178,9 +208,12 @@ class WebhookController @Inject constructor(
             enabled = preferences.getBoolean(KEY_ENABLED, false),
             port = preferences.getInt(KEY_PORT, DEFAULT_PORT),
             allowLan = preferences.getBoolean(KEY_ALLOW_LAN, false),
-            tokenHint = token?.let { if (it.length <= 8) it else it.take(4) + "…" + it.takeLast(4) },
+            tokenHint = token?.let(::tokenHint),
         )
     }
+
+    private fun tokenHint(token: String): String =
+        if (token.length <= 8) token else token.take(4) + "…" + token.takeLast(4)
 
     companion object {
         const val EXTRA_PORT = "port"
@@ -195,6 +228,7 @@ class WebhookController @Inject constructor(
 @AndroidEntryPoint
 class HarnessWebhookService : Service() {
     @Inject lateinit var engine: LocalHarnessEngine
+    @Inject lateinit var controller: WebhookController
     @Inject lateinit var tokenStore: WebhookTokenStore
     @Inject lateinit var resultStore: WebhookResultStore
     @Inject lateinit var json: Json
@@ -207,8 +241,14 @@ class HarnessWebhookService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ensureForeground()
-        val port = intent?.getIntExtra(WebhookController.EXTRA_PORT, 8765) ?: 8765
-        val allowLan = intent?.getBooleanExtra(WebhookController.EXTRA_ALLOW_LAN, false) ?: false
+        val persisted = controller.runtimeConfig()
+        if (intent == null && !persisted.enabled) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        val port = intent?.getIntExtra(WebhookController.EXTRA_PORT, persisted.port) ?: persisted.port
+        val allowLan = intent?.getBooleanExtra(WebhookController.EXTRA_ALLOW_LAN, persisted.allowLan)
+            ?: persisted.allowLan
         restartServer(port, allowLan)
         return START_STICKY
     }
@@ -480,6 +520,20 @@ class WebhookPlugin(
         )
         context.tools.register(
             HarnessTool(
+                name = "webhook_copy_token",
+                schema = schema(
+                    "webhook_copy_token",
+                    "将 Harness Webhook 完整访问令牌复制到系统敏感剪贴板；令牌不会返回给模型",
+                ),
+                access = ToolAccess.PRIVILEGED,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                executor = HarnessToolExecutor { _, _, _ ->
+                    ToolResult(controller.copyTokenToClipboard())
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
                 name = "webhook_rotate_token",
                 schema = schema("webhook_rotate_token", "轮换 Harness Webhook 访问令牌"),
                 access = ToolAccess.PRIVILEGED,
@@ -496,6 +550,7 @@ class WebhookPlugin(
             "webhook_start",
             "webhook_status",
             "webhook_stop",
+            "webhook_copy_token",
             "webhook_rotate_token",
         ).forEach(context.tools::unregister)
     }

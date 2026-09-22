@@ -37,6 +37,7 @@ class HostsStore @Inject constructor(
         val LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
         val SESSION_SORT = stringPreferencesKey("session_sort")
+        val DESIRED_HOST_ID = stringPreferencesKey("desired_host_id")
     }
 
     private val hostsSerializer = ListSerializer(HostConfig.serializer())
@@ -61,6 +62,19 @@ class HostsStore @Inject constructor(
     }
 
     suspend fun settingsOnce(): AppSettings = settings.first()
+
+    suspend fun setDesiredHost(id: String?) {
+        dataStore.edit { prefs ->
+            if (id == null) prefs.remove(Keys.DESIRED_HOST_ID) else prefs[Keys.DESIRED_HOST_ID] = id
+        }
+    }
+
+    suspend fun desiredHostOnce(): HostConfig? {
+        val id = dataStore.data.first()[Keys.DESIRED_HOST_ID] ?: return null
+        val host = hosts.first().firstOrNull { it.id == id }
+        if (host == null) setDesiredHost(null)
+        return host
+    }
 
     suspend fun upsertHost(config: HostConfig) {
         val current = hosts.first().toMutableList()
@@ -140,6 +154,7 @@ class HostsStore @Inject constructor(
      */
     suspend fun removeHost(id: String) {
         persist(hosts.first().filterNot { it.id == id })
+        if (dataStore.data.first()[Keys.DESIRED_HOST_ID] == id) setDesiredHost(null)
         credentials.remove(id)
     }
 

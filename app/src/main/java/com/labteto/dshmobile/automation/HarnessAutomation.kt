@@ -19,6 +19,8 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.local.LocalHarnessBlockedException
+import com.labteto.dshmobile.local.LocalHarnessBusyException
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -29,6 +31,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -238,7 +241,7 @@ class HarnessAutomationWorker(
         val started = System.currentTimeMillis()
         store.update(id) { it.copy(status = "running", lastRunAt = started, lastError = null) }
 
-        return runCatching {
+        return try {
             val result = entry.localHarnessEngine().runAutomationPrompt(task.prompt)
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
@@ -252,7 +255,25 @@ class HarnessAutomationWorker(
             }
             if (task.notify) notifyResult(id, result)
             Result.success()
-        }.getOrElse { error ->
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (busy: LocalHarnessBusyException) {
+            store.update(id) {
+                it.copy(
+                    status = "queued",
+                    lastError = "前台或其他后台任务正在运行，等待重试",
+                )
+            }
+            Result.retry()
+        } catch (blocked: LocalHarnessBlockedException) {
+            store.update(id) {
+                it.copy(
+                    status = "blocked",
+                    lastError = (blocked.message ?: "需要人工处理").take(4_000),
+                )
+            }
+            Result.success()
+        } catch (error: Throwable) {
             store.update(id) {
                 it.copy(
                     status = if (it.recurringMinutes == null) "failed" else "scheduled",

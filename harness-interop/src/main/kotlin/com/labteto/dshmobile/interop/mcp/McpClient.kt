@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.interop.mcp
 
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
@@ -135,7 +136,7 @@ class McpStreamableHttpTransport(
             }
 
             http.newCall(builder.build()).executeCancellable { response ->
-                val body = response.body?.string().orEmpty()
+                val body = response.readMcpBodyBounded()
                 if (!response.isSuccessful) {
                     throw McpHttpException(response.code, body)
                 }
@@ -241,7 +242,7 @@ internal class McpLineProcess(
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .apply { environment().putAll(environmentProvider()) }
             .start()
-        val channel = Channel<String>(Channel.UNLIMITED)
+        val channel = Channel<String>(STDIO_QUEUE_CAPACITY)
         process = next
         writer = next.outputStream.bufferedWriter()
         lines = channel
@@ -249,8 +250,8 @@ internal class McpLineProcess(
             try {
                 next.inputStream.bufferedReader().use { input ->
                     while (true) {
-                        val line = input.readLine() ?: break
-                        if (channel.trySend(line).isFailure) break
+                        val line = readLineBounded(input, MAX_STDIO_LINE_CHARS) ?: break
+                        channel.send(line)
                     }
                 }
                 channel.close(IllegalStateException("MCP stdio 进程已结束"))
@@ -303,7 +304,47 @@ internal class McpLineProcess(
         resetProcess()
         scope.cancel()
     }
+
+    private fun readLineBounded(reader: java.io.BufferedReader, maxChars: Int): String? {
+        val output = StringBuilder(minOf(maxChars, 8 * 1024))
+        while (true) {
+            val value = reader.read()
+            if (value < 0) return output.takeIf { it.isNotEmpty() }?.toString()
+            if (value == '\n'.code) return output.toString()
+            if (value == '\r'.code) continue
+            if (output.length >= maxChars) {
+                throw IllegalStateException("MCP stdio 单行响应超过 ${maxChars} 字符上限")
+            }
+            output.append(value.toChar())
+        }
+    }
+
+    private companion object {
+        const val STDIO_QUEUE_CAPACITY = 64
+        const val MAX_STDIO_LINE_CHARS = 2 * 1024 * 1024
+    }
 }
+
+internal fun Response.readMcpBodyBounded(maxBytes: Int = MAX_MCP_HTTP_BODY_BYTES): String {
+    val responseBody = body ?: return ""
+    val declared = responseBody.contentLength()
+    if (declared > maxBytes) throw IllegalStateException("MCP HTTP 响应超过 ${maxBytes} 字节上限")
+    val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
+    responseBody.byteStream().use { input ->
+        val buffer = ByteArray(16 * 1024)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > maxBytes) throw IllegalStateException("MCP HTTP 响应超过 ${maxBytes} 字节上限")
+            output.write(buffer, 0, read)
+        }
+    }
+    return output.toString(Charsets.UTF_8.name())
+}
+
+private const val MAX_MCP_HTTP_BODY_BYTES = 8 * 1024 * 1024
 
 internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
     suspendCancellableCoroutine { continuation ->
