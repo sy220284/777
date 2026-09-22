@@ -1650,7 +1650,6 @@ class LocalHarnessEngine @Inject constructor(
         model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
-        val recovery = eventLog.repairInterruptedTail()
         val loaded = try {
             sessionRepository.read(sessionId)
         } catch (future: FutureSessionVersionException) {
@@ -1663,6 +1662,9 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
+        // Only mutate the durable event tail after the persisted session format is accepted.
+        // A future-version session must remain completely untouched.
+        val recovery = eventLog.repairInterruptedTail()
         val stored = loaded ?: LocalHarnessSession(id = sessionId)
         val restoredHistory = restoreModelHistory(sessionId, stored.modelHistory)
         modelHistory.clear()
