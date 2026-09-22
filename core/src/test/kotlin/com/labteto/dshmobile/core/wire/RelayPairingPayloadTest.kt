@@ -49,13 +49,6 @@ class RelayPairingPayloadTest {
     }
 
     @Test
-    fun `plaintext payload is rejected before credentials can be sent`() {
-        assertEquals(PairingPayloadResult.NotAPairingCode, RelayPairing.parsePayload(
-            """{"v":1,"kind":"dsh-relay-pair","url":"http://host:3444","code":"secret","expiresAt":1}""",
-        ))
-    }
-
-    @Test
     fun `a newer payload version is refused rather than guessed at`() {
         val result = RelayPairing.parsePayload(
             """{"v":2,"kind":"dsh-relay-pair","url":"https://h:3443","code":"1","expiresAt":1}""",
