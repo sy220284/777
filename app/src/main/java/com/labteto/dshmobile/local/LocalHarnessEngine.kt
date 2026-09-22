@@ -334,6 +334,7 @@ class LocalHarnessEngine @Inject constructor(
             put("content", content)
         }
         eventLog.append("user/message", buildJsonObject { put("content", content) })
+        checkpointModelHistory("user/message")
         persist()
         scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }.also { activeJob = it }
     }
@@ -648,6 +649,7 @@ class LocalHarnessEngine @Inject constructor(
             val prompt = systemPrompt()
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
             eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+            checkpointModelHistory("system/prompt")
         }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         persist()
@@ -749,6 +751,7 @@ class LocalHarnessEngine @Inject constructor(
                             ?: error("缺少第 ${event.step} 步模型响应")
                         modelHistory += reply.message
                         eventLog.append("assistant/message", reply.message)
+                        checkpointModelHistory("assistant/message")
                         reply.reasoning?.takeIf { it.isNotBlank() }?.let {
                             appendMessage("reasoning", it)
                         }
@@ -777,6 +780,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("tool_call_id", event.call.id)
                             put("content", pruneToolResult(event.output))
                         }
+                        checkpointModelHistory("tool/result")
                         persist()
                     }
                     is AgentEvent.StepFinished -> {
@@ -1167,6 +1171,7 @@ class LocalHarnessEngine @Inject constructor(
                 val prompt = systemPrompt()
                 modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
                 eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+                checkpointModelHistory("system/prompt")
             }
             persist()
             "计划已获批准，已进入执行模式"
@@ -1313,6 +1318,7 @@ class LocalHarnessEngine @Inject constructor(
         modelHistory.clear()
         modelHistory += compacted
         eventLog.append("session/compaction", buildJsonObject { put("omitted_messages", omitted) })
+        checkpointModelHistory("session/compaction")
         persist()
     }
 
@@ -1327,6 +1333,7 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+        checkpointModelHistory("system/prompt")
     }
 
     private fun systemPrompt(): String = """
@@ -1434,7 +1441,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         val stored = loaded ?: LocalHarnessSession(id = sessionId)
         modelHistory.clear()
-        modelHistory += stored.modelHistory
+        modelHistory += restoreModelHistory(sessionId, stored.modelHistory)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
@@ -1471,7 +1478,34 @@ class LocalHarnessEngine @Inject constructor(
         )
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
+            checkpointModelHistory("load/system-refresh")
         }
+    }
+
+    private fun checkpointModelHistory(reason: String) {
+        eventLog.append(MODEL_HISTORY_CHECKPOINT_EVENT, buildJsonObject {
+            put("version", MODEL_HISTORY_CHECKPOINT_VERSION)
+            put("reason", reason.take(80))
+            put("messages", JsonArray(modelHistory.toList()))
+        })
+    }
+
+    private fun restoreModelHistory(
+        sessionId: String,
+        fallback: List<JsonObject>,
+    ): List<JsonObject> {
+        val checkpoint = eventLogFor(sessionId).latest(MODEL_HISTORY_CHECKPOINT_EVENT) ?: return fallback
+        val version = checkpoint.data["version"]?.jsonPrimitive?.intOrNull ?: return fallback
+        if (version != MODEL_HISTORY_CHECKPOINT_VERSION) return fallback
+        val messages = checkpoint.data["messages"] as? JsonArray ?: return fallback
+        val restored = messages.mapNotNull { element -> element as? JsonObject }
+        if (restored.size != messages.size) return fallback
+        if (restored.any { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
+            }) {
+            return fallback
+        }
+        return restored
     }
 
     private fun persist() {
@@ -1571,6 +1605,8 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
+        const val MODEL_HISTORY_CHECKPOINT_EVENT = "local/model-history-checkpoint"
+        const val MODEL_HISTORY_CHECKPOINT_VERSION = 1
 
 
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
