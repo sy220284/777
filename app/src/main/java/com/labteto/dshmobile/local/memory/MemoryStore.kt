@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.memory
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,6 +17,7 @@ class MemoryStore @Inject constructor(
 ) {
     private val root = File(context.filesDir, "local-harness/memory").apply { mkdirs() }
     private val file = File(root, "memories.json")
+    private val backup = File(root, "memories.json.bak")
 
     @Synchronized
     fun remember(
@@ -183,18 +186,45 @@ class MemoryStore @Inject constructor(
     }
 
     private fun readDocument(): MemoryDocument {
-        if (!file.isFile) return MemoryDocument()
+        decodeDocument(file)?.let { return it }
+        if (!file.isFile) return decodeDocument(backup) ?: MemoryDocument()
+
+        val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
+        val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
+        if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
+
+        val recovered = decodeDocument(backup)
+        if (recovered != null) {
+            runCatching { backup.copyTo(file, overwrite = true) }
+            return recovered
+        }
+        return MemoryDocument()
+    }
+
+    private fun decodeDocument(source: File): MemoryDocument? {
+        if (!source.isFile) return null
         return runCatching {
-            json.decodeFromString(MemoryDocument.serializer(), file.readText())
-        }.getOrDefault(MemoryDocument())
+            json.decodeFromString(MemoryDocument.serializer(), source.readText())
+        }.getOrNull()
     }
 
     private fun writeDocument(document: MemoryDocument) {
         file.parentFile?.mkdirs()
+        if (decodeDocument(file) != null) {
+            runCatching { file.copyTo(backup, overwrite = true) }
+        }
+
         val temporary = File(file.parentFile, file.name + ".tmp")
         temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
-        if (!temporary.renameTo(file)) {
-            file.writeText(temporary.readText())
+        runCatching {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
+            )
+        }.getOrElse {
+            temporary.copyTo(file, overwrite = true)
             temporary.delete()
         }
     }
