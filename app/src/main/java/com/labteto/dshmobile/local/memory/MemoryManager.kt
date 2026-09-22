@@ -29,6 +29,25 @@ class MemoryManager @Inject constructor(
         )
     }
 
+    fun update(
+        existing: MemoryRecord,
+        content: String? = null,
+        kind: MemoryKind? = null,
+        importance: Int? = null,
+        pinned: Boolean? = null,
+    ): MemoryRecord {
+        val clean = content?.trim() ?: existing.content
+        require(clean.isNotEmpty()) { "记忆内容不能为空" }
+        require(!policy.containsSensitiveData(clean)) { "敏感信息禁止写入长期记忆" }
+        return store.update(
+            id = existing.id,
+            content = clean,
+            kind = kind,
+            importance = importance,
+            pinned = pinned,
+        )
+    }
+
     fun remember(
         content: String,
         scope: MemoryScope,
