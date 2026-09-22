@@ -233,6 +233,9 @@ class LocalHarnessEngine @Inject constructor(
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
         seedWorkspace()
         migrateLegacySession()
+        // Legacy migration may have copied an event log after the field was first constructed.
+        // Reopen it so the append sequence is derived from the migrated durable tail.
+        eventLog = eventLogFor(currentSessionId)
         scope.launch {
             runCatching {
                 bundledNodeRuntime.prepare()
