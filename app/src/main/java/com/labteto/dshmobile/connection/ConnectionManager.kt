@@ -169,7 +169,10 @@ class ConnectionManager @Inject constructor(
      */
     suspend fun connect(config: HostConfig) {
         val intentVersion = desiredIntentVersion.incrementAndGet()
-        disconnectRuntime()
+        // Keep an already-running foreground service alive while replacing the
+        // transport. This is essential when the service itself is restoring a
+        // persisted desired connection after process recreation.
+        disconnectRuntime(stopBackgroundService = false)
         activeHost = config
         _state.value = ConnectionUiState(
             phase = ConnectionPhase.CONNECTING,
@@ -192,13 +195,13 @@ class ConnectionManager @Inject constructor(
         }
     }
 
-    private fun disconnectRuntime() {
+    private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
         loop?.stop()
         loop = null
         api = null
         generation = null
         activeHost = null
-        stopService()
+        if (stopBackgroundService) stopService()
         _state.value = ConnectionUiState()
     }
 
@@ -269,6 +272,7 @@ class ConnectionManager @Inject constructor(
     private fun stopRetrying() {
         loop?.stop()
         loop = null
+        stopService()
         val intentVersion = desiredIntentVersion.incrementAndGet()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)

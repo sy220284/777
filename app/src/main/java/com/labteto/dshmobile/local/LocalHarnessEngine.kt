@@ -458,7 +458,10 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(false)
         questionResponse?.cancel()
         synchronized(runStateLock) { activeJob }?.cancel()
-        _state.update { it.copy(running = false, pendingApproval = null, pendingQuestion = null) }
+        // Keep running=true until runTurn's finally has completed. Otherwise the
+        // composer looks available during cancellation even though queueTurn
+        // correctly still rejects a replacement turn.
+        _state.update { it.copy(pendingApproval = null, pendingQuestion = null) }
     }
 
     /** Clear the transcript and model history while retaining configuration and files. */

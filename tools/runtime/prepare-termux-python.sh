@@ -335,6 +335,22 @@ prepare_arch() {
       cp -L "$python_bin" "$jni_dir/libdsh_python.so"
       chmod 0755 "$jni_dir/libdsh_python.so"
       cp -aL "$prefix/lib/python$PYTHON_MAJOR_MINOR" "$home_dir/lib/"
+
+      # Termux may place the unversioned libpython link under the Python config
+      # directory instead of directly under prefix/lib (notably on x86_64).
+      # Extension modules DT_NEEDED that exact basename, while LD_LIBRARY_PATH
+      # only contains our flat runtime lib directory, so collect every packaged
+      # libpython variant there before dependency-closure verification.
+      while IFS= read -r -d '' python_library; do
+        local python_library_name
+        python_library_name="$(basename "$python_library")"
+        cp -L "$python_library" "$lib_dir/$python_library_name"
+        chmod 0644 "$lib_dir/$python_library_name"
+      done < <(
+        find "$prefix/lib" \( -type f -o -type l \) \
+          -name "libpython$PYTHON_MAJOR_MINOR.so*" -print0
+      )
+
       patch_python_runtime "$stdlib_dir"
       # Patched stdlib source must be authoritative. Precompiled bytecode from the
       # Termux package can otherwise keep compiled-in Termux paths even after the

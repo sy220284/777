@@ -185,7 +185,9 @@ class PrivilegedCommandService() : Binder() {
     }
 
     companion object {
-        private const val MAX_OUTPUT_CHARS = 1_048_576
+        // Binder has a process-wide transaction buffer near 1 MiB. Keep the
+        // returned UTF-16 String comfortably below it after Parcel overhead.
+        private const val MAX_OUTPUT_CHARS = 262_144
         const val DESCRIPTOR = "com.labteto.dshmobile.device.shizuku.PrivilegedCommandService"
         const val TRANSACTION_EXECUTE = IBinder.FIRST_CALL_TRANSACTION
     }
