@@ -271,6 +271,8 @@
     <string name="presets_empty">No agent presets</string>
     <string name="settings_title">Settings</string>
     <string name="settings_general">General</string>
+    <string name="settings_advanced">Advanced capabilities</string>
+    <string name="settings_advanced_hint">Projects, models, local runtime, and device access</string>
     <string name="settings_models">Models</string>
     <string name="settings_plugins">Plugins</string>
     <string name="settings_plugins_inventory">Plugin inventory</string>
