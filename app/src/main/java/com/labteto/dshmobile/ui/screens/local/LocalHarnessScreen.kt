@@ -629,7 +629,7 @@ private fun LocalChat(
                     Column(Modifier.weight(1f)) {
                         Text("自动批准已开启", style = DsType.small13Strong, color = colors.warnLabel)
                         Text(
-                            "当前会话中的文件写入、编辑和命令将直接执行。",
+                            "当前会话中的文件写入和编辑会直接执行；命令及高权限操作仍需确认。",
                             style = DsType.caption11,
                             color = colors.labelSecondary,
                         )
@@ -1301,7 +1301,7 @@ private fun ApprovalDialog(
         }
 
         Text(
-            "“自动批准”只对当前会话生效。开启后，后续写文件、编辑文件和执行命令将直接运行，顶部会持续显示提示，可随时关闭。",
+            "“自动批准”只对当前会话的文件写入和编辑生效。命令、设备高权限、MCP、自动化和凭据操作仍会逐次确认，顶部会持续显示提示，可随时关闭。",
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
