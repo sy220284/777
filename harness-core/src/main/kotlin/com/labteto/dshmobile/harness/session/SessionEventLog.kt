@@ -41,7 +41,7 @@ class SessionEventLog(
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
         val event = SessionEvent(
-            sequence = nextSequence.getAndIncrement(),
+            sequence = nextSequence.get(),
             type = type,
             createdAt = clock(),
             data = data,
@@ -52,6 +52,7 @@ class SessionEventLog(
         file.parentFile?.mkdirs()
         if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
         file.appendText(encoded)
+        nextSequence.incrementAndGet()
         event
     }
 
