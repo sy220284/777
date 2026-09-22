@@ -135,7 +135,7 @@ class CoreArchitectureTest {
     @Test
     fun stopAllAndJoinWaitsForCancelledJobCleanup() = runTest {
         var cleaned = false
-        val manager = HarnessJobManager(this) { }
+        val manager = HarnessJobManager(scope = this, onChanged = { })
         manager.start("cleanup") { _, _ ->
             try {
                 delay(5_000L)
