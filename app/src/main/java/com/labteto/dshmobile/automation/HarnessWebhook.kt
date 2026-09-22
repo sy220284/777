@@ -235,7 +235,7 @@ class HarnessWebhookService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val executionMutex = Mutex()
-    @Volatile private var server: ServerSocket? = null
+    private val listener by lazy { WebhookListener(scope, ::handle) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -254,7 +254,7 @@ class HarnessWebhookService : Service() {
     }
 
     override fun onDestroy() {
-        runCatching { server?.close() }
+        listener.close()
         scope.cancel()
         super.onDestroy()
     }
@@ -278,25 +278,7 @@ class HarnessWebhookService : Service() {
     }
 
     private fun restartServer(port: Int, allowLan: Boolean) {
-        runCatching { server?.close() }
-        scope.launch {
-            tokenStore.getOrCreate()
-            val socket = ServerSocket().apply {
-                reuseAddress = true
-                bind(
-                    InetSocketAddress(
-                        if (allowLan) InetAddress.getByName("0.0.0.0")
-                        else InetAddress.getByName("127.0.0.1"),
-                        port,
-                    ),
-                )
-            }
-            server = socket
-            while (!socket.isClosed) {
-                val client = runCatching { socket.accept() }.getOrNull() ?: break
-                launch { handle(client) }
-            }
-        }
+        listener.restart(InetSocketAddress(if (allowLan) "0.0.0.0" else "127.0.0.1", port))
     }
 
     private suspend fun handle(socket: Socket) {

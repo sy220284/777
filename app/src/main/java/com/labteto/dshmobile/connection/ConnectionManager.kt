@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,7 +72,6 @@ class ConnectionManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val desiredIntentVersion = AtomicLong(0L)
-    private val eventOverflowRecovery = AtomicBoolean(false)
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
@@ -102,24 +100,19 @@ class ConnectionManager @Inject constructor(
      * Nothing here is replayed after a reconnect. State that must survive one has to come from
      * a query or a stream baseline instead — an `emit` that arrives while disconnected is gone.
      */
-    val eventFrames = kotlinx.coroutines.flow.MutableSharedFlow<RemoteEventFrame>(extraBufferCapacity = 256)
+    private val eventBuffer = com.labteto.dshmobile.core.wire.RecoveringEventBuffer<RemoteEventFrame> {
+        if (activeHost == null) eventBufferReset() else scope.launch { reconnectIfNeeded() }
+    }
+    val eventFrames = eventBuffer.frames
+    private fun eventBufferReset() = eventBuffer.connected()
 
     private val sinks = object : LoopSinks {
         override fun onEventFrame(frame: RemoteEventFrame) {
-            if (
-                !eventFrames.tryEmit(frame) &&
-                eventOverflowRecovery.compareAndSet(false, true)
-            ) {
-                if (activeHost == null) {
-                    eventOverflowRecovery.set(false)
-                } else {
-                    scope.launch { reconnectIfNeeded() }
-                }
-            }
+            eventBuffer.offer(frame)
         }
 
         override fun onConnected(generation: HostGeneration) {
-            eventOverflowRecovery.set(false)
+            eventBuffer.connected()
             this@ConnectionManager.generation = generation
             val host = activeHost
             if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }

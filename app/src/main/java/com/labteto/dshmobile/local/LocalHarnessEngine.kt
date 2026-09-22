@@ -376,6 +376,7 @@ class LocalHarnessEngine @Inject constructor(
         val beforeCount = _state.value.messages.size
         val job = queueTurn(prompt) ?: error("后台任务未能启动")
         job.start()
+        com.labteto.dshmobile.automation.owningAutomationRun(job) {
         try {
             withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
                 while (!job.isCompleted) {
@@ -399,8 +400,8 @@ class LocalHarnessEngine @Inject constructor(
             job.cancelAndJoin()
             throw IllegalStateException("后台任务执行超时，已停止本轮任务", timeout)
         } catch (cancelled: CancellationException) {
-            job.cancelAndJoin()
             throw cancelled
+        }
         }
 
         val newMessages = _state.value.messages.drop(beforeCount)
