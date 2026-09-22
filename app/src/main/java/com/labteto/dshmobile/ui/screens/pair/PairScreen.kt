@@ -62,6 +62,7 @@ fun PairScreen(
     onClose: () -> Unit,
     prefillUrl: String? = null,
     onPaired: (() -> Unit)? = null,
+    autoScanOnOpen: Boolean = false,
     viewModel: PairViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,6 +87,17 @@ fun PairScreen(
         result.contents?.let(viewModel::onScanned)
     }
     val scanPrompt = stringResource(R.string.pair_scan_prompt)
+    val scanOptions = remember(scanPrompt) {
+        ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt(scanPrompt)
+            .setBeepEnabled(false)
+            .setCaptureActivity(PortraitCaptureActivity::class.java)
+            .setOrientationLocked(true)
+    }
+    LaunchedEffect(autoScanOnOpen) {
+        if (autoScanOnOpen) scanner.launch(scanOptions)
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         Column(
@@ -123,16 +135,7 @@ fun PairScreen(
             DsButton(
                 text = stringResource(R.string.pair_scan),
                 onClick = {
-                    scanner.launch(
-                        ScanOptions()
-                            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                            .setPrompt(scanPrompt)
-                            .setBeepEnabled(false)
-                            .setCaptureActivity(PortraitCaptureActivity::class.java)
-                            // The dedicated capture activity is portrait-only; keep ZXing's
-                            // orientation lock enabled so the preview cannot rotate mid-scan.
-                            .setOrientationLocked(true),
-                    )
+                    scanner.launch(scanOptions)
                 },
                 enabled = !state.busy,
                 variant = DsButtonVariant.Info,
