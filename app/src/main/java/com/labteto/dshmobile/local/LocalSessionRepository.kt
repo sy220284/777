@@ -55,6 +55,7 @@ internal class LocalSessionRepository(
                 id = session.id.ifBlank { loaded.document.id },
                 title = session.title,
                 updatedAt = session.updatedAt.takeIf { it > 0 } ?: loaded.document.updatedAt,
+                blank = session.messages.none { it.content.isNotBlank() },
             )
         }.getOrNull()
     }
