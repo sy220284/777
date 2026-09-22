@@ -44,7 +44,7 @@ class LocalVisionPluginTest {
 
         assertFalse(result.isError)
         assertEquals("视觉结果", result.content)
-        assertEquals(listOf("android_screenshot" to emptyMap()), device.calls)
+        assertEquals(listOf("android_screenshot" to emptyMap<String, String>()), device.calls)
         assertEquals(1, analyzer.calls.size)
         assertTrue(analyzer.calls.single().prompt.contains("找登录按钮"))
         assertEquals("data:image/png;base64,AAAA", analyzer.calls.single().image)
