@@ -43,6 +43,23 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun writesAndToolOutputsCannotEscapeThroughTraversalOrSymlink() {
+        external = Files.createTempDirectory("local-harness-write-external").toFile()
+        Files.createSymbolicLink(root.toPath().resolve("escape"), external!!.toPath())
+
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.write("../outside.txt", "blocked")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.toolOutputFile("../outside.bin")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.write("escape/outside.txt", "blocked")
+        }
+        assertTrue(!external!!.resolve("outside.txt").exists())
+    }
+
+    @Test
     fun editRequiresUniqueObservationAndGlobFindsFiles() {
         workspace.write("src/one.kt", "val before = 1\n")
         workspace.write("src/two.txt", "before before\n")

@@ -75,6 +75,8 @@ data class LocalApproval(
     val summary: String,
     val arguments: String,
     val access: String,
+    val canAutoApproveWorkspace: Boolean = false,
+    val canApproveDeviceTurn: Boolean = false,
 )
 
 /** A model question that pauses the current turn until the user answers it. */
