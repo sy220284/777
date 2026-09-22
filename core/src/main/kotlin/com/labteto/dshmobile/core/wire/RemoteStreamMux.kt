@@ -82,19 +82,56 @@ class RemoteStreamMux(
     }
 
     private inner class Stream(private val streamId: String) : RemoteStream {
-        val signals: Channel<Signal> = Channel(Channel.UNLIMITED)
+        val signals: Channel<Signal> = Channel(STREAM_SIGNAL_BUFFER)
         private val done = AtomicBoolean(false)
 
-        override suspend fun receive(): JsonElement? = when (val signal = signals.receive()) {
-            is Signal.Item -> signal.value
-            is Signal.Failed -> {
+        override suspend fun receive(): JsonElement? {
+            val result = signals.receiveCatching()
+            val signal = result.getOrNull()
+            if (signal == null) {
                 done.set(true)
-                throw RemoteStreamException(signal.error, signal.carrier)
+                val cause = result.exceptionOrNull()
+                if (cause is RemoteStreamException) throw cause
+                if (cause != null) throw carrierFailure(cause)
+                return null
             }
-            Signal.Ended -> {
-                done.set(true)
-                null
+            return when (signal) {
+                is Signal.Item -> signal.value
+                is Signal.Failed -> {
+                    done.set(true)
+                    throw RemoteStreamException(signal.error, signal.carrier)
+                }
+                Signal.Ended -> {
+                    done.set(true)
+                    null
+                }
             }
+        }
+
+        fun offerItem(value: JsonElement) {
+            if (signals.trySend(Signal.Item(value)).isSuccess) return
+            if (!done.compareAndSet(false, true)) return
+            streams.remove(streamId)
+            val error = RpcError(
+                code = "resource_exhausted",
+                message = "remote stream consumer fell behind; reconnect required",
+            )
+            signals.close(RemoteStreamException(error, carrier = false))
+            if (closedCause == null) {
+                send(RemoteStreamClientMessage.Cancel(streamId = streamId))
+            }
+        }
+
+        fun fail(error: RpcError, carrier: Boolean) {
+            done.set(true)
+            if (signals.trySend(Signal.Failed(error, carrier)).isFailure) {
+                signals.close(RemoteStreamException(error, carrier))
+            }
+        }
+
+        fun end() {
+            done.set(true)
+            if (signals.trySend(Signal.Ended).isFailure) signals.close()
         }
 
         override fun cancel() {
@@ -141,14 +178,14 @@ class RemoteStreamMux(
             val stream = streams[message.streamId] ?: return
             when (message) {
                 is RemoteStreamServerMessage.Item ->
-                    stream.signals.trySend(Signal.Item(message.value ?: JsonObject(emptyMap())))
+                    stream.offerItem(message.value ?: JsonObject(emptyMap()))
                 is RemoteStreamServerMessage.Error -> {
                     streams.remove(message.streamId)
-                    stream.signals.trySend(Signal.Failed(message.error, carrier = false))
+                    stream.fail(message.error, carrier = false)
                 }
                 is RemoteStreamServerMessage.End -> {
                     streams.remove(message.streamId)
-                    stream.signals.trySend(Signal.Ended)
+                    stream.end()
                 }
             }
         }
@@ -261,8 +298,12 @@ class RemoteStreamMux(
         opened.complete(Unit)
         val error = carrierError(closure)
         streams.keys.toList().forEach { streamId ->
-            streams.remove(streamId)?.signals?.trySend(Signal.Failed(error, carrier = true))
+            streams.remove(streamId)?.fail(error, carrier = true)
         }
+    }
+
+    private companion object {
+        const val STREAM_SIGNAL_BUFFER = 256
     }
 
     private fun carrierFailure(cause: Throwable?): RemoteStreamException =
