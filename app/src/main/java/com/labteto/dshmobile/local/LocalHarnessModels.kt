@@ -74,6 +74,7 @@ data class LocalApproval(
     val toolName: String,
     val summary: String,
     val arguments: String,
+    val access: String,
 )
 
 /** A model question that pauses the current turn until the user answers it. */
@@ -117,6 +118,7 @@ data class LocalHarnessState(
     val goal: LocalGoal? = null,
     val planMode: Boolean = false,
     val autoApproveMutations: Boolean = false,
+    val deviceApprovalLease: Boolean = false,
     val jobs: List<LocalJobInfo> = emptyList(),
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
