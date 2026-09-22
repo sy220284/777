@@ -4,7 +4,6 @@ import com.labteto.dshmobile.harness.agent.*
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
@@ -199,31 +198,46 @@ internal class LocalSubagentRunner(
         subagentId: String,
         step: Int,
     ): LocalModelReply {
-        var lastError: LocalModelException? = null
-        val maxAttempts = state.value.modelAttempts.coerceIn(1, 5)
-        repeat(maxAttempts) { attempt ->
-            try {
-                return modelClient.complete(key, baseUrl, model, history, tools)
-            } catch (cancelled: CancellationException) {
-                if (!currentCoroutineContext().isActive) throw cancelled
-                throw cancelled
-            } catch (error: LocalModelException) {
-                lastError = error
-                if (!error.retryable || attempt == maxAttempts - 1) throw error
-                eventLog().append("subagent/retry", buildJsonObject {
-                    put("agent_id", subagentId)
-                    put("step", step)
-                    put("attempt", attempt + 1)
-                    put("code", error.code)
-                })
-                delay(1_000L shl attempt)
-            }
-        }
-        throw lastError ?: LocalModelException(
-            code = "MODEL_ERROR",
-            message = "子代理模型请求失败",
-            retryable = false,
+        val executor = AgentRequestExecutor(
+            maxAttempts = state.value.modelAttempts.coerceIn(1, 5),
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            eventSink = AgentRequestEventSink { event ->
+                when (event) {
+                    is AgentRequestEvent.AttemptStarted -> {
+                        eventLog().append("subagent/request", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("max_attempts", event.maxAttempts)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptFailed -> {
+                        eventLog().append("subagent/request-error", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("retryable", event.retryable)
+                            put("detail", event.reason.take(2_000))
+                        })
+                    }
+                    is AgentRequestEvent.RetryScheduled -> {
+                        eventLog().append("subagent/retry", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("next_attempt", event.nextAttempt)
+                            put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptSucceeded -> Unit
+                }
+            },
         )
+        return executor.execute {
+            modelClient.complete(key, baseUrl, model, history, tools)
+        }
     }
 
     private fun rememberSubagentProgress(progress: ArrayDeque<String>, item: String) {
