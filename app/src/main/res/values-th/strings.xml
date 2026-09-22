@@ -219,6 +219,8 @@
     <string name="presets_user">กำหนดเอง</string>
     <string name="settings_title">การตั้งค่า</string>
     <string name="settings_general">ทั่วไป</string>
+    <string name="settings_advanced">ความสามารถขั้นสูง</string>
+    <string name="settings_advanced_hint">โปรเจ็กต์ โมเดล รันไทม์ในเครื่อง และการเข้าถึงอุปกรณ์</string>
     <string name="settings_models">โมเดล</string>
     <string name="settings_plugins">ปลั๊กอิน</string>
     <string name="settings_plugins_inventory">รายการปลั๊กอิน</string>
