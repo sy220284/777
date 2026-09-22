@@ -119,7 +119,7 @@ class SessionEventLog(
 
     fun clear() {
         synchronized(lock) {
-            segmentFilesUnsafe().forEach(File::delete)
+            segmentFilesUnsafe().forEach { it.delete() }
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
@@ -142,7 +142,7 @@ class SessionEventLog(
     }
 
     private fun orderedFilesUnsafe(): List<File> =
-        segmentFilesUnsafe() + listOfNotNull(file.takeIf(File::isFile))
+        segmentFilesUnsafe() + listOfNotNull(file.takeIf { it.isFile })
 
     private fun segmentFilesUnsafe(): List<File> {
         val parent = file.parentFile ?: return emptyList()
