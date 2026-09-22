@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
@@ -60,7 +62,7 @@ class DeepSeekClient @Inject constructor(
             .build()
         try {
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
-                val body = response.body?.string().orEmpty()
+                val body = response.readModelBodyBounded()
                 if (!response.isSuccessful) {
                     val detail = runCatching {
                         json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
@@ -118,8 +120,39 @@ class DeepSeekClient @Inject constructor(
         )
     }
 
+    private fun Response.readModelBodyBounded(maxBytes: Int = MAX_MODEL_RESPONSE_BYTES): String {
+        val responseBody = body ?: return ""
+        val declared = responseBody.contentLength()
+        if (declared > maxBytes) {
+            throw LocalModelException(
+                code = "MODEL_RESPONSE_TOO_LARGE",
+                message = "模型响应超过 ${maxBytes} 字节上限",
+                retryable = false,
+            )
+        }
+        val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
+        responseBody.byteStream().use { input ->
+            val buffer = ByteArray(16 * 1024)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                if (total > maxBytes) {
+                    throw LocalModelException(
+                        code = "MODEL_RESPONSE_TOO_LARGE",
+                        message = "模型响应超过 ${maxBytes} 字节上限",
+                        retryable = false,
+                    )
+                }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+
     private fun endpoint(baseUrl: String): String {
-        val clean = baseUrl.trim().trimEnd('/')
+        val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')
         return if (clean.endsWith("/chat/completions")) clean else "$clean/chat/completions"
     }
 
@@ -129,6 +162,7 @@ class DeepSeekClient @Inject constructor(
         const val MODEL_READ_TIMEOUT_SECONDS = 180L
         const val MODEL_WRITE_TIMEOUT_SECONDS = 60L
         const val MODEL_CALL_TIMEOUT_SECONDS = 210L
+        const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
     }
 }
 

@@ -152,18 +152,25 @@ verify_elf_alignment() {
   done < <(readelf -lW "$file" | awk '$1 == "LOAD" { print $NF }')
 }
 
+is_system_library() {
+  local wanted="$1"
+  local system_library
+  for system_library in "${SYSTEM_LIBS[@]}"; do
+    [ "$system_library" = "$wanted" ] && return 0
+  done
+  return 1
+}
+
 verify_dependencies() {
   local node="$1"
   local lib_dir="$2"
   local missing=0
-  local available
-  available="$(find "$lib_dir" -maxdepth 1 -type f -printf '%f\n' | sort -u)"
   while IFS= read -r needed; do
     [ -z "$needed" ] && continue
-    if printf '%s\n' "${SYSTEM_LIBS[@]}" | grep -Fxq "$needed"; then
+    if is_system_library "$needed"; then
       continue
     fi
-    if ! printf '%s\n' "$available" | grep -Fxq "$needed"; then
+    if [ ! -f "$lib_dir/$needed" ]; then
       echo "Node 缺少运行库：$needed" >&2
       missing=1
     fi

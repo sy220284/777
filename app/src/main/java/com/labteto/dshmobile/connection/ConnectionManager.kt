@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -70,6 +71,7 @@ class ConnectionManager @Inject constructor(
     private val hostsStore: HostsStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val desiredIntentVersion = AtomicLong(0L)
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
@@ -166,7 +168,11 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
-        disconnect()
+        val intentVersion = desiredIntentVersion.incrementAndGet()
+        // Keep an already-running foreground service alive while replacing the
+        // transport. This is essential when the service itself is restoring a
+        // persisted desired connection after process recreation.
+        disconnectRuntime(stopBackgroundService = false)
         activeHost = config
         _state.value = ConnectionUiState(
             phase = ConnectionPhase.CONNECTING,
@@ -178,16 +184,34 @@ class ConnectionManager @Inject constructor(
         this.loop = loop
         loop.start()
         hostsStore.upsertHost(config)
+        if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(config.id)
     }
 
     fun disconnect() {
+        val intentVersion = desiredIntentVersion.incrementAndGet()
+        disconnectRuntime()
+        scope.launch {
+            if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
+        }
+    }
+
+    private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
         loop?.stop()
         loop = null
         api = null
         generation = null
         activeHost = null
-        stopService()
+        if (stopBackgroundService) stopService()
         _state.value = ConnectionUiState()
+    }
+
+    suspend fun restoreDesiredConnectionIfNeeded() {
+        if (activeHost != null) {
+            if (_state.value.phase != ConnectionPhase.CONNECTED) reconnectIfNeeded()
+            return
+        }
+        val desired = hostsStore.desiredHostOnce() ?: return
+        connect(desired)
     }
 
     fun reconnectIfNeeded() {
@@ -248,6 +272,11 @@ class ConnectionManager @Inject constructor(
     private fun stopRetrying() {
         loop?.stop()
         loop = null
+        stopService()
+        val intentVersion = desiredIntentVersion.incrementAndGet()
+        scope.launch {
+            if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
+        }
         _state.value = _state.value.copy(
             phase = ConnectionPhase.DISCONNECTED,
             // Back to Idle, not left on whatever handshake step the last generation died at. The

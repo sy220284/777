@@ -1,6 +1,6 @@
 # Architecture
 
-DSH Mobile is a three-module Gradle project (Kotlin 2.0, Compose, Hilt).
+DSH Mobile is an eight-module Gradle project (Kotlin 2.0, Compose, Hilt).
 
 ```
 core/           pure JVM — no Android imports
@@ -59,7 +59,16 @@ cwd-relative summary) · Composer (draft, attachment strip: image tiles and
 file chips with upload state) · Docks · TrajectoryTab · Sheet*.kt (commands,
 models, presets, subagents, permission) · ChatProjections (defensive readers).
 
+harness-core/   platform-agnostic agent loop, tools, jobs, capabilities, plugins and versioned local sessions
+harness-runtime-android/
+                Android process runtime + persistent pipe terminal provider
+harness-interop/
+                MCP HTTP/stdio transports and LSP process client/framing
+harness-device-android/
+                Android device capabilities (accessibility, notifications, Shizuku, virtual display)
 mock-harness/   Ktor implementation of the /api protocol for tests
+reference-validation/
+                official Harness semantic/conformance validation
 tools/capture/  Node recorder of real harness traffic → conformance fixtures
 ```
 

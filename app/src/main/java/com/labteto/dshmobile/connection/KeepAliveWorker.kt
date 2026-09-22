@@ -36,8 +36,11 @@ class KeepAliveWorker(
         if (!settings.keepConnectedInBackground) return Result.success()
         val manager = entry.connectionManager()
         val state = manager.state.value
-        if (state.host != null && state.phase != ConnectionPhase.CONNECTED) {
+        if (state.phase == ConnectionPhase.CONNECTED) return Result.success()
+        if (state.host != null) {
             manager.reconnectIfNeeded()
+        } else {
+            manager.restoreDesiredConnectionIfNeeded()
         }
         return Result.success()
     }

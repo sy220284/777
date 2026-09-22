@@ -122,7 +122,7 @@ class McpLegacyStreamableHttpTransport(
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
 
         http.newCall(builder.build()).executeCancellable { response ->
-            val bodyText = response.body?.string().orEmpty()
+            val bodyText = response.readMcpBodyBounded()
             if (!response.isSuccessful) throw McpHttpException(response.code, bodyText)
             if (notification || response.code == 202 || bodyText.isBlank()) {
                 return@executeCancellable LegacyHttpResponse(
@@ -213,7 +213,7 @@ class McpLegacyHttpSseTransport(
                 .build(),
         ).awaitResponseCancellable()
         if (!response.isSuccessful) {
-            val body = response.body?.string().orEmpty()
+            val body = response.readMcpBodyBounded()
             val code = response.code
             response.close()
             throw McpHttpException(code, body)
@@ -285,7 +285,7 @@ class McpLegacyHttpSseTransport(
             .header("Content-Type", "application/json")
             .build()
         http.newCall(request).executeCancellable { response ->
-            val body = response.body?.string().orEmpty()
+            val body = response.readMcpBodyBounded()
             if (!response.isSuccessful) throw McpHttpException(response.code, body)
             if (
                 body.isNotBlank() &&

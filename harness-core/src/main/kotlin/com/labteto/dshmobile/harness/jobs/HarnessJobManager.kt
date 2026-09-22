@@ -4,6 +4,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
 data class JobInfo(
@@ -120,14 +121,23 @@ class HarnessJobManager(
     }
 
     fun stopAll() {
-        val jobs = synchronized(lock) {
-            records.values.filter { it.status == "running" }.onEach {
-                it.status = "cancelled"
-                it.output = "任务已取消"
-            }.mapNotNull { it.job }
-        }
+        val jobs = markRunningJobsCancelled()
         jobs.forEach { it.cancel() }
         publish()
+    }
+
+    suspend fun stopAllAndJoin() {
+        val jobs = markRunningJobsCancelled()
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
+    private fun markRunningJobsCancelled(): List<Job> = synchronized(lock) {
+        records.values.filter { it.status == "running" }.onEach {
+            it.status = "cancelled"
+            it.output = "任务已取消"
+        }.mapNotNull { it.job }
     }
 
     private fun snapshotRecords(): List<JobInfo> = synchronized(lock) {

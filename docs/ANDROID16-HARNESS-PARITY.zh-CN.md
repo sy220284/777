@@ -39,7 +39,9 @@
 | session query | 五个官方查询面：跨会话搜索、事件搜索、会话轨迹、事件轨迹、完整事件读取 | Android 等价实现 |
 | present | 校验工作区成果文件存在及大小后标记交付 | Android 等价实现 |
 | approvals / sandbox policy | 应用私有目录硬边界，加逐次审批 | 已适配 |
-| credentials | Android Keystore AES/GCM 加密，配置与日志不保存明文密钥 | Android 强化实现 |
+| native process / persistent terminal | 原生参数数组进程执行、可跨多次工具调用保持的管道终端；输出读取阶段有硬上限 | Android 等价实现 |
+| HTTP / stdio MCP | HTTP 与设备本地 stdio MCP 可动态发现并注册工具；全部远端工具按高权限逐次审批 | 已适配 |
+| credentials | Android Keystore AES/GCM 加密；模型接口拒绝远程明文 HTTP；Webhook 完整令牌不进入模型/事件日志，只能经审批复制到敏感剪贴板 | Android 强化实现 |
 
 ## Android 16 专项
 
@@ -51,9 +53,9 @@
 - 局域网扫描和直连按需申请“附近的设备”权限；互联网中继和本机模式不触发该权限。
 - 应用启用严格意图过滤匹配，外部深链必须满足已声明规则。
 - 删除 Android 8～15 的通知、WebView 和语言兼容分支。
-- APK 的 AndroidX Graphics 与 DataStore 依赖会打包 8 个多架构原生 `.so`；已验证每个 ELF
-  `LOAD` 段的 `p_align` 为 `0x4000`，且 APK 内未压缩库的数据偏移均按 16 KB 对齐。
-- 普通 CI 与发布构建都会校验 `minSdk=36` 及 16 KB APK/ELF 对齐，防止依赖升级后回退。
+- 正式交付 APK 仅包含 `arm64-v8a`；`x86_64` 仅用于 Android 16 模拟器测试。所有随包 ELF 都会校验
+  `LOAD` 段 16 KB 对齐，APK 内未压缩库的数据偏移也按 16 KB 对齐。
+- 普通 CI 与发布构建都会校验 `minSdk=36`、目标 ABI 以及 16 KB APK/ELF 对齐，防止依赖升级后回退。
 - CI 在 Android 16 模拟器运行界面与协议集成测试；交付 APK 使用 R8 与资源收缩，并关闭调试能力。
 
 ## 无法保持官方语义的能力
@@ -66,14 +68,16 @@
 | Cordis 动态插件、组合包、热重载、`plugin_manager`、Cordis 自省 | APK 无法安装和执行任意 Node 包及其构建脚本 |
 | `run_code` 程序化工具调用 | 官方运行时依赖 Node 沙箱和动态生成的工具绑定 |
 | PowerShell / Windows 工具 | Android 没有 Windows 进程与 PowerShell 环境 |
-| 持久 PTY、桌面终端控制 | Android 公共应用接口不提供等价的宿主终端和完整 Unix 用户空间 |
-| LSP | 各语言服务器及语言运行时没有随 Android 系统提供 |
+| 完整 PTY、桌面终端控制 | 当前提供持久管道终端；Android 公共应用接口仍不能等价提供桌面 PTY/完整 Unix 用户空间 |
 | Stagehand 浏览器自动化 | 依赖受控 Chromium、桌面页面上下文和额外模型服务 |
 | Office 转 PDF | 官方链路依赖桌面文档转换运行时 |
 | `read_image` 模型输入 | 当前本机 DeepSeek 文本路由没有图片输入能力 |
-| 任意 stdio MCP 服务器 | APK 无法启动用户安装的 Node/Python MCP 进程；远程 MCP 仍需独立服务与凭据配置 |
 | 秒级自主调度 | Android 16 后台调度受系统配额和最小周期约束，无法承诺官方常驻进程语义 |
 | 实验性 Agent Teams / Ralph | 官方标准预设默认关闭；其持久成员进程依赖常驻宿主 |
+
+## 已完成底层、尚未接入模型工具
+
+- LSP：`harness-interop` 已实现语言服务器进程启动、JSON-RPC framing、initialize、definition、references、hover、document/workspace symbols 与 rename，并可继承 APK 内置 Node/Python 的命令解析和环境。当前没有随 APK 捆绑具体语言服务器，也尚未注册为本机 Harness 模型工具，因此不能把“客户端存在”误记成“LSP 功能已正式开放”。
 
 ## 安全边界
 

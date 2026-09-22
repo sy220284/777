@@ -89,7 +89,8 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 },
             )
             surface == "remote" && relayClaimed -> RemoteRelayStatus(
-                failed = connection.failure != null,
+                failed = connection.failure != null ||
+                    (connection.phase == ConnectionPhase.DISCONNECTED && connection.host == null),
                 onRetryPairing = {
                     viewModel.disconnectRemote()
                     relayClaimed = false

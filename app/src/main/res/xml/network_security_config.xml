@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The DeepSeek Harness serves plain HTTP on the local network. Cleartext is
-     required to reach it. Cleartext traffic only ever goes to a LAN host the
-     user entered or picked from a scan; the one request that leaves the network
-     is the GitHub release check, which is HTTPS and can be switched off.
+<!-- The DeepSeek Harness can serve plain HTTP on a user-selected local network and
+     user-approved MCP endpoints may also use HTTP, so the application transport layer
+     keeps cleartext available. Credential-bearing model endpoints are validated
+     separately and require HTTPS unless they are literal loopback addresses. GitHub
+     release checks remain HTTPS.
 
      User-installed CAs are trusted alongside the system set: the only way a
      harness is ever reached over HTTPS is through a reverse proxy the user
