@@ -146,10 +146,10 @@ class PrivilegedCommandService() : Binder() {
             .redirectErrorStream(true)
             .start()
         return try {
-            val output = process.inputStream.bufferedReader()
+            val output = process.inputStream
             var text = ""
             val reader = Thread {
-                text = runCatching { output.readText() }.getOrDefault("")
+                text = runCatching { output.readBoundedText(MAX_OUTPUT_CHARS) }.getOrDefault("")
             }
             reader.start()
             val finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
@@ -167,7 +167,25 @@ class PrivilegedCommandService() : Binder() {
         }
     }
 
+    private fun java.io.InputStream.readBoundedText(maxChars: Int): String {
+        bufferedReader().use { reader ->
+            val output = StringBuilder(minOf(maxChars, 16 * 1024))
+            val buffer = CharArray(8 * 1024)
+            var truncated = false
+            while (true) {
+                val read = reader.read(buffer)
+                if (read < 0) break
+                val remaining = maxChars - output.length
+                if (remaining > 0) output.append(buffer, 0, minOf(read, remaining))
+                if (read > remaining) truncated = true
+            }
+            if (truncated) output.append("\n[输出超过 ${maxChars} 字符，已截断]")
+            return output.toString()
+        }
+    }
+
     companion object {
+        private const val MAX_OUTPUT_CHARS = 1_048_576
         const val DESCRIPTOR = "com.labteto.dshmobile.device.shizuku.PrivilegedCommandService"
         const val TRANSACTION_EXECUTE = IBinder.FIRST_CALL_TRANSACTION
     }
