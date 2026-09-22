@@ -35,10 +35,12 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -104,6 +106,8 @@ import kotlinx.coroutines.launch
 fun LocalHarnessScreen(
     onOpenRemote: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -133,6 +137,14 @@ fun LocalHarnessScreen(
                 onSwitchSession = { sessionId ->
                     viewModel.switchSession(sessionId)
                     scope.launch { drawerState.close() }
+                },
+                onTasks = {
+                    scope.launch { drawerState.close() }
+                    onOpenTasks()
+                },
+                onTools = {
+                    scope.launch { drawerState.close() }
+                    onOpenTools()
                 },
                 onSettings = {
                     scope.launch { drawerState.close() }
@@ -193,6 +205,8 @@ private fun LocalModeDrawer(
     onLocal: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
+    onTasks: () -> Unit,
+    onTools: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -286,12 +300,24 @@ private fun LocalModeDrawer(
                 }
             }
 
-            Text("工具与偏好", style = DsType.std14, color = colors.labelTertiary)
+            Text("功能", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
+                DsCategoryRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = "任务",
+                    subtitle = "计划任务、周期任务和执行结果",
+                    onClick = onTasks,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Extension,
+                    title = "工具与连接",
+                    subtitle = "外部工具服务与当前扩展",
+                    onClick = onTools,
+                )
                 DsCategoryRow(
                     icon = Icons.Outlined.Settings,
                     title = "设置",
-                    subtitle = "外观、通知、连接与数据",
+                    subtitle = "模型、个性化、权限与高级选项",
                     onClick = onSettings,
                 )
             }
