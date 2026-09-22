@@ -30,7 +30,9 @@ import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
+import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
+import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -478,7 +480,7 @@ internal fun MemoryManagementCard(
 
             DisclosureRow(
                 title = record.content.take(54),
-                summary = "\${record.scope.name.lowercase()} · \${record.kind.name.lowercase()}" +
+                summary = memoryScopeLabel(record.scope) + " · " + memoryKindLabel(record.kind) +
                     if (record.pinned) " · 已置顶" else "",
                 expanded = expanded,
                 onToggle = { expanded = !expanded },
@@ -544,6 +546,22 @@ internal fun MemoryManagementCard(
             }
         }
     }
+}
+
+private fun memoryScopeLabel(scope: MemoryScope): String = when (scope) {
+    MemoryScope.GLOBAL -> "全局"
+    MemoryScope.PROJECT -> "项目"
+    MemoryScope.LINEAGE -> "当前任务链"
+}
+
+private fun memoryKindLabel(kind: MemoryKind): String = when (kind) {
+    MemoryKind.RULE -> "规则"
+    MemoryKind.PREFERENCE -> "偏好"
+    MemoryKind.FACT -> "事实"
+    MemoryKind.DECISION -> "决定"
+    MemoryKind.CONSTRAINT -> "约束"
+    MemoryKind.STATE -> "状态"
+    MemoryKind.SUMMARY -> "摘要"
 }
 
 @Composable
