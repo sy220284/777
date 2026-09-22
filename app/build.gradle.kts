@@ -85,6 +85,25 @@ val prepareBundledPythonRuntime = tasks.register<Exec>("prepareBundledPythonRunt
     )
 }
 
+val generatedGitRuntime = layout.buildDirectory.dir("generated/gitRuntime")
+val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") {
+    group = "build setup"
+    description = "Fetches and verifies the bundled Android Git runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/prepare-termux-git.sh"))
+    inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
+    outputs.dir(generatedGitRuntime)
+    environment(
+        "TERMUX_RUNTIME_CACHE",
+        rootProject.file(".gradle/runtime-cache/termux-git").absolutePath,
+    )
+    environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    commandLine(
+        "bash",
+        rootProject.file("tools/runtime/prepare-termux-git.sh").absolutePath,
+        generatedGitRuntime.get().asFile.absolutePath,
+    )
+}
+
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 36
@@ -166,8 +185,10 @@ android {
     sourceSets.getByName("main").apply {
         jniLibs.srcDir(generatedNodeRuntime.map { it.dir("jniLibs") })
         jniLibs.srcDir(generatedPythonRuntime.map { it.dir("jniLibs") })
+        jniLibs.srcDir(generatedGitRuntime.map { it.dir("jniLibs") })
         assets.srcDir(generatedNodeRuntime.map { it.dir("assets") })
         assets.srcDir(generatedPythonRuntime.map { it.dir("assets") })
+        assets.srcDir(generatedGitRuntime.map { it.dir("assets") })
     }
 
     packaging {
@@ -194,13 +215,13 @@ tasks.matching {
     it.name.startsWith("merge") &&
         (it.name.endsWith("JniLibFolders") || it.name.endsWith("Assets"))
 }.configureEach {
-    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime)
+    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime, prepareBundledGitRuntime)
 }
 
 // Lint model writers inspect the merged asset source set directly. Without this explicit edge
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
 tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
-    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime)
+    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime, prepareBundledGitRuntime)
 }
 
 dependencies {
