@@ -13,7 +13,77 @@ permissions:
   contents: write
 
 jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify official golden fixture provenance
+        run: |
+          corepack enable
+          bash tools/reference-validation/refresh-official-fixtures.sh
+          git diff --exit-code -- reference-validation/src/test/resources/official
+      - name: Full unit tests
+        run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
+      - name: Official Harness conformance
+        run: ./gradlew :reference-validation:test --stacktrace
+      - name: Lint
+        run: ./gradlew :app:lintDebug --stacktrace
+      - name: Assemble optimized APK
+        run: ./gradlew :app:assembleOptimized --stacktrace
+      - name: Verify Android 16 APK
+        run: .github/scripts/verify-android16-apk.sh app/build/outputs/apk/optimized/app-optimized.apk
+      - name: Enforce APK size budget
+        run: |
+          BYTES="$(stat -c '%s' app/build/outputs/apk/optimized/app-optimized.apk)"
+          BUDGET=125829120
+          echo "Optimized APK: $BYTES bytes (budget: $BUDGET)"
+          test "$BYTES" -le "$BUDGET"
+
+  android-16-instrumented:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "::error::/dev/kvm is unavailable on this runner"
+            exit 1
+          fi
+      - name: Android 16 instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          disable-animations: true
+          script: |
+            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --stacktrace
+            adb shell am force-stop com.sy220284.dshmobile.debug || true
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
+            sleep 2
+            adb shell pidof com.sy220284.dshmobile.debug
+
   release:
+    needs: [quality-gate, android-16-instrumented]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
