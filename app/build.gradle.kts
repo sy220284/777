@@ -53,6 +53,23 @@ val prepareBundledNodeRuntime = tasks.register<Exec>("prepareBundledNodeRuntime"
     )
 }
 
+val generatedPythonRuntime = layout.buildDirectory.dir("generated/pythonRuntime")
+val prepareBundledPythonRuntime = tasks.register<Exec>("prepareBundledPythonRuntime") {
+    group = "build setup"
+    description = "Fetches and verifies the bundled Android Python runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/prepare-termux-python.sh"))
+    outputs.dir(generatedPythonRuntime)
+    environment(
+        "TERMUX_RUNTIME_CACHE",
+        rootProject.file(".gradle/runtime-cache/termux-python").absolutePath,
+    )
+    commandLine(
+        "bash",
+        rootProject.file("tools/runtime/prepare-termux-python.sh").absolutePath,
+        generatedPythonRuntime.get().asFile.absolutePath,
+    )
+}
+
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 36
@@ -122,9 +139,19 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // AAPT's default asset filter contains <dir>_* and silently drops Python 3.14's
+        // Lib/compression/_common package. Keep the other default ignores, but allow
+        // underscore-prefixed directories because Python uses them as real packages.
+        ignoreAssetsPattern =
+            "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     sourceSets.getByName("main").apply {
         jniLibs.srcDir(generatedNodeRuntime.map { it.dir("jniLibs") })
+        jniLibs.srcDir(generatedPythonRuntime.map { it.dir("jniLibs") })
         assets.srcDir(generatedNodeRuntime.map { it.dir("assets") })
+        assets.srcDir(generatedPythonRuntime.map { it.dir("assets") })
     }
 
     packaging {
@@ -152,13 +179,13 @@ tasks.matching {
     it.name.startsWith("merge") &&
         (it.name.endsWith("JniLibFolders") || it.name.endsWith("Assets"))
 }.configureEach {
-    dependsOn(prepareBundledNodeRuntime)
+    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime)
 }
 
 // Lint model writers inspect the merged asset source set directly. Without this explicit edge
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
 tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
-    dependsOn(prepareBundledNodeRuntime)
+    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime)
 }
 
 dependencies {
