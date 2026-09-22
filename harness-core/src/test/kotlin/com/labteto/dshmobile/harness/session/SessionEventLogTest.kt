@@ -35,4 +35,23 @@ class SessionEventLogTest {
             directory.deleteRecursively()
         }
     }
+    @Test
+    fun latestTypedEventSkipsMalformedRowsAndKeepsNewestCompleteMatch() {
+        val directory = Files.createTempDirectory("harness-event-latest").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })
+            log.append("checkpoint", buildJsonObject { put("value", "old") })
+            log.append("other", buildJsonObject { put("value", "noise") })
+            log.append("checkpoint", buildJsonObject { put("value", "new") })
+            file.appendText("{broken\n")
+
+            val latest = requireNotNull(log.latest("checkpoint"))
+            assertEquals(2L, latest.sequence)
+            assertEquals("new", latest.data["value"]?.toString()?.trim('"'))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
