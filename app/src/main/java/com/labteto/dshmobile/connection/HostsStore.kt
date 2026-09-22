@@ -57,7 +57,11 @@ class HostsStore @Inject constructor(
             notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
-            localeOverride = prefs[Keys.LOCALE],
+            localeOverride = when (val tag = prefs[Keys.LOCALE]) {
+                "en" -> "en"
+                "zh", "zh-CN", "zh_CN" -> "zh-CN"
+                else -> null
+            },
         )
     }
 
