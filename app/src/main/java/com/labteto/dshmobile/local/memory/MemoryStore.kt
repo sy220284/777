@@ -227,6 +227,9 @@ class MemoryStore @Inject constructor(
             temporary.copyTo(file, overwrite = true)
             temporary.delete()
         }
+        if (!backup.isFile && decodeDocument(file) != null) {
+            runCatching { file.copyTo(backup, overwrite = true) }
+        }
     }
 
     private companion object {
