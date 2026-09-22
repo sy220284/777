@@ -465,4 +465,7 @@
     <string name="system_prompt">系统提示词</string>
     <string name="image_offload">请求中已省略历史图片</string>
     <string name="panel_open_host">在主机上打开</string>
+    <string name="settings_lsp_command">语言服务器启动命令</string>
+    <string name="settings_lsp_hint">填写 JSON 字符串数组，每项用双引号包裹。需先安装兼容的语言服务器；留空停用。</string>
+    <string name="settings_lsp_save">保存语言服务器</string>
 </resources>

@@ -150,6 +150,12 @@ class LocalHarnessEngine @Inject constructor(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
     )
+    private val lspPlugin = com.labteto.dshmobile.interop.lsp.LspPlugin(
+        root = File(workspace.path), json = json,
+        command = { parseLanguageServerCommand(preferences.getString("language_server_command", "").orEmpty()) },
+        commandResolver = runtimeProcess::resolveCommand,
+        environment = { runtimeProcess.processEnvironment() },
+    )
     private val devicePlugin = AndroidDevicePlugin(context)
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
@@ -191,6 +197,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(builtinPlugin)
                 pluginRegistry.install(runtimePlugin)
                 pluginRegistry.install(mcpPlugin)
+                pluginRegistry.install(lspPlugin)
                 pluginRegistry.install(devicePlugin)
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
@@ -204,6 +211,19 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
         }
+    }
+
+    fun configureLanguageServer(command: String): String {
+        if (isRunBusy()) return "请等待当前任务结束后修改语言服务器配置"
+        runCatching { parseLanguageServerCommand(command) }.getOrElse {
+            return "启动命令格式无效，请填写 JSON 字符串数组，例如 [\"node\",\"server.js\",\"--stdio\"]"
+        }
+        scope.launch {
+            lspPlugin.stop()
+            preferences.edit().putString("language_server_command", command.trim()).apply()
+            _state.update { it.copy(languageServerCommand = command.trim()) }
+        }
+        return "语言服务器配置已提交；启动时仍需批准进程执行"
     }
 
     /** Save the local model route and its encrypted credential. */
@@ -260,6 +280,7 @@ class LocalHarnessEngine @Inject constructor(
                 userRules = profile.customRules,
                 autoRecall = profile.autoRecall,
                 autoMemory = profile.autoMemory,
+            languageServerCommand = preferences.getString("language_server_command", "").orEmpty(),
             )
         }
         scope.launch {
@@ -1486,6 +1507,7 @@ class LocalHarnessEngine @Inject constructor(
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
+            languageServerCommand = preferences.getString("language_server_command", "").orEmpty(),
             sessions = sessionSummaries(),
             messages = stored.messages,
             plan = stored.plan,
@@ -1606,7 +1628,7 @@ class LocalHarnessEngine @Inject constructor(
             "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
             "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
             "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
-            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
+            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect", "lsp_start", "lsp_stop",
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")

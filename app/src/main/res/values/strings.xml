@@ -467,4 +467,7 @@
     <string name="system_prompt">System prompt</string>
     <string name="image_offload">Historical images omitted from request</string>
     <string name="panel_open_host">Open on host</string>
+    <string name="settings_lsp_command">Language server command</string>
+    <string name="settings_lsp_hint">JSON argument array, for example [node, server.js, --stdio] with each item quoted. Install a compatible server first. Leave blank to disable.</string>
+    <string name="settings_lsp_save">Save language server</string>
 </resources>

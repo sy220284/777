@@ -282,7 +282,7 @@ data class RelayPairingPayload(
     fun isLive(now: Long): Boolean = now < expiresAt
 
     /** Whether the credential would travel in the clear on this relay. */
-    val isPlaintext: Boolean get() = fingerprint == null
+    val isPlaintext: Boolean get() = url.toHttpUrlOrNull()?.scheme != "https"
 }
 
 /** How a scanned or pasted payload was read. */
