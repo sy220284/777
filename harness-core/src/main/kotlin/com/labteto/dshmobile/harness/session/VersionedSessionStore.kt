@@ -1,6 +1,11 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -113,6 +118,10 @@ class VersionedSessionStore(
             payload = payload,
         )
         atomicWrite(source, json.encodeToString(SessionDocument.serializer(), document))
+        val backup = backupFor(id)
+        if (!backup.isFile) {
+            source.copyTo(backup, overwrite = false)
+        }
         return document
     }
 
@@ -226,10 +235,27 @@ class VersionedSessionStore(
     private fun atomicWrite(file: File, content: String) {
         file.parentFile?.mkdirs()
         val temporary = File(file.parentFile, "${file.name}.tmp")
-        temporary.writeText(content)
-        if (!temporary.renameTo(file)) {
-            file.writeText(temporary.readText())
-            temporary.delete()
+        val bytes = content.toByteArray(StandardCharsets.UTF_8)
+        FileOutputStream(temporary).use { output ->
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+        }
+        try {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } finally {
+            if (temporary.exists()) temporary.delete()
         }
     }
 
