@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -16,6 +17,7 @@ import java.net.URI
 import java.net.UnknownHostException
 import java.net.Socket
 import java.util.concurrent.TimeUnit
+import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLSocketFactory
 import javax.inject.Inject
@@ -122,6 +124,158 @@ class LocalWebProvider @Inject constructor(
                 error,
             )
         }
+    }
+
+    suspend fun request(
+        method: String,
+        input: String,
+        headers: Map<String, String> = emptyMap(),
+        body: String? = null,
+        maxBytes: Int = DEFAULT_FETCH_BYTES,
+        timeoutSeconds: Long = DEFAULT_FETCH_TIMEOUT_SECONDS,
+    ): LocalHttpResponse = withContext(Dispatchers.IO) {
+        val verb = method.trim().uppercase()
+        require(verb in HTTP_METHODS) { "HTTP 方法仅支持 GET/HEAD/POST/PUT/PATCH/DELETE" }
+        require(body == null || body.toByteArray().size <= MAX_REQUEST_BODY_BYTES) {
+            "HTTP 请求体超过 ${MAX_REQUEST_BODY_BYTES / 1024} KiB"
+        }
+        val safeHeaders = validateRequestHeaders(headers)
+        val byteLimit = maxBytes.coerceIn(MIN_FETCH_BYTES, MAX_FETCH_BYTES)
+        var current = validateTarget(input)
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            val route = requestRoute(current, timeoutSeconds)
+            val media = safeHeaders.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value
+                ?.toMediaType()
+                ?: if (body?.trimStart()?.startsWith("{") == true || body?.trimStart()?.startsWith("[") == true) {
+                    JSON_MEDIA
+                } else {
+                    "text/plain; charset=utf-8".toMediaType()
+                }
+            val requestBody = when {
+                verb in setOf("GET", "HEAD") -> null
+                body != null -> body.toRequestBody(media)
+                else -> ByteArray(0).toRequestBody(null)
+            }
+            val builder = Request.Builder()
+                .url(route.url)
+                .header("User-Agent", USER_AGENT)
+                .method(verb, requestBody)
+            safeHeaders.forEach { (name, value) -> builder.header(name, value) }
+            route.hostHeader?.let { builder.header("Host", it) }
+            route.client.newCall(builder.build()).execute().use { response ->
+                if (response.isRedirect) {
+                    if (verb !in setOf("GET", "HEAD")) {
+                        throw LocalWebException("HTTP_REDIRECT", "会改变远端状态的 HTTP 请求拒绝自动跟随重定向")
+                    }
+                    if (redirectCount >= MAX_REDIRECTS) {
+                        throw LocalWebException("HTTP_REDIRECT", "HTTP 请求重定向次数过多")
+                    }
+                    val location = response.header("Location")
+                        ?: throw LocalWebException("HTTP_REDIRECT", "HTTP 重定向缺少地址")
+                    current = validateTarget(current.uri.resolve(location).toString())
+                    return@repeat
+                }
+                val responseBody = response.body
+                val mediaType = responseBody?.contentType()?.toString().orEmpty()
+                if (verb != "HEAD" && mediaType.isNotBlank() && !isTextualWebMediaType(mediaType)) {
+                    throw LocalWebException(
+                        "UNSUPPORTED_MEDIA",
+                        "http_request 仅返回文本/JSON/XML；二进制响应请使用 download_file",
+                    )
+                }
+                val bounded = responseBody?.byteStream()?.use { readBounded(it, byteLimit) }
+                    ?: BoundedBytes(ByteArray(0), false)
+                return@withContext LocalHttpResponse(
+                    url = current.uri.toString(),
+                    status = response.code,
+                    mediaType = mediaType,
+                    content = bounded.bytes.toString(responseBody?.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8),
+                    bytesRead = bounded.bytes.size,
+                    truncated = bounded.truncated,
+                )
+            }
+        }
+        throw LocalWebException("HTTP_REDIRECT", "HTTP 请求重定向次数过多")
+    }
+
+    suspend fun downloadTo(
+        input: String,
+        destination: File,
+        maxBytes: Long = DEFAULT_DOWNLOAD_BYTES,
+        timeoutSeconds: Long = DEFAULT_FETCH_TIMEOUT_SECONDS,
+    ): LocalDownloadResult = withContext(Dispatchers.IO) {
+        val boundedMax = maxBytes.coerceIn(MIN_DOWNLOAD_BYTES, MAX_DOWNLOAD_BYTES)
+        var current = validateTarget(input)
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            val route = requestRoute(current, timeoutSeconds)
+            val builder = Request.Builder()
+                .url(route.url)
+                .header("User-Agent", USER_AGENT)
+                .get()
+            route.hostHeader?.let { builder.header("Host", it) }
+            route.client.newCall(builder.build()).execute().use { response ->
+                if (response.isRedirect) {
+                    if (redirectCount >= MAX_REDIRECTS) {
+                        throw LocalWebException("HTTP_REDIRECT", "下载重定向次数过多")
+                    }
+                    val location = response.header("Location")
+                        ?: throw LocalWebException("HTTP_REDIRECT", "下载重定向缺少地址")
+                    current = validateTarget(current.uri.resolve(location).toString())
+                    return@repeat
+                }
+                if (!response.isSuccessful) {
+                    throw LocalWebException(
+                        if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX",
+                        "下载失败（HTTP ${response.code}）：${current.uri}",
+                    )
+                }
+                val body = response.body ?: throw LocalWebException("EMPTY_BODY", "下载响应为空")
+                val declared = body.contentLength()
+                if (declared > boundedMax) {
+                    throw LocalWebException("DOWNLOAD_TOO_LARGE", "下载文件超过 ${boundedMax} 字节上限")
+                }
+                destination.parentFile?.mkdirs()
+                val temporary = File(destination.parentFile, destination.name + ".part")
+                temporary.delete()
+                val digest = MessageDigest.getInstance("SHA-256")
+                var total = 0L
+                try {
+                    body.byteStream().use { inputStream ->
+                        temporary.outputStream().use { output ->
+                            val buffer = ByteArray(32 * 1024)
+                            while (true) {
+                                val read = inputStream.read(buffer)
+                                if (read < 0) break
+                                total += read
+                                if (total > boundedMax) {
+                                    throw LocalWebException(
+                                        "DOWNLOAD_TOO_LARGE",
+                                        "下载文件超过 ${boundedMax} 字节上限",
+                                    )
+                                }
+                                digest.update(buffer, 0, read)
+                                output.write(buffer, 0, read)
+                            }
+                        }
+                    }
+                    require(total > 0L) { "下载文件为空" }
+                    if (!temporary.renameTo(destination)) {
+                        temporary.copyTo(destination, overwrite = true)
+                        temporary.delete()
+                    }
+                } catch (error: Throwable) {
+                    temporary.delete()
+                    throw error
+                }
+                return@withContext LocalDownloadResult(
+                    url = current.uri.toString(),
+                    bytes = total,
+                    mediaType = body.contentType()?.toString().orEmpty(),
+                    sha256 = digest.digest().joinToString("") { "%02x".format(it) },
+                )
+            }
+        }
+        throw LocalWebException("HTTP_REDIRECT", "下载重定向次数过多")
     }
 
     /** Human-readable diagnosis used by both the UI and the local Harness tool. */
@@ -273,6 +427,20 @@ class LocalWebProvider @Inject constructor(
             append("搜索：").append(query).append('\n')
             if (answer.isNotEmpty()) append(answer.joinToString("\n").take(4_000)).append('\n')
             append(sources.joinToString("\n"))
+        }
+    }
+
+    private fun validateRequestHeaders(headers: Map<String, String>): Map<String, String> {
+        require(headers.size <= 16) { "HTTP 请求头最多 16 项" }
+        return headers.mapKeys { (name, _) ->
+            val clean = name.trim()
+            require(clean.lowercase() in SAFE_REQUEST_HEADERS) {
+                "请求头 $clean 未获允许；认证信息请通过受保护的连接/凭据机制配置，不能写入工具参数"
+            }
+            clean
+        }.mapValues { (_, value) ->
+            require(value.length <= 4_096 && '\n' !in value && '\r' !in value) { "HTTP 请求头值无效" }
+            value
         }
     }
 
@@ -592,9 +760,31 @@ class LocalWebProvider @Inject constructor(
         const val FETCH_CALL_GRACE_SECONDS = 10L
         const val MAX_QUERIES = 4
         const val MAX_RESULTS = 10
+        const val MAX_REQUEST_BODY_BYTES = 1024 * 1024
+        const val MIN_DOWNLOAD_BYTES = 1024L
+        const val DEFAULT_DOWNLOAD_BYTES = 20L * 1024L * 1024L
+        const val MAX_DOWNLOAD_BYTES = 100L * 1024L * 1024L
+        val HTTP_METHODS = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
+        val SAFE_REQUEST_HEADERS = setOf("accept", "content-type", "if-none-match", "if-modified-since")
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
 }
+data class LocalHttpResponse(
+    val url: String,
+    val status: Int,
+    val mediaType: String,
+    val content: String,
+    val bytesRead: Int,
+    val truncated: Boolean,
+)
+
+data class LocalDownloadResult(
+    val url: String,
+    val bytes: Long,
+    val mediaType: String,
+    val sha256: String,
+)
+
 data class LocalWebFetchResult(
     val url: String,
     val mediaType: String,
