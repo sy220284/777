@@ -24,12 +24,17 @@ class BundledPythonRuntimeTest {
         val script = """
             import bz2
             import lzma
+            import os
             import sqlite3
             import ssl
             import subprocess
             import sys
+            cert = os.environ["SSL_CERT_FILE"]
+            assert os.path.isfile(cert)
+            ca_count = len(ssl.create_default_context().get_ca_certs())
+            assert ca_count > 0
             shell = subprocess.check_output("printf shell-ok", shell=True, text=True)
-            sys.stdout.write(sys.version.split()[0] + "|" + shell)
+            sys.stdout.write(sys.version.split()[0] + "|" + str(ca_count) + "|" + shell)
         """.trimIndent()
 
         val process = ProcessBuilder(python.absolutePath, "-c", script)
@@ -41,7 +46,10 @@ class BundledPythonRuntimeTest {
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
 
         assertEquals("bundled Python failed:\n$output", 0, process.exitValue())
-        assertTrue("unexpected Python version: $output", output.startsWith("3.14.6|"))
-        assertTrue("Python subprocess shell failed: $output", output.endsWith("shell-ok"))
+        val parts = output.split("|")
+        assertEquals("unexpected Python output: $output", 3, parts.size)
+        assertEquals("3.14.6", parts[0])
+        assertTrue("Python CA store is empty: $output", parts[1].toIntOrNull()?.let { it > 0 } == true)
+        assertEquals("shell-ok", parts[2])
     }
 }
