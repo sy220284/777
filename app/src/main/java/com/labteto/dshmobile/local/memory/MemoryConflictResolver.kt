@@ -53,6 +53,6 @@ class MemoryConflictResolver @Inject constructor() {
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
 
     private companion object {
-        const val REPLACE_THRESHOLD = 0.82
+        const val REPLACE_THRESHOLD = 0.76
     }
 }
