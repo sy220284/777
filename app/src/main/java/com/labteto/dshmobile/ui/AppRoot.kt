@@ -48,6 +48,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
         // carries the user into the remote session, while Back returns to the local home.
         var showPair by rememberSaveable { mutableStateOf(false) }
+        var autoScanPair by rememberSaveable { mutableStateOf(false) }
         var relayClaimed by rememberSaveable { mutableStateOf(false) }
         var surface by rememberSaveable { mutableStateOf("local") }
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
@@ -62,13 +63,16 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 },
             )
             showPair -> PairScreen(
+                autoScanOnOpen = autoScanPair,
                 onClose = {
                     showPair = false
+                    autoScanPair = false
                     relayClaimed = false
                     surface = "local"
                 },
                 onPaired = {
                     showPair = false
+                    autoScanPair = false
                     relayClaimed = true
                     surface = "remote"
                 },
@@ -77,6 +81,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 onOpenRemote = {
                     relayClaimed = false
                     surface = "remote"
+                    autoScanPair = true
                     showPair = true
                 },
                 onOpenSettings = { showSettings = true },
@@ -94,6 +99,7 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
                 onRetryPairing = {
                     viewModel.disconnectRemote()
                     relayClaimed = false
+                    autoScanPair = false
                     showPair = true
                 },
                 onBack = {
