@@ -50,39 +50,39 @@ internal object LocalToolRouter {
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
-        val terms = Regex("[\\p{L}\\p{N}_-]{2,}")
+        val terms: Set<String> = Regex("[\\p{L}\\p{N}_-]{2,}")
             .findAll(normalized)
-            .map { it.value }
+            .map { match -> match.value }
             .take(24)
             .toSet()
-        return tools.asSequence()
-            .filter { isOptional(it.name) }
-            .map { tool ->
-                val haystack = buildString {
-                    append(tool.name.lowercase())
-                    append(' ')
-                    append(description(tool).lowercase())
-                    append(' ')
-                    append(familyTags(tool.name))
-                }
-                val score = terms.sumOf { term ->
-                    when {
-                        tool.name.equals(term, ignoreCase = true) -> 100
-                        tool.name.contains(term, ignoreCase = true) -> 25
-                        haystack.contains(term) -> 10
-                        else -> 0
-                    }
-                }
-                tool to score
+        val scored = mutableListOf<Pair<HarnessTool, Int>>()
+        for (tool in tools) {
+            if (!isOptional(tool.name)) continue
+            val haystack = buildString {
+                append(tool.name.lowercase())
+                append(' ')
+                append(description(tool).lowercase())
+                append(' ')
+                append(familyTags(tool.name))
             }
-            .filter { (_, score) -> score > 0 }
-            .sortedWith(
-                compareByDescending<Pair<HarnessTool, Int>> { it.second }
-                    .thenBy { it.first.name },
-            )
+            var score = 0
+            for (term in terms) {
+                score += when {
+                    tool.name.equals(term, ignoreCase = true) -> 100
+                    tool.name.contains(term, ignoreCase = true) -> 25
+                    haystack.contains(term) -> 10
+                    else -> 0
+                }
+            }
+            if (score > 0) scored += tool to score
+        }
+        scored.sortWith(
+            compareByDescending<Pair<HarnessTool, Int>> { pair -> pair.second }
+                .thenBy { pair -> pair.first.name },
+        )
+        return scored
             .take(limit.coerceIn(1, 48))
-            .map { it.first }
-            .toList()
+            .map { pair -> pair.first }
     }
 
     fun description(tool: HarnessTool): String =
