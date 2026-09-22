@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,10 +52,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,7 +65,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -83,8 +88,10 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -202,6 +209,7 @@ private fun LocalModeDrawer(
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    var historyQuery by rememberSaveable { mutableStateOf("") }
     ModalDrawerSheet(
         drawerContainerColor = colors.sidebar,
         modifier = Modifier.safeDrawingPadding(),
@@ -257,14 +265,34 @@ private fun LocalModeDrawer(
                 .sortedByDescending(LocalSessionSummary::updatedAt)
             if (history.isNotEmpty()) {
                 Text("历史会话", style = DsType.std14, color = colors.labelTertiary)
-                DsGroupCard {
-                    history.forEach { session ->
-                        DsCategoryRow(
-                            icon = Icons.Outlined.History,
-                            title = session.title,
-                            subtitle = "本机会话",
-                            onClick = { onSwitchSession(session.id) },
-                        )
+                OutlinedTextField(
+                    value = historyQuery,
+                    onValueChange = { historyQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("搜索会话") },
+                    singleLine = true,
+                    shape = DsShapes.block,
+                )
+                val filteredHistory = history.filter {
+                    historyQuery.isBlank() || it.title.contains(historyQuery.trim(), ignoreCase = true)
+                }
+                if (filteredHistory.isEmpty()) {
+                    Text(
+                        "没有匹配的会话",
+                        style = DsType.small13,
+                        color = colors.labelTertiary,
+                        modifier = Modifier.padding(horizontal = DsSpacing.small),
+                    )
+                } else {
+                    DsGroupCard {
+                        filteredHistory.forEach { session ->
+                            DsCategoryRow(
+                                icon = Icons.Outlined.History,
+                                title = session.title,
+                                subtitle = "本机会话",
+                                onClick = { onSwitchSession(session.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -437,7 +465,19 @@ private fun LocalChat(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
-    var input by rememberSaveable { mutableStateOf("") }
+    val drafts = rememberSaveable(
+        saver = listSaver(
+            save = { map -> map.entries.flatMap { listOf(it.key, it.value) } },
+            restore = { values ->
+                mutableStateMapOf<String, String>().apply {
+                    values.chunked(2).forEach { pair ->
+                        if (pair.size == 2) this[pair[0]] = pair[1]
+                    }
+                }
+            },
+        ),
+    ) { mutableStateMapOf<String, String>() }
+    val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
@@ -486,6 +526,8 @@ private fun LocalChat(
     }
 
     LaunchedEffect(state.sessionId) {
+        attachments.clear()
+        attachmentError = null
         if (state.messages.isNotEmpty()) {
             listState.scrollToItem(state.messages.lastIndex)
         }
@@ -522,8 +564,9 @@ private fun LocalChat(
                 Surface(
                     shape = RoundedCornerShape(999.dp),
                     color = colors.bgLayer1,
-                    shadowElevation = 3.dp,
-                    modifier = Modifier.weight(1f, fill = false),
+                    shadowElevation = 1.dp,
+                    modifier = Modifier.weight(1f, fill = false)
+                        .clickable(onClickLabel = "配置本机 Harness", onClick = onConfigure),
                 ) {
                     Row(
                         Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
@@ -535,11 +578,13 @@ private fun LocalChat(
                             Text("本机 Harness", style = DsType.std14Strong, color = colors.labelPrimary)
                             Text(
                                 when {
-                                    !state.configured -> "未配置 · 可稍后设置"
+                                    !state.configured -> "未配置 · 点此设置"
+                                    state.pendingApproval != null -> "等待批准"
+                                    state.pendingQuestion != null -> "等待回答"
                                     state.running -> state.model.removePrefix("deepseek-") + " · 执行中"
                                     else -> state.model.removePrefix("deepseek-") + " · 已就绪"
                                 },
-                                style = DsType.caption11,
+                                style = DsType.small13,
                                 color = colors.labelTertiary,
                             )
                         }
@@ -554,21 +599,6 @@ private fun LocalChat(
                     containerColor = colors.bgLayer1,
                     shadowElevation = 3.dp,
                 )
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DsButton(
-                    if (state.planMode) "规划中" else "规划",
-                    { onPlanModeChange(!state.planMode) },
-                    variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                    enabled = !state.running,
-                )
-                DsButton("配置", onConfigure, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
-                Spacer(Modifier.weight(1f))
             }
         }
 
@@ -622,7 +652,11 @@ private fun LocalChat(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
                 if (state.messages.isEmpty()) {
-                    item { EmptyLocalHarness() }
+                    item {
+                        EmptyLocalHarness { suggestion ->
+                            drafts[state.sessionId] = suggestion
+                        }
+                    }
                 }
                 items(state.messages, key = { it.id }) { message ->
                     LocalMessageRow(message)
@@ -666,13 +700,33 @@ private fun LocalChat(
             }
         }
 
-        state.error?.let {
-            Text(
-                it,
-                style = DsType.small13,
-                color = colors.error,
+        state.error?.let { error ->
+            Surface(
+                color = colors.warnTertiary,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
-            )
+            ) {
+                Row(
+                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Text(
+                        error,
+                        style = DsType.small13,
+                        color = colors.error,
+                        modifier = Modifier.weight(1f),
+                    )
+                    state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
+                        DsButton(
+                            "恢复请求",
+                            { drafts[state.sessionId] = lastRequest.content },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
+            }
         }
         attachmentError?.let {
             Text(
@@ -683,30 +737,43 @@ private fun LocalChat(
             )
         }
 
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
-                .shadow(8.dp, DsShapes.composer, clip = false)
-                .clip(DsShapes.composer)
-                .background(colors.composerCard)
-                .padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        Surface(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            shape = DsShapes.composer,
+            color = colors.composerCard,
+            shadowElevation = 1.dp,
         ) {
-            if (attachments.isNotEmpty()) {
-                attachments.forEachIndexed { index, attachment ->
-                    ImportedAttachmentRow(
-                        attachment = attachment,
-                        onRemove = { attachments.removeAt(index) },
-                    )
+            Column(
+                Modifier.padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                if (attachments.isNotEmpty()) {
+                    attachments.forEachIndexed { index, attachment ->
+                        ImportedAttachmentRow(
+                            attachment = attachment,
+                            onRemove = { attachments.removeAt(index) },
+                        )
+                    }
                 }
-            }
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
-                leadingIcon = {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { drafts[state.sessionId] = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
+                    shape = DsShapes.block,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent,
+                    ),
+                    minLines = 1,
+                    maxLines = 5,
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     DsIconButton(
                         icon = Icons.Filled.Add,
                         contentDescription = "添加附件",
@@ -715,35 +782,32 @@ private fun LocalChat(
                         tint = colors.labelPrimary,
                         containerColor = colors.bgModulePlatform,
                     )
-                },
-                shape = DsShapes.block,
-                minLines = 1,
-                maxLines = 5,
-            )
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Spacer(Modifier.weight(1f))
-                if (state.running) {
-                    DsButton("停止", onStop, variant = DsButtonVariant.Danger)
-                } else {
                     DsButton(
-                        "发送",
-                        onClick = {
-                            if (!state.configured) {
-                                onConfigure()
-                            } else {
-                                val text = input
-                                val selected = attachments.toList()
-                                input = ""
-                                attachments.clear()
-                                onSend(text, selected)
-                            }
-                        },
-                        enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                        if (state.planMode) "规划中" else "规划",
+                        { onPlanModeChange(!state.planMode) },
+                        variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                        enabled = !state.running,
                     )
+                    Spacer(Modifier.weight(1f))
+                    if (state.running) {
+                        DsButton("停止", onStop, variant = DsButtonVariant.Danger)
+                    } else {
+                        DsButton(
+                            "发送",
+                            onClick = {
+                                if (!state.configured) {
+                                    onConfigure()
+                                } else {
+                                    val selected = attachments.toList()
+                                    onSend(input, selected)
+                                    drafts[state.sessionId] = ""
+                                    attachments.clear()
+                                }
+                            },
+                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                        )
+                    }
                 }
             }
         }
@@ -806,7 +870,7 @@ private fun ImportedAttachmentRow(
 }
 
 @Composable
-private fun EmptyLocalHarness() {
+private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
     val colors = DsTheme.colors
     Column(
         Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = 64.dp),
@@ -820,7 +884,32 @@ private fun EmptyLocalHarness() {
             "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
             style = DsType.std14,
             color = colors.labelSecondary,
+            textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            DsQuickActionTile(
+                icon = FeatherIcons.FileText,
+                label = "整理文件",
+                onClick = { onSuggestion("帮我整理工作区文件，并先给出安全的执行计划") },
+                modifier = Modifier.weight(1f),
+            )
+            DsQuickActionTile(
+                icon = FeatherIcons.Globe,
+                label = "联网调研",
+                onClick = { onSuggestion("联网调研这个主题，列出来源、结论和待核实事项：") },
+                modifier = Modifier.weight(1f),
+            )
+            DsQuickActionTile(
+                icon = FeatherIcons.CheckSquare,
+                label = "拆解任务",
+                onClick = { onSuggestion("把这项任务拆成可执行步骤，并从第一步开始：") },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -924,33 +1013,7 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             onCopy = { clipboard.setText(AnnotatedString(message.content)) },
         )
 
-        isUser -> Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(0.86f),
-                shape = RoundedCornerShape(18.dp),
-                color = colors.userBubble,
-            ) {
-                Column(
-                    Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                ) {
-                    SelectionContainer {
-                        Text(message.content, style = DsType.bubbleText, color = colors.labelPrimary)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        DsButton(
-                            "复制",
-                            { clipboard.setText(AnnotatedString(message.content)) },
-                            variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                        )
-                    }
-                }
-            }
-        }
+        isUser -> UserBubble(message.content)
 
         message.role == "system" -> Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -969,13 +1032,7 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            SelectionContainer {
-                Text(
-                    message.content,
-                    style = DsType.mdBody,
-                    color = colors.labelPrimary,
-                )
-            }
+            MarkdownText(message.content)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 DsButton(
                     "复制",
@@ -1191,21 +1248,21 @@ private fun ApprovalDialog(
         )
 
         DsButton(
-            "批准",
+            "仅批准本次",
             onApprove,
             modifier = Modifier.fillMaxWidth(),
-        )
-        DsButton(
-            "自动批准",
-            onAutoApprove,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Info,
         )
         DsButton(
             "拒绝",
             onDeny,
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
+        )
+        DsButton(
+            "本会话后续自动批准",
+            onAutoApprove,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
         )
     }
 }

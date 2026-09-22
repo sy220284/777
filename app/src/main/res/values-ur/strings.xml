@@ -219,6 +219,8 @@
     <string name="presets_user">کسٹم</string>
     <string name="settings_title">سیٹنگز</string>
     <string name="settings_general">عمومی</string>
+    <string name="settings_advanced">اعلیٰ صلاحیتیں</string>
+    <string name="settings_advanced_hint">پروجیکٹس، ماڈلز، مقامی رن ٹائم اور ڈیوائس تک رسائی</string>
     <string name="settings_models">ماڈلز</string>
     <string name="settings_plugins">پلگ انز</string>
     <string name="settings_plugins_inventory">پلگ ان انوینٹری</string>

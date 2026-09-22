@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -113,6 +115,7 @@ fun SettingsScreen(
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var showDisconnectDialog by remember { mutableStateOf(false) }
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(onBack = onClose)
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
@@ -189,27 +192,60 @@ fun SettingsScreen(
                     ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
                 }
 
-                ProjectSettingsCard(
-                    state = projectSettings,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
+                SettingsCard(
+                    stringResource(R.string.settings_advanced),
+                    Icons.Outlined.Extension,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(DsShapes.row)
+                            .clickable { advancedExpanded = !advancedExpanded }
+                            .padding(vertical = DsSpacing.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_advanced_hint),
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            if (advancedExpanded) Icons.Filled.KeyboardArrowDown
+                            else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.labelTertiary,
+                        )
+                    }
+                }
 
-                ModelServicesCard(
-                    state = modelServices,
-                    viewModel = viewModel,
-                )
+                AnimatedVisibility(visible = advancedExpanded) {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                    ) {
+                        ProjectSettingsCard(
+                            state = projectSettings,
+                            viewModel = viewModel,
+                            report = toast.second,
+                        )
 
-                LocalHarnessSettingsCard(
-                    local = localHarness,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
+                        ModelServicesCard(
+                            state = modelServices,
+                            viewModel = viewModel,
+                        )
 
-                DeviceCapabilitiesCard(
-                    state = deviceCapabilities,
-                    viewModel = viewModel,
-                )
+                        LocalHarnessSettingsCard(
+                            local = localHarness,
+                            viewModel = viewModel,
+                            report = toast.second,
+                        )
+
+                        DeviceCapabilitiesCard(
+                            state = deviceCapabilities,
+                            viewModel = viewModel,
+                        )
+                    }
+                }
 
                 SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
                     DsButton(

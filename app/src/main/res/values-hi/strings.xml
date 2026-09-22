@@ -219,6 +219,8 @@
     <string name="presets_user">कस्टम</string>
     <string name="settings_title">सेटिंग्स</string>
     <string name="settings_general">सामान्य</string>
+    <string name="settings_advanced">उन्नत क्षमताएँ</string>
+    <string name="settings_advanced_hint">प्रोजेक्ट, मॉडल, स्थानीय रनटाइम और डिवाइस एक्सेस</string>
     <string name="settings_models">मॉडल</string>
     <string name="settings_plugins">प्लगइन</string>
     <string name="settings_plugins_inventory">प्लगइन सूची</string>

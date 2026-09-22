@@ -219,6 +219,8 @@
     <string name="presets_user">Personalizado</string>
     <string name="settings_title">Configurações</string>
     <string name="settings_general">Geral</string>
+    <string name="settings_advanced">Recursos avançados</string>
+    <string name="settings_advanced_hint">Projetos, modelos, execução local e acesso ao dispositivo</string>
     <string name="settings_models">Modelos</string>
     <string name="settings_plugins">Plugins</string>
     <string name="settings_plugins_inventory">Inventário de plugins</string>

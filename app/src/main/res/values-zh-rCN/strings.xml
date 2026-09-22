@@ -219,6 +219,8 @@
     <string name="presets_user">自定义</string>
     <string name="settings_title">设置</string>
     <string name="settings_general">通用</string>
+    <string name="settings_advanced">高级能力</string>
+    <string name="settings_advanced_hint">项目、模型、本机运行与设备权限</string>
     <string name="settings_models">模型</string>
     <string name="settings_plugins">插件</string>
     <string name="settings_plugins_inventory">插件清单</string>
