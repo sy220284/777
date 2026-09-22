@@ -20,7 +20,7 @@ internal object LocalToolPolicy {
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
         "read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
-        "environment_info", "get_goal", "skill", "list_subagent_models", "list_agents",
+        "environment_info", "capability_search", "get_goal", "skill", "list_subagent_models", "list_agents",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read" -> ToolAccess.READ_ONLY
         else -> error("内置工具尚未声明权限：$name")
