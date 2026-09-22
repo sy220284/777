@@ -598,13 +598,10 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
 }
 
 @Composable
-private fun LanguageRow(settings: AppSettings, onSelect: (String?) -> Unit) {
+private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = DsTheme.colors
-    // A dropdown, not a grid of twelve cells. The grid spent four rows of a settings page on a
-    // choice that is made once and then never touched, and at three per row the longer endonyms had
-    // to be ellipsised to fit — so the control was both the largest thing on the screen and unable
-    // to spell out its own options.
-    val effectiveTag = when {
+    // A compact dropdown keeps the language choice secondary to the settings users change often.
+        val effectiveTag = when {
         settings.localeOverride?.startsWith("zh", ignoreCase = true) == true -> "zh-CN"
         settings.localeOverride == "en" -> "en"
         Locale.getDefault().language.equals("zh", ignoreCase = true) -> "zh-CN"
