@@ -61,7 +61,7 @@ class AgentLoopTest {
         }
         val loop = AgentLoop(
             model = model,
-            tools = AgentToolExecutor { "文件内容" },
+            tools = AgentToolExecutor { AgentToolResult("文件内容") },
             eventSink = AgentEventSink { events += it },
             idFactory = { "turn-2" },
         )
@@ -107,7 +107,7 @@ class AgentLoopTest {
             tools = AgentToolExecutor { error("批量执行器存在时不应走单调用执行器") },
             toolBatch = AgentToolBatchExecutor { calls ->
                 observedCalls = calls
-                listOf("结果甲", "结果乙")
+                listOf(AgentToolResult("结果甲"), AgentToolResult("结果乙"))
             },
             isParallelTool = { true },
             eventSink = AgentEventSink { events += it },
@@ -125,6 +125,38 @@ class AgentLoopTest {
     }
 
     @Test
+    fun structuredToolErrorIsPreservedButStillAllowsModelRecovery() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        val loop = AgentLoop(
+            model = AgentModel { messages ->
+                request += 1
+                if (request == 1) {
+                    AgentModelReply(
+                        toolCalls = listOf(
+                            AgentToolCall("call-error", "read", buildJsonObject { put("path", "missing") }),
+                        ),
+                    )
+                } else {
+                    assertEquals("读取失败", messages.last().content)
+                    AgentModelReply(content = "已改用其他方案")
+                }
+            },
+            tools = AgentToolExecutor { AgentToolResult("读取失败", isError = true) },
+            eventSink = AgentEventSink { events += it },
+            idFactory = { "turn-tool-error" },
+        )
+
+        val result = loop.run("读取文件")
+
+        val toolEvent = events.filterIsInstance<AgentEvent.ToolFinished>().single()
+        assertTrue(toolEvent.isError)
+        assertEquals("读取失败", toolEvent.output)
+        assertEquals("已改用其他方案", result.answer)
+        assertTrue(events.last() is AgentEvent.TurnCompleted)
+    }
+
+    @Test
     fun stepLimitIsAControlledStopInsteadOfFailure() = runTest {
         val events = mutableListOf<AgentEvent>()
         val loop = AgentLoop(
@@ -135,7 +167,7 @@ class AgentLoopTest {
                     ),
                 )
             },
-            tools = AgentToolExecutor { "继续" },
+            tools = AgentToolExecutor { AgentToolResult("继续") },
             eventSink = AgentEventSink { events += it },
             maxSteps = 1,
             idFactory = { "turn-limit" },
@@ -153,7 +185,7 @@ class AgentLoopTest {
         val events = mutableListOf<AgentEvent>()
         val loop = AgentLoop(
             model = AgentModel { error("模型失败") },
-            tools = AgentToolExecutor { "" },
+            tools = AgentToolExecutor { AgentToolResult("") },
             eventSink = AgentEventSink { events += it },
             idFactory = { "turn-model-failure" },
         )
@@ -200,7 +232,7 @@ class AgentLoopTest {
                 gate.await()
                 AgentModelReply(content = "不会返回")
             },
-            tools = AgentToolExecutor { "" },
+            tools = AgentToolExecutor { AgentToolResult("") },
             eventSink = AgentEventSink { events += it },
             idFactory = { "turn-3" },
         )

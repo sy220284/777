@@ -21,6 +21,7 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
+import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
@@ -391,7 +392,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Persist execution limits exposed from Settings. */
     fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
         val main = mainMaxSteps.coerceIn(4, 128)
-        val subagent = subagentMaxSteps.coerceIn(1, 40)
+        val subagent = subagentMaxSteps.coerceIn(1, 128)
         val attempts = modelAttempts.coerceIn(1, 5)
         preferences.edit()
             .putInt(KEY_MAIN_MAX_STEPS, main)
@@ -1019,6 +1020,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("name", event.call.name)
                             put("content", event.output.take(MAX_EVENT_CHARS))
                             put("model_content", modelOutput)
+                            put("is_error", event.isError)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         modelHistory += buildJsonObject {
@@ -1126,7 +1128,7 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
-    ): List<Pair<LocalToolCall, String>> {
+    ): List<Pair<LocalToolCall, AgentToolResult>> {
         val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
         if (!parallelSubagents) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
@@ -1136,7 +1138,7 @@ class LocalHarnessEngine @Inject constructor(
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
-                call to formatToolFailure(
+                call to toolFailureResult(
                     call,
                     "PARALLEL_TASK_ERROR",
                     error.message ?: error::class.java.simpleName,
@@ -1145,33 +1147,42 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): String = try {
+    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): AgentToolResult = try {
         executeRegistered(call, allowMutation)
     } catch (cancelled: CancellationException) {
         if (!currentCoroutineContext().isActive) throw cancelled
-        formatToolFailure(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
+        toolFailureResult(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
     } catch (error: LocalWebException) {
-        formatToolFailure(call, error.code, error.message ?: "网页工具失败")
+        toolFailureResult(call, error.code, error.message ?: "网页工具失败")
     } catch (error: LocalModelException) {
-        formatToolFailure(call, error.code, error.message ?: "模型请求失败")
+        toolFailureResult(call, error.code, error.message ?: "模型请求失败")
     } catch (error: Exception) {
-        formatToolFailure(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+        toolFailureResult(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
     }
 
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
 
-    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): String {
+    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult =
+        AgentToolResult(
+            content = formatToolFailure(call, code, detail),
+            isError = true,
+        )
+
+    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
-        if (registered == null) return "未知工具：${call.name}"
+            ?: return AgentToolResult("未知工具：${call.name}", isError = true)
         if (
             _state.value.planMode &&
             !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
-            return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
+            return AgentToolResult(
+                "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
+                isError = true,
+            )
         }
-        return toolRegistry.execute(
+        val result = toolRegistry.execute(
             name = call.name,
             input = call.arguments,
             rawArguments = call.rawArguments,
@@ -1193,7 +1204,8 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 },
             ),
-        ).content
+        )
+        return AgentToolResult(result.content, result.isError)
     }
 
     private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
@@ -1384,10 +1396,10 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = args.optionalString("model")
-                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 40)
+                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
                 if (args.boolean("run_in_background", false)) {
                     jobs.start("子代理：${task.take(100)}") { jobId, _ ->
-                        subagents.run(
+                        val result = subagents.runResult(
                             task = task,
                             inheritHistory = false,
                             allowMutation = false,
@@ -1395,6 +1407,7 @@ class LocalHarnessEngine @Inject constructor(
                             modelOverride = model,
                             maxSteps = maxSteps,
                         )
+                        result.requireCompletedOutput()
                     }
                 } else subagents.run(
                     task = task,
@@ -1607,12 +1620,13 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 task
             }
-            subagents.run(
+            val result = subagents.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
             )
+            result.requireCompletedOutput()
         }
         return results.joinToString("\n\n") { result ->
             val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
@@ -1951,7 +1965,7 @@ class LocalHarnessEngine @Inject constructor(
             model = model,
             baseUrl = baseUrl,
             mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 40),
+            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             workspacePath = workspace.path,
             sessionId = sessionId,

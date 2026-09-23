@@ -608,7 +608,7 @@
     <string name="common_disabled">Disabled</string>
     <string name="common_refresh">Refresh</string>
     <string name="advanced_accessibility">Accessibility control</string>
-    <string name="advanced_agent_limits_hint">Main loop 4–128; subagent 1–40; retries 1–5.</string>
+    <string name="advanced_agent_limits_hint">Main loop 4–128; subagent 1–128; retries 1–5.</string>
     <string name="advanced_agent_saved">Agent settings saved</string>
     <string name="advanced_agent_settings">Agent settings</string>
     <string name="advanced_auto_memory">Automatically remember explicit long-term rules</string>
