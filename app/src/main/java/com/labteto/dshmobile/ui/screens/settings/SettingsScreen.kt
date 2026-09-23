@@ -108,6 +108,7 @@ private enum class SettingsPage {
     ROOT,
     GENERAL,
     MODELS,
+    PRICING,
     MEMORY,
     PERMISSIONS,
     NOTIFICATIONS,
@@ -129,6 +130,7 @@ fun SettingsScreen(
     val projectSettings by viewModel.projectSettings.collectAsStateWithLifecycle()
     val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
+    val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val visionSettings by viewModel.visionSettings.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
@@ -155,6 +157,7 @@ fun SettingsScreen(
         SettingsPage.ROOT -> stringResource(R.string.settings_title)
         SettingsPage.GENERAL -> stringResource(R.string.settings_page_general)
         SettingsPage.MODELS -> stringResource(R.string.settings_page_models)
+        SettingsPage.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
         SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
@@ -202,6 +205,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
                                 onClick = { page = SettingsPage.MODELS },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_pricing),
+                                subtitle = stringResource(R.string.settings_pricing_subtitle),
+                                onClick = { page = SettingsPage.PRICING },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
@@ -274,6 +283,10 @@ fun SettingsScreen(
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                         LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
+                    }
+
+                    SettingsPage.PRICING -> {
+                        DeepSeekPricingCard(deepSeekPricing, viewModel)
                     }
 
                     SettingsPage.MEMORY -> {
