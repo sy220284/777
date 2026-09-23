@@ -26,6 +26,30 @@ class LocalApprovalPolicyTest {
     }
 
     @Test
+    fun enablingSafeModeOnlyResolvesACurrentlySafeApproval() {
+        val safe = LocalApproval(
+            callId = "safe",
+            toolName = "read",
+            summary = "read",
+            arguments = "{}",
+            access = "read_only",
+            canAutoApproveSafely = true,
+        )
+        val highRisk = LocalApproval(
+            callId = "risk",
+            toolName = "bash",
+            summary = "bash",
+            arguments = "{}",
+            access = "process",
+            canAutoApproveSafely = false,
+        )
+
+        assertTrue(canResolvePendingByEnablingSafeAutoApproval(safe))
+        assertFalse(canResolvePendingByEnablingSafeAutoApproval(highRisk))
+        assertFalse(canResolvePendingByEnablingSafeAutoApproval(null))
+    }
+
+    @Test
     fun deviceTurnLeaseCannotOverrideAlwaysApproval() {
         assertTrue(canUseDeviceApprovalLease(
             tool("android_tap", ToolAccess.DEVICE, ToolApprovalPolicy.MUTATION),
