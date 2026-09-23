@@ -308,7 +308,9 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                     node.blocks.forEach { block ->
                         when (block.kind) {
                             "text", "reasoning" -> {
-                                if (!block.text.isNullOrBlank()) {\n                                    MarkdownText(block.text.orEmpty(), allowCodeCopy = false)\n                                }
+                                if (!block.text.isNullOrBlank()) {
+                                    MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
+                                }
                             }
                             // Tool calls/results have their own compact cards in the transcript.
                             "tool-call", "tool-result" -> Unit
