@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -269,6 +272,11 @@ fun SettingsScreen(
                         SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                             LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                            BackgroundRow(
+                                path = settings.backgroundImagePath,
+                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
+                                onClear = { viewModel.clearBackgroundImage() },
+                            )
                         }
                         SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
                             ToggleRow(
@@ -809,5 +817,50 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
             style = DsType.small13,
             color = if (selected) colors.accent else colors.labelSecondary,
         )
+    }
+}
+
+/**
+ * Pick or drop the app-wide background image.
+ *
+ * The picked bytes are copied into app storage rather than the URI kept, which is why the document
+ * picker is enough here: it is also the picker this app already uses for attachments, and one
+ * picker is one thing to keep working.
+ */
+@Composable
+private fun BackgroundRow(path: String?, onPick: (Uri) -> Unit, onClear: () -> Unit) {
+    val colors = DsTheme.colors
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onPick(uri)
+    }
+    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+        Text(
+            stringResource(R.string.settings_background_image),
+            style = DsType.std14,
+            color = colors.labelSecondary,
+        )
+        Spacer(Modifier.height(DsSpacing.small))
+        Text(
+            stringResource(
+                if (path == null) {
+                    R.string.settings_background_image_none
+                } else {
+                    R.string.settings_background_image_active
+                },
+            ),
+            style = DsType.small13,
+            color = colors.labelTertiary,
+        )
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            AppearanceChip(stringResource(R.string.settings_background_image_choose), false) {
+                picker.launch(arrayOf("image/*"))
+            }
+            if (path != null) {
+                AppearanceChip(stringResource(R.string.settings_background_image_clear), false) {
+                    onClear()
+                }
+            }
+        }
     }
 }

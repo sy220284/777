@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.github.sisong.HPatch
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.EOFException
 import java.io.File
@@ -39,6 +40,7 @@ class UpdateInstaller @Inject constructor(
         .retryOnConnectionFailure(true)
         .protocols(listOf(Protocol.HTTP_1_1))
         .build()
+
     suspend fun downloadVerifyAndLaunch(update: AvailableUpdate): UpdateInstallResult =
         withContext(Dispatchers.IO) {
             val apkUrl = update.apkUrl ?: error("该发行版没有 APK 资源")
@@ -62,14 +64,29 @@ class UpdateInstaller @Inject constructor(
             val canReuse = target.isFile &&
                 (update.apkSize == null || target.length() == update.apkSize) &&
                 sha256(target).equals(expected, ignoreCase = true)
+
+            var usedDelta = false
             if (!canReuse) {
                 target.delete()
-                download(apkUrl, target, MAX_APK_BYTES, update.apkSize)
-                val actual = sha256(target)
-                if (!actual.equals(expected, ignoreCase = true)) {
+                usedDelta = tryDeltaUpdate(update, target, expected)
+                if (!usedDelta) {
                     target.delete()
-                    error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
+                    downloadFile(
+                        url = apkUrl,
+                        target = target,
+                        maxBytes = MAX_APK_BYTES,
+                        expectedBytes = update.apkSize,
+                        kind = "APK",
+                        accept = "application/vnd.android.package-archive, application/octet-stream",
+                    )
+                    val actual = sha256(target)
+                    if (!actual.equals(expected, ignoreCase = true)) {
+                        target.delete()
+                        error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
+                    }
                 }
+            } else {
+                usedDelta = update.patchChain.isNotEmpty()
             }
 
             verifyPackageAndSigner(target)
@@ -97,13 +114,127 @@ class UpdateInstaller @Inject constructor(
             context.startActivity(intent)
             UpdateInstallResult(
                 launchedInstaller = true,
-                message = "APK 已通过摘要、包名与签名校验，已交给 Android 系统安装器。",
+                message = if (usedDelta) {
+                    "增量包已合成完整 APK，并通过摘要、包名与签名校验，已交给 Android 系统安装器。"
+                } else {
+                    "APK 已通过摘要、包名与签名校验，已交给 Android 系统安装器。"
+                },
             )
         }
 
-    private fun download(url: String, target: File, maxBytes: Long, expectedBytes: Long?) {
+    private fun tryDeltaUpdate(
+        update: AvailableUpdate,
+        target: File,
+        expectedTargetSha256: String,
+    ): Boolean {
+        if (update.patchChain.isEmpty()) return false
+        val installedApk = File(context.applicationInfo.sourceDir)
+        if (!installedApk.isFile) return false
+
+        val intermediates = mutableListOf<File>()
+        var source = installedApk
+
+        try {
+            for ((index, step) in update.patchChain.withIndex()) {
+                if (!sha256(source).equals(step.sourceSha256, ignoreCase = true)) {
+                    cleanupIntermediates(intermediates, target)
+                    return false
+                }
+
+                val safePatchName = step.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val patchFile = File(target.parentFile, safePatchName)
+                val canReusePatch = patchFile.isFile &&
+                    patchFile.length() == step.size &&
+                    sha256(patchFile).equals(step.expectedSha256, ignoreCase = true)
+                if (!canReusePatch) {
+                    patchFile.delete()
+                    downloadFile(
+                        url = step.url,
+                        target = patchFile,
+                        maxBytes = MAX_PATCH_BYTES,
+                        expectedBytes = step.size,
+                        kind = "增量包",
+                        accept = "application/octet-stream",
+                    )
+                    val patchSha = sha256(patchFile)
+                    if (!patchSha.equals(step.expectedSha256, ignoreCase = true)) {
+                        patchFile.delete()
+                        cleanupIntermediates(intermediates, target)
+                        return false
+                    }
+                }
+
+                val isLast = index == update.patchChain.lastIndex
+                val output = if (isLast) {
+                    target
+                } else {
+                    File(
+                        target.parentFile,
+                        "stage-${index + 1}-" +
+                            step.toVersion.replace(Regex("[^A-Za-z0-9._-]"), "_") +
+                            ".apk",
+                    ).also(intermediates::add)
+                }
+                output.delete()
+
+                val patchResult = HPatch.patch(
+                    source.absolutePath,
+                    patchFile.absolutePath,
+                    output.absolutePath,
+                    PATCH_CACHE_BYTES,
+                    PATCH_THREADS,
+                    true,
+                )
+                if (patchResult != 0 || !output.isFile) {
+                    output.delete()
+                    cleanupIntermediates(intermediates, target)
+                    return false
+                }
+
+                val outputSha = sha256(output)
+                if (!outputSha.equals(step.targetSha256, ignoreCase = true)) {
+                    output.delete()
+                    cleanupIntermediates(intermediates, target)
+                    return false
+                }
+
+                if (source !== installedApk && source != target) {
+                    source.delete()
+                    intermediates.remove(source)
+                }
+                source = output
+            }
+
+            val valid = source == target &&
+                target.isFile &&
+                sha256(target).equals(expectedTargetSha256, ignoreCase = true)
+            if (!valid) target.delete()
+            cleanupIntermediates(intermediates, if (valid) null else target)
+            return valid
+        } catch (_: LinkageError) {
+            cleanupIntermediates(intermediates, target)
+            return false
+        } catch (_: Exception) {
+            cleanupIntermediates(intermediates, target)
+            return false
+        }
+    }
+
+    private fun cleanupIntermediates(files: Collection<File>, target: File?) {
+        files.forEach(File::delete)
+        target?.delete()
+    }
+
+    private fun downloadFile(
+        url: String,
+        target: File,
+        maxBytes: Long,
+        expectedBytes: Long?,
+        kind: String,
+        accept: String,
+    ) {
         require(expectedBytes == null || expectedBytes in 1..maxBytes) {
-            "APK 大小异常：$expectedBytes 字节"
+            "$kind 大小异常：$expectedBytes 字节"
         }
         val temp = File(target.parentFile, target.name + ".part")
         var lastError: IOException? = null
@@ -113,19 +244,19 @@ class UpdateInstaller @Inject constructor(
             try {
                 val request = Request.Builder()
                     .url(url)
-                    .header("Accept", "application/vnd.android.package-archive, application/octet-stream")
+                    .header("Accept", accept)
                     .header("Cache-Control", "no-cache")
                     .get()
                     .build()
                 downloadClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        throw IOException("下载 APK 失败：HTTP ${response.code}")
+                        throw IOException("下载 $kind 失败：HTTP ${response.code}")
                     }
-                    val body = response.body ?: throw IOException("下载 APK 返回空响应")
+                    val body = response.body ?: throw IOException("下载 $kind 返回空响应")
                     val declared = body.contentLength()
-                    if (declared > maxBytes) throw IOException("APK 超过允许大小：$declared 字节")
+                    if (declared > maxBytes) throw IOException("$kind 超过允许大小：$declared 字节")
                     if (expectedBytes != null && declared >= 0L && declared != expectedBytes) {
-                        throw EOFException("APK 响应长度异常：$declared/$expectedBytes 字节")
+                        throw EOFException("$kind 响应长度异常：$declared/$expectedBytes 字节")
                     }
 
                     var total = 0L
@@ -136,18 +267,20 @@ class UpdateInstaller @Inject constructor(
                                 val read = input.read(buffer)
                                 if (read < 0) break
                                 total += read
-                                if (total > maxBytes || (expectedBytes != null && total > expectedBytes)) {
-                                    throw IOException("APK 下载超过预期大小")
+                                if (total > maxBytes ||
+                                    (expectedBytes != null && total > expectedBytes)
+                                ) {
+                                    throw IOException("$kind 下载超过预期大小")
                                 }
                                 output.write(buffer, 0, read)
                             }
                         }
                     }
                     if (declared >= 0L && total != declared) {
-                        throw EOFException("APK 下载流提前结束：$total/$declared 字节")
+                        throw EOFException("$kind 下载流提前结束：$total/$declared 字节")
                     }
                     if (expectedBytes != null && total != expectedBytes) {
-                        throw EOFException("APK 下载不完整：$total/$expectedBytes 字节")
+                        throw EOFException("$kind 下载不完整：$total/$expectedBytes 字节")
                     }
                 }
 
@@ -167,10 +300,12 @@ class UpdateInstaller @Inject constructor(
         }
 
         throw IOException(
-            "APK 下载连接中断，已自动重试 $MAX_DOWNLOAD_ATTEMPTS 次：${lastError?.message ?: "未知网络错误"}",
+            "$kind 下载连接中断，已自动重试 $MAX_DOWNLOAD_ATTEMPTS 次：" +
+                (lastError?.message ?: "未知网络错误"),
             lastError,
         )
     }
+
     private fun fetchText(url: String, maxBytes: Long): String {
         val request = Request.Builder()
             .url(url)
@@ -230,6 +365,9 @@ class UpdateInstaller @Inject constructor(
         require(installedSigners == archiveSigners) {
             "APK 签名证书与当前安装版本不一致，拒绝自动安装"
         }
+        require(archive.longVersionCode > installed.longVersionCode) {
+            "APK 版本号没有高于当前安装版本，拒绝覆盖安装"
+        }
     }
 
     private fun signerDigests(info: android.content.pm.PackageInfo): Set<String> {
@@ -248,8 +386,11 @@ class UpdateInstaller @Inject constructor(
 
     private companion object {
         const val MAX_APK_BYTES = 200L * 1024L * 1024L
+        const val MAX_PATCH_BYTES = 128L * 1024L * 1024L
         const val MAX_CHECKSUM_BYTES = 256L * 1024L
         const val MAX_DOWNLOAD_ATTEMPTS = 4
         const val RETRY_BACKOFF_MS = 500L
+        const val PATCH_CACHE_BYTES = 8L * 1024L * 1024L
+        const val PATCH_THREADS = 2
     }
 }

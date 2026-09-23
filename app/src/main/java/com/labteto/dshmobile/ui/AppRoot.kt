@@ -51,7 +51,10 @@ fun AppRoot(
 
     val updateInstallStatus by viewModel.updateInstallStatus.collectAsStateWithLifecycle()
 
-    DshTheme(preference = themePreference) {
+    DshTheme(
+        preference = themePreference,
+        backgroundPath = settings.backgroundImagePath,
+    ) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         // Local Harness is always the product home. Remote control has exactly one transport:

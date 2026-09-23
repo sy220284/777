@@ -13,6 +13,16 @@ data class JobInfo(
     val status: String,
 )
 
+data class JobSnapshot(
+    val id: String,
+    val label: String,
+    val status: String,
+    val output: String = "",
+    val resumeKind: String? = null,
+    val resumePayload: String? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
 /** Process-agnostic shared job controller used by the Android runtime adapter. */
 class HarnessJobManager(
     private val scope: CoroutineScope,
@@ -22,6 +32,8 @@ class HarnessJobManager(
     },
     private val maxConcurrentJobs: Int = DEFAULT_MAX_CONCURRENT_JOBS,
     private val maxRetainedJobs: Int = DEFAULT_MAX_RETAINED_JOBS,
+    initialSnapshots: List<JobSnapshot> = emptyList(),
+    private val onSnapshotsChanged: (List<JobSnapshot>) -> Unit = { },
 ) {
     init {
         require(maxConcurrentJobs in 1..32) { "后台任务并发上限必须在 1..32 之间" }
@@ -29,6 +41,7 @@ class HarnessJobManager(
             "后台任务保留上限必须不少于并发上限，且不超过 512"
         }
     }
+
     private data class Record(
         val id: String,
         val label: String,
@@ -36,12 +49,93 @@ class HarnessJobManager(
         var output: String = "",
         var job: Job? = null,
         val inbox: MutableList<String> = mutableListOf(),
+        val resumeKind: String? = null,
+        val resumePayload: String? = null,
+        var updatedAt: Long = System.currentTimeMillis(),
     )
 
     private val lock = Any()
     private val records = linkedMapOf<String, Record>()
 
-    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String {
+    init {
+        synchronized(lock) {
+            initialSnapshots.takeLast(maxRetainedJobs).forEach { snapshot ->
+                val interrupted = snapshot.status == "running"
+                records[snapshot.id] = Record(
+                    id = snapshot.id,
+                    label = snapshot.label.take(MAX_LABEL),
+                    status = if (interrupted) "interrupted" else snapshot.status,
+                    output = if (interrupted) {
+                        snapshot.output.takeLast(MAX_OUTPUT).let { previous ->
+                            if (previous.isBlank()) "进程中断，等待安全恢复"
+                            else "${previous}\n进程中断，等待安全恢复".takeLast(MAX_OUTPUT)
+                        }
+                    } else {
+                        snapshot.output.takeLast(MAX_OUTPUT)
+                    },
+                    resumeKind = snapshot.resumeKind,
+                    resumePayload = snapshot.resumePayload,
+                    updatedAt = snapshot.updatedAt,
+                )
+            }
+        }
+        publish()
+    }
+
+    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
+        startInternal(label, resumeKind = null, resumePayload = null, block = block)
+
+    fun startPersistent(
+        label: String,
+        resumeKind: String,
+        resumePayload: String,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): String {
+        require(resumeKind.isNotBlank()) { "持久任务恢复类型不能为空" }
+        return startInternal(
+            label = label,
+            resumeKind = resumeKind.take(MAX_RESUME_KIND),
+            resumePayload = resumePayload.take(MAX_RESUME_PAYLOAD),
+            block = block,
+        )
+    }
+
+    fun resumePersistent(
+        id: String,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): String {
+        val record = synchronized(lock) {
+            val found = records[id] ?: return "后台任务不存在：$id"
+            if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
+            if (found.status != "interrupted") return "后台任务无需恢复：$id [${found.status}]"
+            val running = records.values.count { it.status == "running" }
+            if (running >= maxConcurrentJobs) {
+                return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
+            }
+            found.status = "running"
+            found.output = "正在从安全检查点恢复…"
+            found.updatedAt = System.currentTimeMillis()
+            found
+        }
+        launchRecord(record, block)
+        publish()
+        return "后台任务已恢复：${record.id}"
+    }
+
+    fun interruptedSnapshots(): List<JobSnapshot> = synchronized(lock) {
+        records.values
+            .filter { it.status == "interrupted" && !it.resumeKind.isNullOrBlank() }
+            .map(::snapshot)
+    }
+
+    fun snapshots(): List<JobSnapshot> = synchronized(lock) { records.values.map(::snapshot) }
+
+    private fun startInternal(
+        label: String,
+        resumeKind: String?,
+        resumePayload: String?,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): String {
         val record = synchronized(lock) {
             pruneRetainedLocked()
             val running = records.values.count { it.status == "running" }
@@ -52,36 +146,54 @@ class HarnessJobManager(
             do {
                 id = idFactory()
             } while (records.containsKey(id))
-            Record(id, label.take(MAX_LABEL)).also { records[id] = it }
+            Record(
+                id = id,
+                label = label.take(MAX_LABEL),
+                resumeKind = resumeKind,
+                resumePayload = resumePayload,
+            ).also { records[id] = it }
         }
+        launchRecord(record, block)
+        publish()
+        return "后台任务已启动：${record.id}"
+    }
+
+    private fun launchRecord(
+        record: Record,
+        block: suspend (String, (String) -> Unit) -> String,
+    ) {
         record.job = scope.launch {
             try {
                 val report: (String) -> Unit = { output ->
-                    synchronized(lock) { record.output = output.takeLast(MAX_OUTPUT) }
+                    synchronized(lock) {
+                        record.output = output.takeLast(MAX_OUTPUT)
+                        record.updatedAt = System.currentTimeMillis()
+                    }
                     publish()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 synchronized(lock) {
                     record.output = result
                     record.status = "completed"
+                    record.updatedAt = System.currentTimeMillis()
                 }
             } catch (cancelled: CancellationException) {
                 synchronized(lock) {
                     record.status = "cancelled"
                     record.output = "任务已取消"
+                    record.updatedAt = System.currentTimeMillis()
                 }
                 throw cancelled
             } catch (error: Exception) {
                 synchronized(lock) {
                     record.status = "failed"
                     record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
+                    record.updatedAt = System.currentTimeMillis()
                 }
             } finally {
                 publish()
             }
         }
-        publish()
-        return "后台任务已启动：${record.id}"
     }
 
     fun list(): String = snapshotRecords().let { snapshot ->
@@ -108,6 +220,7 @@ class HarnessJobManager(
             if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
             record.status = "cancelled"
             record.output = "任务已取消"
+            record.updatedAt = System.currentTimeMillis()
             record.job
         }
         job?.cancel()
@@ -127,7 +240,9 @@ class HarnessJobManager(
             while (record.inbox.size > MAX_INBOX_MESSAGES) {
                 record.inbox.removeAt(0)
             }
+            record.updatedAt = System.currentTimeMillis()
         }
+        publish()
         return "消息已发送给后台代理：$id"
     }
 
@@ -153,6 +268,7 @@ class HarnessJobManager(
         records.values.filter { it.status == "running" }.onEach {
             it.status = "cancelled"
             it.output = "任务已取消"
+            it.updatedAt = System.currentTimeMillis()
         }.mapNotNull { it.job }
     }
 
@@ -171,7 +287,26 @@ class HarnessJobManager(
         records.values.map { JobInfo(it.id, it.label, it.status) }
     }
 
-    private fun publish() = onChanged(snapshotRecords())
+    private fun snapshot(record: Record): JobSnapshot = JobSnapshot(
+        id = record.id,
+        label = record.label,
+        status = record.status,
+        output = record.output,
+        resumeKind = record.resumeKind,
+        resumePayload = record.resumePayload,
+        updatedAt = record.updatedAt,
+    )
+
+    private fun publish() {
+        val infos: List<JobInfo>
+        val snapshots: List<JobSnapshot>
+        synchronized(lock) {
+            infos = records.values.map { JobInfo(it.id, it.label, it.status) }
+            snapshots = records.values.map(::snapshot)
+        }
+        onChanged(infos)
+        onSnapshotsChanged(snapshots)
+    }
 
     private companion object {
         const val AGENT_PREFIX = "子代理："
@@ -179,6 +314,8 @@ class HarnessJobManager(
         const val MAX_OUTPUT = 65_536
         const val MAX_INBOX_MESSAGE = 4_000
         const val MAX_INBOX_MESSAGES = 32
+        const val MAX_RESUME_KIND = 64
+        const val MAX_RESUME_PAYLOAD = 64_000
         const val DEFAULT_MAX_CONCURRENT_JOBS = 4
         const val DEFAULT_MAX_RETAINED_JOBS = 64
     }

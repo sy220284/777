@@ -80,9 +80,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
+import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
@@ -108,6 +108,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import java.util.Locale
+import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -140,7 +141,6 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
-                usage = state.usage,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
@@ -472,7 +472,7 @@ private fun LocalConfiguration(
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
     Column(
-        Modifier.fillMaxSize().background(colors.bgBase).safeDrawingPadding().imePadding()
+        Modifier.fillMaxSize().background(colors.rootSurface()).safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
             .padding(DsSpacing.xlarge),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
@@ -674,9 +674,9 @@ private fun LocalChat(
         }
     }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.bgBase)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.rootSurface())) {
         Column(
-            Modifier.fillMaxWidth().background(colors.bgBase)
+            Modifier.fillMaxWidth().background(colors.rootSurface())
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
         ) {
             Row(
@@ -816,7 +816,12 @@ private fun LocalChat(
             }
         }
 
-        if (state.plan.isNotEmpty() || state.goal != null || state.todos.isNotEmpty() || state.jobs.isNotEmpty()) {
+        if (
+            state.running || state.plan.isNotEmpty() || state.goal != null ||
+            state.todos.isNotEmpty() || state.jobs.isNotEmpty() ||
+            state.activeAgents > 0 || state.activeTerminals > 0 ||
+            state.activeVirtualDisplays > 0 || state.activeLanguageServers > 0
+        ) {
             ExecutionStatusCard(
                 state = state,
                 modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -850,9 +855,44 @@ private fun LocalChat(
                 }
                 if (state.running) {
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Text(" 代理正在处理…", style = DsType.small13, color = colors.labelTertiary)
+                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(DsSpacing.small))
+                                Text(
+                                    stringResource(R.string.local_streaming_status),
+                                    style = DsType.small13,
+                                    color = colors.labelTertiary,
+                                )
+                            }
+                            if (state.streamingReasoning.isNotBlank()) {
+                                Text(
+                                    stringResource(R.string.local_streaming_reasoning),
+                                    style = DsType.caption11Strong,
+                                    color = colors.labelTertiary,
+                                )
+                                Text(
+                                    state.streamingReasoning,
+                                    style = DsType.small13,
+                                    color = colors.labelSecondary,
+                                    maxLines = 12,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (state.streamingAssistant.isNotBlank()) {
+                                Text(
+                                    stringResource(R.string.local_streaming_answer),
+                                    style = DsType.caption11Strong,
+                                    color = colors.labelTertiary,
+                                )
+                                Text(
+                                    state.streamingAssistant,
+                                    style = DsType.std14,
+                                    color = colors.labelPrimary,
+                                    maxLines = 16,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
@@ -1114,8 +1154,13 @@ private fun ImportedAttachmentRow(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
+                val dimensions = if (attachment.width != null && attachment.height != null) {
+                    " · ${attachment.width}×${attachment.height}"
+                } else {
+                    ""
+                }
                 Text(
-                    "${attachment.mediaType} · ${attachment.bytes} B",
+                    "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
@@ -1175,11 +1220,29 @@ private fun ExecutionStatusCard(
     var expanded by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
+    val resourceSummary = stringResource(
+        R.string.local_resource_summary,
+        state.activeAgents,
+        state.maxAgents,
+        state.activeTerminals,
+        state.maxTerminals,
+        state.activeVirtualDisplays,
+        state.maxVirtualDisplays,
+        state.activeLanguageServers,
+        state.maxLanguageServers,
+    )
+    val contextSummary = stringResource(
+        R.string.local_context_summary,
+        state.contextChars,
+        state.contextBudgetChars,
+    )
     val summary = buildList {
         state.goal?.let { add("目标 ${it.status}") }
         if (state.plan.isNotEmpty()) add("计划 ${state.plan.size} 步")
         if (total > 0) add("任务 $completed/$total")
         if (state.jobs.isNotEmpty()) add("后台 ${state.jobs.size}")
+        add(resourceSummary)
+        add(contextSummary)
     }.joinToString(" · ")
 
     Surface(
@@ -1202,7 +1265,7 @@ private fun ExecutionStatusCard(
                 )
                 Spacer(Modifier.size(DsSpacing.small))
                 Column(Modifier.weight(1f)) {
-                    Text("执行状态", style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(stringResource(R.string.local_execution_console), style = DsType.small13Strong, color = colors.labelPrimary)
                     Text(summary, style = DsType.caption11, color = colors.labelTertiary)
                 }
             }
@@ -1229,6 +1292,8 @@ private fun ExecutionStatusCard(
                         Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
                     }
                 }
+                Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
                 if (state.jobs.isNotEmpty()) {
                     Text(
                         "后台 · " + state.jobs.joinToString { "${it.label}[${it.status}]" },

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.app.ActivityManager
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -138,9 +139,27 @@ internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval
     approval?.canAutoApproveSafely == true
 
 internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
-    memoryClassMb >= 512 -> HarnessResourceBudget(maxModelRequests = 4, maxAgents = 4)
-    memoryClassMb >= 256 -> HarnessResourceBudget(maxModelRequests = 3, maxAgents = 3)
-    else -> HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2)
+    memoryClassMb >= 512 -> HarnessResourceBudget(
+        maxModelRequests = 4,
+        maxAgents = 4,
+        maxTerminals = 4,
+        maxVirtualDisplays = 2,
+        maxLanguageServers = 4,
+    )
+    memoryClassMb >= 256 -> HarnessResourceBudget(
+        maxModelRequests = 3,
+        maxAgents = 3,
+        maxTerminals = 3,
+        maxVirtualDisplays = 2,
+        maxLanguageServers = 3,
+    )
+    else -> HarnessResourceBudget(
+        maxModelRequests = 2,
+        maxAgents = 2,
+        maxTerminals = 2,
+        maxVirtualDisplays = 1,
+        maxLanguageServers = 2,
+    )
 }
 
 /**
@@ -175,6 +194,11 @@ class LocalHarnessEngine @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
+    private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
+    private val persistentJobStore = LocalPersistentJobStore(
+        file = File(root, "jobs.json"),
+        json = json,
+    )
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
         extraSearchPaths = ::bundledRuntimeSearchPaths,
@@ -217,11 +241,14 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
-    private val runtimePlugin = AndroidRuntimePlugin(
-        workspaceRoot = File(workspace.path),
-        processRuntime = runtimeProcess,
-        terminalProvider = runtimeTerminal,
-    )
+    private val runtimePlugin by lazy {
+        AndroidRuntimePlugin(
+            workspaceRoot = File(workspace.path),
+            processRuntime = runtimeProcess,
+            terminalProvider = runtimeTerminal,
+            resourceScheduler = resourceScheduler,
+        )
+    }
     private val mcpPlugin = McpToolBridgePlugin(
         http = http,
         json = json,
@@ -229,22 +256,29 @@ class LocalHarnessEngine @Inject constructor(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
     )
-    private val lspPlugin = com.labteto.dshmobile.interop.lsp.LspPlugin(
-        root = File(workspace.path),
-        json = json,
-        command = automaticLanguageServerResolver::resolve,
-        commandResolver = runtimeProcess::resolveCommand,
-        environment = { runtimeProcess.processEnvironment() },
-    )
-    private val deviceProvider = AndroidDeviceProvider(context)
-    private val devicePlugin = AndroidDevicePlugin(deviceProvider)
-    private val visionPlugin = LocalVisionPlugin(
-        device = deviceProvider,
-        keyProvider = visionSettings::apiKey,
-        routeProvider = visionSettings::route,
-        analyzer = visionClient,
-        workspaceRoot = File(workspace.path),
-    )
+    private val lspPlugin by lazy {
+        com.labteto.dshmobile.interop.lsp.LspPlugin(
+            root = File(workspace.path),
+            json = json,
+            command = automaticLanguageServerResolver::resolve,
+            commandResolver = runtimeProcess::resolveCommand,
+            environment = { runtimeProcess.processEnvironment() },
+            resourceScheduler = resourceScheduler,
+        )
+    }
+    private val deviceProvider by lazy {
+        AndroidDeviceProvider(context, resourceScheduler = resourceScheduler)
+    }
+    private val devicePlugin by lazy { AndroidDevicePlugin(deviceProvider) }
+    private val visionPlugin by lazy {
+        LocalVisionPlugin(
+            device = deviceProvider,
+            keyProvider = visionSettings::apiKey,
+            routeProvider = visionSettings::route,
+            analyzer = visionClient,
+            workspaceRoot = File(workspace.path),
+        )
+    }
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
     private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
@@ -268,9 +302,9 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
-    private val resourceBudget = localResourceBudgetForMemoryClass(
-        context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
-    )
+    private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
+    private val imageCapabilities = LocalImageCapabilityRegistry()
+    private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
@@ -278,14 +312,21 @@ class LocalHarnessEngine @Inject constructor(
                 it.copy(
                     activeModelRequests = snapshot.activeModelRequests,
                     activeAgents = snapshot.activeAgents,
+                    activeTerminals = snapshot.activeTerminals,
+                    activeVirtualDisplays = snapshot.activeVirtualDisplays,
+                    activeLanguageServers = snapshot.activeLanguageServers,
                     maxModelRequests = snapshot.budget.maxModelRequests,
                     maxAgents = snapshot.budget.maxAgents,
+                    maxTerminals = snapshot.budget.maxTerminals,
+                    maxVirtualDisplays = snapshot.budget.maxVirtualDisplays,
+                    maxLanguageServers = snapshot.budget.maxLanguageServers,
                     resourcePressure = snapshot.pressure.name.lowercase(),
+                    contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
                 )
             }
         },
     )
-    private val jobs = LocalJobManager(scope) { snapshot ->
+    private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
         _state.update { it.copy(jobs = snapshot) }
     }
 
@@ -314,16 +355,28 @@ class LocalHarnessEngine @Inject constructor(
             schemas = ::subagentToolSchemas,
             execute = ::executeSafely,
             pruneToolResult = ::pruneToolResult,
-            prepareMessages = { messages, mode ->
+            prepareMessages = { messages, mode, _, _ ->
                 prepareLocalMultimodalMessages(
                     messages = messages,
                     workspaceRoot = File(workspace.path),
-                    mode = effectiveImageInputMode(mode),
+                    mode = mode,
+                    budget = imageRequestBudget,
                 )
             },
+            resolveImageMode = { mode, baseUrl, model ->
+                resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+            },
+            onNativeImageAccepted = { baseUrl, model ->
+                imageCapabilities.markSupported(baseUrl, model)
+            },
             onUsage = { model, usage -> usageTracker.record(model, usage) },
-            onNativeImageRejected = { autoImageNativeRejected = true },
+            onNativeImageRejected = { baseUrl, model ->
+                imageCapabilities.markUnsupported(baseUrl, model)
+            },
             resourceScheduler = resourceScheduler,
+            acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
+            releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
+            historyBudget = ::currentHistoryBudget,
         )
     }
 
@@ -332,7 +385,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    @Volatile private var autoImageNativeRejected = false
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
 
@@ -343,7 +395,11 @@ class LocalHarnessEngine @Inject constructor(
             it.copy(
                 maxModelRequests = initialResources.budget.maxModelRequests,
                 maxAgents = initialResources.budget.maxAgents,
+                maxTerminals = initialResources.budget.maxTerminals,
+                maxVirtualDisplays = initialResources.budget.maxVirtualDisplays,
+                maxLanguageServers = initialResources.budget.maxLanguageServers,
                 resourcePressure = initialResources.pressure.name.lowercase(),
+                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
             )
         }
         seedWorkspace()
@@ -370,6 +426,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
                 load()
+                resumeInterruptedSafeJobs()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -441,7 +498,6 @@ class LocalHarnessEngine @Inject constructor(
                     .putString(KEY_MODEL, normalizedModel)
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .apply()
-                autoImageNativeRejected = false
                 _state.update {
                     it.copy(
                         configured = true,
@@ -457,12 +513,8 @@ class LocalHarnessEngine @Inject constructor(
     /** Choose how user image attachments reach the local model. */
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        autoImageNativeRejected = false
         _state.update { it.copy(imageInputMode = mode) }
     }
-
-    private fun effectiveImageInputMode(mode: LocalImageInputMode): LocalImageInputMode =
-        if (mode == LocalImageInputMode.AUTO && autoImageNativeRejected) LocalImageInputMode.TOOL else mode
 
     /** Persist execution limits exposed from Settings. */
     fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
@@ -591,6 +643,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun appendUserToModelHistory(message: JsonObject, reason: String) {
         modelHistory += message
         checkpointModelHistory(reason)
+        updateContextMetrics()
     }
 
     /**
@@ -670,7 +723,7 @@ class LocalHarnessEngine @Inject constructor(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val mediaType = resolver.getType(uri) ?: "application/octet-stream"
+        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -696,8 +749,22 @@ class LocalHarnessEngine @Inject constructor(
             incoming.delete()
             throw error
         }
+        val imageMetadata = inspectImportedImage(incoming)
+        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
+            incoming.delete()
+            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
+        }
+        if (imageMetadata != null) {
+            try {
+                validateLocalImageMetadata(imageMetadata)
+            } catch (error: Throwable) {
+                incoming.delete()
+                throw error
+            }
+        }
+        val mediaType = imageMetadata?.mediaType ?: declaredMediaType
         val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = when (mediaType.lowercase()) {
+        val extension = when (mediaType) {
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
@@ -719,7 +786,20 @@ class LocalHarnessEngine @Inject constructor(
             mediaType = mediaType,
             bytes = target.length(),
             attachmentId = attachmentId,
+            width = imageMetadata?.width,
+            height = imageMetadata?.height,
         )
+    }
+
+    private fun inspectImportedImage(file: File): LocalImageMetadata? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        val mediaType = options.outMimeType?.lowercase()?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
+            ?: return null
+        val width = options.outWidth
+        val height = options.outHeight
+        if (width <= 0 || height <= 0) return null
+        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
     }
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
@@ -1019,6 +1099,7 @@ class LocalHarnessEngine @Inject constructor(
             put("queued_count", pendingInputs.size())
         })
         checkpointModelHistory("user/queue-consumed")
+        updateContextMetrics()
         persist()
     }
 
@@ -1131,29 +1212,41 @@ class LocalHarnessEngine @Inject constructor(
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
-                val selectedMode = effectiveImageInputMode(snapshot.imageInputMode)
+                val selectedMode = resolveLocalImageInputMode(
+                    snapshot.imageInputMode,
+                    imageCapabilities,
+                    snapshot.baseUrl,
+                    snapshot.model,
+                )
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = durableRequestMessages,
                     workspaceRoot = File(workspace.path),
                     mode = selectedMode,
+                    budget = imageRequestBudget,
                 )
+                val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                 val reply = try {
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
                         messages = requestMessages,
                         step = modelStep + 1,
-                    )
+                    ).also {
+                        if (nativeImagesSent) {
+                            imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
+                        }
+                    }
                 } catch (error: Throwable) {
-                    if (
-                        snapshot.imageInputMode == LocalImageInputMode.AUTO &&
-                        selectedMode != LocalImageInputMode.TOOL &&
-                        hasLocalImageRefs(durableRequestMessages) &&
-                        imageInputUnsupported(error)
-                    ) {
-                        autoImageNativeRejected = true
+                    val nativeImageRejected =
+                        nativeImagesSent &&
+                            imageInputUnsupported(error)
+                    if (nativeImageRejected) {
+                        imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                    }
+                    if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
                         eventLog.append("multimodal/fallback", buildJsonObject {
                             put("step", modelStep + 1)
+                            put("model", snapshot.model)
                             put("from", "native")
                             put("to", "vision-tool")
                             put("reason", error.message.orEmpty().take(2_000))
@@ -1165,6 +1258,7 @@ class LocalHarnessEngine @Inject constructor(
                                 messages = durableRequestMessages,
                                 workspaceRoot = File(workspace.path),
                                 mode = LocalImageInputMode.TOOL,
+                                budget = imageRequestBudget,
                             ),
                             step = modelStep + 1,
                         )
@@ -1238,7 +1332,9 @@ class LocalHarnessEngine @Inject constructor(
                         )
                         modelHistory += reply.message
                         checkpointModelHistory("assistant/message")
+                        updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence)
+                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
                         persist()
                     }
                     is AgentEvent.ToolStarted -> {
@@ -1281,6 +1377,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                         completedToolCallIds += event.call.id
                         checkpointModelHistory("tool/result")
+                        updateContextMetrics()
                         applyTranscriptMessages(listOf(transcriptMessage), toolEvent.sequence)
                         persist()
                     }
@@ -1359,6 +1456,8 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
                 )
             }
             persist()
@@ -1516,13 +1615,17 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
+    private fun subagentToolSchemas(allowMutation: Boolean, allowVirtualScreen: Boolean): JsonArray {
+        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() } +
+            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
+            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
             .filter { tool ->
-                allowMutation || tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+                allowMutation ||
+                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
+                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
             }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
@@ -1649,10 +1752,7 @@ class LocalHarnessEngine @Inject constructor(
                 val background = args.boolean("run_in_background", false)
                 val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 if (background) {
-                    jobs.start("网页抓取：${input.take(120)}") { _, report ->
-                        report("正在抓取：$input")
-                        webTools.fetch(input, maxBytes, format, timeout)
-                    }
+                    startPersistentWebFetch(input, maxBytes, format, timeout)
                 } else {
                     webTools.fetch(input, maxBytes, format, timeout)
                 }
@@ -1705,24 +1805,21 @@ class LocalHarnessEngine @Inject constructor(
                 val task = args.string("task")
                 val model = args.optionalString("model")
                 val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
+                val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
-                    jobs.start("子代理：${task.take(100)}") { jobId, _ ->
-                        val result = subagents.runResult(
-                            task = task,
-                            inheritHistory = false,
-                            allowMutation = false,
-                            backgroundJobId = jobId,
-                            modelOverride = model,
-                            maxSteps = maxSteps,
-                        )
-                        result.requireCompletedOutput()
-                    }
+                    startPersistentReadonlySubagent(
+                        task = task,
+                        model = model,
+                        maxSteps = maxSteps,
+                        virtualScreen = virtualScreen,
+                    )
                 } else subagents.run(
                     task = task,
                     inheritHistory = false,
                     allowMutation = false,
                     modelOverride = model,
                     maxSteps = maxSteps,
+                    virtualScreen = virtualScreen,
                 )
             }
             "subagent_fork", "fork_subagent" ->
@@ -1758,6 +1855,119 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun startPersistentWebFetch(
+        url: String,
+        maxBytes: Int,
+        format: String,
+        timeoutSeconds: Long,
+    ): String {
+        val payload = buildJsonObject {
+            put("session_id", currentSessionId)
+            put("url", url)
+            put("max_bytes", maxBytes)
+            put("format", format)
+            put("timeout_seconds", timeoutSeconds)
+        }.toString()
+        return jobs.startPersistent(
+            label = "网页抓取：${url.take(120)}",
+            resumeKind = "web_fetch",
+            resumePayload = payload,
+        ) { _, report ->
+            report("正在抓取：$url")
+            webTools.fetch(url, maxBytes, format, timeoutSeconds)
+        }
+    }
+
+    private fun startPersistentReadonlySubagent(
+        task: String,
+        model: String?,
+        maxSteps: Int,
+        virtualScreen: Boolean,
+    ): String {
+        val payload = buildJsonObject {
+            put("session_id", currentSessionId)
+            put("task", task)
+            model?.let { put("model", it) }
+            put("max_steps", maxSteps)
+            put("virtual_screen", virtualScreen)
+        }.toString()
+        return jobs.startPersistent(
+            label = "子代理：${task.take(100)}",
+            resumeKind = "subagent_readonly",
+            resumePayload = payload,
+        ) { jobId, _ ->
+            val result = subagents.runResult(
+                task = task,
+                inheritHistory = false,
+                allowMutation = false,
+                backgroundJobId = jobId,
+                modelOverride = model,
+                maxSteps = maxSteps,
+                virtualScreen = virtualScreen,
+            )
+            result.requireCompletedOutput()
+        }
+    }
+
+    private suspend fun resumeInterruptedSafeJobs() {
+        jobs.interruptedSnapshots().forEach { snapshot ->
+            val payloadText = snapshot.resumePayload ?: return@forEach
+            runCatching {
+                val payload = json.parseToJsonElement(payloadText).jsonObject
+                val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull
+                require(sessionId == null || sessionId == currentSessionId) {
+                    "恢复任务属于其他会话：$sessionId"
+                }
+                when (snapshot.resumeKind) {
+                    "web_fetch" -> {
+                        val url = payload["url"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 url")
+                        val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull
+                            ?: DEFAULT_WEB_FETCH_BYTES
+                        val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
+                        val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
+                            ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
+                        jobs.resumePersistent(snapshot.id) { _, report ->
+                            report("正在恢复网页抓取：$url")
+                            webTools.fetch(
+                                url,
+                                maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
+                                format,
+                                timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
+                            )
+                        }
+                    }
+                    "subagent_readonly" -> {
+                        val task = payload["task"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 task")
+                        val model = payload["model"]?.jsonPrimitive?.contentOrNull
+                        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
+                            ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
+                        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+                        jobs.resumePersistent(snapshot.id) { jobId, _ ->
+                            val result = subagents.runResult(
+                                task = task,
+                                inheritHistory = false,
+                                allowMutation = false,
+                                backgroundJobId = jobId,
+                                modelOverride = model,
+                                maxSteps = maxSteps,
+                                virtualScreen = virtualScreen,
+                            )
+                            result.requireCompletedOutput()
+                        }
+                    }
+                    else -> Unit
+                }
+            }.onFailure { error ->
+                eventLog.append("job/resume-error", buildJsonObject {
+                    put("job_id", snapshot.id)
+                    put("kind", snapshot.resumeKind.orEmpty())
+                    put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
+                })
+            }
+        }
+    }
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
@@ -1996,7 +2206,9 @@ class LocalHarnessEngine @Inject constructor(
             },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
-                    is AgentRequestEvent.AttemptStarted -> Unit
+                    is AgentRequestEvent.AttemptStarted -> {
+                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                    }
                     is AgentRequestEvent.AttemptFailed -> {
                         eventLog.append("request/error", buildJsonObject {
                             put("step", step)
@@ -2037,26 +2249,56 @@ class LocalHarnessEngine @Inject constructor(
         )
         return executor.execute {
             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                modelClient.complete(
+                modelClient.completeStreaming(
                     apiKey = key,
                     baseUrl = snapshot.baseUrl,
                     model = snapshot.model,
                     messages = messages,
                     tools = tools,
+                    onDelta = { delta ->
+                        _state.update { state ->
+                            state.copy(
+                                streamingAssistant = (state.streamingAssistant + delta.content)
+                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
+                                streamingReasoning = (state.streamingReasoning + delta.reasoning)
+                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
+                            )
+                        }
+                    },
                 )
             }
         }
     }
 
+    private fun currentHistoryBudget(): LocalHistoryBudget =
+        localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure)
+
+    private fun updateContextMetrics() {
+        val budget = currentHistoryBudget()
+        val chars = modelHistory.sumOf { it.toString().length }
+        _state.update {
+            it.copy(
+                contextChars = chars,
+                contextBudgetChars = budget.maxHistoryChars,
+            )
+        }
+    }
+
     private fun pruneToolResult(result: String): String {
-        if (result.length <= MAX_TOOL_RESULT_CHARS) return result
-        val tail = result.takeLast(TOOL_RESULT_TAIL_CHARS)
-        return result.take(MAX_TOOL_RESULT_CHARS - TOOL_RESULT_TAIL_CHARS) +
+        val limit = currentHistoryBudget().maxToolResultChars
+        if (result.length <= limit) return result
+        val tailChars = minOf(TOOL_RESULT_TAIL_CHARS, limit / 4)
+        val tail = result.takeLast(tailChars)
+        return result.take((limit - tailChars).coerceAtLeast(1)) +
             "\n…工具结果过长，中间内容已压缩…\n" + tail
     }
 
     private fun compactHistoryIfNeeded() {
-        val compaction = historyCompactor.compact(modelHistory) ?: return
+        val budget = currentHistoryBudget()
+        val compaction = historyCompactor.compact(modelHistory, budget) ?: run {
+            updateContextMetrics()
+            return
+        }
         modelHistory.clear()
         modelHistory += compaction.messages
         eventLog.append(
@@ -2067,6 +2309,7 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         checkpointModelHistory("session/compaction")
+        updateContextMetrics()
         persist()
     }
 
@@ -2082,6 +2325,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
         checkpointModelHistory("system/prompt")
+        updateContextMetrics()
     }
 
     private fun systemPrompt(): String = """
@@ -2153,8 +2397,12 @@ class LocalHarnessEngine @Inject constructor(
             appendLine(
                 "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
                     "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
+                    "终端 ${resources.activeTerminals}/${resources.budget.maxTerminals}；" +
+                    "虚拟屏 ${resources.activeVirtualDisplays}/${resources.budget.maxVirtualDisplays}；" +
+                    "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
                     "压力 ${resources.pressure.name.lowercase()}",
             )
+            appendLine("上下文：${modelHistory.sumOf { it.toString().length }}/${currentHistoryBudget().maxHistoryChars} 字符")
             appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
@@ -2326,9 +2574,17 @@ class LocalHarnessEngine @Inject constructor(
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
             activeAgents = resourceScheduler.snapshot().activeAgents,
+            activeTerminals = resourceScheduler.snapshot().activeTerminals,
+            activeVirtualDisplays = resourceScheduler.snapshot().activeVirtualDisplays,
+            activeLanguageServers = resourceScheduler.snapshot().activeLanguageServers,
             maxModelRequests = resourceScheduler.budget.maxModelRequests,
             maxAgents = resourceScheduler.budget.maxAgents,
+            maxTerminals = resourceScheduler.budget.maxTerminals,
+            maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
+            maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
+            contextChars = modelHistory.sumOf { it.toString().length },
+            contextBudgetChars = currentHistoryBudget().maxHistoryChars,
         )
         var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
@@ -2509,11 +2765,20 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val MAX_PENDING_INPUTS = 16
+        const val MAX_STREAM_PREVIEW_CHARS = 80_000
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
 
 
+        val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
+            "android_vscreen_status",
+            "android_vscreen_launch",
+            "android_vscreen_tap",
+            "android_vscreen_swipe",
+            "android_vscreen_screenshot",
+            "vision_analyze_vscreen",
+        )
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
             "subagent", "subagent_fork", "workflow", "ask_user_question",
             "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",

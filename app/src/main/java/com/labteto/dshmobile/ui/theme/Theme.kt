@@ -183,6 +183,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 @Composable
 fun DshTheme(
     preference: ThemePreference = ThemePreference.SYSTEM,
+    backgroundPath: String? = null,
     content: @Composable () -> Unit,
 ) {
     val dark = when (preference) {
@@ -193,11 +194,15 @@ fun DshTheme(
     val ds = if (dark) DsThemeTokens.dark else DsThemeTokens.light
     val scheme = if (dark) materialDarkScheme(ds) else materialLightScheme(ds)
     CompositionLocalProvider(LocalDsColors provides ds) {
-        MaterialTheme(
-            colorScheme = scheme,
-            typography = DsTypography,
-            shapes = DsMaterialShapes,
-            content = content,
-        )
+        // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
+        // screens draw their own Material surfaces on top of whatever is beneath them.
+        AppBackgroundHost(path = backgroundPath) {
+            MaterialTheme(
+                colorScheme = scheme,
+                typography = DsTypography,
+                shapes = DsMaterialShapes,
+                content = content,
+            )
+        }
     }
 }

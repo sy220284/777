@@ -193,6 +193,12 @@
     <string name="local_status_running">On device · Working</string>
     <string name="local_status_running_queued">On device · Working · %1$d queued</string>
     <string name="local_queue_message">Queue</string>
+    <string name="local_execution_console">Execution console</string>
+    <string name="local_resource_summary">Agents %1$d/%2$d · terminals %3$d/%4$d · screens %5$d/%6$d · language servers %7$d/%8$d</string>
+    <string name="local_context_summary">Context %1$d / %2$d chars</string>
+    <string name="local_streaming_status">Agent is responding…</string>
+    <string name="local_streaming_reasoning">Live reasoning</string>
+    <string name="local_streaming_answer">Live answer</string>
     <string name="local_status_ready">On device · Ready</string>
     <string name="local_device_approval_on">Device actions approved for this turn</string>
     <string name="local_safe_approval_on">Safe action auto-approval is on</string>
@@ -313,6 +319,11 @@
     <string name="settings_appearance_light">Light</string>
     <string name="settings_appearance_dark">Dark</string>
     <string name="settings_appearance_system">System</string>
+    <string name="settings_background_image">Background image</string>
+    <string name="settings_background_image_none">Using the plain theme colour</string>
+    <string name="settings_background_image_active">Custom image in use</string>
+    <string name="settings_background_image_choose">Choose image</string>
+    <string name="settings_background_image_clear">Remove</string>
     <string name="settings_readonly_banner">Settings are read-only over the network. Open the harness on its own computer to change them.</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>
