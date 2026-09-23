@@ -241,6 +241,11 @@
     <string name="plan_review_approve">Approve</string>
     <string name="plan_review_decline">Decline</string>
     <string name="plan_review_discuss">Discuss</string>
+    <string name="command_execution_title">Executing operation</string>
+    <string name="command_execution_purpose">Run a local operation for the current task</string>
+    <string name="command_execution_status_running">Running</string>
+    <string name="command_execution_status_done">Completed</string>
+    <string name="command_execution_status_failed">Failed</string>
     <string name="approval_title">Permission requested</string>
     <string name="approval_allow_once">Allow once</string>
     <string name="approval_reject">Refuse</string>
