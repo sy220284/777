@@ -1395,8 +1395,7 @@ class LocalHarnessEngine @Inject constructor(
                             modelOverride = model,
                             maxSteps = maxSteps,
                         )
-                        if (!result.succeeded) error(result.output)
-                        result.output
+                        result.requireCompletedOutput()
                     }
                 } else subagents.run(
                     task = task,
@@ -1615,8 +1614,7 @@ class LocalHarnessEngine @Inject constructor(
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
             )
-            if (!result.succeeded) error(result.output)
-            result.output
+            result.requireCompletedOutput()
         }
         return results.joinToString("\n\n") { result ->
             val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
