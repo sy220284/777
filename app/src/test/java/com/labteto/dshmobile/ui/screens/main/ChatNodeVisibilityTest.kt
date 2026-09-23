@@ -161,4 +161,30 @@ class ChatNodeVisibilityTest {
         assertFalse(assistant.isWorkProcess(nodes))
     }
 
+
+    @Test
+    fun `legacy assistant without turn metadata folds when tool follows`() {
+        val assistant = AssistantMessageNode(
+            seq = 30,
+            messageId = "legacy",
+            turn = null,
+            step = null,
+            blocks = listOf(ChatBlock("text", "我先查一下")),
+        )
+        val nodes = listOf(
+            assistant,
+            ToolCallNode(seq = 31, callId = "legacy-call", name = "grep", arguments = "{}", turn = 9, step = 1),
+            AssistantMessageNode(
+                seq = 32,
+                messageId = "final",
+                turn = null,
+                step = null,
+                blocks = listOf(ChatBlock("text", "最终结果")),
+            ),
+        )
+
+        assertTrue(assistant.isWorkProcess(nodes))
+        assertFalse((nodes[2] as AssistantMessageNode).isWorkProcess(nodes))
+    }
+
 }
