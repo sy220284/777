@@ -87,6 +87,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -780,13 +781,13 @@ class LocalHarnessEngine @Inject constructor(
     fun setPlanMode(enabled: Boolean) {
         if (isRunBusy()) return
         _state.update { it.copy(planMode = enabled) }
+        eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
             eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
             checkpointModelHistory("system/prompt")
         }
-        eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         persist()
     }
 
@@ -1411,9 +1412,13 @@ class LocalHarnessEngine @Inject constructor(
         val items = args["items"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
             ?: args.optionalString("plan")?.lines()?.filter { it.isNotBlank() }
             ?: emptyList()
-        _state.update { it.copy(plan = items.take(20)) }
+        val normalized = items.take(20)
+        _state.update { it.copy(plan = normalized) }
+        eventLog.append("plan/state", buildJsonObject {
+            put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
+        })
         persist()
-        return if (items.isEmpty()) "计划已清空" else "计划已更新，共 ${items.size} 项"
+        return if (normalized.isEmpty()) "计划已清空" else "计划已更新，共 ${normalized.size} 项"
     }
 
     private fun updateTodos(args: JsonObject): String {
@@ -1425,6 +1430,14 @@ class LocalHarnessEngine @Inject constructor(
             if (content.isEmpty() || status !in allowed) null else LocalTodoItem(content.take(500), status)
         }.take(50)
         _state.update { it.copy(todos = items) }
+        eventLog.append("todo/state", buildJsonObject {
+            put("items", JsonArray(items.map { item ->
+                buildJsonObject {
+                    put("content", item.content)
+                    put("status", item.status)
+                }
+            }))
+        })
         persist()
         return if (items.isEmpty()) "任务清单已清空" else "任务清单已更新，共 ${items.size} 项"
     }
@@ -1432,6 +1445,11 @@ class LocalHarnessEngine @Inject constructor(
     private fun createGoal(description: String): String {
         val goal = LocalGoal(description.trim().take(2_000))
         _state.update { it.copy(goal = goal) }
+        eventLog.append("goal/state", buildJsonObject {
+            put("description", goal.description)
+            put("status", goal.status)
+            goal.note?.let { put("note", it) }
+        })
         persist()
         return "目标已创建：${goal.description}"
     }
@@ -1446,6 +1464,11 @@ class LocalHarnessEngine @Inject constructor(
         val current = _state.value.goal ?: error("当前会话没有目标")
         val updated = current.copy(status = status, note = note?.take(2_000))
         _state.update { it.copy(goal = updated) }
+        eventLog.append("goal/state", buildJsonObject {
+            put("description", updated.description)
+            put("status", updated.status)
+            updated.note?.let { put("note", it) }
+        })
         persist()
         return "目标状态已更新为 $status"
     }
@@ -1472,12 +1495,20 @@ class LocalHarnessEngine @Inject constructor(
             listOf("批准并进入执行模式", "继续规划"),
         )
         return if (answer == "批准并进入执行模式") {
+            val approvedPlan = plan.lines().map(String::trim).filter(String::isNotEmpty).take(20)
             _state.update {
                 it.copy(
                     planMode = false,
-                    plan = plan.lines().map(String::trim).filter(String::isNotEmpty).take(20),
+                    plan = approvedPlan,
                 )
             }
+            // Persist the approved plan before leaving planning mode. If the process dies between
+            // these two events, recovery stays conservatively in planning mode with the approved
+            // plan instead of entering execution mode without its durable plan.
+            eventLog.append("plan/state", buildJsonObject {
+                put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
+            })
+            eventLog.append("plan/mode", buildJsonObject { put("active", false) })
             if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 val prompt = systemPrompt()
                 modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
@@ -1776,6 +1807,24 @@ class LocalHarnessEngine @Inject constructor(
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
+        val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
+            eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
+                PROJECTION_BASELINE_EVENT,
+                buildJsonObject { put("source", "legacy-session-snapshot") },
+            ).sequence
+        } else {
+            null
+        }
+        val projectionCursor = projectionReplayCursor(
+            snapshot = stored,
+            persistedSnapshotExists = loaded != null,
+            legacyBaselineSequence = legacyProjectionBaseline,
+        )
+        val projectedControls = projectSessionControlTail(
+            snapshot = stored,
+            events = eventLog.snapshotAfter(projectionCursor),
+            sequenceExclusive = projectionCursor,
+        )
         val restoredHistory = restoreModelHistory(sessionId, stored.modelHistory)
         modelHistory.clear()
         modelHistory += restoredHistory.messages
@@ -1807,10 +1856,10 @@ class LocalHarnessEngine @Inject constructor(
             autoMemory = profile.autoMemory,
             sessions = sessionSummaries(),
             messages = stored.messages,
-            plan = stored.plan,
-            todos = stored.todos,
-            goal = stored.goal,
-            planMode = stored.planMode,
+            plan = projectedControls.plan,
+            todos = projectedControls.todos,
+            goal = projectedControls.goal,
+            planMode = projectedControls.planMode,
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
@@ -1926,6 +1975,11 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun persist() {
+        // Capture the durable boundary before the in-memory projection. A concurrent state update
+        // may then be included in the snapshot with an older cursor, which is safe because replay
+        // can idempotently re-apply its later event. The opposite ordering could advance the cursor
+        // past a control event that the captured state did not yet contain.
+        val projectedThrough = eventLog.latestSequence()
         val state = _state.value
         val snapshot = LocalHarnessSession(
             id = currentSessionId,
@@ -1943,6 +1997,7 @@ class LocalHarnessEngine @Inject constructor(
             todos = state.todos,
             goal = state.goal,
             planMode = state.planMode,
+            controlProjectedThroughSequence = projectedThrough,
         )
         sessionRepository.enqueue(snapshot)
     }
@@ -2024,6 +2079,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
+        const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
 
 
         val SUBAGENT_EXCLUDED_TOOLS = setOf(

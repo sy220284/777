@@ -37,6 +37,8 @@ data class LocalHarnessSession(
     val todos: List<LocalTodoItem> = emptyList(),
     val goal: LocalGoal? = null,
     val planMode: Boolean = false,
+    /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
+    val controlProjectedThroughSequence: Long? = null,
 )
 
 data class LocalImportedAttachment(

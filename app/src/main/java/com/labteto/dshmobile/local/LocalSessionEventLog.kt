@@ -24,12 +24,17 @@ class LocalSessionEventLog(
 
     private val delegate = SessionEventLog(file, json, maxBytes)
 
-    fun append(type: String, data: JsonObject) {
-        delegate.append(type, data)
-    }
+    fun append(type: String, data: JsonObject): Event =
+        delegate.append(type, data).toLocalEvent()
 
     fun snapshot(): List<Event> = delegate.snapshot().map { event ->
-        Event(event.sequence, event.type, event.createdAt, event.data)
+        event.toLocalEvent()
+    }
+
+    fun latestSequence(): Long = delegate.latestSequence()
+
+    fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
+        event.toLocalEvent()
     }
 
     fun repairInterruptedTail(): SessionRepairResult =
@@ -42,16 +47,16 @@ class LocalSessionEventLog(
     fun read(sequence: Long, before: Int = 0, after: Int = 0): String =
         delegate.read(sequence, before, after)
 
-    fun latest(type: String): Event? = delegate.latest(type)?.let { event ->
-        Event(
-            sequence = event.sequence,
-            type = event.type,
-            createdAt = event.createdAt,
-            data = event.data,
-        )
-    }
+    fun latest(type: String): Event? = delegate.latest(type)?.toLocalEvent()
 
     fun clear() = delegate.clear()
+
+    private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
+        sequence = sequence,
+        type = type,
+        createdAt = createdAt,
+        data = data,
+    )
 
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L

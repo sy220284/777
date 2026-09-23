@@ -38,6 +38,22 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun appendReturnsTheExactDurableSequence() {
+        val directory = Files.createTempDirectory("local-event-append-sequence").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 4_096)
+            val baseline = log.append("session/projection-baseline", buildJsonObject { put("source", "legacy") })
+            log.append("plan/state", buildJsonObject { put("value", 1) })
+
+            assertEquals(0L, baseline.sequence)
+            assertEquals(1L, log.latestSequence())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun exposesLatestTypedEventForRecovery() {
         val directory = Files.createTempDirectory("local-event-latest").toFile()
         val file = directory.resolve("session.events.jsonl")
