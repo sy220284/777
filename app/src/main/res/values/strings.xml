@@ -702,4 +702,18 @@
     <string name="advanced_vision_model">Vision model</string>
     <string name="advanced_vision_optional">Optional. After you configure a multimodal model that accepts OpenAI-compatible image messages, Harness can send screenshots to it for analysis.</string>
     <string name="advanced_vision_saved">Vision settings saved</string>
+
+    <string name="local_add_attachment">Add attachment</string>
+    <string name="local_attachment_image">Image</string>
+    <string name="local_attachment_file">File</string>
+    <string name="local_images_preparing">Preparing images…</string>
+    <string name="local_image_mode_title">Image handling</string>
+    <string name="local_image_mode_hint">Auto sends images directly to capable main models and falls back to the configured vision model when needed. You can also force either route.</string>
+    <string name="local_image_mode_current">Current</string>
+    <string name="local_image_mode_auto_short">Image · Auto</string>
+    <string name="local_image_mode_main_short">Image · Main</string>
+    <string name="local_image_mode_vision_short">Image · Vision</string>
+    <string name="local_image_mode_auto">Automatic routing</string>
+    <string name="local_image_mode_main">Send directly to main model</string>
+    <string name="local_image_mode_vision">Analyze with vision model</string>
 </resources>
