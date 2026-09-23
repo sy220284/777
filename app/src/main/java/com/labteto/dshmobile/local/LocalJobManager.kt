@@ -5,7 +5,7 @@ import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import kotlinx.coroutines.CoroutineScope
 
 /** Android projection adapter for the process-agnostic core job controller. */
-class LocalJobManager(
+internal class LocalJobManager(
     scope: CoroutineScope,
     store: LocalPersistentJobStore? = null,
     onChanged: (List<LocalJobInfo>) -> Unit,
