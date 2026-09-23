@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
+import com.labteto.dshmobile.harness.agent.AgentToolResult
 
 class NativeConformanceRunner {
     suspend fun run(vector: ConformanceVector): List<CanonicalEvent> {
@@ -31,8 +32,10 @@ class NativeConformanceRunner {
                 )
             },
             tools = AgentToolExecutor { call ->
-                vector.toolOutputs[call.name]
-                    ?: error("缺少工具输出：${call.name}")
+                AgentToolResult(
+                    vector.toolOutputs[call.name]
+                        ?: error("缺少工具输出：${call.name}"),
+                )
             },
             eventSink = AgentEventSink { events += it },
             idFactory = { "reference-turn" },
