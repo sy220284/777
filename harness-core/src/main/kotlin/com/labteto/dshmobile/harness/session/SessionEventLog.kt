@@ -59,6 +59,20 @@ class SessionEventLog(
 
     fun snapshot(): List<SessionEvent> = synchronized(lock) { readEventsUnsafe() }
 
+    /** Latest durable event sequence, or -1 when the log is empty. */
+    fun latestSequence(): Long = synchronized(lock) { nextSequence.get() - 1L }
+
+    /**
+     * Return events strictly newer than a persisted projection cursor.
+     *
+     * Callers can persist a materialized projection together with [latestSequence] and only fold
+     * the durable tail after restart. This is the bridge toward SessionEventLog becoming the single
+     * source of truth while snapshots remain disposable acceleration checkpoints.
+     */
+    fun snapshotAfter(sequenceExclusive: Long): List<SessionEvent> = synchronized(lock) {
+        readEventsUnsafe().filter { event -> event.sequence > sequenceExclusive }
+    }
+
     fun search(query: String, limit: Int = 50): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
         val wanted = limit.coerceIn(1, MAX_READ_LINES)
