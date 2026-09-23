@@ -256,16 +256,15 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val modelOutput = pruneToolResult(
-                                AgentToolResult(
-                                    content = event.output,
-                                    isError = event.isError,
-                                    errorCode = event.errorCode,
-                                    retryable = event.retryable,
-                                    sideEffect = event.sideEffect,
-                                    recoveryHint = event.recoveryHint,
-                                ).modelVisibleContent(),
-                            )
+                            val boundedContent = pruneToolResult(event.output)
+                            val modelOutput = AgentToolResult(
+                                content = boundedContent,
+                                isError = event.isError,
+                                errorCode = event.errorCode,
+                                retryable = event.retryable,
+                                sideEffect = event.sideEffect,
+                                recoveryHint = event.recoveryHint,
+                            ).modelVisibleContent()
                             rememberSubagentProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
