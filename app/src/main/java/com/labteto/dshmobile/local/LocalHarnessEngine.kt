@@ -440,7 +440,10 @@ class LocalHarnessEngine @Inject constructor(
         val prompt = text.trim()
         val snapshot = _state.value
         if ((prompt.isEmpty() && attachments.isEmpty()) || snapshot.loading || !snapshot.configured) return
-        if (snapshot.preparingImages || snapshot.running || isRunBusy()) return
+        if (snapshot.preparingImages || snapshot.running || isRunBusy()) {
+            _state.update { it.copy(error = "当前会话正在处理其他任务，请稍后再发送") }
+            return
+        }
 
         scope.launch {
             val images = attachments.filter { it.mediaType.startsWith("image/") }
