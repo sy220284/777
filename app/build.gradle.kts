@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -105,7 +106,7 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
 
 android {
     namespace = "com.labteto.dshmobile"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         // Keep this fork installable alongside the upstream DSH Mobile app.
@@ -164,6 +165,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
     buildFeatures {
         compose = true
@@ -179,15 +183,12 @@ android {
     }
 
     sourceSets.getByName("main").apply {
-        // AGP 9 rejects Provider-backed entries in the legacy SourceSet API. These providers only
-        // describe deterministic build-directory paths; generating task edges remain explicit
-        // below, so resolve the paths here without weakening AGP's source-set checks.
-        jniLibs.srcDir(generatedNodeRuntime.get().dir("jniLibs").asFile)
-        jniLibs.srcDir(generatedPythonRuntime.get().dir("jniLibs").asFile)
-        jniLibs.srcDir(generatedGitRuntime.get().dir("jniLibs").asFile)
-        assets.srcDir(generatedNodeRuntime.get().dir("assets").asFile)
-        assets.srcDir(generatedPythonRuntime.get().dir("assets").asFile)
-        assets.srcDir(generatedGitRuntime.get().dir("assets").asFile)
+        jniLibs.srcDir(generatedNodeRuntime.map { it.dir("jniLibs") })
+        jniLibs.srcDir(generatedPythonRuntime.map { it.dir("jniLibs") })
+        jniLibs.srcDir(generatedGitRuntime.map { it.dir("jniLibs") })
+        assets.srcDir(generatedNodeRuntime.map { it.dir("assets") })
+        assets.srcDir(generatedPythonRuntime.map { it.dir("assets") })
+        assets.srcDir(generatedGitRuntime.map { it.dir("assets") })
     }
 
     packaging {

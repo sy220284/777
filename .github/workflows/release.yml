@@ -132,12 +132,17 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --stacktrace
+            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug :app:assembleOptimized --stacktrace
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
             adb shell pidof com.sy220284.dshmobile.debug
+
+            # 发布前必须实际启动开启 R8/资源收缩的包。仅构建和签名校验无法发现启动期崩溃。
+            adb shell am force-stop com.sy220284.dshmobile.debug || true
+            adb install -r app/build/outputs/apk/optimized/app-optimized.apk
+            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
   android-17-instrumented:
     needs: check-release

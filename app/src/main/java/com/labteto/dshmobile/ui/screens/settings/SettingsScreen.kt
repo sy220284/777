@@ -54,7 +54,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -701,11 +700,10 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
 private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = DsTheme.colors
     // A compact dropdown keeps the language choice secondary to the settings users change often.
-    val systemLanguage = LocalConfiguration.current.locales[0].language
-    val effectiveTag = when {
+        val effectiveTag = when {
         settings.localeOverride?.startsWith("zh", ignoreCase = true) == true -> "zh-CN"
         settings.localeOverride == "en" -> "en"
-        systemLanguage.equals("zh", ignoreCase = true) -> "zh-CN"
+        Locale.getDefault().language.equals("zh", ignoreCase = true) -> "zh-CN"
         else -> "en"
     }
     val current = LanguageOptions.first { it.tag == effectiveTag }

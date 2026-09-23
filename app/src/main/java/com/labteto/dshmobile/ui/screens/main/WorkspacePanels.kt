@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,7 +49,7 @@ internal fun WorkspacePanels(
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val resources = LocalResources.current
+    val context = LocalContext.current
     val key = state.key
     val activeDocument = state.previews.getOrNull(state.selectedPreview)?.path
     fun listDirectory(path: String) {
@@ -58,7 +57,7 @@ internal fun WorkspacePanels(
         state.busy = true; state.error = null
         scope.launch {
             try {
-                val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
+                val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
                 state.listing = api.workspaceFileList(key.sessionId, path).requireValue()
                 state.directory = path
             } catch (e: CancellationException) { throw e }
@@ -226,7 +225,7 @@ private fun ConversationFileRow(ref: ConversationFileRef, state: PanelState) {
 
 @Composable
 private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewTab, modifier: Modifier) {
-    val resources = LocalResources.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val extension = tab.path.substringAfterLast('.', "").lowercase()
     val binary = extension in setOf("png", "jpg", "jpeg", "webp", "gif", "pdf")
@@ -235,22 +234,22 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
         tab.busy = true; tab.error = null
         scope.launch {
             try {
-                val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
+                val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
                 val stat = api.workspaceFileStat(key.sessionId, tab.path).requireValue()
                 val changed = stat.version != tab.stat?.version
                 if (changed) { tab.text = null; tab.bytes = null; tab.nextLine = 1; tab.eof = false }
                 tab.stat = stat
                 if (binary && tab.bytes == null) {
-                    if ((stat.bytes ?: 0) > 32L * 1024 * 1024) error(resources.getString(R.string.panel_too_large))
+                    if ((stat.bytes ?: 0) > 32L * 1024 * 1024) error(context.getString(R.string.panel_too_large))
                     val data = api.workspaceFileReadAll(key.sessionId, tab.path).requireValue()
-                    if (data.version != stat.version) error(resources.getString(R.string.panel_changed))
-                    if (data.data.length > 45 * 1024 * 1024) error(resources.getString(R.string.panel_too_large))
+                    if (data.version != stat.version) error(context.getString(R.string.panel_changed))
+                    if (data.data.length > 45 * 1024 * 1024) error(context.getString(R.string.panel_too_large))
                     tab.bytes = withContext(Dispatchers.Default) { Base64.decode(data.data, Base64.DEFAULT) }
                     tab.eof = true
                 } else if (!binary && (tab.text == null || more)) {
                     val data = api.workspaceFileRead(key.sessionId, tab.path, WorkspaceFileRange(tab.nextLine)).requireValue()
-                    if (data.version != stat.version) error(resources.getString(R.string.panel_changed))
-                    if (tab.text.orEmpty().length + data.text.length > 4 * 1024 * 1024) error(resources.getString(R.string.panel_too_large))
+                    if (data.version != stat.version) error(context.getString(R.string.panel_changed))
+                    if (tab.text.orEmpty().length + data.text.length > 4 * 1024 * 1024) error(context.getString(R.string.panel_too_large))
                     tab.text = if (more && !changed) tab.text.orEmpty() + "\n" + data.text else data.text
                     tab.nextLine = data.offset + data.lines
                     tab.eof = data.eof || data.lines == 0
@@ -284,7 +283,7 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
                         val options = BitmapFactory.Options().apply { inSampleSize = com.labteto.dshmobile.ui.media.sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), 2048) }
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
                     }
-                    if (image == null) tab.error = resources.getString(R.string.panel_failed)
+                    if (image == null) tab.error = context.getString(R.string.panel_failed)
                 }
                 image?.let { Image(it, tab.path, Modifier.fillMaxWidth().weight(1f)) }
             }
@@ -340,7 +339,6 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
 @Composable
 private fun PdfPreview(bytes: ByteArray, modifier: Modifier) {
     val context = LocalContext.current
-    val resources = LocalResources.current
     var page by remember(bytes) { mutableIntStateOf(0) }
     var count by remember(bytes) { mutableIntStateOf(0) }
     var failure by remember(bytes) { mutableStateOf(false) }

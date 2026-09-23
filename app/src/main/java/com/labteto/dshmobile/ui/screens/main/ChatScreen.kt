@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.media.sampleSizeFor
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,7 +85,6 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val colors = DsTheme.colors
     val context = LocalContext.current
-    val resources = LocalResources.current
     val toast = rememberDsToast()
 
     val conversation by store.currentConversation.collectAsStateWithLifecycle()
@@ -209,12 +207,12 @@ fun ChatScreen(
                                     preview = pick.preview, bytes = bytes.size, width = pick.width, height = pick.height,
                                 ))
                             } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (_: Exception) { failures.add(resources.getString(R.string.err_attachment_failed)) }
+                            catch (_: Exception) { failures.add(context.getString(R.string.err_attachment_failed)) }
                         }
                         selected
                     }
                     target.attachments.addAll(accepted)
-                    if (failures.isNotEmpty()) toast.second(resources.getString(
+                    if (failures.isNotEmpty()) toast.second(context.getString(
                         R.string.photos_skipped, failures.size, failures.distinct().joinToString("; "),
                     ))
                 } finally { target.preparing = false }
@@ -262,7 +260,7 @@ fun ChatScreen(
         if (uri == null || target == null) return@rememberLauncherForActivityResult
         val (name, size) = describeDocument(context.contentResolver, uri)
         if (name == null) {
-            toast.second(resources.getString(R.string.err_file_read_failed))
+            toast.second(context.getString(R.string.err_file_read_failed))
             return@rememberLauncherForActivityResult
         }
         val file = PendingAttachment.File(
@@ -290,7 +288,7 @@ fun ChatScreen(
         if (files.any { it.state !is FileUploadState.Ready }) {
             draft = text
             toast.second(
-                resources.getString(
+                context.getString(
                     if (files.any { it.state is FileUploadState.Failed }) R.string.chat_attachment_upload_failed
                     else R.string.chat_attachment_still_uploading,
                 ),
@@ -311,7 +309,7 @@ fun ChatScreen(
                     RefusalReason.COMMAND_TAKES_NO_ATTACHMENTS -> R.string.err_command_no_images
                     RefusalReason.HOST_TOO_OLD -> R.string.err_command_images_host
                 }
-                toast.second(resources.getString(message, submission.command))
+                toast.second(context.getString(message, submission.command))
             }
 
             is Submission.Command -> {
@@ -333,7 +331,7 @@ fun ChatScreen(
                     }
                     report(outcome)
                     } catch (e: kotlinx.coroutines.CancellationException) { composer.restoreRejected(text, pending); throw e }
-                    catch (e: Exception) { composer.restoreRejected(text, pending); toast.second(e.message ?: resources.getString(R.string.panel_failed)) }
+                    catch (e: Exception) { composer.restoreRejected(text, pending); toast.second(e.message ?: context.getString(R.string.panel_failed)) }
                     finally { composer.submitting = false }
                 }
             }
@@ -362,7 +360,7 @@ fun ChatScreen(
                         )
                     }
                     } catch (e: kotlinx.coroutines.CancellationException) { composer.restoreRejected(text, pending); throw e }
-                    catch (e: Exception) { composer.restoreRejected(text, pending); toast.second(e.message ?: resources.getString(R.string.panel_failed)) }
+                    catch (e: Exception) { composer.restoreRejected(text, pending); toast.second(e.message ?: context.getString(R.string.panel_failed)) }
                     finally { composer.submitting = false }
                 }
             }
@@ -436,7 +434,7 @@ fun ChatScreen(
                             ?.messageId
                             ?.let { feedback = Triple(composer.key, it, positive) }
                     },
-                    onCopied = { toast.second(resources.getString(R.string.chat_copy_success)) },
+                    onCopied = { toast.second(context.getString(R.string.chat_copy_success)) },
                 )
             }
 
@@ -651,7 +649,7 @@ fun ChatScreen(
                 if (attachments.isEmpty()) {
                     scope.launch { report(store.runCommand(line)) }
                 } else {
-                    toast.second(resources.getString(R.string.err_command_no_images, name))
+                    toast.second(context.getString(R.string.err_command_no_images, name))
                 }
             },
             onPrefillDraft = { prefix -> draft = prefix },

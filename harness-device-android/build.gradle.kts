@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "com.labteto.dshmobile.device"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 36
@@ -17,6 +18,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {

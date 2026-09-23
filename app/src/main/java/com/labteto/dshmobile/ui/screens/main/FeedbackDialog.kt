@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalContext
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
@@ -18,10 +18,10 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
     var loaded by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val resources = LocalResources.current
+    val context = LocalContext.current
     suspend fun refresh() {
         val result = store.apiForHost(key.host)?.messageFeedbackList(key.sessionId)?.requireValue()
-            ?: error(resources.getString(R.string.common_offline))
+            ?: error(context.getString(R.string.common_offline))
         if (!result.ok) error(result.error?.code.orEmpty())
         current = result.value?.items?.firstOrNull { it.messageId == messageId }
         note = current?.note.orEmpty()
@@ -32,7 +32,7 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
         busy = true; error = null
         scope.launch {
             try {
-                val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
+                val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
                 val failure = if (remove) {
                     val version = current?.version ?: return@launch
                     val result = api.messageFeedbackDelete(MessageFeedbackDeleteRequest(key.sessionId, messageId, version)).requireValue()
