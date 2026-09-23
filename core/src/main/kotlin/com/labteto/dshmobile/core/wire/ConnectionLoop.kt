@@ -245,14 +245,22 @@ class ConnectionLoop(
      */
     private suspend fun openGeneration(token: Long): Opened {
         safeSink { sinks.onHandshakeStep(HandshakeStep.OPENING_MUX) }
-        val mux = muxFactory()
+        val mux = try {
+            muxFactory()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            return Opened.Failed(
+                GenerationFailure.MuxFailed(TransportFailures.classify(e), e.message),
+            )
+        }
         if (!installCurrent(token, mux)) {
             runCatching { mux.close() }
             throw CancellationException("connection loop lifecycle retired")
         }
-        mux.start()
 
         try {
+            mux.start()
             withTimeout(config.streamOpenTimeoutMs) { mux.awaitOpen() }
         } catch (e: TimeoutCancellationException) {
             closeGeneration(mux)
