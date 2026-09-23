@@ -185,9 +185,14 @@ class WebhookController @Inject constructor(
         val intent = Intent(context, HarnessWebhookService::class.java)
             .putExtra(EXTRA_PORT, port)
             .putExtra(EXTRA_ALLOW_LAN, false)
-        context.startForegroundService(intent)
+        try {
+            context.startForegroundService(intent)
+        } catch (error: Exception) {
+            markStartFailed(port)
+            throw error
+        }
         val host = "127.0.0.1"
-        return "Webhook 已启动：http://$host:$port/run\n令牌：${tokenHint(token)}。完整令牌不会进入会话记录；需要时请使用 webhook_copy_token。"
+        return "Webhook 已请求启动：http://$host:$port/run\n令牌：${tokenHint(token)}。完整令牌不会进入会话记录；需要时请使用 webhook_copy_token。"
     }
 
     fun stop(): Boolean {
@@ -216,6 +221,12 @@ class WebhookController @Inject constructor(
         port = preferences.getInt(KEY_PORT, DEFAULT_PORT),
         allowLan = false,
     )
+
+    fun markStartFailed(port: Int) {
+        if (preferences.getInt(KEY_PORT, DEFAULT_PORT) == port) {
+            preferences.edit().putBoolean(KEY_ENABLED, false).apply()
+        }
+    }
 
     suspend fun status(): WebhookStatus {
         val token = tokenStore.get()
@@ -257,13 +268,14 @@ class HarnessWebhookService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ensureForeground()
         val persisted = controller.runtimeConfig()
-        if (intent == null && !persisted.enabled) {
+        if (!persisted.enabled) {
             stopSelf()
             return START_NOT_STICKY
         }
         val port = intent?.getIntExtra(WebhookController.EXTRA_PORT, persisted.port) ?: persisted.port
         // Ignore persisted legacy LAN settings and intent extras on service restoration.
         try { restartServer(port) } catch (_: Exception) {
+            controller.markStartFailed(port)
             stopSelf()
             return START_NOT_STICKY
         }
