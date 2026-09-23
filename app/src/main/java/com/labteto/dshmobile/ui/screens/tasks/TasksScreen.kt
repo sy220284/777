@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -141,7 +142,11 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
         ) {
             StateDot(taskStatus(task.status))
             Column(Modifier.weight(1f)) {
-                Text(task.id, style = DsType.std14Strong, color = colors.labelPrimary)
+                Text(
+                    task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty().ifBlank { "后台任务" },
+                    style = DsType.std14Strong,
+                    color = colors.labelPrimary,
+                )
                 Text(
                     if (task.recurringMinutes == null) "一次性任务" else "每 ${task.recurringMinutes} 分钟",
                     style = DsType.caption11,
@@ -155,7 +160,9 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
                 variant = DsButtonVariant.Ghost,
             )
         }
-        Text(task.prompt, style = DsType.small13, color = colors.labelSecondary)
+        if (task.prompt.lineSequence().drop(1).any() || task.prompt.length > 56) {
+            Text(task.prompt.take(320), style = DsType.small13, color = colors.labelSecondary)
+        }
         Text(
             "下次执行：${formatTime(task.nextRunAt)}",
             style = DsType.caption11,

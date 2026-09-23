@@ -30,6 +30,9 @@ import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
+import com.labteto.dshmobile.local.memory.MemoryKind
+import com.labteto.dshmobile.local.memory.MemoryRecord
+import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -444,6 +447,111 @@ internal fun LocalMemorySettingsCard(
             variant = DsButtonVariant.Outline,
         )
     }
+}
+
+@Composable
+internal fun MemoryManagementCard(
+    records: List<MemoryRecord>,
+    viewModel: SettingsViewModel,
+    report: (String) -> Unit,
+) {
+    val colors = DsTheme.colors
+    SettingsCard("管理记忆", Icons.Outlined.Memory) {
+        if (records.isEmpty()) {
+            Text(
+                "当前作用域还没有长期记忆。",
+                style = DsType.small13,
+                color = colors.labelTertiary,
+            )
+            return@SettingsCard
+        }
+
+        Text(
+            "显示当前对话允许访问的长期记忆。修改和停用会直接影响后续自动召回。",
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+
+        records.forEach { record ->
+            var expanded by remember(record.id) { mutableStateOf(false) }
+            var content by remember(record.id, record.updatedAt) { mutableStateOf(record.content) }
+            var pinned by remember(record.id, record.updatedAt) { mutableStateOf(record.pinned) }
+            DisclosureRow(
+                title = record.content.take(54),
+                summary = memoryScopeLabel(record.scope) + " · " + memoryKindLabel(record.kind) +
+                    if (record.pinned) " · 已置顶" else "",
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+            ) {
+                Column(
+                    modifier = Modifier.padding(start = DsSpacing.large),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = { content = it.take(2_000) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("记忆内容") },
+                        minLines = 2,
+                        maxLines = 6,
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("置顶", style = DsType.small13Strong, color = colors.labelPrimary)
+                            Text("提高自动召回优先级", style = DsType.caption11, color = colors.labelTertiary)
+                        }
+                        Switch(checked = pinned, onCheckedChange = { pinned = it })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        DsButton(
+                            text = "保存",
+                            onClick = {
+                                viewModel.updateMemory(
+                                    id = record.id,
+                                    content = content,
+                                    pinned = pinned,
+                                ) { error ->
+                                    report(error ?: "记忆已更新")
+                                }
+                            },
+                            size = DsButtonSize.Small,
+                            variant = DsButtonVariant.Outline,
+                        )
+                        DsButton(
+                            text = "停用",
+                            onClick = {
+                                viewModel.forgetMemory(record.id) { error ->
+                                    report(error ?: "记忆已停用")
+                                }
+                            },
+                            size = DsButtonSize.Small,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun memoryScopeLabel(scope: MemoryScope): String = when (scope) {
+    MemoryScope.GLOBAL -> "全局"
+    MemoryScope.PROJECT -> "项目"
+    MemoryScope.LINEAGE -> "当前任务链"
+}
+
+private fun memoryKindLabel(kind: MemoryKind): String = when (kind) {
+    MemoryKind.RULE -> "规则"
+    MemoryKind.PREFERENCE -> "偏好"
+    MemoryKind.FACT -> "事实"
+    MemoryKind.DECISION -> "决定"
+    MemoryKind.CONSTRAINT -> "约束"
+    MemoryKind.STATE -> "状态"
+    MemoryKind.SUMMARY -> "摘要"
 }
 
 @Composable
