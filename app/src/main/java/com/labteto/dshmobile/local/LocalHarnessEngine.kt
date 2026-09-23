@@ -121,6 +121,9 @@ internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.DEVICE &&
         tool.approvalPolicy == ToolApprovalPolicy.MUTATION
 
+internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval?): Boolean =
+    approval?.canAutoApproveSafely == true
+
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -538,7 +541,7 @@ class LocalHarnessEngine @Inject constructor(
             pending?.toolName?.let { put("tool", it) }
         })
         persist()
-        if (pending?.canAutoApproveSafely == true) {
+        if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
             approvalResponse?.complete(true)
         }
     }
