@@ -6,6 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 
 class LocalHarnessSessionApprovalTest {
@@ -48,6 +50,30 @@ class LocalHarnessSessionApprovalTest {
         assertEquals(LocalConversationMode.INDEPENDENT, session.conversationMode)
         assertEquals(null, session.parentSessionId)
         assertEquals("", session.lineageId)
+    }
+
+    @Test
+    fun legacyModelHistoryWireFieldStillDecodesForMigration() {
+        val session = json.decodeFromString(
+            LocalHarnessSession.serializer(),
+            """{"id":"legacy-history","modelHistory":[{"role":"user","content":"旧问题"}]}""",
+        )
+
+        assertEquals(1, session.legacyModelHistory.size)
+        assertEquals("user", session.legacyModelHistory.single()["role"].toString().trim('"'))
+
+        val encoded = json.encodeToString(
+            LocalHarnessSession.serializer(),
+            LocalHarnessSession(
+                id = "wire-compatible",
+                legacyModelHistory = listOf(buildJsonObject {
+                    put("role", "user")
+                    put("content", "兼容")
+                }),
+            ),
+        )
+        assertTrue(encoded.contains("\"modelHistory\""))
+        assertFalse(encoded.contains("legacyModelHistory"))
     }
 
     @Test
