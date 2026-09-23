@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -20,12 +21,12 @@ class LocalSessionControlProjectionTest {
         )
         val events = listOf(
             event(4L, "plan/state", buildJsonObject {
-                put("items", buildJsonArray { add("过期计划") })
+                put("items", buildJsonArray { add(JsonPrimitive("过期计划")) })
             }),
             event(6L, "plan/state", buildJsonObject {
                 put("items", buildJsonArray {
-                    add("检查事实源")
-                    add("回放增量")
+                    add(JsonPrimitive("检查事实源"))
+                    add(JsonPrimitive("回放增量"))
                 })
             }),
             event(7L, "todo/state", buildJsonObject {
@@ -107,8 +108,8 @@ class LocalSessionControlProjectionTest {
         val events = listOf(
             event(11L, "plan/state", buildJsonObject {
                 put("items", buildJsonArray {
-                    add("新计划")
-                    add(123)
+                    add(JsonPrimitive("新计划"))
+                    add(JsonPrimitive(123))
                 })
             }),
             event(12L, "todo/state", buildJsonObject {
