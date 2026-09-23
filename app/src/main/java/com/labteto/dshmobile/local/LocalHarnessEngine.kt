@@ -401,6 +401,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
                 load()
+                resumeInterruptedSafeJobs()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -1678,10 +1679,7 @@ class LocalHarnessEngine @Inject constructor(
                 val background = args.boolean("run_in_background", false)
                 val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 if (background) {
-                    jobs.start("网页抓取：${input.take(120)}") { _, report ->
-                        report("正在抓取：$input")
-                        webTools.fetch(input, maxBytes, format, timeout)
-                    }
+                    startPersistentWebFetch(input, maxBytes, format, timeout)
                 } else {
                     webTools.fetch(input, maxBytes, format, timeout)
                 }
@@ -1735,17 +1733,11 @@ class LocalHarnessEngine @Inject constructor(
                 val model = args.optionalString("model")
                 val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
                 if (args.boolean("run_in_background", false)) {
-                    jobs.start("子代理：${task.take(100)}") { jobId, _ ->
-                        val result = subagents.runResult(
-                            task = task,
-                            inheritHistory = false,
-                            allowMutation = false,
-                            backgroundJobId = jobId,
-                            modelOverride = model,
-                            maxSteps = maxSteps,
-                        )
-                        result.requireCompletedOutput()
-                    }
+                    startPersistentReadonlySubagent(
+                        task = task,
+                        model = model,
+                        maxSteps = maxSteps,
+                    )
                 } else subagents.run(
                     task = task,
                     inheritHistory = false,
@@ -1787,6 +1779,114 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun startPersistentWebFetch(
+        url: String,
+        maxBytes: Int,
+        format: String,
+        timeoutSeconds: Long,
+    ): String {
+        val payload = buildJsonObject {
+            put("session_id", currentSessionId)
+            put("url", url)
+            put("max_bytes", maxBytes)
+            put("format", format)
+            put("timeout_seconds", timeoutSeconds)
+        }.toString()
+        return jobs.startPersistent(
+            label = "网页抓取：${url.take(120)}",
+            resumeKind = "web_fetch",
+            resumePayload = payload,
+        ) { _, report ->
+            report("正在抓取：$url")
+            webTools.fetch(url, maxBytes, format, timeoutSeconds)
+        }
+    }
+
+    private fun startPersistentReadonlySubagent(
+        task: String,
+        model: String?,
+        maxSteps: Int,
+    ): String {
+        val payload = buildJsonObject {
+            put("session_id", currentSessionId)
+            put("task", task)
+            model?.let { put("model", it) }
+            put("max_steps", maxSteps)
+        }.toString()
+        return jobs.startPersistent(
+            label = "子代理：${task.take(100)}",
+            resumeKind = "subagent_readonly",
+            resumePayload = payload,
+        ) { jobId, _ ->
+            val result = subagents.runResult(
+                task = task,
+                inheritHistory = false,
+                allowMutation = false,
+                backgroundJobId = jobId,
+                modelOverride = model,
+                maxSteps = maxSteps,
+            )
+            result.requireCompletedOutput()
+        }
+    }
+
+    private suspend fun resumeInterruptedSafeJobs() {
+        jobs.interruptedSnapshots().forEach { snapshot ->
+            val payloadText = snapshot.resumePayload ?: return@forEach
+            runCatching {
+                val payload = json.parseToJsonElement(payloadText).jsonObject
+                val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull
+                require(sessionId == null || sessionId == currentSessionId) {
+                    "恢复任务属于其他会话：$sessionId"
+                }
+                when (snapshot.resumeKind) {
+                    "web_fetch" -> {
+                        val url = payload["url"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 url")
+                        val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull
+                            ?: DEFAULT_WEB_FETCH_BYTES
+                        val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
+                        val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
+                            ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
+                        jobs.resumePersistent(snapshot.id) { _, report ->
+                            report("正在恢复网页抓取：$url")
+                            webTools.fetch(
+                                url,
+                                maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
+                                format,
+                                timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
+                            )
+                        }
+                    }
+                    "subagent_readonly" -> {
+                        val task = payload["task"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 task")
+                        val model = payload["model"]?.jsonPrimitive?.contentOrNull
+                        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
+                            ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
+                        jobs.resumePersistent(snapshot.id) { jobId, _ ->
+                            val result = subagents.runResult(
+                                task = task,
+                                inheritHistory = false,
+                                allowMutation = false,
+                                backgroundJobId = jobId,
+                                modelOverride = model,
+                                maxSteps = maxSteps,
+                            )
+                            result.requireCompletedOutput()
+                        }
+                    }
+                    else -> Unit
+                }
+            }.onFailure { error ->
+                eventLog.append("job/resume-error", buildJsonObject {
+                    put("job_id", snapshot.id)
+                    put("kind", snapshot.resumeKind.orEmpty())
+                    put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
+                })
+            }
+        }
+    }
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
