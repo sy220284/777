@@ -1399,25 +1399,62 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
-        "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
+        "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}"
 
-    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult =
-        AgentToolResult(
+    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult {
+        val retryable = code in setOf(
+            "MODEL_TIMEOUT",
+            "MODEL_NETWORK",
+            "TASK_CANCELLED",
+            "PARALLEL_TASK_ERROR",
+        ) || code.startsWith("MODEL_HTTP_5") || code.contains("TIMEOUT") || code.contains("NETWORK")
+        val access = toolRegistry.get(LocalToolPolicy.canonical(call.name))?.access
+        val sideEffect = if (
+            access in setOf(
+                ToolAccess.WORKSPACE_WRITE,
+                ToolAccess.SESSION_WRITE,
+                ToolAccess.PROCESS,
+                ToolAccess.AGENT_CONTROL,
+                ToolAccess.DEVICE,
+                ToolAccess.PRIVILEGED,
+            )
+        ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE
+        val recoveryHint = when {
+            sideEffect == AgentToolSideEffect.POSSIBLE ->
+                "该调用可能已产生部分副作用；先检查当前状态，再决定是否重试。"
+            retryable ->
+                "该错误允许重试；网络类错误可先运行 network_diagnose。"
+            else ->
+                "检查参数、权限或前置状态后再选择其他方案。"
+        }
+        return AgentToolResult(
             content = formatToolFailure(call, code, detail),
             isError = true,
+            errorCode = code,
+            retryable = retryable,
+            sideEffect = sideEffect,
+            recoveryHint = recoveryHint,
         )
+    }
 
     private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
-            ?: return AgentToolResult("未知工具：${call.name}", isError = true)
+            ?: return AgentToolResult(
+                content = "未知工具：${call.name}",
+                isError = true,
+                errorCode = "UNKNOWN_TOOL",
+                recoveryHint = "先使用 capability_search 或检查工具名称。",
+            )
         if (
             _state.value.planMode &&
             !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
             return AgentToolResult(
-                "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
+                content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
                 isError = true,
+                errorCode = "PLAN_MODE_BLOCKED",
+                recoveryHint = "提交并批准计划后再执行修改类工具。",
             )
         }
         val result = toolRegistry.execute(
@@ -1443,7 +1480,26 @@ class LocalHarnessEngine @Inject constructor(
                 },
             ),
         )
-        return AgentToolResult(result.content, result.isError)
+        return if (result.isError) {
+            AgentToolResult(
+                content = result.content,
+                isError = true,
+                errorCode = "TOOL_REPORTED_ERROR",
+                sideEffect = if (
+                    registered.access in setOf(
+                        ToolAccess.WORKSPACE_WRITE,
+                        ToolAccess.SESSION_WRITE,
+                        ToolAccess.PROCESS,
+                        ToolAccess.AGENT_CONTROL,
+                        ToolAccess.DEVICE,
+                        ToolAccess.PRIVILEGED,
+                    )
+                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
+                recoveryHint = "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。",
+            )
+        } else {
+            AgentToolResult(result.content)
+        }
     }
 
     private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
