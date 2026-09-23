@@ -36,7 +36,7 @@ class ShizukuBridge(
             .daemon(false)
             .processNameSuffix("harness_privileged")
             .debuggable(false)
-            .version(1)
+            .version(2)
     }
 
     private val connection = object : ServiceConnection {
