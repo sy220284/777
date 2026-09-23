@@ -10,16 +10,37 @@ import org.junit.rules.TemporaryFolder
 class AutomaticLanguageServerResolverTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun legacyCommandWinsForUpgradeCompatibility() {
+    @Test fun compatibleLegacyCommandIsFallbackWhenAutomaticServerIsUnavailable() {
         val resolver = AutomaticLanguageServerResolver(
             temporary.root,
-            commandAvailable = { false },
-            legacyCommand = { listOf("node", "legacy-server.js", "--stdio") },
+            commandAvailable = { it == "kotlin-language-server" },
+            legacyCommand = { listOf("kotlin-language-server", "--legacy") },
         )
         assertEquals(
-            listOf("node", "legacy-server.js", "--stdio"),
+            listOf("kotlin-language-server"),
             resolver.resolve("src/main.kt"),
         )
+    }
+
+    @Test fun staleLegacyCommandDoesNotBlockAutomaticDetection() {
+        val resolver = AutomaticLanguageServerResolver(
+            temporary.root,
+            commandAvailable = { it == "pyright-langserver" },
+            legacyCommand = { listOf("/missing/kotlin-language-server") },
+        )
+        assertEquals(
+            listOf("pyright-langserver", "--stdio"),
+            resolver.resolve("tools/check.py"),
+        )
+    }
+
+    @Test fun legacyCommandForAnotherLanguageIsIgnored() {
+        val resolver = AutomaticLanguageServerResolver(
+            temporary.root,
+            commandAvailable = { it == "kotlin-language-server" },
+            legacyCommand = { listOf("kotlin-language-server") },
+        )
+        assertTrue(resolver.resolve("tools/check.py").isEmpty())
     }
 
     @Test fun resolvesInstalledServerFromTargetLanguage() {
