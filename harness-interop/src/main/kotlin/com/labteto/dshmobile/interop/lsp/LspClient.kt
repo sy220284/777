@@ -5,12 +5,12 @@ import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.File
 import java.util.ArrayDeque
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -22,6 +22,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class LspProcessClient(
     private val command: List<String>,
@@ -183,15 +185,28 @@ class LspProcessClient(
         boundedIo { requestBlocking(method, params) }
     }
 
-    private suspend fun <T> boundedIo(block: () -> T): T = try {
-        withTimeout(30_000L) {
-            runInterruptible(Dispatchers.IO) { block() }
+    private suspend fun <T> boundedIo(block: () -> T): T = withTimeout(30_000L) {
+        suspendCancellableCoroutine { continuation ->
+            val worker = blockingIo.submit {
+                try {
+                    continuation.resume(block())
+                } catch (error: Throwable) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+            }
+            continuation.invokeOnCancellation {
+                // A pipe read can ignore Thread.interrupt. Close the process from the cancelling
+                // coroutine so neither the caller nor the test runner waits for the blocked read.
+                worker.cancel(true)
+                close()
+            }
         }
-    } catch (cancelled: CancellationException) {
-        // BufferedInputStream.read is blocking. runInterruptible turns coroutine cancellation into
-        // a thread interrupt; closing the process/streams also wakes servers that ignore interrupts.
-        close()
-        throw cancelled
+    }
+
+    private companion object {
+        val blockingIo = Executors.newCachedThreadPool { task ->
+            Thread(task, "lsp-blocking-io").apply { isDaemon = true }
+        }
     }
 
     private fun requestBlocking(method: String, params: JsonObject): JsonObject {
