@@ -54,7 +54,7 @@ internal class LocalSubagentRunner(
     private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean) -> JsonArray,
-    private val execute: suspend (LocalToolCall, Boolean) -> String,
+    private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
@@ -213,6 +213,7 @@ internal class LocalSubagentRunner(
                                 put("name", event.call.name)
                                 put("content", event.output.take(SUBAGENT_EVENT_CHARS))
                                 put("model_content", modelOutput)
+                                put("is_error", event.isError)
                             })
                             history += buildJsonObject {
                                 put("role", "tool")
