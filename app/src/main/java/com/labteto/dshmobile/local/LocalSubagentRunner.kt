@@ -40,6 +40,11 @@ internal data class LocalSubagentResult(
     val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
 }
 
+internal fun LocalSubagentResult.requireCompletedOutput(): String {
+    if (!succeeded) throw IllegalStateException(output)
+    return output
+}
+
 internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
@@ -79,7 +84,7 @@ internal class LocalSubagentRunner(
         parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
-    ): String {
+    ): LocalSubagentResult {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val history = if (inheritHistory) {
             inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
