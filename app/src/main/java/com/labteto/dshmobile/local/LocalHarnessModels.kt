@@ -199,6 +199,11 @@ data class LocalToolCall(
     val rawArguments: String,
 )
 
+data class LocalModelDelta(
+    val content: String = "",
+    val reasoning: String = "",
+)
+
 /** Parsed model response retained verbatim for the next request. */
 data class LocalModelReply(
     val message: JsonObject,
