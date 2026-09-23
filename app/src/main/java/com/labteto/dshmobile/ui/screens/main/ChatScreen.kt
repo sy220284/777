@@ -59,6 +59,7 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.rootSurface
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import java.util.UUID
@@ -376,7 +377,7 @@ fun ChatScreen(
         store.panels.get(composer.key).open(path)
         panelKey = composer.key
     }) {
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         // The activity draws edge to edge, so every top-level surface has to consume the insets
         // itself or the chrome ends up underneath the status bar. safeDrawing covers the status
         // bar and gesture area; IME is separate in edge-to-edge mode, so consume it explicitly.

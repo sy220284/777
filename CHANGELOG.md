@@ -3,6 +3,18 @@
 All notable changes to DSH Mobile are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project uses SemVer.
 
+## [Unreleased]
+
+### Added
+
+- **The app can wear a background image.** Settings → General now takes a picture from the device
+  and paints it behind the whole shell. Cards, sheets and list rows keep their own opaque fills, so
+  text keeps its contrast; only the surfaces that cover the window — the local home, the chat screen
+  and the workspace panel — drop their fill while an image is in use. The picked file is *copied*
+  into the app's private storage instead of being referenced by URI, so the background survives a
+  restart and does not vanish when a picker grant lapses. Picking another image replaces the stored
+  one; removing it returns the plain theme colour.
+
 ## [0.11.4] - 2026-09-19
 
 ### Fixed

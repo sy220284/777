@@ -105,6 +105,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -394,7 +395,7 @@ private fun LocalConfiguration(
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
     Column(
-        Modifier.fillMaxSize().background(colors.bgBase).safeDrawingPadding().imePadding()
+        Modifier.fillMaxSize().background(colors.rootSurface()).safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
             .padding(DsSpacing.xlarge),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
@@ -596,9 +597,9 @@ private fun LocalChat(
         }
     }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.bgBase)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.rootSurface())) {
         Column(
-            Modifier.fillMaxWidth().background(colors.bgBase)
+            Modifier.fillMaxWidth().background(colors.rootSurface())
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
         ) {
             Row(

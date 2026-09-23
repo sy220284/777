@@ -313,6 +313,11 @@
     <string name="settings_appearance_light">Light</string>
     <string name="settings_appearance_dark">Dark</string>
     <string name="settings_appearance_system">System</string>
+    <string name="settings_background_image">Background image</string>
+    <string name="settings_background_image_none">Using the plain theme colour</string>
+    <string name="settings_background_image_active">Custom image in use</string>
+    <string name="settings_background_image_choose">Choose image</string>
+    <string name="settings_background_image_clear">Remove</string>
     <string name="settings_readonly_banner">Settings are read-only over the network. Open the harness on its own computer to change them.</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>
