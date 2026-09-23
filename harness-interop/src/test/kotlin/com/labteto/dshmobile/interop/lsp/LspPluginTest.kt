@@ -105,7 +105,7 @@ class LspPluginTest {
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("slow-server.sh")
         script.writeText(
-            "printf '%s' '" + frame(initialized) + "'\nexec cat >/dev/null\n",
+            "printf '%s' '" + frame(initialized) + "'\nwhile IFS= read -r line; do :; done\n",
         )
         temporary.newFile("example.kt").writeText("fun main() = Unit")
         val context = HarnessContext()
