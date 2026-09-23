@@ -352,7 +352,7 @@ private fun LocalConfiguration(
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
 
     Column(
-        Modifier.fillMaxSize().background(colors.bgBase).safeDrawingPadding()
+        Modifier.fillMaxSize().background(colors.bgBase).safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
             .padding(DsSpacing.xlarge),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
@@ -550,7 +550,7 @@ private fun LocalChat(
         }
     }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().background(colors.bgBase)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.bgBase)) {
         Column(
             Modifier.fillMaxWidth().background(colors.bgBase)
                 .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.medium),
