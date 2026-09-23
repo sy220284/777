@@ -1275,6 +1275,7 @@ class LocalHarnessEngine @Inject constructor(
                         checkpointModelHistory("assistant/message")
                         updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence)
+                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
                         persist()
                     }
                     is AgentEvent.ToolStarted -> {
@@ -1396,6 +1397,8 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
                 )
             }
             persist()
@@ -2142,7 +2145,9 @@ class LocalHarnessEngine @Inject constructor(
             },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
-                    is AgentRequestEvent.AttemptStarted -> Unit
+                    is AgentRequestEvent.AttemptStarted -> {
+                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                    }
                     is AgentRequestEvent.AttemptFailed -> {
                         eventLog.append("request/error", buildJsonObject {
                             put("step", step)
@@ -2183,12 +2188,22 @@ class LocalHarnessEngine @Inject constructor(
         )
         return executor.execute {
             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                modelClient.complete(
+                modelClient.completeStreaming(
                     apiKey = key,
                     baseUrl = snapshot.baseUrl,
                     model = snapshot.model,
                     messages = messages,
                     tools = tools,
+                    onDelta = { delta ->
+                        _state.update { state ->
+                            state.copy(
+                                streamingAssistant = (state.streamingAssistant + delta.content)
+                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
+                                streamingReasoning = (state.streamingReasoning + delta.reasoning)
+                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -2676,6 +2691,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val MAX_PENDING_INPUTS = 16
+        const val MAX_STREAM_PREVIEW_CHARS = 80_000
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
