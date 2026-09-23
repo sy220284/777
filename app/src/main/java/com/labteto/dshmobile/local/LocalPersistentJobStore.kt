@@ -33,7 +33,7 @@ internal class LocalPersistentJobStore(
     private val pending = AtomicReference<List<JobSnapshot>>(emptyList())
 
     fun read(): List<JobSnapshot> = runCatching {
-        if (!file.isFile) return emptyList()
+        if (!file.isFile) return@runCatching emptyList()
         json.parseToJsonElement(file.readText()).jsonArray.mapNotNull { raw ->
             val item = raw.jsonObject
             val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
