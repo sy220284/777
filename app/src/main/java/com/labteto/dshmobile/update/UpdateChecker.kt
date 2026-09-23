@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.update
 
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -7,8 +10,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /** The subset of a GitHub release this app reads. */
 @Serializable
@@ -23,7 +24,48 @@ private data class GithubAsset(
 private data class GithubRelease(
     @SerialName("tag_name") val tagName: String = "",
     @SerialName("html_url") val htmlUrl: String = "",
+    val draft: Boolean = false,
+    val prerelease: Boolean = false,
     val assets: List<GithubAsset> = emptyList(),
+)
+
+@Serializable
+private data class UpdateManifestApk(
+    val name: String = "",
+    val size: Long = -1L,
+    val sha256: String = "",
+)
+
+@Serializable
+private data class UpdateManifestPatch(
+    val fromVersion: String = "",
+    val toVersion: String = "",
+    val algorithm: String = "",
+    val asset: String = "",
+    val size: Long = -1L,
+    val sha256: String = "",
+    val sourceSha256: String = "",
+    val targetSha256: String = "",
+)
+
+@Serializable
+private data class UpdateManifest(
+    val schema: Int = 0,
+    val targetVersion: String = "",
+    val targetApk: UpdateManifestApk = UpdateManifestApk(),
+    val patches: List<UpdateManifestPatch> = emptyList(),
+)
+
+data class DeltaPatch(
+    val fromVersion: String,
+    val toVersion: String,
+    val algorithm: String,
+    val url: String,
+    val name: String,
+    val size: Long,
+    val expectedSha256: String,
+    val sourceSha256: String,
+    val targetSha256: String,
 )
 
 /** A release newer than the running build, including a directly verifiable APK when published. */
@@ -35,6 +77,7 @@ data class AvailableUpdate(
     val apkSize: Long? = null,
     val expectedSha256: String? = null,
     val checksumUrl: String? = null,
+    val patchChain: List<DeltaPatch> = emptyList(),
 )
 
 /** Parse GitHub's release-asset digest field, which is currently shaped like `sha256:<hex>`. */
@@ -49,6 +92,9 @@ internal fun parseGithubSha256(digest: String?): String? {
         ?.lowercase()
 }
 
+private fun normalizeVersion(value: String): String =
+    value.trim().removePrefix("v").substringBefore('+')
+
 /** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
     data class ParsedVersion(
@@ -57,7 +103,7 @@ internal fun isNewerVersion(candidate: String, current: String): Boolean {
     )
 
     fun parse(value: String): ParsedVersion? {
-        val normalized = value.trim().removePrefix("v").substringBefore('+')
+        val normalized = normalizeVersion(value)
         if (normalized.isBlank()) return null
         val coreText = normalized.substringBefore('-')
         val core = coreText.split('.').map { part ->
@@ -66,8 +112,6 @@ internal fun isNewerVersion(candidate: String, current: String): Boolean {
         if (core.isEmpty()) return null
 
         // 777.N is this app's release revision, not a generic semantic-version pre-release label.
-        // Other suffixes (rc/beta/etc.) keep the previous behavior: they do not make an otherwise
-        // equal core version count as an upgrade.
         val suffix = normalized.substringAfter('-', missingDelimiterValue = "")
         val revision = suffix
             .takeIf { it.matches(Regex("""777(?:\.\d+)*""")) }
@@ -100,11 +144,18 @@ internal fun isNewerVersion(candidate: String, current: String): Boolean {
     return false
 }
 
+internal fun shouldUsePatchChain(apkSize: Long?, patches: List<DeltaPatch>): Boolean {
+    if (apkSize == null || apkSize <= 0L || patches.isEmpty()) return false
+    val patchBytes = patches.sumOf { it.size.coerceAtLeast(0L) }
+    return patchBytes > 0L && patchBytes * 100L < apkSize * PATCH_SIZE_PERCENT_LIMIT
+}
+
 /**
  * Manual GitHub release checker.
  *
- * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request,
- * so a user can retry after a failed connection or re-check while the app stays open.
+ * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request.
+ * Recent release metadata is fetched so consecutive differential packages can be chained; if any
+ * edge is missing or inconsistent the caller simply receives the full APK fallback.
  */
 @Singleton
 class UpdateChecker @Inject constructor(
@@ -113,41 +164,164 @@ class UpdateChecker @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun checkNow(currentVersion: String): AvailableUpdate? {
-        val release = fetchLatest() ?: error("无法获取最新发行版")
-        val version = release.tagName.trim().removePrefix("v")
-        if (version.isEmpty() || !isNewerVersion(version, currentVersion)) return null
+        val releases = fetchRecentReleases()
+            .filterNot { it.draft || it.prerelease }
+        val release = releases.firstOrNull { candidate ->
+            val version = normalizeVersion(candidate.tagName)
+            version.isNotEmpty() && isNewerVersion(version, currentVersion)
+        } ?: return null
 
+        val version = normalizeVersion(release.tagName)
         val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
         val checksums = release.assets.firstOrNull {
             it.name.equals("SHA256SUMS.txt", ignoreCase = true)
         }
+        val apkDigest = parseGithubSha256(apk?.digest)
+        val candidateChain = if (apkDigest != null) {
+            resolvePatchChain(
+                currentVersion = normalizeVersion(currentVersion),
+                latestVersion = version,
+                releases = releases,
+            )
+        } else {
+            emptyList()
+        }
+        val patchChain = candidateChain.takeIf { shouldUsePatchChain(apk?.size, it) }.orEmpty()
+
         return AvailableUpdate(
             version = version,
             url = release.htmlUrl.ifBlank { RELEASES_URL },
             apkUrl = apk?.downloadUrl?.takeIf(String::isNotBlank),
             apkName = apk?.name?.takeIf(String::isNotBlank),
             apkSize = apk?.size?.takeIf { it > 0L },
-            expectedSha256 = parseGithubSha256(apk?.digest),
+            expectedSha256 = apkDigest,
             checksumUrl = checksums?.downloadUrl?.takeIf(String::isNotBlank),
+            patchChain = patchChain,
         )
     }
 
-    private suspend fun fetchLatest(): GithubRelease? = withContext(Dispatchers.IO) {
+    private suspend fun resolvePatchChain(
+        currentVersion: String,
+        latestVersion: String,
+        releases: List<GithubRelease>,
+    ): List<DeltaPatch> {
+        var targetVersion = latestVersion
+        val reversed = mutableListOf<DeltaPatch>()
+
+        repeat(MAX_PATCH_CHAIN_LENGTH) {
+            if (normalizeVersion(targetVersion) == normalizeVersion(currentVersion)) {
+                return reversed.asReversed()
+            }
+
+            val release = releases.firstOrNull {
+                normalizeVersion(it.tagName) == normalizeVersion(targetVersion)
+            } ?: return emptyList()
+            val manifestAsset = release.assets.firstOrNull {
+                it.name.equals(UPDATE_MANIFEST_NAME, ignoreCase = true)
+            } ?: return emptyList()
+            val manifest = fetchManifest(manifestAsset) ?: return emptyList()
+            if (manifest.schema != UPDATE_MANIFEST_SCHEMA ||
+                normalizeVersion(manifest.targetVersion) != normalizeVersion(targetVersion)
+            ) {
+                return emptyList()
+            }
+
+            val releaseApk = release.assets.firstOrNull {
+                it.name.equals(manifest.targetApk.name, ignoreCase = false)
+            } ?: return emptyList()
+            val releaseApkSha = parseGithubSha256(releaseApk.digest) ?: return emptyList()
+            if (releaseApk.size != manifest.targetApk.size ||
+                !releaseApkSha.equals(manifest.targetApk.sha256, ignoreCase = true)
+            ) {
+                return emptyList()
+            }
+
+            val manifestPatch = manifest.patches.singleOrNull {
+                normalizeVersion(it.toVersion) == normalizeVersion(targetVersion)
+            } ?: return emptyList()
+            if (manifestPatch.algorithm != SUPPORTED_PATCH_ALGORITHM ||
+                manifestPatch.fromVersion.isBlank() ||
+                normalizeVersion(manifestPatch.fromVersion) == normalizeVersion(targetVersion)
+            ) {
+                return emptyList()
+            }
+
+            val patchAsset = release.assets.firstOrNull { it.name == manifestPatch.asset }
+                ?: return emptyList()
+            val patchSha = parseGithubSha256(patchAsset.digest) ?: return emptyList()
+            if (patchAsset.size <= 0L ||
+                patchAsset.size != manifestPatch.size ||
+                !patchSha.equals(manifestPatch.sha256, ignoreCase = true) ||
+                !releaseApkSha.equals(manifestPatch.targetSha256, ignoreCase = true)
+            ) {
+                return emptyList()
+            }
+
+            reversed += DeltaPatch(
+                fromVersion = normalizeVersion(manifestPatch.fromVersion),
+                toVersion = normalizeVersion(manifestPatch.toVersion),
+                algorithm = manifestPatch.algorithm,
+                url = patchAsset.downloadUrl,
+                name = patchAsset.name,
+                size = patchAsset.size,
+                expectedSha256 = patchSha,
+                sourceSha256 = manifestPatch.sourceSha256.lowercase(),
+                targetSha256 = manifestPatch.targetSha256.lowercase(),
+            )
+            targetVersion = manifestPatch.fromVersion
+        }
+
+        return emptyList()
+    }
+
+    private suspend fun fetchRecentReleases(): List<GithubRelease> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url(LATEST_RELEASE_API)
+            .url(RECENT_RELEASES_API)
             .header("Accept", "application/vnd.github+json")
             .get()
             .build()
         client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("无法获取最新发行版：HTTP ${response.code}")
+            val body = response.body?.string() ?: error("发行版响应为空")
+            json.decodeFromString(ListSerializer, body)
+        }
+    }
+
+    private suspend fun fetchManifest(asset: GithubAsset): UpdateManifest? = withContext(Dispatchers.IO) {
+        val expected = parseGithubSha256(asset.digest) ?: return@withContext null
+        if (asset.size !in 1..MAX_MANIFEST_BYTES) return@withContext null
+        val request = Request.Builder()
+            .url(asset.downloadUrl)
+            .header("Accept", "application/json, application/octet-stream")
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
-            val body = response.body?.string() ?: return@use null
-            json.decodeFromString(GithubRelease.serializer(), body)
+            val body = response.body ?: return@use null
+            if (body.contentLength() > MAX_MANIFEST_BYTES) return@use null
+            val bytes = body.byteStream().use { readChecksumBytes(it, MAX_MANIFEST_BYTES) }
+            val actual = MessageDigest.getInstance("SHA-256")
+                .digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+            if (!actual.equals(expected, ignoreCase = true)) return@use null
+            json.decodeFromString(UpdateManifest.serializer(), bytes.toString(Charsets.UTF_8))
         }
     }
 
     private companion object {
         const val REPO = "sy220284/777"
-        const val LATEST_RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
+        const val RECENT_RELEASES_API =
+            "https://api.github.com/repos/$REPO/releases?per_page=$MAX_RELEASES_TO_SCAN"
+        const val UPDATE_MANIFEST_NAME = "update-manifest.json"
+        const val UPDATE_MANIFEST_SCHEMA = 1
+        const val SUPPORTED_PATCH_ALGORITHM = "hdiffpatch-window-zstd-v1"
+        const val MAX_RELEASES_TO_SCAN = 12
+        const val MAX_PATCH_CHAIN_LENGTH = 6
+        const val MAX_MANIFEST_BYTES = 256L * 1024L
+
+        val ListSerializer = kotlinx.serialization.builtins.ListSerializer(GithubRelease.serializer())
     }
 }
+
+private const val PATCH_SIZE_PERCENT_LIMIT = 65L
