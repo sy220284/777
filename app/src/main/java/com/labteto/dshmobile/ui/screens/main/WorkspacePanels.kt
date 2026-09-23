@@ -38,8 +38,16 @@ internal fun <T> RpcResult<T>.requireValue(): T = when (this) {
     is RpcResult.Err -> throw IllegalStateException("${error.code}: ${error.message}")
 }
 
+internal enum class WorkspacePanelMode { WORKSPACE, CONVERSATION }
+
 @Composable
-internal fun WorkspacePanels(store: SessionStore, state: PanelState, onDismiss: () -> Unit) {
+internal fun WorkspacePanels(
+    store: SessionStore,
+    state: PanelState,
+    mode: WorkspacePanelMode = WorkspacePanelMode.WORKSPACE,
+    conversationFiles: ConversationFileIndex = ConversationFileIndex(),
+    onDismiss: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val key = state.key
@@ -57,7 +65,9 @@ internal fun WorkspacePanels(store: SessionStore, state: PanelState, onDismiss: 
             finally { state.busy = false }
         }
     }
-    LaunchedEffect(key) { if (state.listing == null) listDirectory(state.directory) }
+    LaunchedEffect(key, mode) {
+        if (mode == WorkspacePanelMode.WORKSPACE && state.listing == null) listDirectory(state.directory)
+    }
     // Invalidate previews when the host reports a file observation. OS-only changes are checked
     // by stat each time a tab opens and by the explicit Refresh action.
     LaunchedEffect(key, store.muxForHost(key.host)) {
@@ -84,15 +94,28 @@ internal fun WorkspacePanels(store: SessionStore, state: PanelState, onDismiss: 
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back)) }
-                    Text(stringResource(R.string.panel_workspace), modifier = Modifier.padding(16.dp))
+                    Text(
+                        stringResource(
+                            if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files
+                            else R.string.panel_workspace,
+                        ),
+                        modifier = Modifier.padding(16.dp),
+                    )
                 }
                 TabRow(selectedTabIndex = state.section) {
-                    listOf(R.string.panel_files, R.string.panel_preview, R.string.panel_terminal).forEachIndexed { i, title ->
+                    listOf(
+                        if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files else R.string.panel_files,
+                        R.string.panel_preview,
+                        R.string.panel_terminal,
+                    ).forEachIndexed { i, title ->
                         Tab(selected = state.section == i, onClick = { state.section = i }, text = { Text(stringResource(title)) })
                     }
                 }
                 when (state.section) {
                     0 -> {
+                        if (mode == WorkspacePanelMode.CONVERSATION) {
+                            ConversationFileList(conversationFiles, state, Modifier.weight(1f))
+                        } else {
                         Row(Modifier.fillMaxWidth()) {
                             TextButton(onClick = { listDirectory(".") }, enabled = !state.busy) { Text(stringResource(R.string.panel_root)) }
                             TextButton(onClick = { listDirectory(state.directory.substringBeforeLast('/', ".").ifEmpty { "." }) }, enabled = !state.busy) {
@@ -113,6 +136,8 @@ internal fun WorkspacePanels(store: SessionStore, state: PanelState, onDismiss: 
                                         if (entry.type == "directory") listDirectory(path) else state.open(path)
                                     })
                             }
+                        }
+
                         }
                     }
                     1 -> {
@@ -138,6 +163,64 @@ internal fun WorkspacePanels(store: SessionStore, state: PanelState, onDismiss: 
         }
     }
     }
+}
+
+@Composable
+private fun ConversationFileList(
+    files: ConversationFileIndex,
+    state: PanelState,
+    modifier: Modifier = Modifier,
+) {
+    if (files.isEmpty) {
+        Text(
+            stringResource(R.string.panel_conversation_files_empty),
+            modifier = modifier.fillMaxWidth().padding(24.dp),
+            color = DsTheme.colors.labelTertiary,
+        )
+        return
+    }
+    LazyColumn(modifier) {
+        if (files.artifacts.isNotEmpty()) {
+            item(key = "conversation-artifacts-header") {
+                Text(
+                    stringResource(R.string.panel_artifacts),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = DsTheme.colors.labelSecondary,
+                )
+            }
+            items(files.artifacts, key = { "artifact:" + it.path }) { ref ->
+                ConversationFileRow(ref, state)
+            }
+        }
+        if (files.involved.isNotEmpty()) {
+            item(key = "conversation-involved-header") {
+                Text(
+                    stringResource(R.string.panel_involved_files),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = DsTheme.colors.labelSecondary,
+                )
+            }
+            items(files.involved, key = { "involved:" + it.path }) { ref ->
+                ConversationFileRow(ref, state)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationFileRow(ref: ConversationFileRef, state: PanelState) {
+    ListItem(
+        headlineContent = { Text(ref.path.substringAfterLast('/').substringAfterLast('\\')) },
+        supportingContent = {
+            Column {
+                Text(ref.path)
+                Text(ref.tool, style = MaterialTheme.typography.labelSmall)
+            }
+        },
+        modifier = Modifier.clickable { state.open(ref.path) },
+    )
 }
 
 @Composable

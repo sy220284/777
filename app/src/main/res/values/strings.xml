@@ -446,6 +446,12 @@
     <string name="archived_empty">No archived sessions match</string>
     <string name="archived_restore">Restore</string>
     <string name="panel_workspace">Workspace</string>
+    <string name="panel_conversation_files">Conversation files</string>
+    <string name="panel_artifacts">Outputs</string>
+    <string name="panel_involved_files">Working files</string>
+    <string name="panel_conversation_files_empty">No workspace files have been used or produced in this conversation yet.</string>
+    <string name="chat_open_files">Open conversation files</string>
+    <string name="chatlist_workspace_files">Workspace files</string>
     <string name="panel_files">Files</string>
     <string name="panel_preview">Preview</string>
     <string name="panel_terminal">Terminal</string>
@@ -529,5 +535,18 @@
     <string name="relay_status_connecting_body">Pairing is complete. Establishing the remote control connection.</string>
     <string name="relay_status_retry">Pair again</string>
     <string name="relay_status_back_local">Back to Local Harness</string>
+
+    <string name="local_files_workspace_subtitle">Browse on-device workspace files and task artifacts</string>
+    <string name="local_files_read_failed">Could not read workspace files</string>
+    <string name="local_files_preview_failed">Could not preview file</string>
+    <string name="local_files_back_to_files">Back to files</string>
+    <string name="local_files_back">Back</string>
+    <string name="local_files_workspace_title">Workspace files</string>
+    <string name="local_files_conversation_title">Conversation files</string>
+    <string name="local_files_refresh">Refresh</string>
+    <string name="local_files_workspace_empty">No files in this workspace</string>
+    <string name="local_files_loading">Reading file…</string>
+    <string name="local_files_binary_hint">This is a binary file. File information is shown here; use the workspace list to confirm its path and size.</string>
+    <string name="local_files_truncated_hint">This file is large. Showing the first 512 KB.</string>
 
 </resources>
