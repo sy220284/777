@@ -104,8 +104,10 @@ internal fun ChatTranscript(
     //
     // Reversed here rather than at the call site: the fold's natural order is oldest-first, and
     // that is the order every other reader of `nodes` wants.
-    val rows = remember(conversation?.nodes) {
-        conversation?.nodes.orEmpty().filter { it.rendersContent() }.asReversed()
+    var transcriptMode by rememberSaveable { mutableStateOf(TranscriptMode.CONCISE) }
+    val nodes = conversation?.nodes.orEmpty()
+    val rows = remember(conversation?.nodes, transcriptMode) {
+        nodes.filter { it.rendersInTranscript(nodes, transcriptMode) }.asReversed()
     }
     val hasMore = conversation?.hasMore == true
     val itemCount = rows.size + if (hasMore) 1 else 0
@@ -162,53 +164,79 @@ internal fun ChatTranscript(
         return
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        // Newest first, so the row the viewport anchors on is the one that grows.
-        reverseLayout = true,
-        // Still bottom-aligned: a transcript shorter than the viewport belongs above the composer,
-        // not pinned under the tab strip with the empty half below it. The alignment is in visual
-        // space, not the reversed one, so this reads the same as it always did — and it only has
-        // any effect while the content is shorter than the viewport, which is exactly when no row
-        // is growing under anyone's eyes.
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Bottom),
-    ) {
-        if (rows.isEmpty()) {
-            item(key = "empty") {
-                EmptyHero(
-                    headline = stringResource(R.string.chat_empty_title),
-                    subtitle = stringResource(R.string.chat_empty_hint),
-                )
-            }
-        } else {
-            items(
-                rows,
-                // A streaming row's seq is minted past the durable cursor and is explicitly not
-                // stable across folds, so keying on it destroyed and rebuilt the row the moment the
-                // settlement landed — a visible pop at the end of every reply. One constant key
-                // instead: there is only ever one provisional row, and it is the same row before
-                // and after it settles.
-                key = { node -> if (node is AssistantMessageNode && node.streaming) STREAMING_ROW_KEY else node.seq },
-            ) { node ->
-                val streaming = node is AssistantMessageNode && node.streaming
-                // Placement animation is for rows that move. The streaming row grows in place many
-                // times a second, and animating that reads as jitter rather than motion.
-                Column(if (streaming) Modifier else Modifier.animateItem()) {
-                    ChatNodeItem(node = node, context = context)
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                stringResource(R.string.chat_view_mode),
+                style = DsType.caption11,
+                color = DsTheme.colors.labelTertiary,
+                modifier = Modifier.weight(1f),
+            )
+            DsButton(
+                text = stringResource(R.string.chat_view_concise),
+                onClick = { transcriptMode = TranscriptMode.CONCISE },
+                variant = if (transcriptMode == TranscriptMode.CONCISE) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+            DsButton(
+                text = stringResource(R.string.chat_view_full),
+                onClick = { transcriptMode = TranscriptMode.FULL },
+                variant = if (transcriptMode == TranscriptMode.FULL) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            // Newest first, so the row the viewport anchors on is the one that grows.
+            reverseLayout = true,
+            // Still bottom-aligned: a transcript shorter than the viewport belongs above the composer,
+            // not pinned under the tab strip with the empty half below it. The alignment is in visual
+            // space, not the reversed one, so this reads the same as it always did — and it only has
+            // any effect while the content is shorter than the viewport, which is exactly when no row
+            // is growing under anyone's eyes.
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Bottom),
+        ) {
+            if (rows.isEmpty()) {
+                item(key = "empty") {
+                    EmptyHero(
+                        headline = stringResource(R.string.chat_empty_title),
+                        subtitle = stringResource(R.string.chat_empty_hint),
+                    )
+                }
+            } else {
+                items(
+                    rows,
+                    // A streaming row's seq is minted past the durable cursor and is explicitly not
+                    // stable across folds, so keying on it destroyed and rebuilt the row the moment the
+                    // settlement landed — a visible pop at the end of every reply. One constant key
+                    // instead: there is only ever one provisional row, and it is the same row before
+                    // and after it settles.
+                    key = { node -> if (node is AssistantMessageNode && node.streaming) STREAMING_ROW_KEY else node.seq },
+                ) { node ->
+                    val streaming = node is AssistantMessageNode && node.streaming
+                    // Placement animation is for rows that move. The streaming row grows in place many
+                    // times a second, and animating that reads as jitter rather than motion.
+                    Column(if (streaming) Modifier else Modifier.animateItem()) {
+                        ChatNodeItem(node = node, context = context)
+                    }
                 }
             }
-        }
-        if (hasMore) {
-            // The far end of a reversed list is the oldest message, so the paging row goes last.
-            item(key = "load-older") {
-                LoadOlderRow(
-                    loading = loadingOlder,
-                    failed = loadOlderFailed,
-                    offerManual = autoPagingExhausted,
-                    onRetry = onLoadOlder,
-                )
+            if (hasMore) {
+                // The far end of a reversed list is the oldest message, so the paging row goes last.
+                item(key = "load-older") {
+                    LoadOlderRow(
+                        loading = loadingOlder,
+                        failed = loadOlderFailed,
+                        offerManual = autoPagingExhausted,
+                        onRetry = onLoadOlder,
+                    )
+                }
             }
         }
     }

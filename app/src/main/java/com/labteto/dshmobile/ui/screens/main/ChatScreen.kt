@@ -403,6 +403,7 @@ fun ChatScreen(
                     conversation?.nodes?.filterIsInstance<com.labteto.dshmobile.core.session.AssistantMessageNode>()
                         ?.firstOrNull { it.seq == seq }?.messageId?.let { feedback = Triple(composer.key, it, positive) }
                 },
+                onCopied = { toast.second(context.getString(R.string.chat_copy_success)) },
             )
 
             AnimatedContent(

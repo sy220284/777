@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -86,6 +87,7 @@ internal data class ChatNodeContext(
     val onOpenSubagent: (String) -> Unit,
     val onBranchFrom: (Long) -> Unit,
     val onFeedback: (Long, Boolean) -> Unit,
+    val onCopied: () -> Unit = {},
     val eventTimes: Map<Long, Long> = emptyMap(),
 )
 
@@ -282,9 +284,6 @@ internal fun FileChip(name: String, bytes: Long, modifier: Modifier = Modifier) 
 private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContext) {
     val colors = DsTheme.colors
     val isLast = context.nodes.lastOrNull()?.seq == node.seq
-    // A message the harness marked as a cancelled turn's prefix arrives before that turn's end,
-    // so `running` is still true for a frame. Without this the last thing the user sees after
-    // tapping stop is the answer apparently still being written.
     val streaming = context.running && isLast && !node.interrupted
     val isWorkProcess = node.isWorkProcess(context.nodes)
     val reasoningExpanded = remember(node.seq) { mutableStateMapOf<Int, Boolean>() }
@@ -312,7 +311,6 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                                     MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
                                 }
                             }
-                            // Tool calls/results have their own compact cards in the transcript.
                             "tool-call", "tool-result" -> Unit
                             "image" -> parseImageRef(block)?.let { ref ->
                                 AttachmentImage(
@@ -336,64 +334,89 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !streaming) { actionsVisible = !actionsVisible },
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    if (!streaming && !node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
+    val finalText = node.finalAnswerText(context.nodes).ifBlank { node.plainText }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL2),
     ) {
-        node.blocks.forEachIndexed { index, block ->
-            when (block.kind) {
-                "text" -> MarkdownText(block.text.orEmpty())
-                "reasoning" -> {
-                    val expanded = reasoningExpanded[index] ?: false
-                    ThinkingRow(
-                        summary = block.text?.lineSequence()?.firstOrNull()
-                            ?: stringResource(R.string.chat_thinking),
-                        expanded = expanded,
-                        onToggle = { reasoningExpanded[index] = !expanded },
-                        streaming = streaming,
-                    )
-                    AnimatedVisibility(visible = expanded) {
-                        MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
-                    }
-                }
-                // Tool calls arrive as their own nodes and render as cards; the inline block is a
-                // duplicate reference, so it stays quiet here.
-                "tool-call", "tool-result" -> Unit
-                "image" -> parseImageRef(block)?.let { ref ->
-                    AttachmentImage(
-                        attachmentId = ref.attachmentId,
-                        intrinsicWidth = ref.width,
-                        intrinsicHeight = ref.height,
-                        contentDescription = ref.name,
-                    )
-                }
-                "file" -> parseFileRef(block)?.let { ref -> FileChip(name = ref.name, bytes = ref.bytes) }
-                else -> block.text?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelTertiary)
-                }
-            }
-        }
-        if (node.interrupted) {
-            DsPill(text = stringResource(R.string.chat_stopped), warn = true)
-        }
-        if (!streaming && node.plainText.isNotBlank()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                DsButton(
-                    text = stringResource(R.string.chat_copy_answer),
-                    onClick = { clipboard.setText(AnnotatedString(node.plainText)) },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                )
-            }
-        }
-        AnimatedVisibility(
-            visible = actionsVisible && !streaming,
-            enter = fadeIn(DsAnimations.fade),
-            exit = fadeOut(DsAnimations.fade),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !streaming) { actionsVisible = !actionsVisible }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MessageActionsRow(node, context)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.chat_final_answer),
+                    style = DsType.small13Strong,
+                    color = colors.labelSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!streaming && finalText.isNotBlank()) {
+                    DsButton(
+                        text = stringResource(R.string.chat_copy_answer),
+                        onClick = {
+                            clipboard.setText(AnnotatedString(finalText))
+                            context.onCopied()
+                        },
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
+            }
+
+            node.blocks.forEachIndexed { index, block ->
+                when (block.kind) {
+                    "reasoning" -> {
+                        val expanded = reasoningExpanded[index] ?: false
+                        ThinkingRow(
+                            summary = block.text?.lineSequence()?.firstOrNull()
+                                ?: stringResource(R.string.chat_thinking),
+                            expanded = expanded,
+                            onToggle = { reasoningExpanded[index] = !expanded },
+                            streaming = streaming,
+                        )
+                        AnimatedVisibility(visible = expanded) {
+                            MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
+                        }
+                    }
+                    "image" -> parseImageRef(block)?.let { ref ->
+                        AttachmentImage(
+                            attachmentId = ref.attachmentId,
+                            intrinsicWidth = ref.width,
+                            intrinsicHeight = ref.height,
+                            contentDescription = ref.name,
+                        )
+                    }
+                    "file" -> parseFileRef(block)?.let { ref ->
+                        FileChip(name = ref.name, bytes = ref.bytes)
+                    }
+                    else -> Unit
+                }
+            }
+
+            if (finalText.isNotBlank()) {
+                MarkdownText(finalText)
+            }
+            if (node.interrupted) {
+                DsPill(text = stringResource(R.string.chat_stopped), warn = true)
+            }
+            AnimatedVisibility(
+                visible = actionsVisible && !streaming,
+                enter = fadeIn(DsAnimations.fade),
+                exit = fadeOut(DsAnimations.fade),
+            ) {
+                MessageActionsRow(node, context)
+            }
         }
     }
 }
@@ -432,9 +455,9 @@ private fun ActionIcon(
         contentDescription = label,
         tint = DsTheme.colors.labelTertiary,
         modifier = Modifier
-            .size(28.dp)
+            .size(44.dp)
             .clickable(onClick = onClick)
-            .padding(6.dp),
+            .padding(12.dp),
     )
 }
 

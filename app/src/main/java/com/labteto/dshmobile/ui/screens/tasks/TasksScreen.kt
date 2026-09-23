@@ -19,10 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.ui.components.DsButton
@@ -44,9 +46,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class TasksNotice { CANCELLED, MISSING }
+
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
-    val message: String? = null,
+    val notice: TasksNotice? = null,
 )
 
 @HiltViewModel
@@ -61,14 +65,14 @@ class TasksViewModel @Inject constructor(
     }
 
     fun refresh() {
-        _state.value = _state.value.copy(tasks = scheduler.list(), message = null)
+        _state.value = _state.value.copy(tasks = scheduler.list(), notice = null)
     }
 
     fun cancel(id: String) {
         val removed = scheduler.cancelTask(id)
         _state.value = TasksUiState(
             tasks = scheduler.list(),
-            message = if (removed) "任务已取消" else "任务已经不存在",
+            notice = if (removed) TasksNotice.CANCELLED else TasksNotice.MISSING,
         )
     }
 }
@@ -91,18 +95,18 @@ fun TasksScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 DsIconButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(R.string.common_back),
                     onClick = onClose,
                     containerColor = colors.bgLayer1,
                     shadowElevation = 3.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = DsSpacing.medium)) {
-                    Text("任务", style = DsType.large20, color = colors.labelPrimary)
-                    Text("查看计划任务、周期任务和最近执行结果", style = DsType.caption11, color = colors.labelTertiary)
+                    Text(stringResource(R.string.tasks_title), style = DsType.large20, color = colors.labelPrimary)
+                    Text(stringResource(R.string.tasks_subtitle), style = DsType.caption11, color = colors.labelTertiary)
                 }
                 DsIconButton(
                     icon = Icons.Outlined.Refresh,
-                    contentDescription = "刷新任务",
+                    contentDescription = stringResource(R.string.tasks_refresh),
                     onClick = viewModel::refresh,
                     containerColor = colors.bgLayer1,
                 )
@@ -110,8 +114,8 @@ fun TasksScreen(
 
             if (state.tasks.isEmpty()) {
                 EmptyHero(
-                    headline = "暂无后台任务",
-                    subtitle = "直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。",
+                    headline = stringResource(R.string.tasks_empty_title),
+                    subtitle = stringResource(R.string.tasks_empty_subtitle),
                 )
             } else {
                 LazyColumn(
@@ -124,8 +128,17 @@ fun TasksScreen(
                 }
             }
 
-            state.message?.let {
-                Text(it, style = DsType.small13, color = colors.labelSecondary)
+            state.notice?.let { notice ->
+                Text(
+                    stringResource(
+                        when (notice) {
+                            TasksNotice.CANCELLED -> R.string.tasks_cancelled
+                            TasksNotice.MISSING -> R.string.tasks_missing
+                        },
+                    ),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                )
             }
         }
     }
@@ -143,18 +156,18 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
             StateDot(taskStatus(task.status))
             Column(Modifier.weight(1f)) {
                 Text(
-                    task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty().ifBlank { "后台任务" },
+                    task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty().ifBlank { stringResource(R.string.tasks_background_task) },
                     style = DsType.std14Strong,
                     color = colors.labelPrimary,
                 )
                 Text(
-                    if (task.recurringMinutes == null) "一次性任务" else "每 ${task.recurringMinutes} 分钟",
+                    if (task.recurringMinutes == null) stringResource(R.string.tasks_once) else stringResource(R.string.tasks_every_minutes, task.recurringMinutes),
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
             }
             DsButton(
-                text = "取消",
+                text = stringResource(R.string.tasks_cancel),
                 onClick = onCancel,
                 size = DsButtonSize.Small,
                 variant = DsButtonVariant.Ghost,
@@ -164,15 +177,15 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
             Text(task.prompt.take(320), style = DsType.small13, color = colors.labelSecondary)
         }
         Text(
-            "下次执行：${formatTime(task.nextRunAt)}",
+            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt)),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
         task.lastResult?.takeIf(String::isNotBlank)?.let {
-            Text("最近结果：${it.take(240)}", style = DsType.caption11, color = colors.labelSecondary)
+            Text(stringResource(R.string.tasks_last_result, it.take(240)), style = DsType.caption11, color = colors.labelSecondary)
         }
         task.lastError?.takeIf(String::isNotBlank)?.let {
-            Text("最近状态：${it.take(240)}", style = DsType.caption11, color = colors.error)
+            Text(stringResource(R.string.tasks_last_status, it.take(240)), style = DsType.caption11, color = colors.error)
         }
     }
 }
