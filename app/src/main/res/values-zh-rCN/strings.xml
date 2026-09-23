@@ -700,4 +700,18 @@
     <string name="advanced_vision_model">视觉模型</string>
     <string name="advanced_vision_optional">可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。</string>
     <string name="advanced_vision_saved">视觉模型配置已保存</string>
+
+    <string name="local_add_attachment">添加附件</string>
+    <string name="local_attachment_image">图片</string>
+    <string name="local_attachment_file">文件</string>
+    <string name="local_images_preparing">准备图片…</string>
+    <string name="local_image_mode_title">图片处理方式</string>
+    <string name="local_image_mode_hint">自动模式会优先让支持图片的主模型直接读取；主模型不支持时使用已配置的视觉模型。也可以手动强制指定。</string>
+    <string name="local_image_mode_current">当前使用</string>
+    <string name="local_image_mode_auto_short">图片·自动</string>
+    <string name="local_image_mode_main_short">图片·主模型</string>
+    <string name="local_image_mode_vision_short">图片·视觉</string>
+    <string name="local_image_mode_auto">自动选择</string>
+    <string name="local_image_mode_main">主模型直接看图</string>
+    <string name="local_image_mode_vision">独立视觉模型分析</string>
 </resources>
