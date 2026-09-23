@@ -60,12 +60,12 @@ class ManagedProcessAndroidTest {
         val workspace = LocalWorkspace(root)
 
         val result = workspace.shell(
-            command = "(sleep 1; printf leftover > '${marker.absolutePath}') & wait",
+            command = "(sleep 2; printf leftover > '${marker.absolutePath}') & wait",
             timeoutSeconds = 1,
         )
 
         assertTrue("workspace did not return timeout: $result", result.contains("[TOOL_TIMEOUT]"))
-        delay(1_200)
+        delay(2_200)
         assertFalse("workspace descendant survived timeout", marker.exists())
     }
 
