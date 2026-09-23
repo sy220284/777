@@ -79,7 +79,10 @@ class LocalSessionEventLog(
     fun read(sequence: Long, before: Int = 0, after: Int = 0): String =
         delegate.read(sequence, before, after)
 
-    fun latest(type: String): Event? = delegate.latest(type)?.toLocalEvent()
+    fun latest(
+        type: String,
+        beforeSequenceExclusive: Long = Long.MAX_VALUE,
+    ): Event? = delegate.latest(type, beforeSequenceExclusive)?.toLocalEvent()
 
     fun clear() = delegate.clear()
 
