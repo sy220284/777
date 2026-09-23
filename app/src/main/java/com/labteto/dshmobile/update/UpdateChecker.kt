@@ -348,14 +348,14 @@ class UpdateChecker @Inject constructor(
                             response.code == 429 ||
                             response.code in 500..599
                         if (!retryable || attempt + 1 >= MAX_REQUEST_ATTEMPTS) {
-                            throw IOException("$purpose失败：HTTP ${response.code}")
+                            throw IOException("${purpose}失败：HTTP ${response.code}")
                         }
-                        lastTransportError = IOException("$purpose暂时失败：HTTP ${response.code}")
+                        lastTransportError = IOException("${purpose}暂时失败：HTTP ${response.code}")
                     } else {
-                        val body = response.body ?: throw IOException("$purpose返回空响应")
+                        val body = response.body ?: throw IOException("${purpose}返回空响应")
                         val declared = body.contentLength()
                         if (declared > maxBytes) {
-                            throw IOException("$purpose响应异常过大：$declared 字节")
+                            throw IOException("${purpose}响应异常过大：$declared 字节")
                         }
                         return readChecksumBytes(body.byteStream(), maxBytes)
                     }
