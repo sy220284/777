@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -28,7 +29,7 @@ import java.util.UUID
 @Composable
 internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Modifier) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val key = state.key
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -45,7 +46,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
         }
     }
     suspend fun refresh() {
-        val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
+        val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
         state.terminals = api.terminalList(key.sessionId).requireValue()
         state.shells = api.terminalShells(key.sessionId).requireValue()
         if (state.terminals.none { it.id == state.selectedTerminal }) state.selectedTerminal = state.terminals.firstOrNull()?.id
@@ -60,7 +61,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                 }
             }
             TextButton(enabled = !busy, onClick = { operation {
-                val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
+                val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
                 val info = api.terminalCreate(key.sessionId, TerminalCreateRequest(UUID.randomUUID().toString(), 80, 24, state.shellPath)).requireValue()
                 state.selectedTerminal = info.id
                 refresh()
@@ -79,7 +80,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                 TextButton(onClick = { rename = terminal.title }) { Text(stringResource(R.string.common_rename)) }
                 TextButton(enabled = !busy, onClick = { operation {
                     store.apiForHost(key.host)?.terminalClose(key.sessionId, terminal.id)?.requireValue()
-                        ?: error(context.getString(R.string.common_offline))
+                        ?: error(resources.getString(R.string.common_offline))
                     refresh()
                 } }) { Text(stringResource(R.string.common_close)) }
             }
@@ -88,7 +89,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                 text = { OutlinedTextField(title, { rename = it }, singleLine = true) },
                 confirmButton = { TextButton(enabled = title.isNotBlank() && title.length <= 120 && !busy, onClick = { operation {
                     store.apiForHost(key.host)?.terminalRename(key.sessionId, terminal.id, title)?.requireValue()
-                        ?: error(context.getString(R.string.common_offline))
+                        ?: error(resources.getString(R.string.common_offline))
                     rename = null; refresh()
                 } }) { Text(stringResource(R.string.common_save)) } },
                 dismissButton = { TextButton(onClick = { rename = null }) { Text(stringResource(R.string.common_cancel)) } }) }
@@ -104,6 +105,7 @@ private class TerminalBridge(private val receive: (String) -> Unit) {
 @Composable
 private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTerminalInfo, modifier: Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val connection by store.connectionState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var reconnect by remember { mutableIntStateOf(0) }
@@ -168,8 +170,8 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
         connected = false; writable = false; error = null
         while (input.tryReceive().isSuccess) { /* Discard input from the previous controller. */ }
         try {
-            val api = store.apiForHost(key.host) ?: error(context.getString(R.string.common_offline))
-            val mux = store.muxForHost(key.host) ?: error(context.getString(R.string.common_offline))
+            val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
+            val mux = store.muxForHost(key.host) ?: error(resources.getString(R.string.common_offline))
             environment = api.terminalEnvironment(key.sessionId).requireValue()
             var sequence: Long? = null
             mux.openStream("terminal/follow", buildJsonObject {
@@ -178,9 +180,9 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
                 val frame = decodeFromJsonElement(TerminalFrame.serializer(), raw)
                 if (frame.type == "snapshot") { sequence = frame.sequence; connected = true }
                 else if (frame.type == "output") {
-                    val next = frame.sequence ?: error(context.getString(R.string.panel_changed))
-                    val previous = sequence ?: error(context.getString(R.string.panel_changed))
-                    if (next != previous + 1) error(context.getString(R.string.panel_changed))
+                    val next = frame.sequence ?: error(resources.getString(R.string.panel_changed))
+                    val previous = sequence ?: error(resources.getString(R.string.panel_changed))
+                    if (next != previous + 1) error(resources.getString(R.string.panel_changed))
                     sequence = next
                 }
                 frame.info?.let { info = it }
@@ -202,7 +204,7 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
                 when (json.optString("type")) {
                     "input" -> {
                         val data = json.optString("data")
-                        if (data.toByteArray(Charsets.UTF_8).size > env.maxInputBytes) error(context.getString(R.string.panel_too_large))
+                        if (data.toByteArray(Charsets.UTF_8).size > env.maxInputBytes) error(resources.getString(R.string.panel_too_large))
                         api.terminalWrite(key.sessionId, initial.id, attachmentId, data).requireValue()
                     }
                     "resize" -> {
