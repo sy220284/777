@@ -54,6 +54,7 @@ data class LocalImportedAttachment(
     val relativePath: String,
     val mediaType: String,
     val bytes: Long,
+    val attachmentId: String = "",
 )
 
 data class LocalSessionSummary(
@@ -142,6 +143,8 @@ data class LocalHarnessState(
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
+    val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
+    val preparingImages: Boolean = false,
     val workspacePath: String = "",
     val sessionId: String = "",
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
