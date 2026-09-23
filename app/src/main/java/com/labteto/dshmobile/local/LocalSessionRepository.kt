@@ -55,12 +55,15 @@ internal class LocalSessionRepository(
         wakeups.trySend(Unit)
     }
 
-    fun read(id: String): LocalSessionRead? = store.read(id)?.document?.payload?.let { payload ->
-        LocalSessionRead(
-            session = json.decodeFromString(LocalHarnessSession.serializer(), payload.toString()),
-            legacySafeAutoApproval = legacySafeAutoApproval(payload),
-        )
-    }
+    fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
+
+    fun readWithLegacyApproval(id: String): LocalSessionRead? =
+        store.read(id)?.document?.payload?.let { payload ->
+            LocalSessionRead(
+                session = json.decodeFromString(LocalHarnessSession.serializer(), payload.toString()),
+                legacySafeAutoApproval = legacySafeAutoApproval(payload),
+            )
+        }
 
     fun summaries(): List<LocalSessionSummary> = store.list().mapNotNull { loaded ->
         runCatching {
