@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
@@ -347,6 +348,7 @@ internal fun LocalModelSettingsCard(
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
+    var imageMode by remember(local.imageInputMode) { mutableStateOf(local.imageInputMode) }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
         Text(
@@ -376,6 +378,33 @@ internal fun LocalModelSettingsCard(
             label = { Text(stringResource(if (local.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
             visualTransformation = PasswordVisualTransformation(),
         )
+        Text(
+            stringResource(R.string.advanced_image_input_mode),
+            style = DsType.small13Strong,
+            color = colors.labelPrimary,
+        )
+        Text(
+            stringResource(R.string.advanced_image_input_hint),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            listOf(
+                LocalImageInputMode.AUTO to R.string.advanced_image_mode_auto,
+                LocalImageInputMode.NATIVE to R.string.advanced_image_mode_native,
+                LocalImageInputMode.TOOL to R.string.advanced_image_mode_tool,
+            ).forEach { (mode, label) ->
+                DsButton(
+                    text = stringResource(label),
+                    onClick = {
+                        imageMode = mode
+                        viewModel.configureLocalImageInputMode(mode)
+                    },
+                    size = DsButtonSize.Small,
+                    variant = if (imageMode == mode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                )
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
                 text = stringResource(R.string.advanced_save_model_settings),
