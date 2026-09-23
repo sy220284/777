@@ -405,8 +405,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun configureLanguageServer(command: String): String = localHarness.configureLanguageServer(command)
-
     fun clearLocalCredential() {
         localHarness.clearCredential()
     }
