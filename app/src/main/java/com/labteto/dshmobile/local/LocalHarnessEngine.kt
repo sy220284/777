@@ -814,7 +814,6 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 completedToolCallIds += result.callId
             }
-            checkpointModelHistory("turn/$reason-tool-settlement")
         }
 
         val loop = AgentLoop(
@@ -945,8 +944,8 @@ class LocalHarnessEngine @Inject constructor(
                             put("tool_call_id", event.call.id)
                             put("content", pruneToolResult(event.output))
                         }
-                        checkpointModelHistory("tool/result")
                         completedToolCallIds += event.call.id
+                        checkpointModelHistory("tool/result")
                         persist()
                     }
                     is AgentEvent.StepFinished -> {
