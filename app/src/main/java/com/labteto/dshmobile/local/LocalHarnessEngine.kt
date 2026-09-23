@@ -93,6 +93,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -155,6 +156,7 @@ class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
+    private val usageTracker: DeepSeekUsageTracker,
     private val visionClient: VisionClient,
     private val visionSettings: LocalVisionSettings,
     private val bundledNodeRuntime: BundledNodeRuntime,
@@ -259,7 +261,11 @@ class LocalHarnessEngine @Inject constructor(
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     private val _state = MutableStateFlow(
-        LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
+        LocalHarnessState(
+            workspacePath = workspace.path,
+            sessionId = currentSessionId,
+            usage = usageTracker.state.value,
+        ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     private val resourceBudget = localResourceBudgetForMemoryClass(
@@ -315,6 +321,7 @@ class LocalHarnessEngine @Inject constructor(
                     mode = effectiveImageInputMode(mode),
                 )
             },
+            onUsage = { model, usage -> usageTracker.record(model, usage) },
             onNativeImageRejected = { autoImageNativeRejected = true },
             resourceScheduler = resourceScheduler,
         )
@@ -344,6 +351,11 @@ class LocalHarnessEngine @Inject constructor(
         // Legacy migration may have copied an event log after the field was first constructed.
         // Reopen it so the append sequence is derived from the migrated durable tail.
         eventLog = eventLogFor(currentSessionId)
+        scope.launch {
+            usageTracker.state.collect { usage ->
+                _state.update { it.copy(usage = usage) }
+            }
+        }
         scope.launch {
             runCatching {
                 bundledNodeRuntime.prepare()
@@ -1159,6 +1171,7 @@ class LocalHarnessEngine @Inject constructor(
                         throw error
                     }
                 }
+                usageTracker.record(snapshot.model, reply.usage)
                 modelStep += 1
                 repliesByStep[modelStep] = reply
                 AgentModelReply(
@@ -1719,7 +1732,7 @@ class LocalHarnessEngine @Inject constructor(
                     parentCallId = call.id,
                     maxSteps = _state.value.subagentMaxSteps,
                 )
-            "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
+            "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
             "list_agents" -> jobs.listAgents()
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
             "interrupt_agent" -> jobs.kill(args.string("agent_id"))
@@ -2287,6 +2300,7 @@ class LocalHarnessEngine @Inject constructor(
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
+            usage = usageTracker.state.value,
             sessions = sessionSummaries(),
             messages = projectedTranscript.messages,
             plan = projectedControls.plan,
@@ -2458,7 +2472,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
-        const val DEFAULT_MODEL = "deepseek-chat"
+        const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
         const val DEFAULT_SUBAGENT_MAX_STEPS = 20
