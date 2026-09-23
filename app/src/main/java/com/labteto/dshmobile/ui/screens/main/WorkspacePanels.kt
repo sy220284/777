@@ -187,9 +187,10 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { tab.error = e.message }
         } }) { Text(stringResource(R.string.panel_open_host)) }
+        val loadedBytes = tab.bytes
         when {
-            extension == "pdf" && tab.bytes != null -> PdfPreview(tab.bytes!!, Modifier.weight(1f))
-            binary && tab.bytes != null -> {
+            extension == "pdf" && loadedBytes != null -> PdfPreview(loadedBytes, Modifier.weight(1f))
+            binary && loadedBytes != null -> {
                 var image by remember(tab.bytes) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
                 LaunchedEffect(tab.bytes) {
                     image = withContext(Dispatchers.Default) {
