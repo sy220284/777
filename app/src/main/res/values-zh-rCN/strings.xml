@@ -714,4 +714,7 @@
     <string name="local_image_mode_auto">自动选择</string>
     <string name="local_image_mode_main">主模型直接看图</string>
     <string name="local_image_mode_vision">独立视觉模型分析</string>
+
+    <string name="advanced_image_input_mode">图片输入路由</string>
+    <string name="advanced_image_input_mode_hint">自动模式优先使用支持图片的主模型；主模型不支持时转交已配置的独立视觉模型。可手动强制指定。</string>
 </resources>
