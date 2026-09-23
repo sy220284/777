@@ -403,7 +403,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Choose how user image attachments reach the local model. */
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        if (mode != LocalImageInputMode.AUTO) autoImageNativeRejected = false
+        autoImageNativeRejected = false
         _state.update { it.copy(imageInputMode = mode) }
     }
 
