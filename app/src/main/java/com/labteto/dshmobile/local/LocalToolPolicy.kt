@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 internal enum class LocalAutoApprovalScope {
     NONE,
     WORKSPACE,
+    READ_ONLY,
 }
 
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
@@ -40,15 +41,17 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Only operations whose implementation is cryptographically/path-wise confined to LocalWorkspace
-     * may inherit the session's workspace auto-approval.
+     * Safe automatic approval is intentionally narrow:
+     * - workspace writes are allowed only for built-ins whose implementation is path-confined to LocalWorkspace;
+     * - read-only built-ins may be approved regardless of whether the data lives in or outside the workspace.
      *
-     * Everything else fails closed even if its coarse ToolAccess is later changed.
+     * Process, device, network mutation and privileged operations remain explicit.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
-        else -> {
-            access(name)
+        else -> if (access(name) == ToolAccess.READ_ONLY) {
+            LocalAutoApprovalScope.READ_ONLY
+        } else {
             LocalAutoApprovalScope.NONE
         }
     }
