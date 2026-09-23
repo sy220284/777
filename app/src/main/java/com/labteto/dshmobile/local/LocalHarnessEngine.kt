@@ -2015,8 +2015,7 @@ class LocalHarnessEngine @Inject constructor(
                     replayed = true
                 }
                 "assistant/message" -> {
-                    val nested = event.data["message"] as? JsonObject
-                    val message = nested ?: JsonObject(event.data - "transcript")
+                    val message = assistantModelMessageFromEvent(event.data)
                     if (message["role"]?.jsonPrimitive?.contentOrNull == "assistant") {
                         history += message
                         replayed = true
