@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
@@ -376,6 +377,31 @@ internal fun LocalModelSettingsCard(
             label = { Text(stringResource(if (local.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
             visualTransformation = PasswordVisualTransformation(),
         )
+        Text(
+            stringResource(R.string.advanced_image_input_mode),
+            style = DsType.small13Strong,
+            color = colors.labelPrimary,
+        )
+        Text(
+            stringResource(R.string.advanced_image_input_mode_hint),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            listOf(
+                LocalImageInputMode.AUTO to R.string.local_image_mode_auto,
+                LocalImageInputMode.MAIN_MODEL to R.string.local_image_mode_main,
+                LocalImageInputMode.VISION_MODEL to R.string.local_image_mode_vision,
+            ).forEach { (mode, label) ->
+                DsButton(
+                    text = stringResource(label) +
+                        if (mode == local.imageInputMode) " · " + stringResource(R.string.local_image_mode_current) else "",
+                    onClick = { viewModel.configureLocalImageInputMode(mode) },
+                    size = DsButtonSize.Small,
+                    variant = if (mode == local.imageInputMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                )
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
                 text = stringResource(R.string.advanced_save_model_settings),
