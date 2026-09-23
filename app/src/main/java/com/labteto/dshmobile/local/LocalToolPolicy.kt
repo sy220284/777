@@ -11,12 +11,47 @@ internal enum class LocalAutoApprovalScope {
 
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
+    /**
+     * Bash commands eligible for automatic approval, matched as a whole-command prefix.
+     *
+     * Only GitHub operations are listed. Every other command — including anything that can touch
+     * arbitrary paths — keeps the interactive prompt, so the process-level escape hatch stays closed.
+     */
+    private val AUTO_APPROVED_COMMAND_PREFIXES = listOf("git ")
+
+    /**
+     * Git subcommands that rewrite history or discard local work. These keep the prompt even though
+     * their parent command is allowlisted, because a mistake here destroys remote or local data.
+     */
+    private val PROMPT_REQUIRED_GIT_SUBCOMMANDS = listOf(
+        "push --force", "push -f", "reset --hard", "clean -fd", "clean -fdx", "filter-branch",
+    )
+
+    /**
+     * Shell metacharacters that let one command chain into another. Any command containing one of
+     * these is rejected from automatic approval, otherwise `git status; rm -rf /` would slip through
+     * a prefix-only check.
+     */
+    private val COMMAND_CHAINING_CHARACTERS = charArrayOf(';', '|', '&', '$', '`', '\n', '>', '<')
+
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
         "glob_files" to "glob", "search_text" to "grep", "run_shell" to "bash",
         "spawn_subagent" to "subagent", "fork_subagent" to "subagent_fork",
     )
     fun canonical(name: String): String = aliases[name] ?: name
+
+    /**
+     * Whether [command] is an allowlisted, non-chained, non-destructive shell command that may run
+     * without an approval prompt.
+     */
+    fun canAutoApproveCommand(command: String): Boolean {
+        val trimmed = command.trim()
+        if (trimmed.isEmpty()) return false
+        if (trimmed.any { it in COMMAND_CHAINING_CHARACTERS }) return false
+        if (AUTO_APPROVED_COMMAND_PREFIXES.none { trimmed.startsWith(it) }) return false
+        return PROMPT_REQUIRED_GIT_SUBCOMMANDS.none { trimmed.contains(it) }
+    }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "present" -> ToolAccess.WORKSPACE_WRITE
@@ -49,6 +84,8 @@ internal object LocalToolPolicy {
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
+        // bash is not broadly allowlisted: only commands passing canAutoApproveCommand() qualify,
+        // and that check needs the command text, which this name-only function does not receive.
         else -> if (access(name) == ToolAccess.READ_ONLY) {
             LocalAutoApprovalScope.READ_ONLY
         } else {

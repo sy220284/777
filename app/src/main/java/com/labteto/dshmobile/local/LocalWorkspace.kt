@@ -21,6 +21,11 @@ class LocalWorkspace(
     private val extraSearchPaths: () -> List<File> = { emptyList() },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
     private val shellExecutable: String = "/system/bin/sh",
+    /**
+     * Multi-root boundary. Defaults to workspace-only so existing callers keep the previous
+     * sandbox semantics; additional authorized roots must be opted into explicitly.
+     */
+    private val whitelist: LocalPathWhitelist = LocalPathWhitelist.workspaceOnly(root),
 ) {
     private val canonicalRoot = root.canonicalFile
     private val observations = ConcurrentHashMap<String, String>()
@@ -52,7 +57,7 @@ class LocalWorkspace(
     /** Replace one UTF-8 file, creating its parent directories. */
     fun write(relativePath: String, content: String): String {
         require(content.toByteArray().size <= MAX_WRITE_BYTES) { "单次写入超过 ${MAX_WRITE_BYTES / 1024} KB" }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         atomicWrite(file, content)
         observations.remove(file.path)
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
@@ -64,14 +69,15 @@ class LocalWorkspace(
         require(bytes.size <= MAX_TOOL_ARTIFACT_BYTES) {
             "工具产物超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
         }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         atomicWrite(file, content)
+        // Artifacts always live under the workspace root, so this relativization stays well defined.
         return file.relativeTo(canonicalRoot).invariantSeparatorsPath
     }
 
-    /** Resolve a tool-owned output path without letting callers escape the workspace. */
+    /** Resolve a tool-owned output path without letting callers escape the sandbox. */
     fun toolOutputFile(relativePath: String): File {
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         file.parentFile?.mkdirs()
         return file
     }
@@ -105,7 +111,7 @@ class LocalWorkspace(
     /** Replace one unique literal after the caller has observed the file. */
     fun edit(relativePath: String, oldText: String, newText: String): String {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
         val observed = requireFreshObservation(relativePath)
@@ -179,12 +185,21 @@ class LocalWorkspace(
 
     /** Snapshot real files for the app UI without exposing raw File handles outside the sandbox. */
     fun files(limit: Int = 2_000): List<LocalWorkspaceFile> =
-        safeWalk(canonicalRoot)
-            .filter { it.isFile && isInsideWorkspace(it) }
+        whitelist.roots
+            .asSequence()
+            .flatMap { root ->
+                val base = File(root.canonicalPrefix)
+                safeWalk(base)
+                    .filter { it.isFile && isInsideWorkspace(it) }
+                    .map { file -> root to file }
+            }
             .take(limit.coerceIn(1, 10_000))
-            .map { file ->
+            .map { (root, file) ->
+                // Cross-root relative paths are ambiguous, so every entry carries its root prefix.
+                val relative = runCatching { file.relativeTo(File(root.canonicalPrefix)).invariantSeparatorsPath }
+                    .getOrElse { file.name }
                 LocalWorkspaceFile(
-                    path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+                    path = if (root.kind == LocalPathRootKind.WORKSPACE) relative else "${root.path}/$relative",
                     bytes = file.length(),
                     modifiedAt = file.lastModified(),
                 )
@@ -274,10 +289,14 @@ class LocalWorkspace(
 
     /** Validate a deliverable before the model presents it. */
     fun present(relativePath: String): String {
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         require(file.isFile) { "成果文件不存在：$relativePath" }
         return "成果已确认：$relativePath（${file.length()} 字节）"
     }
+
+    /** Whether a write to [relativePath] may skip the approval prompt under the current whitelist. */
+    fun canAutoApproveWrite(relativePath: String): Boolean =
+        runCatching { whitelist.canAutoApproveWrite(resolve(relativePath)) }.getOrDefault(false)
 
     private fun fingerprint(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -317,23 +336,27 @@ class LocalWorkspace(
     private fun resolve(relativePath: String): File {
         require(relativePath.isNotBlank()) { "路径不能为空" }
         val candidate = File(canonicalRoot, relativePath).canonicalFile
-        require(candidate == canonicalRoot || candidate.path.startsWith(canonicalRoot.path + File.separator)) {
+        require(whitelist.canRead(candidate)) {
             "拒绝访问工作区之外的路径"
         }
         return candidate
     }
 
+    /** Resolve a path for writing, additionally honouring read-only authorized roots. */
+    private fun resolveForWrite(relativePath: String): File {
+        val file = resolve(relativePath)
+        require(whitelist.canWrite(file)) { "拒绝写入只读授权目录：$relativePath" }
+        return file
+    }
+
     private fun safeWalk(directory: File): Sequence<File> =
         directory.walkTopDown()
             .onEnter { candidate ->
-                isInsideWorkspace(candidate) && !Files.isSymbolicLink(candidate.toPath())
+                whitelist.canRead(candidate) && !Files.isSymbolicLink(candidate.toPath())
             }
             .asSequence()
 
-    private fun isInsideWorkspace(candidate: File): Boolean = runCatching {
-        val canonical = candidate.canonicalFile
-        canonical == canonicalRoot || canonical.path.startsWith(canonicalRoot.path + File.separator)
-    }.getOrDefault(false)
+    private fun isInsideWorkspace(candidate: File): Boolean = whitelist.canRead(candidate)
 
     private fun globRegex(glob: String): Regex {
         val output = StringBuilder("^")

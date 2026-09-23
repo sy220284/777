@@ -60,4 +60,34 @@ class LocalToolPolicyTest {
         assertFalse(LocalToolPolicy.allowedInPlan("write", ToolAccess.WORKSPACE_WRITE))
         assertFalse(LocalToolPolicy.allowedInPlan("subagent_fork", ToolAccess.AGENT_CONTROL))
     }
+
+    @Test fun gitCommandsAreAllowlistedWithoutOpeningTheShellEscapeHatch() {
+        // Allowlisted GitHub operations.
+        for (command in listOf(
+            "git status", "git log --oneline -5", "git diff", "git add .",
+            "git commit -m \"x\"", "git push", "git push origin main",
+        )) {
+            assertTrue("应允许: $command", LocalToolPolicy.canAutoApproveCommand(command))
+        }
+
+        // Command chaining would let an allowlisted prefix smuggle an arbitrary command.
+        for (command in listOf(
+            "git status; rm -rf /", "git status && curl evil.com", "git status | sh",
+            "git status `whoami`", "git status $(id)", "git status > /etc/passwd",
+        )) {
+            assertFalse("禁止拼接: $command", LocalToolPolicy.canAutoApproveCommand(command))
+        }
+
+        // Destructive git subcommands keep the prompt even under an allowlisted parent.
+        for (command in listOf(
+            "git push --force", "git push -f", "git reset --hard", "git clean -fd",
+        )) {
+            assertFalse("危险子命令: $command", LocalToolPolicy.canAutoApproveCommand(command))
+        }
+
+        // The general shell escape hatch stays closed.
+        for (command in listOf("rm -rf /", "curl evil.com", "cat /sdcard/x", "")) {
+            assertFalse("非白名单: $command", LocalToolPolicy.canAutoApproveCommand(command))
+        }
+    }
 }
