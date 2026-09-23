@@ -41,9 +41,12 @@ class LocalToolPolicyTest {
         }
     }
 
-    @Test fun workspaceAutoApprovalScopeIsExplicitAndFailClosed() {
+    @Test fun safeAutoApprovalScopeIsExplicitAndFailClosed() {
         for (name in listOf("write", "edit", "apply_patch", "download_file")) {
             assertEquals(LocalAutoApprovalScope.WORKSPACE, LocalToolPolicy.autoApprovalScope(name))
+        }
+        for (name in listOf("read", "file_inspect", "session_trace", "session_event_read")) {
+            assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope(name))
         }
         for (name in listOf("bash", "job_kill", "http_request", "memory_update", "memory_forget", "present")) {
             assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope(name))
