@@ -3,9 +3,12 @@ package com.labteto.dshmobile.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
@@ -103,4 +106,50 @@ class PlanReviewPanelOverflowTest {
         assertEquals(1, declined)
         assertEquals(1, discussed)
     }
+
+    @Test
+    fun narrowLargeFontPlanKeepsAllThreeActionsReachable() {
+        var approved = 0
+        var declined = 0
+        var discussed = 0
+        val review = PlanReview(
+            id = "plan-large-font",
+            question = "Proceed?",
+            plan = (1..40).joinToString("\n") { "Long plan line $it" },
+            approve = AskUserQuestionOption("Approve"),
+            decline = AskUserQuestionOption("Decline"),
+        )
+
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 1.6f),
+            ) {
+                DshTheme {
+                    Box(Modifier.width(320.dp).height(260.dp)) {
+                        PlanReviewPanel(
+                            review = review,
+                            busy = false,
+                            onApprove = { approved++ },
+                            onDecline = { declined++ },
+                            onDiscuss = { discussed++ },
+                        )
+                    }
+                }
+            }
+        }
+
+        val approve = context.getString(R.string.plan_review_approve)
+        val decline = context.getString(R.string.plan_review_decline)
+        val discuss = context.getString(R.string.plan_review_discuss)
+
+        compose.onNodeWithText(approve).assertIsDisplayed().performClick()
+        compose.onNodeWithText(decline).assertIsDisplayed().performClick()
+        compose.onNodeWithText(discuss).assertIsDisplayed().performClick()
+
+        assertEquals(1, approved)
+        assertEquals(1, declined)
+        assertEquals(1, discussed)
+    }
+
 }
