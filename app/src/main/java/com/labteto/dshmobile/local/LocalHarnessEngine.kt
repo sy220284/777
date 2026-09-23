@@ -391,7 +391,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Persist execution limits exposed from Settings. */
     fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
         val main = mainMaxSteps.coerceIn(4, 128)
-        val subagent = subagentMaxSteps.coerceIn(1, 40)
+        val subagent = subagentMaxSteps.coerceIn(1, 128)
         val attempts = modelAttempts.coerceIn(1, 5)
         preferences.edit()
             .putInt(KEY_MAIN_MAX_STEPS, main)
@@ -1384,10 +1384,10 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = args.optionalString("model")
-                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 40)
+                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
                 if (args.boolean("run_in_background", false)) {
                     jobs.start("子代理：${task.take(100)}") { jobId, _ ->
-                        subagents.run(
+                        val result = subagents.runResult(
                             task = task,
                             inheritHistory = false,
                             allowMutation = false,
@@ -1395,6 +1395,8 @@ class LocalHarnessEngine @Inject constructor(
                             modelOverride = model,
                             maxSteps = maxSteps,
                         )
+                        if (!result.succeeded) error(result.output)
+                        result.output
                     }
                 } else subagents.run(
                     task = task,
@@ -1607,12 +1609,14 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 task
             }
-            subagents.run(
+            val result = subagents.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
             )
+            if (!result.succeeded) error(result.output)
+            result.output
         }
         return results.joinToString("\n\n") { result ->
             val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
@@ -1951,7 +1955,7 @@ class LocalHarnessEngine @Inject constructor(
             model = model,
             baseUrl = baseUrl,
             mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 40),
+            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             workspacePath = workspace.path,
             sessionId = sessionId,
