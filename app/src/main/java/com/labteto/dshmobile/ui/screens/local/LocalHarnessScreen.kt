@@ -83,6 +83,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
@@ -188,6 +189,7 @@ fun LocalHarnessScreen(
                 onConfigure = { editingConfig = true },
                 onSend = viewModel::send,
                 onImportAttachment = viewModel::importAttachment,
+                onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
                 onPlanModeChange = viewModel::setPlanMode,
@@ -500,6 +502,7 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
+    onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -528,6 +531,9 @@ private fun LocalChat(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var showImageModePicker by rememberSaveable { mutableStateOf(false) }
+    var pendingSubmission by remember { mutableStateOf(false) }
+    var submittedMessageCount by remember { mutableStateOf(0) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -578,8 +584,22 @@ private fun LocalChat(
     LaunchedEffect(state.sessionId) {
         attachments.clear()
         attachmentError = null
+        pendingSubmission = false
         if (transcriptItems.isNotEmpty()) {
             listState.scrollToItem(transcriptItems.lastIndex)
+        }
+    }
+
+    LaunchedEffect(state.messages.size, state.preparingImages, state.error) {
+        if (!pendingSubmission) return@LaunchedEffect
+        val accepted = state.messages.size > submittedMessageCount &&
+            state.messages.lastOrNull()?.role == "user"
+        if (accepted) {
+            drafts[state.sessionId] = ""
+            attachments.clear()
+            pendingSubmission = false
+        } else if (!state.preparingImages && state.error != null) {
+            pendingSubmission = false
         }
     }
 
@@ -879,21 +899,39 @@ private fun LocalChat(
                 ) {
                     DsIconButton(
                         icon = Icons.Filled.Add,
-                        contentDescription = "添加附件",
+                        contentDescription = stringResource(R.string.local_add_attachment),
                         onClick = { showAttachmentPicker = true },
-                        enabled = !state.running,
+                        enabled = !state.running && !state.preparingImages,
                         tint = colors.labelPrimary,
                         containerColor = colors.bgModulePlatform,
+                    )
+                    DsButton(
+                        text = when (state.imageInputMode) {
+                            LocalImageInputMode.AUTO -> stringResource(R.string.local_image_mode_auto_short)
+                            LocalImageInputMode.MAIN_MODEL -> stringResource(R.string.local_image_mode_main_short)
+                            LocalImageInputMode.VISION_MODEL -> stringResource(R.string.local_image_mode_vision_short)
+                        },
+                        onClick = { showImageModePicker = true },
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                        enabled = !state.running && !state.preparingImages,
                     )
                     DsButton(
                         if (state.planMode) "规划中" else "规划",
                         { onPlanModeChange(!state.planMode) },
                         variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
                         size = DsButtonSize.Small,
-                        enabled = !state.running,
+                        enabled = !state.running && !state.preparingImages,
                     )
                     Spacer(Modifier.weight(1f))
-                    if (state.running) {
+                    if (state.preparingImages) {
+                        DsButton(
+                            stringResource(R.string.local_images_preparing),
+                            onClick = {},
+                            enabled = false,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    } else if (state.running) {
                         DsButton("停止", onStop, variant = DsButtonVariant.Danger)
                     } else {
                         DsButton(
@@ -903,9 +941,9 @@ private fun LocalChat(
                                     onConfigure()
                                 } else {
                                     val selected = attachments.toList()
+                                    submittedMessageCount = state.messages.size
+                                    pendingSubmission = true
                                     onSend(input, selected)
-                                    drafts[state.sessionId] = ""
-                                    attachments.clear()
                                 }
                             },
                             enabled = input.isNotBlank() || attachments.isNotEmpty(),
@@ -928,14 +966,14 @@ private fun LocalChat(
     }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = "添加附件", onDismiss = { showAttachmentPicker = false }) {
+        DsBottomSheet(title = stringResource(R.string.local_add_attachment), onDismiss = { showAttachmentPicker = false }) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsQuickActionTile(
                     icon = Icons.Outlined.Image,
-                    label = "图片",
+                    label = stringResource(R.string.local_attachment_image),
                     onClick = {
                         showAttachmentPicker = false
                         imagePicker.launch(arrayOf("image/*"))
@@ -944,13 +982,46 @@ private fun LocalChat(
                 )
                 DsQuickActionTile(
                     icon = Icons.Outlined.AttachFile,
-                    label = "文件",
+                    label = stringResource(R.string.local_attachment_file),
                     onClick = {
                         showAttachmentPicker = false
                         filePicker.launch(arrayOf("*/*"))
                     },
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+    }
+    if (showImageModePicker) {
+        DsBottomSheet(
+            title = stringResource(R.string.local_image_mode_title),
+            onDismiss = { showImageModePicker = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Text(
+                    stringResource(R.string.local_image_mode_hint),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+                listOf(
+                    LocalImageInputMode.AUTO to R.string.local_image_mode_auto,
+                    LocalImageInputMode.MAIN_MODEL to R.string.local_image_mode_main,
+                    LocalImageInputMode.VISION_MODEL to R.string.local_image_mode_vision,
+                ).forEach { (mode, label) ->
+                    DsCategoryRow(
+                        icon = Icons.Outlined.Image,
+                        title = stringResource(label),
+                        subtitle = if (mode == state.imageInputMode) {
+                            stringResource(R.string.local_image_mode_current)
+                        } else {
+                            null
+                        },
+                        onClick = {
+                            onImageModeChange(mode)
+                            showImageModePicker = false
+                        },
+                    )
+                }
             }
         }
     }
