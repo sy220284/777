@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -647,15 +648,34 @@ class LocalHarnessEngine @Inject constructor(
                     }
                 }
             }
+            val mediaType = normalizeLocalAttachmentMediaType(resolver.getType(uri), safeName)
+            if (mediaType.startsWith("image/")) {
+                validateImportedImage(temp, mediaType)
+            }
             finalizeLocalImportedAttachment(
                 tempFile = temp,
                 workspaceRoot = root,
                 attachmentsRoot = dir,
                 displayName = safeName,
-                mediaType = resolver.getType(uri) ?: "application/octet-stream",
+                mediaType = mediaType,
             )
         } finally {
             if (temp.exists()) temp.delete()
+        }
+    }
+
+    private fun validateImportedImage(file: File, mediaType: String) {
+        require(mediaType in SUPPORTED_LOCAL_IMAGE_TYPES) { "不支持的图片类型：" + mediaType }
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        val width = options.outWidth
+        val height = options.outHeight
+        require(width > 0 && height > 0) { "无法解析图片内容" }
+        require(width.toLong() * height.toLong() <= MAX_LOCAL_IMAGE_PIXELS) {
+            "图片分辨率超过 6400 万像素上限"
+        }
+        require(maxOf(width, height) <= MAX_LOCAL_IMAGE_DIMENSION) {
+            "图片边长超过 8192 像素上限"
         }
     }
 
@@ -2253,6 +2273,9 @@ class LocalHarnessEngine @Inject constructor(
         const val TOOL_RESULT_TAIL_CHARS = 4_000
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
+        const val MAX_LOCAL_IMAGE_PIXELS = 64_000_000L
+        const val MAX_LOCAL_IMAGE_DIMENSION = 8_192
+        val SUPPORTED_LOCAL_IMAGE_TYPES = setOf("image/png", "image/jpeg", "image/webp", "image/gif")
         const val MAX_VISION_FALLBACK_CHARS = 12_000
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_CONVERSATION_FILES_CACHE = 12
