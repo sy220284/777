@@ -260,19 +260,24 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    if (
-                        !allowMutation &&
-                        call.name.startsWith("android_") &&
-                        !call.name.startsWith("android_vscreen_")
-                    ) {
-                        AgentToolResult(
-                            content = "只读子代理未获主屏设备操作权限",
-                            isError = true,
-                            errorCode = "SUBAGENT_DEVICE_SCOPE_BLOCKED",
-                            recoveryHint = "仅使用已分配虚拟屏的 android_vscreen_* 工具。",
-                        )
-                    } else {
-                        execute(call.toLocalToolCall(), allowMutation)
+                    val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
+                    val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
+                    when {
+                        !allowMutation && call.name.startsWith("android_") && !virtualAllowed ->
+                            AgentToolResult(
+                                content = "只读子代理未获主屏设备操作权限",
+                                isError = true,
+                                errorCode = "SUBAGENT_DEVICE_SCOPE_BLOCKED",
+                                recoveryHint = "仅使用已分配虚拟屏的受限工具。",
+                            )
+                        virtualAllowed && requestedScreen != virtualScreenId ->
+                            AgentToolResult(
+                                content = "子代理只能操作自己分配的虚拟屏",
+                                isError = true,
+                                errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
+                                recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
+                            )
+                        else -> execute(call.toLocalToolCall(), allowMutation)
                     }
                 },
                 eventSink = AgentEventSink { event ->
@@ -491,5 +496,12 @@ internal class LocalSubagentRunner(
     private companion object {
         const val SUBAGENT_PROGRESS_ITEMS = 6
         const val SUBAGENT_EVENT_CHARS = 65_536
+        val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
+            "android_vscreen_status",
+            "android_vscreen_launch",
+            "android_vscreen_tap",
+            "android_vscreen_swipe",
+            "android_vscreen_screenshot",
+        )
     }
 }
