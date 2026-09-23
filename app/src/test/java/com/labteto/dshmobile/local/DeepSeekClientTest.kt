@@ -49,7 +49,7 @@ class DeepSeekClientTest {
             "data: {\"choices\":[{\"delta\":{\"content\":\"的\",\"tool_calls\":[{\"index\":0,\"id\":\"call-1\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\"}}]}}]}",
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"a.txt\\\"}\"}}]}}]}",
             "data: [DONE]",
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder()
                 .request(chain.request())
