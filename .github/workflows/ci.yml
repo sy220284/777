@@ -41,6 +41,8 @@ jobs:
         run: ./gradlew :reference-validation:test --stacktrace
       - name: Lint
         run: ./gradlew :app:lintDebug --stacktrace
+      - name: Guard hard-coded UI text
+        run: python3 .github/scripts/check-ui-hardcoded-cjk.py
       - name: Assemble optimized APK
         run: ./gradlew :app:assembleOptimized --stacktrace
       - name: Verify Android 16 APK
