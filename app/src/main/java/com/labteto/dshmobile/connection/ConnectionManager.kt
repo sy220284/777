@@ -302,6 +302,10 @@ class ConnectionManager @Inject constructor(
                     }
                 } ?: return@withLock
                 retired.loop?.stop()
+                _state.value = _state.value.copy(
+                    phase = ConnectionPhase.RECONNECTING,
+                    stage = ConnectStage.OpeningStreams,
+                )
 
                 // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
                 // rotated or dropped while the app is backgrounded, and the credential is baked into the
