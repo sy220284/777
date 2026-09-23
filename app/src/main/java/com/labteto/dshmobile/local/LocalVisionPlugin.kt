@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -45,6 +46,9 @@ class LocalVisionPlugin(
     private val workspaceRoot: File? = null,
 ) : HarnessPlugin {
     override val id: String = "local-vision"
+    private val analysisCache = workspaceRoot?.let { root ->
+        LocalVisionAnalysisCache(File(root, ".dsh/vision-cache"))
+    }
 
     override suspend fun install(context: HarnessContext) {
         context.tools.register(
@@ -109,32 +113,56 @@ class LocalVisionPlugin(
                 name = "vision_analyze_file",
                 schema = schema(
                     name = "vision_analyze_file",
-                    description = "分析工作区内的 PNG/JPEG/WebP/GIF 图片；图片会发送到外部视觉模型",
-                    properties = mapOf("path" to "string", "prompt" to "string"),
+                    description = "分析工作区内的 PNG/JPEG/WebP/GIF 图片；图片会发送到外部视觉模型；相同图片与分析要求可复用已批准分析缓存",
+                    properties = mapOf(
+                        "path" to "string",
+                        "prompt" to "string",
+                        "refresh" to "boolean",
+                    ),
                     required = setOf("path", "prompt"),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
-                    if (routeProvider() == null || keyProvider().isNullOrBlank()) {
+                    val route = routeProvider()
+                    val key = keyProvider()
+                    if (route == null || key.isNullOrBlank()) {
                         return@HarnessToolExecutor ToolResult(
                             "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
                             isError = true,
                         )
                     }
-                    val dataUrl = runCatching { imageFileDataUrl(input.requiredString("path")) }
+                    val prompt = input.requiredString("prompt")
+                    val file = runCatching { imageFile(input.requiredString("path")) }
                         .getOrElse { error ->
                             return@HarnessToolExecutor ToolResult(
                                 "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
                                 isError = true,
                             )
                         }
-                    analyzeDataUrl(
-                        prompt = input.requiredString("prompt"),
+                    val refresh = input.optionalBoolean("refresh")
+                    if (!refresh) {
+                        analysisCache?.get(file, route, prompt)?.let { cached ->
+                            return@HarnessToolExecutor ToolResult(cached)
+                        }
+                    }
+                    val dataUrl = runCatching { imageFileDataUrl(file) }
+                        .getOrElse { error ->
+                            return@HarnessToolExecutor ToolResult(
+                                "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
+                                isError = true,
+                            )
+                        }
+                    val result = analyzeDataUrl(
+                        prompt = prompt,
                         imageDataUrl = dataUrl,
                         intro = "分析这张用户工作区图片。",
+                        fixedRoute = route,
+                        fixedKey = key,
                     )
+                    if (!result.isError) analysisCache?.put(file, route, prompt, result.content)
+                    result
                 },
             ),
         )
@@ -173,10 +201,12 @@ class LocalVisionPlugin(
         prompt: String,
         imageDataUrl: String,
         intro: String,
+        fixedRoute: LocalVisionRoute? = null,
+        fixedKey: String? = null,
     ): ToolResult {
-        val route = routeProvider()
+        val route = fixedRoute ?: routeProvider()
             ?: return ToolResult("视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥", isError = true)
-        val key = keyProvider()
+        val key = fixedKey ?: keyProvider()
             ?: return ToolResult("视觉模型密钥尚未配置", isError = true)
         val boundedPrompt = buildString {
             appendLine(intro)
@@ -194,7 +224,7 @@ class LocalVisionPlugin(
         )
     }
 
-    private fun imageFileDataUrl(relativePath: String): String {
+    private fun imageFile(relativePath: String): File {
         val root = workspaceRoot?.canonicalFile ?: error("本机工作区未配置")
         require(!File(relativePath).isAbsolute) { "视觉文件路径必须使用工作区相对路径" }
         val file = File(root, relativePath).canonicalFile
@@ -203,13 +233,13 @@ class LocalVisionPlugin(
         require(file.length() in 1..MAX_IMAGE_FILE_BYTES) {
             "图片大小必须在 1..${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MiB"
         }
-        val mime = when (file.extension.lowercase()) {
-            "png" -> "image/png"
-            "jpg", "jpeg" -> "image/jpeg"
-            "webp" -> "image/webp"
-            "gif" -> "image/gif"
-            else -> error("视觉文件仅支持 PNG/JPEG/WebP/GIF")
-        }
+        require(sniffLocalImageMediaType(file) != null) { "视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片" }
+        return file
+    }
+
+    private fun imageFileDataUrl(file: File): String {
+        val mime = sniffLocalImageMediaType(file)
+            ?: error("视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片")
         val encoded = Base64.getEncoder().encodeToString(file.readBytes())
         return "data:$mime;base64,$encoded"
     }
@@ -242,6 +272,9 @@ class LocalVisionPlugin(
     private fun JsonObject.requiredString(name: String): String =
         this[name]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
             ?: error("缺少参数：$name")
+
+    private fun JsonObject.optionalBoolean(name: String): Boolean =
+        this[name]?.jsonPrimitive?.booleanOrNull == true
 
     private companion object {
         const val MAX_IMAGE_FILE_BYTES = 16L * 1024L * 1024L
