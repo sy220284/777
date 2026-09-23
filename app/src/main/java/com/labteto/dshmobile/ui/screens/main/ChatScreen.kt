@@ -389,22 +389,40 @@ fun ChatScreen(
                 ConnectionBanner(stringResource(R.string.common_reconnecting))
             }
 
-            val nodeContext = ChatNodeContext(
-                nodes = conversation?.nodes ?: emptyList(),
-                eventTimes = conversation?.journal?.associate { it.seq to it.time }.orEmpty(),
-                running = conversation?.running == true,
-                cwd = currentSession?.cwd,
-                onOpenSubagent = { childId ->
-                    scope.launch { store.openSubagentTranscript(childId) }
-                    sheet = ChatSheet.Subagents
-                },
-                onBranchFrom = { seq -> scope.launch { currentSessionId?.let { store.forkSession(it, seq) } } },
-                onFeedback = { seq, positive ->
-                    conversation?.nodes?.filterIsInstance<com.labteto.dshmobile.core.session.AssistantMessageNode>()
-                        ?.firstOrNull { it.seq == seq }?.messageId?.let { feedback = Triple(composer.key, it, positive) }
-                },
-                onCopied = { toast.second(context.getString(R.string.chat_copy_success)) },
-            )
+            val contextNodes = conversation?.nodes.orEmpty()
+            val eventTimes = remember(conversation?.journal) {
+                conversation?.journal?.associate { it.seq to it.time }.orEmpty()
+            }
+            val nodeContext = remember(
+                contextNodes,
+                eventTimes,
+                conversation?.running,
+                currentSession?.cwd,
+                currentSessionId,
+                composer.key,
+            ) {
+                ChatNodeContext(
+                    nodes = contextNodes,
+                    eventTimes = eventTimes,
+                    running = conversation?.running == true,
+                    cwd = currentSession?.cwd,
+                    onOpenSubagent = { childId ->
+                        scope.launch { store.openSubagentTranscript(childId) }
+                        sheet = ChatSheet.Subagents
+                    },
+                    onBranchFrom = { seq ->
+                        scope.launch { currentSessionId?.let { store.forkSession(it, seq) } }
+                    },
+                    onFeedback = { seq, positive ->
+                        contextNodes
+                            .filterIsInstance<com.labteto.dshmobile.core.session.AssistantMessageNode>()
+                            .firstOrNull { it.seq == seq }
+                            ?.messageId
+                            ?.let { feedback = Triple(composer.key, it, positive) }
+                    },
+                    onCopied = { toast.second(context.getString(R.string.chat_copy_success)) },
+                )
+            }
 
             AnimatedContent(
                 targetState = tab,
