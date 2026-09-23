@@ -1,11 +1,14 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,7 +51,8 @@ internal fun PermissionMenu(
         title = stringResource(R.string.permission_preset),
         onDismiss = onDismiss,
     ) {
-        select.selectable.forEach { option ->
+        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            select.selectable.forEach { option ->
             val selected = option.value == current
             Row(
                 modifier = Modifier
@@ -82,6 +86,7 @@ internal fun PermissionMenu(
                         modifier = Modifier.size(16.dp),
                     )
                 }
+            }
             }
         }
         if (select.currentValue !in select.selectable.map { it.value }) {

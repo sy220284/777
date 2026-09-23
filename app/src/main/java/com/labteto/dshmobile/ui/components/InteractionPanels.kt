@@ -44,53 +44,66 @@ fun ApprovalPanel(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.approvalCard,
-        color = colors.composerCard,
-        border = BorderStroke(1.dp, colors.warnSecondary),
-        shadowElevation = 2.dp,
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.warnTertiary)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.WarningAmber,
-                    contentDescription = null,
-                    tint = colors.warn,
-                    modifier = Modifier.width(14.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.approval_title),
-                    style = DsType.small13Strong,
-                    color = colors.warnLabel,
-                )
-            }
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.approval_reason, reason ?: toolName),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DsButton(
-                        text = stringResource(R.string.approval_allow_once),
-                        onClick = onAllow,
-                        variant = DsButtonVariant.Info,
-                        size = DsButtonSize.Small,
+    val bodyScroll = rememberScrollState()
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val cap = questionCardMaxHeight(maxHeight)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = cap),
+            shape = DsShapes.approvalCard,
+            color = colors.composerCard,
+            border = BorderStroke(1.dp, colors.warnSecondary),
+            shadowElevation = 2.dp,
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.warnTertiary)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.WarningAmber,
+                        contentDescription = null,
+                        tint = colors.warn,
+                        modifier = Modifier.width(14.dp),
                     )
-                    DsButton(
-                        text = stringResource(R.string.approval_reject),
-                        onClick = onReject,
-                        variant = DsButtonVariant.Outline,
-                        size = DsButtonSize.Small,
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.approval_title),
+                        style = DsType.small13Strong,
+                        color = colors.warnLabel,
                     )
+                }
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.approval_reason, reason ?: toolName),
+                        style = DsType.small13,
+                        color = colors.labelSecondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(bodyScroll),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DsButton(
+                            text = stringResource(R.string.approval_allow_once),
+                            onClick = onAllow,
+                            variant = DsButtonVariant.Info,
+                            size = DsButtonSize.Small,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.approval_reject),
+                            onClick = onReject,
+                            variant = DsButtonVariant.Outline,
+                            size = DsButtonSize.Small,
+                        )
+                    }
                 }
             }
         }

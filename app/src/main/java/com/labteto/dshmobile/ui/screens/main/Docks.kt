@@ -174,6 +174,7 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
                 value = editText,
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
+                maxLines = 8,
                 placeholder = { Text(stringResource(R.string.goal_title), style = DsType.std14) },
                 colors = dialogTextFieldColors(),
             )
@@ -276,6 +277,7 @@ internal fun QueueDock(queue: List<QueueItem>, store: SessionStore, modifier: Mo
                 value = editText,
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
+                maxLines = 8,
                 placeholder = { Text(stringResource(R.string.chat_composer_hint), style = DsType.std14) },
                 colors = dialogTextFieldColors(),
             )

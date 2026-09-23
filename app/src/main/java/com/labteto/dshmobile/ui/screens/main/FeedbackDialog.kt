@@ -60,7 +60,7 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
         title = { Text(stringResource(if (positive) R.string.chat_feedback_up else R.string.chat_feedback_down)) },
         text = { Column {
-            OutlinedTextField(note, { note = it }, enabled = !busy, label = { Text(stringResource(R.string.feedback_note)) })
+            OutlinedTextField(note, { note = it }, enabled = !busy, maxLines = 6, label = { Text(stringResource(R.string.feedback_note)) })
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (current != null) TextButton(onClick = { submit(true) }, enabled = !busy) { Text(stringResource(R.string.common_remove)) }
             if (!loaded && !busy) TextButton(onClick = {

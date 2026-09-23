@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -1234,7 +1235,7 @@ internal fun NetworkDiagnosticDialog(
                     it,
                     style = DsType.mdCode,
                     color = colors.labelPrimary,
-                    modifier = Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
                 )
             }
         }
@@ -1258,7 +1259,7 @@ internal fun EnvironmentInfoDialog(
                 text,
                 style = DsType.mdCode,
                 color = colors.labelPrimary,
-                modifier = Modifier.fillMaxWidth().height(260.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
     }
@@ -1300,7 +1301,7 @@ private fun ApprovalDialog(
                 approval.arguments,
                 style = DsType.mdCode,
                 color = colors.labelSecondary,
-                modifier = Modifier.fillMaxWidth().height(140.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
             )
         }
 

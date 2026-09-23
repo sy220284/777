@@ -29,6 +29,38 @@ class PlanReviewPanelOverflowTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
+    fun longApprovalReasonKeepsAllowAndRejectVisible() {
+        var allowed = 0
+        var rejected = 0
+        val reason = (1..80).joinToString("\n") { index ->
+            "Approval reason line $index with enough detail to overflow a short phone viewport."
+        }
+
+        compose.setContent {
+            DshTheme {
+                Box(Modifier.width(360.dp).height(240.dp)) {
+                    ApprovalPanel(
+                        toolName = "test_tool",
+                        reason = reason,
+                        onAllow = { allowed++ },
+                        onReject = { rejected++ },
+                    )
+                }
+            }
+        }
+
+        val allow = context.getString(R.string.approval_allow_once)
+        val reject = context.getString(R.string.approval_reject)
+
+        compose.onNodeWithText(allow).assertIsDisplayed().performClick()
+        compose.onNodeWithText(reject).assertIsDisplayed().performClick()
+        compose.onNode(hasScrollAction()).assertExists()
+
+        assertEquals(1, allowed)
+        assertEquals(1, rejected)
+    }
+
+    @Test
     fun longPlanKeepsDecisionActionsVisibleAndBodyScrollable() {
         var approved = 0
         var declined = 0
