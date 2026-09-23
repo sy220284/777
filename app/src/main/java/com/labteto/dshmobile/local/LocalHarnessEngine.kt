@@ -796,7 +796,12 @@ class LocalHarnessEngine @Inject constructor(
     fun stop() {
         approvalResponse?.complete(false)
         questionResponse?.cancel()
-        synchronized(runStateLock) { activeJob }?.cancel()
+        val running = synchronized(runStateLock) {
+            pendingInputs.clear()
+            _state.update { it.copy(queuedInputCount = 0) }
+            activeJob
+        }
+        running?.cancel()
         // Keep running=true until runTurn's finally has completed. Otherwise the
         // composer looks available during cancellation even though queueTurn
         // correctly still rejects a replacement turn.
@@ -950,11 +955,77 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun cancelActiveRunAndJoin() {
         approvalResponse?.complete(false)
         questionResponse?.cancel()
-        val job = synchronized(runStateLock) { activeJob }
+        val job = synchronized(runStateLock) {
+            pendingInputs.clear()
+            _state.update { it.copy(queuedInputCount = 0) }
+            activeJob
+        }
         job?.cancelAndJoin()
         synchronized(runStateLock) {
             if (activeJob === job) activeJob = null
         }
+    }
+
+    private suspend fun captureAutoMemoryDirective(text: String) {
+        val snapshot = _state.value
+        if (!snapshot.autoMemory || text.isBlank()) return
+        runCatching {
+            memoryManager.captureExplicitUserDirective(
+                text = text,
+                mode = snapshot.conversationMode,
+                projectId = snapshot.projectId,
+                lineageId = snapshot.lineageId,
+                sourceSessionId = currentSessionId,
+            )
+        }.onSuccess { remembered ->
+            if (remembered != null) {
+                eventLog.append("memory/auto", buildJsonObject {
+                    put("id", remembered.id)
+                    put("scope", remembered.scope.name.lowercase())
+                    put("kind", remembered.kind.name.lowercase())
+                })
+            }
+        }
+    }
+
+    private suspend fun drainPendingInputsIntoHistory() {
+        val queued = pendingInputs.drain()
+        if (queued.isEmpty()) return
+        queued.forEach { input ->
+            val durableMessage = input.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", input.content)
+            }
+            modelHistory += durableMessage
+            captureAutoMemoryDirective(input.memoryInput)
+        }
+        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+        eventLog.append("user/queue", buildJsonObject {
+            put("action", "consumed")
+            put("count", queued.size)
+            put("queued_count", pendingInputs.size())
+        })
+        checkpointModelHistory("user/queue-consumed")
+        persist()
+    }
+
+    private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
+        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
+        val next = pendingInputs.poll() ?: return@synchronized null
+        val durableMessage = next.modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", next.content)
+        }
+        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+        appendUserToModelHistory(durableMessage, "user/queue-resume")
+        eventLog.append("user/queue", buildJsonObject {
+            put("action", "resumed")
+            put("queued_count", pendingInputs.size())
+        })
+        persist()
+        scope.launch(start = CoroutineStart.LAZY) {
+            runTurn(next.content, next.memoryInput)
+        }.also { activeJob = it }
     }
 
     /** Switch between inspection-only planning and normal execution. */
