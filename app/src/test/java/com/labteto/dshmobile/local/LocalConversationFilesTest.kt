@@ -64,7 +64,7 @@ class LocalConversationFilesTest {
             toolCall(3, "read", buildJsonObject { put("path", "./src/App.kt") }),
         )
 
-        val index = localConversationFiles(events, files)
+        val index = localConversationFiles(events.asSequence(), files)
 
         assertEquals(listOf("src/App.kt"), index.involved.map { it.path })
         assertTrue(index.artifacts.isEmpty())
