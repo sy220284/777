@@ -1825,7 +1825,11 @@ class LocalHarnessEngine @Inject constructor(
             events = eventLog.snapshotAfter(projectionCursor),
             sequenceExclusive = projectionCursor,
         )
-        val restoredHistory = restoreModelHistory(sessionId, stored.modelHistory)
+        val restoredHistory = restoreLocalModelHistory(
+            events = eventLog.snapshot(),
+            legacyFallback = stored.legacyModelHistory,
+            codec = modelHistoryCheckpointCodec,
+        )
         modelHistory.clear()
         modelHistory += restoredHistory.messages
         applyRecoveredToolResults(recovery)
@@ -1864,18 +1868,26 @@ class LocalHarnessEngine @Inject constructor(
                 loaded?.legacySafeAutoApproval == true,
             ),
         )
+        var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
             checkpointModelHistory("load/system-refresh")
-        } else if (recovery.repaired || restoredHistory.replayedTail) {
-            checkpointModelHistory("load/event-replay")
+            wroteHistoryCheckpoint = true
+        } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
+            checkpointModelHistory(
+                if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
+                else "load/event-replay",
+            )
+            wroteHistoryCheckpoint = true
+        }
+        if (restoredHistory.usedLegacyFallback) {
+            if (!wroteHistoryCheckpoint) {
+                checkpointModelHistory("load/legacy-history-migration")
+            }
+            // Rewrite the materialized snapshot without duplicating model-visible history.
+            persist()
         }
     }
-
-    private data class RestoredModelHistory(
-        val messages: List<JsonObject>,
-        val replayedTail: Boolean,
-    )
 
     private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
         if (recovery.toolResults.isEmpty()) return
@@ -1901,79 +1913,6 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun restoreModelHistory(
-        sessionId: String,
-        fallback: List<JsonObject>,
-    ): RestoredModelHistory {
-        val events = if (sessionId == currentSessionId) {
-            eventLog.snapshot()
-        } else {
-            eventLogFor(sessionId).snapshot()
-        }
-        val checkpointIndex = events.indexOfLast { it.type == ModelHistoryCheckpointCodec.EVENT_TYPE }
-        if (checkpointIndex < 0) return RestoredModelHistory(fallback, replayedTail = false)
-        val checkpoint = events[checkpointIndex]
-        val restored = modelHistoryCheckpointCodec.decode(checkpoint.data)
-            ?: return RestoredModelHistory(fallback, replayedTail = false)
-        val history = restored.toMutableList()
-        var replayed = false
-
-        events.drop(checkpointIndex + 1).forEach { event ->
-            when (event.type) {
-                "system/prompt" -> {
-                    val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                    val message = buildJsonObject {
-                        put("role", "system")
-                        put("content", content)
-                    }
-                    if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-                        history[0] = message
-                    } else {
-                        history.add(0, message)
-                    }
-                    replayed = true
-                }
-                "user/message" -> {
-                    val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                    history += buildJsonObject {
-                        put("role", "user")
-                        put("content", content)
-                    }
-                    replayed = true
-                }
-                "assistant/message" -> {
-                    val message = (event.data["message"] as? JsonObject) ?: event.data
-                    if (message["role"]?.jsonPrimitive?.contentOrNull == "assistant") {
-                        history += message
-                        replayed = true
-                    }
-                }
-                "tool/result" -> {
-                    val nested = event.data["message"] as? JsonObject
-                    if (nested?.get("role")?.jsonPrimitive?.contentOrNull == "tool") {
-                        history += nested
-                        replayed = true
-                    } else {
-                        val callId = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                        val alreadyPresent = history.any { message ->
-                            message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
-                                message["tool_call_id"]?.jsonPrimitive?.contentOrNull == callId
-                        }
-                        if (!alreadyPresent) {
-                            history += buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", callId)
-                                put("content", event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty())
-                            }
-                            replayed = true
-                        }
-                    }
-                }
-            }
-        }
-        return RestoredModelHistory(history, replayed)
-    }
-
     private fun persist() {
         // Capture the durable boundary before the in-memory projection. A concurrent state update
         // may then be included in the snapshot with an older cursor, which is safe because replay
@@ -1992,7 +1931,6 @@ class LocalHarnessEngine @Inject constructor(
             projectId = state.projectId,
             handoffSummary = state.handoffSummary,
             messages = state.messages,
-            modelHistory = modelHistory.toList(),
             plan = state.plan,
             todos = state.todos,
             goal = state.goal,
