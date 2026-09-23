@@ -523,4 +523,11 @@
     <string name="tools_plugin_active">Active</string>
     <string name="tools_plugin_failed">Failed</string>
     <string name="tools_plugin_enabled">Enabled</string>
+    <string name="relay_status_failed_title">Relay connection failed</string>
+    <string name="relay_status_connecting_title">Connecting to relay…</string>
+    <string name="relay_status_failed_body">Pair this relay again, or return to Local Harness.</string>
+    <string name="relay_status_connecting_body">Pairing is complete. Establishing the remote control connection.</string>
+    <string name="relay_status_retry">Pair again</string>
+    <string name="relay_status_back_local">Back to Local Harness</string>
+
 </resources>
