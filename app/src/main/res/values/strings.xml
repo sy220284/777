@@ -568,6 +568,7 @@
     <string name="relay_status_retry">Pair again</string>
     <string name="relay_status_back_local">Back to Local Harness</string>
 
+    <string name="local_image_mode_status">Image handling: %1$s</string>
     <string name="local_files_workspace_subtitle">Browse on-device workspace files and task artifacts</string>
     <string name="local_files_read_failed">Could not read workspace files</string>
     <string name="local_files_preview_failed">Could not preview file</string>
