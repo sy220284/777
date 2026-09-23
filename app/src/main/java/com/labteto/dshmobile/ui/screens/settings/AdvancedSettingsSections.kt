@@ -144,6 +144,7 @@ private fun DynamicSettingEditor(
 ) {
     val colors = DsTheme.colors
     val context = LocalContext.current
+    val selectLabel = stringResource(R.string.adv_select)
     val currentText = if (field.secret) "" else field.value?.let(::displayJsonScalar).orEmpty()
     var text by remember(namespace.revision, field.path) { mutableStateOf(currentText) }
 
@@ -184,7 +185,7 @@ private fun DynamicSettingEditor(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                selected.ifBlank { stringResource(R.string.adv_select) },
+                                selected.ifBlank { selectLabel },
                                 style = DsType.std14,
                                 color = colors.labelSecondary,
                                 modifier = Modifier.padding(DsSpacing.small),
@@ -290,6 +291,7 @@ private fun ModelProviderRow(
     viewModel: SettingsViewModel,
 ) {
     val colors = DsTheme.colors
+    val context = LocalContext.current
     var expanded by remember(provider.provider) { mutableStateOf(false) }
     val models = state.discovered[provider.provider].orEmpty()
     DisclosureRow(
@@ -319,7 +321,7 @@ private fun ModelProviderRow(
                         buildString {
                             append(model.name ?: model.id)
                             if (model.name != null && model.name != model.id) append(" · ${model.id}")
-                            model.contextWindow?.let { append(stringResource(R.string.adv_context_suffix, it.toString())) }
+                            model.contextWindow?.let { append(context.getString(R.string.adv_context_suffix, it.toString())) }
                         }
                     },
                     style = DsType.caption11,
@@ -513,7 +515,7 @@ internal fun MemoryManagementCard(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         DsButton(
-                            text = "保存",
+                            text = stringResource(R.string.common_save),
                             onClick = {
                                 viewModel.updateMemory(
                                     id = record.id,
