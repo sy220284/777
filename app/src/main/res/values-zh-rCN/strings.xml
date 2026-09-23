@@ -199,6 +199,11 @@
     <string name="plan_review_approve">批准</string>
     <string name="plan_review_decline">拒绝</string>
     <string name="plan_review_discuss">讨论</string>
+    <string name="command_execution_title">执行操作</string>
+    <string name="command_execution_purpose">执行本机操作以完成当前任务</string>
+    <string name="command_execution_status_running">执行中</string>
+    <string name="command_execution_status_done">已完成</string>
+    <string name="command_execution_status_failed">执行失败</string>
     <string name="approval_title">请求权限</string>
     <string name="approval_allow_once">允许一次</string>
     <string name="approval_reject">拒绝</string>

@@ -91,6 +91,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -1339,7 +1340,7 @@ private fun ExecutionStatusCard(
                 Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
                 if (state.jobs.isNotEmpty()) {
                     Text(
-                        "后台 · " + state.jobs.joinToString { "${it.label}[${it.status}]" },
+                        "后台 · " + state.jobs.joinToString { it.status },
                         style = DsType.caption11,
                         color = colors.labelTertiary,
                     )
@@ -1431,25 +1432,36 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
 
             if (expanded) {
                 messages.forEach { message ->
-                    val title = when (message.role) {
-                        "reasoning" -> "思考"
-                        "tool" -> "工具 · ${message.toolName ?: "执行结果"}"
+                    val commandExecution = message.role == "tool" && isCommandExecutionTool(message.toolName)
+                    val title = when {
+                        commandExecution -> stringResource(R.string.command_execution_title)
+                        message.role == "reasoning" -> "思考"
+                        message.role == "tool" -> "工具 · ${message.toolName ?: "执行结果"}"
                         else -> "执行说明"
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(title, style = DsType.caption11Strong, color = colors.labelTertiary)
                         if (message.role == "tool") {
+                            if (commandExecution) {
+                                Text(
+                                    stringResource(R.string.command_execution_purpose),
+                                    style = DsType.small13,
+                                    color = colors.labelSecondary,
+                                )
+                            }
                             Text(
                                 toolResultMeta(message.content),
                                 style = DsType.caption11,
                                 color = colors.labelTertiary,
                             )
-                            SelectionContainer {
-                                Text(
-                                    message.content,
-                                    style = DsType.mdCode,
-                                    color = colors.labelSecondary,
-                                )
+                            if (!commandExecution) {
+                                SelectionContainer {
+                                    Text(
+                                        message.content,
+                                        style = DsType.mdCode,
+                                        color = colors.labelSecondary,
+                                    )
+                                }
                             }
                         } else {
                             MarkdownText(message.content, allowCodeCopy = false)
@@ -1644,8 +1656,13 @@ private fun ApprovalDialog(
     onApproveDeviceTurn: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val commandExecution = isCommandExecutionTool(approval.toolName)
     DsDialog(title = "执行前确认", onDismiss = onDeny) {
-        Text(approval.summary, style = DsType.base16Strong, color = colors.labelPrimary)
+        Text(
+            if (commandExecution) stringResource(R.string.command_execution_title) else approval.summary,
+            style = DsType.base16Strong,
+            color = colors.labelPrimary,
+        )
         Text(
             "影响等级：${approvalImpactLabel(approval.impact)}",
             style = DsType.caption11Strong,
@@ -1675,14 +1692,16 @@ private fun ApprovalDialog(
             }
         }
 
-        Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
-        SelectionContainer {
-            Text(
-                approval.arguments,
-                style = DsType.mdCode,
-                color = colors.labelSecondary,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
-            )
+        if (!commandExecution) {
+            Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
+            SelectionContainer {
+                Text(
+                    approval.arguments,
+                    style = DsType.mdCode,
+                    color = colors.labelSecondary,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
+                )
+            }
         }
 
         Text(
@@ -1742,8 +1761,8 @@ private fun approvalImpactLabel(impact: com.labteto.dshmobile.local.LocalApprova
 }
 
 private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
-    "bash", "run_shell" ->
-        "Harness 准备在手机的本机执行环境中运行一条系统命令，用来完成当前任务中的检查、构建、文件处理或其他自动化步骤。命令可能读写工作区、访问网络或启动进程，具体影响取决于下方命令内容。"
+    "bash", "pwsh", "shell", "run_shell", "process_exec", "terminal_open", "terminal_send", "terminal_write" ->
+        "Harness 准备在手机的本机执行环境中完成当前任务所需的操作。操作可能读写工作区、访问网络或启动进程；界面仅展示用途、状态与影响等级。"
     "write", "write_file" ->
         "Harness 准备创建或完整写入一个工作区文件，用来保存代码、配置、文档或任务产物。批准后会实际改变工作区内容。"
     "edit", "edit_file" ->

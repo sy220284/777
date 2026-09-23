@@ -56,6 +56,7 @@ import com.labteto.dshmobile.core.session.TurnErrorNode
 import com.labteto.dshmobile.core.session.TurnStartNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.session.WorkflowNode
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import com.labteto.dshmobile.ui.components.AttachmentImage
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DisclosureState
@@ -236,6 +237,8 @@ internal val STRUCTURAL_EVENT_TYPES = setOf(
     "assistant/chunk",
     // A model attempt that settled without a message (harness 0.1.3): replay data, not content.
     "assistant/attempt",
+    // Full model request context can contain raw historical tool arguments, including commands.
+    "request/context",
 )
 
 /**
@@ -501,6 +504,25 @@ private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
         com.labteto.dshmobile.ui.components.formatDurationMs((endedAt - startedAt).coerceAtLeast(0)),
         style = DsType.caption11, color = colors.labelCaption,
     )
+    if (isCommandExecutionTool(node.name)) {
+        val purpose = row.summary ?: stringResource(R.string.command_execution_purpose)
+        val status = stringResource(
+            when {
+                result?.isError == true -> R.string.command_execution_status_failed
+                result == null && context.running -> R.string.command_execution_status_running
+                else -> R.string.command_execution_status_done
+            },
+        )
+        DisclosureRow(
+            title = stringResource(R.string.command_execution_title),
+            summary = "$purpose · $status",
+            icon = row.variant.featherIcon(),
+            state = state,
+            expanded = false,
+            onToggle = null,
+        )
+        return
+    }
     ToolCard(
         view = card,
         expanded = expanded,
@@ -552,25 +574,18 @@ private fun CompactionRow(node: CompactionNode) {
 
 @Composable
 private fun CommandRow(node: CommandNode) {
-    val colors = DsTheme.colors
-    val data = node.data as? JsonObject
-    val name = data?.get("name").asString() ?: node.kind
-    val text = data?.get("text").asString()
-    var expanded by remember(node.seq) { mutableStateOf(false) }
+    val running = node.kind == "command/run"
     DisclosureRow(
-        title = "/$name",
-        summary = text,
+        title = stringResource(R.string.command_execution_title),
+        summary = stringResource(
+            if (running) R.string.command_execution_status_running
+            else R.string.command_execution_status_done,
+        ),
         icon = FeatherIcons.Terminal,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    ) {
-        Text(
-            node.data.toString(),
-            style = DsType.caption11.copy(fontFamily = DsType.codeFont),
-            color = colors.labelCaption,
-            modifier = Modifier.padding(start = 28.dp, top = 2.dp),
-        )
-    }
+        state = if (running) DisclosureState.Running else DisclosureState.Idle,
+        expanded = false,
+        onToggle = null,
+    )
 }
 
 @Composable

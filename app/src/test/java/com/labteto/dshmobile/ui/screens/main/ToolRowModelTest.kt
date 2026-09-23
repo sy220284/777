@@ -85,10 +85,29 @@ class ToolRowModelTest {
     }
 
     @Test
-    fun `a shell without a description falls back to the command`() {
+    fun `a shell without a description never exposes the command`() {
         val row = toolRowModel("bash", """{"command":"./gradlew test"}""", cwd = null)
         assertEquals("Bash", row.title)
-        assertEquals("./gradlew test", row.summary)
+        assertNull(row.summary)
+    }
+
+    @Test
+    fun `native process and terminal tools never expose execution payloads`() {
+        val process = toolRowModel(
+            "process_exec",
+            """{"command":"git status --porcelain","args":["status","--porcelain"]}""",
+            cwd = null,
+        )
+        assertEquals("Bash", process.title)
+        assertNull(process.summary)
+
+        val terminal = toolRowModel(
+            "terminal_write",
+            """{"text":"rm -rf build"}""",
+            cwd = null,
+        )
+        assertEquals("Bash", terminal.title)
+        assertNull(terminal.summary)
     }
 
     @Test

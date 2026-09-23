@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -47,6 +48,11 @@ fun ApprovalPanel(
 ) {
     val colors = DsTheme.colors
     val bodyScroll = rememberScrollState()
+    val displayReason = if (isCommandExecutionTool(toolName)) {
+        stringResource(R.string.command_execution_purpose)
+    } else {
+        reason ?: toolName
+    }
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cap = questionCardMaxHeight(maxHeight)
         Surface(
@@ -84,7 +90,7 @@ fun ApprovalPanel(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        stringResource(R.string.approval_reason, reason ?: toolName),
+                        stringResource(R.string.approval_reason, displayReason),
                         style = DsType.small13,
                         color = colors.labelSecondary,
                         modifier = Modifier

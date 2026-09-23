@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -34,6 +35,13 @@ internal enum class ToolRowVariant(val title: String) {
 private val TOOL_VARIANTS: Map<String, ToolRowVariant> = mapOf(
     "bash" to ToolRowVariant.Bash,
     "pwsh" to ToolRowVariant.Bash,
+    "shell" to ToolRowVariant.Bash,
+    "run_shell" to ToolRowVariant.Bash,
+    "process_exec" to ToolRowVariant.Bash,
+    "terminal_open" to ToolRowVariant.Bash,
+    "terminal_send" to ToolRowVariant.Bash,
+    "terminal_write" to ToolRowVariant.Bash,
+    "pty-send" to ToolRowVariant.Bash,
     "read" to ToolRowVariant.Read,
     "web_fetch" to ToolRowVariant.Read,
     "web_search" to ToolRowVariant.Search,
@@ -54,7 +62,7 @@ private val TOOL_VARIANTS: Map<String, ToolRowVariant> = mapOf(
  * the arguments object wins.
  */
 private val SUMMARY_KEYS: Map<ToolRowVariant, List<String>> = mapOf(
-    ToolRowVariant.Bash to listOf("description", "command"),
+    ToolRowVariant.Bash to listOf("description"),
     ToolRowVariant.Read to listOf("path", "file_path", "url"),
     // `queries` first: harness 0.1.0-rc.8 turned `web_search` into a 1-4 query array, and an
     // rc.7 host still sends the singular `query` that grep and glob use anyway.
@@ -112,9 +120,13 @@ internal fun toolRowModel(
 ): ToolRowModel {
     val variant = classifyTool(toolName)
     val arguments = parseArguments(argumentsJson)
-    val derived = SUMMARY_KEYS[variant]
-        .orEmpty()
-        .firstNotNullOfOrNull { key -> arguments?.get(key).asSummary()?.takeIf { it.isNotBlank() } }
+    val derived = if (isCommandExecutionTool(toolName)) {
+        arguments?.get("description").asSummary()?.takeIf { it.isNotBlank() }
+    } else {
+        SUMMARY_KEYS[variant]
+            .orEmpty()
+            .firstNotNullOfOrNull { key -> arguments?.get(key).asSummary()?.takeIf { it.isNotBlank() } }
+    }
     val relative = derived?.let { relativizeToCwd(it, cwd) }
     // An unclassified tool with no presenter title would otherwise render as a bare "Tool call"
     // with nothing identifying it, so its raw name carries the summary instead.

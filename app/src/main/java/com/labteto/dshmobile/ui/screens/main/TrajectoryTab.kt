@@ -30,6 +30,7 @@ import com.labteto.dshmobile.core.session.ToolResultNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
@@ -96,17 +97,6 @@ internal fun TrajectoryTab(
                 TrajectoryRow(turnNodes[index], turnNodes, cwd)
             }
         }
-        conversation?.journal?.forEach { event ->
-            item(key = "raw-${event.seq}") {
-                JsonDisclosure("#${event.seq} · ${event.type} · ${java.text.DateFormat.getTimeInstance().format(java.util.Date(event.time))}",
-                    kotlinx.serialization.json.buildJsonObject {
-                        put("data", event.data)
-                        event.surfaceIntent?.let { put("surfaceOp", it) }
-                        event.sourceEventSeqs?.let { put("sourceEventSeqs", kotlinx.serialization.json.JsonArray(it.map { seq -> kotlinx.serialization.json.JsonPrimitive(seq) })) }
-                        event.ignorable?.let { put("ignorable", kotlinx.serialization.json.JsonPrimitive(it)) }
-                    })
-            }
-        }
         if (stats != null || usage != null) {
             item(key = "totals") {
                 Spacer(Modifier.width(8.dp))
@@ -164,26 +154,45 @@ private fun ToolLedgerRow(call: ToolCallNode, result: ToolResultNode?, cwd: Stri
             size = 8.dp,
         )
         Spacer(Modifier.width(6.dp))
-        DisclosureRow(
-            title = row.title,
-            summary = row.summary,
-            // The ledger already leads with its own state dot, so the slot keeps the glyph.
-            icon = row.variant.featherIcon(),
-            expanded = expanded,
-            onToggle = { expanded = !expanded },
-            modifier = Modifier.weight(1f),
-        ) {
-            Column(Modifier.padding(start = 28.dp, top = 2.dp)) {
-                Text(stringResource(R.string.chat_input_placeholder), style = DsType.caption11, color = colors.labelCaption)
-                JsonDisclosure(call.name, runCatching { kotlinx.serialization.json.Json.parseToJsonElement(call.arguments) }.getOrElse { kotlinx.serialization.json.JsonPrimitive(call.arguments) })
-                result?.content?.let { content ->
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.chat_output_placeholder), style = DsType.caption11, color = colors.labelCaption)
-                    Text(
-                        content.toString(),
-                        style = MonoCaption,
-                        color = if (result.isError) colors.error else colors.labelTertiary,
-                    )
+        if (isCommandExecutionTool(call.name)) {
+            val purpose = row.summary ?: stringResource(R.string.command_execution_purpose)
+            val status = stringResource(
+                when {
+                    result == null -> R.string.command_execution_status_running
+                    result.isError -> R.string.command_execution_status_failed
+                    else -> R.string.command_execution_status_done
+                },
+            )
+            DisclosureRow(
+                title = stringResource(R.string.command_execution_title),
+                summary = "$purpose · $status",
+                icon = row.variant.featherIcon(),
+                expanded = false,
+                onToggle = null,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            DisclosureRow(
+                title = row.title,
+                summary = row.summary,
+                // The ledger already leads with its own state dot, so the slot keeps the glyph.
+                icon = row.variant.featherIcon(),
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+                modifier = Modifier.weight(1f),
+            ) {
+                Column(Modifier.padding(start = 28.dp, top = 2.dp)) {
+                    Text(stringResource(R.string.chat_input_placeholder), style = DsType.caption11, color = colors.labelCaption)
+                    JsonDisclosure(call.name, runCatching { kotlinx.serialization.json.Json.parseToJsonElement(call.arguments) }.getOrElse { kotlinx.serialization.json.JsonPrimitive(call.arguments) })
+                    result?.content?.let { content ->
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.chat_output_placeholder), style = DsType.caption11, color = colors.labelCaption)
+                        Text(
+                            content.toString(),
+                            style = MonoCaption,
+                            color = if (result.isError) colors.error else colors.labelTertiary,
+                        )
+                    }
                 }
             }
         }
