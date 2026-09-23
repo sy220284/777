@@ -22,6 +22,7 @@ import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalVisionSettings
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
@@ -311,6 +312,10 @@ class SettingsViewModel @Inject constructor(
 
     fun configureLocalModel(apiKey: String, model: String, baseUrl: String) {
         localHarness.configure(apiKey, model, baseUrl)
+    }
+
+    fun configureLocalImageInputMode(mode: LocalImageInputMode) {
+        localHarness.configureImageInputMode(mode)
     }
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
