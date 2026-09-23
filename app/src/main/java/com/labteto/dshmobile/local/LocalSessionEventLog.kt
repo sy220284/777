@@ -55,20 +55,6 @@ class LocalSessionEventLog(
         }
     }
 
-    /** Cheap invalidation stamp for cached projections over this append-only log. */
-    fun storageStamp(): Long {
-        var stamp = 1_469_598_103_934_665_603L
-        for (source in orderedFiles()) {
-            stamp = stamp xor source.name.hashCode().toLong()
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor source.length()
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor source.lastModified()
-            stamp *= 1_099_511_628_211L
-        }
-        return stamp
-    }
-
     fun repairInterruptedTail(): SessionRepairResult =
         SessionRecovery.repairInterruptedTail(delegate)
 
