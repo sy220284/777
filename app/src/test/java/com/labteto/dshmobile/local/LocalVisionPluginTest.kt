@@ -79,7 +79,7 @@ class LocalVisionPluginTest {
     fun workspaceImageAnalysisRequiresApprovalAndStaysInsideWorkspace() = runTest {
         val root = Files.createTempDirectory("vision-workspace").toFile()
         try {
-            root.resolve("shot.png").writeBytes(byteArrayOf(1, 2, 3, 4))
+            root.resolve("shot.png").writeBytes(validPngBytes())
             val device = RecordingDevice()
             val analyzer = RecordingAnalyzer()
             val registry = PluginRegistry()
@@ -114,6 +114,53 @@ class LocalVisionPluginTest {
                 context = ToolContext(approval = { true }),
             )
             assertTrue(escaped.isError)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun workspaceImageAnalysisReusesExactCacheAndRefreshBypassesIt() = runTest {
+        val root = Files.createTempDirectory("vision-cache-workspace").toFile()
+        try {
+            root.resolve("shot.png").writeBytes(validPngBytes())
+            val analyzer = RecordingAnalyzer()
+            val registry = PluginRegistry()
+            registry.install(
+                LocalVisionPlugin(
+                    device = RecordingDevice(),
+                    keyProvider = { "secret" },
+                    routeProvider = { LocalVisionRoute("https://vision.example/v1", "vision-model") },
+                    analyzer = analyzer,
+                    workspaceRoot = root,
+                ),
+            )
+            val context = ToolContext(approval = { true })
+
+            val first = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "shot.png"); put("prompt", "分析") },
+                context = context,
+            )
+            val second = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "shot.png"); put("prompt", "分析") },
+                context = context,
+            )
+            val refreshed = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject {
+                    put("path", "shot.png")
+                    put("prompt", "分析")
+                    put("refresh", true)
+                },
+                context = context,
+            )
+
+            assertFalse(first.isError)
+            assertFalse(second.isError)
+            assertFalse(refreshed.isError)
+            assertEquals(2, analyzer.calls.size)
         } finally {
             root.deleteRecursively()
         }
@@ -182,6 +229,11 @@ class LocalVisionPluginTest {
             return "data:image/png;base64,AAAA"
         }
     }
+
+    private fun validPngBytes(): ByteArray =
+        byteArrayOf(
+            0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ) + ByteArray(32) { 1 }
 
     private class RecordingAnalyzer : LocalVisionAnalyzer {
         data class Call(
