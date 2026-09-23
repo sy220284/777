@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -11,6 +12,7 @@ import com.labteto.dshmobile.automation.WebhookPlugin
 import com.labteto.dshmobile.device.AndroidDevicePlugin
 import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.harness.agent.AgentEvent
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
@@ -22,10 +24,16 @@ import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.HandoffGoal
@@ -127,6 +135,12 @@ internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
 
 internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval?): Boolean =
     approval?.canAutoApproveSafely == true
+
+internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
+    memoryClassMb >= 512 -> HarnessResourceBudget(maxModelRequests = 4, maxAgents = 4)
+    memoryClassMb >= 256 -> HarnessResourceBudget(maxModelRequests = 3, maxAgents = 3)
+    else -> HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2)
+}
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -248,6 +262,23 @@ class LocalHarnessEngine @Inject constructor(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    private val resourceBudget = localResourceBudgetForMemoryClass(
+        context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+    )
+    private val resourceScheduler = HarnessResourceScheduler(
+        budget = resourceBudget,
+        onChanged = { snapshot ->
+            _state.update {
+                it.copy(
+                    activeModelRequests = snapshot.activeModelRequests,
+                    activeAgents = snapshot.activeAgents,
+                    maxModelRequests = snapshot.budget.maxModelRequests,
+                    maxAgents = snapshot.budget.maxAgents,
+                    resourcePressure = snapshot.pressure.name.lowercase(),
+                )
+            }
+        },
+    )
     private val jobs = LocalJobManager(scope) { snapshot ->
         _state.update { it.copy(jobs = snapshot) }
     }
@@ -285,10 +316,12 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             onNativeImageRejected = { autoImageNativeRejected = true },
+            resourceScheduler = resourceScheduler,
         )
     }
 
     private val runStateLock = Any()
+    private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
@@ -298,6 +331,14 @@ class LocalHarnessEngine @Inject constructor(
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+        val initialResources = resourceScheduler.snapshot()
+        _state.update {
+            it.copy(
+                maxModelRequests = initialResources.budget.maxModelRequests,
+                maxAgents = initialResources.budget.maxAgents,
+                resourcePressure = initialResources.pressure.name.lowercase(),
+            )
+        }
         seedWorkspace()
         migrateLegacySession()
         // Legacy migration may have copied an event log after the field was first constructed.
