@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -32,7 +33,12 @@ data class LocalHarnessSession(
     val projectId: String? = null,
     val handoffSummary: String? = null,
     val messages: List<LocalHarnessMessage> = emptyList(),
-    val modelHistory: List<JsonObject> = emptyList(),
+    /**
+     * Legacy compatibility only. New snapshots leave this empty; model-visible history is restored
+     * from SessionEventLog checkpoints and semantic tail events.
+     */
+    @SerialName("modelHistory")
+    val legacyModelHistory: List<JsonObject> = emptyList(),
     val plan: List<String> = emptyList(),
     val todos: List<LocalTodoItem> = emptyList(),
     val goal: LocalGoal? = null,

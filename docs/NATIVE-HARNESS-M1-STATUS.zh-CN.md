@@ -22,8 +22,8 @@
 
 ## 当前边界
 
-- `SessionEventLog` 已承担事实日志职责，但 `modelHistory`、`LocalHarnessSession` 快照与 `LocalHarnessState` 仍同时保存部分权威状态；Session 还没有完全收敛为“事件唯一事实源 + 投影”。
-- `AgentLoop` 已拥有 turn / step 调度权，但真正发送给模型的主会话历史仍由 Android 层 `modelHistory` 组装；核心与适配层仍存在双状态来源。
+- `SessionEventLog` 已开始承担唯一事实源职责：Plan / Todo / Goal / 规划模式使用带 sequence 的快照游标增量回放，模型历史也不再写入新会话快照；当前主要剩余双状态是用户可见 transcript 与部分会话元数据。
+- `AgentLoop` 已拥有 turn / step 调度权；Android 层 `modelHistory` 仍负责组装当前请求，但已降级为可从 Session 事件检查点和语义尾部重建的运行时投影，不再作为会话 JSON 中的第二份持久权威状态。
 - 内置工具已经通过核心 `ToolRegistry` 注册，但 `LocalHarnessEngine` 仍承担较大的 Android 内置工具分派、上下文组装和会话桥接职责。
 - 可选工具启用集合目前仍属于 Engine 级运行状态，后续需要下沉为单次 Agent Run / 子代理独立作用域。
 - 工具执行失败在部分 Android 适配链路中仍主要以文本返回给模型；后续应保留结构化错误、错误码和可重试信息。
@@ -33,7 +33,7 @@
 
 ## M1 后续
 
-1. 将 Session Event 收敛为唯一事实源；快照只作为带 sequence 的加速检查点，启动后回放增量事件恢复模型、UI、Goal、Todo、Plan 等投影。
+1. 继续将用户可见 transcript 与会话元数据迁入 Session Event 投影；控制状态与模型历史已经完成第一批收口，快照仅保留物化加速和旧版本兼容职责。
 2. 引入统一 `AgentRunContext`，把会话、上下文快照、工具视图、权限范围、模型路由和取消状态交给核心循环；逐步取消 Android 层平行 `modelHistory` 权威状态。
 3. 将可选工具可见性、权限与审批作用域下沉到单个 Agent Run，彻底隔离父代理、并行子代理和工作流分支。
 4. 将工具执行结果升级为结构化结果，统一成功/失败、错误码、是否可重试、内容与审计元数据。
