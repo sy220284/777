@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.*
+import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -49,6 +50,7 @@ internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
     private val state: StateFlow<LocalHarnessState>,
+    private val workspaceRoot: File,
     private val jobs: LocalJobManager,
     private val historySnapshot: () -> List<JsonObject>,
     private val contextSnapshot: (String) -> String,
@@ -355,7 +357,18 @@ internal class LocalSubagentRunner(
             },
         )
         return executor.execute {
-            modelClient.complete(key, baseUrl, model, history, tools)
+            val snapshot = state.value
+            val nativeImages = snapshot.imageInputMode == LocalImageInputMode.MAIN_MODEL ||
+                (
+                    snapshot.imageInputMode == LocalImageInputMode.AUTO &&
+                        LocalModelMultimodalCapabilities.supportsImageInput(model)
+                    )
+            val providerHistory = materializeLocalImageMessages(
+                messages = history,
+                workspaceRoot = workspaceRoot,
+                nativeImageInput = nativeImages,
+            )
+            modelClient.complete(key, baseUrl, model, providerHistory, tools)
         }
     }
 
