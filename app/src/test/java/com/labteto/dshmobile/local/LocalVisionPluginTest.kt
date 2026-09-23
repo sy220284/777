@@ -52,7 +52,7 @@ class LocalVisionPluginTest {
     }
 
     @Test
-    fun virtualScreenAnalysisUsesRequestedDisplayWithoutSecondApproval() = runTest {
+    fun virtualScreenAnalysisUsesRequestedDisplayAfterFreshApproval() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()
         val registry = PluginRegistry()
@@ -64,6 +64,7 @@ class LocalVisionPluginTest {
                 put("id", "display-1")
                 put("prompt", "识别下一步")
             },
+            context = ToolContext(approval = { true }),
         )
 
         assertFalse(result.isError)
@@ -137,10 +138,26 @@ class LocalVisionPluginTest {
                 put("id", "display-1")
                 put("prompt", "分析")
             },
+            context = ToolContext(approval = { true }),
         )
 
         assertTrue(result.isError)
         assertTrue(device.calls.isEmpty())
+    }
+
+    @Test
+    fun virtualScreenCannotUploadWithoutApproval() = runTest {
+        val device = RecordingDevice()
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        registry.install(plugin(device, analyzer))
+        val denied = registry.context.tools.execute("vision_analyze_vscreen", buildJsonObject {
+            put("id", "display-1")
+            put("prompt", "分析")
+        })
+        assertTrue(denied.isError)
+        assertTrue(device.calls.isEmpty())
+        assertTrue(analyzer.calls.isEmpty())
     }
 
     private fun plugin(

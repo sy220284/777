@@ -69,6 +69,10 @@ class AppViewModel @Inject constructor(
         }
     }
 
+    suspend fun prepareNotificationNavigation() {
+        connectionManager.restoreDesiredConnectionIfNeeded()
+    }
+
     suspend fun openNotificationSession(id: String) {
         if (id.isNotBlank()) sessionStore.openSession(id)
     }

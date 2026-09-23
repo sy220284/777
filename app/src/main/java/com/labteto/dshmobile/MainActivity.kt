@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         requestedSession.value = savedInstanceState?.getString("pending_session")
-            ?: intent.getStringExtra(DshNotifications.EXTRA_SESSION_ID)
+            ?: notificationSession(intent)
         enableEdgeToEdge()
         notifications.ensureChannels()
         notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -65,15 +65,24 @@ class MainActivity : AppCompatActivity() {
                 onSessionRequestConsumed = {
                     requestedSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_SESSION_ID)
+                    intent.data = null
                 },
             )
         }
     }
 
+    private fun notificationSession(intent: Intent): String? {
+        val uri = intent.data
+        val fromUri = uri?.takeIf { it.scheme == "dshmobile" && it.host == "host" }
+            ?.pathSegments?.takeIf { it.size == 3 && it[0] == "current" && it[1] == "session" }?.get(2)
+        return (intent.getStringExtra(DshNotifications.EXTRA_SESSION_ID) ?: fromUri)
+            ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        requestedSession.value = intent.getStringExtra(DshNotifications.EXTRA_SESSION_ID)
+        requestedSession.value = notificationSession(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

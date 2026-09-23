@@ -35,9 +35,7 @@ fun interface LocalVisionAnalyzer {
 /**
  * Vision tools keep raw screenshots out of the text agent history.
  *
- * Main-screen capture always needs approval because pixels leave the device. Virtual-screen capture
- * can run without a second approval after the agent has already been allowed to create/control that
- * isolated display.
+ * Every capture needs fresh approval because pixels leave the device, including virtual displays.
  */
 class LocalVisionPlugin(
     private val device: HarnessDeviceProvider,
@@ -95,7 +93,7 @@ class LocalVisionPlugin(
                     required = setOf("id", "prompt"),
                 ),
                 access = ToolAccess.NETWORK,
-                approvalPolicy = ToolApprovalPolicy.NEVER,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
                     analyze(

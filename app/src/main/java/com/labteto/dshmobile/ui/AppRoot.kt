@@ -62,6 +62,9 @@ fun AppRoot(
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         val selectedRemoteMatches = surface == "remote" && connection.host != null
+        LaunchedEffect(requestedSessionId) {
+            if (!requestedSessionId.isNullOrBlank()) viewModel.prepareNotificationNavigation()
+        }
         LaunchedEffect(requestedSessionId, showMain) {
             val target = requestedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
             showSettings = false
