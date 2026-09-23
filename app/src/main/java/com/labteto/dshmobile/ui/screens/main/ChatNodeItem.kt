@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CallSplit
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Description
@@ -59,6 +58,9 @@ import com.labteto.dshmobile.core.session.WorkflowNode
 import com.labteto.dshmobile.ui.components.AttachmentImage
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DisclosureState
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -284,8 +286,53 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     // so `running` is still true for a frame. Without this the last thing the user sees after
     // tapping stop is the answer apparently still being written.
     val streaming = context.running && isLast && !node.interrupted
+    val isWorkProcess = node.isWorkProcess(context.nodes)
     val reasoningExpanded = remember(node.seq) { mutableStateMapOf<Int, Boolean>() }
+    var processExpanded by remember(node.seq) { mutableStateOf(false) }
     var actionsVisible by remember(node.seq) { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+
+    if (isWorkProcess) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            ThinkingRow(
+                summary = stringResource(R.string.chat_work_process),
+                expanded = processExpanded,
+                onToggle = { processExpanded = !processExpanded },
+                streaming = streaming,
+            )
+            AnimatedVisibility(visible = processExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    node.blocks.forEach { block ->
+                        when (block.kind) {
+                            "text", "reasoning" -> {
+                                if (!block.text.isNullOrBlank()) MarkdownText(block.text.orEmpty())
+                            }
+                            // Tool calls/results have their own compact cards in the transcript.
+                            "tool-call", "tool-result" -> Unit
+                            "image" -> parseImageRef(block)?.let { ref ->
+                                AttachmentImage(
+                                    attachmentId = ref.attachmentId,
+                                    intrinsicWidth = ref.width,
+                                    intrinsicHeight = ref.height,
+                                    contentDescription = ref.name,
+                                )
+                            }
+                            "file" -> parseFileRef(block)?.let { ref ->
+                                FileChip(name = ref.name, bytes = ref.bytes)
+                            }
+                            else -> block.text?.let {
+                                Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -329,6 +376,16 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
         if (node.interrupted) {
             DsPill(text = stringResource(R.string.chat_stopped), warn = true)
         }
+        if (!streaming && node.plainText.isNotBlank()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DsButton(
+                    text = stringResource(R.string.chat_copy_answer),
+                    onClick = { clipboard.setText(AnnotatedString(node.plainText)) },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
         AnimatedVisibility(
             visible = actionsVisible && !streaming,
             enter = fadeIn(DsAnimations.fade),
@@ -340,21 +397,16 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
 }
 
 /**
- * Per-message actions, revealed on tap rather than always shown — a transcript with a row of icons
- * under every message reads as clutter, and these are all occasional.
+ * Branching and feedback remain secondary tap actions. Copy is intentionally absent here: completed
+ * answers expose one persistent copy button, while work-process rows expose none.
  */
 @Composable
 private fun MessageActionsRow(node: AssistantMessageNode, context: ChatNodeContext) {
-    val colors = DsTheme.colors
-    val clipboard = LocalClipboardManager.current
     Row(
         modifier = Modifier.padding(top = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ActionIcon(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_message)) {
-            clipboard.setText(AnnotatedString(node.plainText))
-        }
         ActionIcon(Icons.AutoMirrored.Outlined.CallSplit, stringResource(R.string.chat_branch_message)) {
             context.onBranchFrom(node.seq)
         }
