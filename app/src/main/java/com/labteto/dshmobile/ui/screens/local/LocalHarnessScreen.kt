@@ -141,6 +141,7 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
+                usage = state.usage,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
