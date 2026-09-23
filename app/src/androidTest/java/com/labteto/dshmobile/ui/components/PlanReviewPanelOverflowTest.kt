@@ -152,4 +152,125 @@ class PlanReviewPanelOverflowTest {
         assertEquals(1, discussed)
     }
 
+
+    @Test
+    fun landscapeShortViewportKeepsPlanActionsReachable() {
+        var approved = 0
+        var declined = 0
+        var discussed = 0
+        val review = PlanReview(
+            id = "plan-landscape",
+            question = "Proceed with the full migration?",
+            plan = (1..80).joinToString("\n") { "Landscape plan line $it with enough text to scroll." },
+            approve = AskUserQuestionOption("Approve"),
+            decline = AskUserQuestionOption("Decline"),
+        )
+
+        compose.setContent {
+            DshTheme {
+                Box(Modifier.width(640.dp).height(180.dp)) {
+                    PlanReviewPanel(
+                        review = review,
+                        busy = false,
+                        onApprove = { approved++ },
+                        onDecline = { declined++ },
+                        onDiscuss = { discussed++ },
+                    )
+                }
+            }
+        }
+
+        val approve = context.getString(R.string.plan_review_approve)
+        val decline = context.getString(R.string.plan_review_decline)
+        val discuss = context.getString(R.string.plan_review_discuss)
+
+        compose.onNodeWithText(approve).assertIsDisplayed().performClick()
+        compose.onNodeWithText(decline).assertIsDisplayed().performClick()
+        compose.onNodeWithText(discuss).assertIsDisplayed().performClick()
+        compose.onNode(hasScrollAction()).assertExists()
+
+        assertEquals(1, approved)
+        assertEquals(1, declined)
+        assertEquals(1, discussed)
+    }
+
+    @Test
+    fun splitScreenNarrowViewportWithLargeFontKeepsPlanActionsReachable() {
+        var approved = 0
+        var declined = 0
+        var discussed = 0
+        val review = PlanReview(
+            id = "plan-split-screen",
+            question = "Proceed?",
+            plan = (1..60).joinToString("\n") { "Split-screen plan line $it" },
+            approve = AskUserQuestionOption("Approve"),
+            decline = AskUserQuestionOption("Decline"),
+        )
+
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 1.4f),
+            ) {
+                DshTheme {
+                    Box(Modifier.width(280.dp).height(320.dp)) {
+                        PlanReviewPanel(
+                            review = review,
+                            busy = false,
+                            onApprove = { approved++ },
+                            onDecline = { declined++ },
+                            onDiscuss = { discussed++ },
+                        )
+                    }
+                }
+            }
+        }
+
+        val approve = context.getString(R.string.plan_review_approve)
+        val decline = context.getString(R.string.plan_review_decline)
+        val discuss = context.getString(R.string.plan_review_discuss)
+
+        compose.onNodeWithText(approve).assertIsDisplayed().performClick()
+        compose.onNodeWithText(decline).assertIsDisplayed().performClick()
+        compose.onNodeWithText(discuss).assertIsDisplayed().performClick()
+        compose.onNode(hasScrollAction()).assertExists()
+
+        assertEquals(1, approved)
+        assertEquals(1, declined)
+        assertEquals(1, discussed)
+    }
+
+    @Test
+    fun imeCompressedViewportKeepsApprovalActionsReachable() {
+        var allowed = 0
+        var rejected = 0
+        val reason = (1..80).joinToString("\n") {
+            "Approval line $it after the on-screen keyboard reduced the usable height."
+        }
+
+        compose.setContent {
+            DshTheme {
+                // Models the remaining chat height after IME insets are consumed.
+                Box(Modifier.width(360.dp).height(170.dp)) {
+                    ApprovalPanel(
+                        toolName = "test_tool",
+                        reason = reason,
+                        onAllow = { allowed++ },
+                        onReject = { rejected++ },
+                    )
+                }
+            }
+        }
+
+        val allow = context.getString(R.string.approval_allow_once)
+        val reject = context.getString(R.string.approval_reject)
+
+        compose.onNodeWithText(allow).assertIsDisplayed().performClick()
+        compose.onNodeWithText(reject).assertIsDisplayed().performClick()
+        compose.onNode(hasScrollAction()).assertExists()
+
+        assertEquals(1, allowed)
+        assertEquals(1, rejected)
+    }
+
 }

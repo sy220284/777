@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -370,8 +371,8 @@ fun ChatScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         // The activity draws edge to edge, so every top-level surface has to consume the insets
         // itself or the chrome ends up underneath the status bar. safeDrawing covers the status
-        // bar, the gesture area and the keyboard in one modifier.
-        Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        // bar and gesture area; IME is separate in edge-to-edge mode, so consume it explicitly.
+        Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             ChatTopBar(
                 title = title,
                 running = conversation?.running == true,
