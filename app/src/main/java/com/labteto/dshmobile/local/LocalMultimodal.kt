@@ -104,6 +104,12 @@ internal fun buildLocalMultimodalUserMessage(
         if (files.isNotEmpty() && images.isEmpty() && prompt.isBlank()) append("请处理上述附件。")
     }
 
+    if (images.isEmpty()) {
+        return buildJsonObject {
+            put("role", "user")
+            put("content", text)
+        }
+    }
     val parts = buildJsonArray {
         add(buildJsonObject {
             put("type", "text")
@@ -135,6 +141,23 @@ internal fun materializeLocalImageMessages(
     if (content.none { part -> (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == LOCAL_IMAGE_TYPE }) {
         return@map message
     }
+
+    if (!nativeImageInput) {
+        val text = content.joinToString("\n") { part ->
+            val objectPart = part as? JsonObject ?: return@joinToString ""
+            when (objectPart["type"]?.jsonPrimitive?.contentOrNull) {
+                "text" -> objectPart["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                LOCAL_IMAGE_TYPE -> {
+                    val path = objectPart["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    val name = objectPart["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
+                    "[图片附件：" + name + "，路径 " + path + "]"
+                }
+                else -> ""
+            }
+        }.trim()
+        return@map JsonObject(message.toMutableMap().apply { put("content", JsonPrimitive(text)) })
+    }
+
     val materialized = buildJsonArray {
         content.forEach { part ->
             val objectPart = part as? JsonObject
@@ -145,13 +168,6 @@ internal fun materializeLocalImageMessages(
             val path = objectPart["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val name = objectPart["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
             val mediaType = objectPart["mediaType"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            if (!nativeImageInput) {
-                add(buildJsonObject {
-                    put("type", "text")
-                    put("text", "[图片附件：" + name + "，路径 " + path + "]")
-                })
-                return@forEach
-            }
             val file = resolveWorkspaceFile(workspaceRoot, path)
             require(file.length() in 1..MAX_NATIVE_IMAGE_BYTES) {
                 "图片 " + name + " 超过主模型图片输入上限"
