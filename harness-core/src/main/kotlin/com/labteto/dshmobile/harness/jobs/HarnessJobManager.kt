@@ -20,7 +20,15 @@ class HarnessJobManager(
     private val idFactory: () -> String = {
         "job-" + UUID.randomUUID().toString().replace("-", "").take(16)
     },
+    private val maxConcurrentJobs: Int = DEFAULT_MAX_CONCURRENT_JOBS,
+    private val maxRetainedJobs: Int = DEFAULT_MAX_RETAINED_JOBS,
 ) {
+    init {
+        require(maxConcurrentJobs in 1..32) { "后台任务并发上限必须在 1..32 之间" }
+        require(maxRetainedJobs in maxConcurrentJobs..512) {
+            "后台任务保留上限必须不少于并发上限，且不超过 512"
+        }
+    }
     private data class Record(
         val id: String,
         val label: String,
@@ -35,6 +43,11 @@ class HarnessJobManager(
 
     fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String {
         val record = synchronized(lock) {
+            pruneRetainedLocked()
+            val running = records.values.count { it.status == "running" }
+            if (running >= maxConcurrentJobs) {
+                return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
+            }
             var id: String
             do {
                 id = idFactory()
@@ -111,6 +124,9 @@ class HarnessJobManager(
                 return "目标不是正在运行的后台代理：$id"
             }
             record.inbox += clean.take(MAX_INBOX_MESSAGE)
+            while (record.inbox.size > MAX_INBOX_MESSAGES) {
+                record.inbox.removeAt(0)
+            }
         }
         return "消息已发送给后台代理：$id"
     }
@@ -140,6 +156,17 @@ class HarnessJobManager(
         }.mapNotNull { it.job }
     }
 
+    private fun pruneRetainedLocked() {
+        if (records.size < maxRetainedJobs) return
+        val removable = records.values
+            .filter { it.status != "running" }
+            .map { it.id }
+        for (id in removable) {
+            if (records.size < maxRetainedJobs) break
+            records.remove(id)
+        }
+    }
+
     private fun snapshotRecords(): List<JobInfo> = synchronized(lock) {
         records.values.map { JobInfo(it.id, it.label, it.status) }
     }
@@ -151,5 +178,8 @@ class HarnessJobManager(
         const val MAX_LABEL = 160
         const val MAX_OUTPUT = 65_536
         const val MAX_INBOX_MESSAGE = 4_000
+        const val MAX_INBOX_MESSAGES = 32
+        const val DEFAULT_MAX_CONCURRENT_JOBS = 4
+        const val DEFAULT_MAX_RETAINED_JOBS = 64
     }
 }
