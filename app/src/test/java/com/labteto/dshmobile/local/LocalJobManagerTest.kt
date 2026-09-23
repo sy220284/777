@@ -1,10 +1,14 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -61,4 +65,36 @@ class LocalJobManagerTest {
         assertTrue(manager.output(secondId).contains("second done"))
     }
 
+    @Test
+    fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
+        val root = createTempDir(prefix = "persistent-jobs-")
+        try {
+            val file = File(root, "jobs.json")
+            val store = LocalPersistentJobStore(
+                file = file,
+                json = Json { ignoreUnknownKeys = true },
+                scope = this,
+            )
+            store.writeAsync(
+                listOf(
+                    JobSnapshot(
+                        id = "job-restored",
+                        label = "网页抓取",
+                        status = "running",
+                        resumeKind = "web_fetch",
+                        resumePayload = "{\"url\":\"https://example.com\"}",
+                    ),
+                ),
+            )
+            advanceUntilIdle()
+            assertTrue(file.isFile)
+            assertEquals("running", store.read().single().status)
+
+            val restarted = LocalJobManager(this, store) { }
+            assertTrue(restarted.list().contains("job-restored [interrupted]"))
+            assertEquals("web_fetch", restarted.interruptedSnapshots().single().resumeKind)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
