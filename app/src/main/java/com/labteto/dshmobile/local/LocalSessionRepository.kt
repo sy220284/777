@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -103,7 +104,7 @@ internal class LocalSessionRepository(
                     title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
                     updatedAt = loaded.document.updatedAt,
                     blank = messages?.none { element ->
-                        val message = element as? JsonObject ?: return@none true
+                        val message = element as? JsonObject ?: return@none false
                         message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
                     } ?: true,
                 )
