@@ -1584,7 +1584,9 @@ class LocalHarnessEngine @Inject constructor(
                         summary = when (tool.name) {
                             "write", "edit", "apply_patch", "download_file" ->
                                 "${tool.name}：${call.arguments.optionalString("path").orEmpty()}"
-                            "bash" -> "执行命令：${call.arguments.optionalString("command").orEmpty().take(160)}"
+                            "bash", "pwsh", "shell", "run_shell", "process_exec",
+                            "terminal_open", "terminal_send", "terminal_write" ->
+                                "执行本机操作以完成当前任务"
                             "lsp_start" -> "启用代码智能分析"
                             else -> "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）"
                         },
