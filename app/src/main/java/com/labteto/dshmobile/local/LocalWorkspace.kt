@@ -21,6 +21,11 @@ class LocalWorkspace(
     private val extraSearchPaths: () -> List<File> = { emptyList() },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
     private val shellExecutable: String = "/system/bin/sh",
+    /**
+     * Sandbox boundary drawn at firmware. Defaults to workspace-only, matching the pre-existing
+     * behaviour; callers opt into shared-storage roots explicitly.
+     */
+    private val boundary: LocalSandboxBoundary = LocalSandboxBoundary.workspaceOnly(root),
 ) {
     private val canonicalRoot = root.canonicalFile
     private val observations = ConcurrentHashMap<String, String>()
@@ -52,7 +57,7 @@ class LocalWorkspace(
     /** Replace one UTF-8 file, creating its parent directories. */
     fun write(relativePath: String, content: String): String {
         require(content.toByteArray().size <= MAX_WRITE_BYTES) { "单次写入超过 ${MAX_WRITE_BYTES / 1024} KB" }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         atomicWrite(file, content)
         observations.remove(file.path)
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
@@ -64,14 +69,15 @@ class LocalWorkspace(
         require(bytes.size <= MAX_TOOL_ARTIFACT_BYTES) {
             "工具产物超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
         }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         atomicWrite(file, content)
+        // Artifacts always live under the workspace root, so this relativization stays well defined.
         return file.relativeTo(canonicalRoot).invariantSeparatorsPath
     }
 
-    /** Resolve a tool-owned output path without letting callers escape the workspace. */
+    /** Resolve a tool-owned output path without letting callers escape the sandbox. */
     fun toolOutputFile(relativePath: String): File {
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         file.parentFile?.mkdirs()
         return file
     }
@@ -105,7 +111,7 @@ class LocalWorkspace(
     /** Replace one unique literal after the caller has observed the file. */
     fun edit(relativePath: String, oldText: String, newText: String): String {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
         val observed = requireFreshObservation(relativePath)
@@ -222,7 +228,16 @@ class LocalWorkspace(
         )
     }
 
-    /** Execute Android's system shell in the workspace with a hard timeout. */
+    /**
+     * Execute Android's system shell with a hard timeout.
+     *
+     * Enforcement here is the kernel's, not this class's. `directory(canonicalRoot)` sets the
+     * working directory only — it is not an access restriction, and a command can `cd /` out of it.
+     * What actually keeps firmware and other apps' private data out of reach is the mount table
+     * (`/system` and friends are read-only) plus the untrusted-app SELinux domain. The command
+     * policy in LocalToolPolicy is a best-effort second line: it withholds the prompt for commands
+     * that name a firmware location, but static inspection of shell text is not a guarantee.
+     */
     suspend fun shell(
         command: String,
         timeoutSeconds: Int,
@@ -274,10 +289,14 @@ class LocalWorkspace(
 
     /** Validate a deliverable before the model presents it. */
     fun present(relativePath: String): String {
-        val file = resolve(relativePath)
+        val file = resolveForWrite(relativePath)
         require(file.isFile) { "成果文件不存在：$relativePath" }
         return "成果已确认：$relativePath（${file.length()} 字节）"
     }
+
+    /** Whether a write to [relativePath] may skip the approval prompt under the current boundary. */
+    fun canAutoApproveWrite(relativePath: String): Boolean =
+        runCatching { boundary.canAutoApprove(resolve(relativePath)) }.getOrDefault(false)
 
     private fun fingerprint(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -314,26 +333,38 @@ class LocalWorkspace(
         }
     }
 
+    /**
+     * Resolve a workspace-relative path, or an absolute path when it names a shared-storage root.
+     *
+     * Absolute paths let the model address user media directly (`/storage/emulated/0/Download/x`).
+     * This is the enforcement point for every file tool: the boundary is checked before any I/O, so
+     * a rejected path never reaches the filesystem. It does not constrain [shell], which runs as a
+     * child process and is bounded by the kernel instead.
+     */
     private fun resolve(relativePath: String): File {
         require(relativePath.isNotBlank()) { "路径不能为空" }
-        val candidate = File(canonicalRoot, relativePath).canonicalFile
-        require(candidate == canonicalRoot || candidate.path.startsWith(canonicalRoot.path + File.separator)) {
-            "拒绝访问工作区之外的路径"
+        val candidate = if (relativePath.startsWith(File.separator)) {
+            File(relativePath).canonicalFile
+        } else {
+            File(canonicalRoot, relativePath).canonicalFile
+        }
+        require(boundary.isAllowed(candidate)) {
+            "拒绝访问沙箱边界之外的路径：$relativePath"
         }
         return candidate
     }
 
+    /** Resolve a path for writing. Writes are allowed wherever reads are. */
+    private fun resolveForWrite(relativePath: String): File = resolve(relativePath)
+
     private fun safeWalk(directory: File): Sequence<File> =
         directory.walkTopDown()
             .onEnter { candidate ->
-                isInsideWorkspace(candidate) && !Files.isSymbolicLink(candidate.toPath())
+                boundary.isAllowed(candidate) && !Files.isSymbolicLink(candidate.toPath())
             }
             .asSequence()
 
-    private fun isInsideWorkspace(candidate: File): Boolean = runCatching {
-        val canonical = candidate.canonicalFile
-        canonical == canonicalRoot || canonical.path.startsWith(canonicalRoot.path + File.separator)
-    }.getOrDefault(false)
+    private fun isInsideWorkspace(candidate: File): Boolean = boundary.isAllowed(candidate)
 
     private fun globRegex(glob: String): Regex {
         val output = StringBuilder("^")
