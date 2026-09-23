@@ -192,7 +192,7 @@ internal fun ChatTranscript(
         }
         LazyColumn(
             state = listState,
-            modifier = modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             // Newest first, so the row the viewport anchors on is the one that grows.
             reverseLayout = true,
