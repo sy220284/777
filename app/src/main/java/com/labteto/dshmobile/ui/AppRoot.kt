@@ -65,15 +65,14 @@ fun AppRoot(
         LaunchedEffect(requestedSessionId) {
             if (!requestedSessionId.isNullOrBlank()) viewModel.prepareNotificationNavigation()
         }
-        LaunchedEffect(requestedSessionId, showMain) {
+        LaunchedEffect(requestedSessionId, connection.phase) {
             val target = requestedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
             showSettings = false
             utilitySurface = null
             showPair = false
             surface = "remote"
             relayClaimed = true
-            if (showMain) {
-                viewModel.openNotificationSession(target)
+            if (connection.phase == ConnectionPhase.CONNECTED && viewModel.openNotificationSession(target)) {
                 onSessionRequestConsumed()
             }
         }

@@ -67,6 +67,7 @@ class PersistentPipeTerminalProvider(
         session.managed.terminate()
         runCatching { session.input.close() }
         runCatching { session.output.close() }
+        Unit
     }
 
     fun isAlive(sessionId: String): Boolean = sessions[sessionId]?.managed?.process?.isAlive == true

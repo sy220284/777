@@ -73,8 +73,10 @@ class AppViewModel @Inject constructor(
         connectionManager.restoreDesiredConnectionIfNeeded()
     }
 
-    suspend fun openNotificationSession(id: String) {
-        if (id.isNotBlank()) sessionStore.openSession(id)
+    suspend fun openNotificationSession(id: String): Boolean {
+        if (id.isBlank()) return false
+        sessionStore.openSession(id)
+        return sessionStore.currentSessionId.value == id
     }
 
     fun clearUpdateInstallStatus() {
