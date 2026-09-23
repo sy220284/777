@@ -232,6 +232,13 @@ class LocalHarnessEngine @Inject constructor(
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
+    private data class ConversationFilesCacheEntry(
+        val eventStamp: Long,
+        val workspaceStamp: Long,
+        val value: LocalConversationFiles,
+    )
+    private val conversationFilesCacheLock = Any()
+    private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
     private val modelHistory = mutableListOf<JsonObject>()
     private val _state = MutableStateFlow(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
@@ -316,8 +323,42 @@ class LocalHarnessEngine @Inject constructor(
     suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
             val files = workspace.files()
-            localConversationFiles(eventLogFor(sessionId).snapshot(), files)
+            val log = eventLogFor(sessionId)
+            val eventStamp = log.storageStamp()
+            val workspaceStamp = workspaceFilesStamp(files)
+            synchronized(conversationFilesCacheLock) {
+                conversationFilesCache[sessionId]
+                    ?.takeIf { it.eventStamp == eventStamp && it.workspaceStamp == workspaceStamp }
+                    ?.value
+            }?.let { return@withContext it }
+
+            val projected = localConversationFiles(log.events(), files)
+            synchronized(conversationFilesCacheLock) {
+                conversationFilesCache[sessionId] = ConversationFilesCacheEntry(
+                    eventStamp = eventStamp,
+                    workspaceStamp = workspaceStamp,
+                    value = projected,
+                )
+                while (conversationFilesCache.size > MAX_CONVERSATION_FILES_CACHE) {
+                    val eldest = conversationFilesCache.entries.firstOrNull()?.key ?: break
+                    conversationFilesCache.remove(eldest)
+                }
+            }
+            projected
         }
+
+    private fun workspaceFilesStamp(files: List<LocalWorkspaceFile>): Long {
+        var stamp = 1_469_598_103_934_665_603L
+        files.forEach { file ->
+            stamp = stamp xor file.path.hashCode().toLong()
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor file.bytes
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor file.modifiedAt
+            stamp *= 1_099_511_628_211L
+        }
+        return stamp
+    }
 
     suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { workspace.preview(path) }
@@ -2017,6 +2058,7 @@ class LocalHarnessEngine @Inject constructor(
         const val HISTORY_TAIL_CHARS = 240_000
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
+        const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"

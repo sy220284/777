@@ -10,8 +10,8 @@ import kotlinx.serialization.json.JsonObject
 
 /** Android-facing adapter kept source-compatible while storage lives in the native core module. */
 class LocalSessionEventLog(
-    file: File,
-    json: Json,
+    private val file: File,
+    private val json: Json,
     maxBytes: Long = DEFAULT_MAX_BYTES,
 ) {
     @Serializable
@@ -37,6 +37,38 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
+    /**
+     * Stream durable events in sequence order without materializing the whole session in memory.
+     * UI projections such as conversation files only keep their compact projection state.
+     */
+    fun events(): Sequence<Event> = sequence {
+        for (source in orderedFiles()) {
+            source.bufferedReader().use { reader ->
+                while (true) {
+                    val line = reader.readLine() ?: break
+                    val event = runCatching {
+                        json.decodeFromString(Event.serializer(), line)
+                    }.getOrNull() ?: continue
+                    yield(event)
+                }
+            }
+        }
+    }
+
+    /** Cheap invalidation stamp for cached projections over this append-only log. */
+    fun storageStamp(): Long {
+        var stamp = 1_469_598_103_934_665_603L
+        for (source in orderedFiles()) {
+            stamp = stamp xor source.name.hashCode().toLong()
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor source.length()
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor source.lastModified()
+            stamp *= 1_099_511_628_211L
+        }
+        return stamp
+    }
+
     fun repairInterruptedTail(): SessionRepairResult =
         SessionRecovery.repairInterruptedTail(delegate)
 
@@ -57,6 +89,15 @@ class LocalSessionEventLog(
         createdAt = createdAt,
         data = data,
     )
+
+    private fun orderedFiles(): List<File> {
+        val parent = file.parentFile ?: return listOfNotNull(file.takeIf(File::isFile))
+        val prefix = "${file.name}.part-"
+        val segments = parent.listFiles().orEmpty()
+            .filter { it.isFile && it.name.startsWith(prefix) }
+            .sortedBy { it.name.removePrefix(prefix).toIntOrNull() ?: Int.MAX_VALUE }
+        return segments + listOfNotNull(file.takeIf(File::isFile))
+    }
 
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L

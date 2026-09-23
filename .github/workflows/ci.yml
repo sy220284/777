@@ -43,6 +43,8 @@ jobs:
         run: ./gradlew :app:lintDebug --stacktrace
       - name: Guard hard-coded UI text
         run: python3 .github/scripts/check-ui-hardcoded-cjk.py
+      - name: Guard Kotlin risk patterns
+        run: python3 .github/scripts/check-kotlin-risk-patterns.py
       - name: Assemble optimized APK
         run: ./gradlew :app:assembleOptimized --stacktrace
       - name: Verify Android 16 APK

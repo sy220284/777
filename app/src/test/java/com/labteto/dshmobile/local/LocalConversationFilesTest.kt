@@ -45,7 +45,7 @@ class LocalConversationFilesTest {
             ),
         )
 
-        val index = localConversationFiles(events, files)
+        val index = localConversationFiles(events.asSequence(), files)
 
         assertEquals(listOf("out/report.md"), index.artifacts.map { it.path })
         assertEquals(

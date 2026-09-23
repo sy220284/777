@@ -93,6 +93,14 @@ class ConnectionManager @Inject constructor(
     private var activeHost: HostConfig? = null
 
     /**
+     * A terminal relay failure (revoked/expired credential or changed pin) must not be revived by
+     * keep-alive, event-buffer recovery or notification navigation. A fresh explicit pairing
+     * clears this fence.
+     */
+    @Volatile
+    private var retryBlockedHostId: String? = null
+
+    /**
      * The current generation, or null while disconnected.
      *
      * Screens need it for two things the unary client cannot give them: the mux, to open a
@@ -132,6 +140,7 @@ class ConnectionManager @Inject constructor(
                 eventBuffer.connected()
                 this@ConnectionManager.generation = generation
                 val host = activeHost
+                if (host != null && retryBlockedHostId == host.id) retryBlockedHostId = null
                 if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }
                 _state.value = ConnectionUiState(
                     phase = ConnectionPhase.CONNECTED,
@@ -206,7 +215,10 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
-        connectMutex.withLock { connectLocked(config) }
+        connectMutex.withLock {
+            retryBlockedHostId = null
+            connectLocked(config)
+        }
     }
 
     private suspend fun connectLocked(config: HostConfig) {
@@ -257,6 +269,7 @@ class ConnectionManager @Inject constructor(
     fun disconnect() {
         val intentVersion = desiredIntentVersion.incrementAndGet()
         reconnectRequestVersion.incrementAndGet()
+        retryBlockedHostId = null
         disconnectRuntime()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
@@ -279,16 +292,21 @@ class ConnectionManager @Inject constructor(
     }
 
     suspend fun restoreDesiredConnectionIfNeeded() {
-        if (activeHost != null) {
+        activeHost?.let { host ->
+            if (retryBlockedHostId == host.id) return
             if (_state.value.phase != ConnectionPhase.CONNECTED) reconnectIfNeeded()
             return
         }
         val desired = hostsStore.desiredHostOnce() ?: return
-        connect(desired)
+        if (retryBlockedHostId == desired.id) return
+        connectMutex.withLock {
+            if (retryBlockedHostId != desired.id) connectLocked(desired)
+        }
     }
 
     fun reconnectIfNeeded() {
         val host = activeHost ?: return
+        if (retryBlockedHostId == host.id) return
         val intentVersion = desiredIntentVersion.get()
         val requestVersion = reconnectRequestVersion.incrementAndGet()
         scope.launch {
@@ -400,6 +418,8 @@ class ConnectionManager @Inject constructor(
                 null
             } else {
                 accepted = true
+                activeHost?.id?.let { retryBlockedHostId = it }
+                reconnectRequestVersion.incrementAndGet()
                 transportEpoch.incrementAndGet()
                 val previous = loop
                 loop = null

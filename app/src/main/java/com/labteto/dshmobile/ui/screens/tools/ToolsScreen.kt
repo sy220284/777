@@ -48,6 +48,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,15 +84,16 @@ class ToolsViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = null)
-            runCatching {
-                engine.mcpServersForUi() to engine.installedPluginIdsForUi()
-            }.onSuccess { (servers, plugins) ->
+            try {
+                val (servers, plugins) = engine.mcpServersForUi() to engine.installedPluginIdsForUi()
                 _state.value = ToolsUiState(
                     loading = false,
                     servers = servers,
                     localPlugins = plugins,
                 )
-            }.onFailure {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
                     notice = ToolsNotice.LOAD_FAILED,
@@ -102,38 +104,40 @@ class ToolsViewModel @Inject constructor(
 
     fun connectHttp(serverId: String, endpoint: String) {
         viewModelScope.launch {
-_state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
-            runCatching { engine.connectMcpHttpForUi(serverId, endpoint) }
-                .onSuccess {
-                    _state.value = ToolsUiState(
-                        loading = false,
-                        servers = engine.mcpServersForUi(),
-                        localPlugins = engine.installedPluginIdsForUi(),
-                        notice = ToolsNotice.CONNECTED,
-                    )
-                }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(
-                        loading = false,
-                        notice = ToolsNotice.CONNECT_FAILED,
-                    )
-                }
+            _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
+            try {
+                engine.connectMcpHttpForUi(serverId, endpoint)
+                _state.value = ToolsUiState(
+                    loading = false,
+                    servers = engine.mcpServersForUi(),
+                    localPlugins = engine.installedPluginIdsForUi(),
+                    notice = ToolsNotice.CONNECTED,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    notice = ToolsNotice.CONNECT_FAILED,
+                )
+            }
         }
     }
 
     fun disconnect(serverId: String) {
         viewModelScope.launch {
-            runCatching { engine.disconnectMcpForUi(serverId) }
-                .onSuccess {
-                    _state.value = ToolsUiState(
-                        servers = engine.mcpServersForUi(),
-                        localPlugins = engine.installedPluginIdsForUi(),
-                        notice = ToolsNotice.DISCONNECTED,
-                    )
-                }
-                .onFailure {
-                    _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
-                }
+            try {
+                engine.disconnectMcpForUi(serverId)
+                _state.value = ToolsUiState(
+                    servers = engine.mcpServersForUi(),
+                    localPlugins = engine.installedPluginIdsForUi(),
+                    notice = ToolsNotice.DISCONNECTED,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
+            }
         }
     }
 }
