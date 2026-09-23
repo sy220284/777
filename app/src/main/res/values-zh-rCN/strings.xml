@@ -643,6 +643,11 @@
     <string name="advanced_memory_saved">记忆设置已保存</string>
     <string name="advanced_memory_settings">记忆设置</string>
     <string name="advanced_memory_updated">记忆已更新</string>
+    <string name="advanced_image_input_mode">图片输入</string>
+    <string name="advanced_image_input_hint">自动：优先让支持多模态的主模型直接看图，服务明确拒绝图片时退回视觉工具；也可强制指定路径。</string>
+    <string name="advanced_image_mode_auto">自动</string>
+    <string name="advanced_image_mode_native">主模型直读</string>
+    <string name="advanced_image_mode_tool">视觉工具</string>
     <string name="advanced_model_attempts">模型失败重试次数</string>
     <string name="advanced_model_configured">本机模型密钥已配置。留空密钥可只修改模型和接口地址。</string>
     <string name="advanced_model_key">模型密钥</string>
