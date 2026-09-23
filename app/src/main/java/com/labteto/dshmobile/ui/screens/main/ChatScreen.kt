@@ -12,9 +12,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -435,16 +438,23 @@ fun ChatScreen(
                 }
             }
 
-            conversation?.let { conv ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    parseTodos(conv.projections["todos"])?.let { TodoDock(it) }
-                    parseGoal(conv.projections["goal"])?.let { GoalBar(it, store) }
-                    QueueDock(conv.queue, store)
+            val hasBlockingInteraction =
+                pendingApproval?.sessionId == currentSessionId ||
+                    pendingQuestions?.sessionId == currentSessionId
+            if (!hasBlockingInteraction) {
+                conversation?.let { conv ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 160.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        parseTodos(conv.projections["todos"])?.let { TodoDock(it) }
+                        parseGoal(conv.projections["goal"])?.let { GoalBar(it, store) }
+                        QueueDock(conv.queue, store)
+                    }
                 }
             }
 
