@@ -64,7 +64,13 @@ class AppViewModel @Inject constructor(
                 return@launch
             }
 
-            _updateInstallStatus.value = "发现新版本 ${update.version}，正在下载并校验…"
+            _updateInstallStatus.value = if (update.patchChain.isNotEmpty()) {
+                val patchBytes = update.patchChain.sumOf { it.size }
+                val mib = patchBytes.toDouble() / (1024.0 * 1024.0)
+                "发现新版本 ${update.version}，正在下载增量包（约 %.1f MiB）并校验…".format(mib)
+            } else {
+                "发现新版本 ${update.version}，正在下载完整 APK 并校验…"
+            }
             _updateInstallStatus.value = try {
                 updateInstaller.downloadVerifyAndLaunch(update).message
             } catch (cancelled: CancellationException) {

@@ -107,4 +107,46 @@ class UpdateVersionTest {
         assertNull(parseGithubSha256("md5:deadbeef"))
         assertNull(parseGithubSha256("sha256:too-short"))
     }
+
+    @Test
+    fun `patch chain must stay below sixty five percent of full apk`() {
+        val small = patch(size = 64)
+        val boundary = patch(size = 65)
+        assertTrue(shouldUsePatchChain(apkSize = 100, patches = listOf(small)))
+        assertFalse(shouldUsePatchChain(apkSize = 100, patches = listOf(boundary)))
+    }
+
+    @Test
+    fun `multiple patch sizes are evaluated as one download`() {
+        assertTrue(
+            shouldUsePatchChain(
+                apkSize = 1_000,
+                patches = listOf(patch(200), patch(300)),
+            ),
+        )
+        assertFalse(
+            shouldUsePatchChain(
+                apkSize = 1_000,
+                patches = listOf(patch(400), patch(300)),
+            ),
+        )
+    }
+
+    @Test
+    fun `missing apk size or empty chain falls back to full apk`() {
+        assertFalse(shouldUsePatchChain(apkSize = null, patches = listOf(patch(1))))
+        assertFalse(shouldUsePatchChain(apkSize = 100, patches = emptyList()))
+    }
+
+    private fun patch(size: Long) = DeltaPatch(
+        fromVersion = "0.12.0-777.1",
+        toVersion = "0.12.0-777.2",
+        algorithm = "hdiffpatch-window-zstd-v1",
+        url = "https://example.invalid/delta.hpatch",
+        name = "delta.hpatch",
+        size = size,
+        expectedSha256 = "a".repeat(64),
+        sourceSha256 = "b".repeat(64),
+        targetSha256 = "c".repeat(64),
+    )
 }

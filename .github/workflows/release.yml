@@ -303,11 +303,136 @@ jobs:
           APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
           .github/scripts/verify-android16-apk.sh "$APK"
 
-      - name: Checksums
+      - name: Prepare incremental update assets
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cd app/build/outputs/apk/release
-          sha256sum *.apk > SHA256SUMS.txt
-          ls -la
+          set -euo pipefail
+
+          RELEASE_DIR="app/build/outputs/apk/release"
+          NEW_APK="$(find "$RELEASE_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$NEW_APK"
+
+          ASSET_DIR="$GITHUB_WORKSPACE/.release-assets"
+          rm -rf "$ASSET_DIR"
+          mkdir -p "$ASSET_DIR"
+
+          APK_NAME="$(basename "$NEW_APK")"
+          cp "$NEW_APK" "$ASSET_DIR/$APK_NAME"
+          NEW_APK="$ASSET_DIR/$APK_NAME"
+          NEW_SIZE="$(stat -c '%s' "$NEW_APK")"
+          NEW_SHA="$(sha256sum "$NEW_APK" | awk '{print $1}')"
+          PATCH_JSON="$RUNNER_TEMP/update-patches.json"
+          printf '[]\n' > "$PATCH_JSON"
+
+          PREVIOUS_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name // empty' 2>/dev/null || true)"
+          CURRENT_TAG="${{ steps.version.outputs.tag }}"
+
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+            PREVIOUS_DIR="$RUNNER_TEMP/previous-release"
+            rm -rf "$PREVIOUS_DIR"
+            mkdir -p "$PREVIOUS_DIR"
+
+            if gh release download "$PREVIOUS_TAG" --pattern '*.apk' --dir "$PREVIOUS_DIR"; then
+              OLD_APK="$(find "$PREVIOUS_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)"
+              if [ -n "$OLD_APK" ]; then
+                HDIFF_VERSION="5.1.3"
+                HDIFF_ARCHIVE="hdiffpatch_v${HDIFF_VERSION}_bin_linux64.zip"
+                HDIFF_URL="https://github.com/sisong/HDiffPatch/releases/download/v${HDIFF_VERSION}/${HDIFF_ARCHIVE}"
+                HDIFF_SHA256="628963bf2ee9108a97260fa5eef44acd9ec94369b76090a957c9182b3abbb558"
+                HDIFF_DIR="$RUNNER_TEMP/hdiffpatch"
+                HDIFF_ZIP="$RUNNER_TEMP/$HDIFF_ARCHIVE"
+                rm -rf "$HDIFF_DIR" "$HDIFF_ZIP"
+                mkdir -p "$HDIFF_DIR"
+
+                if curl --fail --location --retry 3 --retry-delay 2 "$HDIFF_URL" --output "$HDIFF_ZIP" &&
+                   printf '%s  %s\n' "$HDIFF_SHA256" "$HDIFF_ZIP" | sha256sum -c - &&
+                   unzip -q "$HDIFF_ZIP" -d "$HDIFF_DIR"; then
+                  HDIFFZ="$(find "$HDIFF_DIR" -type f -name hdiffz -print -quit)"
+                  HPATCHZ="$(find "$HDIFF_DIR" -type f -name hpatchz -print -quit)"
+                  if [ -n "$HDIFFZ" ] && [ -n "$HPATCHZ" ]; then
+                    chmod +x "$HDIFFZ" "$HPATCHZ"
+                    FROM_VERSION="${PREVIOUS_TAG#v}"
+                    TO_VERSION="$DSH_VERSION_NAME"
+                    SAFE_FROM="$(printf '%s' "$FROM_VERSION" | tr -c 'A-Za-z0-9._-' '_')"
+                    SAFE_TO="$(printf '%s' "$TO_VERSION" | tr -c 'A-Za-z0-9._-' '_')"
+                    PATCH_NAME="delta-${SAFE_FROM}-to-${SAFE_TO}.hpatch"
+                    PATCH_PATH="$ASSET_DIR/$PATCH_NAME"
+                    REBUILT_APK="$RUNNER_TEMP/rebuilt-from-delta.apk"
+                    rm -f "$PATCH_PATH" "$REBUILT_APK"
+
+                    if "$HDIFFZ" -s-64 -WD -w-2m -f -p-4 -c-zstd-19-24 -C-xxh128 \
+                         "$OLD_APK" "$NEW_APK" "$PATCH_PATH" &&
+                       "$HPATCHZ" -f "$OLD_APK" "$PATCH_PATH" "$REBUILT_APK"; then
+                      REBUILT_SHA="$(sha256sum "$REBUILT_APK" | awk '{print $1}')"
+                      PATCH_SIZE="$(stat -c '%s' "$PATCH_PATH")"
+                      if [ "$REBUILT_SHA" = "$NEW_SHA" ] &&
+                         [ "$((PATCH_SIZE * 100))" -lt "$((NEW_SIZE * 65))" ]; then
+                        OLD_SHA="$(sha256sum "$OLD_APK" | awk '{print $1}')"
+                        PATCH_SHA="$(sha256sum "$PATCH_PATH" | awk '{print $1}')"
+                        jq -n \
+                          --arg from "$FROM_VERSION" \
+                          --arg to "$TO_VERSION" \
+                          --arg asset "$PATCH_NAME" \
+                          --arg sha256 "$PATCH_SHA" \
+                          --arg sourceSha256 "$OLD_SHA" \
+                          --arg targetSha256 "$NEW_SHA" \
+                          --argjson size "$PATCH_SIZE" \
+                          '[{
+                            fromVersion: $from,
+                            toVersion: $to,
+                            algorithm: "hdiffpatch-window-zstd-v1",
+                            asset: $asset,
+                            size: $size,
+                            sha256: $sha256,
+                            sourceSha256: $sourceSha256,
+                            targetSha256: $targetSha256
+                          }]' > "$PATCH_JSON"
+                        echo "::notice::已生成增量包：$PATCH_NAME ($PATCH_SIZE / $NEW_SIZE bytes)"
+                      else
+                        echo "::notice::增量包校验失败或达到完整 APK 的 65%，本版仅发布完整包。"
+                        rm -f "$PATCH_PATH"
+                      fi
+                    else
+                      echo "::warning::HDiffPatch 生成或回放失败，本版继续发布完整 APK。"
+                      rm -f "$PATCH_PATH" "$REBUILT_APK"
+                    fi
+                  fi
+                else
+                  echo "::warning::HDiffPatch 工具下载或校验失败，本版继续发布完整 APK。"
+                fi
+              fi
+            else
+              echo "::notice::无法下载上一正式版 APK，本版仅发布完整包。"
+            fi
+          fi
+
+          MANIFEST_PATH="$ASSET_DIR/update-manifest.json"
+          jq -n \
+            --arg targetVersion "$DSH_VERSION_NAME" \
+            --arg apkName "$APK_NAME" \
+            --arg apkSha256 "$NEW_SHA" \
+            --argjson apkSize "$NEW_SIZE" \
+            --slurpfile patches "$PATCH_JSON" \
+            '{
+              schema: 1,
+              targetVersion: $targetVersion,
+              targetApk: {
+                name: $apkName,
+                size: $apkSize,
+                sha256: $apkSha256
+              },
+              patches: $patches[0]
+            }' > "$MANIFEST_PATH"
+
+          (
+            cd "$ASSET_DIR"
+            rm -f SHA256SUMS.txt
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\n' |
+              sort |
+              while IFS= read -r file; do sha256sum "$file"; done > SHA256SUMS.txt
+            ls -lh
+          )
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -316,6 +441,5 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ steps.version.outputs.tag }}
           files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/release/SHA256SUMS.txt
+            .release-assets/*
           generate_release_notes: true
