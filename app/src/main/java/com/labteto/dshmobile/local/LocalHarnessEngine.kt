@@ -323,8 +323,8 @@ class LocalHarnessEngine @Inject constructor(
     suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
             val files = workspace.files()
-            val log = eventLogFor(sessionId)
-            val eventStamp = log.storageStamp()
+            val log = if (sessionId == currentSessionId) eventLog else eventLogFor(sessionId)
+            val eventStamp = log.latestSequence()
             val workspaceStamp = workspaceFilesStamp(files)
             synchronized(conversationFilesCacheLock) {
                 conversationFilesCache[sessionId]
