@@ -102,7 +102,7 @@ class HarnessResourceScheduler(
     val budget: HarnessResourceBudget,
     private val onChanged: (HarnessResourceSnapshot) -> Unit = { },
 ) {
-    private val semaphores = HarnessResourceKind.entries.associateWith { kind ->
+    private val semaphores = HarnessResourceKind.values().associateWith { kind ->
         Semaphore(budget.limit(kind))
     }
     private val activeModels = AtomicInteger()
