@@ -26,6 +26,11 @@ data class AgentModelReply(
     val toolCalls: List<AgentToolCall> = emptyList(),
 )
 
+data class AgentToolResult(
+    val content: String,
+    val isError: Boolean = false,
+)
+
 enum class AgentStopReason {
     COMPLETED,
     STEP_LIMIT,
@@ -70,6 +75,7 @@ sealed interface AgentEvent {
         val step: Int,
         val call: AgentToolCall,
         val output: String,
+        val isError: Boolean = false,
     ) : AgentEvent
 
     data class StepFinished(
@@ -103,11 +109,11 @@ fun interface AgentModel {
 }
 
 fun interface AgentToolExecutor {
-    suspend fun execute(call: AgentToolCall): String
+    suspend fun execute(call: AgentToolCall): AgentToolResult
 }
 
 fun interface AgentToolBatchExecutor {
-    suspend fun execute(calls: List<AgentToolCall>): List<String>
+    suspend fun execute(calls: List<AgentToolCall>): List<AgentToolResult>
 }
 
 fun interface AgentEventSink {
@@ -186,11 +192,19 @@ class AgentLoop(
                     val first = reply.toolCalls[callIndex]
                     if (!isParallelTool(first)) {
                         eventSink.append(AgentEvent.ToolStarted(turnId, step, first))
-                        val output = tools.execute(first)
-                        eventSink.append(AgentEvent.ToolFinished(turnId, step, first, output))
+                        val result = tools.execute(first)
+                        eventSink.append(
+                            AgentEvent.ToolFinished(
+                                turnId = turnId,
+                                step = step,
+                                call = first,
+                                output = result.content,
+                                isError = result.isError,
+                            ),
+                        )
                         messages += AgentMessage(
                             role = "tool",
-                            content = output,
+                            content = result.content,
                             toolCallId = first.id,
                             toolName = first.name,
                         )
@@ -204,15 +218,23 @@ class AgentLoop(
                     group.forEach { call ->
                         eventSink.append(AgentEvent.ToolStarted(turnId, step, call))
                     }
-                    val outputs = toolBatch.execute(group)
-                    require(outputs.size == group.size) {
-                        "工具批次结果数量不匹配：调用 ${group.size}，结果 ${outputs.size}"
+                    val results = toolBatch.execute(group)
+                    require(results.size == group.size) {
+                        "工具批次结果数量不匹配：调用 ${group.size}，结果 ${results.size}"
                     }
-                    group.zip(outputs).forEach { (call, output) ->
-                        eventSink.append(AgentEvent.ToolFinished(turnId, step, call, output))
+                    group.zip(results).forEach { (call, result) ->
+                        eventSink.append(
+                            AgentEvent.ToolFinished(
+                                turnId = turnId,
+                                step = step,
+                                call = call,
+                                output = result.content,
+                                isError = result.isError,
+                            ),
+                        )
                         messages += AgentMessage(
                             role = "tool",
-                            content = output,
+                            content = result.content,
                             toolCallId = call.id,
                             toolName = call.name,
                         )
