@@ -86,12 +86,18 @@ private fun applyModelHistoryEvent(
             true
         }
         "user/message" -> {
-            val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return false
-            history += buildJsonObject {
-                put("role", "user")
-                put("content", content)
+            val durable = event.data["model_message"] as? JsonObject
+            if (durable?.get("role")?.jsonPrimitive?.contentOrNull == "user") {
+                history += durable
+                true
+            } else {
+                val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return false
+                history += buildJsonObject {
+                    put("role", "user")
+                    put("content", content)
+                }
+                true
             }
-            true
         }
         "assistant/message" -> {
             val message = assistantModelMessageFromEvent(event.data)
