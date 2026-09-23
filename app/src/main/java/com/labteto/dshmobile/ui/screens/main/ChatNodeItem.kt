@@ -517,7 +517,7 @@ private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
             icon = row.variant.featherIcon(),
             state = state,
             expanded = false,
-            onToggle = {},
+            onToggle = null,
         )
         return
     }
@@ -582,7 +582,7 @@ private fun CommandRow(node: CommandNode) {
         icon = FeatherIcons.Terminal,
         state = if (running) DisclosureState.Running else DisclosureState.Idle,
         expanded = false,
-        onToggle = {},
+        onToggle = null,
     )
 }
 
