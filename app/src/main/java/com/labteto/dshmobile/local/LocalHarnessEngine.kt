@@ -570,6 +570,7 @@ class LocalHarnessEngine @Inject constructor(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
+        val mediaType = resolver.getType(uri) ?: "application/octet-stream"
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -596,9 +597,15 @@ class LocalHarnessEngine @Inject constructor(
             throw error
         }
         val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = safeName.substringAfterLast('.', "")
-            .lowercase()
-            .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
+        val extension = when (mediaType.lowercase()) {
+            "image/png" -> "png"
+            "image/jpeg" -> "jpg"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            else -> safeName.substringAfterLast('.', "")
+                .lowercase()
+                .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
+        }
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
         if (target.exists()) {
             incoming.delete()
@@ -609,7 +616,7 @@ class LocalHarnessEngine @Inject constructor(
         LocalImportedAttachment(
             name = displayName ?: safeName,
             relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
-            mediaType = resolver.getType(uri) ?: "application/octet-stream",
+            mediaType = mediaType,
             bytes = target.length(),
             attachmentId = attachmentId,
         )
