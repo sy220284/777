@@ -445,11 +445,19 @@ class LocalHarnessEngine @Inject constructor(
             val images = attachments.filter { it.mediaType.startsWith("image/") }
             if (images.isNotEmpty()) _state.update { it.copy(preparingImages = true, error = null) }
             try {
-                val visionSnapshot = visionSettings.snapshot()
+                val current = _state.value
+                val mainSupportsImages = LocalModelMultimodalCapabilities.supportsImageInput(current.model)
+                val needsVisionStatus = current.imageInputMode == LocalImageInputMode.VISION_MODEL ||
+                    (current.imageInputMode == LocalImageInputMode.AUTO && !mainSupportsImages)
+                val visionConfigured = if (needsVisionStatus) {
+                    visionSettings.snapshot().configured
+                } else {
+                    false
+                }
                 val route = LocalModelMultimodalCapabilities.route(
-                    mode = _state.value.imageInputMode,
-                    model = _state.value.model,
-                    visionConfigured = visionSnapshot.configured,
+                    mode = current.imageInputMode,
+                    model = current.model,
+                    visionConfigured = visionConfigured,
                 )
                 if (images.isNotEmpty() && route == LocalImageRoute.REFERENCE_ONLY) {
                     val requestedVision = _state.value.imageInputMode == LocalImageInputMode.VISION_MODEL
@@ -476,7 +484,7 @@ class LocalHarnessEngine @Inject constructor(
                             route = visionRoute,
                             prompt = request,
                             imageDataUrl = localImageDataUrl(File(workspace.path), attachment),
-                        )
+                        ).take(MAX_VISION_FALLBACK_CHARS)
                     }
                 } else {
                     emptyMap()
@@ -2245,6 +2253,7 @@ class LocalHarnessEngine @Inject constructor(
         const val TOOL_RESULT_TAIL_CHARS = 4_000
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
+        const val MAX_VISION_FALLBACK_CHARS = 12_000
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
