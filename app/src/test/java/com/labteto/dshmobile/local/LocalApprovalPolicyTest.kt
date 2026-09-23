@@ -50,6 +50,8 @@ class LocalApprovalPolicyTest {
     @Test
     fun impactLevelsFollowExternalEffect() {
         assertTrue(approvalImpact(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.LOW)
+        assertTrue(approvalImpact(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.LOW)
+        assertTrue(approvalImpact(tool("plugin_external_write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.MEDIUM)
         assertTrue(approvalImpact(tool("memory_update", ToolAccess.SESSION_WRITE, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.MEDIUM)
         assertTrue(approvalImpact(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.HIGH)
         assertTrue(approvalImpact(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.CRITICAL)
