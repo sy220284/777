@@ -310,15 +310,15 @@ class UpdateChecker @Inject constructor(
 
     private companion object {
         const val REPO = "sy220284/777"
+        const val MAX_RELEASES_TO_SCAN = 12
+        const val MAX_PATCH_CHAIN_LENGTH = 6
+        const val MAX_MANIFEST_BYTES = 256L * 1024L
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
         const val RECENT_RELEASES_API =
             "https://api.github.com/repos/$REPO/releases?per_page=$MAX_RELEASES_TO_SCAN"
         const val UPDATE_MANIFEST_NAME = "update-manifest.json"
         const val UPDATE_MANIFEST_SCHEMA = 1
         const val SUPPORTED_PATCH_ALGORITHM = "hdiffpatch-window-zstd-v1"
-        const val MAX_RELEASES_TO_SCAN = 12
-        const val MAX_PATCH_CHAIN_LENGTH = 6
-        const val MAX_MANIFEST_BYTES = 256L * 1024L
 
         val ListSerializer = kotlinx.serialization.builtins.ListSerializer(GithubRelease.serializer())
     }
