@@ -76,6 +76,7 @@ class ConnectionManager @Inject constructor(
     private val desiredIntentVersion = AtomicLong(0L)
     private val reconnectRequestVersion = AtomicLong(0L)
     private val transportEpoch = AtomicLong(0L)
+    private val transportLock = Any()
     private val reconnectMutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionUiState())
@@ -176,6 +177,11 @@ class ConnectionManager @Inject constructor(
         }
     }
 
+    private data class RetiredTransport(
+        val epoch: Long,
+        val loop: ConnectionLoop?,
+    )
+
     val connectedApi: DshApiClient? get() = api
 
     /**
@@ -199,17 +205,35 @@ class ConnectionManager @Inject constructor(
             _state.value = ConnectionUiState(host = config, failure = ConnectFailure.PairingRequired)
             return
         }
-        activeHost = config
+        val baseEpoch = synchronized(transportLock) {
+            if (desiredIntentVersion.get() != intentVersion) return
+            activeHost = config
+            transportEpoch.get()
+        }
         _state.value = ConnectionUiState(
             phase = ConnectionPhase.CONNECTING,
             host = config,
             stage = ConnectStage.OpeningStreams,
         )
-        api = clientFactory.clientFor(config)
-        val epoch = transportEpoch.incrementAndGet()
-        val loop = ConnectionLoop(muxFactory(config), sinks(epoch), LoopConfig())
-        this.loop = loop
-        loop.start()
+
+        val nextApi = clientFactory.clientFor(config)
+        val installed = synchronized(transportLock) {
+            if (desiredIntentVersion.get() != intentVersion ||
+                activeHost?.id != config.id ||
+                transportEpoch.get() != baseEpoch
+            ) {
+                false
+            } else {
+                val epoch = transportEpoch.incrementAndGet()
+                val nextLoop = ConnectionLoop(muxFactory(config), sinks(epoch), LoopConfig())
+                api = nextApi
+                loop = nextLoop
+                nextLoop.start()
+                true
+            }
+        }
+        if (!installed) return
+
         hostsStore.upsertHost(config)
         if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(config.id)
     }
@@ -224,12 +248,16 @@ class ConnectionManager @Inject constructor(
     }
 
     private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
-        transportEpoch.incrementAndGet()
-        loop?.stop()
-        loop = null
-        api = null
-        generation = null
-        activeHost = null
+        val retired = synchronized(transportLock) {
+            transportEpoch.incrementAndGet()
+            val previous = loop
+            loop = null
+            api = null
+            generation = null
+            activeHost = null
+            previous
+        }
+        retired?.stop()
         if (stopBackgroundService) stopService()
         _state.value = ConnectionUiState()
     }
@@ -258,29 +286,47 @@ class ConnectionManager @Inject constructor(
                     return@withLock
                 }
 
-                val epoch = transportEpoch.incrementAndGet()
-                loop?.stop()
+                val retired = synchronized(transportLock) {
+                    if (requestVersion != reconnectRequestVersion.get() ||
+                        intentVersion != desiredIntentVersion.get() ||
+                        activeHost?.id != host.id
+                    ) {
+                        null
+                    } else {
+                        val epoch = transportEpoch.incrementAndGet()
+                        val previous = loop
+                        loop = null
+                        api = null
+                        generation = null
+                        RetiredTransport(epoch, previous)
+                    }
+                } ?: return@withLock
+                retired.loop?.stop()
 
                 // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
                 // rotated or dropped while the app is backgrounded, and the credential is baked into the
                 // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
                 // when that is most likely to have happened.
                 val nextApi = clientFactory.clientFor(host)
-                val nextLoop = ConnectionLoop(muxFactory(host), sinks(epoch), LoopConfig())
+                val nextLoop = ConnectionLoop(muxFactory(host), sinks(retired.epoch), LoopConfig())
 
-                // A disconnect or host switch can land while the client is being rebuilt. Do not
-                // publish a transport belonging to an intent that has already been retired.
-                if (requestVersion != reconnectRequestVersion.get() ||
-                    intentVersion != desiredIntentVersion.get() ||
-                    activeHost?.id != host.id
-                ) {
-                    nextLoop.stop()
-                    return@withLock
+                // A disconnect or host switch can land while the client is being rebuilt. Install
+                // the replacement only if this request still owns the transport epoch it retired.
+                val installed = synchronized(transportLock) {
+                    if (requestVersion != reconnectRequestVersion.get() ||
+                        intentVersion != desiredIntentVersion.get() ||
+                        activeHost?.id != host.id ||
+                        transportEpoch.get() != retired.epoch
+                    ) {
+                        false
+                    } else {
+                        api = nextApi
+                        loop = nextLoop
+                        nextLoop.start()
+                        true
+                    }
                 }
-
-                api = nextApi
-                loop = nextLoop
-                nextLoop.start()
+                if (!installed) nextLoop.stop()
             }
         }
     }
@@ -328,9 +374,15 @@ class ConnectionManager @Inject constructor(
      * the user needs in order to know that pairing again is the fix.
      */
     private fun stopRetrying() {
-        transportEpoch.incrementAndGet()
-        loop?.stop()
-        loop = null
+        val retired = synchronized(transportLock) {
+            transportEpoch.incrementAndGet()
+            val previous = loop
+            loop = null
+            api = null
+            generation = null
+            previous
+        }
+        retired?.stop()
         stopService()
         val intentVersion = desiredIntentVersion.incrementAndGet()
         scope.launch {
