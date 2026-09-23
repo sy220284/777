@@ -100,7 +100,7 @@ class AgentLoopTest {
                 if (request == 1) {
                     AgentModelReply(toolCalls = listOf(first, second))
                 } else {
-                    assertEquals(listOf(AgentToolResult("结果甲"), AgentToolResult("结果乙")), messages.takeLast(2).map { it.content })
+                    assertEquals(listOf("结果甲", "结果乙"), messages.takeLast(2).map { it.content })
                     AgentModelReply(content = "汇总")
                 }
             },
