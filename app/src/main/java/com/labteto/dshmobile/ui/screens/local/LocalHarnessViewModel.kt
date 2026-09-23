@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalImageInputMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -16,6 +17,7 @@ class LocalHarnessViewModel @Inject constructor(
     val state = engine.state
 
     fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
+    fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
     suspend fun diagnoseNetwork(target: String): String = engine.diagnoseNetwork(target)
