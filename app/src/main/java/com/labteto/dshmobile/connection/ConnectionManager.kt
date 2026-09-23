@@ -75,13 +75,19 @@ class ConnectionManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val desiredIntentVersion = AtomicLong(0L)
     private val reconnectRequestVersion = AtomicLong(0L)
+    private val transportEpoch = AtomicLong(0L)
     private val reconnectMutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
 
+    @Volatile
     private var loop: ConnectionLoop? = null
+
+    @Volatile
     private var api: DshApiClient? = null
+
+    @Volatile
     private var activeHost: HostConfig? = null
 
     /**
@@ -110,12 +116,14 @@ class ConnectionManager @Inject constructor(
     val eventFrames = eventBuffer.frames
     private fun eventBufferReset(): Unit = eventBuffer.connected()
 
-    private val sinks = object : LoopSinks {
+    private fun sinks(epoch: Long) = object : LoopSinks {
         override fun onEventFrame(frame: RemoteEventFrame) {
+            if (epoch != transportEpoch.get()) return
             eventBuffer.offer(frame)
         }
 
         override fun onConnected(generation: HostGeneration) {
+            if (epoch != transportEpoch.get()) return
             eventBuffer.connected()
             this@ConnectionManager.generation = generation
             val host = activeHost
@@ -133,6 +141,7 @@ class ConnectionManager @Inject constructor(
         }
 
         override fun onStateChange(state: ConnectionState) {
+            if (epoch != transportEpoch.get()) return
             val current = _state.value
             val phase = when {
                 state == ConnectionState.CONNECTED -> ConnectionPhase.CONNECTED
@@ -148,6 +157,7 @@ class ConnectionManager @Inject constructor(
         }
 
         override fun onHandshakeStep(step: HandshakeStep) {
+            if (epoch != transportEpoch.get()) return
             val stage = when (step) {
                 HandshakeStep.OPENING_MUX -> ConnectStage.OpeningStreams
                 HandshakeStep.AWAITING_READY -> ConnectStage.Verifying
@@ -156,6 +166,7 @@ class ConnectionManager @Inject constructor(
         }
 
         override fun onGenerationFailed(attempt: Int, failure: GenerationFailure) {
+            if (epoch != transportEpoch.get()) return
             val host = activeHost
             _state.value = _state.value.copy(
                 failure = ConnectFailure.from(failure, relay = host?.isRelay == true),
@@ -195,7 +206,8 @@ class ConnectionManager @Inject constructor(
             stage = ConnectStage.OpeningStreams,
         )
         api = clientFactory.clientFor(config)
-        val loop = ConnectionLoop(muxFactory(config), sinks, LoopConfig())
+        val epoch = transportEpoch.incrementAndGet()
+        val loop = ConnectionLoop(muxFactory(config), sinks(epoch), LoopConfig())
         this.loop = loop
         loop.start()
         hostsStore.upsertHost(config)
@@ -212,6 +224,7 @@ class ConnectionManager @Inject constructor(
     }
 
     private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
+        transportEpoch.incrementAndGet()
         loop?.stop()
         loop = null
         api = null
@@ -245,6 +258,7 @@ class ConnectionManager @Inject constructor(
                     return@withLock
                 }
 
+                val epoch = transportEpoch.incrementAndGet()
                 loop?.stop()
 
                 // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
@@ -252,7 +266,7 @@ class ConnectionManager @Inject constructor(
                 // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
                 // when that is most likely to have happened.
                 val nextApi = clientFactory.clientFor(host)
-                val nextLoop = ConnectionLoop(muxFactory(host), sinks, LoopConfig())
+                val nextLoop = ConnectionLoop(muxFactory(host), sinks(epoch), LoopConfig())
 
                 // A disconnect or host switch can land while the client is being rebuilt. Do not
                 // publish a transport belonging to an intent that has already been retired.
@@ -314,6 +328,7 @@ class ConnectionManager @Inject constructor(
      * the user needs in order to know that pairing again is the fix.
      */
     private fun stopRetrying() {
+        transportEpoch.incrementAndGet()
         loop?.stop()
         loop = null
         stopService()
