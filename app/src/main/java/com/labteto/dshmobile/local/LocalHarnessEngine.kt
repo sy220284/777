@@ -622,6 +622,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun appendUserToModelHistory(message: JsonObject, reason: String) {
         modelHistory += message
         checkpointModelHistory(reason)
+        updateContextMetrics()
     }
 
     /**
@@ -1050,6 +1051,7 @@ class LocalHarnessEngine @Inject constructor(
             put("queued_count", pendingInputs.size())
         })
         checkpointModelHistory("user/queue-consumed")
+        updateContextMetrics()
         persist()
     }
 
@@ -1268,6 +1270,7 @@ class LocalHarnessEngine @Inject constructor(
                         )
                         modelHistory += reply.message
                         checkpointModelHistory("assistant/message")
+                        updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence)
                         persist()
                     }
@@ -1311,6 +1314,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                         completedToolCallIds += event.call.id
                         checkpointModelHistory("tool/result")
+                        updateContextMetrics()
                         applyTranscriptMessages(listOf(transcriptMessage), toolEvent.sequence)
                         persist()
                     }
@@ -2177,15 +2181,35 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun currentHistoryBudget(): LocalHistoryBudget =
+        localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure)
+
+    private fun updateContextMetrics() {
+        val budget = currentHistoryBudget()
+        val chars = modelHistory.sumOf { it.toString().length }
+        _state.update {
+            it.copy(
+                contextChars = chars,
+                contextBudgetChars = budget.maxHistoryChars,
+            )
+        }
+    }
+
     private fun pruneToolResult(result: String): String {
-        if (result.length <= MAX_TOOL_RESULT_CHARS) return result
-        val tail = result.takeLast(TOOL_RESULT_TAIL_CHARS)
-        return result.take(MAX_TOOL_RESULT_CHARS - TOOL_RESULT_TAIL_CHARS) +
+        val limit = currentHistoryBudget().maxToolResultChars
+        if (result.length <= limit) return result
+        val tailChars = minOf(TOOL_RESULT_TAIL_CHARS, limit / 4)
+        val tail = result.takeLast(tailChars)
+        return result.take((limit - tailChars).coerceAtLeast(1)) +
             "\n…工具结果过长，中间内容已压缩…\n" + tail
     }
 
     private fun compactHistoryIfNeeded() {
-        val compaction = historyCompactor.compact(modelHistory) ?: return
+        val budget = currentHistoryBudget()
+        val compaction = historyCompactor.compact(modelHistory, budget) ?: run {
+            updateContextMetrics()
+            return
+        }
         modelHistory.clear()
         modelHistory += compaction.messages
         eventLog.append(
@@ -2196,6 +2220,7 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         checkpointModelHistory("session/compaction")
+        updateContextMetrics()
         persist()
     }
 
@@ -2211,6 +2236,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
         checkpointModelHistory("system/prompt")
+        updateContextMetrics()
     }
 
     private fun systemPrompt(): String = """
@@ -2282,8 +2308,12 @@ class LocalHarnessEngine @Inject constructor(
             appendLine(
                 "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
                     "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
+                    "终端 ${resources.activeTerminals}/${resources.budget.maxTerminals}；" +
+                    "虚拟屏 ${resources.activeVirtualDisplays}/${resources.budget.maxVirtualDisplays}；" +
+                    "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
                     "压力 ${resources.pressure.name.lowercase()}",
             )
+            appendLine("上下文：${modelHistory.sumOf { it.toString().length }}/${currentHistoryBudget().maxHistoryChars} 字符")
             appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
@@ -2442,9 +2472,17 @@ class LocalHarnessEngine @Inject constructor(
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
             activeAgents = resourceScheduler.snapshot().activeAgents,
+            activeTerminals = resourceScheduler.snapshot().activeTerminals,
+            activeVirtualDisplays = resourceScheduler.snapshot().activeVirtualDisplays,
+            activeLanguageServers = resourceScheduler.snapshot().activeLanguageServers,
             maxModelRequests = resourceScheduler.budget.maxModelRequests,
             maxAgents = resourceScheduler.budget.maxAgents,
+            maxTerminals = resourceScheduler.budget.maxTerminals,
+            maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
+            maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
+            contextChars = modelHistory.sumOf { it.toString().length },
+            contextBudgetChars = currentHistoryBudget().maxHistoryChars,
         )
         var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
