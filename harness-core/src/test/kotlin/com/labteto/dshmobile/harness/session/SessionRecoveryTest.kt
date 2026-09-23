@@ -27,7 +27,11 @@ class SessionRecoveryTest {
 
             val repaired = SessionRecovery.repairInterruptedTail(log)
             assertTrue(repaired.repaired)
-            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN, repaired.toolResults.single().code)
+            val recovered = repaired.toolResults.single()
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN, recovered.code)
+            assertTrue(recovered.modelContent.contains("\"status\":\"error\""))
+            assertTrue(recovered.modelContent.contains("\"side_effect\":\"possible\""))
+            assertTrue(recovered.modelContent.contains("\"retryable\":false"))
             assertEquals(listOf("tool/result", "step/end", "turn/end"), repaired.appended.map { it.type })
             assertFalse(SessionRecovery.repairInterruptedTail(log).repaired)
         } finally {
@@ -45,8 +49,11 @@ class SessionRecoveryTest {
             log.append("assistant/message", assistantWithTool("call-2", "read"))
 
             val repaired = SessionRecovery.repairInterruptedTail(log)
-            assertEquals(SessionRecovery.TOOL_NOT_STARTED, repaired.toolResults.single().code)
-            assertEquals(3, repaired.toolResults.single().step)
+            val recovered = repaired.toolResults.single()
+            assertEquals(SessionRecovery.TOOL_NOT_STARTED, recovered.code)
+            assertEquals(3, recovered.step)
+            assertTrue(recovered.modelContent.contains("\"retryable\":true"))
+            assertTrue(recovered.modelContent.contains("\"side_effect\":\"none\""))
         } finally {
             directory.deleteRecursively()
         }
