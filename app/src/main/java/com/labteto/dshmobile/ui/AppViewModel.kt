@@ -11,6 +11,7 @@ import com.labteto.dshmobile.update.UpdateInstaller
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,7 @@ class AppViewModel @Inject constructor(
 
     private val _updateInstallStatus = MutableStateFlow<String?>(null)
     val updateInstallStatus: StateFlow<String?> = _updateInstallStatus.asStateFlow()
+    private var updateJob: Job? = null
 
     /**
      * Manual update flow only.
@@ -46,8 +48,8 @@ class AppViewModel @Inject constructor(
      * installer.
      */
     fun checkForUpdateAndInstall(currentVersion: String) {
-        if (_updateInstallStatus.value?.startsWith("正在") == true) return
-        viewModelScope.launch {
+        if (updateJob?.isActive == true) return
+        updateJob = viewModelScope.launch {
             _updateInstallStatus.value = "正在检查更新…"
             val update = try {
                 updateChecker.checkNow(currentVersion)
