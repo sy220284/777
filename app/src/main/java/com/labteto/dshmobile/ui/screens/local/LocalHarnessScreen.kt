@@ -189,6 +189,7 @@ fun LocalHarnessScreen(
                 onConfigure = { editingConfig = true },
                 onSend = viewModel::send,
                 onImportAttachment = viewModel::importAttachment,
+                onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
                 onPlanModeChange = viewModel::setPlanMode,
@@ -501,6 +502,7 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
+    onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -529,6 +531,7 @@ private fun LocalChat(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -869,10 +872,11 @@ private fun LocalChat(
                                 LocalImageInputMode.TOOL -> R.string.advanced_image_mode_tool
                             },
                         )
-                        Text(
-                            stringResource(R.string.local_image_mode_status, imageModeLabel),
-                            style = DsType.caption11,
-                            color = colors.labelTertiary,
+                        DsButton(
+                            text = stringResource(R.string.local_image_mode_status, imageModeLabel),
+                            onClick = { showImageModePicker = true },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
                         )
                     }
                 }
@@ -984,6 +988,35 @@ private fun LocalChat(
                     },
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+    }
+    if (showImageModePicker) {
+        DsBottomSheet(
+            title = stringResource(R.string.advanced_image_input_mode),
+            onDismiss = { showImageModePicker = false },
+        ) {
+            Text(
+                stringResource(R.string.advanced_image_input_hint),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                listOf(
+                    LocalImageInputMode.AUTO to R.string.advanced_image_mode_auto,
+                    LocalImageInputMode.NATIVE to R.string.advanced_image_mode_native,
+                    LocalImageInputMode.TOOL to R.string.advanced_image_mode_tool,
+                ).forEach { (mode, label) ->
+                    DsButton(
+                        text = stringResource(label),
+                        onClick = {
+                            onImageModeChange(mode)
+                            showImageModePicker = false
+                        },
+                        variant = if (state.imageInputMode == mode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
             }
         }
     }
