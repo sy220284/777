@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -115,66 +116,81 @@ internal fun PlanReviewPanel(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.approvalCard,
-        color = colors.composerCard,
-        border = BorderStroke(1.dp, colors.warnSecondary),
-        shadowElevation = 2.dp,
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.warnTertiary)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.plan_review_title),
-                    style = DsType.small13Strong,
-                    color = colors.warnLabel,
-                )
-            }
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(
+    val bodyScroll = rememberScrollState()
+
+    // This panel sits in the same bottom stack as QuestionsPanel and the composer. A fixed-height
+    // plan body can fit on a tall phone yet overflow the remaining column on a short screen, with
+    // the action row laid out below the viewport. Bound the whole card to the actual space offered
+    // by the chat column, then give only the plan body the flexible/scrollable portion so the
+    // decision controls stay reachable at all times.
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val cap = questionCardMaxHeight(maxHeight)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = cap),
+            shape = DsShapes.approvalCard,
+            color = colors.composerCard,
+            border = BorderStroke(1.dp, colors.warnSecondary),
+            shadowElevation = 2.dp,
+        ) {
+            Column {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 220.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .background(colors.warnTertiary)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    MarkdownText(review.plan)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DsButton(
-                        text = stringResource(R.string.plan_review_approve),
-                        onClick = onApprove,
-                        enabled = !busy,
-                        variant = DsButtonVariant.Info,
-                        size = DsButtonSize.Small,
+                    Text(
+                        stringResource(R.string.plan_review_title),
+                        style = DsType.small13Strong,
+                        color = colors.warnLabel,
                     )
-                    // Only when the asker offered a second option. A refusal it never named is not
-                    // one this card can send: the host checks every selected label against the
-                    // question's own options and refuses one it does not recognise.
-                    if (review.decline != null) {
+                }
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(bodyScroll),
+                    ) {
+                        MarkdownText(review.plan)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DsButton(
-                            text = stringResource(R.string.plan_review_decline),
-                            onClick = onDecline,
+                            text = stringResource(R.string.plan_review_approve),
+                            onClick = onApprove,
                             enabled = !busy,
-                            variant = DsButtonVariant.Outline,
+                            variant = DsButtonVariant.Info,
+                            size = DsButtonSize.Small,
+                        )
+                        // Only when the asker offered a second option. A refusal it never named is not
+                        // one this card can send: the host checks every selected label against the
+                        // question's own options and refuses one it does not recognise.
+                        if (review.decline != null) {
+                            DsButton(
+                                text = stringResource(R.string.plan_review_decline),
+                                onClick = onDecline,
+                                enabled = !busy,
+                                variant = DsButtonVariant.Outline,
+                                size = DsButtonSize.Small,
+                            )
+                        }
+                        // "Chat about it" dismisses the request rather than answering it with the
+                        // refusal, which is what the harness's own card does — declining picks a stated
+                        // option, whereas wanting to talk first is not one of the choices on offer.
+                        DsButton(
+                            text = stringResource(R.string.plan_review_discuss),
+                            onClick = onDiscuss,
+                            enabled = !busy,
+                            variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                         )
                     }
-                    // "Chat about it" dismisses the request rather than answering it with the
-                    // refusal, which is what the harness's own card does — declining picks a stated
-                    // option, whereas wanting to talk first is not one of the choices on offer.
-                    DsButton(
-                        text = stringResource(R.string.plan_review_discuss),
-                        onClick = onDiscuss,
-                        enabled = !busy,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
                 }
             }
         }
