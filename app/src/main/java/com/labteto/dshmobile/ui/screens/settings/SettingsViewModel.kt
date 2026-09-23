@@ -21,6 +21,8 @@ import com.labteto.dshmobile.core.wire.dto.SettingsPathOpView
 import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
+import com.labteto.dshmobile.local.DeepSeekPricingRepository
+import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImageInputMode
@@ -81,6 +83,7 @@ class SettingsViewModel @Inject constructor(
     private val credentials: RelayCredentialStore,
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalHarnessEngine,
+    private val deepSeekPricingRepository: DeepSeekPricingRepository,
     private val localVisionSettings: LocalVisionSettings,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
@@ -94,6 +97,7 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
     val localHarnessState: StateFlow<LocalHarnessState> = localHarness.state
+    val deepSeekPricing: StateFlow<DeepSeekPricingState> = deepSeekPricingRepository.state
 
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
@@ -148,6 +152,10 @@ class SettingsViewModel @Inject constructor(
         refreshRemoteSettings()
         refreshDeviceCapabilities()
         refreshVisionSettings()
+    }
+
+    fun refreshDeepSeekPricing() {
+        viewModelScope.launch { deepSeekPricingRepository.refreshFromOfficial() }
     }
 
     fun refreshVisionSettings() {
