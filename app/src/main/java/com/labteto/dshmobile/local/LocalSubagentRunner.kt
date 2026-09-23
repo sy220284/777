@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.*
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -58,6 +60,7 @@ internal class LocalSubagentRunner(
     private val pruneToolResult: (String) -> String,
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode) -> List<JsonObject>,
     private val onNativeImageRejected: () -> Unit = {},
+    private val resourceScheduler: HarnessResourceScheduler,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
@@ -86,6 +89,26 @@ internal class LocalSubagentRunner(
         parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
+    ): LocalSubagentResult = resourceScheduler.withResource(HarnessResourceKind.AGENT) {
+        runResultWithLease(
+            task = task,
+            inheritHistory = inheritHistory,
+            allowMutation = allowMutation,
+            backgroundJobId = backgroundJobId,
+            parentCallId = parentCallId,
+            modelOverride = modelOverride,
+            maxSteps = maxSteps,
+        )
+    }
+
+    private suspend fun runResultWithLease(
+        task: String,
+        inheritHistory: Boolean,
+        allowMutation: Boolean,
+        backgroundJobId: String?,
+        parentCallId: String?,
+        modelOverride: String?,
+        maxSteps: Int,
     ): LocalSubagentResult {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val history = if (inheritHistory) {
@@ -233,7 +256,16 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val modelOutput = pruneToolResult(event.output)
+                            val modelOutput = pruneToolResult(
+                                AgentToolResult(
+                                    content = event.output,
+                                    isError = event.isError,
+                                    errorCode = event.errorCode,
+                                    retryable = event.retryable,
+                                    sideEffect = event.sideEffect,
+                                    recoveryHint = event.recoveryHint,
+                                ).modelVisibleContent(),
+                            )
                             rememberSubagentProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
@@ -246,6 +278,10 @@ internal class LocalSubagentRunner(
                                 put("content", event.output.take(SUBAGENT_EVENT_CHARS))
                                 put("model_content", modelOutput)
                                 put("is_error", event.isError)
+                                event.errorCode?.let { put("error_code", it) }
+                                put("retryable", event.retryable)
+                                put("side_effect", event.sideEffect.name.lowercase())
+                                event.recoveryHint?.let { put("recovery_hint", it) }
                             })
                             history += buildJsonObject {
                                 put("role", "tool")
@@ -387,7 +423,9 @@ internal class LocalSubagentRunner(
             },
         )
         return executor.execute {
-            modelClient.complete(key, baseUrl, model, history, tools)
+            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                modelClient.complete(key, baseUrl, model, history, tools)
+            }
         }
     }
 
