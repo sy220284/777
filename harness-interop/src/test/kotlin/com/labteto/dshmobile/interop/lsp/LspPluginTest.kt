@@ -3,6 +3,7 @@ package com.labteto.dshmobile.interop.lsp
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.tools.ToolContext
 import java.io.File
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
@@ -93,6 +94,41 @@ class LspPluginTest {
                 assertTrue(second.content.contains("example type again"))
                 assertEquals(1, approvals)
             }
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+    @Test fun diagnosticsCancellationIsNotSwallowed() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
+        val script = temporary.newFile("slow-server.sh")
+        script.writeText(
+            "printf '%s' '" + frame(initialized) + "'\nwhile IFS= read -r line; do :; done\n",
+        )
+        temporary.newFile("example.kt").writeText("fun main() = Unit")
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            temporary.root,
+            Json,
+            command = { listOf("/bin/sh", script.absolutePath) },
+        )
+        plugin.install(context)
+        try {
+            var timedOut = false
+            try {
+                withTimeout(250) {
+                    context.tools.execute(
+                        "lsp_diagnostics",
+                        buildJsonObject { put("path", "example.kt") },
+                        context = ToolContext(approval = { true }),
+                    )
+                }
+            } catch (_: TimeoutCancellationException) {
+                timedOut = true
+            }
+            assertTrue("LSP diagnostics swallowed coroutine cancellation", timedOut)
         } finally {
             plugin.uninstall(context)
         }

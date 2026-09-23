@@ -11,7 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * dead rows in the UI.
  */
 internal fun localConversationFiles(
-    events: List<LocalSessionEventLog.Event>,
+    events: Sequence<LocalSessionEventLog.Event>,
     workspaceFiles: List<LocalWorkspaceFile>,
 ): LocalConversationFiles {
     val existing = workspaceFiles.associateBy(LocalWorkspaceFile::path)

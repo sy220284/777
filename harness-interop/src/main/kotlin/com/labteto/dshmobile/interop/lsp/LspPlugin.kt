@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -133,7 +134,14 @@ class LspPlugin(
                     active.client.rename(uri, line, character, newName)
                 }
                 "lsp_diagnostics" -> {
-                    val triggerError = runCatching { active.client.documentSymbols(uri) }.exceptionOrNull()
+                    val triggerError = try {
+                        active.client.documentSymbols(uri)
+                        null
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        error
+                    }
                     val notifications = active.client.drainNotifications()
                     val published = notifications.filter { notification ->
                         notification["method"]?.jsonPrimitive?.contentOrNull == "textDocument/publishDiagnostics" &&
@@ -185,7 +193,10 @@ class LspPlugin(
         )
         try {
             next.initialize(root.canonicalFile.toURI().toString())
-        } catch (error: Throwable) {
+        } catch (cancelled: CancellationException) {
+            next.close()
+            throw cancelled
+        } catch (error: Exception) {
             next.close()
             throw IllegalStateException(
                 "语言服务器启动失败（${resolved.firstOrNull().orEmpty()}）：${error.message ?: error::class.java.simpleName}",
@@ -230,7 +241,16 @@ class LspPlugin(
         val current = clients.values.toList()
         clients.clear()
         versions.clear()
-        current.forEach { handle -> runCatching { handle.client.shutdown() } }
+        for (handle in current) {
+            try {
+                handle.client.shutdown()
+            } catch (cancelled: CancellationException) {
+                handle.client.close()
+                throw cancelled
+            } catch (_: Exception) {
+                handle.client.close()
+            }
+        }
     }
 
     private fun bounded(output: String): String =

@@ -70,7 +70,27 @@ class SessionEventLog(
      * source of truth while snapshots remain disposable acceleration checkpoints.
      */
     fun snapshotAfter(sequenceExclusive: Long): List<SessionEvent> = synchronized(lock) {
-        readEventsUnsafe().filter { event -> event.sequence > sequenceExclusive }
+        val sources = orderedFilesUnsafe()
+        if (sources.isEmpty()) return@synchronized emptyList()
+
+        // Walk from the newest segment until its durable tail is no newer than the checkpoint.
+        // Old segments before that boundary are never parsed. In the common restart case the
+        // checkpoint is near the tail, so this touches only the active segment.
+        val relevant = ArrayDeque<File>()
+        for (source in sources.asReversed()) {
+            val last = readLastValidEventUnsafe(source) ?: continue
+            if (last.sequence <= sequenceExclusive) break
+            relevant.addFirst(source)
+        }
+
+        buildList {
+            relevant.forEach { source ->
+                source.forEachLine { line ->
+                    val event = decodeEventOrNull(line) ?: return@forEachLine
+                    if (event.sequence > sequenceExclusive) add(event)
+                }
+            }
+        }
     }
 
     fun search(query: String, limit: Int = 50): String {
@@ -96,14 +116,16 @@ class SessionEventLog(
     fun tail(limit: Int = 40): String {
         val wanted = limit.coerceIn(1, MAX_READ_LINES)
         val lines = synchronized(lock) {
-            val retained = ArrayDeque<String>(wanted)
-            for (source in orderedFilesUnsafe()) {
-                source.forEachLine { line ->
-                    if (retained.size == wanted) retained.removeFirst()
-                    retained.addLast(line)
+            val newestFirst = ArrayList<String>(wanted)
+            for (source in orderedFilesUnsafe().asReversed()) {
+                readLinesFromTailUnsafe(source) { line ->
+                    if (newestFirst.size >= wanted) return@readLinesFromTailUnsafe false
+                    newestFirst += line
+                    true
                 }
+                if (newestFirst.size >= wanted) break
             }
-            retained.toList()
+            newestFirst.asReversed()
         }
         return if (lines.isEmpty()) "会话事件日志为空" else lines.joinToString("\n")
     }
@@ -119,18 +141,29 @@ class SessionEventLog(
             .joinToString("\n") { json.encodeToString(SessionEvent.serializer(), it) }
     }
 
-    fun latest(type: String): SessionEvent? = synchronized(lock) {
+    fun latest(
+        type: String,
+        beforeSequenceExclusive: Long = Long.MAX_VALUE,
+    ): SessionEvent? = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
-        var latest: SessionEvent? = null
-        for (source in orderedFilesUnsafe()) {
-            source.forEachLine { line ->
-                val event = runCatching {
-                    json.decodeFromString(SessionEvent.serializer(), line)
-                }.getOrNull()
-                if (event?.type == type) latest = event
+        for (source in orderedFilesUnsafe().asReversed()) {
+            var found: SessionEvent? = null
+            readLinesFromTailUnsafe(source) { line ->
+                val event = decodeEventOrNull(line)
+                if (
+                    event != null &&
+                    event.sequence < beforeSequenceExclusive &&
+                    event.type == type
+                ) {
+                    found = event
+                    false
+                } else {
+                    true
+                }
             }
+            found?.let { return@synchronized it }
         }
-        latest
+        null
     }
 
     fun clear() {
@@ -159,7 +192,27 @@ class SessionEventLog(
     }
 
     private fun readLastValidEventUnsafe(source: File): SessionEvent? {
-        if (!source.isFile || source.length() <= 0L) return null
+        var latest: SessionEvent? = null
+        readLinesFromTailUnsafe(source) { line ->
+            val event = decodeEventOrNull(line)
+            if (event != null) {
+                latest = event
+                false
+            } else {
+                true
+            }
+        }
+        return latest
+    }
+
+    /**
+     * Visit complete lines newest-first from one bounded segment.
+     *
+     * A torn active tail may start/end with an incomplete row; callers decode defensively and keep
+     * walking. Returning false stops the scan early.
+     */
+    private inline fun readLinesFromTailUnsafe(source: File, visitor: (String) -> Boolean) {
+        if (!source.isFile || source.length() <= 0L) return
         val length = source.length()
         val bytesToRead = minOf(length, maxBytes, Int.MAX_VALUE.toLong()).toInt()
         val bytes = ByteArray(bytesToRead)
@@ -171,13 +224,12 @@ class SessionEventLog(
         for (index in rows.indices.reversed()) {
             val line = rows[index]
             if (line.isBlank()) continue
-            val event = runCatching {
-                json.decodeFromString(SessionEvent.serializer(), line)
-            }.getOrNull()
-            if (event != null) return event
+            if (!visitor(line)) return
         }
-        return null
     }
+
+    private fun decodeEventOrNull(line: String): SessionEvent? =
+        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }.getOrNull()
 
     private fun readEventsUnsafe(): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()

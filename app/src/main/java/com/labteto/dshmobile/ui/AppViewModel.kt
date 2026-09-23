@@ -10,6 +10,7 @@ import com.labteto.dshmobile.update.UpdateChecker
 import com.labteto.dshmobile.update.UpdateInstaller
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,12 +49,15 @@ class AppViewModel @Inject constructor(
         if (_updateInstallStatus.value?.startsWith("正在") == true) return
         viewModelScope.launch {
             _updateInstallStatus.value = "正在检查更新…"
-            val update = runCatching { updateChecker.checkNow(currentVersion) }
-                .getOrElse { error ->
-                    _updateInstallStatus.value =
-                        "检查更新失败：" + (error.message ?: error::class.java.simpleName)
-                    return@launch
-                }
+            val update = try {
+                updateChecker.checkNow(currentVersion)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _updateInstallStatus.value =
+                    "检查更新失败：" + (error.message ?: error::class.java.simpleName)
+                return@launch
+            }
 
             if (update == null) {
                 _updateInstallStatus.value = "当前已是最新版本。"
@@ -61,9 +65,11 @@ class AppViewModel @Inject constructor(
             }
 
             _updateInstallStatus.value = "发现新版本 ${update.version}，正在下载并校验…"
-            _updateInstallStatus.value = runCatching {
+            _updateInstallStatus.value = try {
                 updateInstaller.downloadVerifyAndLaunch(update).message
-            }.getOrElse { error ->
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 "更新失败：" + (error.message ?: error::class.java.simpleName)
             }
         }

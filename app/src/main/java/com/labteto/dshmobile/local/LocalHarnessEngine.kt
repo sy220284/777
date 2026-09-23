@@ -233,6 +233,13 @@ class LocalHarnessEngine @Inject constructor(
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
+    private data class ConversationFilesCacheEntry(
+        val eventStamp: Long,
+        val workspaceStamp: Long,
+        val value: LocalConversationFiles,
+    )
+    private val conversationFilesCacheLock = Any()
+    private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     private val _state = MutableStateFlow(
@@ -318,8 +325,42 @@ class LocalHarnessEngine @Inject constructor(
     suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
             val files = workspace.files()
-            localConversationFiles(eventLogFor(sessionId).snapshot(), files)
+            val log = if (sessionId == currentSessionId) eventLog else eventLogFor(sessionId)
+            val eventStamp = log.latestSequence()
+            val workspaceStamp = workspaceFilesStamp(files)
+            synchronized(conversationFilesCacheLock) {
+                conversationFilesCache[sessionId]
+                    ?.takeIf { it.eventStamp == eventStamp && it.workspaceStamp == workspaceStamp }
+                    ?.value
+            }?.let { return@withContext it }
+
+            val projected = localConversationFiles(log.events(), files)
+            synchronized(conversationFilesCacheLock) {
+                conversationFilesCache[sessionId] = ConversationFilesCacheEntry(
+                    eventStamp = eventStamp,
+                    workspaceStamp = workspaceStamp,
+                    value = projected,
+                )
+                while (conversationFilesCache.size > MAX_CONVERSATION_FILES_CACHE) {
+                    val eldest = conversationFilesCache.entries.firstOrNull()?.key ?: break
+                    conversationFilesCache.remove(eldest)
+                }
+            }
+            projected
         }
+
+    private fun workspaceFilesStamp(files: List<LocalWorkspaceFile>): Long {
+        var stamp = 1_469_598_103_934_665_603L
+        files.forEach { file ->
+            stamp = stamp xor file.path.hashCode().toLong()
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor file.bytes
+            stamp *= 1_099_511_628_211L
+            stamp = stamp xor file.modifiedAt
+            stamp *= 1_099_511_628_211L
+        }
+        return stamp
+    }
 
     suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { workspace.preview(path) }
@@ -1890,7 +1931,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         transcriptProjectionCursor = projectedTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
-            events = eventLog.snapshot(),
+            events = modelHistoryReplayEvents(stored.legacyModelHistory),
             legacyFallback = stored.legacyModelHistory,
             codec = modelHistoryCheckpointCodec,
         )
@@ -1956,6 +1997,30 @@ class LocalHarnessEngine @Inject constructor(
             // Materialize migrated/replayed projections so later restarts only fold the new tail.
             persist()
         }
+    }
+
+    /**
+     * Restore model history from the newest valid checkpoint tail whenever possible.
+     *
+     * New sessions checkpoint model-visible history regularly. Reading the entire event archive
+     * here would undo the projection-cursor startup optimization for long-lived sessions. Legacy
+     * history still provides the one-time fallback when no valid checkpoint exists.
+     */
+    private fun modelHistoryReplayEvents(
+        legacyFallback: List<JsonObject>,
+    ): List<LocalSessionEventLog.Event> {
+        var beforeSequence = Long.MAX_VALUE
+        while (true) {
+            val checkpoint = eventLog.latest(
+                ModelHistoryCheckpointCodec.EVENT_TYPE,
+                beforeSequenceExclusive = beforeSequence,
+            ) ?: break
+            if (modelHistoryCheckpointCodec.decode(checkpoint.data) != null) {
+                return eventLog.snapshotAfter(checkpoint.sequence - 1L)
+            }
+            beforeSequence = checkpoint.sequence
+        }
+        return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
     }
 
     private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
@@ -2083,6 +2148,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
+        const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"

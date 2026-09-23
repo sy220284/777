@@ -38,6 +38,7 @@ import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
@@ -65,13 +66,18 @@ internal fun LocalWorkspaceFilesDialog(
         loading = true
         error = null
         preview = null
-        runCatching {
+        try {
             when (mode) {
                 LocalFilesMode.WORKSPACE -> workspace = loadWorkspace()
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
-        }.onFailure { error = it.message ?: readFilesFailed }
-        loading = false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: readFilesFailed
+        } finally {
+            loading = false
+        }
     }
 
     LaunchedEffect(mode, sessionId) { reload() }
@@ -134,10 +140,16 @@ internal fun LocalWorkspaceFilesDialog(
                             LocalFileList(workspace) { file ->
                                 previewLoading = true
                                 error = null
-                                preview = runCatching { loadPreview(file.path) }
-                                    .onFailure { error = it.message ?: previewFailed }
-                                    .getOrNull()
-                                previewLoading = false
+                                try {
+                                    preview = loadPreview(file.path)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (failure: Exception) {
+                                    error = failure.message ?: previewFailed
+                                    preview = null
+                                } finally {
+                                    previewLoading = false
+                                }
                             }
                         }
                     }
@@ -145,10 +157,16 @@ internal fun LocalWorkspaceFilesDialog(
                     else -> ConversationLocalFileList(conversation) { file ->
                         previewLoading = true
                         error = null
-                        preview = runCatching { loadPreview(file.path) }
-                            .onFailure { error = it.message ?: previewFailed }
-                            .getOrNull()
-                        previewLoading = false
+                        try {
+                            preview = loadPreview(file.path)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            error = failure.message ?: previewFailed
+                            preview = null
+                        } finally {
+                            previewLoading = false
+                        }
                     }
                 }
 

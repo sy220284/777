@@ -54,6 +54,33 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun streamedEventsMatchSnapshotAcrossRotatedSegmentsAndSequenceAdvances() {
+        val directory = Files.createTempDirectory("local-event-stream").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 700)
+            repeat(20) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) },
+                )
+            }
+            val firstSequence = log.latestSequence()
+            assertEquals(
+                log.snapshot().map { it.sequence to it.type },
+                log.events().map { it.sequence to it.type }.toList(),
+            )
+
+            log.append("test/next", buildJsonObject { put("value", "next") })
+
+            assertTrue(log.latestSequence() > firstSequence)
+            assertEquals("test/next", log.events().last().type)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun exposesLatestTypedEventForRecovery() {
         val directory = Files.createTempDirectory("local-event-latest").toFile()
         val file = directory.resolve("session.events.jsonl")
