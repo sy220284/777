@@ -115,7 +115,11 @@ private fun applyModelHistoryEvent(
                 buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", callId)
-                    put("content", event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                    put(
+                        "content",
+                        event.data["model_content"]?.jsonPrimitive?.contentOrNull
+                            ?: event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    )
                 }
             }
             history += message
