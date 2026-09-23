@@ -301,13 +301,20 @@ class ConnectionManager @Inject constructor(
     private fun maybeStartService() {
         val connectedHost = activeHost ?: return
         scope.launch {
-            val settings = hostsStore.settingsOnce()
-            if (
-                settings.keepConnectedInBackground &&
-                activeHost?.id == connectedHost.id &&
-                _state.value.phase == ConnectionPhase.CONNECTED
-            ) {
-                startService()
+            try {
+                val settings = hostsStore.settingsOnce()
+                if (
+                    settings.keepConnectedInBackground &&
+                    activeHost?.id == connectedHost.id &&
+                    _state.value.phase == ConnectionPhase.CONNECTED
+                ) {
+                    startService()
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Background keep-alive is best-effort; a settings read/service failure must not
+                // take down the already-established connection loop.
             }
         }
     }
