@@ -435,16 +435,17 @@ class LocalHarnessEngine @Inject constructor(
             runCatching {
                 if (apiKey.isNotBlank()) apiKeys.put(apiKey)
                 else require(apiKeys.get() != null) { "请填写 DeepSeek API 密钥" }
+                val normalizedModel = normalizeConfiguredModel(model)
                 val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl.ifBlank { DEFAULT_BASE_URL })
                 preferences.edit()
-                    .putString(KEY_MODEL, model.ifBlank { DEFAULT_MODEL })
+                    .putString(KEY_MODEL, normalizedModel)
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .apply()
                 autoImageNativeRejected = false
                 _state.update {
                     it.copy(
                         configured = true,
-                        model = model.ifBlank { DEFAULT_MODEL },
+                        model = normalizedModel,
                         baseUrl = normalizedBaseUrl,
                         error = null,
                     )
@@ -2196,9 +2197,21 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun load() {
-        val model = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
+        val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
+        val model = normalizeConfiguredModel(storedModel)
+        if (model != storedModel) {
+            preferences.edit().putString(KEY_MODEL, model).apply()
+        }
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         loadSession(currentSessionId, model, baseUrl)
+    }
+
+    private fun normalizeConfiguredModel(model: String): String {
+        val value = model.trim().ifBlank { DEFAULT_MODEL }
+        return when (value.lowercase()) {
+            "deepseek-chat", "deepseek-reasoner" -> DEFAULT_MODEL
+            else -> value
+        }
     }
 
     private suspend fun loadSession(
