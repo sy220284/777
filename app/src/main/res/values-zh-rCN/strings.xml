@@ -606,7 +606,7 @@
     <string name="common_disabled">已关闭</string>
     <string name="common_refresh">刷新</string>
     <string name="advanced_accessibility">无障碍控制</string>
-    <string name="advanced_agent_limits_hint">主循环 4–128；子代理 1–40；重试 1–5。</string>
+    <string name="advanced_agent_limits_hint">主循环 4–128；子代理 1–128；重试 1–5。</string>
     <string name="advanced_agent_saved">智能体设置已保存</string>
     <string name="advanced_agent_settings">智能体设置</string>
     <string name="advanced_auto_memory">自动记忆明确长期规则</string>
