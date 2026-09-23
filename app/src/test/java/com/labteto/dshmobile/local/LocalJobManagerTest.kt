@@ -73,9 +73,8 @@ class LocalJobManagerTest {
             val store = LocalPersistentJobStore(
                 file = file,
                 json = Json { ignoreUnknownKeys = true },
-                scope = this,
             )
-            store.writeAsync(
+            store.write(
                 listOf(
                     JobSnapshot(
                         id = "job-restored",
@@ -86,7 +85,6 @@ class LocalJobManagerTest {
                     ),
                 ),
             )
-            advanceUntilIdle()
             assertTrue(file.isFile)
             assertEquals("running", store.read().single().status)
 
