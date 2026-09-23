@@ -508,7 +508,31 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         val modelMessage = buildLocalUserModelMessage(content, attachments)
-        queueTurn(content, prompt, modelMessage)?.start()
+        queueHumanTurn(content, prompt, modelMessage)?.start()
+    }
+
+    private fun queueHumanTurn(
+        content: String,
+        memoryInput: String = content,
+        modelMessage: JsonObject? = null,
+    ): Job? = synchronized(runStateLock) {
+        if (sessionTransitioning) return@synchronized null
+        if (activeJob?.isCompleted == false) {
+            val accepted = pendingInputs.offer(QueuedAgentInput(content, memoryInput, modelMessage))
+            if (!accepted) {
+                _state.update { it.copy(error = "当前执行中的补充消息已达到 $MAX_PENDING_INPUTS 条上限") }
+                return@synchronized null
+            }
+            recordUserTranscript(content, modelMessage, queued = true)
+            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            eventLog.append("user/queue", buildJsonObject {
+                put("action", "queued")
+                put("queued_count", pendingInputs.size())
+            })
+            persist()
+            return@synchronized null
+        }
+        queueTurnLocked(content, memoryInput, modelMessage)
     }
 
     private fun queueTurn(
@@ -517,21 +541,43 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject? = null,
     ): Job? = synchronized(runStateLock) {
         if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
-        val transcriptMessage = newTranscriptMessage("user", content)
+        queueTurnLocked(content, memoryInput, modelMessage)
+    }
+
+    private fun queueTurnLocked(
+        content: String,
+        memoryInput: String,
+        modelMessage: JsonObject?,
+    ): Job {
         val durableMessage = modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", content)
         }
+        recordUserTranscript(content, durableMessage, queued = false)
+        appendUserToModelHistory(durableMessage, "user/message")
+        persist()
+        return scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }
+            .also { activeJob = it }
+    }
+
+    private fun recordUserTranscript(
+        content: String,
+        modelMessage: JsonObject?,
+        queued: Boolean,
+    ) {
+        val transcriptMessage = newTranscriptMessage("user", content)
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
-            put("model_message", durableMessage)
+            modelMessage?.let { put("model_message", it) }
+            put("queued", queued)
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
         })
-        modelHistory += durableMessage
-        checkpointModelHistory("user/message")
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
-        persist()
-        scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }.also { activeJob = it }
+    }
+
+    private fun appendUserToModelHistory(message: JsonObject, reason: String) {
+        modelHistory += message
+        checkpointModelHistory(reason)
     }
 
     /**
