@@ -128,6 +128,7 @@ class LocalMultimodalTest {
         val event = LocalSessionEventLog.Event(
             sequence = 1L,
             type = "user/message",
+            createdAt = 1L,
             data = buildJsonObject {
                 put("content", "分析附件")
                 put("model_message", durable)
