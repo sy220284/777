@@ -125,6 +125,29 @@ class ConnectionLoopHandshakeTest {
         assertEquals(30L, (failure as GenerationFailure.MuxTimedOut).timeoutMs)
     }
 
+
+    @Test
+    fun `a factory failure is reported and retried instead of killing the loop`() = runBlocking {
+        val recorder = Recorder()
+        val calls = AtomicInteger(0)
+        val loop = ConnectionLoop(
+            muxFactory = {
+                if (calls.getAndIncrement() == 0) error("factory boom")
+                RemoteStreamMux { sink -> FakeChannel(sink, openingWith(readyFrame)) }
+            },
+            sinks = recorder,
+            config = LoopConfig(streamOpenTimeoutMs = 100, readyTimeoutMs = 100, delay = { }),
+        )
+
+        loop.start()
+        assertTrue(await { recorder.failures.isNotEmpty() })
+        assertTrue(await { recorder.connected.isNotEmpty() })
+        loop.stop()
+
+        assertTrue(recorder.failures.first().second is GenerationFailure.MuxFailed)
+        assertTrue(calls.get() >= 2)
+    }
+
     @Test
     fun `a rejected upgrade reports the trust fence rather than a protocol error`() = runBlocking {
         val recorder = Recorder()
