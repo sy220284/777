@@ -7,14 +7,12 @@ import java.io.File
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -144,11 +142,26 @@ class LspProcessClient(
     }
 
     suspend fun shutdown(timeoutMillis: Long = 1_500L) {
-        withTimeoutOrNull(timeoutMillis) {
-            runCatching { request("shutdown", JsonObject(emptyMap())) }
-            runCatching { notify("exit", JsonObject(emptyMap())) }
+        try {
+            withTimeoutOrNull(timeoutMillis) {
+                try {
+                    request("shutdown", JsonObject(emptyMap()))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A broken server still needs a best-effort exit/close below.
+                }
+                try {
+                    notify("exit", JsonObject(emptyMap()))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Force-close remains the final fallback.
+                }
+            }
+        } finally {
+            close()
         }
-        close()
     }
 
     fun drainNotifications(): List<JsonObject> = synchronized(pendingNotifications) {
@@ -170,10 +183,15 @@ class LspProcessClient(
         boundedIo { requestBlocking(method, params) }
     }
 
-    private suspend fun <T> boundedIo(block: () -> T): T = coroutineScope {
-        val pending = async(Dispatchers.IO) { block() }
-        try { withTimeout(30_000L) { pending.await() } }
-        catch (cancelled: CancellationException) { close(); throw cancelled }
+    private suspend fun <T> boundedIo(block: () -> T): T = try {
+        withTimeout(30_000L) {
+            runInterruptible(Dispatchers.IO) { block() }
+        }
+    } catch (cancelled: CancellationException) {
+        // BufferedInputStream.read is blocking. runInterruptible turns coroutine cancellation into
+        // a thread interrupt; closing the process/streams also wakes servers that ignore interrupts.
+        close()
+        throw cancelled
     }
 
     private fun requestBlocking(method: String, params: JsonObject): JsonObject {
