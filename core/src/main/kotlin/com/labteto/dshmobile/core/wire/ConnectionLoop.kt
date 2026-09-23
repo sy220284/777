@@ -5,6 +5,7 @@ import com.labteto.dshmobile.core.wire.dto.REMOTE_EVENT_STREAM_ENDPOINT
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import kotlin.math.pow
 import kotlin.random.Random
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -157,51 +158,74 @@ class ConnectionLoop(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
+    private val lifecycleLock = Any()
+    private var lifecycleId = 0L
+
     @Volatile
     private var job: Job? = null
 
     @Volatile
     private var current: RemoteStreamMux? = null
 
-    /** Begin the loop. Idempotent. */
+    /** Begin the loop. Idempotent, including when a previous run is still unwinding. */
     fun start() {
-        if (job != null) return
-        val newJob = scope.launch { runLoop() }
-        job = newJob
+        synchronized(lifecycleLock) {
+            if (job?.isActive == true) return
+            val token = ++lifecycleId
+            job = scope.launch { runLoop(token) }
+        }
     }
 
-    /** Stop the loop and tear down the mux. Idempotent. */
+    /** Stop the loop and tear down exactly the mux owned by that run. Idempotent. */
     fun stop() {
-        val running = job ?: return
-        job = null
-        running.cancel()
-        closeGeneration()
+        val running: Job?
+        val mux: RemoteStreamMux?
+        synchronized(lifecycleLock) {
+            if (job == null && current == null) return
+            ++lifecycleId
+            running = job
+            job = null
+            mux = current
+            current = null
+        }
+        running?.cancel()
+        if (mux != null) runCatching { mux.close() }
     }
 
     // ---------------------------------------------------------------- loop
 
-    private suspend fun runLoop() {
+    private suspend fun runLoop(token: Long) {
         var attempt = 0
-        while (currentCoroutineContext().isActive) {
-            safeSink { sinks.onStateChange(ConnectionState.RECONNECTING) }
-            when (val opened = openGeneration()) {
-                is Opened.Ok -> {
-                    attempt = 0
-                    safeSink { sinks.onConnected(opened.generation) }
-                    safeSink { sinks.onStateChange(ConnectionState.CONNECTED) }
-                    consumeEvents(opened.events)
-                    closeGeneration()
-                }
+        try {
+            while (currentCoroutineContext().isActive && isCurrentLifecycle(token)) {
+                safeSink { sinks.onStateChange(ConnectionState.RECONNECTING) }
+                when (val opened = openGeneration(token)) {
+                    is Opened.Ok -> {
+                        attempt = 0
+                        safeSink { sinks.onConnected(opened.generation) }
+                        safeSink { sinks.onStateChange(ConnectionState.CONNECTED) }
+                        consumeEvents(opened.events)
+                        closeGeneration(opened.generation.mux)
+                    }
 
-                is Opened.Failed -> {
-                    attempt += 1
-                    val reported = attempt
-                    closeGeneration()
-                    safeSink { sinks.onGenerationFailed(reported, opened.failure) }
+                    is Opened.Failed -> {
+                        attempt += 1
+                        safeSink { sinks.onGenerationFailed(attempt, opened.failure) }
+                    }
+                }
+                if (!currentCoroutineContext().isActive || !isCurrentLifecycle(token)) break
+                config.delay(nextBackoff(attempt))
+            }
+        } finally {
+            val mux = synchronized(lifecycleLock) {
+                if (lifecycleId != token) {
+                    null
+                } else {
+                    job = null
+                    current.also { current = null }
                 }
             }
-            if (!currentCoroutineContext().isActive) break
-            config.delay(nextBackoff(attempt))
+            if (mux != null) runCatching { mux.close() }
         }
     }
 
@@ -219,17 +243,25 @@ class ConnectionLoop(
      * handle rather than a cold flow: collecting a flow twice would open two event generations
      * for one connection.
      */
-    private suspend fun openGeneration(): Opened {
+    private suspend fun openGeneration(token: Long): Opened {
         safeSink { sinks.onHandshakeStep(HandshakeStep.OPENING_MUX) }
         val mux = muxFactory()
-        current = mux
+        if (!installCurrent(token, mux)) {
+            runCatching { mux.close() }
+            throw CancellationException("connection loop lifecycle retired")
+        }
         mux.start()
 
         try {
             withTimeout(config.streamOpenTimeoutMs) { mux.awaitOpen() }
         } catch (e: TimeoutCancellationException) {
+            closeGeneration(mux)
             return Opened.Failed(GenerationFailure.MuxTimedOut(config.streamOpenTimeoutMs))
+        } catch (e: CancellationException) {
+            closeGeneration(mux)
+            throw e
         } catch (e: Throwable) {
+            closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.MuxFailed(TransportFailures.classify(e), e.message),
             )
@@ -239,37 +271,55 @@ class ConnectionLoop(
         val events = try {
             mux.open(REMOTE_EVENT_STREAM_ENDPOINT)
         } catch (e: RemoteStreamException) {
+            closeGeneration(mux)
             return Opened.Failed(GenerationFailure.ReadyFailed(e.error))
         }
         val ready = try {
             withTimeout(config.readyTimeoutMs) { events.receive() }
         } catch (e: TimeoutCancellationException) {
+            events.cancel()
+            closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.ReadyFailed(
                     RpcError("internal", "no ready frame within ${config.readyTimeoutMs}ms"),
                 ),
             )
+        } catch (e: CancellationException) {
+            events.cancel()
+            closeGeneration(mux)
+            throw e
         } catch (e: RemoteStreamException) {
+            closeGeneration(mux)
             return Opened.Failed(GenerationFailure.ReadyFailed(e.error))
         } catch (e: Throwable) {
+            events.cancel()
+            closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.ReadyFailed(RpcError("internal", e.message ?: "events stream failed")),
             )
         }
 
         if (ready == null) {
+            events.cancel()
+            closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.ReadyFailed(RpcError("internal", "events stream ended before it was ready")),
             )
         }
         val frame = decodeEventFrame(ready)
-            ?: return Opened.Failed(
-                GenerationFailure.ReadyFailed(RpcError("internal", "opening event frame did not parse")),
-            )
+            ?: run {
+                events.cancel()
+                closeGeneration(mux)
+                return Opened.Failed(
+                    GenerationFailure.ReadyFailed(RpcError("internal", "opening event frame did not parse")),
+                )
+            }
         // A generation that opens on anything but `ready` is a protocol failure, not a frame to
         // skip: every later reply is bound to the clientId this frame carries, so without it
         // there is nothing to answer a waterfall with.
         if (frame !is RemoteEventFrame.Ready) {
+            events.cancel()
+            closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.ReadyFailed(
                     RpcError("internal", "events stream opened with \"${frame.type}\", not \"ready\""),
@@ -315,11 +365,25 @@ class ConnectionLoop(
         null
     }
 
-    /** Tear down the current generation's socket. */
-    private fun closeGeneration() {
-        val mux = current
-        current = null
-        if (mux != null) runCatching { mux.close() }
+    private fun installCurrent(token: Long, mux: RemoteStreamMux): Boolean =
+        synchronized(lifecycleLock) {
+            if (lifecycleId != token) {
+                false
+            } else {
+                current = mux
+                true
+            }
+        }
+
+    private fun isCurrentLifecycle(token: Long): Boolean =
+        synchronized(lifecycleLock) { lifecycleId == token }
+
+    /** Tear down one exact generation without touching a replacement installed by a newer run. */
+    private fun closeGeneration(mux: RemoteStreamMux) {
+        synchronized(lifecycleLock) {
+            if (current === mux) current = null
+        }
+        runCatching { mux.close() }
     }
 
     /**
