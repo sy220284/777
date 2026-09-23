@@ -89,7 +89,7 @@ class AndroidDeviceProvider(
             "dumpsys" -> privileged(
                 "dumpsys " + shellQuote(arguments.required("service")) +
                     arguments["args"].orEmpty().takeIf(String::isNotBlank)
-                        ?.let { " " + it } .orEmpty(),
+                        ?.let { value -> " " + value.trim().split(Regex("\\s+")).joinToString(" ", transform = ::shellQuote) }.orEmpty(),
             )
             "accessibility_tree" -> accessibilityTree()
             "accessibility_find" -> accessibilityFind(arguments)

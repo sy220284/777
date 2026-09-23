@@ -32,44 +32,13 @@ class AndroidProcessRuntime(
         }
 
         val resolvedCommand = resolveCommand(request.command)
-        val process = ProcessBuilder(resolvedCommand)
-            .directory(workingDirectory)
-            .apply { environment().putAll(processEnvironment(request.environment)) }
-            .start()
-
-        try {
-            request.stdin?.let { input ->
-                process.outputStream.bufferedWriter().use { writer ->
-                    writer.write(input)
-                    writer.flush()
-                }
-            } ?: process.outputStream.close()
-
-            coroutineScope {
-                val stdout = async { process.inputStream.readBoundedText(MAX_CAPTURED_PROCESS_CHARS) }
-                val stderr = async { process.errorStream.readBoundedText(MAX_CAPTURED_PROCESS_CHARS) }
-                val completed = runInterruptible {
-                    process.waitFor(request.timeoutMillis.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
-                }
-                if (!completed) {
-                    process.destroyForcibly()
-                    process.waitFor()
-                    return@coroutineScope ProcessResult(
-                        exitCode = -1,
-                        stdout = stdout.await(),
-                        stderr = stderr.await(),
-                        timedOut = true,
-                    )
-                }
-                ProcessResult(
-                    exitCode = process.exitValue(),
-                    stdout = stdout.await(),
-                    stderr = stderr.await(),
-                )
-            }
-        } finally {
-            if (process.isAlive) process.destroyForcibly()
-        }
+        executeManagedProcess(
+            builder = ProcessBuilder(resolvedCommand)
+                .directory(workingDirectory)
+                .apply { environment().putAll(processEnvironment(request.environment)) },
+            stdin = request.stdin,
+            timeoutMillis = request.timeoutMillis,
+        )
     }
 
     fun processEnvironment(overrides: Map<String, String> = emptyMap()): Map<String, String> =
@@ -88,23 +57,6 @@ class AndroidProcessRuntime(
             .firstOrNull(File::canExecute)
             ?: return command
         return listOf(resolved.absolutePath) + command.drop(1)
-    }
-
-    private fun java.io.InputStream.readBoundedText(maxChars: Int): String {
-        bufferedReader().use { reader ->
-            val output = StringBuilder(minOf(maxChars, 16 * 1024))
-            val buffer = CharArray(8 * 1024)
-            var truncated = false
-            while (true) {
-                val read = reader.read(buffer)
-                if (read < 0) break
-                val remaining = maxChars - output.length
-                if (remaining > 0) output.append(buffer, 0, minOf(read, remaining))
-                if (read > remaining) truncated = true
-            }
-            if (truncated) output.append("\n[输出超过 ${maxChars} 字符，已在读取阶段截断]")
-            return output.toString()
-        }
     }
 
     private fun searchPaths(): List<File> {

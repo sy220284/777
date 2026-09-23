@@ -201,27 +201,16 @@ class LocalWorkspace(
                 )
             }
         }
-        val process = builder.start()
-        try {
-            coroutineScope {
-                val output = async {
-                    process.inputStream.bufferedReader().use { readBounded(it, onProgress) }
-                }
-                val finished = runInterruptible {
-                    process.waitFor(timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS).toLong(), TimeUnit.SECONDS)
-                }
-                if (!finished) {
-                    process.destroyForcibly()
-                    process.waitFor()
-                    return@coroutineScope (
-                        "[shell][TOOL_TIMEOUT] 命令执行超时（${timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS)} 秒），已终止。" +
-                            "\n已产生输出：\n${output.await()}"
-                        ).trimEnd()
-                }
-                "退出码：${process.exitValue()}\n${output.await()}"
-            }
-        } finally {
-            if (process.isAlive) process.destroyForcibly()
+        val result = com.labteto.dshmobile.runtime.executeManagedProcess(
+            builder = builder,
+            timeoutMillis = timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS) * 1000L,
+            maxChars = MAX_SHELL_CHARS,
+            onProgress = onProgress,
+        )
+        if (result.timedOut) {
+            "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}"
+        } else {
+            "退出码：${result.exitCode}\n${result.stdout}"
         }
     }
 
