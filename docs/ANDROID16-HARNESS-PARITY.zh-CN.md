@@ -75,9 +75,11 @@
 | 秒级自主调度 | Android 16 后台调度受系统配额和最小周期约束，无法承诺官方常驻进程语义 |
 | 实验性 Agent Teams / Ralph | 官方标准预设默认关闭；其持久成员进程依赖常驻宿主 |
 
-## 已完成底层、尚未接入模型工具
+## 代码智能 / LSP
 
-- LSP：`harness-interop` 已实现语言服务器进程启动、JSON-RPC framing、initialize、definition、references、hover、document/workspace symbols 与 rename，并可继承 APK 内置 Node/Python 的命令解析和环境。当前没有随 APK 捆绑具体语言服务器，也尚未注册为本机 Harness 模型工具，因此不能把“客户端存在”误记成“LSP 功能已正式开放”。
+- `harness-interop` 已实现语言服务器进程启动、JSON-RPC framing、initialize、definition、references、hover、implementation、document/workspace symbols、rename 预览与 diagnostics，并已注册为本机 Harness 的按需模型工具。
+- 普通用户不再配置启动命令。777 会按目标文件和项目特征自动选择当前运行环境中已存在的 Kotlin、Java、Python、TypeScript/JavaScript、Rust、Go、C/C++ 语言服务器，并支持工作区自带的 TypeScript language server；首次真正启动新的外部代码智能进程仍需人工审批。
+- 当前 APK 不主动下载或安装第三方语言服务器。若项目与运行环境中没有可用服务器，Agent 会继续使用文件读取、grep/glob、编译和测试完成任务，不会把 LSP 当成硬依赖。旧版本已经保存的显式启动命令仅作为升级兼容的内部覆盖项继续生效。
 
 ## 安全边界
 
