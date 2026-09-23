@@ -59,6 +59,7 @@ internal class LocalSubagentRunner(
     private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode) -> List<JsonObject>,
+    private val onUsage: (String, DeepSeekTokenUsage) -> Unit = { _, _ -> },
     private val onNativeImageRejected: () -> Unit = {},
     private val resourceScheduler: HarnessResourceScheduler,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
@@ -217,6 +218,7 @@ internal class LocalSubagentRunner(
                             throw error
                         }
                     }
+                    onUsage(routeModel, reply.usage)
                     repliesByStep[modelStep] = reply
                     AgentModelReply(
                         content = reply.content.orEmpty(),
