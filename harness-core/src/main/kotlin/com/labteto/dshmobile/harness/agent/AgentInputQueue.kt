@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.harness.agent
 
+import kotlinx.serialization.json.JsonObject
+
 data class QueuedAgentInput(
     val content: String,
     val memoryInput: String = content,
+    val modelMessage: JsonObject? = null,
 )
 
 class AgentInputQueue(
