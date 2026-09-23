@@ -187,4 +187,85 @@ class ChatNodeVisibilityTest {
         assertFalse((nodes[2] as AssistantMessageNode).isWorkProcess(nodes))
     }
 
+
+    @Test
+    fun `split final answer is merged and only last node anchors the card`() {
+        val first = AssistantMessageNode(
+            seq = 41,
+            messageId = "a-first",
+            turn = 7,
+            step = 3,
+            blocks = listOf(ChatBlock("text", "第一段")),
+        )
+        val second = AssistantMessageNode(
+            seq = 42,
+            messageId = "a-second",
+            turn = 7,
+            step = 4,
+            blocks = listOf(ChatBlock("text", "第二段")),
+        )
+        val nodes = listOf(
+            UserMessageNode(
+                seq = 40,
+                messageId = "u40",
+                blocks = listOf(ChatBlock("text", "继续")),
+                sourceKind = "user",
+            ),
+            first,
+            second,
+            TurnEndNode(seq = 43, turn = 7, reasonKind = "completed"),
+        )
+
+        assertFalse(first.isFinalAnswerAnchor(nodes))
+        assertTrue(second.isFinalAnswerAnchor(nodes))
+        assertEquals("第一段\n\n第二段", second.finalAnswerText(nodes))
+        assertFalse(first.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+        assertTrue(second.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+    }
+
+    @Test
+    fun `concise mode hides work and tools while full mode restores them`() {
+        val work = AssistantMessageNode(
+            seq = 51,
+            messageId = "work",
+            turn = 8,
+            step = 1,
+            blocks = listOf(ChatBlock("text", "先查文件")),
+        )
+        val tool = ToolCallNode(
+            seq = 52,
+            callId = "call-1",
+            name = "read",
+            arguments = "{}",
+            turn = 8,
+            step = 1,
+        )
+        val answer = AssistantMessageNode(
+            seq = 53,
+            messageId = "answer",
+            turn = 8,
+            step = 2,
+            blocks = listOf(ChatBlock("text", "最终结果")),
+        )
+        val nodes = listOf(
+            UserMessageNode(
+                seq = 50,
+                messageId = "u50",
+                blocks = listOf(ChatBlock("text", "检查")),
+                sourceKind = "user",
+            ),
+            work,
+            tool,
+            answer,
+            TurnEndNode(seq = 54, turn = 8, reasonKind = "completed"),
+        )
+
+        assertFalse(work.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+        assertFalse(tool.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+        assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+        assertTrue(work.rendersInTranscript(nodes, TranscriptMode.FULL))
+        assertTrue(tool.rendersInTranscript(nodes, TranscriptMode.FULL))
+        assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.FULL))
+    }
+
 }
