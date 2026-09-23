@@ -81,62 +81,58 @@ object SessionRecovery {
     }
 
     fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
-        val events = log.snapshot()
-        if (events.isEmpty()) return SessionRepairResult()
+        // A restart only needs to inspect the newest unfinished turn. Replaying the complete
+        // append-only archive here used to duplicate years of session history in the Android heap
+        // and could OOM before the Harness reached its incremental projection checkpoints.
+        val turnStart = log.latest("turn/start") ?: return SessionRepairResult()
+        val turnEnd = log.latest("turn/end")
+        if (turnEnd != null && turnEnd.sequence > turnStart.sequence) {
+            return SessionRepairResult()
+        }
 
-        var openTurn = false
-        var openStep: Int? = null
+        val latestStepStart = log.latest("step/start")
+        val latestStepEnd = log.latest("step/end")
+        val openStepEvent = latestStepStart?.takeIf { stepStart ->
+            stepStart.sequence > turnStart.sequence &&
+                (latestStepEnd == null || latestStepEnd.sequence < stepStart.sequence)
+        }
+        val openStep = openStepEvent?.data?.get("step")?.jsonPrimitive?.intOrNull
         val pending = linkedMapOf<String, PendingCall>()
 
-        for (event in events) {
-            when (event.type) {
-                "turn/start" -> {
-                    openTurn = true
-                    openStep = null
-                    pending.clear()
-                }
-                "turn/end" -> {
-                    openTurn = false
-                    openStep = null
-                    pending.clear()
-                }
-                "step/start" -> if (openTurn) {
-                    openStep = event.data["step"]?.jsonPrimitive?.intOrNull
-                }
-                "assistant/message" -> {
-                    if (!openTurn || openStep == null) continue
-                    val calls = event.data["tool_calls"] as? JsonArray ?: continue
-                    for (element in calls) {
-                        val call = element as? JsonObject ?: continue
-                        val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
-                        val function = call["function"] as? JsonObject
-                        val name = function?.get("name")?.jsonPrimitive?.contentOrNull
-                        pending[id] = PendingCall(id, name, openStep, started = false)
+        if (openStepEvent != null) {
+            // Stream only the current open step. No List of historical SessionEvent objects is
+            // created, and events from completed steps cannot leak pending calls into recovery.
+            log.forEachAfter(openStepEvent.sequence) { event ->
+                when (event.type) {
+                    "assistant/message" -> {
+                        val calls = event.data["tool_calls"] as? JsonArray ?: return@forEachAfter
+                        for (element in calls) {
+                            val call = element as? JsonObject ?: continue
+                            val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                            val function = call["function"] as? JsonObject
+                            val name = function?.get("name")?.jsonPrimitive?.contentOrNull
+                            pending[id] = PendingCall(id, name, openStep, started = false)
+                        }
                     }
-                }
-                "tool/call" -> {
-                    if (!openTurn) continue
-                    val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: continue
-                    val name = event.data["name"]?.jsonPrimitive?.contentOrNull
-                    val step = event.data["step"]?.jsonPrimitive?.intOrNull ?: openStep
-                    val existing = pending[id]
-                    if (existing == null) {
-                        pending[id] = PendingCall(id, name, step, started = true)
-                    } else {
-                        existing.name = name ?: existing.name
-                        existing.step = step ?: existing.step
-                        existing.started = true
+                    "tool/call" -> {
+                        val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEachAfter
+                        val name = event.data["name"]?.jsonPrimitive?.contentOrNull
+                        val step = event.data["step"]?.jsonPrimitive?.intOrNull ?: openStep
+                        val existing = pending[id]
+                        if (existing == null) {
+                            pending[id] = PendingCall(id, name, step, started = true)
+                        } else {
+                            existing.name = name ?: existing.name
+                            existing.step = step ?: existing.step
+                            existing.started = true
+                        }
                     }
-                }
-                "tool/result" -> event.data["id"]?.jsonPrimitive?.contentOrNull?.let(pending::remove)
-                "step/end" -> {
-                    openStep = null
-                    pending.clear()
+                    "tool/result" -> {
+                        event.data["id"]?.jsonPrimitive?.contentOrNull?.let(pending::remove)
+                    }
                 }
             }
         }
-
-        if (!openTurn) return SessionRepairResult()
 
         val appended = mutableListOf<SessionEvent>()
         val recovered = mutableListOf<RecoveredToolResult>()
