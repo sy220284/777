@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -33,9 +34,10 @@ class DsDialogOverflowTest {
         }
 
         val scrollable = compose.onNode(hasScrollAction()).assertExists()
-        repeat(24) {
-            scrollable.performTouchInput { swipeUp() }
+        scrollable.performSemanticsAction(SemanticsActions.ScrollBy) { scrollBy ->
+            scrollBy(0f, Float.MAX_VALUE)
         }
+        compose.waitForIdle()
         compose.onNodeWithText("Finish")
             .assertIsDisplayed()
             .performClick()
