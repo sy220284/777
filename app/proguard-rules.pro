@@ -20,3 +20,9 @@
 -keep class androidx.work.impl.WorkDatabase_Impl {
     <init>();
 }
+
+
+# HDiffPatch JNI exports Java_com_github_sisong_HPatch_patch; keep the ABI name stable.
+-keep class com.github.sisong.HPatch {
+    *;
+}
