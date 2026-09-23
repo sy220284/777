@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,12 +74,22 @@ class ConnectionManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val desiredIntentVersion = AtomicLong(0L)
+    private val reconnectRequestVersion = AtomicLong(0L)
+    private val transportEpoch = AtomicLong(0L)
+    private val transportLock = Any()
+    private val connectMutex = Mutex()
+    private val reconnectMutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
 
+    @Volatile
     private var loop: ConnectionLoop? = null
+
+    @Volatile
     private var api: DshApiClient? = null
+
+    @Volatile
     private var activeHost: HostConfig? = null
 
     /**
@@ -106,60 +118,81 @@ class ConnectionManager @Inject constructor(
     val eventFrames = eventBuffer.frames
     private fun eventBufferReset(): Unit = eventBuffer.connected()
 
-    private val sinks = object : LoopSinks {
+    private fun sinks(epoch: Long) = object : LoopSinks {
         override fun onEventFrame(frame: RemoteEventFrame) {
-            eventBuffer.offer(frame)
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                eventBuffer.offer(frame)
+            }
         }
 
         override fun onConnected(generation: HostGeneration) {
-            eventBuffer.connected()
-            this@ConnectionManager.generation = generation
-            val host = activeHost
-            if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }
-            _state.value = ConnectionUiState(
-                phase = ConnectionPhase.CONNECTED,
-                host = activeHost,
-                description = generation.description,
-                stage = ConnectStage.Connected,
-                failure = null,
-                attempts = 0,
-                hasConnected = true,
-            )
-            maybeStartService()
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                eventBuffer.connected()
+                this@ConnectionManager.generation = generation
+                val host = activeHost
+                if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }
+                _state.value = ConnectionUiState(
+                    phase = ConnectionPhase.CONNECTED,
+                    host = activeHost,
+                    description = generation.description,
+                    stage = ConnectStage.Connected,
+                    failure = null,
+                    attempts = 0,
+                    hasConnected = true,
+                )
+                maybeStartService()
+            }
         }
 
         override fun onStateChange(state: ConnectionState) {
-            val current = _state.value
-            val phase = when {
-                state == ConnectionState.CONNECTED -> ConnectionPhase.CONNECTED
-                // The loop opens every generation the same way, but the first one is not a
-                // *re*connect — calling it that is what let a never-connected attempt look like a
-                // healthy session dropping, and hid it from the connect screen entirely.
-                current.hasConnected -> ConnectionPhase.RECONNECTING
-                else -> ConnectionPhase.CONNECTING
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val current = _state.value
+                val phase = when {
+                    state == ConnectionState.CONNECTED -> ConnectionPhase.CONNECTED
+                    // The loop opens every generation the same way, but the first one is not a
+                    // *re*connect — calling it that is what let a never-connected attempt look like a
+                    // healthy session dropping, and hid it from the connect screen entirely.
+                    current.hasConnected -> ConnectionPhase.RECONNECTING
+                    else -> ConnectionPhase.CONNECTING
+                }
+                // Note: does not clear `failure`. The loop emits this on every retry, so clearing here
+                // would erase the explanation a fraction of a second after showing it.
+                _state.value = current.copy(phase = phase)
             }
-            // Note: does not clear `failure`. The loop emits this on every retry, so clearing here
-            // would erase the explanation a fraction of a second after showing it.
-            _state.value = current.copy(phase = phase)
         }
 
         override fun onHandshakeStep(step: HandshakeStep) {
-            val stage = when (step) {
-                HandshakeStep.OPENING_MUX -> ConnectStage.OpeningStreams
-                HandshakeStep.AWAITING_READY -> ConnectStage.Verifying
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val stage = when (step) {
+                    HandshakeStep.OPENING_MUX -> ConnectStage.OpeningStreams
+                    HandshakeStep.AWAITING_READY -> ConnectStage.Verifying
+                }
+                _state.value = _state.value.copy(stage = stage)
             }
-            _state.value = _state.value.copy(stage = stage)
         }
 
         override fun onGenerationFailed(attempt: Int, failure: GenerationFailure) {
-            val host = activeHost
-            _state.value = _state.value.copy(
-                failure = ConnectFailure.from(failure, relay = host?.isRelay == true),
-                attempts = attempt,
-            )
-            if (host != null && isTerminalForRelay(host, failure)) stopRetrying()
+            val terminal = synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val host = activeHost
+                _state.value = _state.value.copy(
+                    failure = ConnectFailure.from(failure, relay = host?.isRelay == true),
+                    attempts = attempt,
+                )
+                host != null && isTerminalForRelay(host, failure)
+            }
+            if (terminal) stopRetrying(epoch)
         }
     }
+
+    private data class RetiredTransport(
+        val epoch: Long,
+        val loop: ConnectionLoop?,
+    )
 
     val connectedApi: DshApiClient? get() = api
 
@@ -173,7 +206,12 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
+        connectMutex.withLock { connectLocked(config) }
+    }
+
+    private suspend fun connectLocked(config: HostConfig) {
         val intentVersion = desiredIntentVersion.incrementAndGet()
+        reconnectRequestVersion.incrementAndGet()
         // Keep an already-running foreground service alive while replacing the
         // transport. This is essential when the service itself is restoring a
         // persisted desired connection after process recreation.
@@ -183,22 +221,42 @@ class ConnectionManager @Inject constructor(
             _state.value = ConnectionUiState(host = config, failure = ConnectFailure.PairingRequired)
             return
         }
-        activeHost = config
-        _state.value = ConnectionUiState(
-            phase = ConnectionPhase.CONNECTING,
-            host = config,
-            stage = ConnectStage.OpeningStreams,
-        )
-        api = clientFactory.clientFor(config)
-        val loop = ConnectionLoop(muxFactory(config), sinks, LoopConfig())
-        this.loop = loop
-        loop.start()
+        val baseEpoch = synchronized(transportLock) {
+            if (desiredIntentVersion.get() != intentVersion) return
+            activeHost = config
+            _state.value = ConnectionUiState(
+                phase = ConnectionPhase.CONNECTING,
+                host = config,
+                stage = ConnectStage.OpeningStreams,
+            )
+            transportEpoch.get()
+        }
+
+        val nextApi = clientFactory.clientFor(config)
+        val installed = synchronized(transportLock) {
+            if (desiredIntentVersion.get() != intentVersion ||
+                activeHost?.id != config.id ||
+                transportEpoch.get() != baseEpoch
+            ) {
+                false
+            } else {
+                val epoch = transportEpoch.incrementAndGet()
+                val nextLoop = ConnectionLoop(muxFactory(config), sinks(epoch), LoopConfig())
+                api = nextApi
+                loop = nextLoop
+                nextLoop.start()
+                true
+            }
+        }
+        if (!installed) return
+
         hostsStore.upsertHost(config)
         if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(config.id)
     }
 
     fun disconnect() {
         val intentVersion = desiredIntentVersion.incrementAndGet()
+        reconnectRequestVersion.incrementAndGet()
         disconnectRuntime()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
@@ -206,13 +264,18 @@ class ConnectionManager @Inject constructor(
     }
 
     private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
-        loop?.stop()
-        loop = null
-        api = null
-        generation = null
-        activeHost = null
+        val retired = synchronized(transportLock) {
+            transportEpoch.incrementAndGet()
+            val previous = loop
+            loop = null
+            api = null
+            generation = null
+            activeHost = null
+            _state.value = ConnectionUiState()
+            previous
+        }
+        retired?.stop()
         if (stopBackgroundService) stopService()
-        _state.value = ConnectionUiState()
     }
 
     suspend fun restoreDesiredConnectionIfNeeded() {
@@ -226,14 +289,65 @@ class ConnectionManager @Inject constructor(
 
     fun reconnectIfNeeded() {
         val host = activeHost ?: return
-        loop?.stop()
+        val intentVersion = desiredIntentVersion.get()
+        val requestVersion = reconnectRequestVersion.incrementAndGet()
         scope.launch {
-            // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
-            // rotated or dropped while the app is backgrounded, and the credential is baked into the
-            // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
-            // when that is most likely to have happened.
-            api = clientFactory.clientFor(host)
-            loop = ConnectionLoop(muxFactory(host), sinks, LoopConfig()).also { it.start() }
+            reconnectMutex.withLock {
+                // Coalesce bursts from UI retry, keep-alive and event-buffer recovery. Only the
+                // newest request for the still-selected host may replace the transport.
+                if (requestVersion != reconnectRequestVersion.get() ||
+                    intentVersion != desiredIntentVersion.get() ||
+                    activeHost?.id != host.id
+                ) {
+                    return@withLock
+                }
+
+                val retired = synchronized(transportLock) {
+                    if (requestVersion != reconnectRequestVersion.get() ||
+                        intentVersion != desiredIntentVersion.get() ||
+                        activeHost?.id != host.id
+                    ) {
+                        null
+                    } else {
+                        val epoch = transportEpoch.incrementAndGet()
+                        val previous = loop
+                        loop = null
+                        api = null
+                        generation = null
+                        _state.value = _state.value.copy(
+                            phase = ConnectionPhase.RECONNECTING,
+                            stage = ConnectStage.OpeningStreams,
+                        )
+                        RetiredTransport(epoch, previous)
+                    }
+                } ?: return@withLock
+                retired.loop?.stop()
+
+                // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
+                // rotated or dropped while the app is backgrounded, and the credential is baked into the
+                // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
+                // when that is most likely to have happened.
+                val nextApi = clientFactory.clientFor(host)
+                val nextLoop = ConnectionLoop(muxFactory(host), sinks(retired.epoch), LoopConfig())
+
+                // A disconnect or host switch can land while the client is being rebuilt. Install
+                // the replacement only if this request still owns the transport epoch it retired.
+                val installed = synchronized(transportLock) {
+                    if (requestVersion != reconnectRequestVersion.get() ||
+                        intentVersion != desiredIntentVersion.get() ||
+                        activeHost?.id != host.id ||
+                        transportEpoch.get() != retired.epoch
+                    ) {
+                        false
+                    } else {
+                        api = nextApi
+                        loop = nextLoop
+                        nextLoop.start()
+                        true
+                    }
+                }
+                if (!installed) nextLoop.stop()
+            }
         }
     }
 
@@ -279,23 +393,37 @@ class ConnectionManager @Inject constructor(
      * Not [disconnect]: that resets the whole state object, which would wipe the very explanation
      * the user needs in order to know that pairing again is the fix.
      */
-    private fun stopRetrying() {
-        loop?.stop()
-        loop = null
+    private fun stopRetrying(expectedEpoch: Long) {
+        var accepted = false
+        val retired = synchronized(transportLock) {
+            if (transportEpoch.get() != expectedEpoch) {
+                null
+            } else {
+                accepted = true
+                transportEpoch.incrementAndGet()
+                val previous = loop
+                loop = null
+                api = null
+                generation = null
+                _state.value = _state.value.copy(
+                    phase = ConnectionPhase.DISCONNECTED,
+                    // Back to Idle, not left on whatever handshake step the last generation died at. The
+                    // connect screen derives "still connecting" from the stage, so a stage frozen mid-
+                    // handshake leaves the Connect button disabled with a spinner that will never finish —
+                    // which is precisely the failure this screen already learned once.
+                    stage = ConnectStage.Idle,
+                    attempts = 0,
+                )
+                previous
+            }
+        }
+        if (!accepted) return
+        retired?.stop()
         stopService()
         val intentVersion = desiredIntentVersion.incrementAndGet()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
         }
-        _state.value = _state.value.copy(
-            phase = ConnectionPhase.DISCONNECTED,
-            // Back to Idle, not left on whatever handshake step the last generation died at. The
-            // connect screen derives "still connecting" from the stage, so a stage frozen mid-
-            // handshake leaves the Connect button disabled with a spinner that will never finish —
-            // which is precisely the failure this screen already learned once.
-            stage = ConnectStage.Idle,
-            attempts = 0,
-        )
     }
 
     private fun maybeStartService() {

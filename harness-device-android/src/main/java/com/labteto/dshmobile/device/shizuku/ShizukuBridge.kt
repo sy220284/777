@@ -36,7 +36,7 @@ class ShizukuBridge(
             .daemon(false)
             .processNameSuffix("harness_privileged")
             .debuggable(false)
-            .version(1)
+            .version(2)
     }
 
     private val connection = object : ServiceConnection {
@@ -69,8 +69,8 @@ class ShizukuBridge(
         if (!state().permissionGranted) Shizuku.requestPermission(requestCode)
     }
 
-    suspend fun execute(command: String, timeoutMillis: Long = 30_000L): String {
-        require(command.isNotBlank()) { "特权命令不能为空" }
+    suspend fun execute(command: List<String>, timeoutMillis: Long = 30_000L): String {
+        validatePrivilegedCommand(command)
         val current = state()
         require(current.binderAlive) { "Shizuku 服务未运行" }
         require(current.permissionGranted) { "Shizuku 权限未授予" }
@@ -80,7 +80,7 @@ class ShizukuBridge(
             val reply = Parcel.obtain()
             try {
                 data.writeInterfaceToken(PrivilegedCommandService.DESCRIPTOR)
-                data.writeString(command)
+                data.writeStringList(command)
                 data.writeLong(timeoutMillis.coerceIn(1L, MAX_TIMEOUT_MILLIS))
                 val accepted = binder.transact(
                     PrivilegedCommandService.TRANSACTION_EXECUTE,
@@ -125,6 +125,39 @@ class ShizukuBridge(
     }
 }
 
+
+internal fun validatePrivilegedCommand(command: List<String>) {
+    require(command.isNotEmpty()) { "特权命令不能为空" }
+    require(command.size <= 32) { "特权命令参数过多" }
+    require(command.all { it.length <= 4_096 && '\u0000' !in it && '\n' !in it && '\r' !in it }) {
+        "特权命令参数非法"
+    }
+    when (command.first()) {
+        "/system/bin/am" -> {
+            require(command.size == 3 && command[1] == "force-stop") { "仅允许 am force-stop" }
+            require(ANDROID_PACKAGE.matches(command[2])) { "应用包名非法" }
+        }
+        "/system/bin/settings" -> {
+            require(command.size == 5 && command[1] == "put") { "仅允许 settings put" }
+            require(command[2] in setOf("global", "secure", "system")) { "settings namespace 非法" }
+            require(command[3].isNotBlank() && command[3].length <= 256) { "settings key 非法" }
+        }
+        "/system/bin/dumpsys" -> {
+            require(command.size >= 2) { "dumpsys 缺少服务名" }
+            require(SERVICE_NAME.matches(command[1])) { "dumpsys 服务名非法" }
+        }
+        "/system/bin/pm" -> {
+            require(command == listOf("/system/bin/pm", "list", "packages")) {
+                "仅允许 pm list packages"
+            }
+        }
+        else -> error("特权命令不在允许列表")
+    }
+}
+
+private val ANDROID_PACKAGE = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
+private val SERVICE_NAME = Regex("[A-Za-z0-9_.:-]{1,128}")
+
 class PrivilegedCommandService() : Binder() {
     @Suppress("UNUSED_PARAMETER")
     constructor(context: Context) : this()
@@ -132,7 +165,7 @@ class PrivilegedCommandService() : Binder() {
     override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
         if (code != TRANSACTION_EXECUTE) return super.onTransact(code, data, reply, flags)
         data.enforceInterface(DESCRIPTOR)
-        val command = data.readString().orEmpty()
+        val command = data.createStringArrayList().orEmpty()
         val timeoutMillis = data.readLong().coerceIn(1L, 15 * 60_000L)
         val result = executeCommand(command, timeoutMillis)
         reply?.writeNoException()
@@ -140,9 +173,9 @@ class PrivilegedCommandService() : Binder() {
         return true
     }
 
-    private fun executeCommand(command: String, timeoutMillis: Long): String {
-        if (command.isBlank()) return "退出码：-1\n命令为空"
-        val process = ProcessBuilder("/system/bin/sh", "-c", command)
+    private fun executeCommand(command: List<String>, timeoutMillis: Long): String {
+        validatePrivilegedCommand(command)
+        val process = ProcessBuilder(command)
             .redirectErrorStream(true)
             .start()
         return try {

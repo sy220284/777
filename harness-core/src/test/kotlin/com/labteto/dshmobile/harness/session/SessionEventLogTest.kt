@@ -40,6 +40,59 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun restartRecoversSequenceFromNewestValidTailWithoutReplayingHistory() {
+        val directory = Files.createTempDirectory("harness-event-tail-recovery").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(18) { index ->
+                log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) })
+            }
+            val expectedNext = log.snapshot().last().sequence + 1L
+
+            // Simulate a torn final write. Startup must skip it and recover from the newest
+            // complete row without requiring a full historical replay.
+            file.appendText("{\"sequence\":999")
+            val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
+            val appended = restarted.append("test/restarted", buildJsonObject { put("value", "ok") })
+
+            assertEquals(expectedNext, appended.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun restartFallsBackToPreviousSegmentWhenActiveFileHasNoValidRow() {
+        val directory = Files.createTempDirectory("harness-event-tail-fallback").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(12) { index ->
+                log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(52)) })
+            }
+            val newestSegment = directory.listFiles().orEmpty()
+                .filter { it.name.startsWith("session.events.jsonl.part-") }
+                .maxByOrNull { it.name }
+                ?: error("expected at least one rotated segment")
+            val previousSequence = newestSegment.readLines()
+                .mapNotNull { line ->
+                    runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
+                }
+                .maxOrNull()
+                ?: error("expected a valid event in rotated segment")
+
+            file.writeText("{broken tail only")
+
+            val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
+            val appended = restarted.append("test/restarted", buildJsonObject { put("value", "ok") })
+            assertEquals(previousSequence + 1L, appended.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectedOversizedEventDoesNotConsumeSequence() {
         val directory = Files.createTempDirectory("harness-event-sequence").toFile()
         val file = directory.resolve("session.events.jsonl")

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -127,8 +128,42 @@ class SessionEventLog(
         }
     }
 
-    private fun readNextSequence(): Long =
-        readEventsUnsafe().maxOfOrNull(SessionEvent::sequence)?.plus(1L) ?: 0L
+    /**
+     * Recover the next sequence from the newest valid row only.
+     *
+     * Each segment is bounded by [maxBytes] and sequences are monotonic across rotations, so
+     * replaying every historical JSON row at startup is unnecessary. Scanning newest files
+     * backwards keeps restart cost bounded by one segment in the normal case while still
+     * tolerating a torn/corrupt tail.
+     */
+    private fun readNextSequence(): Long {
+        for (source in orderedFilesUnsafe().asReversed()) {
+            val latest = readLastValidEventUnsafe(source) ?: continue
+            return latest.sequence + 1L
+        }
+        return 0L
+    }
+
+    private fun readLastValidEventUnsafe(source: File): SessionEvent? {
+        if (!source.isFile || source.length() <= 0L) return null
+        val length = source.length()
+        val bytesToRead = minOf(length, maxBytes, Int.MAX_VALUE.toLong()).toInt()
+        val bytes = ByteArray(bytesToRead)
+        RandomAccessFile(source, "r").use { input ->
+            input.seek(length - bytesToRead)
+            input.readFully(bytes)
+        }
+        val rows = bytes.toString(Charsets.UTF_8).lineSequence().toList()
+        for (index in rows.indices.reversed()) {
+            val line = rows[index]
+            if (line.isBlank()) continue
+            val event = runCatching {
+                json.decodeFromString(SessionEvent.serializer(), line)
+            }.getOrNull()
+            if (event != null) return event
+        }
+        return null
+    }
 
     private fun readEventsUnsafe(): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()

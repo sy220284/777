@@ -1,13 +1,19 @@
 package com.labteto.dshmobile.core.wire
 
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The loop has to say *why* a generation failed.
@@ -117,6 +123,29 @@ class ConnectionLoopHandshakeTest {
         assertEquals(1, attempt)
         assertTrue("was $failure", failure is GenerationFailure.MuxTimedOut)
         assertEquals(30L, (failure as GenerationFailure.MuxTimedOut).timeoutMs)
+    }
+
+
+    @Test
+    fun `a factory failure is reported and retried instead of killing the loop`() = runBlocking {
+        val recorder = Recorder()
+        val calls = AtomicInteger(0)
+        val loop = ConnectionLoop(
+            muxFactory = {
+                if (calls.getAndIncrement() == 0) error("factory boom")
+                RemoteStreamMux { sink -> FakeChannel(sink, openingWith(readyFrame)) }
+            },
+            sinks = recorder,
+            config = LoopConfig(streamOpenTimeoutMs = 100, readyTimeoutMs = 100, delay = { }),
+        )
+
+        loop.start()
+        assertTrue(await { recorder.failures.isNotEmpty() })
+        assertTrue(await { recorder.connected.isNotEmpty() })
+        loop.stop()
+
+        assertTrue(recorder.failures.first().second is GenerationFailure.MuxFailed)
+        assertTrue(calls.get() >= 2)
     }
 
     @Test
@@ -265,6 +294,72 @@ class ConnectionLoopHandshakeTest {
         val frame = recorder.frames.first()
         assertTrue("was $frame", frame is RemoteEventFrame.Emit)
         assertEquals("commands/change", (frame as RemoteEventFrame.Emit).event)
+    }
+
+
+    @Test
+    fun `stop then immediate start cannot let a retired run close the replacement mux`() = runBlocking {
+        val recorder = Recorder()
+        val firstFactoryEntered = CompletableDeferred<Unit>()
+        val releaseFirstFactory = CompletableDeferred<Unit>()
+        val sockets = CopyOnWriteArrayList<FakeChannel>()
+        val factoryCalls = AtomicInteger(0)
+
+        val loop = ConnectionLoop(
+            muxFactory = {
+                if (factoryCalls.getAndIncrement() == 0) {
+                    firstFactoryEntered.complete(Unit)
+                    // Simulate a factory that cannot be cancelled immediately. The retired run
+                    // must be rejected when it eventually returns.
+                    withContext(NonCancellable) { releaseFirstFactory.await() }
+                }
+                RemoteStreamMux { sink ->
+                    FakeChannel(sink, openingWith(readyFrame)).also(sockets::add)
+                }
+            },
+            sinks = recorder,
+            config = LoopConfig(streamOpenTimeoutMs = 100, readyTimeoutMs = 100, delay = { }),
+        )
+
+        loop.start()
+        firstFactoryEntered.await()
+        loop.stop()
+        loop.start()
+
+        assertTrue(await { recorder.connected.isNotEmpty() })
+        val replacement = sockets.last()
+        assertFalse(replacement.closed)
+
+        releaseFirstFactory.complete(Unit)
+        kotlinx.coroutines.delay(50)
+        assertFalse("retired lifecycle closed replacement mux", replacement.closed)
+
+        loop.stop()
+        assertTrue(replacement.closed)
+    }
+
+    @Test
+    fun `concurrent starts still create one active lifecycle`() = runBlocking {
+        val recorder = Recorder()
+        val factoryCalls = AtomicInteger(0)
+        val loop = ConnectionLoop(
+            muxFactory = {
+                factoryCalls.incrementAndGet()
+                RemoteStreamMux { sink -> FakeChannel(sink, openingWith(readyFrame)) }
+            },
+            sinks = recorder,
+            config = LoopConfig(streamOpenTimeoutMs = 100, readyTimeoutMs = 100, delay = { }),
+        )
+
+        kotlinx.coroutines.coroutineScope {
+            repeat(24) {
+                launch(kotlinx.coroutines.Dispatchers.Default) { loop.start() }
+            }
+        }
+
+        assertTrue(await { recorder.connected.isNotEmpty() })
+        assertEquals(1, factoryCalls.get())
+        loop.stop()
     }
 
     @Test

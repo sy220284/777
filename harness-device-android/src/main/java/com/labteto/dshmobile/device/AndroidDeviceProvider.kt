@@ -76,7 +76,9 @@ class AndroidDeviceProvider(
             "app_list" -> appList()
             "app_info" -> appInfo(arguments.required("package"))
             "app_launch" -> appLaunch(arguments.required("package"))
-            "app_stop" -> privileged("am force-stop ${shellQuote(arguments.required("package"))}")
+            "app_stop" -> privileged(
+                listOf("/system/bin/am", "force-stop", arguments.required("package")),
+            )
             "settings_get" -> settingsGet(
                 arguments.required("namespace"),
                 arguments.required("key"),
@@ -87,9 +89,12 @@ class AndroidDeviceProvider(
                 arguments.required("value"),
             )
             "dumpsys" -> privileged(
-                "dumpsys " + shellQuote(arguments.required("service")) +
-                    arguments["args"].orEmpty().takeIf(String::isNotBlank)
-                        ?.let { value -> " " + value.trim().split(Regex("\\s+")).joinToString(" ", transform = ::shellQuote) }.orEmpty(),
+                listOf("/system/bin/dumpsys", arguments.required("service")) +
+                    arguments["args"].orEmpty()
+                        .trim()
+                        .takeIf(String::isNotBlank)
+                        ?.split(Regex("\\s+"))
+                        .orEmpty(),
             )
             "accessibility_tree" -> accessibilityTree()
             "accessibility_find" -> accessibilityFind(arguments)
@@ -192,7 +197,7 @@ class AndroidDeviceProvider(
 
     private suspend fun appList(): String = withContext(Dispatchers.IO) {
         if (shizuku.state().permissionGranted) {
-            return@withContext privileged("pm list packages")
+            return@withContext privileged(listOf("/system/bin/pm", "list", "packages"))
         }
         context.packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
             .map { it.packageName }
@@ -238,7 +243,7 @@ class AndroidDeviceProvider(
             "settings namespace 仅支持 global/secure/system"
         }
         return privileged(
-            "settings put ${shellQuote(namespace.lowercase())} ${shellQuote(key)} ${shellQuote(value)}",
+            listOf("/system/bin/settings", "put", namespace.lowercase(), key, value),
         )
     }
 
@@ -349,7 +354,7 @@ class AndroidDeviceProvider(
     private fun virtualStatus(status: com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus): String =
         "id=${status.id}\ndisplay_id=${status.displayId}\nsize=${status.width}x${status.height}\ndensity=${status.densityDpi}\nvalid=${status.valid}"
 
-    private suspend fun privileged(command: String): String =
+    private suspend fun privileged(command: List<String>): String =
         shizuku.execute(command)
 
     private fun accessibility(): HarnessAccessibilityService =
@@ -358,9 +363,6 @@ class AndroidDeviceProvider(
 
     private fun Map<String, String>.required(key: String): String =
         this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
-
-    private fun shellQuote(value: String): String =
-        "'" + value.replace("'", "'\"'\"'") + "'"
 
     private companion object {
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")

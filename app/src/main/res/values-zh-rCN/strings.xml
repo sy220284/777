@@ -521,4 +521,11 @@
     <string name="tools_plugin_active">已启用</string>
     <string name="tools_plugin_failed">加载失败</string>
     <string name="tools_plugin_enabled">已启用</string>
+    <string name="relay_status_failed_title">中继连接失败</string>
+    <string name="relay_status_connecting_title">正在连接中继…</string>
+    <string name="relay_status_failed_body">请重新配对中继，或返回本机 Harness。</string>
+    <string name="relay_status_connecting_body">配对已完成，正在建立远程控制连接。</string>
+    <string name="relay_status_retry">重新配对</string>
+    <string name="relay_status_back_local">返回本机</string>
+
 </resources>
