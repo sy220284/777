@@ -716,4 +716,7 @@
     <string name="local_image_mode_auto">Automatic routing</string>
     <string name="local_image_mode_main">Send directly to main model</string>
     <string name="local_image_mode_vision">Analyze with vision model</string>
+
+    <string name="advanced_image_input_mode">Image input routing</string>
+    <string name="advanced_image_input_mode_hint">Auto prefers a main model that supports images, then falls back to the configured vision model. You can force either route.</string>
 </resources>
