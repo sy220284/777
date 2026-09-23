@@ -356,6 +356,9 @@ class LocalHarnessEngine @Inject constructor(
             },
             onNativeImageRejected = { autoImageNativeRejected = true },
             resourceScheduler = resourceScheduler,
+            acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
+            releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
+            historyBudget = ::currentHistoryBudget,
         )
     }
 
@@ -1550,13 +1553,15 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
+    private fun subagentToolSchemas(allowMutation: Boolean, allowVirtualScreen: Boolean): JsonArray {
         val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
             .filter { tool ->
-                allowMutation || tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+                allowMutation ||
+                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
+                    (allowVirtualScreen && tool.name.startsWith("android_vscreen_"))
             }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
@@ -1736,11 +1741,13 @@ class LocalHarnessEngine @Inject constructor(
                 val task = args.string("task")
                 val model = args.optionalString("model")
                 val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
+                val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
                     startPersistentReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
+                        virtualScreen = virtualScreen,
                     )
                 } else subagents.run(
                     task = task,
@@ -1748,6 +1755,7 @@ class LocalHarnessEngine @Inject constructor(
                     allowMutation = false,
                     modelOverride = model,
                     maxSteps = maxSteps,
+                    virtualScreen = virtualScreen,
                 )
             }
             "subagent_fork", "fork_subagent" ->
@@ -1810,12 +1818,14 @@ class LocalHarnessEngine @Inject constructor(
         task: String,
         model: String?,
         maxSteps: Int,
+        virtualScreen: Boolean,
     ): String {
         val payload = buildJsonObject {
             put("session_id", currentSessionId)
             put("task", task)
             model?.let { put("model", it) }
             put("max_steps", maxSteps)
+            put("virtual_screen", virtualScreen)
         }.toString()
         return jobs.startPersistent(
             label = "子代理：${task.take(100)}",
@@ -1829,6 +1839,7 @@ class LocalHarnessEngine @Inject constructor(
                 backgroundJobId = jobId,
                 modelOverride = model,
                 maxSteps = maxSteps,
+                virtualScreen = virtualScreen,
             )
             result.requireCompletedOutput()
         }
@@ -1868,6 +1879,7 @@ class LocalHarnessEngine @Inject constructor(
                         val model = payload["model"]?.jsonPrimitive?.contentOrNull
                         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
+                        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
                             val result = subagents.runResult(
                                 task = task,
@@ -1876,6 +1888,7 @@ class LocalHarnessEngine @Inject constructor(
                                 backgroundJobId = jobId,
                                 modelOverride = model,
                                 maxSteps = maxSteps,
+                                virtualScreen = virtualScreen,
                             )
                             result.requireCompletedOutput()
                         }
