@@ -119,61 +119,72 @@ class ConnectionManager @Inject constructor(
 
     private fun sinks(epoch: Long) = object : LoopSinks {
         override fun onEventFrame(frame: RemoteEventFrame) {
-            if (epoch != transportEpoch.get()) return
-            eventBuffer.offer(frame)
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                eventBuffer.offer(frame)
+            }
         }
 
         override fun onConnected(generation: HostGeneration) {
-            if (epoch != transportEpoch.get()) return
-            eventBuffer.connected()
-            this@ConnectionManager.generation = generation
-            val host = activeHost
-            if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }
-            _state.value = ConnectionUiState(
-                phase = ConnectionPhase.CONNECTED,
-                host = activeHost,
-                description = generation.description,
-                stage = ConnectStage.Connected,
-                failure = null,
-                attempts = 0,
-                hasConnected = true,
-            )
-            maybeStartService()
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                eventBuffer.connected()
+                this@ConnectionManager.generation = generation
+                val host = activeHost
+                if (host != null) scope.launch { hostsStore.touchHost(host.host, host.port) }
+                _state.value = ConnectionUiState(
+                    phase = ConnectionPhase.CONNECTED,
+                    host = activeHost,
+                    description = generation.description,
+                    stage = ConnectStage.Connected,
+                    failure = null,
+                    attempts = 0,
+                    hasConnected = true,
+                )
+                maybeStartService()
+            }
         }
 
         override fun onStateChange(state: ConnectionState) {
-            if (epoch != transportEpoch.get()) return
-            val current = _state.value
-            val phase = when {
-                state == ConnectionState.CONNECTED -> ConnectionPhase.CONNECTED
-                // The loop opens every generation the same way, but the first one is not a
-                // *re*connect — calling it that is what let a never-connected attempt look like a
-                // healthy session dropping, and hid it from the connect screen entirely.
-                current.hasConnected -> ConnectionPhase.RECONNECTING
-                else -> ConnectionPhase.CONNECTING
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val current = _state.value
+                val phase = when {
+                    state == ConnectionState.CONNECTED -> ConnectionPhase.CONNECTED
+                    // The loop opens every generation the same way, but the first one is not a
+                    // *re*connect — calling it that is what let a never-connected attempt look like a
+                    // healthy session dropping, and hid it from the connect screen entirely.
+                    current.hasConnected -> ConnectionPhase.RECONNECTING
+                    else -> ConnectionPhase.CONNECTING
+                }
+                // Note: does not clear `failure`. The loop emits this on every retry, so clearing here
+                // would erase the explanation a fraction of a second after showing it.
+                _state.value = current.copy(phase = phase)
             }
-            // Note: does not clear `failure`. The loop emits this on every retry, so clearing here
-            // would erase the explanation a fraction of a second after showing it.
-            _state.value = current.copy(phase = phase)
         }
 
         override fun onHandshakeStep(step: HandshakeStep) {
-            if (epoch != transportEpoch.get()) return
-            val stage = when (step) {
-                HandshakeStep.OPENING_MUX -> ConnectStage.OpeningStreams
-                HandshakeStep.AWAITING_READY -> ConnectStage.Verifying
+            synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val stage = when (step) {
+                    HandshakeStep.OPENING_MUX -> ConnectStage.OpeningStreams
+                    HandshakeStep.AWAITING_READY -> ConnectStage.Verifying
+                }
+                _state.value = _state.value.copy(stage = stage)
             }
-            _state.value = _state.value.copy(stage = stage)
         }
 
         override fun onGenerationFailed(attempt: Int, failure: GenerationFailure) {
-            if (epoch != transportEpoch.get()) return
-            val host = activeHost
-            _state.value = _state.value.copy(
-                failure = ConnectFailure.from(failure, relay = host?.isRelay == true),
-                attempts = attempt,
-            )
-            if (host != null && isTerminalForRelay(host, failure)) stopRetrying()
+            val terminal = synchronized(transportLock) {
+                if (epoch != transportEpoch.get()) return
+                val host = activeHost
+                _state.value = _state.value.copy(
+                    failure = ConnectFailure.from(failure, relay = host?.isRelay == true),
+                    attempts = attempt,
+                )
+                host != null && isTerminalForRelay(host, failure)
+            }
+            if (terminal) stopRetrying(epoch)
         }
     }
 
@@ -208,13 +219,13 @@ class ConnectionManager @Inject constructor(
         val baseEpoch = synchronized(transportLock) {
             if (desiredIntentVersion.get() != intentVersion) return
             activeHost = config
+            _state.value = ConnectionUiState(
+                phase = ConnectionPhase.CONNECTING,
+                host = config,
+                stage = ConnectStage.OpeningStreams,
+            )
             transportEpoch.get()
         }
-        _state.value = ConnectionUiState(
-            phase = ConnectionPhase.CONNECTING,
-            host = config,
-            stage = ConnectStage.OpeningStreams,
-        )
 
         val nextApi = clientFactory.clientFor(config)
         val installed = synchronized(transportLock) {
@@ -255,11 +266,11 @@ class ConnectionManager @Inject constructor(
             api = null
             generation = null
             activeHost = null
+            _state.value = ConnectionUiState()
             previous
         }
         retired?.stop()
         if (stopBackgroundService) stopService()
-        _state.value = ConnectionUiState()
     }
 
     suspend fun restoreDesiredConnectionIfNeeded() {
@@ -298,14 +309,14 @@ class ConnectionManager @Inject constructor(
                         loop = null
                         api = null
                         generation = null
+                        _state.value = _state.value.copy(
+                            phase = ConnectionPhase.RECONNECTING,
+                            stage = ConnectStage.OpeningStreams,
+                        )
                         RetiredTransport(epoch, previous)
                     }
                 } ?: return@withLock
                 retired.loop?.stop()
-                _state.value = _state.value.copy(
-                    phase = ConnectionPhase.RECONNECTING,
-                    stage = ConnectStage.OpeningStreams,
-                )
 
                 // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
                 // rotated or dropped while the app is backgrounded, and the credential is baked into the
@@ -377,30 +388,37 @@ class ConnectionManager @Inject constructor(
      * Not [disconnect]: that resets the whole state object, which would wipe the very explanation
      * the user needs in order to know that pairing again is the fix.
      */
-    private fun stopRetrying() {
+    private fun stopRetrying(expectedEpoch: Long) {
+        var accepted = false
         val retired = synchronized(transportLock) {
-            transportEpoch.incrementAndGet()
-            val previous = loop
-            loop = null
-            api = null
-            generation = null
-            previous
+            if (transportEpoch.get() != expectedEpoch) {
+                null
+            } else {
+                accepted = true
+                transportEpoch.incrementAndGet()
+                val previous = loop
+                loop = null
+                api = null
+                generation = null
+                _state.value = _state.value.copy(
+                    phase = ConnectionPhase.DISCONNECTED,
+                    // Back to Idle, not left on whatever handshake step the last generation died at. The
+                    // connect screen derives "still connecting" from the stage, so a stage frozen mid-
+                    // handshake leaves the Connect button disabled with a spinner that will never finish —
+                    // which is precisely the failure this screen already learned once.
+                    stage = ConnectStage.Idle,
+                    attempts = 0,
+                )
+                previous
+            }
         }
+        if (!accepted) return
         retired?.stop()
         stopService()
         val intentVersion = desiredIntentVersion.incrementAndGet()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
         }
-        _state.value = _state.value.copy(
-            phase = ConnectionPhase.DISCONNECTED,
-            // Back to Idle, not left on whatever handshake step the last generation died at. The
-            // connect screen derives "still connecting" from the stage, so a stage frozen mid-
-            // handshake leaves the Connect button disabled with a spinner that will never finish —
-            // which is precisely the failure this screen already learned once.
-            stage = ConnectStage.Idle,
-            attempts = 0,
-        )
     }
 
     private fun maybeStartService() {
