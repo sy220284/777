@@ -53,7 +53,7 @@ val LocalFileOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
  * `code` chips and [links](https://example.com). Tables render as plain text.
  */
 @Composable
-fun MarkdownText(text: String, modifier: Modifier = Modifier) {
+fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boolean = true) {
     val colors = DsTheme.colors
     val blocks = remember(text) { parseMarkdown(text) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -75,7 +75,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier) {
                 )
                 is MdBlock.MdList -> MdListBlock(block)
                 is MdBlock.Blockquote -> MdBlockquote(block)
-                is MdBlock.Code -> CodeBlock(block.lang, block.code)
+                is MdBlock.Code -> CodeBlock(block.lang, block.code, allowCopy = allowCodeCopy)
                 is MdBlock.Table -> block.rows.forEach { row ->
                     InlineMarkdown(row, DsType.mdSmall.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
                 }
@@ -355,7 +355,12 @@ private fun MdBlockquote(block: MdBlock.Blockquote) {
 
 /** Fenced code block with a sticky banner (lang · copy) and a mono pre. */
 @Composable
-private fun CodeBlock(lang: String?, code: String, modifier: Modifier = Modifier) {
+private fun CodeBlock(
+    lang: String?,
+    code: String,
+    modifier: Modifier = Modifier,
+    allowCopy: Boolean = true,
+) {
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
     Column(
@@ -373,21 +378,28 @@ private fun CodeBlock(lang: String?, code: String, modifier: Modifier = Modifier
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                lang?.let { "$it · copy" } ?: "copy",
+                when {
+                    allowCopy && lang != null -> "$lang · copy"
+                    allowCopy -> "copy"
+                    lang != null -> lang
+                    else -> "code"
+                },
                 style = DsType.caption11Strong.copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
                 color = colors.labelCaption,
                 modifier = Modifier.weight(1f),
             )
-            Icon(
-                Icons.Filled.ContentCopy,
-                contentDescription = "Copy code",
-                tint = colors.labelTertiary,
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(DsShapes.chip)
-                    .clickable { clipboard.setText(AnnotatedString(code)) }
-                    .padding(2.dp),
-            )
+            if (allowCopy) {
+                Icon(
+                    Icons.Filled.ContentCopy,
+                    contentDescription = "Copy code",
+                    tint = colors.labelTertiary,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(DsShapes.chip)
+                        .clickable { clipboard.setText(AnnotatedString(code)) }
+                        .padding(2.dp),
+                )
+            }
         }
         Text(
             code,

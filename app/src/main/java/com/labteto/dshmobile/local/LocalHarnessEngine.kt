@@ -841,7 +841,10 @@ class LocalHarnessEngine @Inject constructor(
                             appendMessage("reasoning", it)
                         }
                         reply.content?.takeIf { it.isNotBlank() }?.let {
-                            appendMessage("assistant", it)
+                            appendMessage(
+                                role = if (event.toolCalls.isEmpty()) "assistant" else "progress",
+                                content = it,
+                            )
                         }
                     }
                     is AgentEvent.ToolStarted -> {

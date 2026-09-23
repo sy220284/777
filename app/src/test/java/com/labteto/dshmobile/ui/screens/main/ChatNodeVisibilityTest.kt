@@ -126,4 +126,65 @@ class ChatNodeVisibilityTest {
         )
         assertEquals(listOf(3L, 4L, 5L), nodes.filter { it.rendersContent() }.map { it.seq })
     }
+
+    @Test
+    fun `assistant step with matching tool call is work process`() {
+        val assistant = AssistantMessageNode(
+            seq = 10,
+            messageId = "a1",
+            turn = 2,
+            step = 3,
+            blocks = listOf(ChatBlock("text", "先检查文件")),
+        )
+        val nodes = listOf(
+            assistant,
+            ToolCallNode(seq = 11, callId = "c1", name = "read", arguments = "{}", turn = 2, step = 3),
+        )
+
+        assertTrue(assistant.isWorkProcess(nodes))
+    }
+
+    @Test
+    fun `assistant step without matching tool call is final answer`() {
+        val assistant = AssistantMessageNode(
+            seq = 20,
+            messageId = "a2",
+            turn = 2,
+            step = 4,
+            blocks = listOf(ChatBlock("text", "最终答复")),
+        )
+        val nodes = listOf(
+            assistant,
+            TurnEndNode(seq = 21, turn = 2, reasonKind = "completed"),
+        )
+
+        assertFalse(assistant.isWorkProcess(nodes))
+    }
+
+
+    @Test
+    fun `legacy assistant without turn metadata folds when tool follows`() {
+        val assistant = AssistantMessageNode(
+            seq = 30,
+            messageId = "legacy",
+            turn = null,
+            step = null,
+            blocks = listOf(ChatBlock("text", "我先查一下")),
+        )
+        val nodes = listOf(
+            assistant,
+            ToolCallNode(seq = 31, callId = "legacy-call", name = "grep", arguments = "{}", turn = 9, step = 1),
+            AssistantMessageNode(
+                seq = 32,
+                messageId = "final",
+                turn = null,
+                step = null,
+                blocks = listOf(ChatBlock("text", "最终结果")),
+            ),
+        )
+
+        assertTrue(assistant.isWorkProcess(nodes))
+        assertFalse((nodes[2] as AssistantMessageNode).isWorkProcess(nodes))
+    }
+
 }

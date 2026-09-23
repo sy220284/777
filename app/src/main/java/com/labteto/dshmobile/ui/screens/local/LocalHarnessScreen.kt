@@ -489,6 +489,7 @@ private fun LocalChat(
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+    val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
 
     LaunchedEffect(listState) {
         var previousIndex = listState.firstVisibleItemIndex
@@ -534,16 +535,16 @@ private fun LocalChat(
     LaunchedEffect(state.sessionId) {
         attachments.clear()
         attachmentError = null
-        if (state.messages.isNotEmpty()) {
-            listState.scrollToItem(state.messages.lastIndex)
+        if (transcriptItems.isNotEmpty()) {
+            listState.scrollToItem(transcriptItems.lastIndex)
         }
     }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) {
+    LaunchedEffect(state.messages.size, transcriptItems.size) {
+        if (transcriptItems.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            if (lastVisible >= state.messages.lastIndex - 2) {
-                listState.animateScrollToItem(state.messages.lastIndex)
+            if (lastVisible >= transcriptItems.lastIndex - 2) {
+                listState.animateScrollToItem(transcriptItems.lastIndex)
             }
         }
     }
@@ -665,15 +666,18 @@ private fun LocalChat(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-                if (state.messages.isEmpty()) {
+                if (transcriptItems.isEmpty()) {
                     item {
                         EmptyLocalHarness { suggestion ->
                             drafts[state.sessionId] = suggestion
                         }
                     }
                 }
-                items(state.messages, key = { it.id }) { message ->
-                    LocalMessageRow(message)
+                items(transcriptItems, key = { it.key }) { transcriptItem ->
+                    when (transcriptItem) {
+                        is LocalTranscriptItem.Message -> LocalMessageRow(transcriptItem.message)
+                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                    }
                 }
                 if (state.running) {
                     item {
@@ -706,7 +710,7 @@ private fun LocalChat(
                         .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
                 ) {
                     scope.launch {
-                        val target = (state.messages.size - 1).coerceAtLeast(0)
+                        val target = transcriptItems.lastIndex.coerceAtLeast(0)
                         listState.animateScrollToItem(target)
                         scrollShortcut = null
                     }
@@ -1008,30 +1012,11 @@ private fun ExecutionStatusCard(
 private fun LocalMessageRow(message: LocalHarnessMessage) {
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
-    val isUser = message.role == "user"
-    val isTool = message.role == "tool"
-    val isReasoning = message.role == "reasoning"
 
-    when {
-        isReasoning -> CollapsibleTranscriptRow(
-            title = "思考过程",
-            meta = "已思考 ${message.content.length} 字",
-            content = message.content,
-            code = false,
-            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
-        )
+    when (message.role) {
+        "user" -> UserBubble(message.content)
 
-        isTool -> CollapsibleTranscriptRow(
-            title = "工具 · ${message.toolName ?: "执行结果"}",
-            meta = toolResultMeta(message.content),
-            content = message.content,
-            code = true,
-            onCopy = { clipboard.setText(AnnotatedString(message.content)) },
-        )
-
-        isUser -> UserBubble(message.content)
-
-        message.role == "system" -> Surface(
+        "system" -> Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             color = colors.warnTertiary,
@@ -1044,6 +1029,8 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             )
         }
 
+        "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
+
         else -> Column(
             Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -1051,7 +1038,7 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             MarkdownText(message.content)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 DsButton(
-                    "复制",
+                    "复制答复",
                     { clipboard.setText(AnnotatedString(message.content)) },
                     variant = DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
@@ -1061,27 +1048,23 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
     }
 }
 
-private fun toolResultMeta(content: String): String = when {
-    "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
-        "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content ->
-        "执行失败，点击查看详情"
-    "已自动降级" in content || ("达到" in content && "步上限" in content) ->
-        "已降级/未完整结束，点击查看详情"
-    else -> "已完成，点击查看详情"
-}
 @Composable
-private fun CollapsibleTranscriptRow(
-    title: String,
-    meta: String,
-    content: String,
-    code: Boolean,
-    onCopy: () -> Unit,
-) {
+private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
+    if (messages.isEmpty()) return
+
     val colors = DsTheme.colors
-    var expanded by rememberSaveable(title, content.hashCode()) { mutableStateOf(false) }
+    var expanded by rememberSaveable(messages.first().id) { mutableStateOf(false) }
+    val toolCount = messages.count { it.role == "tool" }
+    val summary = buildList {
+        add("已折叠 ${messages.size} 条过程")
+        if (toolCount > 0) add("${toolCount} 次工具调用")
+    }.joinToString(" · ")
+
     Surface(
         modifier = Modifier.fillMaxWidth()
-            .clickable(onClickLabel = if (expanded) "收起" else "展开") { expanded = !expanded },
+            .clickable(onClickLabel = if (expanded) "收起工作过程" else "展开工作过程") {
+                expanded = !expanded
+            },
         shape = RoundedCornerShape(12.dp),
         color = colors.bgModulePlatform,
     ) {
@@ -1100,29 +1083,50 @@ private fun CollapsibleTranscriptRow(
                     color = colors.labelTertiary,
                 )
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = DsType.small13Strong, color = colors.labelSecondary)
-                    Text(meta, style = DsType.caption11, color = colors.labelTertiary)
+                    Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
+                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
                 }
             }
+
             if (expanded) {
-                SelectionContainer {
-                    Text(
-                        content,
-                        style = if (code) DsType.mdCode else DsType.mdSmall,
-                        color = colors.labelSecondary,
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DsButton(
-                        "复制",
-                        onCopy,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
+                messages.forEach { message ->
+                    val title = when (message.role) {
+                        "reasoning" -> "思考"
+                        "tool" -> "工具 · ${message.toolName ?: "执行结果"}"
+                        else -> "执行说明"
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                        Text(title, style = DsType.caption11Strong, color = colors.labelTertiary)
+                        if (message.role == "tool") {
+                            Text(
+                                toolResultMeta(message.content),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                            SelectionContainer {
+                                Text(
+                                    message.content,
+                                    style = DsType.mdCode,
+                                    color = colors.labelSecondary,
+                                )
+                            }
+                        } else {
+                            MarkdownText(message.content, allowCodeCopy = false)
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+private fun toolResultMeta(content: String): String = when {
+    "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
+        "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content ->
+        "执行失败"
+    "已自动降级" in content || ("达到" in content && "步上限" in content) ->
+        "已降级/未完整结束"
+    else -> "已完成"
 }
 
 @Composable
