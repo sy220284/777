@@ -60,21 +60,44 @@ class RelayCredentialStore @Inject constructor(
     suspend fun token(hostId: String): String? {
         val blob = blobs()[hostId] ?: return null
         val plain = withContext(Dispatchers.Default) { runCatching { decrypt(blob) }.getOrNull() }
-        if (plain == null) remove(hostId)
+        if (plain == null) removeIfUnchanged(hostId, blob)
         return plain
     }
 
-    /** Remember [token] for [hostId], replacing any previous one. */
+    /** Remember [token] for [hostId], replacing any previous one without clobbering other hosts. */
     suspend fun put(hostId: String, token: String) {
         val blob = withContext(Dispatchers.Default) { encrypt(token) }
-        write(blobs() + (hostId to blob))
+        dataStore.edit { prefs ->
+            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            current[hostId] = blob
+            prefs[KEY] = WireJson.encodeToString(serializer, current)
+        }
     }
 
     /** Forget the credential for [hostId]. Safe to call when there is none. */
     suspend fun remove(hostId: String) {
-        val current = blobs()
-        if (hostId !in current) return
-        write(current - hostId)
+        dataStore.edit { prefs ->
+            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            if (current.remove(hostId) == null) return@edit
+            if (current.isEmpty()) prefs.remove(KEY)
+            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+        }
+    }
+
+    /**
+     * Drop a corrupt blob only if it is still the blob that failed to decrypt.
+     *
+     * A fresh pairing may replace the credential while decryption is happening on another
+     * dispatcher. Blindly calling [remove] here could otherwise delete that brand-new token.
+     */
+    private suspend fun removeIfUnchanged(hostId: String, failedBlob: String) {
+        dataStore.edit { prefs ->
+            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            if (current[hostId] != failedBlob) return@edit
+            current.remove(hostId)
+            if (current.isEmpty()) prefs.remove(KEY)
+            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+        }
     }
 
     /** Forget every credential — the Settings "clear data" action, and a signed-out-everywhere relay. */
@@ -82,13 +105,12 @@ class RelayCredentialStore @Inject constructor(
         dataStore.edit { it.remove(KEY) }
     }
 
-    private suspend fun blobs(): Map<String, String> {
-        val raw = dataStore.data.first()[KEY] ?: return emptyMap()
-        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
-    }
+    private suspend fun blobs(): Map<String, String> =
+        decodeBlobs(dataStore.data.first()[KEY])
 
-    private suspend fun write(next: Map<String, String>) {
-        dataStore.edit { it[KEY] = WireJson.encodeToString(serializer, next) }
+    private fun decodeBlobs(raw: String?): Map<String, String> {
+        if (raw == null) return emptyMap()
+        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
     }
 
     /**
@@ -116,6 +138,7 @@ class RelayCredentialStore @Inject constructor(
     }
 
     /** The Keystore key, generated on first use. */
+    @Synchronized
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
         (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }

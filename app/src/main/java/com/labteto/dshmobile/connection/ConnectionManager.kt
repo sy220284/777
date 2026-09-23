@@ -18,6 +18,7 @@ import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.core.wire.TransportFailure
 import com.labteto.dshmobile.core.wire.TransportFailures
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -244,7 +245,19 @@ class ConnectionManager @Inject constructor(
             transportEpoch.get()
         }
 
-        val nextApi = clientFactory.clientFor(config)
+        val nextApi = try {
+            clientFactory.clientFor(config)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            failClientSetup(
+                expectedIntentVersion = intentVersion,
+                expectedHostId = config.id,
+                expectedEpoch = baseEpoch,
+                error = error,
+            )
+            return
+        }
         val installed = synchronized(transportLock) {
             if (desiredIntentVersion.get() != intentVersion ||
                 activeHost?.id != config.id ||
@@ -345,7 +358,19 @@ class ConnectionManager @Inject constructor(
                 // rotated or dropped while the app is backgrounded, and the credential is baked into the
                 // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
                 // when that is most likely to have happened.
-                val nextApi = clientFactory.clientFor(host)
+                val nextApi = try {
+                    clientFactory.clientFor(host)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    failClientSetup(
+                        expectedIntentVersion = intentVersion,
+                        expectedHostId = host.id,
+                        expectedEpoch = retired.epoch,
+                        error = error,
+                    )
+                    return@withLock
+                }
                 val nextLoop = ConnectionLoop(muxFactory(host), sinks(retired.epoch), LoopConfig())
 
                 // A disconnect or host switch can land while the client is being rebuilt. Install
@@ -367,6 +392,47 @@ class ConnectionManager @Inject constructor(
                 if (!installed) nextLoop.stop()
             }
         }
+    }
+
+    /**
+     * Retire a client-build attempt that failed before a ConnectionLoop could own the transport.
+     *
+     * Pin construction, encrypted credential reads and local transport setup can all fail before
+     * the socket exists. Leaving the state in CONNECTING/RECONNECTING here creates a permanent
+     * spinner because there is no loop left to publish another state change.
+     */
+    private fun failClientSetup(
+        expectedIntentVersion: Long,
+        expectedHostId: String,
+        expectedEpoch: Long,
+        error: Exception,
+    ) {
+        val accepted = synchronized(transportLock) {
+            if (desiredIntentVersion.get() != expectedIntentVersion ||
+                activeHost?.id != expectedHostId ||
+                transportEpoch.get() != expectedEpoch
+            ) {
+                false
+            } else {
+                api = null
+                loop = null
+                generation = null
+                _state.value = _state.value.copy(
+                    phase = ConnectionPhase.DISCONNECTED,
+                    stage = ConnectStage.Idle,
+                    failure = ConnectFailure.from(
+                        GenerationFailure.MuxFailed(
+                            TransportFailures.classify(error),
+                            error.message,
+                        ),
+                        relay = activeHost?.isRelay == true,
+                    ),
+                    attempts = (_state.value.attempts + 1).coerceAtLeast(1),
+                )
+                true
+            }
+        }
+        if (accepted) stopService()
     }
 
     /**

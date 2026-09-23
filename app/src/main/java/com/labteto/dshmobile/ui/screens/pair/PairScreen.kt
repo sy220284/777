@@ -236,6 +236,7 @@ private fun PairFailureBlock(failure: PairFailure) {
             stringResource(R.string.pair_fail_certificate, failure.authority)
         PairFailure.InvalidUrl -> stringResource(R.string.pair_fail_url)
         PairFailure.InvalidCode -> stringResource(R.string.pair_fail_code)
+        PairFailure.LocalError -> stringResource(R.string.pair_fail_local)
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
