@@ -1234,7 +1234,7 @@ internal fun NetworkDiagnosticDialog(
                     it,
                     style = DsType.mdCode,
                     color = colors.labelPrimary,
-                    modifier = Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
                 )
             }
         }
@@ -1258,7 +1258,7 @@ internal fun EnvironmentInfoDialog(
                 text,
                 style = DsType.mdCode,
                 color = colors.labelPrimary,
-                modifier = Modifier.fillMaxWidth().height(260.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
     }
@@ -1300,7 +1300,7 @@ private fun ApprovalDialog(
                 approval.arguments,
                 style = DsType.mdCode,
                 color = colors.labelSecondary,
-                modifier = Modifier.fillMaxWidth().height(140.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
             )
         }
 
