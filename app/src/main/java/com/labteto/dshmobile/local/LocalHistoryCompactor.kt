@@ -31,9 +31,9 @@ internal class LocalHistoryCompactor(
         for (index in history.lastIndex downTo 1) {
             keptChars += history[index].toString().length
             if (keptChars > tailChars) {
-                start = (index + 1 until history.size).firstOrNull { candidate ->
+                start = (index until history.size).firstOrNull { candidate ->
                     history[candidate]["role"].asText() == "user"
-                } ?: index + 1
+                } ?: index
                 break
             }
         }
