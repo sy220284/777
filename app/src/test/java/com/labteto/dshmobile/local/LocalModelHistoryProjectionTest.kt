@@ -81,6 +81,25 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun toolReplayPrefersExactModelVisibleContentOverAuditContent() {
+        val events = listOf(
+            event(0L, "tool/result", buildJsonObject {
+                put("id", "call-exact")
+                put("content", "审计保留的原始截断内容")
+                put("model_content", "模型实际看到的压缩内容")
+            }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(1, restored.messages.size)
+        assertEquals(
+            "模型实际看到的压缩内容",
+            restored.messages.single()["content"].toString().trim('"'),
+        )
+    }
+
+    @Test
     fun duplicateToolResultIsNotReapplied() {
         val checkpoint = listOf(
             buildJsonObject {
