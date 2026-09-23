@@ -141,13 +141,20 @@ class SessionEventLog(
             .joinToString("\n") { json.encodeToString(SessionEvent.serializer(), it) }
     }
 
-    fun latest(type: String): SessionEvent? = synchronized(lock) {
+    fun latest(
+        type: String,
+        beforeSequenceExclusive: Long = Long.MAX_VALUE,
+    ): SessionEvent? = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
             readLinesFromTailUnsafe(source) { line ->
                 val event = decodeEventOrNull(line)
-                if (event?.type == type) {
+                if (
+                    event != null &&
+                    event.sequence < beforeSequenceExclusive &&
+                    event.type == type
+                ) {
                     found = event
                     false
                 } else {
