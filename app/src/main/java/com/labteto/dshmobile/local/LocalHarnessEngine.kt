@@ -1562,6 +1562,7 @@ class LocalHarnessEngine @Inject constructor(
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
+            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
             .filter { tool ->
                 allowMutation ||
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
