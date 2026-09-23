@@ -34,6 +34,9 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
@@ -71,6 +74,7 @@ import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
@@ -99,6 +103,18 @@ import java.util.Locale
  * blanket-labelling the whole screen read-only, as it used to, tells users their own preferences
  * cannot be changed when they plainly can.
  */
+private enum class SettingsPage {
+    ROOT,
+    GENERAL,
+    MODELS,
+    MEMORY,
+    PERMISSIONS,
+    NOTIFICATIONS,
+    DATA,
+    ADVANCED,
+    ABOUT,
+}
+
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
@@ -114,18 +130,37 @@ fun SettingsScreen(
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val visionSettings by viewModel.visionSettings.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
+    val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
+    var page by rememberSaveable { mutableStateOf(SettingsPage.ROOT) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
-    BackHandler(onBack = onClose)
+
+    BackHandler {
+        if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+    }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
+    }
+    LaunchedEffect(page) {
+        if (page == SettingsPage.MEMORY) viewModel.refreshMemories()
     }
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
     val sessionsCleared = stringResource(R.string.settings_clear_last_sessions_done)
+    val title = when (page) {
+        SettingsPage.ROOT -> stringResource(R.string.settings_title)
+        SettingsPage.GENERAL -> "外观与会话"
+        SettingsPage.MODELS -> "模型"
+        SettingsPage.MEMORY -> "个性化与记忆"
+        SettingsPage.PERMISSIONS -> "连接与权限"
+        SettingsPage.NOTIFICATIONS -> "通知"
+        SettingsPage.DATA -> "数据"
+        SettingsPage.ADVANCED -> "高级"
+        SettingsPage.ABOUT -> "关于"
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         Box {
@@ -141,12 +176,14 @@ fun SettingsScreen(
                     DsIconButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.common_back),
-                        onClick = onClose,
+                        onClick = {
+                            if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+                        },
                         containerColor = colors.bgLayer1,
                         shadowElevation = 3.dp,
                     )
                     Text(
-                        stringResource(R.string.settings_title),
+                        title,
                         style = DsType.large20,
                         color = colors.labelPrimary,
                         modifier = Modifier.weight(1f),
@@ -155,144 +192,189 @@ fun SettingsScreen(
                     Spacer(Modifier.width(48.dp))
                 }
 
-                SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
-                    LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
-                    AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
-                }
+                when (page) {
+                    SettingsPage.ROOT -> {
+                        Text("体验", style = DsType.std14, color = colors.labelTertiary)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Cloud,
+                                title = "模型",
+                                subtitle = "文字模型、视觉模型与模型服务",
+                                onClick = { page = SettingsPage.MODELS },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Memory,
+                                title = "个性化与记忆",
+                                subtitle = "长期规则、自动记忆与召回",
+                                onClick = { page = SettingsPage.MEMORY },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Language,
+                                title = "外观与会话",
+                                subtitle = "语言、主题与会话排序",
+                                onClick = { page = SettingsPage.GENERAL },
+                            )
+                        }
 
-                SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
-                    ToggleRow(
-                        stringResource(R.string.chatlist_sort_updated),
-                        sessionSort == "updated",
-                        stringResource(R.string.chatlist_sort_manual),
-                    ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
-                }
+                        Text("系统", style = DsType.std14, color = colors.labelTertiary)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.PhoneAndroid,
+                                title = "连接与权限",
+                                subtitle = "远程连接、后台连接与设备授权",
+                                onClick = { page = SettingsPage.PERMISSIONS },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Notifications,
+                                title = "通知",
+                                subtitle = "完成、目标与需要处理的提醒",
+                                onClick = { page = SettingsPage.NOTIFICATIONS },
+                            )
+                        }
 
-                SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
-                    ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
-                    ToggleRow(
-                        stringResource(R.string.settings_background),
-                        settings.keepConnectedInBackground,
-                        stringResource(R.string.settings_background_hint),
-                    ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
-                }
-
-                SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
-                    ToggleRow(
-                        stringResource(R.string.settings_notifications_turn),
-                        settings.notifyTurnComplete,
-                        stringResource(R.string.settings_notifications_turn_hint),
-                    ) { viewModel.set { it.copy(notifyTurnComplete = !it.notifyTurnComplete) } }
-                    ToggleRow(
-                        stringResource(R.string.settings_notifications_goal),
-                        settings.notifyGoal,
-                        stringResource(R.string.settings_notifications_goal_hint),
-                    ) { viewModel.set { it.copy(notifyGoal = !it.notifyGoal) } }
-                    ToggleRow(
-                        stringResource(R.string.settings_notifications_action),
-                        settings.notifyNeedsAction,
-                        stringResource(R.string.settings_notifications_action_hint),
-                    ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
-                }
-
-                SettingsCard("运行环境", Icons.Outlined.Info) {
-                    DsButton(
-                        text = "网络诊断",
-                        onClick = { showDiagnostic = true },
-                        variant = DsButtonVariant.Outline,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DsButton(
-                        text = "环境能力",
-                        onClick = { showEnvironment = true },
-                        variant = DsButtonVariant.Ghost,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                LocalModelSettingsCard(
-                    local = localHarness,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
-
-                ModelServicesCard(
-                    state = modelServices,
-                    viewModel = viewModel,
-                )
-
-                LocalVisionSettingsCard(
-                    vision = visionSettings,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
-
-                LocalMemorySettingsCard(
-                    local = localHarness,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
-
-                LocalAgentSettingsCard(
-                    local = localHarness,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
-
-                ProjectSettingsCard(
-                    state = projectSettings,
-                    viewModel = viewModel,
-                    report = toast.second,
-                )
-
-                DeviceCapabilitiesCard(
-                    state = deviceCapabilities,
-                    viewModel = viewModel,
-                )
-
-                SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
-                    DsButton(
-                        text = stringResource(R.string.settings_forget_hosts),
-                        onClick = { viewModel.forgetHosts { toast.second(hostsCleared) } },
-                        variant = DsButtonVariant.Outline,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DsButton(
-                        text = stringResource(R.string.settings_clear_last_sessions),
-                        onClick = { viewModel.clearLastSessions { toast.second(sessionsCleared) } },
-                        variant = DsButtonVariant.Ghost,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                SettingsCard(stringResource(R.string.settings_about), Icons.Outlined.Info) {
-                    DsButton(
-                        text = stringResource(R.string.settings_update_check),
-                        onClick = onCheckUpdate,
-                        variant = DsButtonVariant.Outline,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_update_check_hint),
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                    updateStatus?.let { status ->
-                        Text(
-                            text = status,
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                        )
+                        Text("维护", style = DsType.std14, color = colors.labelTertiary)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Storage,
+                                title = "数据",
+                                subtitle = "已记住的连接与会话恢复数据",
+                                onClick = { page = SettingsPage.DATA },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = "高级",
+                                subtitle = "智能体执行、项目配置与诊断",
+                                onClick = { page = SettingsPage.ADVANCED },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Info,
+                                title = "关于",
+                                subtitle = "版本与应用更新",
+                                onClick = { page = SettingsPage.ABOUT },
+                            )
+                        }
                     }
-                    Text(
-                        stringResource(
-                            R.string.settings_about_version,
-                            BuildConfig.VERSION_NAME,
-                            DshCore.PROTOCOL_BASELINE,
-                        ),
-                        style = DsType.small13,
-                        color = colors.labelTertiary,
-                    )
+
+                    SettingsPage.GENERAL -> {
+                        SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
+                            LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
+                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                        }
+                        SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
+                            ToggleRow(
+                                stringResource(R.string.chatlist_sort_updated),
+                                sessionSort == "updated",
+                                stringResource(R.string.chatlist_sort_manual),
+                            ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
+                        }
+                    }
+
+                    SettingsPage.MODELS -> {
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        ModelServicesCard(modelServices, viewModel)
+                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
+                    }
+
+                    SettingsPage.MEMORY -> {
+                        LocalMemorySettingsCard(localHarness, viewModel, toast.second)
+                        MemoryManagementCard(memories, viewModel, toast.second)
+                    }
+
+                    SettingsPage.PERMISSIONS -> {
+                        SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
+                            ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
+                            ToggleRow(
+                                stringResource(R.string.settings_background),
+                                settings.keepConnectedInBackground,
+                                stringResource(R.string.settings_background_hint),
+                            ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
+                        }
+                        DeviceCapabilitiesCard(deviceCapabilities, viewModel)
+                    }
+
+                    SettingsPage.NOTIFICATIONS -> {
+                        SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
+                            ToggleRow(
+                                stringResource(R.string.settings_notifications_turn),
+                                settings.notifyTurnComplete,
+                                stringResource(R.string.settings_notifications_turn_hint),
+                            ) { viewModel.set { it.copy(notifyTurnComplete = !it.notifyTurnComplete) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notifications_goal),
+                                settings.notifyGoal,
+                                stringResource(R.string.settings_notifications_goal_hint),
+                            ) { viewModel.set { it.copy(notifyGoal = !it.notifyGoal) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notifications_action),
+                                settings.notifyNeedsAction,
+                                stringResource(R.string.settings_notifications_action_hint),
+                            ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                        }
+                    }
+
+                    SettingsPage.DATA -> {
+                        SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
+                            DsButton(
+                                text = stringResource(R.string.settings_forget_hosts),
+                                onClick = { viewModel.forgetHosts { toast.second(hostsCleared) } },
+                                variant = DsButtonVariant.Outline,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            DsButton(
+                                text = stringResource(R.string.settings_clear_last_sessions),
+                                onClick = { viewModel.clearLastSessions { toast.second(sessionsCleared) } },
+                                variant = DsButtonVariant.Ghost,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
+                    SettingsPage.ADVANCED -> {
+                        LocalAgentSettingsCard(localHarness, viewModel, toast.second)
+                        ProjectSettingsCard(projectSettings, viewModel, toast.second)
+                        SettingsCard("运行与诊断", Icons.Outlined.Info) {
+                            DsButton(
+                                text = "网络诊断",
+                                onClick = { showDiagnostic = true },
+                                variant = DsButtonVariant.Outline,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            DsButton(
+                                text = "环境能力",
+                                onClick = { showEnvironment = true },
+                                variant = DsButtonVariant.Ghost,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
+                    SettingsPage.ABOUT -> {
+                        SettingsCard(stringResource(R.string.settings_about), Icons.Outlined.Info) {
+                            DsButton(
+                                text = stringResource(R.string.settings_update_check),
+                                onClick = onCheckUpdate,
+                                variant = DsButtonVariant.Outline,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_update_check_hint),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                            updateStatus?.let { status ->
+                                Text(status, style = DsType.small13, color = colors.labelSecondary)
+                            }
+                            Text(
+                                stringResource(
+                                    R.string.settings_about_version,
+                                    BuildConfig.VERSION_NAME,
+                                    DshCore.PROTOCOL_BASELINE,
+                                ),
+                                style = DsType.small13,
+                                color = colors.labelTertiary,
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(DsSpacing.xlarge))
