@@ -1074,15 +1074,21 @@ class LocalHarnessEngine @Inject constructor(
                     put("id", result.callId)
                     result.name?.let { put("name", it) }
                     put("content", result.content)
+                    put("model_content", result.modelContent)
                     put("is_error", true)
                     put("error_code", result.code)
+                    put("retryable", result.code == SessionRecovery.TOOL_NOT_STARTED)
+                    put(
+                        "side_effect",
+                        if (result.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN) "possible" else "none",
+                    )
                     put("runtime_settlement", true)
                     put("reason", reason)
                 })
                 modelHistory += buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", result.callId)
-                    put("content", result.content)
+                    put("content", result.modelContent)
                 }
                 completedToolCallIds += result.callId
             }
@@ -1105,27 +1111,10 @@ class LocalHarnessEngine @Inject constructor(
                             handoffSummary = snapshot.handoffSummary,
                         ),
                     )
-                    if (snapshot.autoMemory && memoryInput.isNotBlank()) {
-                        runCatching {
-                            memoryManager.captureExplicitUserDirective(
-                                text = memoryInput,
-                                mode = snapshot.conversationMode,
-                                projectId = snapshot.projectId,
-                                lineageId = snapshot.lineageId,
-                                sourceSessionId = currentSessionId,
-                            )
-                        }.onSuccess { remembered ->
-                            if (remembered != null) {
-                                eventLog.append("memory/auto", buildJsonObject {
-                                    put("id", remembered.id)
-                                    put("scope", remembered.scope.name.lowercase())
-                                    put("kind", remembered.kind.name.lowercase())
-                                })
-                            }
-                        }
-                    }
+                    captureAutoMemoryDirective(memoryInput)
                     requestPrepared = true
                 }
+                drainPendingInputsIntoHistory()
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
@@ -1248,7 +1237,15 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
-                        val modelOutput = pruneToolResult(event.output)
+                        val visibleResult = AgentToolResult(
+                            content = event.output,
+                            isError = event.isError,
+                            errorCode = event.errorCode,
+                            retryable = event.retryable,
+                            sideEffect = event.sideEffect,
+                            recoveryHint = event.recoveryHint,
+                        ).modelVisibleContent()
+                        val modelOutput = pruneToolResult(visibleResult)
                         val transcriptMessage = newTranscriptMessage("tool", event.output, event.call.name)
                         val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -1257,6 +1254,10 @@ class LocalHarnessEngine @Inject constructor(
                             put("content", event.output.take(MAX_EVENT_CHARS))
                             put("model_content", modelOutput)
                             put("is_error", event.isError)
+                            event.errorCode?.let { put("error_code", it) }
+                            put("retryable", event.retryable)
+                            put("side_effect", event.sideEffect.name.lowercase())
+                            event.recoveryHint?.let { put("recovery_hint", it) }
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         modelHistory += buildJsonObject {
@@ -1351,6 +1352,7 @@ class LocalHarnessEngine @Inject constructor(
             synchronized(runStateLock) {
                 if (activeJob === completedJob) activeJob = null
             }
+            startNextQueuedTurnIfIdle()?.start()
         }
     }
 
