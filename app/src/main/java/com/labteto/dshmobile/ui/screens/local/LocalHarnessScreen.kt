@@ -623,7 +623,7 @@ private fun LocalChat(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "工作区自动批准已开启",
+                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "安全操作自动批准已开启",
                             style = DsType.small13Strong,
                             color = colors.warnLabel,
                         )
@@ -832,7 +832,14 @@ private fun LocalChat(
     }
 
     state.pendingApproval?.let {
-        ApprovalDialog(it, onApprove, onDeny, onAutoApprove, onApproveDeviceTurn)
+        ApprovalDialog(
+            approval = it,
+            safeAutoApprovalEnabled = state.autoApproveMutations,
+            onApprove = onApprove,
+            onDeny = onDeny,
+            onAutoApprove = onAutoApprove,
+            onApproveDeviceTurn = onApproveDeviceTurn,
+        )
     }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
     if (showAttachmentPicker) {
@@ -1272,6 +1279,7 @@ internal fun EnvironmentInfoDialog(
 @Composable
 private fun ApprovalDialog(
     approval: LocalApproval,
+    safeAutoApprovalEnabled: Boolean,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
     onAutoApprove: () -> Unit,
@@ -1280,6 +1288,16 @@ private fun ApprovalDialog(
     val colors = DsTheme.colors
     DsDialog(title = "执行前确认", onDismiss = onDeny) {
         Text(approval.summary, style = DsType.base16Strong, color = colors.labelPrimary)
+        Text(
+            "影响等级：${approvalImpactLabel(approval.impact)}",
+            style = DsType.caption11Strong,
+            color = when (approval.impact) {
+                com.labteto.dshmobile.local.LocalApprovalImpact.LOW -> colors.labelTertiary
+                com.labteto.dshmobile.local.LocalApprovalImpact.MEDIUM -> colors.warnLabel
+                com.labteto.dshmobile.local.LocalApprovalImpact.HIGH,
+                com.labteto.dshmobile.local.LocalApprovalImpact.CRITICAL -> colors.error
+            },
+        )
 
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -1311,12 +1329,12 @@ private fun ApprovalDialog(
 
         Text(
             when {
-                approval.canAutoApproveWorkspace ->
-                    "该操作被严格限制在当前工作区内。可只批准本次，或开启本会话工作区自动批准；工作区外写入、删除、命令和其他高风险操作仍会逐次确认。"
+                approval.canAutoApproveSafely ->
+                    "该操作属于安全自动批准范围：受工作区边界约束的写入，或不会改变外部状态的只读操作。开启后会跨对话持续生效。"
                 approval.canApproveDeviceTurn ->
-                    "可只批准本次，或仅在当前代理回合内授权普通设备界面操作；要求逐次批准的设备能力不会被本轮授权覆盖。"
+                    "该操作影响设备状态，需要确认。可只批准本次，或仅在当前代理回合内授权普通设备界面操作；高权限设备能力仍逐次确认。"
                 else ->
-                    "该操作只支持逐次确认；工作区外写入、删除、命令、系统级和其他高风险能力不会被自动批准设置绕过。"
+                    "该操作会影响工作区外状态、进程、网络、设备或高权限资源，需要按影响等级确认。安全自动批准不会绕过当前操作。"
             },
             style = DsType.caption11,
             color = colors.labelTertiary,
@@ -1333,14 +1351,22 @@ private fun ApprovalDialog(
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
         )
-        when {
-            approval.canAutoApproveWorkspace -> DsButton(
-                "本会话工作区操作自动批准",
+        if (!safeAutoApprovalEnabled) {
+            DsButton(
+                "开启安全操作自动批准",
                 onAutoApprove,
                 modifier = Modifier.fillMaxWidth(),
                 variant = DsButtonVariant.Ghost,
             )
-            approval.canApproveDeviceTurn -> DsButton(
+        } else {
+            Text(
+                "安全操作自动批准已开启，并会在后续对话继续生效。",
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+        }
+        if (approval.canApproveDeviceTurn) {
+            DsButton(
                 "批准本轮普通设备操作",
                 onApproveDeviceTurn,
                 modifier = Modifier.fillMaxWidth(),
@@ -1348,6 +1374,13 @@ private fun ApprovalDialog(
             )
         }
     }
+}
+
+private fun approvalImpactLabel(impact: com.labteto.dshmobile.local.LocalApprovalImpact): String = when (impact) {
+    com.labteto.dshmobile.local.LocalApprovalImpact.LOW -> "低"
+    com.labteto.dshmobile.local.LocalApprovalImpact.MEDIUM -> "中"
+    com.labteto.dshmobile.local.LocalApprovalImpact.HIGH -> "高"
+    com.labteto.dshmobile.local.LocalApprovalImpact.CRITICAL -> "关键"
 }
 
 private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
