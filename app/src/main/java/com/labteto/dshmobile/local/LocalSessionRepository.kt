@@ -15,6 +15,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 internal data class LocalSessionRead(
     val session: LocalHarnessSession,
@@ -102,7 +103,9 @@ internal class LocalSessionRepository(
                         ?.takeIf(String::isNotBlank)
                         ?: loaded.document.id,
                     title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
-                    updatedAt = loaded.document.updatedAt,
+                    updatedAt = payload["updatedAt"]?.jsonPrimitive?.longOrNull
+                        ?.takeIf { it > 0L }
+                        ?: loaded.document.updatedAt,
                     blank = messages?.none { element ->
                         val message = element as? JsonObject ?: return@none false
                         message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
