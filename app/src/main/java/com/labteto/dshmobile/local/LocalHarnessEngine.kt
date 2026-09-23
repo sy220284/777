@@ -2296,6 +2296,12 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
+            queuedInputCount = pendingInputs.size(),
+            activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
+            activeAgents = resourceScheduler.snapshot().activeAgents,
+            maxModelRequests = resourceScheduler.budget.maxModelRequests,
+            maxAgents = resourceScheduler.budget.maxAgents,
+            resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
         )
         var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
