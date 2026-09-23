@@ -237,9 +237,28 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
     private val subagents by lazy {
-        LocalSubagentRunner(apiKeys, modelClient, state, jobs,
-            historySnapshot = { modelHistory.toList() }, eventLog = { eventLog },
-            schemas = ::subagentToolSchemas, execute = ::executeSafely, pruneToolResult = ::pruneToolResult,
+        LocalSubagentRunner(
+            apiKeys = apiKeys,
+            modelClient = modelClient,
+            state = state,
+            jobs = jobs,
+            historySnapshot = { modelHistory.toList() },
+            contextSnapshot = { query ->
+                val snapshot = _state.value
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = snapshot.conversationMode,
+                        projectId = snapshot.projectId,
+                        lineageId = snapshot.lineageId,
+                        handoffSummary = snapshot.handoffSummary,
+                    ),
+                )
+            },
+            eventLog = { eventLog },
+            schemas = ::subagentToolSchemas,
+            execute = ::executeSafely,
+            pruneToolResult = ::pruneToolResult,
         )
     }
 
