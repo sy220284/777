@@ -137,7 +137,8 @@ class LspProcessClient(
                 put("method", method)
                 put("params", params)
             }
-            LspFraming.write(output!!, json.encodeToString(JsonObject.serializer(), payload))
+            val writer = checkNotNull(output) { "LSP 输出流未就绪" }
+            LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
         }
     }
 
@@ -175,14 +176,17 @@ class LspProcessClient(
                 put("method", method)
                 put("params", params)
             }
-            LspFraming.write(output!!, json.encodeToString(JsonObject.serializer(), payload))
+            val writer = checkNotNull(output) { "LSP 输出流未就绪" }
+            val reader = checkNotNull(input) { "LSP 输入流未就绪" }
+            LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
             while (true) {
-                val message = json.parseToJsonElement(LspFraming.read(input!!)).jsonObject
-                val messageId = message["id"]?.jsonPrimitive?.content
+                val message = json.parseToJsonElement(LspFraming.read(reader)).jsonObject
+                val messageIdElement = message["id"]
+                val messageId = messageIdElement?.jsonPrimitive?.content
                 if (messageId == id.toString()) return message
-                if (messageId != null && message["method"] != null) {
-                    LspFraming.write(output!!, buildJsonObject {
-                        put("jsonrpc", "2.0"); put("id", message["id"]!!)
+                if (messageIdElement != null && messageId != null && message["method"] != null) {
+                    LspFraming.write(writer, buildJsonObject {
+                        put("jsonrpc", "2.0"); put("id", messageIdElement)
                         put("error", buildJsonObject { put("code", -32601); put("message", "Client method unsupported") })
                     }.toString())
                 } else synchronized(pendingNotifications) {
