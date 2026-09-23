@@ -2022,13 +2022,15 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         return executor.execute {
-            modelClient.complete(
-                apiKey = key,
-                baseUrl = snapshot.baseUrl,
-                model = snapshot.model,
-                messages = messages,
-                tools = tools,
-            )
+            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                modelClient.complete(
+                    apiKey = key,
+                    baseUrl = snapshot.baseUrl,
+                    model = snapshot.model,
+                    messages = messages,
+                    tools = tools,
+                )
+            }
         }
     }
 
@@ -2130,9 +2132,16 @@ class LocalHarnessEngine @Inject constructor(
             "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
             "git", "curl", "wget", "python3", "python", "node",
         ).filter(runtimeProcess::isCommandAvailable)
+        val resources = resourceScheduler.snapshot()
         return buildString {
             appendLine("安卓本机 Harness 环境")
             appendLine("工作区：${workspace.path}")
+            appendLine(
+                "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
+                    "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
+                    "压力 ${resources.pressure.name.lowercase()}",
+            )
+            appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
             appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
@@ -2349,7 +2358,7 @@ class LocalHarnessEngine @Inject constructor(
                 modelHistory += buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", recovered.callId)
-                    put("content", recovered.content)
+                    put("content", recovered.modelContent)
                 }
             }
         }
@@ -2466,6 +2475,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
+        const val MAX_PENDING_INPUTS = 16
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
