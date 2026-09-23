@@ -79,6 +79,70 @@ internal fun AssistantMessageNode.isWorkProcess(nodes: List<ChatNode>): Boolean 
         .any { it is ToolCallNode }
 }
 
+
+/**
+ * Assistant text that belongs to the same user-visible final answer as this node.
+ *
+ * Current harness events carry a turn id; legacy history may not. For legacy rows we fall back to
+ * the nearest user/turn boundary so one completed reply can still be copied as a single answer.
+ */
+internal fun AssistantMessageNode.finalAnswerNodes(nodes: List<ChatNode>): List<AssistantMessageNode> {
+    if (isWorkProcess(nodes)) return emptyList()
+    val ordered = nodes.sortedBy(ChatNode::seq)
+    val index = ordered.indexOfFirst { it.seq == seq }
+    if (index < 0) return listOf(this).filter { it.plainText.isNotBlank() }
+
+    // Never cross a user or turn boundary even when a buggy/legacy producer reuses a turn id.
+    var start = index
+    while (start > 0) {
+        val previous = ordered[start - 1]
+        if (previous is UserMessageNode || previous is TurnStartNode || previous is TurnEndNode) break
+        start--
+    }
+    var end = index + 1
+    while (end < ordered.size) {
+        val next = ordered[end]
+        if (next is UserMessageNode || next is TurnStartNode || next is TurnEndNode) break
+        end++
+    }
+
+    val segment = ordered.subList(start, end)
+        .filterIsInstance<AssistantMessageNode>()
+        .filter { candidate -> !candidate.isWorkProcess(nodes) && candidate.plainText.isNotBlank() }
+    val sameTurn = turn?.let { turnId -> segment.filter { it.turn == turnId } }.orEmpty()
+    return (sameTurn.ifEmpty { segment }).sortedBy(AssistantMessageNode::seq)
+}
+
+internal fun AssistantMessageNode.isFinalAnswerAnchor(nodes: List<ChatNode>): Boolean {
+    val group = finalAnswerNodes(nodes)
+    return group.lastOrNull()?.seq == seq || (group.isEmpty() && interrupted)
+}
+
+internal fun AssistantMessageNode.finalAnswerText(nodes: List<ChatNode>): String =
+    finalAnswerNodes(nodes)
+        .map { it.plainText.trim() }
+        .filter(String::isNotBlank)
+        .joinToString("\n\n")
+
+internal enum class TranscriptMode { CONCISE, FULL }
+
+internal fun ChatNode.rendersInTranscript(nodes: List<ChatNode>, mode: TranscriptMode): Boolean {
+    if (!rendersContent()) return false
+    return when (this) {
+        is AssistantMessageNode -> when {
+            isWorkProcess(nodes) -> mode == TranscriptMode.FULL
+            interrupted -> true
+            else -> isFinalAnswerAnchor(nodes)
+        }
+        is UserMessageNode, is TurnErrorNode -> true
+        is TurnEndNode -> reasonKind != "completed"
+        is ToolCallNode, is TodoNode, is GoalNode, is PlanModeNode, is CompactionNode,
+        is RetryNode, is CommandNode, is WorkflowNode, is TitleNode, is SubagentNode,
+        is OtherNode -> mode == TranscriptMode.FULL
+        is TurnStartNode, is ToolResultNode -> false
+    }
+}
+
 internal fun ChatNode.rendersContent(): Boolean = when (this) {
     // Structure, not content.
     is TurnStartNode -> false
