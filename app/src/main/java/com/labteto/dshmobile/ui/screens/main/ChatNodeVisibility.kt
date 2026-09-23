@@ -89,32 +89,28 @@ internal fun AssistantMessageNode.isWorkProcess(nodes: List<ChatNode>): Boolean 
 internal fun AssistantMessageNode.finalAnswerNodes(nodes: List<ChatNode>): List<AssistantMessageNode> {
     if (isWorkProcess(nodes)) return emptyList()
     val ordered = nodes.sortedBy(ChatNode::seq)
-    val candidates = if (turn != null) {
-        ordered.filterIsInstance<AssistantMessageNode>().filter { candidate ->
-            candidate.turn == turn &&
-                !candidate.isWorkProcess(nodes) &&
-                candidate.plainText.isNotBlank()
-        }
-    } else {
-        val index = ordered.indexOfFirst { it.seq == seq }
-        if (index < 0) return listOf(this).filter { it.plainText.isNotBlank() }
-        var start = index
-        while (start > 0) {
-            val previous = ordered[start - 1]
-            if (previous is UserMessageNode || previous is TurnStartNode || previous is TurnEndNode) break
-            start--
-        }
-        var end = index + 1
-        while (end < ordered.size) {
-            val next = ordered[end]
-            if (next is UserMessageNode || next is TurnStartNode || next is TurnEndNode) break
-            end++
-        }
-        ordered.subList(start, end)
-            .filterIsInstance<AssistantMessageNode>()
-            .filter { candidate -> !candidate.isWorkProcess(nodes) && candidate.plainText.isNotBlank() }
+    val index = ordered.indexOfFirst { it.seq == seq }
+    if (index < 0) return listOf(this).filter { it.plainText.isNotBlank() }
+
+    // Never cross a user or turn boundary even when a buggy/legacy producer reuses a turn id.
+    var start = index
+    while (start > 0) {
+        val previous = ordered[start - 1]
+        if (previous is UserMessageNode || previous is TurnStartNode || previous is TurnEndNode) break
+        start--
     }
-    return candidates.sortedBy(AssistantMessageNode::seq)
+    var end = index + 1
+    while (end < ordered.size) {
+        val next = ordered[end]
+        if (next is UserMessageNode || next is TurnStartNode || next is TurnEndNode) break
+        end++
+    }
+
+    val segment = ordered.subList(start, end)
+        .filterIsInstance<AssistantMessageNode>()
+        .filter { candidate -> !candidate.isWorkProcess(nodes) && candidate.plainText.isNotBlank() }
+    val sameTurn = turn?.let { turnId -> segment.filter { it.turn == turnId } }.orEmpty()
+    return (sameTurn.ifEmpty { segment }).sortedBy(AssistantMessageNode::seq)
 }
 
 internal fun AssistantMessageNode.isFinalAnswerAnchor(nodes: List<ChatNode>): Boolean {
