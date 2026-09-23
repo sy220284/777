@@ -1488,10 +1488,13 @@ class LocalHarnessEngine @Inject constructor(
                     plan = approvedPlan,
                 )
             }
-            eventLog.append("plan/mode", buildJsonObject { put("active", false) })
+            // Persist the approved plan before leaving planning mode. If the process dies between
+            // these two events, recovery stays conservatively in planning mode with the approved
+            // plan instead of entering execution mode without its durable plan.
             eventLog.append("plan/state", buildJsonObject {
                 put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
             })
+            eventLog.append("plan/mode", buildJsonObject { put("active", false) })
             if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 val prompt = systemPrompt()
                 modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
@@ -1791,12 +1794,10 @@ class LocalHarnessEngine @Inject constructor(
         val recovery = eventLog.repairInterruptedTail()
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
-            eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: run {
-                eventLog.append(PROJECTION_BASELINE_EVENT, buildJsonObject {
-                    put("source", "legacy-session-snapshot")
-                })
-                eventLog.latestSequence()
-            }
+            eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
+                PROJECTION_BASELINE_EVENT,
+                buildJsonObject { put("source", "legacy-session-snapshot") },
+            ).sequence
         } else {
             null
         }
@@ -1960,6 +1961,11 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun persist() {
+        // Capture the durable boundary before the in-memory projection. A concurrent state update
+        // may then be included in the snapshot with an older cursor, which is safe because replay
+        // can idempotently re-apply its later event. The opposite ordering could advance the cursor
+        // past a control event that the captured state did not yet contain.
+        val projectedThrough = eventLog.latestSequence()
         val state = _state.value
         val snapshot = LocalHarnessSession(
             id = currentSessionId,
@@ -1977,7 +1983,7 @@ class LocalHarnessEngine @Inject constructor(
             todos = state.todos,
             goal = state.goal,
             planMode = state.planMode,
-            controlProjectedThroughSequence = eventLog.latestSequence(),
+            controlProjectedThroughSequence = projectedThrough,
         )
         sessionRepository.enqueue(snapshot)
     }
