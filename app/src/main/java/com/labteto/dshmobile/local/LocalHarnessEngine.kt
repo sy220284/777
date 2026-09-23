@@ -1869,7 +1869,7 @@ class LocalHarnessEngine @Inject constructor(
             sequenceExclusive = projectionCursor,
         )
         val restoredHistory = restoreLocalModelHistory(
-            events = eventLog.snapshot(),
+            events = modelHistoryReplayEvents(stored.legacyModelHistory),
             legacyFallback = stored.legacyModelHistory,
             codec = modelHistoryCheckpointCodec,
         )
@@ -1930,6 +1930,30 @@ class LocalHarnessEngine @Inject constructor(
             // Rewrite the materialized snapshot without duplicating model-visible history.
             persist()
         }
+    }
+
+    /**
+     * Restore model history from the newest valid checkpoint tail whenever possible.
+     *
+     * New sessions checkpoint model-visible history regularly. Reading the entire event archive
+     * here would undo the projection-cursor startup optimization for long-lived sessions. Legacy
+     * history still provides the one-time fallback when no valid checkpoint exists.
+     */
+    private fun modelHistoryReplayEvents(
+        legacyFallback: List<JsonObject>,
+    ): List<LocalSessionEventLog.Event> {
+        var beforeSequence = Long.MAX_VALUE
+        while (true) {
+            val checkpoint = eventLog.latest(
+                ModelHistoryCheckpointCodec.EVENT_TYPE,
+                beforeSequenceExclusive = beforeSequence,
+            ) ?: break
+            if (modelHistoryCheckpointCodec.decode(checkpoint.data) != null) {
+                return eventLog.snapshotAfter(checkpoint.sequence - 1L)
+            }
+            beforeSequence = checkpoint.sequence
+        }
+        return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
     }
 
     private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
