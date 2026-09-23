@@ -568,6 +568,7 @@
     <string name="relay_status_retry">Pair again</string>
     <string name="relay_status_back_local">Back to Local Harness</string>
 
+    <string name="local_image_mode_status">Image handling: %1$s</string>
     <string name="local_files_workspace_subtitle">Browse on-device workspace files and task artifacts</string>
     <string name="local_files_read_failed">Could not read workspace files</string>
     <string name="local_files_preview_failed">Could not preview file</string>
@@ -645,6 +646,11 @@
     <string name="advanced_memory_saved">Memory settings saved</string>
     <string name="advanced_memory_settings">Memory settings</string>
     <string name="advanced_memory_updated">Memory updated</string>
+    <string name="advanced_image_input_mode">Image input</string>
+    <string name="advanced_image_input_hint">Auto sends pixels to a multimodal primary model first and falls back to the vision tool when the service explicitly rejects images. You can also force either route.</string>
+    <string name="advanced_image_mode_auto">Auto</string>
+    <string name="advanced_image_mode_native">Primary model</string>
+    <string name="advanced_image_mode_tool">Vision tool</string>
     <string name="advanced_model_attempts">Model retry attempts</string>
     <string name="advanced_model_configured">The on-device model key is configured. Leave the key blank to change only the model or endpoint.</string>
     <string name="advanced_model_key">Model key</string>

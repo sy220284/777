@@ -31,7 +31,7 @@ internal object LocalToolRouter {
     fun isOptional(name: String): Boolean =
         name in optionalExact ||
             name.startsWith("android_") ||
-            name.startsWith("vision_") ||
+            (name.startsWith("vision_") && name != "vision_analyze_file") ||
             name.startsWith("mcp_") ||
             name.startsWith("lsp_") ||
             name.startsWith("webhook_")

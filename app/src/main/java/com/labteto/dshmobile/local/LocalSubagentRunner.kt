@@ -56,6 +56,8 @@ internal class LocalSubagentRunner(
     private val schemas: (Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
+    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode) -> List<JsonObject>,
+    private val onNativeImageRejected: () -> Unit = {},
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
@@ -153,15 +155,45 @@ internal class LocalSubagentRunner(
                     }
                     compactSubagentHistory(history, subagentId)
                     modelStep += 1
-                    val reply = completeSubagentStep(
-                        key = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = routeModel,
-                        history = history.toList(),
-                        tools = schemas(allowMutation),
-                        subagentId = subagentId,
-                        step = modelStep,
-                    )
+                    val durableHistory = history.toList()
+                    val preparedHistory = prepareMessages(durableHistory, snapshot.imageInputMode)
+                    val reply = try {
+                        completeSubagentStep(
+                            key = key,
+                            baseUrl = snapshot.baseUrl,
+                            model = routeModel,
+                            history = preparedHistory,
+                            tools = schemas(allowMutation),
+                            subagentId = subagentId,
+                            step = modelStep,
+                        )
+                    } catch (error: Throwable) {
+                        if (
+                            snapshot.imageInputMode == LocalImageInputMode.AUTO &&
+                            hasLocalImageRefs(durableHistory) &&
+                            imageInputUnsupported(error)
+                        ) {
+                            onNativeImageRejected()
+                            eventLog().append("subagent/multimodal-fallback", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("step", modelStep)
+                                put("from", "native")
+                                put("to", "vision-tool")
+                                put("reason", error.message.orEmpty().take(2_000))
+                            })
+                            completeSubagentStep(
+                                key = key,
+                                baseUrl = snapshot.baseUrl,
+                                model = routeModel,
+                                history = prepareMessages(durableHistory, LocalImageInputMode.TOOL),
+                                tools = schemas(allowMutation),
+                                subagentId = subagentId,
+                                step = modelStep,
+                            )
+                        } else {
+                            throw error
+                        }
+                    }
                     repliesByStep[modelStep] = reply
                     AgentModelReply(
                         content = reply.content.orEmpty(),

@@ -83,6 +83,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
@@ -856,6 +857,20 @@ private fun LocalChat(
                         ImportedAttachmentRow(
                             attachment = attachment,
                             onRemove = { attachments.removeAt(index) },
+                        )
+                    }
+                    if (attachments.any { it.mediaType.startsWith("image/") }) {
+                        val imageModeLabel = stringResource(
+                            when (state.imageInputMode) {
+                                LocalImageInputMode.AUTO -> R.string.advanced_image_mode_auto
+                                LocalImageInputMode.NATIVE -> R.string.advanced_image_mode_native
+                                LocalImageInputMode.TOOL -> R.string.advanced_image_mode_tool
+                            },
+                        )
+                        Text(
+                            stringResource(R.string.local_image_mode_status, imageModeLabel),
+                            style = DsType.caption11,
+                            color = colors.labelTertiary,
                         )
                     }
                 }

@@ -49,11 +49,18 @@ data class LocalHarnessSession(
     val transcriptProjectedThroughSequence: Long? = null,
 )
 
+enum class LocalImageInputMode {
+    AUTO,
+    NATIVE,
+    TOOL,
+}
+
 data class LocalImportedAttachment(
     val name: String,
     val relativePath: String,
     val mediaType: String,
     val bytes: Long,
+    val attachmentId: String? = null,
 )
 
 data class LocalSessionSummary(
@@ -142,6 +149,7 @@ data class LocalHarnessState(
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
+    val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
     val workspacePath: String = "",
     val sessionId: String = "",
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
