@@ -5,10 +5,10 @@ import java.io.File
 /**
  * Resolves a usable language server without exposing configuration to ordinary users.
  *
- * A legacy explicit command is still honored for upgrade compatibility. Otherwise the resolver
- * inspects the target file/project and only selects a server that is already available in the
- * shared Android runtime or a workspace-local TypeScript server that can be launched by the
- * bundled Node runtime. It never downloads or installs executable code on its own.
+ * Legacy explicit commands are compatibility fallbacks only: automatic matching wins whenever a
+ * compatible server is available, stale commands are ignored, and a legacy server is never reused
+ * for a different language family. The resolver never downloads or installs executable code on its
+ * own.
  */
 internal class AutomaticLanguageServerResolver(
     private val root: File,
@@ -16,11 +16,36 @@ internal class AutomaticLanguageServerResolver(
     private val legacyCommand: () -> List<String> = { emptyList() },
 ) {
     fun resolve(relativePath: String? = null): List<String> {
-        runCatching(legacyCommand).getOrDefault(emptyList()).takeIf { it.isNotEmpty() }?.let {
-            return it
+        val family = familyFor(relativePath) ?: detectWorkspaceFamily()
+        family?.let(::commandFor)?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        val legacy = runCatching(legacyCommand).getOrDefault(emptyList())
+        return legacy.takeIf { isUsableLegacy(it, family) }.orEmpty()
+    }
+
+    private fun isUsableLegacy(command: List<String>, family: Family?): Boolean {
+        val executable = command.firstOrNull()?.takeIf(String::isNotBlank) ?: return false
+        if (!commandAvailable(executable)) return false
+        if (family == null) return true
+        return legacyFamily(command) == family
+    }
+
+    private fun legacyFamily(command: List<String>): Family? {
+        val executable = File(command.firstOrNull().orEmpty()).name.lowercase()
+        return when (executable) {
+            "kotlin-language-server" -> Family.KOTLIN
+            "jdtls" -> Family.JAVA
+            "basedpyright-langserver", "pyright-langserver", "pylsp" -> Family.PYTHON
+            "typescript-language-server" -> Family.TYPESCRIPT
+            "rust-analyzer" -> Family.RUST
+            "gopls" -> Family.GO
+            "clangd" -> Family.C_CPP
+            "node" -> if (command.drop(1).any {
+                File(it).name.lowercase().contains("typescript-language-server") ||
+                    it.lowercase().contains("typescript-language-server")
+            }) Family.TYPESCRIPT else null
+            else -> null
         }
-        val family = familyFor(relativePath) ?: detectWorkspaceFamily() ?: return emptyList()
-        return commandFor(family)
     }
 
     internal fun familyFor(relativePath: String?): Family? {
