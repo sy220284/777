@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.harness.session
 
+import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +17,7 @@ data class RecoveredToolResult(
     val step: Int?,
     val code: String,
     val content: String,
+    val modelContent: String,
 )
 
 data class SessionRepairResult(
@@ -57,7 +61,23 @@ object SessionRecovery {
         } else {
             "该工具调用在中断前尚未记录为开始。如任务仍需要，可重新执行。"
         }
-        return RecoveredToolResult(callId, name, step, code, content)
+        val modelContent = AgentToolResult(
+            content = content,
+            isError = true,
+            errorCode = code,
+            retryable = code == TOOL_NOT_STARTED,
+            sideEffect = if (code == TOOL_OUTCOME_UNKNOWN) {
+                AgentToolSideEffect.POSSIBLE
+            } else {
+                AgentToolSideEffect.NONE
+            },
+            recoveryHint = if (code == TOOL_OUTCOME_UNKNOWN) {
+                "先检查外部状态，再决定是否重试。"
+            } else {
+                "如任务仍需要，可重新执行该工具。"
+            },
+        ).modelVisibleContent()
+        return RecoveredToolResult(callId, name, step, code, content, modelContent)
     }
 
     fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
@@ -133,6 +153,7 @@ object SessionRecovery {
                 put("id", result.callId)
                 result.name?.let { put("name", it) }
                 put("content", result.content)
+                put("model_content", result.modelContent)
                 put("is_error", true)
                 put("error_code", result.code)
                 put("recovered", true)
