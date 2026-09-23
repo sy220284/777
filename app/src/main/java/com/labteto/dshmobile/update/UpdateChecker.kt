@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.update
 
+import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +11,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 
 /** The subset of a GitHub release this app reads. */
@@ -159,9 +162,21 @@ internal fun shouldUsePatchChain(apkSize: Long?, patches: List<DeltaPatch>): Boo
  */
 @Singleton
 class UpdateChecker @Inject constructor(
-    private val client: OkHttpClient,
+    client: OkHttpClient,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+
+    // GitHub API/CDN HTTP/2 negotiation is unreliable on some mobile networks and proxies.
+    // Keep update checks isolated from the app's shared client, force HTTP/1.1, and retry
+    // transient transport failures. This also matches the release download path.
+    private val githubClient = client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .pingInterval(0, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .protocols(listOf(Protocol.HTTP_1_1))
+        .build()
 
     suspend fun checkNow(currentVersion: String): AvailableUpdate? {
         val releases = fetchRecentReleases()
@@ -278,13 +293,11 @@ class UpdateChecker @Inject constructor(
         val request = Request.Builder()
             .url(RECENT_RELEASES_API)
             .header("Accept", "application/vnd.github+json")
+            .header("Cache-Control", "no-cache")
             .get()
             .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("无法获取最新发行版：HTTP ${response.code}")
-            val body = response.body?.string() ?: error("发行版响应为空")
-            json.decodeFromString(ListSerializer, body)
-        }
+        val body = executeGithubText(request, "检查 GitHub 发行版")
+        json.decodeFromString(ListSerializer, body)
     }
 
     private suspend fun fetchManifest(asset: GithubAsset): UpdateManifest? = withContext(Dispatchers.IO) {
@@ -293,19 +306,73 @@ class UpdateChecker @Inject constructor(
         val request = Request.Builder()
             .url(asset.downloadUrl)
             .header("Accept", "application/json, application/octet-stream")
+            .header("Cache-Control", "no-cache")
             .get()
             .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@use null
-            val body = response.body ?: return@use null
-            if (body.contentLength() > MAX_MANIFEST_BYTES) return@use null
-            val bytes = body.byteStream().use { readChecksumBytes(it, MAX_MANIFEST_BYTES) }
-            val actual = MessageDigest.getInstance("SHA-256")
-                .digest(bytes)
-                .joinToString("") { "%02x".format(it) }
-            if (!actual.equals(expected, ignoreCase = true)) return@use null
-            json.decodeFromString(UpdateManifest.serializer(), bytes.toString(Charsets.UTF_8))
+
+        // A missing/unreachable incremental manifest must never make "检查更新" fail. The full APK
+        // is always a valid fallback, so manifest transport/parsing failures deliberately fail open.
+        val bytes = try {
+            executeGithubBytes(
+                request = request,
+                purpose = "读取增量更新清单",
+                maxBytes = MAX_MANIFEST_BYTES,
+            )
+        } catch (_: IOException) {
+            return@withContext null
         }
+        val actual = MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        if (!actual.equals(expected, ignoreCase = true)) return@withContext null
+        runCatching {
+            json.decodeFromString(UpdateManifest.serializer(), bytes.toString(Charsets.UTF_8))
+        }.getOrNull()
+    }
+
+    private fun executeGithubText(request: Request, purpose: String): String =
+        executeGithubBytes(request, purpose, MAX_RELEASE_METADATA_BYTES).toString(Charsets.UTF_8)
+
+    private fun executeGithubBytes(
+        request: Request,
+        purpose: String,
+        maxBytes: Long,
+    ): ByteArray {
+        var lastTransportError: IOException? = null
+
+        repeat(MAX_REQUEST_ATTEMPTS) { attempt ->
+            try {
+                githubClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val retryable = response.code == 408 ||
+                            response.code == 429 ||
+                            response.code in 500..599
+                        if (!retryable || attempt + 1 >= MAX_REQUEST_ATTEMPTS) {
+                            throw IOException("$purpose失败：HTTP ${response.code}")
+                        }
+                        lastTransportError = IOException("$purpose暂时失败：HTTP ${response.code}")
+                    } else {
+                        val body = response.body ?: throw IOException("$purpose返回空响应")
+                        val declared = body.contentLength()
+                        if (declared > maxBytes) {
+                            throw IOException("$purpose响应异常过大：$declared 字节")
+                        }
+                        return readChecksumBytes(body.byteStream(), maxBytes)
+                    }
+                }
+            } catch (error: IOException) {
+                lastTransportError = error
+            }
+
+            if (attempt + 1 < MAX_REQUEST_ATTEMPTS) {
+                Thread.sleep(REQUEST_RETRY_BACKOFF_MS * (attempt + 1L))
+            }
+        }
+
+        throw IOException(
+            "$purpose连接失败，已自动重试 $MAX_REQUEST_ATTEMPTS 次，请检查网络后重试。",
+            lastTransportError,
+        )
     }
 
     private companion object {
@@ -313,6 +380,9 @@ class UpdateChecker @Inject constructor(
         const val MAX_RELEASES_TO_SCAN = 12
         const val MAX_PATCH_CHAIN_LENGTH = 6
         const val MAX_MANIFEST_BYTES = 256L * 1024L
+        const val MAX_RELEASE_METADATA_BYTES = 2L * 1024L * 1024L
+        const val MAX_REQUEST_ATTEMPTS = 3
+        const val REQUEST_RETRY_BACKOFF_MS = 400L
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
         const val RECENT_RELEASES_API =
             "https://api.github.com/repos/$REPO/releases?per_page=$MAX_RELEASES_TO_SCAN"
