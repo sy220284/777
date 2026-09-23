@@ -1674,7 +1674,7 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
         val loaded = try {
-            sessionRepository.read(sessionId)
+            sessionRepository.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
             _state.update {
                 it.copy(
