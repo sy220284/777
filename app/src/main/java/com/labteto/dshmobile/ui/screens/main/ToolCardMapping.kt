@@ -174,13 +174,12 @@ private fun terminalCard(
     // A background call has no output to show inline; it becomes a job instead.
     if (shell?.background == true || send?.background == true) return null
 
-    val command = shell?.command ?: send?.text.orEmpty()
     val description = shell?.description
     val workdir = resolveTerminalCwd(shell?.workdir, cwd)
 
     if (result == null) {
         return ToolCardView.TerminalCard(
-            title = command,
+            title = description ?: "Terminal",
             description = description,
             cwd = workdir,
             running = true,
@@ -192,7 +191,7 @@ private fun terminalCard(
     val output = singleResultText(result) ?: return null
     val status = if (send != null) ExitStatus(output, null, null) else parseExitStatus(output)
     return ToolCardView.TerminalCard(
-        title = command,
+        title = description ?: "Terminal",
         description = description,
         cwd = workdir,
         output = status.output,
