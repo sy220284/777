@@ -64,7 +64,6 @@ import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.core.wire.dto.SessionPageRequest
-import com.labteto.dshmobile.core.wire.dto.SessionProjectionsBlock
 import com.labteto.dshmobile.core.wire.dto.SessionPromptRequest
 import com.labteto.dshmobile.core.wire.dto.SessionRenameRequest
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
@@ -93,7 +92,6 @@ import com.labteto.dshmobile.core.wire.encodeToJsonElement
 import com.labteto.dshmobile.core.wire.newPromptRequestId
 import java.io.InputStream
 import java.io.OutputStream
-import java.time.Instant
 import java.util.TimeZone
 import com.labteto.dshmobile.core.wire.dto.PermissionCatalog
 import javax.inject.Inject
@@ -225,15 +223,6 @@ internal fun settlesRequest(outcome: QuestionOutcome): Boolean = when (outcome) 
     is QuestionOutcome.Refused -> outcome.reason == NOT_PENDING
     is QuestionOutcome.Unsent -> false
 }
-
-/** Wire workspace -> renderable row, parsing the ISO-8601 stamp once at the boundary. */
-private fun WorkspaceView.toRow(): WorkspaceRow = WorkspaceRow(
-    workspaceId = workspaceId,
-    path = path,
-    title = title,
-    sessionIds = sessionIds,
-    updatedAtEpoch = runCatching { Instant.parse(updatedAt).toEpochMilli() }.getOrDefault(0L),
-)
 
 /** A pending sandbox/permission approval the user can answer (allow-once / reject). */
 data class PendingApproval(
@@ -445,13 +434,7 @@ class SessionStore @Inject constructor(
             .stateIn(scope, SharingStarted.Eagerly, null)
 
     // ------------------------------------------------------------------ internal state (guarded by `lock`)
-    private val sessionRows = LinkedHashMap<String, SessionRow>()
-    private val runningBySession = HashMap<String, Boolean>()
-    private val titleBySession = HashMap<String, String>()
-    private val workspaceRows = LinkedHashMap<String, WorkspaceRow>()
-    private val workspaceOrder = ArrayList<String>()
-    private var archived = emptySet<String>()
-    private val pendingKinds = HashMap<String, MutableSet<String>>()
+    private val indexState = SessionIndexState()
 
     // Pending Remote Event waterfalls this store can answer. Keyed by the frame's `eventId`,
     // which is both what an answer names and what a `cancel` frame withdraws — 0.1.2 mints no
@@ -653,11 +636,7 @@ class SessionStore @Inject constructor(
     private suspend fun resolveInitialSession(): String? {
         val remembered = hostKey()?.let { hostsStore.lastSessionId(it) }
         val (rows, workspaces, archivedNow) = synchronized(lock) {
-            Triple(
-                sessionRows.values.toList(),
-                workspaceOrder.mapNotNull { workspaceRows[it] },
-                archived,
-            )
+            indexState.initialSnapshot()
         }
         return pickInitialSession(rows, workspaces, archivedNow, remembered)
     }
@@ -869,12 +848,12 @@ class SessionStore @Inject constructor(
     private fun handleWorkspaceFrame(frame: WorkspaceFollowFrame) {
         when (frame) {
             is WorkspaceFollowFrame.Baseline -> synchronized(lock) {
-                workspaceRows.clear()
-                workspaceOrder.clear()
-                for (w in frame.workspaces) workspaceRows[w.workspaceId] = w.toRow()
-                workspaceOrder.addAll(frame.workspaceIds.ifEmpty { frame.workspaces.map { it.workspaceId } })
-                archived = frame.archivedSessionIds.toSet()
-                _archivedSessionIds.value = archived
+                indexState.replaceWorkspaceBaseline(
+                    frame.workspaces,
+                    frame.workspaceIds,
+                    frame.archivedSessionIds,
+                )
+                _archivedSessionIds.value = indexState.archivedIds()
                 emitWorkspacesLocked()
             }
             is WorkspaceFollowFrame.Upsert -> upsertWorkspace(frame.workspace)
@@ -992,46 +971,14 @@ class SessionStore @Inject constructor(
 
     private fun onSessionAdded(item: SessionSummary) {
         synchronized(lock) {
-            val existing = sessionRows[item.sessionId]
-            val title = titleBySession[item.sessionId]
-            val row = existing?.copy(
-                title = title ?: existing.title,
-                blank = item.blank,
-                parentSessionId = item.parentSessionId,
-                origin = item.origin,
-                cwd = item.cwd,
-                agentPreset = item.agentPreset,
-            ) ?: SessionRow(
-                sessionId = item.sessionId,
-                title = title,
-                running = runningBySession[item.sessionId] ?: item.running,
-                blank = item.blank,
-                parentSessionId = item.parentSessionId,
-                origin = item.origin,
-                cwd = item.cwd,
-                agentPreset = item.agentPreset,
-                updatedAt = item.updatedAt,
-                pendingInteraction = null,
-            )
-            if (existing == null) {
-                // New sessions appear at the front (most recent first).
-                val copy = LinkedHashMap<String, SessionRow>(sessionRows.size + 1)
-                copy[item.sessionId] = row
-                copy.putAll(sessionRows)
-                sessionRows.clear()
-                sessionRows.putAll(copy)
-            } else {
-                sessionRows[item.sessionId] = row
-            }
+            indexState.addSession(item)
             emitSessionsLocked()
         }
     }
 
     private fun onSessionRemoved(sessionId: String) {
         synchronized(lock) {
-            sessionRows.remove(sessionId)
-            pendingKinds.remove(sessionId)
-            runningBySession.remove(sessionId)
+            indexState.removeSession(sessionId)
             questionEvents.discard(sessionId)
             emitSessionsLocked()
         }
@@ -1039,8 +986,7 @@ class SessionStore @Inject constructor(
 
     private fun setRunning(sessionId: String, running: Boolean) {
         synchronized(lock) {
-            runningBySession[sessionId] = running
-            sessionRows[sessionId]?.let { if (it.running != running) sessionRows[sessionId] = it.copy(running = running) }
+            indexState.setRunning(sessionId, running)
             if (sessionId == currentId) rebuildCurrentLocked()
             emitSessionsLocked()
         }
@@ -1049,15 +995,14 @@ class SessionStore @Inject constructor(
     /** Reorder one session on a durable user message, without touching anything else about it. */
     private fun setUpdatedAt(sessionId: String, updatedAt: Long) {
         synchronized(lock) {
-            val row = sessionRows[sessionId] ?: return@synchronized
-            sessionRows[sessionId] = row.copy(updatedAt = updatedAt)
+            indexState.setUpdatedAt(sessionId, updatedAt)
             emitSessionsLocked()
         }
     }
 
     private fun setBlank(sessionId: String, blank: Boolean) {
         synchronized(lock) {
-            sessionRows[sessionId]?.let { if (it.blank != blank) sessionRows[sessionId] = it.copy(blank = blank) }
+            indexState.setBlank(sessionId, blank)
             if (sessionId == currentId) currentBlank = blank
             emitSessionsLocked()
         }
@@ -1065,41 +1010,35 @@ class SessionStore @Inject constructor(
 
     private fun setTitle(sessionId: String, title: String) {
         synchronized(lock) {
-            titleBySession[sessionId] = title
-            sessionRows[sessionId]?.let { if (it.title != title) sessionRows[sessionId] = it.copy(title = title) }
+            indexState.setTitle(sessionId, title)
             emitSessionsLocked()
         }
     }
 
     private fun upsertWorkspace(workspace: WorkspaceView) {
         synchronized(lock) {
-            val row = workspace.toRow()
-            if (!workspaceRows.containsKey(workspace.workspaceId)) workspaceOrder.add(workspace.workspaceId)
-            workspaceRows[workspace.workspaceId] = row
+            indexState.upsertWorkspace(workspace)
             emitWorkspacesLocked()
         }
     }
 
     private fun removeWorkspace(workspaceId: String) {
         synchronized(lock) {
-            workspaceRows.remove(workspaceId)
-            workspaceOrder.remove(workspaceId)
+            indexState.removeWorkspace(workspaceId)
             emitWorkspacesLocked()
         }
     }
 
     private fun setWorkspaceOrder(ids: List<String>) {
         synchronized(lock) {
-            workspaceOrder.clear()
-            workspaceOrder.addAll(ids)
+            indexState.setWorkspaceOrder(ids)
             emitWorkspacesLocked()
         }
     }
 
     private fun setArchived(ids: List<String>) {
         synchronized(lock) {
-            archived = ids.toSet()
-            _archivedSessionIds.value = archived
+            _archivedSessionIds.value = indexState.setArchived(ids)
         }
     }
 
@@ -1157,7 +1096,7 @@ class SessionStore @Inject constructor(
         val events = currentEvents.toList()
         val snapshot = EventFold(sid).fold(events, liveAssistant.transientEnvelopes())
         val blank = if (events.isEmpty()) currentBlank else snapshot.blank
-        val running = runningBySession[sid] ?: snapshot.running
+        val running = indexState.running(sid) ?: snapshot.running
         val merged = snapshot.copy(
             blank = blank,
             running = running,
@@ -1169,44 +1108,19 @@ class SessionStore @Inject constructor(
     }
 
     private fun emitSessionsLocked() {
-        val rows = sessionRows.values.map { row ->
-            row.copy(pendingInteraction = pendingInteractionOf(pendingKinds[row.sessionId]))
-        }
-        _sessions.value = rows
+        _sessions.value = indexState.renderSessions()
     }
 
     private fun emitWorkspacesLocked() {
-        val ordered = workspaceOrder.mapNotNull { workspaceRows[it] } +
-            workspaceRows.values.filter { it.workspaceId !in workspaceOrder }
-        _workspaces.value = ordered
-    }
-
-    private fun pendingInteractionOf(kinds: Set<String>?): String? {
-        if (kinds.isNullOrEmpty()) return null
-        return when {
-            "question" in kinds -> "question"
-            "plan-review" in kinds -> "plan-review"
-            "approval" in kinds -> "approval"
-            else -> null
-        }
+        _workspaces.value = indexState.orderedWorkspaces()
     }
 
     private fun addPendingLocked(sessionId: String, kind: String) {
-        pendingKinds.getOrPut(sessionId) { LinkedHashSet() }.add(kind)
+        indexState.addPending(sessionId, kind)
     }
 
     private fun removePendingLocked(sessionId: String, kind: String) {
-        pendingKinds[sessionId]?.remove(kind)
-        if (pendingKinds[sessionId].isNullOrEmpty()) pendingKinds.remove(sessionId)
-    }
-
-    private fun extractTitle(block: SessionProjectionsBlock?): String? {
-        val value = block?.values?.get("title") ?: return null
-        return when (value) {
-            is JsonPrimitive -> value.contentOrNull
-            is JsonObject -> value["title"]?.jsonPrimitive?.contentOrNull
-            else -> null
-        }
+        indexState.removePending(sessionId, kind)
     }
 
     // ------------------------------------------------------------------ public RPC surface
@@ -1216,24 +1130,7 @@ class SessionStore @Inject constructor(
             is RpcResult.Ok -> {
                 clearConnectionError()
                 synchronized(lock) {
-                    sessionRows.clear()
-                    for (item in r.value.items) {
-                        val title = titleBySession[item.sessionId]
-                            ?: extractTitle(item.projections)?.also { titleBySession[item.sessionId] = it }
-                        runningBySession.putIfAbsent(item.sessionId, item.running)
-                        sessionRows[item.sessionId] = SessionRow(
-                            sessionId = item.sessionId,
-                            title = title,
-                            running = runningBySession[item.sessionId] ?: item.running,
-                            blank = item.blank,
-                            parentSessionId = item.parentSessionId,
-                            origin = item.origin,
-                            cwd = item.cwd,
-                            agentPreset = item.agentPreset,
-                            updatedAt = item.updatedAt,
-                            pendingInteraction = null,
-                        )
-                    }
+                    indexState.replaceSessions(r.value.items)
                     emitSessionsLocked()
                 }
             }
@@ -1262,7 +1159,7 @@ class SessionStore @Inject constructor(
             _currentSessionId.value = sessionId
             currentEvents.clear()
             currentHasMore = false
-            currentBlank = sessionRows[sessionId]?.blank ?: true
+            currentBlank = indexState.session(sessionId)?.blank ?: true
             currentProjections.clear()
             currentQueue = emptyList()
             liveAssistant.clear()
@@ -1475,10 +1372,7 @@ class SessionStore @Inject constructor(
         // — the harness's own New Session does this, and it is why its list stays clean.
         if (workspaceId != null) {
             val reusable = synchronized(lock) {
-                workspaceRows[workspaceId]?.sessionIds
-                    ?.mapNotNull { sessionRows[it] }
-                    ?.firstOrNull { it.blank && it.sessionId !in archived && it.origin != "subagent" }
-                    ?.sessionId
+                indexState.reusableBlankSession(workspaceId)
             }
             if (reusable != null) {
                 openSession(reusable)
