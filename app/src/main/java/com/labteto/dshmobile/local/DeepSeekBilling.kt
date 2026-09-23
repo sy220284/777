@@ -313,7 +313,7 @@ internal fun parseDeepSeekPricingPage(html: String): List<DeepSeekModelPricing> 
     val start = text.indexOf("价格").takeIf { it >= 0 } ?: error("未找到价格表")
     val end = text.indexOf("并发限制", start).takeIf { it > start } ?: error("价格表结构已变化")
     val section = text.substring(start, end)
-    val values = Regex("""([0-9]+(?:\\.[0-9]+)?)\\s*元""")
+    val values = Regex("""([0-9]+(?:\.[0-9]+)?)\s*元""")
         .findAll(section)
         .map { it.groupValues[1].toDouble() }
         .take(12)
