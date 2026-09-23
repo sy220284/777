@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
 import org.junit.After
@@ -18,7 +18,7 @@ class LocalApprovalPreferencesAndroidTest {
 
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
+        context = InstrumentationRegistry.getInstrumentation().targetContext
         name = "approval-test-${UUID.randomUUID()}"
     }
 
