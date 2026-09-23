@@ -17,6 +17,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -95,6 +96,144 @@ class DeepSeekClient @Inject constructor(
         }
     }
 
+    suspend fun completeStreaming(
+        apiKey: String,
+        baseUrl: String,
+        model: String,
+        messages: List<JsonObject>,
+        tools: JsonArray = LocalToolCatalog.specs,
+        onDelta: (LocalModelDelta) -> Unit = { },
+    ): LocalModelReply = withContext(Dispatchers.IO) {
+        val payload = buildJsonObject {
+            put("model", model)
+            put("messages", JsonArray(messages))
+            put("stream", true)
+            if (tools.isNotEmpty()) {
+                put("tools", tools)
+                put("tool_choice", "auto")
+            }
+        }
+        val request = Request.Builder()
+            .url(endpoint(baseUrl))
+            .header("Authorization", "Bearer $apiKey")
+            .header("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        try {
+            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+                if (!response.isSuccessful) {
+                    val body = response.readModelBodyBounded()
+                    val detail = runCatching {
+                        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
+                            ?.get("message")?.jsonPrimitive?.content
+                    }.getOrNull()
+                    throw LocalModelException(
+                        code = "MODEL_HTTP_${response.code}",
+                        message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
+                        retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                    )
+                }
+                val responseBody = response.body ?: error("模型响应为空")
+                val content = StringBuilder()
+                val reasoning = StringBuilder()
+                val fallback = StringBuilder()
+                val toolCalls = linkedMapOf<Int, StreamToolCall>()
+                var totalBytes = 0
+                var sawStreamData = false
+                responseBody.charStream().buffered().use { reader ->
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
+                        if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
+                            throw LocalModelException(
+                                code = "MODEL_RESPONSE_TOO_LARGE",
+                                message = "模型流式响应超过 ${MAX_MODEL_RESPONSE_BYTES} 字节上限",
+                                retryable = false,
+                            )
+                        }
+                        if (!line.startsWith("data:")) {
+                            if (line.isNotBlank()) fallback.append(line)
+                            continue
+                        }
+                        sawStreamData = true
+                        val data = line.removePrefix("data:").trim()
+                        if (data.isBlank()) continue
+                        if (data == "[DONE]") break
+                        val root = json.parseToJsonElement(data).jsonObject
+                        val delta = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                            ?.get("delta")?.jsonObject ?: continue
+                        val textDelta = assistantText(delta["content"]).orEmpty()
+                        val reasoningDelta = delta["reasoning_content"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                        if (textDelta.isNotEmpty()) content.append(textDelta)
+                        if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
+                        if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
+                            onDelta(LocalModelDelta(textDelta, reasoningDelta))
+                        }
+                        delta["tool_calls"]?.jsonArray.orEmpty().forEach { element ->
+                            val item = element.jsonObject
+                            val index = item["index"]?.jsonPrimitive?.intOrNull ?: 0
+                            val acc = toolCalls.getOrPut(index) { StreamToolCall() }
+                            item["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)?.let { acc.id = it }
+                            val function = item["function"] as? JsonObject
+                            function?.get("name")?.jsonPrimitive?.contentOrNull
+                                ?.takeIf(String::isNotBlank)?.let { acc.name = it }
+                            function?.get("arguments")?.jsonPrimitive?.contentOrNull?.let(acc.arguments::append)
+                        }
+                    }
+                }
+                if (!sawStreamData && fallback.isNotBlank()) {
+                    return@use parse(fallback.toString())
+                }
+                val message = buildJsonObject {
+                    put("role", "assistant")
+                    put("content", content.toString())
+                    if (reasoning.isNotEmpty()) put("reasoning_content", reasoning.toString())
+                    if (toolCalls.isNotEmpty()) {
+                        put("tool_calls", buildJsonArray {
+                            toolCalls.toSortedMap().values.forEach { call ->
+                                add(buildJsonObject {
+                                    put("id", call.id ?: error("流式工具调用缺少 id"))
+                                    put("type", "function")
+                                    put("function", buildJsonObject {
+                                        put("name", call.name ?: error("流式工具调用缺少 name"))
+                                        put("arguments", call.arguments.toString())
+                                    })
+                                })
+                            }
+                        })
+                    }
+                }
+                val synthetic = buildJsonObject {
+                    put("choices", buildJsonArray {
+                        add(buildJsonObject { put("message", message) })
+                    })
+                }
+                parse(synthetic.toString())
+            }
+        } catch (error: LocalModelException) {
+            throw error
+        } catch (error: SocketTimeoutException) {
+            throw LocalModelException(
+                code = "MODEL_TIMEOUT",
+                message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
+                retryable = true,
+                cause = error,
+            )
+        } catch (error: java.io.IOException) {
+            throw LocalModelException(
+                code = "MODEL_NETWORK",
+                message = "模型网络请求失败：${error.message ?: "网络异常"}",
+                retryable = true,
+                cause = error,
+            )
+        }
+    }
+
+    private data class StreamToolCall(
+        var id: String? = null,
+        var name: String? = null,
+        val arguments: StringBuilder = StringBuilder(),
+    )
     internal fun parse(body: String): LocalModelReply {
         val root = json.parseToJsonElement(body).jsonObject
         val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
