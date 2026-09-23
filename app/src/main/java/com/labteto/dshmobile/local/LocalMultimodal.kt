@@ -45,6 +45,7 @@ internal fun buildLocalUserModelMessage(
                         put("mediaType", image.mediaType)
                         put("name", image.name)
                         put("bytes", image.bytes)
+                        image.attachmentId?.let { put("attachmentId", it) }
                     })
                 }
             })
