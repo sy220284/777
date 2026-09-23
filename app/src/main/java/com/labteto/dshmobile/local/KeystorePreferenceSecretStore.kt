@@ -34,7 +34,11 @@ internal class KeystorePreferenceSecretStore(
         val value = withContext(Dispatchers.Default) {
             runCatching { decrypt(blob) }.getOrNull()
         }
-        if (value == null) clear()
+        if (value == null) {
+            dataStore.edit { preferences ->
+                if (preferences[key] == blob) preferences.remove(key)
+            }
+        }
         return value
     }
 
@@ -69,6 +73,7 @@ internal class KeystorePreferenceSecretStore(
         return String(cipher.doFinal(decoder.decode(parts[1])), Charsets.UTF_8)
     }
 
+    @Synchronized
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
         (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }

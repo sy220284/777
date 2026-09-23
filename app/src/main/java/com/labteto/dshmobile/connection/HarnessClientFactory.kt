@@ -47,7 +47,7 @@ class HarnessClientFactory @Inject constructor(
      */
     fun httpClient(fingerprint: String?): OkHttpClient =
         if (fingerprint == null) okHttpClient
-        else pinned.getOrPut(fingerprint) { RelayTls.pinnedClient(okHttpClient, fingerprint) }
+        else pinned.computeIfAbsent(fingerprint) { pin -> RelayTls.pinnedClient(okHttpClient, pin) }
 
     /** The `Authorization` value for [config], or null when it is not a paired relay. */
     suspend fun authorizationFor(config: HostConfig): String? =

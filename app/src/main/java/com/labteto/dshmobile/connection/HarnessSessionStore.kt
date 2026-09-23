@@ -53,16 +53,23 @@ class HarnessSessionStore @Inject constructor(
             ?: return SessionExchange.Refused(0)
         val outcome = HarnessSession.exchange(baseUrl, token, okHttpClient)
         if (outcome is SessionExchange.Granted) {
-            write(sessions() + (hostId to outcome.cookie))
+            dataStore.edit { prefs ->
+                val current = decodeSessions(prefs[KEY]).toMutableMap()
+                current[hostId] = outcome.cookie
+                prefs[KEY] = WireJson.encodeToString(serializer, current)
+            }
         }
         return outcome
     }
 
     /** Forget the session for [hostId]. Safe to call when there is none. */
     suspend fun remove(hostId: String) {
-        val current = sessions()
-        if (hostId !in current) return
-        write(current - hostId)
+        dataStore.edit { prefs ->
+            val current = decodeSessions(prefs[KEY]).toMutableMap()
+            if (current.remove(hostId) == null) return@edit
+            if (current.isEmpty()) prefs.remove(KEY)
+            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+        }
     }
 
     /** Forget every session — the Settings "clear data" action. */
@@ -70,13 +77,12 @@ class HarnessSessionStore @Inject constructor(
         dataStore.edit { it.remove(KEY) }
     }
 
-    private suspend fun sessions(): Map<String, String> {
-        val raw = dataStore.data.first()[KEY] ?: return emptyMap()
-        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
-    }
+    private suspend fun sessions(): Map<String, String> =
+        decodeSessions(dataStore.data.first()[KEY])
 
-    private suspend fun write(next: Map<String, String>) {
-        dataStore.edit { it[KEY] = WireJson.encodeToString(serializer, next) }
+    private fun decodeSessions(raw: String?): Map<String, String> {
+        if (raw == null) return emptyMap()
+        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
     }
 
     private companion object {

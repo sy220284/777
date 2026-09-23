@@ -469,8 +469,9 @@ class SettingsViewModel @Inject constructor(
 
     /** Forget every remembered harness and its locally stored relay credential. */
     fun forgetHosts(onDone: () -> Unit = {}) {
+        connectionManager.disconnect()
         viewModelScope.launch {
-            hostsStore.hosts.first().forEach { hostsStore.removeHost(it.id) }
+            hostsStore.clearHosts()
             credentials.clear()
             onDone()
         }

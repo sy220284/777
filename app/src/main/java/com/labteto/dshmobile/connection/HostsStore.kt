@@ -43,27 +43,9 @@ class HostsStore @Inject constructor(
     private val hostsSerializer = ListSerializer(HostConfig.serializer())
     private val lastSessionsSerializer = MapSerializer(String.serializer(), String.serializer())
 
-    val hosts: Flow<List<HostConfig>> = dataStore.data.map { prefs ->
-        val raw = prefs[Keys.HOSTS] ?: return@map emptyList()
-        runCatching {
-            WireJson.decodeFromString(hostsSerializer, raw).sortedByDescending { it.lastConnectedAt }
-        }.getOrDefault(emptyList())
-    }
+    val hosts: Flow<List<HostConfig>> = dataStore.data.map(::decodeHosts)
 
-    val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
-        AppSettings(
-            keepConnectedInBackground = prefs[Keys.BACKGROUND] ?: false,
-            notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
-            notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
-            notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
-            themePreference = prefs[Keys.THEME] ?: "system",
-            localeOverride = when (val tag = prefs[Keys.LOCALE]) {
-                "en" -> "en"
-                "zh", "zh-CN", "zh_CN" -> "zh-CN"
-                else -> null
-            },
-        )
-    }
+    val settings: Flow<AppSettings> = dataStore.data.map(::decodeSettings)
 
     suspend fun settingsOnce(): AppSettings = settings.first()
 
@@ -74,24 +56,39 @@ class HostsStore @Inject constructor(
     }
 
     suspend fun desiredHostOnce(): HostConfig? {
-        val id = dataStore.data.first()[Keys.DESIRED_HOST_ID] ?: return null
-        val host = hosts.first().firstOrNull { it.id == id }
-        if (host == null) setDesiredHost(null)
+        val snapshot = dataStore.data.first()
+        val id = snapshot[Keys.DESIRED_HOST_ID] ?: return null
+        val host = decodeHosts(snapshot).firstOrNull { it.id == id }
+        if (host == null) {
+            // Clear only the stale value we actually observed. A concurrent connect may already
+            // have selected another host, and a blind setDesiredHost(null) would erase that choice.
+            dataStore.edit { prefs ->
+                if (prefs[Keys.DESIRED_HOST_ID] == id) prefs.remove(Keys.DESIRED_HOST_ID)
+            }
+        }
         return host
     }
 
     suspend fun upsertHost(config: HostConfig) {
-        val current = hosts.first().toMutableList()
-        current.removeAll { it.host == config.host && it.port == config.port }
-        current.add(0, config)
-        persist(current)
+        dataStore.edit { prefs ->
+            val current = decodeHosts(prefs).toMutableList()
+            current.removeAll { it.host == config.host && it.port == config.port }
+            current.add(0, config)
+            prefs[Keys.HOSTS] = WireJson.encodeToString(hostsSerializer, current)
+        }
     }
 
     suspend fun touchHost(host: String, port: Int) {
-        val current = hosts.first().map {
-            if (it.host == host && it.port == port) it.copy(lastConnectedAt = System.currentTimeMillis()) else it
+        val now = System.currentTimeMillis()
+        dataStore.edit { prefs ->
+            val current = decodeHosts(prefs)
+            prefs[Keys.HOSTS] = WireJson.encodeToString(
+                hostsSerializer,
+                current.map {
+                    if (it.host == host && it.port == port) it.copy(lastConnectedAt = now) else it
+                },
+            )
         }
-        persist(current)
     }
 
     /**
@@ -111,42 +108,46 @@ class HostsStore @Inject constructor(
         description: HostDescription? = null,
         relay: RelayIdentity? = null,
     ): HostConfig {
-        val existing = hosts.first().firstOrNull { it.host == host && it.port == port }
-        val config = HostConfig(
-            id = existing?.id ?: UUID.randomUUID().toString(),
-            name = name,
-            host = host,
-            port = port,
-            isLoopback = isLoopback,
-            lastConnectedAt = System.currentTimeMillis(),
-            lastHome = description?.home ?: existing?.lastHome,
-            // A fresh pairing replaces the whole relay identity rather than merging into it: a
-            // re-pair mints a new device id, may move between TLS postures, and can land on a
-            // regenerated key. Keeping any of the previous three would leave the record describing
-            // two different enrolments at once. A pairing also decides the transport, which is why
-            // it outranks the caller's `useTls` here rather than sitting beside it.
-            useTls = relay?.useTls ?: useTls,
-            relayFingerprint = relay?.fingerprint ?: existing?.relayFingerprint,
-            relayDeviceId = relay?.deviceId ?: existing?.relayDeviceId,
-            relayTokenExpiresAt = relay?.tokenExpiresAt ?: existing?.relayTokenExpiresAt ?: 0L,
-        )
-        upsertHost(config)
-        return config
+        var remembered: HostConfig? = null
+        dataStore.edit { prefs ->
+            val current = decodeHosts(prefs).toMutableList()
+            val existing = current.firstOrNull { it.host == host && it.port == port }
+            val config = HostConfig(
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                name = name,
+                host = host,
+                port = port,
+                isLoopback = isLoopback,
+                lastConnectedAt = System.currentTimeMillis(),
+                lastHome = description?.home ?: existing?.lastHome,
+                // A fresh pairing replaces the complete relay identity. In particular, a null
+                // fingerprint is meaningful: it says platform trust is now used, so an old pin
+                // must not survive the re-pair.
+                useTls = relay?.useTls ?: useTls,
+                relayFingerprint = if (relay != null) relay.fingerprint else existing?.relayFingerprint,
+                relayDeviceId = if (relay != null) relay.deviceId else existing?.relayDeviceId,
+                relayTokenExpiresAt = if (relay != null) relay.tokenExpiresAt else existing?.relayTokenExpiresAt ?: 0L,
+            )
+            current.removeAll { it.host == host && it.port == port }
+            current.add(0, config)
+            prefs[Keys.HOSTS] = WireJson.encodeToString(hostsSerializer, current)
+            remembered = config
+        }
+        return checkNotNull(remembered)
     }
 
     /** Fold a fresh host description into the remembered entry without touching its recency. */
     suspend fun cacheDescription(host: String, port: Int, description: HostDescription) {
-        val current = hosts.first()
-        if (current.none { it.host == host && it.port == port }) return
-        persist(
-            current.map {
-                if (it.host == host && it.port == port) {
-                    it.copy(lastHome = description.home)
-                } else {
-                    it
-                }
-            },
-        )
+        dataStore.edit { prefs ->
+            val current = decodeHosts(prefs)
+            if (current.none { it.host == host && it.port == port }) return@edit
+            prefs[Keys.HOSTS] = WireJson.encodeToString(
+                hostsSerializer,
+                current.map {
+                    if (it.host == host && it.port == port) it.copy(lastHome = description.home) else it
+                },
+            )
+        }
     }
 
     /**
@@ -157,8 +158,13 @@ class HostsStore @Inject constructor(
      * — the relay's own device entry is revoked from the relay, not from here.
      */
     suspend fun removeHost(id: String) {
-        persist(hosts.first().filterNot { it.id == id })
-        if (dataStore.data.first()[Keys.DESIRED_HOST_ID] == id) setDesiredHost(null)
+        dataStore.edit { prefs ->
+            prefs[Keys.HOSTS] = WireJson.encodeToString(
+                hostsSerializer,
+                decodeHosts(prefs).filterNot { it.id == id },
+            )
+            if (prefs[Keys.DESIRED_HOST_ID] == id) prefs.remove(Keys.DESIRED_HOST_ID)
+        }
         credentials.remove(id)
     }
 
@@ -171,11 +177,22 @@ class HostsStore @Inject constructor(
 
     /** Remember [sessionId] as the landing session for [hostKey], keeping the newest 8 hosts. */
     suspend fun setLastSessionId(hostKey: String, sessionId: String) {
-        val next = LinkedHashMap<String, String>()
-        next[hostKey] = sessionId
-        lastSessions().forEach { (key, value) -> if (key != hostKey) next[key] = value }
-        val trimmed = next.entries.take(MAX_REMEMBERED_HOSTS).associate { it.key to it.value }
-        dataStore.edit { it[Keys.LAST_SESSIONS] = WireJson.encodeToString(lastSessionsSerializer, trimmed) }
+        dataStore.edit { prefs ->
+            val next = LinkedHashMap<String, String>()
+            next[hostKey] = sessionId
+            decodeLastSessions(prefs).forEach { (key, value) -> if (key != hostKey) next[key] = value }
+            val trimmed = next.entries.take(MAX_REMEMBERED_HOSTS).associate { it.key to it.value }
+            prefs[Keys.LAST_SESSIONS] = WireJson.encodeToString(lastSessionsSerializer, trimmed)
+        }
+    }
+
+    /** Forget every remembered endpoint and all host-scoped landing metadata atomically. */
+    suspend fun clearHosts() {
+        dataStore.edit { prefs ->
+            prefs.remove(Keys.HOSTS)
+            prefs.remove(Keys.DESIRED_HOST_ID)
+            prefs.remove(Keys.LAST_SESSIONS)
+        }
     }
 
     /** Forget every remembered landing session (the Settings "clear data" action). */
@@ -183,8 +200,32 @@ class HostsStore @Inject constructor(
         dataStore.edit { it.remove(Keys.LAST_SESSIONS) }
     }
 
-    private suspend fun lastSessions(): Map<String, String> {
-        val raw = dataStore.data.first()[Keys.LAST_SESSIONS] ?: return emptyMap()
+    private suspend fun lastSessions(): Map<String, String> =
+        decodeLastSessions(dataStore.data.first())
+
+    private fun decodeSettings(prefs: Preferences): AppSettings =
+        AppSettings(
+            keepConnectedInBackground = prefs[Keys.BACKGROUND] ?: false,
+            notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
+            notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
+            notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
+            themePreference = prefs[Keys.THEME] ?: "system",
+            localeOverride = when (val tag = prefs[Keys.LOCALE]) {
+                "en" -> "en"
+                "zh", "zh-CN", "zh_CN" -> "zh-CN"
+                else -> null
+            },
+        )
+
+    private fun decodeHosts(prefs: Preferences): List<HostConfig> {
+        val raw = prefs[Keys.HOSTS] ?: return emptyList()
+        return runCatching {
+            WireJson.decodeFromString(hostsSerializer, raw).sortedByDescending { it.lastConnectedAt }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun decodeLastSessions(prefs: Preferences): Map<String, String> {
+        val raw = prefs[Keys.LAST_SESSIONS] ?: return emptyMap()
         return runCatching { WireJson.decodeFromString(lastSessionsSerializer, raw) }.getOrDefault(emptyMap())
     }
 
@@ -196,22 +237,22 @@ class HostsStore @Inject constructor(
     }
 
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
-        val next = transform(settingsOnce())
-        // Mirrored out to SharedPreferences as well: the scheme has to be readable before any
-        // activity exists, and DataStore cannot be read from there. See DshApplication.
-        DshApplication.storeThemePreference(context, next.themePreference)
+        var committed: AppSettings? = null
         dataStore.edit { prefs ->
+            val next = transform(decodeSettings(prefs))
             prefs[Keys.BACKGROUND] = next.keepConnectedInBackground
             prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
             prefs[Keys.NOTIFY_ACTION] = next.notifyNeedsAction
             prefs[Keys.THEME] = next.themePreference
             next.localeOverride?.let { prefs[Keys.LOCALE] = it } ?: prefs.remove(Keys.LOCALE)
+            committed = next
         }
-    }
-
-    private suspend fun persist(list: List<HostConfig>) {
-        dataStore.edit { it[Keys.HOSTS] = WireJson.encodeToString(hostsSerializer, list) }
+        // Mirrored out to SharedPreferences as well: the scheme has to be readable before any
+        // activity exists, and DataStore cannot be read from there. Mirror only after the
+        // transactional write succeeds so a failed DataStore update cannot leave startup theme
+        // state ahead of the durable settings.
+        DshApplication.storeThemePreference(context, checkNotNull(committed).themePreference)
     }
 
     private companion object {

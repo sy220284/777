@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
@@ -70,18 +71,18 @@ internal fun ProjectSettingsCard(
     report: (String) -> Unit,
 ) {
     if (!state.available && state.error == null && !state.loading) return
-    SettingsCard("项目配置", Icons.Outlined.Tune) {
+    SettingsCard(stringResource(R.string.advanced_project_config), Icons.Outlined.Tune) {
         when {
-            state.loading -> Text("正在读取当前 Harness 可配置项目…", style = DsType.small13, color = DsTheme.colors.labelTertiary)
+            state.loading -> Text(stringResource(R.string.advanced_project_loading), style = DsType.small13, color = DsTheme.colors.labelTertiary)
             state.error != null -> {
-                Text("项目配置不可用：${state.error}", style = DsType.small13, color = DsTheme.colors.error)
-                DsButton("重新读取", viewModel::refreshRemoteSettings, variant = DsButtonVariant.Ghost)
+                Text(stringResource(R.string.advanced_project_unavailable, state.error.orEmpty()), style = DsType.small13, color = DsTheme.colors.error)
+                DsButton(stringResource(R.string.common_retry), viewModel::refreshRemoteSettings, variant = DsButtonVariant.Ghost)
             }
-            state.namespaces.isEmpty() -> Text("当前 Harness 没有公开可配置项目。", style = DsType.small13, color = DsTheme.colors.labelTertiary)
+            state.namespaces.isEmpty() -> Text(stringResource(R.string.advanced_project_empty), style = DsType.small13, color = DsTheme.colors.labelTertiary)
             else -> {
                 Text(
-                    if (state.writable) "配置项由当前 Harness 动态提供；官方新增配置后可自动出现在这里。"
-                    else "当前 Harness 返回了配置结构，但本次连接没有写入权限。",
+                    if (state.writable) stringResource(R.string.advanced_project_dynamic)
+                    else stringResource(R.string.advanced_project_read_only),
                     style = DsType.caption11,
                     color = DsTheme.colors.labelTertiary,
                 )
@@ -101,21 +102,22 @@ private fun NamespaceSettings(
     report: (String) -> Unit,
 ) {
     var expanded by remember(namespace.ns) { mutableStateOf(false) }
-    val fields = remember(namespace.revision, namespace.schema, namespace.value, namespace.secrets) {
-        dynamicFields(namespace)
+    val secretFallback = stringResource(R.string.advanced_secret)
+    val fields = remember(namespace.revision, namespace.schema, namespace.value, namespace.secrets, secretFallback) {
+        dynamicFields(namespace, secretFallback)
     }
     DisclosureRow(
         title = namespace.ns,
         summary = when (namespace.applies) {
-            "restart" -> "修改后重启生效 · ${fields.size} 项"
-            else -> "立即生效 · ${fields.size} 项"
+            "restart" -> stringResource(R.string.advanced_project_restart_summary, fields.size)
+            else -> stringResource(R.string.advanced_project_immediate_summary, fields.size)
         },
         expanded = expanded,
         onToggle = { expanded = !expanded },
     ) {
         if (fields.isEmpty()) {
             Text(
-                "该命名空间没有可直接编辑的标量项目。",
+                stringResource(R.string.advanced_project_no_scalar),
                 style = DsType.caption11,
                 color = DsTheme.colors.labelTertiary,
                 modifier = Modifier.padding(start = DsSpacing.large),
@@ -141,6 +143,7 @@ private fun DynamicSettingEditor(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = DsTheme.colors
     val currentText = if (field.secret) "" else field.value?.let(::displayJsonScalar).orEmpty()
     var text by remember(namespace.revision, field.path) { mutableStateOf(currentText) }
@@ -156,7 +159,7 @@ private fun DynamicSettingEditor(
                 val checked = (field.value as? JsonPrimitive)?.booleanOrNull ?: false
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (checked) "已开启" else "已关闭",
+                        if (checked) stringResource(R.string.common_enabled) else stringResource(R.string.common_disabled),
                         style = DsType.small13,
                         color = colors.labelSecondary,
                         modifier = Modifier.weight(1f),
@@ -166,7 +169,7 @@ private fun DynamicSettingEditor(
                         enabled = enabled,
                         onCheckedChange = { next ->
                             viewModel.setRemoteSetting(namespace, field.path, JsonPrimitive(next)) { error ->
-                                report(error ?: "已更新 ${field.title}")
+                                report(error ?: context.getString(R.string.advanced_updated_field, field.title))
                             }
                         },
                     )
@@ -182,7 +185,7 @@ private fun DynamicSettingEditor(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                selected.ifBlank { "选择…" },
+                                selected.ifBlank { stringResource(R.string.advanced_select) },
                                 style = DsType.std14,
                                 color = colors.labelSecondary,
                                 modifier = Modifier.padding(DsSpacing.small),
@@ -192,7 +195,7 @@ private fun DynamicSettingEditor(
                     items = field.enumValues.map { option ->
                         MenuItem(displayJsonScalar(option)) {
                             viewModel.setRemoteSetting(namespace, field.path, option) { error ->
-                                report(error ?: "已更新 ${field.title}")
+                                report(error ?: context.getString(R.string.advanced_updated_field, field.title))
                             }
                         }
                     },
@@ -208,7 +211,7 @@ private fun DynamicSettingEditor(
                     label = {
                         Text(
                             if (field.secret) {
-                                if (field.secretSet) "已设置，输入新值可替换" else "尚未设置"
+                                if (field.secretSet) stringResource(R.string.advanced_secret_replace_hint) else stringResource(R.string.advanced_secret_unset)
                             } else {
                                 field.path.joinToString(".")
                             },
@@ -218,15 +221,15 @@ private fun DynamicSettingEditor(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     DsButton(
-                        text = "保存",
+                        text = stringResource(R.string.common_save),
                         onClick = {
                             val value = parseScalar(field.type, text)
                             if (value == null) {
-                                report("“${field.title}”的输入格式不正确")
+                                report(context.getString(R.string.advanced_bad_format, field.title))
                             } else {
                                 viewModel.setRemoteSetting(namespace, field.path, value) { error ->
                                     if (error == null && field.secret) text = ""
-                                    report(error ?: "已更新 ${field.title}")
+                                    report(error ?: context.getString(R.string.advanced_updated_field, field.title))
                                 }
                             }
                         },
@@ -236,10 +239,10 @@ private fun DynamicSettingEditor(
                     if (field.secret) {
                         if (field.secretSet) {
                             DsButton(
-                                text = "清除密钥",
+                                text = stringResource(R.string.advanced_clear_key),
                                 onClick = {
                                     viewModel.unsetRemoteSetting(namespace, field.path) { error ->
-                                        report(error ?: "已清除 ${field.title}")
+                                        report(error ?: context.getString(R.string.advanced_cleared_field, field.title))
                                     }
                                 },
                                 size = DsButtonSize.Small,
@@ -248,10 +251,10 @@ private fun DynamicSettingEditor(
                         }
                     } else {
                         DsButton(
-                            text = "恢复默认",
+                            text = stringResource(R.string.advanced_restore_default),
                             onClick = {
                                 viewModel.unsetRemoteSetting(namespace, field.path) { error ->
-                                    report(error ?: "已恢复 ${field.title}")
+                                    report(error ?: context.getString(R.string.advanced_restored_field, field.title))
                                 }
                             },
                             size = DsButtonSize.Small,
@@ -270,9 +273,9 @@ internal fun ModelServicesCard(
     viewModel: SettingsViewModel,
 ) {
     if (state.providers.isEmpty() && state.error == null && !state.loading) return
-    SettingsCard("模型服务", Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_model_services), Icons.Outlined.Cloud) {
         Text(
-            "服务商的地址、协议与密钥由项目动态配置管理；这里显示状态并执行模型发现。",
+            stringResource(R.string.advanced_model_services_hint),
             style = DsType.caption11,
             color = DsTheme.colors.labelTertiary,
         )
@@ -288,11 +291,12 @@ private fun ModelProviderRow(
     viewModel: SettingsViewModel,
 ) {
     val colors = DsTheme.colors
+    val contextWindowLabel = stringResource(R.string.advanced_context_window_label)
     var expanded by remember(provider.provider) { mutableStateOf(false) }
     val models = state.discovered[provider.provider].orEmpty()
     DisclosureRow(
         title = provider.displayName,
-        summary = if (provider.active) "已启用" else "未启用",
+        summary = stringResource(if (provider.active) R.string.common_enabled else R.string.common_disabled),
         expanded = expanded,
         onToggle = { expanded = !expanded },
     ) {
@@ -301,12 +305,12 @@ private fun ModelProviderRow(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Text(
-                "配置：${provider.settingsNs}/${provider.settingsPath.joinToString("/")}",
+                stringResource(R.string.advanced_provider_config, provider.settingsNs, provider.settingsPath.joinToString("/")),
                 style = DsType.caption11,
                 color = colors.labelTertiary,
             )
             DsButton(
-                text = if (state.loading) "正在发现…" else "发现可用模型",
+                text = stringResource(if (state.loading) R.string.advanced_discovering_models else R.string.advanced_discover_models),
                 onClick = { viewModel.discoverModels(provider) },
                 size = DsButtonSize.Small,
                 variant = DsButtonVariant.Outline,
@@ -317,7 +321,7 @@ private fun ModelProviderRow(
                         buildString {
                             append(model.name ?: model.id)
                             if (model.name != null && model.name != model.id) append(" · ${model.id}")
-                            model.contextWindow?.let { append(" · 上下文 $it") }
+                            model.contextWindow?.let { append(" · $contextWindowLabel $it") }
                         }
                     },
                     style = DsType.caption11,
@@ -334,14 +338,15 @@ internal fun LocalModelSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = DsTheme.colors
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
 
-    SettingsCard("模型设置", Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
         Text(
-            if (local.configured) "本机模型密钥已配置。留空密钥可只修改模型和接口地址。" else "尚未配置本机模型密钥。",
+            if (local.configured) stringResource(R.string.advanced_model_configured) else stringResource(R.string.advanced_model_unconfigured),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -350,43 +355,43 @@ internal fun LocalModelSettingsCard(
             onValueChange = { model = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("默认模型") },
+            label = { Text(stringResource(R.string.advanced_default_model)) },
         )
         OutlinedTextField(
             value = baseUrl,
             onValueChange = { baseUrl = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("接口地址") },
+            label = { Text(stringResource(R.string.advanced_endpoint)) },
         )
         OutlinedTextField(
             value = apiKey,
             onValueChange = { apiKey = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text(if (local.configured) "替换模型密钥（可留空）" else "模型密钥") },
+            label = { Text(stringResource(if (local.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
             visualTransformation = PasswordVisualTransformation(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
-                text = "保存模型设置",
+                text = stringResource(R.string.advanced_save_model_settings),
                 onClick = {
                     if (!local.configured && apiKey.isBlank()) {
-                        report("首次使用请先填写模型密钥")
+                        report(context.getString(R.string.advanced_model_key_required))
                         return@DsButton
                     }
                     viewModel.configureLocalModel(apiKey, model, baseUrl)
                     apiKey = ""
-                    report("模型设置已保存")
+                    report(context.getString(R.string.advanced_model_saved))
                 },
                 variant = DsButtonVariant.Outline,
             )
             if (local.configured) {
                 DsButton(
-                    text = "清除密钥",
+                    text = stringResource(R.string.advanced_clear_key),
                     onClick = {
                         viewModel.clearLocalCredential()
-                        report("本机模型密钥已清除")
+                        report(context.getString(R.string.advanced_model_key_cleared))
                     },
                     variant = DsButtonVariant.Ghost,
                 )
@@ -401,18 +406,19 @@ internal fun LocalMemorySettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = DsTheme.colors
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
     var autoMemory by remember(local.autoMemory) { mutableStateOf(local.autoMemory) }
 
-    SettingsCard("记忆设置", Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_memory_settings), Icons.Outlined.Memory) {
         OutlinedTextField(
             value = userRules,
             onValueChange = { userRules = it.take(6_000) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("用户长期规则") },
-            supportingText = { Text("最多保存 6000 字，每轮最多注入 3000 字；适合长期工作规则与回答偏好。") },
+            label = { Text(stringResource(R.string.advanced_user_rules)) },
+            supportingText = { Text(stringResource(R.string.advanced_user_rules_hint)) },
             minLines = 3,
             maxLines = 6,
         )
@@ -422,8 +428,8 @@ internal fun LocalMemorySettingsCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Column(Modifier.weight(1f)) {
-                Text("自动召回长期记忆", style = DsType.small13Strong, color = colors.labelPrimary)
-                Text("按当前问题检索少量相关记忆，不把整个记忆库塞进上下文。", style = DsType.caption11, color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11, color = colors.labelTertiary)
             }
             Switch(checked = autoRecall, onCheckedChange = { autoRecall = it })
         }
@@ -433,16 +439,16 @@ internal fun LocalMemorySettingsCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Column(Modifier.weight(1f)) {
-                Text("自动记忆明确长期规则", style = DsType.small13Strong, color = colors.labelPrimary)
-                Text("只捕捉“记住、以后、后续都”等明确长期表达；不额外调用模型，敏感信息直接过滤。", style = DsType.caption11, color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11, color = colors.labelTertiary)
             }
             Switch(checked = autoMemory, onCheckedChange = { autoMemory = it })
         }
         DsButton(
-            text = "保存记忆设置",
+            text = stringResource(R.string.advanced_save_memory_settings),
             onClick = {
                 viewModel.configureLocalMemory(userRules, autoRecall, autoMemory)
-                report("记忆设置已保存")
+                report(context.getString(R.string.advanced_memory_saved))
             },
             variant = DsButtonVariant.Outline,
         )
@@ -455,11 +461,12 @@ internal fun MemoryManagementCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = DsTheme.colors
-    SettingsCard("管理记忆", Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
         if (records.isEmpty()) {
             Text(
-                "当前作用域还没有长期记忆。",
+                stringResource(R.string.advanced_memory_empty),
                 style = DsType.small13,
                 color = colors.labelTertiary,
             )
@@ -467,7 +474,7 @@ internal fun MemoryManagementCard(
         }
 
         Text(
-            "显示当前对话允许访问的长期记忆。修改和停用会直接影响后续自动召回。",
+            stringResource(R.string.advanced_memory_manage_hint),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -479,7 +486,7 @@ internal fun MemoryManagementCard(
             DisclosureRow(
                 title = record.content.take(54),
                 summary = memoryScopeLabel(record.scope) + " · " + memoryKindLabel(record.kind) +
-                    if (record.pinned) " · 已置顶" else "",
+                    if (record.pinned) stringResource(R.string.advanced_pinned_suffix) else "",
                 expanded = expanded,
                 onToggle = { expanded = !expanded },
             ) {
@@ -491,7 +498,7 @@ internal fun MemoryManagementCard(
                         value = content,
                         onValueChange = { content = it.take(2_000) },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("记忆内容") },
+                        label = { Text(stringResource(R.string.advanced_memory_content)) },
                         minLines = 2,
                         maxLines = 6,
                     )
@@ -501,31 +508,31 @@ internal fun MemoryManagementCard(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("置顶", style = DsType.small13Strong, color = colors.labelPrimary)
-                            Text("提高自动召回优先级", style = DsType.caption11, color = colors.labelTertiary)
+                            Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong, color = colors.labelPrimary)
+                            Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11, color = colors.labelTertiary)
                         }
                         Switch(checked = pinned, onCheckedChange = { pinned = it })
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         DsButton(
-                            text = "保存",
+                            text = stringResource(R.string.common_save),
                             onClick = {
                                 viewModel.updateMemory(
                                     id = record.id,
                                     content = content,
                                     pinned = pinned,
                                 ) { error ->
-                                    report(error ?: "记忆已更新")
+                                    report(error ?: context.getString(R.string.advanced_memory_updated))
                                 }
                             },
                             size = DsButtonSize.Small,
                             variant = DsButtonVariant.Outline,
                         )
                         DsButton(
-                            text = "停用",
+                            text = stringResource(R.string.advanced_deactivate),
                             onClick = {
                                 viewModel.forgetMemory(record.id) { error ->
-                                    report(error ?: "记忆已停用")
+                                    report(error ?: context.getString(R.string.advanced_memory_deactivated))
                                 }
                             },
                             size = DsButtonSize.Small,
@@ -538,21 +545,27 @@ internal fun MemoryManagementCard(
     }
 }
 
-private fun memoryScopeLabel(scope: MemoryScope): String = when (scope) {
-    MemoryScope.GLOBAL -> "全局"
-    MemoryScope.PROJECT -> "项目"
-    MemoryScope.LINEAGE -> "当前任务链"
-}
+@Composable
+private fun memoryScopeLabel(scope: MemoryScope): String = stringResource(
+    when (scope) {
+        MemoryScope.GLOBAL -> R.string.advanced_scope_global
+        MemoryScope.PROJECT -> R.string.advanced_scope_project
+        MemoryScope.LINEAGE -> R.string.advanced_scope_lineage
+    },
+)
 
-private fun memoryKindLabel(kind: MemoryKind): String = when (kind) {
-    MemoryKind.RULE -> "规则"
-    MemoryKind.PREFERENCE -> "偏好"
-    MemoryKind.FACT -> "事实"
-    MemoryKind.DECISION -> "决定"
-    MemoryKind.CONSTRAINT -> "约束"
-    MemoryKind.STATE -> "状态"
-    MemoryKind.SUMMARY -> "摘要"
-}
+@Composable
+private fun memoryKindLabel(kind: MemoryKind): String = stringResource(
+    when (kind) {
+        MemoryKind.RULE -> R.string.advanced_kind_rule
+        MemoryKind.PREFERENCE -> R.string.advanced_kind_preference
+        MemoryKind.FACT -> R.string.advanced_kind_fact
+        MemoryKind.DECISION -> R.string.advanced_kind_decision
+        MemoryKind.CONSTRAINT -> R.string.advanced_kind_constraint
+        MemoryKind.STATE -> R.string.advanced_kind_state
+        MemoryKind.SUMMARY -> R.string.advanced_kind_summary
+    },
+)
 
 @Composable
 internal fun LocalAgentSettingsCard(
@@ -560,25 +573,26 @@ internal fun LocalAgentSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
     var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
     var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
 
-    SettingsCard("智能体设置", Icons.Outlined.Tune) {
+    SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
                 value = mainSteps,
                 onValueChange = { mainSteps = it.filter(Char::isDigit).take(3) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                label = { Text("主循环步数") },
+                label = { Text(stringResource(R.string.advanced_main_steps)) },
             )
             OutlinedTextField(
                 value = subagentSteps,
                 onValueChange = { subagentSteps = it.filter(Char::isDigit).take(2) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                label = { Text("子代理步数") },
+                label = { Text(stringResource(R.string.advanced_subagent_steps)) },
             )
         }
         OutlinedTextField(
@@ -586,18 +600,18 @@ internal fun LocalAgentSettingsCard(
             onValueChange = { attempts = it.filter(Char::isDigit).take(1) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("模型失败重试次数") },
-            supportingText = { Text("主循环 4–128；子代理 1–40；重试 1–5。") },
+            label = { Text(stringResource(R.string.advanced_model_attempts)) },
+            supportingText = { Text(stringResource(R.string.advanced_agent_limits_hint)) },
         )
         DsButton(
-            text = "保存智能体设置",
+            text = stringResource(R.string.advanced_save_agent_settings),
             onClick = {
                 viewModel.configureLocalAgent(
                     mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
                     subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
                     modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
                 )
-                report("智能体设置已保存")
+                report(context.getString(R.string.advanced_agent_saved))
             },
             variant = DsButtonVariant.Outline,
         )
@@ -610,16 +624,17 @@ internal fun LocalVisionSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     var model by remember(vision.model) { mutableStateOf(vision.model) }
     var baseUrl by remember(vision.baseUrl) { mutableStateOf(vision.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
 
-    SettingsCard("视觉模型", Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_vision_model), Icons.Outlined.Cloud) {
         Text(
             if (vision.configured) {
-                "多模态视觉已配置。主屏分析会在发送截图前要求确认；虚拟屏可在已授权设备任务内连续分析。"
+                stringResource(R.string.advanced_vision_configured)
             } else {
-                "可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。"
+                stringResource(R.string.advanced_vision_optional)
             },
             style = DsType.caption11,
             color = DsTheme.colors.labelTertiary,
@@ -629,16 +644,16 @@ internal fun LocalVisionSettingsCard(
             onValueChange = { model = it.take(200) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("视觉模型") },
+            label = { Text(stringResource(R.string.advanced_vision_model)) },
         )
         OutlinedTextField(
             value = baseUrl,
             onValueChange = { baseUrl = it.take(1_000) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("视觉接口地址") },
+            label = { Text(stringResource(R.string.advanced_vision_endpoint)) },
             supportingText = {
-                Text("远程地址必须使用 HTTPS；本机 localhost/127.0.0.1/::1 可使用 HTTP。")
+                Text(stringResource(R.string.advanced_vision_endpoint_hint))
             },
         )
         OutlinedTextField(
@@ -646,15 +661,15 @@ internal fun LocalVisionSettingsCard(
             onValueChange = { apiKey = it.take(8_000) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text(if (vision.configured) "替换视觉密钥（可留空）" else "视觉模型密钥") },
+            label = { Text(stringResource(if (vision.configured) R.string.advanced_replace_vision_key else R.string.advanced_vision_key)) },
             visualTransformation = PasswordVisualTransformation(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
-                text = "保存视觉配置",
+                text = stringResource(R.string.advanced_save_vision),
                 onClick = {
                     if (!vision.configured && apiKey.isBlank()) {
-                        report("首次启用视觉模型请填写密钥")
+                        report(context.getString(R.string.advanced_vision_key_required))
                         return@DsButton
                     }
                     viewModel.configureLocalVision(
@@ -664,7 +679,7 @@ internal fun LocalVisionSettingsCard(
                     ) { error ->
                         if (error == null) {
                             apiKey = ""
-                            report("视觉模型配置已保存")
+                            report(context.getString(R.string.advanced_vision_saved))
                         } else {
                             report(error)
                         }
@@ -675,10 +690,10 @@ internal fun LocalVisionSettingsCard(
             )
             if (vision.configured) {
                 DsButton(
-                    text = "清除视觉密钥",
+                    text = stringResource(R.string.advanced_clear_vision_key),
                     onClick = {
                         viewModel.clearLocalVisionCredential { error ->
-                            report(error ?: "视觉模型密钥已清除")
+                            report(error ?: context.getString(R.string.advanced_vision_key_cleared))
                         }
                     },
                     size = DsButtonSize.Small,
@@ -694,16 +709,16 @@ internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
 ) {
-    SettingsCard("设备能力", Icons.Outlined.PhoneAndroid) {
-        CapabilityRow("Shizuku 服务", state.shizukuAlive)
-        CapabilityRow("Shizuku 授权", state.shizukuGranted)
-        CapabilityRow("无障碍控制", state.accessibility)
-        CapabilityRow("通知读取", state.notifications)
-        CapabilityRow("虚拟屏幕", state.virtualDisplay)
+    SettingsCard(stringResource(R.string.advanced_device_capabilities), Icons.Outlined.PhoneAndroid) {
+        CapabilityRow(stringResource(R.string.advanced_shizuku_service), state.shizukuAlive)
+        CapabilityRow(stringResource(R.string.advanced_shizuku_permission), state.shizukuGranted)
+        CapabilityRow(stringResource(R.string.advanced_accessibility), state.accessibility)
+        CapabilityRow(stringResource(R.string.advanced_notification_access), state.notifications)
+        CapabilityRow(stringResource(R.string.advanced_virtual_display), state.virtualDisplay)
         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (!state.shizukuGranted) {
                 DsButton(
-                    text = "请求 Shizuku 授权",
+                    text = stringResource(R.string.advanced_request_shizuku),
                     onClick = viewModel::requestShizukuPermission,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Outline,
@@ -711,7 +726,7 @@ internal fun DeviceCapabilitiesCard(
             }
             if (!state.accessibility) {
                 DsButton(
-                    text = "开启无障碍控制",
+                    text = stringResource(R.string.advanced_enable_accessibility),
                     onClick = viewModel::openAccessibilitySettings,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Outline,
@@ -719,14 +734,14 @@ internal fun DeviceCapabilitiesCard(
             }
             if (!state.notifications) {
                 DsButton(
-                    text = "开启通知读取",
+                    text = stringResource(R.string.advanced_enable_notifications),
                     onClick = viewModel::openNotificationAccessSettings,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Outline,
                 )
             }
             DsButton(
-                text = "刷新状态",
+                text = stringResource(R.string.common_refresh),
                 onClick = viewModel::refreshDeviceCapabilities,
                 size = DsButtonSize.Small,
                 variant = DsButtonVariant.Ghost,
@@ -742,11 +757,11 @@ private fun CapabilityRow(label: String, enabled: Boolean) {
         StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
         Spacer(Modifier.width(DsSpacing.small))
         Text(label, style = DsType.std14, color = DsTheme.colors.labelSecondary, modifier = Modifier.weight(1f))
-        Text(if (enabled) "可用" else "未授权", style = DsType.caption11, color = DsTheme.colors.labelTertiary)
+        Text(stringResource(if (enabled) R.string.advanced_available else R.string.advanced_not_authorized), style = DsType.caption11, color = DsTheme.colors.labelTertiary)
     }
 }
 
-private fun dynamicFields(namespace: SettingsNamespaceView): List<DynamicSettingField> {
+private fun dynamicFields(namespace: SettingsNamespaceView, secretFallback: String): List<DynamicSettingField> {
     val rootSchema = namespace.schema as? JsonObject ?: return emptyList()
     val secretMap = namespace.secrets.associate { it.path to it.set }
     val fields = flattenSchema(rootSchema, namespace.value, emptyList(), secretMap).toMutableList()
@@ -754,7 +769,7 @@ private fun dynamicFields(namespace: SettingsNamespaceView): List<DynamicSetting
     namespace.secrets.filterNot { it.path in known }.forEach { secret ->
         fields += DynamicSettingField(
             path = secret.path,
-            title = secret.path.lastOrNull() ?: "密钥",
+            title = secret.path.lastOrNull() ?: secretFallback,
             description = null,
             type = "string",
             enumValues = emptyList(),
