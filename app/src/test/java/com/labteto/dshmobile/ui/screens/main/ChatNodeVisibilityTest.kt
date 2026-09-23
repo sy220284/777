@@ -44,7 +44,8 @@ class ChatNodeVisibilityTest {
         // The compatibility contract keeps genuinely unknown types visible; the noise is named.
         assertFalse(OtherNode(seq = 4, type = "step/start", data = JsonNull).rendersContent())
         assertFalse(OtherNode(seq = 5, type = "assistant/chunk", data = JsonNull).rendersContent())
-        assertTrue(OtherNode(seq = 6, type = "something/new", data = JsonNull).rendersContent())
+        assertFalse(OtherNode(seq = 6, type = "request/context", data = JsonNull).rendersContent())
+        assertTrue(OtherNode(seq = 7, type = "something/new", data = JsonNull).rendersContent())
     }
 
     @Test
@@ -113,7 +114,7 @@ class ChatNodeVisibilityTest {
     }
 
     @Test
-    fun `a turn exposes request context alongside tool calls`() {
+    fun `a turn hides request context while keeping tool status`() {
         val nodes = listOf(
             TurnStartNode(seq = 1, turn = 1),
             OtherNode(seq = 2, type = "step/start", data = JsonNull),
@@ -124,7 +125,7 @@ class ChatNodeVisibilityTest {
             OtherNode(seq = 7, type = "step/end", data = JsonNull),
             TurnEndNode(seq = 8, turn = 1, reasonKind = "completed"),
         )
-        assertEquals(listOf(3L, 4L, 5L), nodes.filter { it.rendersContent() }.map { it.seq })
+        assertEquals(listOf(3L, 5L), nodes.filter { it.rendersContent() }.map { it.seq })
     }
 
     @Test
