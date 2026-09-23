@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -120,6 +121,7 @@ fun ApprovalPanel(
  * declines anything this card could not answer in full, because the card answers one question and
  * the host refuses a batch shorter than the request it resolves.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PlanReviewPanel(
     review: PlanReview,
