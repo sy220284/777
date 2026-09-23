@@ -1,0 +1,104 @@
+package com.labteto.dshmobile.local
+
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
+
+internal data class LocalSessionTranscriptProjection(
+    val messages: List<LocalHarnessMessage>,
+    val projectedThroughSequence: Long,
+)
+
+internal fun transcriptProjectionReplayCursor(
+    snapshot: LocalHarnessSession,
+    persistedSnapshotExists: Boolean,
+    legacyBaselineSequence: Long?,
+): Long = snapshot.transcriptProjectedThroughSequence
+    ?: when {
+        !persistedSnapshotExists -> -1L
+        legacyBaselineSequence != null -> legacyBaselineSequence
+        else -> error("旧会话缺少对话投影迁移基线")
+    }
+
+internal fun encodeTranscriptMessages(messages: List<LocalHarnessMessage>): JsonArray =
+    JsonArray(messages.map(::encodeTranscriptMessage))
+
+private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
+    JsonObject(
+        buildMap {
+            put("id", JsonPrimitive(message.id))
+            put("role", JsonPrimitive(message.role))
+            put("content", JsonPrimitive(message.content))
+            put("created_at", JsonPrimitive(message.createdAt))
+            message.toolName?.let { put("tool_name", JsonPrimitive(it)) }
+        },
+    )
+
+internal fun projectSessionTranscriptTail(
+    snapshotMessages: List<LocalHarnessMessage>,
+    events: List<LocalSessionEventLog.Event>,
+    sequenceExclusive: Long,
+): LocalSessionTranscriptProjection {
+    val messages = snapshotMessages.toMutableList()
+    val knownIds = messages.mapTo(linkedSetOf(), LocalHarnessMessage::id)
+    var projectedThrough = sequenceExclusive
+
+    events
+        .asSequence()
+        .filter { event -> event.sequence > sequenceExclusive }
+        .sortedBy { event -> event.sequence }
+        .forEach { event ->
+            val decoded = decodeTranscriptMessages(event.data)
+            if (decoded != null) {
+                decoded.forEach { message ->
+                    if (knownIds.add(message.id)) messages += message
+                }
+            }
+            projectedThrough = maxOf(projectedThrough, event.sequence)
+        }
+
+    return LocalSessionTranscriptProjection(
+        messages = messages,
+        projectedThroughSequence = projectedThrough,
+    )
+}
+
+private fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage>? {
+    val encoded = data["transcript"] as? JsonArray ?: return emptyList()
+    val decoded = mutableListOf<LocalHarnessMessage>()
+    for (element in encoded) {
+        val item = element as? JsonObject ?: return null
+        val idValue = item["id"] as? JsonPrimitive ?: return null
+        val roleValue = item["role"] as? JsonPrimitive ?: return null
+        val contentValue = item["content"] as? JsonPrimitive ?: return null
+        val createdAtValue = item["created_at"] as? JsonPrimitive ?: return null
+        if (!idValue.isString || !roleValue.isString || !contentValue.isString) return null
+
+        val id = idValue.contentOrNull?.takeIf(String::isNotBlank) ?: return null
+        val role = roleValue.contentOrNull?.takeIf {
+            it in setOf("user", "reasoning", "assistant", "progress", "tool", "system")
+        } ?: return null
+        val content = contentValue.contentOrNull ?: return null
+        val createdAt = createdAtValue.longOrNull ?: return null
+        val toolNameValue = item["tool_name"]
+        val toolName = when (toolNameValue) {
+            null -> null
+            is JsonPrimitive -> {
+                if (!toolNameValue.isString) return null
+                toolNameValue.contentOrNull
+            }
+            else -> return null
+        }
+
+        decoded += LocalHarnessMessage(
+            id = id,
+            role = role,
+            content = content,
+            toolName = toolName,
+            createdAt = createdAt,
+        )
+    }
+    return decoded
+}
