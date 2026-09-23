@@ -94,7 +94,7 @@ private fun applyModelHistoryEvent(
             true
         }
         "assistant/message" -> {
-            val message = (event.data["message"] as? JsonObject) ?: event.data
+            val message = assistantModelMessageFromEvent(event.data)
             if (message["role"]?.jsonPrimitive?.contentOrNull != "assistant") return false
             history += message
             true

@@ -233,6 +233,7 @@ class LocalHarnessEngine @Inject constructor(
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     private var eventLog = eventLogFor(currentSessionId)
+    private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     private val _state = MutableStateFlow(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
@@ -410,13 +411,17 @@ class LocalHarnessEngine @Inject constructor(
         memoryInput: String = content,
     ): Job? = synchronized(runStateLock) {
         if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
-        appendMessage("user", content)
+        val transcriptMessage = newTranscriptMessage("user", content)
+        val userEvent = eventLog.append("user/message", buildJsonObject {
+            put("content", content)
+            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
+        })
         modelHistory += buildJsonObject {
             put("role", "user")
             put("content", content)
         }
-        eventLog.append("user/message", buildJsonObject { put("content", content) })
         checkpointModelHistory("user/message")
+        applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
         persist()
         scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }.also { activeJob = it }
     }
@@ -649,6 +654,7 @@ class LocalHarnessEngine @Inject constructor(
                     currentSessionId = UUID.randomUUID().toString()
                     preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
                     eventLog = eventLogFor(currentSessionId)
+                    transcriptProjectionCursor = -1L
                     modelHistory.clear()
 
                     val lineageId = when (mode) {
@@ -727,6 +733,7 @@ class LocalHarnessEngine @Inject constructor(
                     currentSessionId = sessionId
                     preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
                     eventLog = eventLogFor(sessionId)
+                    transcriptProjectionCursor = null
                     loadSession(sessionId)
                 } finally {
                     endSessionTransition()
@@ -928,21 +935,30 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.AssistantObserved -> {
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
-                        modelHistory += reply.message
+                        val transcriptMessages = buildList {
+                            reply.reasoning?.takeIf(String::isNotBlank)?.let { reasoning ->
+                                add(newTranscriptMessage("reasoning", reasoning))
+                            }
+                            reply.content?.takeIf(String::isNotBlank)?.let { content ->
+                                add(
+                                    newTranscriptMessage(
+                                        role = if (event.toolCalls.isEmpty()) "assistant" else "progress",
+                                        content = content,
+                                    ),
+                                )
+                            }
+                        }
                         activeToolCalls = event.toolCalls
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
-                        eventLog.append("assistant/message", reply.message)
+                        val assistantEvent = eventLog.append(
+                            "assistant/message",
+                            withTranscript(reply.message, transcriptMessages),
+                        )
+                        modelHistory += reply.message
                         checkpointModelHistory("assistant/message")
-                        reply.reasoning?.takeIf { it.isNotBlank() }?.let {
-                            appendMessage("reasoning", it)
-                        }
-                        reply.content?.takeIf { it.isNotBlank() }?.let {
-                            appendMessage(
-                                role = if (event.toolCalls.isEmpty()) "assistant" else "progress",
-                                content = it,
-                            )
-                        }
+                        applyTranscriptMessages(transcriptMessages, assistantEvent.sequence)
+                        persist()
                     }
                     is AgentEvent.ToolStarted -> {
                         startedToolCallIds += event.call.id
@@ -955,13 +971,14 @@ class LocalHarnessEngine @Inject constructor(
                     }
                     is AgentEvent.ToolFinished -> {
                         val modelOutput = pruneToolResult(event.output)
-                        appendMessage("tool", event.output, event.call.name)
-                        eventLog.append("tool/result", buildJsonObject {
+                        val transcriptMessage = newTranscriptMessage("tool", event.output, event.call.name)
+                        val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
                             put("name", event.call.name)
                             put("content", event.output.take(MAX_EVENT_CHARS))
                             put("model_content", modelOutput)
+                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         modelHistory += buildJsonObject {
                             put("role", "tool")
@@ -970,6 +987,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                         completedToolCallIds += event.call.id
                         checkpointModelHistory("tool/result")
+                        applyTranscriptMessages(listOf(transcriptMessage), toolEvent.sequence)
                         persist()
                     }
                     is AgentEvent.StepFinished -> {
@@ -989,27 +1007,42 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnStepLimit -> {
-                        appendMessage("system", "本轮达到 $mainMaxSteps 步安全上限，请继续发送消息以恢复任务。")
-                        eventLog.append("turn/end", buildJsonObject {
+                        val transcriptMessage = newTranscriptMessage(
+                            "system",
+                            "本轮达到 $mainMaxSteps 步安全上限，请继续发送消息以恢复任务。",
+                        )
+                        val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
                             put("steps", event.steps)
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.messages.size + 1)
+                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
+                        applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        persist()
                     }
                     is AgentEvent.TurnFailed -> {
                         settlePendingTools("failed")
-                        eventLog.append("turn/end", buildJsonObject {
+                        val detail = event.reason.take(2_000)
+                        val transcriptMessage = newTranscriptMessage("system", "执行失败：$detail")
+                        val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "error")
-                            put("detail", event.reason.take(2_000))
+                            put("detail", detail)
                             put("messages", _state.value.messages.size)
+                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
+                        applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        persist()
                     }
                     is AgentEvent.TurnCancelled -> {
                         settlePendingTools("cancelled")
-                        eventLog.append("turn/end", buildJsonObject {
+                        val transcriptMessage = newTranscriptMessage("system", "本轮已停止。")
+                        val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "aborted")
                             put("messages", _state.value.messages.size)
+                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
+                        applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        persist()
                     }
                 }
             },
@@ -1019,10 +1052,10 @@ class LocalHarnessEngine @Inject constructor(
         try {
             loop.run(input)
         } catch (_: CancellationException) {
-            appendMessage("system", "本轮已停止。")
+            // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
             _state.update { it.copy(error = error.message ?: "本机 Harness 执行失败") }
-            appendMessage("system", "执行失败：${error.message ?: error::class.java.simpleName}")
+            // TurnFailed durably records and projects the visible failure message.
         } finally {
             approvalResponse = null
             questionResponse = null
@@ -1758,16 +1791,36 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun appendMessage(role: String, content: String, toolName: String? = null) {
-        val message = LocalHarnessMessage(
-            id = UUID.randomUUID().toString(),
-            role = role,
-            content = if (role == "tool") pruneToolResult(content) else content,
-            toolName = toolName,
-            createdAt = System.currentTimeMillis(),
-        )
-        _state.update { it.copy(messages = it.messages + message) }
-        persist()
+    private fun newTranscriptMessage(
+        role: String,
+        content: String,
+        toolName: String? = null,
+    ): LocalHarnessMessage = LocalHarnessMessage(
+        id = UUID.randomUUID().toString(),
+        role = role,
+        content = if (role == "tool") pruneToolResult(content) else content,
+        toolName = toolName,
+        createdAt = System.currentTimeMillis(),
+    )
+
+    private fun withTranscript(
+        data: JsonObject,
+        messages: List<LocalHarnessMessage>,
+    ): JsonObject = if (messages.isEmpty()) data else JsonObject(
+        data + ("transcript" to encodeTranscriptMessages(messages)),
+    )
+
+    private fun applyTranscriptMessages(
+        messages: List<LocalHarnessMessage>,
+        eventSequence: Long,
+    ) {
+        if (messages.isNotEmpty()) {
+            _state.update { state ->
+                val knownIds = state.messages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+                state.copy(messages = state.messages + messages.filter { knownIds.add(it.id) })
+            }
+        }
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, eventSequence)
     }
 
     private suspend fun load() {
@@ -1815,6 +1868,27 @@ class LocalHarnessEngine @Inject constructor(
             events = eventLog.snapshotAfter(projectionCursor),
             sequenceExclusive = projectionCursor,
         )
+        val legacyTranscriptBaseline = if (
+            stored.transcriptProjectedThroughSequence == null && loaded != null
+        ) {
+            eventLog.latest(TRANSCRIPT_PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
+                TRANSCRIPT_PROJECTION_BASELINE_EVENT,
+                buildJsonObject { put("source", "legacy-session-snapshot") },
+            ).sequence
+        } else {
+            null
+        }
+        val transcriptCursor = transcriptProjectionReplayCursor(
+            snapshot = stored,
+            persistedSnapshotExists = loaded != null,
+            legacyBaselineSequence = legacyTranscriptBaseline,
+        )
+        val projectedTranscript = projectSessionTranscriptTail(
+            snapshotMessages = stored.messages,
+            events = eventLog.snapshotAfter(transcriptCursor),
+            sequenceExclusive = transcriptCursor,
+        )
+        transcriptProjectionCursor = projectedTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
             events = eventLog.snapshot(),
             legacyFallback = stored.legacyModelHistory,
@@ -1849,7 +1923,7 @@ class LocalHarnessEngine @Inject constructor(
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
             sessions = sessionSummaries(),
-            messages = stored.messages,
+            messages = projectedTranscript.messages,
             plan = projectedControls.plan,
             todos = projectedControls.todos,
             goal = projectedControls.goal,
@@ -1870,11 +1944,16 @@ class LocalHarnessEngine @Inject constructor(
             )
             wroteHistoryCheckpoint = true
         }
-        if (restoredHistory.usedLegacyFallback) {
-            if (!wroteHistoryCheckpoint) {
-                checkpointModelHistory("load/legacy-history-migration")
-            }
-            // Rewrite the materialized snapshot without duplicating model-visible history.
+        if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
+            checkpointModelHistory("load/legacy-history-migration")
+        }
+        if (
+            restoredHistory.usedLegacyFallback ||
+            legacyTranscriptBaseline != null ||
+            projectedTranscript.messages != stored.messages ||
+            projectedTranscript.projectedThroughSequence != stored.transcriptProjectedThroughSequence
+        ) {
+            // Materialize migrated/replayed projections so later restarts only fold the new tail.
             persist()
         }
     }
@@ -1926,6 +2005,7 @@ class LocalHarnessEngine @Inject constructor(
             goal = state.goal,
             planMode = state.planMode,
             controlProjectedThroughSequence = projectedThrough,
+            transcriptProjectedThroughSequence = transcriptProjectionCursor,
         )
         sessionRepository.enqueue(snapshot)
     }
@@ -2006,6 +2086,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
+        const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
 
 
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
