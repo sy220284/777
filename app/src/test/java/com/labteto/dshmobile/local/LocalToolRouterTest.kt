@@ -31,6 +31,19 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun workspaceImageAnalyzerIsAlwaysVisibleForAutomaticFallback() {
+        val read = tool("read", "读取文件")
+        val image = tool("vision_analyze_file", "分析工作区图片")
+        val screen = tool("vision_analyze_screen", "分析当前屏幕")
+
+        val visible = names(LocalToolRouter.visibleSchemas(listOf(read, image, screen), emptySet()))
+
+        assertTrue("read" in visible)
+        assertTrue("vision_analyze_file" in visible)
+        assertTrue("vision_analyze_screen" !in visible)
+    }
+
+    @Test
     fun familyKeywordsDiscoverRuntimeAndVisionTools() {
         val tools = listOf(
             tool("process_exec", "直接执行本机进程"),
