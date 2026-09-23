@@ -23,14 +23,20 @@ internal class LocalHistoryCompactor(
     private val tailChars: Int = DEFAULT_TAIL_CHARS,
     private val maxSummaryChars: Int = DEFAULT_MAX_SUMMARY_CHARS,
 ) {
-    fun compact(history: List<JsonObject>): LocalHistoryCompaction? {
-        if (history.size < 3 || history.sumOf { it.toString().length } <= maxHistoryChars) return null
+    fun compact(
+        history: List<JsonObject>,
+        budget: LocalHistoryBudget? = null,
+    ): LocalHistoryCompaction? {
+        val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
+        val effectiveTailChars = budget?.tailChars ?: tailChars
+        val effectiveSummaryChars = budget?.maxSummaryChars ?: maxSummaryChars
+        if (history.size < 3 || history.sumOf { it.toString().length } <= effectiveMaxHistoryChars) return null
 
         var start = 1
         var keptChars = 0
         for (index in history.lastIndex downTo 1) {
             keptChars += history[index].toString().length
-            if (keptChars > tailChars) {
+            if (keptChars > effectiveTailChars) {
                 start = (index until history.size).firstOrNull { candidate ->
                     history[candidate]["role"].asText() == "user"
                 } ?: index
@@ -40,7 +46,7 @@ internal class LocalHistoryCompactor(
         if (start <= 1 || start >= history.size) return null
 
         val omitted = history.subList(1, start)
-        val summary = buildSummary(omitted)
+        val summary = buildSummary(omitted, effectiveSummaryChars)
         val compacted = buildList {
             add(history.first())
             add(buildJsonObject {
@@ -56,7 +62,7 @@ internal class LocalHistoryCompactor(
         )
     }
 
-    private fun buildSummary(messages: List<JsonObject>): String {
+    private fun buildSummary(messages: List<JsonObject>, summaryLimit: Int): String {
         val user = recentText(messages, "user", maxItems = 8, maxPerItem = 1_200)
         val assistant = recentText(messages, "assistant", maxItems = 6, maxPerItem = 1_200)
         val tools = recentTools(messages, maxItems = 12)
@@ -79,7 +85,7 @@ internal class LocalHistoryCompactor(
                 append(tools.joinToString("、"))
             }
         }
-        return text.take(maxSummaryChars)
+        return text.take(summaryLimit)
     }
 
     private fun recentText(
