@@ -281,8 +281,9 @@ jobs:
           echo "DSH_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Unit tests
-        run: ./gradlew :core:test :mock-harness:test :app:testReleaseUnitTest --stacktrace
+      # quality-gate already runs the full unit-test suite. AGP 9 no longer creates
+      # :app:testReleaseUnitTest for this application setup, so do not select a
+      # non-existent release-variant test task here.
 
       - name: Build release APK
         env:
