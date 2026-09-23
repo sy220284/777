@@ -25,6 +25,21 @@ internal fun inheritedHistoryBeforeToolCall(
     return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
 }
 
+internal enum class LocalSubagentStatus {
+    COMPLETED,
+    STEP_LIMIT,
+    CANCELLED,
+    FAILED,
+}
+
+internal data class LocalSubagentResult(
+    val status: LocalSubagentStatus,
+    val output: String,
+    val errorCode: String? = null,
+) {
+    val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
+}
+
 internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
@@ -36,6 +51,7 @@ internal class LocalSubagentRunner(
     private val schemas: (Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> String,
     private val pruneToolResult: (String) -> String,
+    private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
         task: String,
@@ -45,16 +61,33 @@ internal class LocalSubagentRunner(
         parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
+    ): String = runResult(
+        task = task,
+        inheritHistory = inheritHistory,
+        allowMutation = allowMutation,
+        backgroundJobId = backgroundJobId,
+        parentCallId = parentCallId,
+        modelOverride = modelOverride,
+        maxSteps = maxSteps,
+    ).output
+
+    suspend fun runResult(
+        task: String,
+        inheritHistory: Boolean,
+        allowMutation: Boolean,
+        backgroundJobId: String? = null,
+        parentCallId: String? = null,
+        modelOverride: String? = null,
+        maxSteps: Int = state.value.subagentMaxSteps,
     ): String {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
-        val key = apiKeys.get() ?: return "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
         val history = if (inheritHistory) {
             inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
         } else {
             mutableListOf()
         }
         val progress = ArrayDeque<String>()
-        val stepLimit = maxSteps.coerceIn(1, 40)
+        val stepLimit = maxSteps.coerceIn(1, 128)
         val snapshot = state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
@@ -67,6 +100,16 @@ internal class LocalSubagentRunner(
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
         })
+        val key = apiKeys.get()
+        if (key == null) {
+            val output = "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
+            eventLog().append("subagent/end", buildJsonObject {
+                put("agent_id", subagentId)
+                put("status", "failed")
+                put("code", "NO_API_KEY")
+            })
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_API_KEY")
+        }
 
         try {
             if (!inheritHistory) history += buildJsonObject {
@@ -103,6 +146,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         }
                     }
+                    compactSubagentHistory(history, subagentId)
                     modelStep += 1
                     val reply = completeSubagentStep(
                         key = key,
@@ -142,15 +186,33 @@ internal class LocalSubagentRunner(
                                 )
                             }
                         }
+                        is AgentEvent.ToolStarted -> {
+                            eventLog().append("subagent/tool-call", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("step", event.step)
+                                put("id", event.call.id)
+                                put("name", event.call.name)
+                                put("arguments", event.call.arguments)
+                            })
+                        }
                         is AgentEvent.ToolFinished -> {
+                            val modelOutput = pruneToolResult(event.output)
                             rememberSubagentProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
                             )
+                            eventLog().append("subagent/tool-result", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("step", event.step)
+                                put("id", event.call.id)
+                                put("name", event.call.name)
+                                put("content", event.output.take(SUBAGENT_EVENT_CHARS))
+                                put("model_content", modelOutput)
+                            })
                             history += buildJsonObject {
                                 put("role", "tool")
                                 put("tool_call_id", event.call.id)
-                                put("content", pruneToolResult(event.output))
+                                put("content", modelOutput)
                             }
                         }
                         is AgentEvent.TurnCompleted -> {
@@ -188,39 +250,46 @@ internal class LocalSubagentRunner(
 
             val result = loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
-                return result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
+                return LocalSubagentResult(
+                    status = LocalSubagentStatus.COMPLETED,
+                    output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                )
             }
 
             val partial = progress.joinToString("\n")
-            return buildString {
+            val output = buildString {
                 append("[subagent][$subagentId][STEP_LIMIT] 达到 $stepLimit 步上限，任务未完整结束。")
                 if (partial.isNotBlank()) {
                     append("\n已完成的最近进度：\n")
                     append(partial)
                 }
-                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 40。")
+                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 128。")
             }
+            return LocalSubagentResult(LocalSubagentStatus.STEP_LIMIT, output, "STEP_LIMIT")
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             val partial = progress.joinToString("\n")
-            return buildString {
+            val output = buildString {
                 append("[subagent][$subagentId][TASK_CANCELLED] 子代理自身被取消；同批其他子代理不会被级联取消。")
                 cancelled.message?.takeIf(String::isNotBlank)?.let { append("\n原因：$it") }
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
+            return LocalSubagentResult(LocalSubagentStatus.CANCELLED, output, "TASK_CANCELLED")
         } catch (error: LocalModelException) {
             val partial = progress.joinToString("\n")
-            return buildString {
+            val output = buildString {
                 append("[subagent][$subagentId][${error.code}] 模型阶段失败：${error.message}")
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
                 append("\n建议：模型超时可重试；网页/工具超时请查看对应工具错误码。")
             }
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, error.code)
         } catch (error: Exception) {
             val partial = progress.joinToString("\n")
-            return buildString {
+            val output = buildString {
                 append("[subagent][$subagentId][SUBAGENT_ERROR] ${error.message ?: error::class.java.simpleName}")
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
         }
     }
 
@@ -284,6 +353,17 @@ internal class LocalSubagentRunner(
         }
     }
 
+    private fun compactSubagentHistory(history: MutableList<JsonObject>, subagentId: String) {
+        val compaction = historyCompactor.compact(history) ?: return
+        history.clear()
+        history += compaction.messages
+        eventLog().append("subagent/compaction", buildJsonObject {
+            put("agent_id", subagentId)
+            put("omitted_messages", compaction.omittedMessages)
+            put("summary", compaction.summary)
+        })
+    }
+
     private fun rememberSubagentProgress(progress: ArrayDeque<String>, item: String) {
         progress.addLast(item)
         while (progress.size > SUBAGENT_PROGRESS_ITEMS) progress.removeFirst()
@@ -291,5 +371,8 @@ internal class LocalSubagentRunner(
 
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
-    private companion object { const val SUBAGENT_PROGRESS_ITEMS = 6 }
+    private companion object {
+        const val SUBAGENT_PROGRESS_ITEMS = 6
+        const val SUBAGENT_EVENT_CHARS = 65_536
+    }
 }
