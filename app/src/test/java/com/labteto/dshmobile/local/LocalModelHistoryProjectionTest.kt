@@ -62,6 +62,33 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun structuredUserMessageKeepsDurableImageReference() {
+        val structured = buildLocalUserModelMessage(
+            visibleText = "看这张图",
+            attachments = listOf(
+                LocalImportedAttachment(
+                    name = "sample.png",
+                    relativePath = ".dsh/attachments/abc.png",
+                    mediaType = "image/png",
+                    bytes = 3,
+                    attachmentId = "abc",
+                ),
+            ),
+        )
+        val events = listOf(
+            event(0L, "user/message", buildJsonObject {
+                put("content", "看这张图")
+                put("model_message", structured)
+            }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(structured, restored.messages.single())
+        assertTrue(restored.messages.single()["content"].toString().contains(LOCAL_IMAGE_REF))
+    }
+
+    @Test
     fun legacyFallbackIsUsedWithoutReplayingUnknownOverlap() {
         val fallback = listOf(
             message("system", "旧系统"),
