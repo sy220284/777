@@ -953,17 +953,19 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
+                        val modelOutput = pruneToolResult(event.output)
                         appendMessage("tool", event.output, event.call.name)
                         eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
                             put("name", event.call.name)
                             put("content", event.output.take(MAX_EVENT_CHARS))
+                            put("model_content", modelOutput)
                         })
                         modelHistory += buildJsonObject {
                             put("role", "tool")
                             put("tool_call_id", event.call.id)
-                            put("content", pruneToolResult(event.output))
+                            put("content", modelOutput)
                         }
                         completedToolCallIds += event.call.id
                         checkpointModelHistory("tool/result")
