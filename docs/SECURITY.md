@@ -18,7 +18,7 @@ Agent tools can read and modify workspace files and run processes. Approving a p
 - Automatic approval covers workspace writes only. Process, device and privileged operations keep their explicit approval policies.
 - Background runs stop at interactive approval or question boundaries. External cancellation cancels and waits for the owned agent run.
 - Webhook only listens on `127.0.0.1`, uses a bearer token and limits request sizes. Legacy LAN preferences cannot enable an external plaintext listener.
-- Language servers use a user-configured command, start only after process approval, and receive files within the workspace. The server must be installed separately. Queries have a response deadline and bounded notification storage.
+- Language intelligence automatically resolves an already-available language server from the project/file type or preserves a legacy explicit command for upgrade compatibility. A new external server process still requires process approval before first launch; no server is downloaded or installed automatically. Server file access stays within the workspace, queries have a response deadline, and notification storage is bounded.
 
 ## Local storage and network requests
 
