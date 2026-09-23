@@ -187,9 +187,10 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { tab.error = e.message }
         } }) { Text(stringResource(R.string.panel_open_host)) }
+        val loadedBytes = tab.bytes
         when {
-            extension == "pdf" && tab.bytes != null -> PdfPreview(tab.bytes!!, Modifier.weight(1f))
-            binary && tab.bytes != null -> {
+            extension == "pdf" && loadedBytes != null -> PdfPreview(loadedBytes, Modifier.weight(1f))
+            binary && loadedBytes != null -> {
                 var image by remember(tab.bytes) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
                 LaunchedEffect(tab.bytes) {
                     image = withContext(Dispatchers.Default) {
@@ -221,6 +222,10 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
                                 val relative = uri.path?.let { com.labteto.dshmobile.core.session.relativePreviewResource(base.path.orEmpty(), it) }
                                     ?.takeIf { it.isNotBlank() } ?: return denied()
                                 return try {
+                                    // WebView requires this callback to return WebResourceResponse synchronously
+                                    // on its worker thread. The workspace API is suspend-only, so this is an
+                                    // intentional synchronous bridge, bounded by the 10s timeout below; it does
+                                    // not block the main thread or ConnectionLoop's Dispatchers.Default workers.
                                     val bytes = runBlocking(Dispatchers.IO) {
                                         withTimeout(10000) {
                                             val api = store.apiForHost(key.host) ?: return@withTimeout null

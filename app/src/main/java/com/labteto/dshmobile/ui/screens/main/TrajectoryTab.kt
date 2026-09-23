@@ -59,9 +59,10 @@ internal fun TrajectoryTab(
 ) {
     val colors = DsTheme.colors
     val nodes = remember(conversation?.journal, conversation?.nodes) {
-        if (conversation?.journal.isNullOrEmpty()) conversation?.nodes.orEmpty()
-        else com.labteto.dshmobile.core.session.EventFold(conversation!!.sessionId).fold(
-            conversation.journal.map { it.copy(surfaceOp = null, surfaceIntent = null) },
+        val current = conversation
+        if (current == null || current.journal.isEmpty()) current?.nodes.orEmpty()
+        else com.labteto.dshmobile.core.session.EventFold(current.sessionId).fold(
+            current.journal.map { it.copy(surfaceOp = null, surfaceIntent = null) },
         ).nodes
     }
     val groups = remember(nodes) { groupByTurn(nodes) }

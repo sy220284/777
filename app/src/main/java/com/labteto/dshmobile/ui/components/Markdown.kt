@@ -118,7 +118,7 @@ private fun parseMarkdown(markdown: String): List<MdBlock> {
                 blocks += MdBlock.Code(lang, code.toString().trimEnd('\n'))
             }
             HEADING_REGEX.matches(trimmed) -> {
-                val match = HEADING_REGEX.matchEntire(trimmed)!!
+                val match = checkNotNull(HEADING_REGEX.matchEntire(trimmed)) { "标题正则匹配状态不一致" }
                 val level = match.groupValues[1].length
                 val text = match.groupValues[2].trim().trimEnd('#').trim()
                 blocks += MdBlock.Heading(level, text)

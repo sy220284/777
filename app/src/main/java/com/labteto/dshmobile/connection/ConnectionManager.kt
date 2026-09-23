@@ -245,8 +245,8 @@ class ConnectionManager @Inject constructor(
      * [reconnectIfNeeded] rebuilds its client: a relay token can rotate while the app is
      * backgrounded, and a socket built with the old one is refused at the upgrade.
      */
-    private fun muxFactory(host: HostConfig): () -> RemoteStreamMux = {
-        kotlinx.coroutines.runBlocking { clientFactory.muxFor(host) }
+    private fun muxFactory(host: HostConfig): suspend () -> RemoteStreamMux = {
+        clientFactory.muxFor(host)
     }
 
     /**
@@ -299,8 +299,24 @@ class ConnectionManager @Inject constructor(
     }
 
     private fun maybeStartService() {
-        val settings = runBlockingRead { hostsStore.settingsOnce() }
-        if (settings.keepConnectedInBackground) startService()
+        val connectedHost = activeHost ?: return
+        scope.launch {
+            try {
+                val settings = hostsStore.settingsOnce()
+                if (
+                    settings.keepConnectedInBackground &&
+                    activeHost?.id == connectedHost.id &&
+                    _state.value.phase == ConnectionPhase.CONNECTED
+                ) {
+                    startService()
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Background keep-alive is best-effort; a settings read/service failure must not
+                // take down the already-established connection loop.
+            }
+        }
     }
 
     private fun startService() {
@@ -312,6 +328,4 @@ class ConnectionManager @Inject constructor(
         context.stopService(Intent(context, ConnectionService::class.java))
     }
 
-    private fun <T> runBlockingRead(block: suspend () -> T): T =
-        kotlinx.coroutines.runBlocking { block() }
 }

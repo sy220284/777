@@ -179,7 +179,8 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
                 if (frame.type == "snapshot") { sequence = frame.sequence; connected = true }
                 else if (frame.type == "output") {
                     val next = frame.sequence ?: error(context.getString(R.string.panel_changed))
-                    if (sequence == null || next != sequence!! + 1) error(context.getString(R.string.panel_changed))
+                    val previous = sequence ?: error(context.getString(R.string.panel_changed))
+                    if (next != previous + 1) error(context.getString(R.string.panel_changed))
                     sequence = next
                 }
                 frame.info?.let { info = it }

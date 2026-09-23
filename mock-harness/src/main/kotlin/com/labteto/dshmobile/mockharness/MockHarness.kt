@@ -766,9 +766,9 @@ class MockHarness(
         }
         when {
             asyncHandlers.containsKey(method) ->
-                respondJson(okEnvelope(rpcId, asyncHandlers[method]!!(payload)))
+                respondJson(okEnvelope(rpcId, asyncHandlers.getValue(method)(payload)))
             okHandlers.containsKey(method) -> try {
-                respondJson(okEnvelope(rpcId, okHandlers[method]!!(payload)))
+                respondJson(okEnvelope(rpcId, okHandlers.getValue(method)(payload)))
             } catch (invalid: ArgumentsInvalid) {
                 // Since 0.1.3 every gateway refusal carries its own namespaced code; the
                 // messages are unchanged, and still name the field rather than the fault.
@@ -777,7 +777,7 @@ class MockHarness(
                 respondJson(errorEnvelope(rpcId, "gateway/input-invalid", invalid.message))
             }
             failHandlers.containsKey(method) -> {
-                val error = failHandlers[method]!!(payload)
+                val error = failHandlers.getValue(method)(payload)
                 respondJson(errorEnvelope(rpcId, error.code, error.message, error.details))
             }
             else -> respondJson(errorEnvelope(rpcId, "gateway/internal", "unregistered $method"))
