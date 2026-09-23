@@ -72,6 +72,63 @@ class SessionRecoveryTest {
         }
     }
 
+
+    @Test
+    fun completedStepInsideOpenTurnDoesNotResurrectOldPendingCalls() {
+        val directory = Files.createTempDirectory("session-recovery-step-boundary").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 700, clock = { 1L })
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("assistant/message", assistantWithTool("old-call", "write"))
+            log.append("step/end", buildJsonObject { put("step", 1) })
+            log.append("step/start", buildJsonObject { put("step", 2) })
+            log.append("assistant/message", assistantWithTool("current-call", "read"))
+
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+
+            assertEquals(listOf("current-call"), repaired.toolResults.map { it.callId })
+            assertEquals(2, repaired.toolResults.single().step)
+            assertEquals(SessionRecovery.TOOL_NOT_STARTED, repaired.toolResults.single().code)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun largeRotatedHistoryRepairsOnlyNewestOpenTail() {
+        val directory = Files.createTempDirectory("session-recovery-large-history").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 700, clock = { 1L })
+            repeat(160) { index ->
+                log.append("turn/start", buildJsonObject { put("turn", index) })
+                log.append("step/start", buildJsonObject { put("step", 1) })
+                log.append("assistant/message", buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "history-$index-" + "x".repeat(80))
+                })
+                log.append("step/end", buildJsonObject { put("step", 1) })
+                log.append("turn/end", buildJsonObject { put("reason", "completed") })
+            }
+            assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("events.jsonl.part-") })
+
+            log.append("turn/start", buildJsonObject { put("turn", 999) })
+            log.append("step/start", buildJsonObject { put("step", 7) })
+            log.append("assistant/message", assistantWithTool("tail-call", "write"))
+            log.append("tool/call", buildJsonObject {
+                put("step", 7); put("id", "tail-call"); put("name", "write")
+            })
+
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+
+            assertEquals(listOf("tail-call"), repaired.toolResults.map { it.callId })
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN, repaired.toolResults.single().code)
+            assertEquals(listOf("tool/result", "step/end", "turn/end"), repaired.appended.map { it.type })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     private fun assistantWithTool(id: String, name: String) = buildJsonObject {
         put("role", "assistant")
         put("content", "")
