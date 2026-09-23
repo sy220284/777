@@ -71,12 +71,22 @@ class SessionEventLogTest {
             repeat(12) { index ->
                 log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(52)) })
             }
-            val lastSequence = log.snapshot().last().sequence
+            val newestSegment = directory.listFiles().orEmpty()
+                .filter { it.name.startsWith("session.events.jsonl.part-") }
+                .maxByOrNull { it.name }
+                ?: error("expected at least one rotated segment")
+            val previousSequence = newestSegment.readLines()
+                .mapNotNull { line ->
+                    runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
+                }
+                .maxOrNull()
+                ?: error("expected a valid event in rotated segment")
+
             file.writeText("{broken tail only")
 
             val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
             val appended = restarted.append("test/restarted", buildJsonObject { put("value", "ok") })
-            assertEquals(lastSequence + 1L, appended.sequence)
+            assertEquals(previousSequence + 1L, appended.sequence)
         } finally {
             directory.deleteRecursively()
         }
