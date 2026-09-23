@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.labteto.dshmobile.ui.import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.isCommandExecutionTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -122,12 +122,11 @@ internal fun toolRowModel(
     val arguments = parseArguments(argumentsJson)
     val derived = if (isCommandExecutionTool(toolName)) {
         arguments?.get("description").asSummary()?.takeIf { it.isNotBlank() }
-    } else SUMMARY_KEYS[variant]
-        ?.let { listOf(it) }
-        ?.firstOrNull()
-        ?: if (isCommandExecutionTool(toolName)) null else SUMMARY_KEYS[variant]
+    } else {
+        SUMMARY_KEYS[variant]
             .orEmpty()
             .firstNotNullOfOrNull { key -> arguments?.get(key).asSummary()?.takeIf { it.isNotBlank() } }
+    }
     val relative = derived?.let { relativizeToCwd(it, cwd) }
     // An unclassified tool with no presenter title would otherwise render as a bare "Tool call"
     // with nothing identifying it, so its raw name carries the summary instead.
