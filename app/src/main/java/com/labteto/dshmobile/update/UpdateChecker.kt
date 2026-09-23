@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -330,10 +331,10 @@ class UpdateChecker @Inject constructor(
         }.getOrNull()
     }
 
-    private fun executeGithubText(request: Request, purpose: String): String =
+    private suspend fun executeGithubText(request: Request, purpose: String): String =
         executeGithubBytes(request, purpose, MAX_RELEASE_METADATA_BYTES).toString(Charsets.UTF_8)
 
-    private fun executeGithubBytes(
+    private suspend fun executeGithubBytes(
         request: Request,
         purpose: String,
         maxBytes: Long,
@@ -365,7 +366,7 @@ class UpdateChecker @Inject constructor(
             }
 
             if (attempt + 1 < MAX_REQUEST_ATTEMPTS) {
-                Thread.sleep(REQUEST_RETRY_BACKOFF_MS * (attempt + 1L))
+                delay(REQUEST_RETRY_BACKOFF_MS * (attempt + 1L))
             }
         }
 
