@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -11,6 +12,7 @@ import com.labteto.dshmobile.automation.WebhookPlugin
 import com.labteto.dshmobile.device.AndroidDevicePlugin
 import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.harness.agent.AgentEvent
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
@@ -22,10 +24,16 @@ import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.HandoffGoal
@@ -127,6 +135,12 @@ internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
 
 internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval?): Boolean =
     approval?.canAutoApproveSafely == true
+
+internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
+    memoryClassMb >= 512 -> HarnessResourceBudget(maxModelRequests = 4, maxAgents = 4)
+    memoryClassMb >= 256 -> HarnessResourceBudget(maxModelRequests = 3, maxAgents = 3)
+    else -> HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2)
+}
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -248,6 +262,23 @@ class LocalHarnessEngine @Inject constructor(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    private val resourceBudget = localResourceBudgetForMemoryClass(
+        context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+    )
+    private val resourceScheduler = HarnessResourceScheduler(
+        budget = resourceBudget,
+        onChanged = { snapshot ->
+            _state.update {
+                it.copy(
+                    activeModelRequests = snapshot.activeModelRequests,
+                    activeAgents = snapshot.activeAgents,
+                    maxModelRequests = snapshot.budget.maxModelRequests,
+                    maxAgents = snapshot.budget.maxAgents,
+                    resourcePressure = snapshot.pressure.name.lowercase(),
+                )
+            }
+        },
+    )
     private val jobs = LocalJobManager(scope) { snapshot ->
         _state.update { it.copy(jobs = snapshot) }
     }
@@ -285,10 +316,12 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             onNativeImageRejected = { autoImageNativeRejected = true },
+            resourceScheduler = resourceScheduler,
         )
     }
 
     private val runStateLock = Any()
+    private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
@@ -298,6 +331,14 @@ class LocalHarnessEngine @Inject constructor(
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+        val initialResources = resourceScheduler.snapshot()
+        _state.update {
+            it.copy(
+                maxModelRequests = initialResources.budget.maxModelRequests,
+                maxAgents = initialResources.budget.maxAgents,
+                resourcePressure = initialResources.pressure.name.lowercase(),
+            )
+        }
         seedWorkspace()
         migrateLegacySession()
         // Legacy migration may have copied an event log after the field was first constructed.
@@ -467,7 +508,31 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         val modelMessage = buildLocalUserModelMessage(content, attachments)
-        queueTurn(content, prompt, modelMessage)?.start()
+        queueHumanTurn(content, prompt, modelMessage)?.start()
+    }
+
+    private fun queueHumanTurn(
+        content: String,
+        memoryInput: String = content,
+        modelMessage: JsonObject? = null,
+    ): Job? = synchronized(runStateLock) {
+        if (sessionTransitioning) return@synchronized null
+        if (activeJob?.isCompleted == false) {
+            val accepted = pendingInputs.offer(QueuedAgentInput(content, memoryInput, modelMessage))
+            if (!accepted) {
+                _state.update { it.copy(error = "当前执行中的补充消息已达到 $MAX_PENDING_INPUTS 条上限") }
+                return@synchronized null
+            }
+            recordUserTranscript(content, modelMessage, queued = true)
+            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            eventLog.append("user/queue", buildJsonObject {
+                put("action", "queued")
+                put("queued_count", pendingInputs.size())
+            })
+            persist()
+            return@synchronized null
+        }
+        queueTurnLocked(content, memoryInput, modelMessage)
     }
 
     private fun queueTurn(
@@ -476,21 +541,43 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject? = null,
     ): Job? = synchronized(runStateLock) {
         if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
-        val transcriptMessage = newTranscriptMessage("user", content)
+        queueTurnLocked(content, memoryInput, modelMessage)
+    }
+
+    private fun queueTurnLocked(
+        content: String,
+        memoryInput: String,
+        modelMessage: JsonObject?,
+    ): Job {
         val durableMessage = modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", content)
         }
+        recordUserTranscript(content, durableMessage, queued = false)
+        appendUserToModelHistory(durableMessage, "user/message")
+        persist()
+        return scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }
+            .also { activeJob = it }
+    }
+
+    private fun recordUserTranscript(
+        content: String,
+        modelMessage: JsonObject?,
+        queued: Boolean,
+    ) {
+        val transcriptMessage = newTranscriptMessage("user", content)
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
-            put("model_message", durableMessage)
+            modelMessage?.let { put("model_message", it) }
+            put("queued", queued)
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
         })
-        modelHistory += durableMessage
-        checkpointModelHistory("user/message")
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
-        persist()
-        scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }.also { activeJob = it }
+    }
+
+    private fun appendUserToModelHistory(message: JsonObject, reason: String) {
+        modelHistory += message
+        checkpointModelHistory(reason)
     }
 
     /**
@@ -709,7 +796,12 @@ class LocalHarnessEngine @Inject constructor(
     fun stop() {
         approvalResponse?.complete(false)
         questionResponse?.cancel()
-        synchronized(runStateLock) { activeJob }?.cancel()
+        val running = synchronized(runStateLock) {
+            pendingInputs.clear()
+            _state.update { it.copy(queuedInputCount = 0) }
+            activeJob
+        }
+        running?.cancel()
         // Keep running=true until runTurn's finally has completed. Otherwise the
         // composer looks available during cancellation even though queueTurn
         // correctly still rejects a replacement turn.
@@ -863,11 +955,77 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun cancelActiveRunAndJoin() {
         approvalResponse?.complete(false)
         questionResponse?.cancel()
-        val job = synchronized(runStateLock) { activeJob }
+        val job = synchronized(runStateLock) {
+            pendingInputs.clear()
+            _state.update { it.copy(queuedInputCount = 0) }
+            activeJob
+        }
         job?.cancelAndJoin()
         synchronized(runStateLock) {
             if (activeJob === job) activeJob = null
         }
+    }
+
+    private suspend fun captureAutoMemoryDirective(text: String) {
+        val snapshot = _state.value
+        if (!snapshot.autoMemory || text.isBlank()) return
+        runCatching {
+            memoryManager.captureExplicitUserDirective(
+                text = text,
+                mode = snapshot.conversationMode,
+                projectId = snapshot.projectId,
+                lineageId = snapshot.lineageId,
+                sourceSessionId = currentSessionId,
+            )
+        }.onSuccess { remembered ->
+            if (remembered != null) {
+                eventLog.append("memory/auto", buildJsonObject {
+                    put("id", remembered.id)
+                    put("scope", remembered.scope.name.lowercase())
+                    put("kind", remembered.kind.name.lowercase())
+                })
+            }
+        }
+    }
+
+    private suspend fun drainPendingInputsIntoHistory() {
+        val queued = pendingInputs.drain()
+        if (queued.isEmpty()) return
+        queued.forEach { input ->
+            val durableMessage = input.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", input.content)
+            }
+            modelHistory += durableMessage
+            captureAutoMemoryDirective(input.memoryInput)
+        }
+        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+        eventLog.append("user/queue", buildJsonObject {
+            put("action", "consumed")
+            put("count", queued.size)
+            put("queued_count", pendingInputs.size())
+        })
+        checkpointModelHistory("user/queue-consumed")
+        persist()
+    }
+
+    private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
+        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
+        val next = pendingInputs.poll() ?: return@synchronized null
+        val durableMessage = next.modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", next.content)
+        }
+        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+        appendUserToModelHistory(durableMessage, "user/queue-resume")
+        eventLog.append("user/queue", buildJsonObject {
+            put("action", "resumed")
+            put("queued_count", pendingInputs.size())
+        })
+        persist()
+        scope.launch(start = CoroutineStart.LAZY) {
+            runTurn(next.content, next.memoryInput)
+        }.also { activeJob = it }
     }
 
     /** Switch between inspection-only planning and normal execution. */
@@ -916,15 +1074,21 @@ class LocalHarnessEngine @Inject constructor(
                     put("id", result.callId)
                     result.name?.let { put("name", it) }
                     put("content", result.content)
+                    put("model_content", result.modelContent)
                     put("is_error", true)
                     put("error_code", result.code)
+                    put("retryable", result.code == SessionRecovery.TOOL_NOT_STARTED)
+                    put(
+                        "side_effect",
+                        if (result.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN) "possible" else "none",
+                    )
                     put("runtime_settlement", true)
                     put("reason", reason)
                 })
                 modelHistory += buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", result.callId)
-                    put("content", result.content)
+                    put("content", result.modelContent)
                 }
                 completedToolCallIds += result.callId
             }
@@ -947,27 +1111,10 @@ class LocalHarnessEngine @Inject constructor(
                             handoffSummary = snapshot.handoffSummary,
                         ),
                     )
-                    if (snapshot.autoMemory && memoryInput.isNotBlank()) {
-                        runCatching {
-                            memoryManager.captureExplicitUserDirective(
-                                text = memoryInput,
-                                mode = snapshot.conversationMode,
-                                projectId = snapshot.projectId,
-                                lineageId = snapshot.lineageId,
-                                sourceSessionId = currentSessionId,
-                            )
-                        }.onSuccess { remembered ->
-                            if (remembered != null) {
-                                eventLog.append("memory/auto", buildJsonObject {
-                                    put("id", remembered.id)
-                                    put("scope", remembered.scope.name.lowercase())
-                                    put("kind", remembered.kind.name.lowercase())
-                                })
-                            }
-                        }
-                    }
+                    captureAutoMemoryDirective(memoryInput)
                     requestPrepared = true
                 }
+                drainPendingInputsIntoHistory()
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
@@ -1090,7 +1237,15 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
-                        val modelOutput = pruneToolResult(event.output)
+                        val boundedContent = pruneToolResult(event.output)
+                        val modelOutput = AgentToolResult(
+                            content = boundedContent,
+                            isError = event.isError,
+                            errorCode = event.errorCode,
+                            retryable = event.retryable,
+                            sideEffect = event.sideEffect,
+                            recoveryHint = event.recoveryHint,
+                        ).modelVisibleContent()
                         val transcriptMessage = newTranscriptMessage("tool", event.output, event.call.name)
                         val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -1099,6 +1254,10 @@ class LocalHarnessEngine @Inject constructor(
                             put("content", event.output.take(MAX_EVENT_CHARS))
                             put("model_content", modelOutput)
                             put("is_error", event.isError)
+                            event.errorCode?.let { put("error_code", it) }
+                            put("retryable", event.retryable)
+                            put("side_effect", event.sideEffect.name.lowercase())
+                            event.recoveryHint?.let { put("recovery_hint", it) }
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         modelHistory += buildJsonObject {
@@ -1193,6 +1352,7 @@ class LocalHarnessEngine @Inject constructor(
             synchronized(runStateLock) {
                 if (activeJob === completedJob) activeJob = null
             }
+            startNextQueuedTurnIfIdle()?.start()
         }
     }
 
@@ -1239,25 +1399,62 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
-        "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
+        "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}"
 
-    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult =
-        AgentToolResult(
+    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult {
+        val retryable = code in setOf(
+            "MODEL_TIMEOUT",
+            "MODEL_NETWORK",
+            "TASK_CANCELLED",
+            "PARALLEL_TASK_ERROR",
+        ) || code.startsWith("MODEL_HTTP_5") || code.contains("TIMEOUT") || code.contains("NETWORK")
+        val access = toolRegistry.get(LocalToolPolicy.canonical(call.name))?.access
+        val sideEffect = if (
+            access in setOf(
+                ToolAccess.WORKSPACE_WRITE,
+                ToolAccess.SESSION_WRITE,
+                ToolAccess.PROCESS,
+                ToolAccess.AGENT_CONTROL,
+                ToolAccess.DEVICE,
+                ToolAccess.PRIVILEGED,
+            )
+        ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE
+        val recoveryHint = when {
+            sideEffect == AgentToolSideEffect.POSSIBLE ->
+                "该调用可能已产生部分副作用；先检查当前状态，再决定是否重试。"
+            retryable ->
+                "该错误允许重试；网络类错误可先运行 network_diagnose。"
+            else ->
+                "检查参数、权限或前置状态后再选择其他方案。"
+        }
+        return AgentToolResult(
             content = formatToolFailure(call, code, detail),
             isError = true,
+            errorCode = code,
+            retryable = retryable,
+            sideEffect = sideEffect,
+            recoveryHint = recoveryHint,
         )
+    }
 
     private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
-            ?: return AgentToolResult("未知工具：${call.name}", isError = true)
+            ?: return AgentToolResult(
+                content = "未知工具：${call.name}",
+                isError = true,
+                errorCode = "UNKNOWN_TOOL",
+                recoveryHint = "先使用 capability_search 或检查工具名称。",
+            )
         if (
             _state.value.planMode &&
             !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
             return AgentToolResult(
-                "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
+                content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
                 isError = true,
+                errorCode = "PLAN_MODE_BLOCKED",
+                recoveryHint = "提交并批准计划后再执行修改类工具。",
             )
         }
         val result = toolRegistry.execute(
@@ -1283,7 +1480,26 @@ class LocalHarnessEngine @Inject constructor(
                 },
             ),
         )
-        return AgentToolResult(result.content, result.isError)
+        return if (result.isError) {
+            AgentToolResult(
+                content = result.content,
+                isError = true,
+                errorCode = "TOOL_REPORTED_ERROR",
+                sideEffect = if (
+                    registered.access in setOf(
+                        ToolAccess.WORKSPACE_WRITE,
+                        ToolAccess.SESSION_WRITE,
+                        ToolAccess.PROCESS,
+                        ToolAccess.AGENT_CONTROL,
+                        ToolAccess.DEVICE,
+                        ToolAccess.PRIVILEGED,
+                    )
+                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
+                recoveryHint = "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。",
+            )
+        } else {
+            AgentToolResult(result.content)
+        }
     }
 
     private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
@@ -1806,13 +2022,15 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         return executor.execute {
-            modelClient.complete(
-                apiKey = key,
-                baseUrl = snapshot.baseUrl,
-                model = snapshot.model,
-                messages = messages,
-                tools = tools,
-            )
+            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                modelClient.complete(
+                    apiKey = key,
+                    baseUrl = snapshot.baseUrl,
+                    model = snapshot.model,
+                    messages = messages,
+                    tools = tools,
+                )
+            }
         }
     }
 
@@ -1914,9 +2132,16 @@ class LocalHarnessEngine @Inject constructor(
             "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
             "git", "curl", "wget", "python3", "python", "node",
         ).filter(runtimeProcess::isCommandAvailable)
+        val resources = resourceScheduler.snapshot()
         return buildString {
             appendLine("安卓本机 Harness 环境")
             appendLine("工作区：${workspace.path}")
+            appendLine(
+                "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
+                    "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
+                    "压力 ${resources.pressure.name.lowercase()}",
+            )
+            appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
             appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
@@ -2071,6 +2296,12 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
+            queuedInputCount = pendingInputs.size(),
+            activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
+            activeAgents = resourceScheduler.snapshot().activeAgents,
+            maxModelRequests = resourceScheduler.budget.maxModelRequests,
+            maxAgents = resourceScheduler.budget.maxAgents,
+            resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
         )
         var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
@@ -2133,7 +2364,7 @@ class LocalHarnessEngine @Inject constructor(
                 modelHistory += buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", recovered.callId)
-                    put("content", recovered.content)
+                    put("content", recovered.modelContent)
                 }
             }
         }
@@ -2250,6 +2481,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
+        const val MAX_PENDING_INPUTS = 16
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"

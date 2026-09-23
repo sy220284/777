@@ -138,11 +138,25 @@ class AgentLoopTest {
                         ),
                     )
                 } else {
-                    assertEquals("读取失败", messages.last().content)
+                    val visible = messages.last().content
+                    assertTrue(visible.contains("\"status\":\"error\""))
+                    assertTrue(visible.contains("\"error_code\":\"READ_FAILED\""))
+                    assertTrue(visible.contains("\"retryable\":true"))
+                    assertTrue(visible.contains("\"side_effect\":\"none\""))
+                    assertTrue(visible.contains("读取失败"))
                     AgentModelReply(content = "已改用其他方案")
                 }
             },
-            tools = AgentToolExecutor { AgentToolResult("读取失败", isError = true) },
+            tools = AgentToolExecutor {
+                AgentToolResult(
+                    content = "读取失败",
+                    isError = true,
+                    errorCode = "READ_FAILED",
+                    retryable = true,
+                    sideEffect = AgentToolSideEffect.NONE,
+                    recoveryHint = "检查路径后重试",
+                )
+            },
             eventSink = AgentEventSink { events += it },
             idFactory = { "turn-tool-error" },
         )
@@ -152,6 +166,10 @@ class AgentLoopTest {
         val toolEvent = events.filterIsInstance<AgentEvent.ToolFinished>().single()
         assertTrue(toolEvent.isError)
         assertEquals("读取失败", toolEvent.output)
+        assertEquals("READ_FAILED", toolEvent.errorCode)
+        assertTrue(toolEvent.retryable)
+        assertEquals(AgentToolSideEffect.NONE, toolEvent.sideEffect)
+        assertEquals("检查路径后重试", toolEvent.recoveryHint)
         assertEquals("已改用其他方案", result.answer)
         assertTrue(events.last() is AgentEvent.TurnCompleted)
     }

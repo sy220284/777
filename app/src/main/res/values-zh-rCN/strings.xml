@@ -149,6 +149,8 @@
     <string name="local_status_approval">本机 · 等待批准</string>
     <string name="local_status_question">本机 · 等待回答</string>
     <string name="local_status_running">本机 · 执行中</string>
+    <string name="local_status_running_queued">本机 · 执行中 · 待处理 %1$d</string>
+    <string name="local_queue_message">追加</string>
     <string name="local_status_ready">本机 · 已就绪</string>
     <string name="local_device_approval_on">本轮设备操作已授权</string>
     <string name="local_safe_approval_on">安全操作自动批准已开启</string>
