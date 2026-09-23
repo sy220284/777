@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,6 +74,8 @@ class ConnectionManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val desiredIntentVersion = AtomicLong(0L)
+    private val reconnectRequestVersion = AtomicLong(0L)
+    private val reconnectMutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionUiState())
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
@@ -174,6 +178,7 @@ class ConnectionManager @Inject constructor(
      */
     suspend fun connect(config: HostConfig) {
         val intentVersion = desiredIntentVersion.incrementAndGet()
+        reconnectRequestVersion.incrementAndGet()
         // Keep an already-running foreground service alive while replacing the
         // transport. This is essential when the service itself is restoring a
         // persisted desired connection after process recreation.
@@ -199,6 +204,7 @@ class ConnectionManager @Inject constructor(
 
     fun disconnect() {
         val intentVersion = desiredIntentVersion.incrementAndGet()
+        reconnectRequestVersion.incrementAndGet()
         disconnectRuntime()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
@@ -226,14 +232,42 @@ class ConnectionManager @Inject constructor(
 
     fun reconnectIfNeeded() {
         val host = activeHost ?: return
-        loop?.stop()
+        val intentVersion = desiredIntentVersion.get()
+        val requestVersion = reconnectRequestVersion.incrementAndGet()
         scope.launch {
-            // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
-            // rotated or dropped while the app is backgrounded, and the credential is baked into the
-            // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
-            // when that is most likely to have happened.
-            api = clientFactory.clientFor(host)
-            loop = ConnectionLoop(muxFactory(host), sinks, LoopConfig()).also { it.start() }
+            reconnectMutex.withLock {
+                // Coalesce bursts from UI retry, keep-alive and event-buffer recovery. Only the
+                // newest request for the still-selected host may replace the transport.
+                if (requestVersion != reconnectRequestVersion.get() ||
+                    intentVersion != desiredIntentVersion.get() ||
+                    activeHost?.id != host.id
+                ) {
+                    return@withLock
+                }
+
+                loop?.stop()
+
+                // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
+                // rotated or dropped while the app is backgrounded, and the credential is baked into the
+                // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
+                // when that is most likely to have happened.
+                val nextApi = clientFactory.clientFor(host)
+                val nextLoop = ConnectionLoop(muxFactory(host), sinks, LoopConfig())
+
+                // A disconnect or host switch can land while the client is being rebuilt. Do not
+                // publish a transport belonging to an intent that has already been retired.
+                if (requestVersion != reconnectRequestVersion.get() ||
+                    intentVersion != desiredIntentVersion.get() ||
+                    activeHost?.id != host.id
+                ) {
+                    nextLoop.stop()
+                    return@withLock
+                }
+
+                api = nextApi
+                loop = nextLoop
+                nextLoop.start()
+            }
         }
     }
 
