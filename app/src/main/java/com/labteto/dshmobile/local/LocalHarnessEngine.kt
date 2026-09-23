@@ -195,7 +195,6 @@ class LocalHarnessEngine @Inject constructor(
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
         json = json,
-        scope = scope,
     )
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
