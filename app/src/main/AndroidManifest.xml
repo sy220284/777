@@ -19,6 +19,22 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!--
+        Shared-storage access for the Harness sandbox.
+
+        The sandbox draws its boundary at firmware partitions: those stay read-only and unreachable
+        under the untrusted-app SELinux domain, no matter what the approval policy decides. Everything
+        the user owns lives in shared storage, so the file tools need scoped access to it.
+
+        Media collections are read through the READ_MEDIA_* grants. No MANAGE_EXTERNAL_STORAGE is
+        requested: that permission is reserved for file managers and would widen the grant to the
+        whole volume, whereas the sandbox only needs the user-visible collections.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
     <application
         android:name=".DshApplication"
         android:allowBackup="false"
