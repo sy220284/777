@@ -26,11 +26,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.LocalHarnessEngine
@@ -52,11 +54,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+enum class ToolsNotice {
+    LOAD_FAILED,
+    CONNECTING,
+    CONNECTED,
+    CONNECT_FAILED,
+    DISCONNECTED,
+    DISCONNECT_FAILED,
+}
+
 data class ToolsUiState(
     val loading: Boolean = false,
     val servers: List<McpServerSnapshot> = emptyList(),
     val localPlugins: List<String> = emptyList(),
-    val message: String? = null,
+    val notice: ToolsNotice? = null,
 )
 
 @HiltViewModel
@@ -72,7 +83,7 @@ class ToolsViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, message = null)
+            _state.value = _state.value.copy(loading = true, notice = null)
             runCatching {
                 engine.mcpServersForUi() to engine.installedPluginIdsForUi()
             }.onSuccess { (servers, plugins) ->
@@ -84,7 +95,7 @@ class ToolsViewModel @Inject constructor(
             }.onFailure { error ->
                 _state.value = _state.value.copy(
                     loading = false,
-                    message = error.message ?: "读取工具状态失败",
+                    notice = ToolsNotice.LOAD_FAILED,
                 )
             }
         }
@@ -92,20 +103,20 @@ class ToolsViewModel @Inject constructor(
 
     fun connectHttp(serverId: String, endpoint: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, message = "正在连接外部工具服务…")
+_state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             runCatching { engine.connectMcpHttpForUi(serverId, endpoint) }
-                .onSuccess { message ->
+                .onSuccess {
                     _state.value = ToolsUiState(
                         loading = false,
                         servers = engine.mcpServersForUi(),
                         localPlugins = engine.installedPluginIdsForUi(),
-                        message = message,
+                        notice = ToolsNotice.CONNECTED,
                     )
                 }
                 .onFailure { error ->
                     _state.value = _state.value.copy(
                         loading = false,
-                        message = error.message ?: "连接失败",
+                        notice = ToolsNotice.CONNECT_FAILED,
                     )
                 }
         }
@@ -114,15 +125,15 @@ class ToolsViewModel @Inject constructor(
     fun disconnect(serverId: String) {
         viewModelScope.launch {
             runCatching { engine.disconnectMcpForUi(serverId) }
-                .onSuccess { message ->
+                .onSuccess {
                     _state.value = ToolsUiState(
                         servers = engine.mcpServersForUi(),
                         localPlugins = engine.installedPluginIdsForUi(),
-                        message = message,
+                        notice = ToolsNotice.DISCONNECTED,
                     )
                 }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(message = error.message ?: "断开失败")
+                .onFailure {
+                    _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
                 }
         }
     }
@@ -155,27 +166,27 @@ fun ToolsScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 DsIconButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(R.string.common_back),
                     onClick = onClose,
                     containerColor = colors.bgLayer1,
                     shadowElevation = 3.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = DsSpacing.medium)) {
-                    Text("工具与连接", style = DsType.large20, color = colors.labelPrimary)
-                    Text("管理外部工具服务和当前可用扩展", style = DsType.caption11, color = colors.labelTertiary)
+                    Text(stringResource(R.string.tools_title), style = DsType.large20, color = colors.labelPrimary)
+                    Text(stringResource(R.string.tools_subtitle), style = DsType.caption11, color = colors.labelTertiary)
                 }
                 DsIconButton(
                     icon = Icons.Outlined.Refresh,
-                    contentDescription = "刷新",
+                    contentDescription = stringResource(R.string.tools_refresh),
                     onClick = viewModel::refresh,
                     containerColor = colors.bgLayer1,
                 )
             }
 
-            Text("外部工具服务", style = DsType.std14, color = colors.labelTertiary)
+            Text(stringResource(R.string.tools_external_services), style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
                 if (state.servers.isEmpty()) {
-                    Text("暂无已连接服务", style = DsType.small13, color = colors.labelTertiary)
+                    Text(stringResource(R.string.tools_no_services), style = DsType.small13, color = colors.labelTertiary)
                 } else {
                     state.servers.forEach { server ->
                         Row(
@@ -187,13 +198,13 @@ fun ToolsScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(server.id, style = DsType.std14Strong, color = colors.labelPrimary)
                                 Text(
-                                    "${server.transport.uppercase()} · ${server.target} · ${server.tools.size} 个工具",
+                                    stringResource(R.string.tools_server_summary, server.transport.uppercase(), server.tools.size),
                                     style = DsType.caption11,
                                     color = colors.labelTertiary,
                                 )
                             }
                             DsButton(
-                                text = "断开",
+                                text = stringResource(R.string.tools_disconnect),
                                 onClick = { viewModel.disconnect(server.id) },
                                 size = DsButtonSize.Small,
                                 variant = DsButtonVariant.Ghost,
@@ -206,19 +217,19 @@ fun ToolsScreen(
                     value = serverId,
                     onValueChange = { serverId = it.take(24) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("服务名称") },
+                    label = { Text(stringResource(R.string.tools_server_name)) },
                     singleLine = true,
                 )
                 OutlinedTextField(
                     value = endpoint,
                     onValueChange = { endpoint = it.take(2000) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("HTTP / HTTPS 地址") },
-                    supportingText = { Text("连接后会自动发现工具；外部工具仍按高风险能力处理。") },
+                    label = { Text(stringResource(R.string.tools_endpoint)) },
+                    supportingText = { Text(stringResource(R.string.tools_endpoint_hint)) },
                     singleLine = true,
                 )
                 DsButton(
-                    text = if (state.loading) "处理中…" else "连接服务",
+                    text = stringResource(if (state.loading) R.string.tools_processing else R.string.tools_connect),
                     onClick = {
                         viewModel.connectHttp(serverId.trim(), endpoint.trim())
                         serverId = ""
@@ -231,10 +242,10 @@ fun ToolsScreen(
                 )
             }
 
-            Text("本机能力", style = DsType.std14, color = colors.labelTertiary)
+            Text(stringResource(R.string.tools_local_capabilities), style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
                 Text(
-                    "已加载 ${state.localPlugins.size} 个本机能力模块",
+                    stringResource(R.string.tools_local_loaded, state.localPlugins.size),
                     style = DsType.small13,
                     color = colors.labelSecondary,
                 )
@@ -251,10 +262,10 @@ fun ToolsScreen(
             }
 
             remotePlugins?.let { inventory ->
-                Text("远程 Harness 扩展", style = DsType.std14, color = colors.labelTertiary)
+                Text(stringResource(R.string.tools_remote_extensions), style = DsType.std14, color = colors.labelTertiary)
                 DsGroupCard {
                     Text(
-                        "${inventory.entries.size} 个扩展，仅显示当前加载状态",
+                        stringResource(R.string.tools_remote_inventory, inventory.entries.size),
                         style = DsType.caption11,
                         color = colors.labelTertiary,
                     )
@@ -275,7 +286,7 @@ fun ToolsScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(shortPluginName(entry.moduleName), style = DsType.small13, color = colors.labelPrimary)
                                 Text(
-                                    entry.fiberPhase?.name?.lowercase() ?: if (entry.enabled) "已启用" else "未启用",
+                                    pluginPhaseLabel(entry.fiberPhase, entry.enabled),
                                     style = DsType.caption11,
                                     color = colors.labelTertiary,
                                 )
@@ -285,23 +296,41 @@ fun ToolsScreen(
                 }
             }
 
-            state.message?.let {
-                Text(it, style = DsType.small13, color = colors.labelSecondary)
+            state.notice?.let { notice ->
+                val message = when (notice) {
+                    ToolsNotice.LOAD_FAILED -> R.string.tools_load_failed
+                    ToolsNotice.CONNECTING -> R.string.tools_connecting
+                    ToolsNotice.CONNECTED -> R.string.tools_connected
+                    ToolsNotice.CONNECT_FAILED -> R.string.tools_connect_failed
+                    ToolsNotice.DISCONNECTED -> R.string.tools_disconnected
+                    ToolsNotice.DISCONNECT_FAILED -> R.string.tools_disconnect_failed
+                }
+                Text(stringResource(message), style = DsType.small13, color = colors.labelSecondary)
             }
         }
     }
 }
 
+@Composable
 private fun localPluginLabel(id: String): String = when (id) {
-    "local-builtin" -> "基础文件与网页工具"
-    "android-runtime" -> "本机进程与终端"
-    "mcp-bridge" -> "外部工具服务"
-    "local-language-server" -> "代码语言服务"
-    "android-device" -> "Android 设备控制"
-    "local-vision" -> "视觉分析"
-    "android-automation" -> "后台任务"
-    "android-webhook" -> "外部回调"
+    "local-builtin" -> stringResource(R.string.tools_plugin_builtin)
+    "android-runtime" -> stringResource(R.string.tools_plugin_runtime)
+    "mcp-bridge" -> stringResource(R.string.tools_plugin_mcp)
+    "local-language-server" -> stringResource(R.string.tools_plugin_language_server)
+    "android-device" -> stringResource(R.string.tools_plugin_device)
+    "local-vision" -> stringResource(R.string.tools_plugin_vision)
+    "android-automation" -> stringResource(R.string.tools_plugin_automation)
+    "android-webhook" -> stringResource(R.string.tools_plugin_webhook)
     else -> id
+}
+
+@Composable
+private fun pluginPhaseLabel(phase: PluginFiberPhase?, enabled: Boolean): String = when {
+    !enabled -> stringResource(R.string.tools_plugin_disabled)
+    phase == PluginFiberPhase.ACTIVE -> stringResource(R.string.tools_plugin_active)
+    phase == PluginFiberPhase.FAILED -> stringResource(R.string.tools_plugin_failed)
+    phase != null -> phase.name.lowercase()
+    else -> stringResource(R.string.tools_plugin_enabled)
 }
 
 private fun shortPluginName(moduleName: String): String =
