@@ -22,7 +22,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
@@ -143,7 +142,10 @@ private fun DynamicSettingEditor(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val updatedFieldMessage = stringResource(R.string.advanced_updated_field, field.title)
+    val badFormatMessage = stringResource(R.string.advanced_bad_format, field.title)
+    val clearedFieldMessage = stringResource(R.string.advanced_cleared_field, field.title)
+    val restoredFieldMessage = stringResource(R.string.advanced_restored_field, field.title)
     val colors = DsTheme.colors
     val currentText = if (field.secret) "" else field.value?.let(::displayJsonScalar).orEmpty()
     var text by remember(namespace.revision, field.path) { mutableStateOf(currentText) }
@@ -169,7 +171,7 @@ private fun DynamicSettingEditor(
                         enabled = enabled,
                         onCheckedChange = { next ->
                             viewModel.setRemoteSetting(namespace, field.path, JsonPrimitive(next)) { error ->
-                                report(error ?: context.getString(R.string.advanced_updated_field, field.title))
+                                report(error ?: updatedFieldMessage)
                             }
                         },
                     )
@@ -195,7 +197,7 @@ private fun DynamicSettingEditor(
                     items = field.enumValues.map { option ->
                         MenuItem(displayJsonScalar(option)) {
                             viewModel.setRemoteSetting(namespace, field.path, option) { error ->
-                                report(error ?: context.getString(R.string.advanced_updated_field, field.title))
+                                report(error ?: updatedFieldMessage)
                             }
                         }
                     },
@@ -225,11 +227,11 @@ private fun DynamicSettingEditor(
                         onClick = {
                             val value = parseScalar(field.type, text)
                             if (value == null) {
-                                report(context.getString(R.string.advanced_bad_format, field.title))
+                                report(badFormatMessage)
                             } else {
                                 viewModel.setRemoteSetting(namespace, field.path, value) { error ->
                                     if (error == null && field.secret) text = ""
-                                    report(error ?: context.getString(R.string.advanced_updated_field, field.title))
+                                    report(error ?: updatedFieldMessage)
                                 }
                             }
                         },
@@ -242,7 +244,7 @@ private fun DynamicSettingEditor(
                                 text = stringResource(R.string.advanced_clear_key),
                                 onClick = {
                                     viewModel.unsetRemoteSetting(namespace, field.path) { error ->
-                                        report(error ?: context.getString(R.string.advanced_cleared_field, field.title))
+                                        report(error ?: clearedFieldMessage)
                                     }
                                 },
                                 size = DsButtonSize.Small,
@@ -254,7 +256,7 @@ private fun DynamicSettingEditor(
                             text = stringResource(R.string.advanced_restore_default),
                             onClick = {
                                 viewModel.unsetRemoteSetting(namespace, field.path) { error ->
-                                    report(error ?: context.getString(R.string.advanced_restored_field, field.title))
+                                    report(error ?: restoredFieldMessage)
                                 }
                             },
                             size = DsButtonSize.Small,
@@ -338,7 +340,9 @@ internal fun LocalModelSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val modelKeyRequiredMessage = stringResource(R.string.advanced_model_key_required)
+    val modelSavedMessage = stringResource(R.string.advanced_model_saved)
+    val modelKeyClearedMessage = stringResource(R.string.advanced_model_key_cleared)
     val colors = DsTheme.colors
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
@@ -377,12 +381,12 @@ internal fun LocalModelSettingsCard(
                 text = stringResource(R.string.advanced_save_model_settings),
                 onClick = {
                     if (!local.configured && apiKey.isBlank()) {
-                        report(context.getString(R.string.advanced_model_key_required))
+                        report(modelKeyRequiredMessage)
                         return@DsButton
                     }
                     viewModel.configureLocalModel(apiKey, model, baseUrl)
                     apiKey = ""
-                    report(context.getString(R.string.advanced_model_saved))
+                    report(modelSavedMessage)
                 },
                 variant = DsButtonVariant.Outline,
             )
@@ -391,7 +395,7 @@ internal fun LocalModelSettingsCard(
                     text = stringResource(R.string.advanced_clear_key),
                     onClick = {
                         viewModel.clearLocalCredential()
-                        report(context.getString(R.string.advanced_model_key_cleared))
+                        report(modelKeyClearedMessage)
                     },
                     variant = DsButtonVariant.Ghost,
                 )
@@ -406,7 +410,7 @@ internal fun LocalMemorySettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val memorySavedMessage = stringResource(R.string.advanced_memory_saved)
     val colors = DsTheme.colors
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
@@ -448,7 +452,7 @@ internal fun LocalMemorySettingsCard(
             text = stringResource(R.string.advanced_save_memory_settings),
             onClick = {
                 viewModel.configureLocalMemory(userRules, autoRecall, autoMemory)
-                report(context.getString(R.string.advanced_memory_saved))
+                report(memorySavedMessage)
             },
             variant = DsButtonVariant.Outline,
         )
@@ -461,7 +465,8 @@ internal fun MemoryManagementCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
+    val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
     val colors = DsTheme.colors
     SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
         if (records.isEmpty()) {
@@ -522,7 +527,7 @@ internal fun MemoryManagementCard(
                                     content = content,
                                     pinned = pinned,
                                 ) { error ->
-                                    report(error ?: context.getString(R.string.advanced_memory_updated))
+                                    report(error ?: memoryUpdatedMessage)
                                 }
                             },
                             size = DsButtonSize.Small,
@@ -532,7 +537,7 @@ internal fun MemoryManagementCard(
                             text = stringResource(R.string.advanced_deactivate),
                             onClick = {
                                 viewModel.forgetMemory(record.id) { error ->
-                                    report(error ?: context.getString(R.string.advanced_memory_deactivated))
+                                    report(error ?: memoryDeactivatedMessage)
                                 }
                             },
                             size = DsButtonSize.Small,
@@ -573,7 +578,7 @@ internal fun LocalAgentSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val agentSavedMessage = stringResource(R.string.advanced_agent_saved)
     var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
     var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
     var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
@@ -611,7 +616,7 @@ internal fun LocalAgentSettingsCard(
                     subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
                     modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
                 )
-                report(context.getString(R.string.advanced_agent_saved))
+                report(agentSavedMessage)
             },
             variant = DsButtonVariant.Outline,
         )
@@ -624,7 +629,9 @@ internal fun LocalVisionSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val context = LocalContext.current
+    val visionKeyRequiredMessage = stringResource(R.string.advanced_vision_key_required)
+    val visionSavedMessage = stringResource(R.string.advanced_vision_saved)
+    val visionKeyClearedMessage = stringResource(R.string.advanced_vision_key_cleared)
     var model by remember(vision.model) { mutableStateOf(vision.model) }
     var baseUrl by remember(vision.baseUrl) { mutableStateOf(vision.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
@@ -669,7 +676,7 @@ internal fun LocalVisionSettingsCard(
                 text = stringResource(R.string.advanced_save_vision),
                 onClick = {
                     if (!vision.configured && apiKey.isBlank()) {
-                        report(context.getString(R.string.advanced_vision_key_required))
+                        report(visionKeyRequiredMessage)
                         return@DsButton
                     }
                     viewModel.configureLocalVision(
@@ -679,7 +686,7 @@ internal fun LocalVisionSettingsCard(
                     ) { error ->
                         if (error == null) {
                             apiKey = ""
-                            report(context.getString(R.string.advanced_vision_saved))
+                            report(visionSavedMessage)
                         } else {
                             report(error)
                         }
@@ -693,7 +700,7 @@ internal fun LocalVisionSettingsCard(
                     text = stringResource(R.string.advanced_clear_vision_key),
                     onClick = {
                         viewModel.clearLocalVisionCredential { error ->
-                            report(error ?: context.getString(R.string.advanced_vision_key_cleared))
+                            report(error ?: visionKeyClearedMessage)
                         }
                     },
                     size = DsButtonSize.Small,
