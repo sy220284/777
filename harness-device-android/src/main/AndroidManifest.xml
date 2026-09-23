@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!--
+            These three exported components are system integration entry points, not general app
+            APIs. Each is permission-gated by Android/Shizuku and must remain exported so the
+            corresponding system service can bind to it.
+        -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
