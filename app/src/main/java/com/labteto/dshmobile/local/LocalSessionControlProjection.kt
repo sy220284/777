@@ -46,25 +46,8 @@ internal fun projectSessionControlTail(
         .sortedBy { event -> event.sequence }
         .forEach { event ->
             when (event.type) {
-                "plan/state" -> {
-                    plan = (event.data["items"] as? JsonArray)
-                        ?.mapNotNull { item -> (item as? JsonPrimitive)?.contentOrNull }
-                        ?.take(20)
-                        ?: plan
-                }
-                "todo/state" -> {
-                    val allowed = setOf("pending", "in_progress", "completed")
-                    todos = (event.data["items"] as? JsonArray)
-                        ?.mapNotNull { element ->
-                            val item = element as? JsonObject ?: return@mapNotNull null
-                            val content = (item["content"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
-                            val status = (item["status"] as? JsonPrimitive)?.contentOrNull.orEmpty()
-                            if (content.isEmpty() || status !in allowed) null
-                            else LocalTodoItem(content.take(500), status)
-                        }
-                        ?.take(50)
-                        ?: todos
-                }
+                "plan/state" -> decodePlanState(event.data)?.let { decoded -> plan = decoded }
+                "todo/state" -> decodeTodoState(event.data)?.let { decoded -> todos = decoded }
                 "goal/state" -> {
                     val description = (event.data["description"] as? JsonPrimitive)?.contentOrNull
                     val status = (event.data["status"] as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -90,4 +73,33 @@ internal fun projectSessionControlTail(
         goal = goal,
         planMode = planMode,
     )
+}
+
+
+private fun decodePlanState(data: JsonObject): List<String>? {
+    val items = data["items"] as? JsonArray ?: return null
+    val decoded = mutableListOf<String>()
+    for (element in items) {
+        val item = element as? JsonPrimitive ?: return null
+        if (!item.isString) return null
+        decoded += item.contentOrNull ?: return null
+    }
+    return decoded.take(20)
+}
+
+private fun decodeTodoState(data: JsonObject): List<LocalTodoItem>? {
+    val items = data["items"] as? JsonArray ?: return null
+    val allowed = setOf("pending", "in_progress", "completed")
+    val decoded = mutableListOf<LocalTodoItem>()
+    for (element in items) {
+        val item = element as? JsonObject ?: return null
+        val contentValue = item["content"] as? JsonPrimitive ?: return null
+        val statusValue = item["status"] as? JsonPrimitive ?: return null
+        if (!contentValue.isString || !statusValue.isString) return null
+        val content = contentValue.contentOrNull?.trim().orEmpty()
+        val status = statusValue.contentOrNull.orEmpty()
+        if (content.isEmpty() || status !in allowed) return null
+        decoded += LocalTodoItem(content.take(500), status)
+    }
+    return decoded.take(50)
 }
