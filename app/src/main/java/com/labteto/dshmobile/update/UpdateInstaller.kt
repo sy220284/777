@@ -85,8 +85,6 @@ class UpdateInstaller @Inject constructor(
                         error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
                     }
                 }
-            } else {
-                usedDelta = update.patchChain.isNotEmpty()
             }
 
             verifyPackageAndSigner(target)
