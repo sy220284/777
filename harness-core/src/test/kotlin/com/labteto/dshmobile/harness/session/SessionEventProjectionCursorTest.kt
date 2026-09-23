@@ -66,4 +66,36 @@ class SessionEventProjectionCursorTest {
             directory.deleteRecursively()
         }
     }
+
+    @Test
+    fun reverseLookupCanSkipARejectedNewerCheckpoint() {
+        val directory = Files.createTempDirectory("session-reverse-checkpoint").toFile()
+        try {
+            val log = SessionEventLog(
+                file = directory.resolve("events.jsonl"),
+                json = json,
+                maxBytes = 700,
+                clock = { 1L },
+            )
+            log.append("history/checkpoint", buildJsonObject { put("version", 1) })
+            repeat(8) { index ->
+                log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) })
+            }
+            val newer = log.append("history/checkpoint", buildJsonObject { put("version", 999) })
+
+            assertEquals(newer.sequence, requireNotNull(log.latest("history/checkpoint")).sequence)
+            assertEquals(
+                0L,
+                requireNotNull(
+                    log.latest(
+                        "history/checkpoint",
+                        beforeSequenceExclusive = newer.sequence,
+                    ),
+                ).sequence,
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
