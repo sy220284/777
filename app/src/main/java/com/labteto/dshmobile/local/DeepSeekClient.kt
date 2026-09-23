@@ -114,10 +114,22 @@ class DeepSeekClient @Inject constructor(
         }
         return LocalModelReply(
             message = message,
-            content = message["content"]?.jsonPrimitive?.contentOrNull,
+            content = assistantText(message["content"]),
             reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
             toolCalls = calls,
         )
+    }
+
+    private fun assistantText(content: kotlinx.serialization.json.JsonElement?): String? = when (content) {
+        is JsonPrimitive -> content.contentOrNull
+        is JsonArray -> content.mapNotNull { part ->
+            val obj = part as? JsonObject ?: return@mapNotNull null
+            when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+                "text", "output_text" -> obj["text"]?.jsonPrimitive?.contentOrNull
+                else -> null
+            }
+        }.joinToString("\n").takeIf(String::isNotBlank)
+        else -> null
     }
 
     private fun Response.readModelBodyBounded(maxBytes: Int = MAX_MODEL_RESPONSE_BYTES): String {
