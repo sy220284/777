@@ -8,12 +8,16 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
 
+internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
+    context.trim().takeIf(String::isNotEmpty)?.take(maxChars.coerceAtLeast(1))
+
 internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
     private val state: StateFlow<LocalHarnessState>,
     private val jobs: LocalJobManager,
     private val historySnapshot: () -> List<JsonObject>,
+    private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> String,
@@ -56,6 +60,15 @@ internal class LocalSubagentRunner(
                         "你是安卓本机 Harness 的只读子代理。完成指定子任务，可读取和搜索工作区、读取技能、获取网页与解析 JSON；禁止修改用户文件和执行命令。"
                     },
                 )
+            }
+            boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
+                history += buildJsonObject {
+                    put("role", "system")
+                    put(
+                        "content",
+                        "【父级约束上下文】\n$inherited\n以上约束继承自父任务；若与本子任务的明确新要求冲突，以本子任务要求为准。",
+                    )
+                }
             }
             history += buildJsonObject { put("role", "user"); put("content", task) }
 
