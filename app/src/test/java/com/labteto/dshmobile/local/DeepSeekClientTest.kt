@@ -76,4 +76,36 @@ class DeepSeekClientTest {
         assertEquals("a.txt", reply.toolCalls.single().arguments["path"]?.toString()?.trim('"'))
         assertTrue(deltas.any { it.content == "好" && it.reasoning == "先查" })
     }
+    @Test
+    fun parsesDeepSeekUsageAndCacheBreakdown() {
+        val reply = client.parse(
+            """
+            {
+              "choices": [{
+                "message": {
+                  "role": "assistant",
+                  "content": "完成"
+                }
+              }],
+              "usage": {
+                "prompt_tokens": 1000,
+                "prompt_cache_hit_tokens": 800,
+                "prompt_cache_miss_tokens": 200,
+                "completion_tokens": 120,
+                "completion_tokens_details": {
+                  "reasoning_tokens": 60
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1000L, reply.usage.promptTokens)
+        assertEquals(800L, reply.usage.cacheHitTokens)
+        assertEquals(200L, reply.usage.cacheMissTokens)
+        assertEquals(120L, reply.usage.completionTokens)
+        assertEquals(60L, reply.usage.reasoningTokens)
+        assertEquals(true, reply.usage.reported)
+    }
+
 }

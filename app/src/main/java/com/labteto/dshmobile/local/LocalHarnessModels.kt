@@ -61,6 +61,8 @@ data class LocalImportedAttachment(
     val mediaType: String,
     val bytes: Long,
     val attachmentId: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )
 
 data class LocalSessionSummary(
@@ -144,7 +146,7 @@ data class LocalJobInfo(
 data class LocalHarnessState(
     val loading: Boolean = true,
     val configured: Boolean = false,
-    val model: String = "deepseek-chat",
+    val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
@@ -188,6 +190,7 @@ data class LocalHarnessState(
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
+    val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
 )
 
@@ -210,4 +213,5 @@ data class LocalModelReply(
     val content: String?,
     val reasoning: String?,
     val toolCalls: List<LocalToolCall>,
+    val usage: DeepSeekTokenUsage = DeepSeekTokenUsage(),
 )

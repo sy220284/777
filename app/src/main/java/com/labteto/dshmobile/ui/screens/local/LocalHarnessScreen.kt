@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -79,6 +80,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
+import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -105,6 +107,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import java.util.Locale
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -138,6 +141,7 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
+                usage = state.usage,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
@@ -232,6 +236,7 @@ fun LocalHarnessScreen(
 private fun LocalModeDrawer(
     currentSessionId: String,
     sessions: List<LocalSessionSummary>,
+    usage: DeepSeekUsageSnapshot,
     onNewSession: () -> Unit,
     onLocal: () -> Unit,
     onRemote: () -> Unit,
@@ -247,12 +252,14 @@ private fun LocalModeDrawer(
         drawerContainerColor = colors.sidebar,
         modifier = Modifier.safeDrawingPadding(),
     ) {
-        Column(
-            Modifier
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
-        ) {
+        Column(Modifier.fillMaxHeight()) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 WhaleMark(Modifier.size(44.dp))
                 Spacer(Modifier.size(DsSpacing.medium))
@@ -367,8 +374,79 @@ private fun LocalModeDrawer(
                 )
             }
         }
+        LocalUsageFooter(usage)
     }
 }
+}
+
+@Composable
+private fun LocalUsageFooter(usage: DeepSeekUsageSnapshot) {
+    val colors = DsTheme.colors
+    Column(
+        modifier = Modifier.padding(
+            start = DsSpacing.medium,
+            end = DsSpacing.medium,
+            bottom = DsSpacing.medium,
+        ),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+    ) {
+        Text(
+            stringResource(R.string.local_usage_title),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            UsageStatRow(
+                label = stringResource(R.string.local_usage_tokens),
+                value = formatTokenCount(usage.totalTokens),
+            )
+            UsageStatRow(
+                label = stringResource(R.string.local_usage_cache_hit_rate),
+                value = String.format(Locale.US, "%.1f%%", usage.cacheHitRate * 100.0),
+            )
+            UsageStatRow(
+                label = stringResource(R.string.local_usage_estimated_cost),
+                value = formatCny(usage.estimatedCostCny),
+            )
+            Text(
+                stringResource(
+                    R.string.local_usage_breakdown,
+                    formatTokenCount(usage.inputTokens),
+                    formatTokenCount(usage.outputTokens),
+                    usage.requestCount,
+                ),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            if (usage.unpricedTokens > 0L) {
+                Text(
+                    stringResource(R.string.local_usage_unpriced, formatTokenCount(usage.unpricedTokens)),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UsageStatRow(label: String, value: String) {
+    val colors = DsTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = DsType.small13, color = colors.labelSecondary)
+        Text(value, style = DsType.small13Strong, color = colors.labelPrimary)
+    }
+}
+
+private fun formatTokenCount(value: Long): String = when {
+    value >= 100_000_000L -> String.format(Locale.US, "%.2f亿", value / 100_000_000.0)
+    value >= 10_000L -> String.format(Locale.US, "%.1f万", value / 10_000.0)
+    else -> value.toString()
+}
+
+private fun formatCny(value: Double): String =
+    if (value >= 1.0) String.format(Locale.US, "¥%.2f", value)
+    else String.format(Locale.US, "¥%.4f", value)
 
 @Composable
 private fun LoadingScreen() {
@@ -449,8 +527,8 @@ private fun LocalConfiguration(
             Spacer(Modifier.height(DsSpacing.medium))
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                 Text("模型", style = DsType.std14Strong, color = colors.labelPrimary)
-                ModelChoice("deepseek-chat", "DeepSeek Chat｜工具执行", model) { model = it }
-                ModelChoice("deepseek-reasoner", "DeepSeek Reasoner｜深度推理", model) { model = it }
+                ModelChoice("deepseek-flash", "DeepSeek Flash｜V4.1 · 思考默认开启", model) { model = it }
+                ModelChoice("deepseek-v4-pro", "DeepSeek V4 Pro｜专家模型", model) { model = it }
             }
             Spacer(Modifier.height(DsSpacing.medium))
             OutlinedTextField(
@@ -1077,8 +1155,13 @@ private fun ImportedAttachmentRow(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
+                val dimensions = if (attachment.width != null && attachment.height != null) {
+                    " · ${attachment.width}×${attachment.height}"
+                } else {
+                    ""
+                }
                 Text(
-                    "${attachment.mediaType} · ${attachment.bytes} B",
+                    "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )

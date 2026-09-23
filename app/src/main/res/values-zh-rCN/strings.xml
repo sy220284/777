@@ -719,4 +719,27 @@
     <string name="advanced_vision_model">视觉模型</string>
     <string name="advanced_vision_optional">可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。</string>
     <string name="advanced_vision_saved">视觉模型配置已保存</string>
+
+    <string name="settings_page_pricing">API 价格</string>
+    <string name="settings_pricing_subtitle">模型 Token 价格、计价规则与官网自动更新</string>
+    <string name="pricing_deepseek_title">DeepSeek API 价格</string>
+    <string name="pricing_current_period">当前计价时段：%1$s</string>
+    <string name="pricing_period_peak">高峰</string>
+    <string name="pricing_period_off_peak">空闲</string>
+    <string name="pricing_builtin_source">当前使用内置官网价格基准</string>
+    <string name="pricing_updated_at">官网价格更新于 %1$s</string>
+    <string name="pricing_source_official">来源：DeepSeek 官方 API 定价页</string>
+    <string name="pricing_same_thinking">思考 / 非思考：Token 单价相同</string>
+    <string name="pricing_off_peak_row">空闲 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
+    <string name="pricing_peak_row">高峰 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
+    <string name="pricing_holiday_hint">预估金额按北京时间工作日峰谷计算。DeepSeek 官网将中国法定节假日按空闲价计费；应用暂未内置节假日表，因此节假日预估可能略高。</string>
+    <string name="pricing_refresh">联网查询官网最新价格</string>
+    <string name="pricing_refreshing">正在查询官网价格…</string>
+    <string name="pricing_refresh_failed">更新失败：%1$s。已保留上一次有效价格。</string>
+    <string name="local_usage_title">API 用量 · 本机累计</string>
+    <string name="local_usage_tokens">Token 消耗</string>
+    <string name="local_usage_cache_hit_rate">缓存命中率</string>
+    <string name="local_usage_estimated_cost">预估金额</string>
+    <string name="local_usage_breakdown">输入 %1$s · 输出 %2$s · %3$d 次请求</string>
+    <string name="local_usage_unpriced">另有 %1$s Token 暂无匹配官网价格，未计入金额</string>
 </resources>

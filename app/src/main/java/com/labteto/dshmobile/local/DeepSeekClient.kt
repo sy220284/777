@@ -17,6 +17,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -251,11 +252,31 @@ class DeepSeekClient @Inject constructor(
                 rawArguments = raw,
             )
         }
+        val usageObject = root["usage"]?.jsonObject
+        val promptTokens = usageObject?.get("prompt_tokens")?.jsonPrimitive?.longOrNull ?: 0L
+        val cacheHitTokens = usageObject?.get("prompt_cache_hit_tokens")?.jsonPrimitive?.longOrNull
+            ?: usageObject?.get("prompt_tokens_details")?.jsonObject
+                ?.get("cached_tokens")?.jsonPrimitive?.longOrNull
+            ?: 0L
+        val cacheMissTokens = usageObject?.get("prompt_cache_miss_tokens")?.jsonPrimitive?.longOrNull
+            ?: (promptTokens - cacheHitTokens).coerceAtLeast(0L)
+        val completionTokens = usageObject?.get("completion_tokens")?.jsonPrimitive?.longOrNull ?: 0L
+        val reasoningTokens = usageObject?.get("completion_tokens_details")?.jsonObject
+            ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
+            ?: 0L
         return LocalModelReply(
             message = message,
             content = assistantText(message["content"]),
             reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
             toolCalls = calls,
+            usage = DeepSeekTokenUsage(
+                promptTokens = promptTokens,
+                cacheHitTokens = cacheHitTokens,
+                cacheMissTokens = cacheMissTokens,
+                completionTokens = completionTokens,
+                reasoningTokens = reasoningTokens,
+                reported = usageObject != null,
+            ),
         )
     }
 

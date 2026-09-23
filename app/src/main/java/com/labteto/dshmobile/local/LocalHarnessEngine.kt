@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.app.ActivityManager
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -93,6 +94,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -173,6 +175,7 @@ class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
+    private val usageTracker: DeepSeekUsageTracker,
     private val visionClient: VisionClient,
     private val visionSettings: LocalVisionSettings,
     private val bundledNodeRuntime: BundledNodeRuntime,
@@ -292,10 +295,16 @@ class LocalHarnessEngine @Inject constructor(
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     private val _state = MutableStateFlow(
-        LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
+        LocalHarnessState(
+            workspacePath = workspace.path,
+            sessionId = currentSessionId,
+            usage = usageTracker.state.value,
+        ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
+    private val imageCapabilities = LocalImageCapabilityRegistry()
+    private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
@@ -346,14 +355,24 @@ class LocalHarnessEngine @Inject constructor(
             schemas = ::subagentToolSchemas,
             execute = ::executeSafely,
             pruneToolResult = ::pruneToolResult,
-            prepareMessages = { messages, mode ->
+            prepareMessages = { messages, mode, _, _ ->
                 prepareLocalMultimodalMessages(
                     messages = messages,
                     workspaceRoot = File(workspace.path),
-                    mode = effectiveImageInputMode(mode),
+                    mode = mode,
+                    budget = imageRequestBudget,
                 )
             },
-            onNativeImageRejected = { autoImageNativeRejected = true },
+            resolveImageMode = { mode, baseUrl, model ->
+                resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+            },
+            onNativeImageAccepted = { baseUrl, model ->
+                imageCapabilities.markSupported(baseUrl, model)
+            },
+            onUsage = { model, usage -> usageTracker.record(model, usage) },
+            onNativeImageRejected = { baseUrl, model ->
+                imageCapabilities.markUnsupported(baseUrl, model)
+            },
             resourceScheduler = resourceScheduler,
             acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
             releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
@@ -366,7 +385,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    @Volatile private var autoImageNativeRejected = false
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
 
@@ -389,6 +407,11 @@ class LocalHarnessEngine @Inject constructor(
         // Legacy migration may have copied an event log after the field was first constructed.
         // Reopen it so the append sequence is derived from the migrated durable tail.
         eventLog = eventLogFor(currentSessionId)
+        scope.launch {
+            usageTracker.state.collect { usage ->
+                _state.update { it.copy(usage = usage) }
+            }
+        }
         scope.launch {
             runCatching {
                 bundledNodeRuntime.prepare()
@@ -469,16 +492,16 @@ class LocalHarnessEngine @Inject constructor(
             runCatching {
                 if (apiKey.isNotBlank()) apiKeys.put(apiKey)
                 else require(apiKeys.get() != null) { "请填写 DeepSeek API 密钥" }
+                val normalizedModel = normalizeConfiguredModel(model)
                 val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl.ifBlank { DEFAULT_BASE_URL })
                 preferences.edit()
-                    .putString(KEY_MODEL, model.ifBlank { DEFAULT_MODEL })
+                    .putString(KEY_MODEL, normalizedModel)
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .apply()
-                autoImageNativeRejected = false
                 _state.update {
                     it.copy(
                         configured = true,
-                        model = model.ifBlank { DEFAULT_MODEL },
+                        model = normalizedModel,
                         baseUrl = normalizedBaseUrl,
                         error = null,
                     )
@@ -490,12 +513,8 @@ class LocalHarnessEngine @Inject constructor(
     /** Choose how user image attachments reach the local model. */
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        autoImageNativeRejected = false
         _state.update { it.copy(imageInputMode = mode) }
     }
-
-    private fun effectiveImageInputMode(mode: LocalImageInputMode): LocalImageInputMode =
-        if (mode == LocalImageInputMode.AUTO && autoImageNativeRejected) LocalImageInputMode.TOOL else mode
 
     /** Persist execution limits exposed from Settings. */
     fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
@@ -704,7 +723,7 @@ class LocalHarnessEngine @Inject constructor(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val mediaType = resolver.getType(uri) ?: "application/octet-stream"
+        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -730,8 +749,22 @@ class LocalHarnessEngine @Inject constructor(
             incoming.delete()
             throw error
         }
+        val imageMetadata = inspectImportedImage(incoming)
+        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
+            incoming.delete()
+            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
+        }
+        if (imageMetadata != null) {
+            try {
+                validateLocalImageMetadata(imageMetadata)
+            } catch (error: Throwable) {
+                incoming.delete()
+                throw error
+            }
+        }
+        val mediaType = imageMetadata?.mediaType ?: declaredMediaType
         val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = when (mediaType.lowercase()) {
+        val extension = when (mediaType) {
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
@@ -753,7 +786,20 @@ class LocalHarnessEngine @Inject constructor(
             mediaType = mediaType,
             bytes = target.length(),
             attachmentId = attachmentId,
+            width = imageMetadata?.width,
+            height = imageMetadata?.height,
         )
+    }
+
+    private fun inspectImportedImage(file: File): LocalImageMetadata? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        val mediaType = options.outMimeType?.lowercase()?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
+            ?: return null
+        val width = options.outWidth
+        val height = options.outHeight
+        if (width <= 0 || height <= 0) return null
+        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
     }
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
@@ -1166,29 +1212,41 @@ class LocalHarnessEngine @Inject constructor(
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
-                val selectedMode = effectiveImageInputMode(snapshot.imageInputMode)
+                val selectedMode = resolveLocalImageInputMode(
+                    snapshot.imageInputMode,
+                    imageCapabilities,
+                    snapshot.baseUrl,
+                    snapshot.model,
+                )
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = durableRequestMessages,
                     workspaceRoot = File(workspace.path),
                     mode = selectedMode,
+                    budget = imageRequestBudget,
                 )
+                val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                 val reply = try {
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
                         messages = requestMessages,
                         step = modelStep + 1,
-                    )
+                    ).also {
+                        if (nativeImagesSent) {
+                            imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
+                        }
+                    }
                 } catch (error: Throwable) {
-                    if (
-                        snapshot.imageInputMode == LocalImageInputMode.AUTO &&
-                        selectedMode != LocalImageInputMode.TOOL &&
-                        hasLocalImageRefs(durableRequestMessages) &&
-                        imageInputUnsupported(error)
-                    ) {
-                        autoImageNativeRejected = true
+                    val nativeImageRejected =
+                        nativeImagesSent &&
+                            imageInputUnsupported(error)
+                    if (nativeImageRejected) {
+                        imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                    }
+                    if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
                         eventLog.append("multimodal/fallback", buildJsonObject {
                             put("step", modelStep + 1)
+                            put("model", snapshot.model)
                             put("from", "native")
                             put("to", "vision-tool")
                             put("reason", error.message.orEmpty().take(2_000))
@@ -1200,6 +1258,7 @@ class LocalHarnessEngine @Inject constructor(
                                 messages = durableRequestMessages,
                                 workspaceRoot = File(workspace.path),
                                 mode = LocalImageInputMode.TOOL,
+                                budget = imageRequestBudget,
                             ),
                             step = modelStep + 1,
                         )
@@ -1207,6 +1266,7 @@ class LocalHarnessEngine @Inject constructor(
                         throw error
                     }
                 }
+                usageTracker.record(snapshot.model, reply.usage)
                 modelStep += 1
                 repliesByStep[modelStep] = reply
                 AgentModelReply(
@@ -1770,7 +1830,7 @@ class LocalHarnessEngine @Inject constructor(
                     parentCallId = call.id,
                     maxSteps = _state.value.subagentMaxSteps,
                 )
-            "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
+            "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
             "list_agents" -> jobs.listAgents()
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
             "interrupt_agent" -> jobs.kill(args.string("agent_id"))
@@ -2385,9 +2445,21 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun load() {
-        val model = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
+        val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
+        val model = normalizeConfiguredModel(storedModel)
+        if (model != storedModel) {
+            preferences.edit().putString(KEY_MODEL, model).apply()
+        }
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         loadSession(currentSessionId, model, baseUrl)
+    }
+
+    private fun normalizeConfiguredModel(model: String): String {
+        val value = model.trim().ifBlank { DEFAULT_MODEL }
+        return when (value.lowercase()) {
+            "deepseek-chat", "deepseek-reasoner" -> DEFAULT_MODEL
+            else -> value
+        }
     }
 
     private suspend fun loadSession(
@@ -2489,6 +2561,7 @@ class LocalHarnessEngine @Inject constructor(
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
+            usage = usageTracker.state.value,
             sessions = sessionSummaries(),
             messages = projectedTranscript.messages,
             plan = projectedControls.plan,
@@ -2668,7 +2741,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
-        const val DEFAULT_MODEL = "deepseek-chat"
+        const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
         const val DEFAULT_SUBAGENT_MAX_STEPS = 20
