@@ -191,6 +191,8 @@
     <string name="local_status_approval">On device · Needs approval</string>
     <string name="local_status_question">On device · Needs answer</string>
     <string name="local_status_running">On device · Working</string>
+    <string name="local_status_running_queued">On device · Working · %1$d queued</string>
+    <string name="local_queue_message">Queue</string>
     <string name="local_status_ready">On device · Ready</string>
     <string name="local_device_approval_on">Device actions approved for this turn</string>
     <string name="local_safe_approval_on">Safe action auto-approval is on</string>
