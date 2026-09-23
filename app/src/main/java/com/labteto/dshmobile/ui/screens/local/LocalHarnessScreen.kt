@@ -633,6 +633,8 @@ private fun LocalChat(
                                 !state.configured -> stringResource(R.string.local_status_setup)
                                 state.pendingApproval != null -> stringResource(R.string.local_status_approval)
                                 state.pendingQuestion != null -> stringResource(R.string.local_status_question)
+                                state.running && state.queuedInputCount > 0 ->
+                                    stringResource(R.string.local_status_running_queued, state.queuedInputCount)
                                 state.running -> stringResource(R.string.local_status_running)
                                 else -> stringResource(R.string.local_status_ready)
                             },
@@ -909,7 +911,23 @@ private fun LocalChat(
                     )
                     Spacer(Modifier.weight(1f))
                     if (state.running) {
-                        DsButton("停止", onStop, variant = DsButtonVariant.Danger)
+                        DsButton(
+                            "停止",
+                            onStop,
+                            variant = DsButtonVariant.Danger,
+                            size = DsButtonSize.Small,
+                        )
+                        DsButton(
+                            stringResource(R.string.local_queue_message),
+                            onClick = {
+                                val selected = attachments.toList()
+                                onSend(input, selected)
+                                drafts[state.sessionId] = ""
+                                attachments.clear()
+                            },
+                            size = DsButtonSize.Small,
+                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                        )
                     } else {
                         DsButton(
                             "发送",
