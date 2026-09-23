@@ -1557,14 +1557,15 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun subagentToolSchemas(allowMutation: Boolean, allowVirtualScreen: Boolean): JsonArray {
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
+        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() } +
+            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
             .filter { tool ->
                 allowMutation ||
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
-                    (allowVirtualScreen && tool.name.startsWith("android_vscreen_"))
+                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
             }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
@@ -2697,6 +2698,14 @@ class LocalHarnessEngine @Inject constructor(
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
 
 
+        val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
+            "android_vscreen_status",
+            "android_vscreen_launch",
+            "android_vscreen_tap",
+            "android_vscreen_swipe",
+            "android_vscreen_screenshot",
+            "vision_analyze_vscreen",
+        )
         val SUBAGENT_EXCLUDED_TOOLS = setOf(
             "subagent", "subagent_fork", "workflow", "ask_user_question",
             "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
