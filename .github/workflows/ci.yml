@@ -22,10 +22,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
-          # The legacy `tools` package is no longer published on current runners.
-          packages: platform-tools
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - uses: actions/setup-node@v4
         with:
@@ -40,7 +39,15 @@ jobs:
       - name: Official Harness conformance
         run: ./gradlew :reference-validation:test --stacktrace
       - name: Lint
-        run: ./gradlew :app:lintDebug --stacktrace
+        run: |
+          set +e
+          ./gradlew :app:lintDebug --stacktrace
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "=== lint text report ==="
+            find app/build -type f -name 'lint-results-debug.txt' -print -exec cat {} \; || true
+          fi
+          exit "$status"
       - name: Guard hard-coded UI text
         run: python3 .github/scripts/check-ui-hardcoded-cjk.py
       - name: Assemble optimized APK
@@ -67,6 +74,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - name: Enable KVM acceleration
         run: |
@@ -90,3 +100,50 @@ jobs:
             adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
             adb shell pidof com.sy220284.dshmobile.debug
+
+  android-17-instrumented:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools emulator platforms;android-37.0 build-tools;37.0.0 system-images;android-37.0;google_apis_ps16k;x86_64'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "::error::/dev/kvm is unavailable on this runner"
+            exit 1
+          fi
+      - name: Android 17 instrumentation tests
+        run: |
+          echo no | avdmanager create avd --force -n android17 \
+            --package 'system-images;android-37.0;google_apis_ps16k;x86_64'
+          "$ANDROID_SDK_ROOT/emulator/emulator" -avd android17 \
+            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim &
+          adb wait-for-device
+          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          set +e
+          DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --stacktrace
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "=== connected test XML ==="
+            find app/build -type f -path '*androidTest-results*' -name '*.xml' -print -exec cat {} \; || true
+            exit "$status"
+          fi
+          set -e
+          adb shell am force-stop com.sy220284.dshmobile.debug || true
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
+          sleep 2
+          adb shell pidof com.sy220284.dshmobile.debug
