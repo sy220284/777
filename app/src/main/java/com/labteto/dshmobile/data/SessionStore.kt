@@ -5,10 +5,8 @@ import android.util.Log
 import com.labteto.dshmobile.connection.ConnectionManager
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.session.AssistantLiveState
 import com.labteto.dshmobile.core.session.ChunkRows
 import com.labteto.dshmobile.core.session.ConversationSnapshot
-import com.labteto.dshmobile.core.session.EventFold
 import com.labteto.dshmobile.core.session.QueueItem
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
 import com.labteto.dshmobile.core.wire.DshApiClient
@@ -444,27 +442,7 @@ class SessionStore @Inject constructor(
 
     // Open-session fold state.
     private var currentId: String? = null
-    private val currentEvents = ArrayList<SessionEventEnvelope>()
-    private var currentHasMore = false
-    private var currentBlank = true
-    private val currentProjections = HashMap<String, ProjectionValue>()
-    private var currentQueue = emptyList<QueueItem>()
-
-    /**
-     * The open session's follow cursor: the log cut its current stream generation opened at.
-     *
-     * `session/page` will not answer without it. Paging is pinned to the same cut the live tail
-     * started from, which is what lets an older page and the streaming tail be joined without a
-     * gap — so a page requested before the snapshot arrives has nothing to send and is skipped.
-     */
-    private var followCursor: Int? = null
-
-    /**
-     * The reply being written in the open session, as the follow stream's assistant frames show
-     * it. Harness 0.1.3 logs no deltas, so this is the only source of a streaming preview; it is
-     * folded after the durable window and retired by the settlement. Guarded by [lock].
-     */
-    private val liveAssistant = AssistantLiveState()
+    private val openSessionState = OpenSessionFoldState()
 
     /** The open session's live journal. Cancelled and replaced whenever the open session changes. */
     private var followJob: Job? = null
@@ -482,8 +460,6 @@ class SessionStore @Inject constructor(
         val toolName: String,
         val reason: String?,
     )
-    private data class ProjectionValue(val seq: Int, val value: JsonElement)
-
     init {
         observeConnection()
         observeEvents()
@@ -516,7 +492,7 @@ class SessionStore @Inject constructor(
      *
      * The channel is conflated because a rebuild is idempotent and reads whatever state exists when
      * it runs: a burst of deltas collapses into one rebuild, and no delta can be lost by it — the
-     * event is already in `currentEvents` before the tick is sent. The interval is a display frame
+     * event is already in the open-session fold before the tick is sent. The interval is a display frame
      * rather than a debounce, so the tail of a stream still lands promptly.
      */
     private fun observeRebuildTicks() {
@@ -796,7 +772,7 @@ class SessionStore @Inject constructor(
             is SessionControlFrame.Jobs -> applyJobs(frame.sessionId, frame.jobs)
             is SessionControlFrame.Projection -> synchronized(lock) {
                 if (frame.sessionId == currentId) {
-                    mergeProjectionLocked(frame.key, frame.seq, frame.value)
+                    openSessionState.mergeProjection(frame.key, frame.seq, frame.value)
                     rebuildCurrentLocked()
                 }
             }
@@ -808,7 +784,7 @@ class SessionStore @Inject constructor(
         queuesBySession.value = queuesBySession.value + (sessionId to items.map(::queuedInboxItemToQueueItem))
         synchronized(lock) {
             if (sessionId == currentId) {
-                currentQueue = items.map { queuedInboxItemToQueueItem(it) }
+                openSessionState.setQueue(items.map { queuedInboxItemToQueueItem(it) })
                 rebuildCurrentLocked()
             }
         }
@@ -824,7 +800,7 @@ class SessionStore @Inject constructor(
      * Merge a projection baseline for one session.
      *
      * The tail page's baseline and the control stream's are produced independently, so neither is
-     * authoritative on its own; [mergeProjectionLocked] keeps whichever carries the higher
+     * authoritative on its own; [OpenSessionFoldState.mergeProjection] keeps whichever carries the higher
      * watermark.
      */
     private fun applyProjectionBaseline(sessionId: String, block: JsonObject) {
@@ -832,7 +808,7 @@ class SessionStore @Inject constructor(
             if (sessionId != currentId) return@synchronized
             val asOf = block["asOfSeq"]?.jsonPrimitive?.intOrNull ?: 0
             (block["values"] as? JsonObject)?.forEach { (key, value) ->
-                mergeProjectionLocked(key, asOf, value)
+                openSessionState.mergeProjection(key, asOf, value)
             }
             rebuildCurrentLocked()
         }
@@ -893,15 +869,8 @@ class SessionStore @Inject constructor(
                 // The durable settlement and the transient rows say the same thing; the moment
                 // the settlement lands the preview is redundant, and a fold that saw both would
                 // show the reply twice.
-                val data = envelope.data as? JsonObject
-                liveAssistant.acceptDurable(
-                    type = envelope.type,
-                    turn = data?.get("turn")?.jsonPrimitive?.intOrNull,
-                    step = data?.get("step")?.jsonPrimitive?.intOrNull,
-                    seq = envelope.seq,
-                    surfaceOp = envelope.surfaceOp,
-                )
-                appendCurrentEventLocked(envelope)
+                openSessionState.acceptDurable(envelope)
+                rebuildTicks.trySend(Unit)
             }
         }
     }
@@ -1003,7 +972,7 @@ class SessionStore @Inject constructor(
     private fun setBlank(sessionId: String, blank: Boolean) {
         synchronized(lock) {
             indexState.setBlank(sessionId, blank)
-            if (sessionId == currentId) currentBlank = blank
+            if (sessionId == currentId) openSessionState.setBlank(blank)
             emitSessionsLocked()
         }
     }
@@ -1058,53 +1027,9 @@ class SessionStore @Inject constructor(
     }
 
     // ------------------------------------------------------------------ open-session fold
-    /**
-     * Fold one freshly-streamed event into the open session.
-     *
-     * The common case by far is a strictly-increasing append, which is why it is checked first:
-     * the scan-and-sort below is O(n log n) and used to run for every delta of every turn. Out of
-     * order or repeated sequence numbers still take the slow path, which is what makes a
-     * re-delivery after a reconnect land in the right place.
-     *
-     * The rebuild is requested rather than performed — see [observeRebuildTicks].
-     */
-    private fun appendCurrentEventLocked(envelope: SessionEventEnvelope) {
-        val lastSeq = currentEvents.lastOrNull()?.seq
-        if (lastSeq == null || envelope.seq > lastSeq) {
-            currentEvents.add(envelope)
-        } else {
-            val idx = currentEvents.indexOfFirst { it.seq == envelope.seq }
-            if (idx >= 0) {
-                currentEvents[idx] = envelope
-            } else {
-                currentEvents.add(envelope)
-                currentEvents.sortBy { it.seq }
-            }
-        }
-        rebuildTicks.trySend(Unit)
-    }
-
-    private fun mergeProjectionLocked(key: String, seq: Int, value: JsonElement) {
-        val existing = currentProjections[key]
-        if (existing == null || seq >= existing.seq) {
-            currentProjections[key] = ProjectionValue(seq, value)
-        }
-    }
-
     private fun rebuildCurrentLocked() {
         val sid = currentId ?: return
-        val events = currentEvents.toList()
-        val snapshot = EventFold(sid).fold(events, liveAssistant.transientEnvelopes())
-        val blank = if (events.isEmpty()) currentBlank else snapshot.blank
-        val running = indexState.running(sid) ?: snapshot.running
-        val merged = snapshot.copy(
-            blank = blank,
-            running = running,
-            hasMore = currentHasMore,
-            queue = currentQueue,
-            projections = currentProjections.mapValues { it.value.value },
-        )
-        _currentConversation.value = merged
+        _currentConversation.value = openSessionState.rebuild(sid, indexState.running(sid))
     }
 
     private fun emitSessionsLocked() {
@@ -1157,12 +1082,7 @@ class SessionStore @Inject constructor(
             val same = currentId == sessionId
             currentId = sessionId
             _currentSessionId.value = sessionId
-            currentEvents.clear()
-            currentHasMore = false
-            currentBlank = indexState.session(sessionId)?.blank ?: true
-            currentProjections.clear()
-            currentQueue = emptyList()
-            liveAssistant.clear()
+            openSessionState.reset(indexState.session(sessionId)?.blank ?: true)
             if (!same) {
                 _currentConversation.value = null
                 _jobs.value = emptyList()
@@ -1213,7 +1133,7 @@ class SessionStore @Inject constructor(
      */
     private fun startFollow(sessionId: String) {
         followJob?.cancel()
-        followCursor = null
+        openSessionState.clearFollowCursor()
         val mux = connectionManager.generation?.mux
         if (mux == null) {
             log("cannot follow $sessionId: no connection generation")
@@ -1258,20 +1178,7 @@ class SessionStore @Inject constructor(
         val overDelivered = envelopes.size > page.size
         synchronized(lock) {
             if (currentId != sessionId) return@synchronized
-            followCursor = frame.cursor
-            currentEvents.clear()
-            currentEvents.addAll(page)
-            currentEvents.sortBy { it.seq }
-            currentHasMore = frame.hasMore || overDelivered
-            val asOf = frame.projections["asOfSeq"]?.jsonPrimitive?.intOrNull ?: frame.cursor
-            (frame.projections["values"] as? JsonObject)?.forEach { (key, value) ->
-                mergeProjectionLocked(key, asOf, value)
-            }
-            // A reconnect mid-answer: the baseline carries the compact prefix this generation
-            // missed, so the partial reply is on screen before the next live chunk arrives. A
-            // host that predates the feature sends no baseline, and the preview simply waits for
-            // the settlement.
-            liveAssistant.seed(frame.assistantStream)
+            openSessionState.installSnapshot(frame, page, overDelivered)
             rebuildCurrentLocked()
         }
     }
@@ -1287,7 +1194,7 @@ class SessionStore @Inject constructor(
     private fun applyAssistantFrame(sessionId: String, frame: SessionFollowFrame.AssistantStream) {
         val changed = synchronized(lock) {
             if (currentId != sessionId) return
-            liveAssistant.accept(frame.frame) != AssistantLiveState.Change.NONE
+            openSessionState.acceptAssistant(frame)
         }
         if (changed) rebuildTicks.trySend(Unit)
     }
@@ -1322,7 +1229,7 @@ class SessionStore @Inject constructor(
         if (!_loadingOlder.compareAndSet(expect = false, update = true)) return@withContext
         try {
             val (oldestSeq, cursor) = synchronized(lock) {
-                currentEvents.firstOrNull()?.seq to followCursor
+                openSessionState.pageAnchor()
             }
             // A page is pinned to the follow generation's log cut, and there is no page without
             // one. Before the opening snapshot lands there is nothing to pin to, so this waits
@@ -1348,13 +1255,7 @@ class SessionStore @Inject constructor(
                     val overDelivered = envelopes.size > page.size
                     synchronized(lock) {
                         if (currentId != sid) return@synchronized
-                        val existingSeqs = currentEvents.mapTo(HashSet()) { it.seq }
-                        val fresh = page.filter { it.seq !in existingSeqs }
-                        if (fresh.isNotEmpty()) {
-                            currentEvents.addAll(fresh)
-                            currentEvents.sortBy { it.seq }
-                        }
-                        currentHasMore = nextHasMore(fresh.size, r.value.hasMore, overDelivered)
+                        openSessionState.prependPage(page, r.value.hasMore, overDelivered)
                         rebuildCurrentLocked()
                     }
                 }
@@ -2091,7 +1992,7 @@ class SessionStore @Inject constructor(
 
     // ------------------------------------------------------------------ internal helpers
     private fun goalRefFromProjectionLocked(): GoalRef? {
-        val value = currentProjections["goal"]?.value ?: return null
+        val value = openSessionState.projection("goal") ?: return null
         return runCatching {
             val snapshot = decodeFromJsonElement(GoalSnapshot.serializer(), value)
             GoalRef(snapshot.id, snapshot.revision)
