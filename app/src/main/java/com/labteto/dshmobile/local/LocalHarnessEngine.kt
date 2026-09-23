@@ -1237,15 +1237,15 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
-                        val visibleResult = AgentToolResult(
-                            content = event.output,
+                        val boundedContent = pruneToolResult(event.output)
+                        val modelOutput = AgentToolResult(
+                            content = boundedContent,
                             isError = event.isError,
                             errorCode = event.errorCode,
                             retryable = event.retryable,
                             sideEffect = event.sideEffect,
                             recoveryHint = event.recoveryHint,
                         ).modelVisibleContent()
-                        val modelOutput = pruneToolResult(visibleResult)
                         val transcriptMessage = newTranscriptMessage("tool", event.output, event.call.name)
                         val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
