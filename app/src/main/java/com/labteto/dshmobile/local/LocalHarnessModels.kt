@@ -69,14 +69,22 @@ data class LocalGoal(
     val note: String? = null,
 )
 
-/** A destructive or command-execution tool call waiting for the operator. */
+enum class LocalApprovalImpact {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL,
+}
+
+/** A tool call waiting for the operator because it crossed an approval boundary. */
 data class LocalApproval(
     val callId: String,
     val toolName: String,
     val summary: String,
     val arguments: String,
     val access: String,
-    val canAutoApproveWorkspace: Boolean = false,
+    val impact: LocalApprovalImpact = LocalApprovalImpact.HIGH,
+    val canAutoApproveSafely: Boolean = false,
     val canApproveDeviceTurn: Boolean = false,
 )
 
