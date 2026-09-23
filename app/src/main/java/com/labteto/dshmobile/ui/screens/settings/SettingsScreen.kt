@@ -153,14 +153,14 @@ fun SettingsScreen(
     val sessionsCleared = stringResource(R.string.settings_clear_last_sessions_done)
     val title = when (page) {
         SettingsPage.ROOT -> stringResource(R.string.settings_title)
-        SettingsPage.GENERAL -> "外观与会话"
-        SettingsPage.MODELS -> "模型"
-        SettingsPage.MEMORY -> "个性化与记忆"
-        SettingsPage.PERMISSIONS -> "连接与权限"
-        SettingsPage.NOTIFICATIONS -> "通知"
-        SettingsPage.DATA -> "数据"
-        SettingsPage.ADVANCED -> "高级"
-        SettingsPage.ABOUT -> "关于"
+        SettingsPage.GENERAL -> stringResource(R.string.settings_page_general)
+        SettingsPage.MODELS -> stringResource(R.string.settings_page_models)
+        SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
+        SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
+        SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
+        SettingsPage.DATA -> stringResource(R.string.settings_page_data)
+        SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
+        SettingsPage.ABOUT -> stringResource(R.string.settings_page_about)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
@@ -195,62 +195,62 @@ fun SettingsScreen(
 
                 when (page) {
                     SettingsPage.ROOT -> {
-                        Text("体验", style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14, color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Cloud,
-                                title = "模型",
-                                subtitle = "文字模型、视觉模型与模型服务",
+                                title = stringResource(R.string.settings_page_models),
+                                subtitle = stringResource(R.string.settings_models_subtitle),
                                 onClick = { page = SettingsPage.MODELS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
-                                title = "个性化与记忆",
-                                subtitle = "长期规则、自动记忆与召回",
+                                title = stringResource(R.string.settings_page_memory),
+                                subtitle = stringResource(R.string.settings_memory_subtitle),
                                 onClick = { page = SettingsPage.MEMORY },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
-                                title = "外观与会话",
-                                subtitle = "语言、主题与会话排序",
+                                title = stringResource(R.string.settings_page_general),
+                                subtitle = stringResource(R.string.settings_general_subtitle),
                                 onClick = { page = SettingsPage.GENERAL },
                             )
                         }
 
-                        Text("系统", style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_system), style = DsType.std14, color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.PhoneAndroid,
-                                title = "连接与权限",
-                                subtitle = "远程连接、后台连接与设备授权",
+                                title = stringResource(R.string.settings_page_permissions),
+                                subtitle = stringResource(R.string.settings_permissions_subtitle),
                                 onClick = { page = SettingsPage.PERMISSIONS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Notifications,
-                                title = "通知",
-                                subtitle = "完成、目标与需要处理的提醒",
+                                title = stringResource(R.string.settings_page_notifications),
+                                subtitle = stringResource(R.string.settings_notifications_subtitle),
                                 onClick = { page = SettingsPage.NOTIFICATIONS },
                             )
                         }
 
-                        Text("维护", style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14, color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Storage,
-                                title = "数据",
-                                subtitle = "已记住的连接与会话恢复数据",
+                                title = stringResource(R.string.settings_page_data),
+                                subtitle = stringResource(R.string.settings_data_subtitle),
                                 onClick = { page = SettingsPage.DATA },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
-                                title = "高级",
-                                subtitle = "智能体执行、项目配置与诊断",
+                                title = stringResource(R.string.settings_page_advanced),
+                                subtitle = stringResource(R.string.settings_advanced_subtitle),
                                 onClick = { page = SettingsPage.ADVANCED },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Info,
-                                title = "关于",
-                                subtitle = "版本与应用更新",
+                                title = stringResource(R.string.settings_page_about),
+                                subtitle = stringResource(R.string.settings_about_subtitle),
                                 onClick = { page = SettingsPage.ABOUT },
                             )
                         }
@@ -333,15 +333,15 @@ fun SettingsScreen(
                     SettingsPage.ADVANCED -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
-                        SettingsCard("运行与诊断", Icons.Outlined.Info) {
+                        SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {
                             DsButton(
-                                text = "网络诊断",
+                                text = stringResource(R.string.settings_network_diagnostic),
                                 onClick = { showDiagnostic = true },
                                 variant = DsButtonVariant.Outline,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             DsButton(
-                                text = "环境能力",
+                                text = stringResource(R.string.settings_environment_capabilities),
                                 onClick = { showEnvironment = true },
                                 variant = DsButtonVariant.Ghost,
                                 modifier = Modifier.fillMaxWidth(),

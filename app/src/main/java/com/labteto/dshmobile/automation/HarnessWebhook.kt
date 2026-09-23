@@ -74,33 +74,46 @@ data class WebhookRuntimeConfig(
 class WebhookTokenStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) {
-    suspend fun get(): String? {
-        val blob = dataStore.data.first()[KEY] ?: return null
-        val value = withContext(Dispatchers.Default) { runCatching { decrypt(blob) }.getOrNull() }
-        if (value == null) clear()
-        return value
+    private val tokenMutex = Mutex()
+
+    suspend fun get(): String? = tokenMutex.withLock { getLocked() }
+
+    suspend fun getOrCreate(): String = tokenMutex.withLock {
+        getLocked()?.let { return@withLock it }
+        val token = newToken()
+        putLocked(token)
+        token
     }
 
-    suspend fun getOrCreate(): String {
-        get()?.let { return it }
-        val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
-        val token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-        put(token)
-        return token
+    suspend fun rotate(): String = tokenMutex.withLock {
+        val token = newToken()
+        putLocked(token)
+        token
     }
 
-    suspend fun rotate(): String {
-        clear()
-        return getOrCreate()
-    }
-
-    suspend fun clear() {
+    suspend fun clear() = tokenMutex.withLock {
         dataStore.edit { it.remove(KEY) }
     }
 
-    private suspend fun put(value: String) {
+    private suspend fun getLocked(): String? {
+        val blob = dataStore.data.first()[KEY] ?: return null
+        val value = withContext(Dispatchers.Default) { runCatching { decrypt(blob) }.getOrNull() }
+        if (value == null) {
+            dataStore.edit { prefs ->
+                if (prefs[KEY] == blob) prefs.remove(KEY)
+            }
+        }
+        return value
+    }
+
+    private suspend fun putLocked(value: String) {
         val encrypted = withContext(Dispatchers.Default) { encrypt(value) }
         dataStore.edit { it[KEY] = encrypted }
+    }
+
+    private fun newToken(): String {
+        val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
     private fun encrypt(plain: String): String {
@@ -124,6 +137,7 @@ class WebhookTokenStore @Inject constructor(
         return String(cipher.doFinal(decoder.decode(parts[1])), Charsets.UTF_8)
     }
 
+    @Synchronized
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
         (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }

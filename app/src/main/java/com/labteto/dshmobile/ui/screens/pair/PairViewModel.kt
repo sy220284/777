@@ -18,6 +18,7 @@ import com.labteto.dshmobile.core.wire.RelayPairingPayload
 import com.labteto.dshmobile.core.wire.RelayTls
 import com.labteto.dshmobile.core.wire.TransportFailure
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -110,6 +111,9 @@ sealed interface PairFailure {
 
     /** No code was typed. */
     data object InvalidCode : PairFailure
+
+    /** A local persistence, keystore, or client-construction failure interrupted pairing. */
+    data object LocalError : PairFailure
 }
 
 /**
@@ -192,49 +196,55 @@ class PairViewModel @Inject constructor(
     private fun claim(url: String, code: String, fingerprint: String?) {
         _state.update { it.copy(stage = PairStage.Claiming, failure = null) }
         viewModelScope.launch {
-            // Ask the address where the relay is before deciding how to talk to it. Since relay
-            // 0.1.1 the harness's own port redirects `/relay` to the relay's listener, so the
-            // address people already know — the one this app has asked them for since day one —
-            // is a usable way in. The redirect has to be resolved here rather than followed by the
-            // HTTP client: it names a different scheme and port, which decides both the pin to
-            // present and what gets remembered, and a 302 would rewrite the claim's POST to a GET.
-            val effective = when (val located = RelayPairing.locate(url, okHttpClient)) {
-                is RelayOrigin.Redirected -> located.origin
-                // `None` still gets an attempt. Health is unauthenticated and always served, so
-                // this should not happen — but refusing to try on its say-so would turn one
-                // unanswered probe into a pairing that cannot be completed at all.
-                else -> url
-            }
-            val parsed = effective.toHttpUrlOrNull()
-            if (parsed == null || parsed.scheme != "https") {
-                fail(PairFailure.InvalidUrl)
-                return@launch
-            }
-            val authority = "${parsed.host}:${parsed.port}"
-            val secure = parsed.scheme == "https"
-            val observed = ObservedKey()
-            val client = when {
-                fingerprint != null -> clientFactory.httpClient(fingerprint)
-                // The relay only reveals its key in the claim answer, so a typed https address has
-                // to be spoken to before it can be verified. The screen labels this differently
-                // from a scanned pairing for exactly that reason.
-                secure -> RelayTls.trustOnFirstUseClient(okHttpClient, observed)
-                else -> okHttpClient
-            }
-            val name = _state.value.deviceName.ifBlank { defaultDeviceName() }
-            when (val outcome = RelayPairing.claim(effective, code, name, client)) {
-                is RelayPairOutcome.Paired -> enrol(parsed, outcome, fingerprint ?: observed.pin)
-                RelayPairOutcome.Rejected -> fail(PairFailure.Rejected)
-                RelayPairOutcome.HostRefused -> fail(PairFailure.HostRefused(authority))
-                RelayPairOutcome.NotARelay -> fail(PairFailure.NotARelay(authority))
-                is RelayPairOutcome.RateLimited -> fail(PairFailure.RateLimited(outcome.retryAfterSeconds))
-                is RelayPairOutcome.Unreachable -> fail(
-                    if (outcome.kind == TransportFailure.CERTIFICATE_PIN) {
-                        PairFailure.CertificateMismatch(authority)
-                    } else {
-                        PairFailure.Unreachable(authority)
-                    },
-                )
+            try {
+                // Ask the address where the relay is before deciding how to talk to it. Since relay
+                // 0.1.1 the harness's own port redirects `/relay` to the relay's listener, so the
+                // address people already know — the one this app has asked them for since day one —
+                // is a usable way in. The redirect has to be resolved here rather than followed by the
+                // HTTP client: it names a different scheme and port, which decides both the pin to
+                // present and what gets remembered, and a 302 would rewrite the claim's POST to a GET.
+                val effective = when (val located = RelayPairing.locate(url, okHttpClient)) {
+                    is RelayOrigin.Redirected -> located.origin
+                    // `None` still gets an attempt. Health is unauthenticated and always served, so
+                    // this should not happen — but refusing to try on its say-so would turn one
+                    // unanswered probe into a pairing that cannot be completed at all.
+                    else -> url
+                }
+                val parsed = effective.toHttpUrlOrNull()
+                if (parsed == null || parsed.scheme != "https") {
+                    fail(PairFailure.InvalidUrl)
+                    return@launch
+                }
+                val authority = "${parsed.host}:${parsed.port}"
+                val secure = parsed.scheme == "https"
+                val observed = ObservedKey()
+                val client = when {
+                    fingerprint != null -> clientFactory.httpClient(fingerprint)
+                    // The relay only reveals its key in the claim answer, so a typed https address has
+                    // to be spoken to before it can be verified. The screen labels this differently
+                    // from a scanned pairing for exactly that reason.
+                    secure -> RelayTls.trustOnFirstUseClient(okHttpClient, observed)
+                    else -> okHttpClient
+                }
+                val name = _state.value.deviceName.ifBlank { defaultDeviceName() }
+                when (val outcome = RelayPairing.claim(effective, code, name, client)) {
+                    is RelayPairOutcome.Paired -> enrol(parsed, outcome, fingerprint ?: observed.pin)
+                    RelayPairOutcome.Rejected -> fail(PairFailure.Rejected)
+                    RelayPairOutcome.HostRefused -> fail(PairFailure.HostRefused(authority))
+                    RelayPairOutcome.NotARelay -> fail(PairFailure.NotARelay(authority))
+                    is RelayPairOutcome.RateLimited -> fail(PairFailure.RateLimited(outcome.retryAfterSeconds))
+                    is RelayPairOutcome.Unreachable -> fail(
+                        if (outcome.kind == TransportFailure.CERTIFICATE_PIN) {
+                            PairFailure.CertificateMismatch(authority)
+                        } else {
+                            PairFailure.Unreachable(authority)
+                        },
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                fail(PairFailure.LocalError)
             }
         }
     }
@@ -262,8 +272,8 @@ class PairViewModel @Inject constructor(
             ),
         )
         credentials.put(config.id, response.token)
-        _state.update { it.copy(stage = PairStage.Paired, paired = config, failure = null) }
         connectionManager.connect(config)
+        _state.update { it.copy(stage = PairStage.Paired, paired = config, failure = null) }
     }
 
     /**
