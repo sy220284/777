@@ -13,3 +13,10 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# WorkManager 2.10 creates its generated Room database implementation reflectively.
+# AGP 9.4 / R8 can otherwise remove the no-arg constructor while keeping the class,
+# causing InitializationProvider to crash before Application.onCreate().
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    <init>();
+}
