@@ -92,7 +92,7 @@ internal class OpenSessionFoldState {
         liveAssistant.seed(frame.assistantStream)
     }
 
-    fun pageAnchor(): Pair<Int?, Int?> = events.firstOrNull()?.seq to followCursor
+    fun pageAnchor(): Pair<Long?, Int?> = events.firstOrNull()?.seq to followCursor
 
     fun prependPage(
         page: List<SessionEventEnvelope>,
