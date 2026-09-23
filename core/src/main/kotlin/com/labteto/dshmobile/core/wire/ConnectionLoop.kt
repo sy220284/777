@@ -249,7 +249,7 @@ class ConnectionLoop(
             muxFactory()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
             return Opened.Failed(
                 GenerationFailure.MuxFailed(TransportFailures.classify(e), e.message),
             )
@@ -268,7 +268,7 @@ class ConnectionLoop(
         } catch (e: CancellationException) {
             closeGeneration(mux)
             throw e
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
             closeGeneration(mux)
             return Opened.Failed(
                 GenerationFailure.MuxFailed(TransportFailures.classify(e), e.message),
@@ -299,7 +299,7 @@ class ConnectionLoop(
         } catch (e: RemoteStreamException) {
             closeGeneration(mux)
             return Opened.Failed(GenerationFailure.ReadyFailed(e.error))
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
             events.cancel()
             closeGeneration(mux)
             return Opened.Failed(
@@ -413,7 +413,7 @@ class ConnectionLoop(
     private inline fun safeSink(block: () -> Unit) {
         try {
             block()
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
             // Contain: a misbehaving sink must not take the loop down.
         }
     }
