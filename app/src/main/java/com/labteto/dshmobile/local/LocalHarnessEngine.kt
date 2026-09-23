@@ -595,7 +595,7 @@ class LocalHarnessEngine @Inject constructor(
             incoming.delete()
             throw error
         }
-        val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+        val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         val extension = safeName.substringAfterLast('.', "")
             .lowercase()
             .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
