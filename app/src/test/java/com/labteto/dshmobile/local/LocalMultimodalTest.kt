@@ -56,13 +56,20 @@ class LocalMultimodalTest {
         val second = imageMessage(root, "second.png", "second")
 
         val prepared = prepareLocalMultimodalMessages(
-            listOf(first, second),
+            listOf(
+                first,
+                kotlinx.serialization.json.buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "第一轮已经处理")
+                },
+                second,
+            ),
             root,
             LocalImageInputMode.NATIVE,
         )
 
         val oldContent = prepared[0]["content"] as JsonArray
-        val newContent = prepared[1]["content"] as JsonArray
+        val newContent = prepared[2]["content"] as JsonArray
         assertFalse(oldContent.toString().contains("image_url"))
         assertTrue(oldContent.toString().contains("历史图片引用"))
         assertTrue(oldContent.toString().contains("vision_analyze_file"))
@@ -79,7 +86,14 @@ class LocalMultimodalTest {
         }
 
         val prepared = prepareLocalMultimodalMessages(
-            listOf(image, laterText),
+            listOf(
+                image,
+                kotlinx.serialization.json.buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "上一轮图片已经处理")
+                },
+                laterText,
+            ),
             root,
             LocalImageInputMode.NATIVE,
         )
