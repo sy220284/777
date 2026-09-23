@@ -231,6 +231,14 @@ internal class LocalSubagentRunner(
                             put("delay_ms", event.delayMillis)
                         })
                     }
+                    is AgentRequestEvent.AttemptCancelled -> {
+                        eventLog().append("subagent/request-cancelled", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            event.reason?.let { put("detail", it.take(2_000)) }
+                        })
+                    }
                     is AgentRequestEvent.AttemptSucceeded -> Unit
                 }
             },

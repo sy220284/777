@@ -12,7 +12,7 @@ class LocalSessionEventLogTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun rotatesAtWholeJsonLinesAndKeepsSequenceMonotonicAcrossRestart() {
+    fun rotatesAtWholeJsonLinesWithoutDiscardingHistory() {
         val directory = Files.createTempDirectory("local-event-log").toFile()
         val file = directory.resolve("session.events.jsonl")
         try {
@@ -22,24 +22,21 @@ class LocalSessionEventLogTest {
             }
 
             assertTrue(file.length() <= 700)
-            val retained = file.readLines().map {
-                json.decodeFromString(LocalSessionEventLog.Event.serializer(), it)
-            }
-            assertTrue(retained.isNotEmpty())
+            assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("session.events.jsonl.part-") })
+            val retained = log.snapshot()
+            assertEquals(20, retained.size)
+            assertEquals(0L, retained.first().sequence)
             assertEquals(19L, retained.last().sequence)
-            assertTrue(retained.first().sequence > 0L)
 
-            LocalSessionEventLog(file, json, maxBytes = 700)
-                .append("test/restarted", buildJsonObject { put("value", "latest") })
-            val latest = json.decodeFromString(
-                LocalSessionEventLog.Event.serializer(),
-                file.readLines().last(),
-            )
-            assertEquals(20L, latest.sequence)
+            val restarted = LocalSessionEventLog(file, json, maxBytes = 700)
+            restarted.append("test/restarted", buildJsonObject { put("value", "latest") })
+            assertEquals(20L, requireNotNull(restarted.latest("test/restarted")).sequence)
+            assertEquals(21, restarted.snapshot().size)
         } finally {
             directory.deleteRecursively()
         }
     }
+
     @Test
     fun exposesLatestTypedEventForRecovery() {
         val directory = Files.createTempDirectory("local-event-latest").toFile()
@@ -56,5 +53,4 @@ class LocalSessionEventLogTest {
             directory.deleteRecursively()
         }
     }
-
 }

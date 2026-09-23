@@ -87,6 +87,7 @@ class AgentRequestExecutorTest {
 
         assertTrue(job.isCancelled)
         assertEquals(1, events.count { it is AgentRequestEvent.AttemptStarted })
+        assertEquals(1, events.count { it is AgentRequestEvent.AttemptCancelled })
         assertFalse(events.any { it is AgentRequestEvent.AttemptFailed })
         assertFalse(events.any { it is AgentRequestEvent.RetryScheduled })
     }

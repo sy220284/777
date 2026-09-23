@@ -232,6 +232,9 @@ class LocalHarnessEngine @Inject constructor(
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
         seedWorkspace()
         migrateLegacySession()
+        // Legacy migration may have copied an event log after the field was first constructed.
+        // Reopen it so the append sequence is derived from the migrated durable tail.
+        eventLog = eventLogFor(currentSessionId)
         scope.launch {
             runCatching {
                 bundledNodeRuntime.prepare()
@@ -1439,7 +1442,7 @@ class LocalHarnessEngine @Inject constructor(
             put("tools", tools)
             put("plan_mode", snapshot.planMode)
         })
-        eventLog.append("local/request-snapshot", buildJsonObject {
+        eventLog.append("request/context", buildJsonObject {
             put("step", step)
             put("model", snapshot.model)
             put("messages", JsonArray(messages))
@@ -1461,6 +1464,14 @@ class LocalHarnessEngine @Inject constructor(
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
                         })
+                        eventLog.append("assistant/attempt", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("status", "failed")
+                            put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
+                            put("detail", event.reason.take(2_000))
+                        })
                     }
                     is AgentRequestEvent.RetryScheduled -> {
                         eventLog.append("llm/retry", buildJsonObject {
@@ -1468,6 +1479,15 @@ class LocalHarnessEngine @Inject constructor(
                             put("attempt", event.attempt)
                             put("next_attempt", event.nextAttempt)
                             put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptCancelled -> {
+                        eventLog.append("assistant/attempt", buildJsonObject {
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("status", "cancelled")
+                            put("will_retry", false)
+                            event.reason?.let { put("detail", it.take(2_000)) }
                         })
                     }
                     is AgentRequestEvent.AttemptSucceeded -> Unit
@@ -1642,9 +1662,14 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
+        // Only mutate the durable event tail after the persisted session format is accepted.
+        // A future-version session must remain completely untouched.
+        val recovery = eventLog.repairInterruptedTail()
         val stored = loaded ?: LocalHarnessSession(id = sessionId)
+        val restoredHistory = restoreModelHistory(sessionId, stored.modelHistory)
         modelHistory.clear()
-        modelHistory += restoreModelHistory(sessionId, stored.modelHistory)
+        modelHistory += restoredHistory.messages
+        applyRecoveredToolResults(recovery)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
@@ -1682,6 +1707,30 @@ class LocalHarnessEngine @Inject constructor(
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
             checkpointModelHistory("load/system-refresh")
+        } else if (recovery.repaired || restoredHistory.replayedTail) {
+            checkpointModelHistory("load/event-replay")
+        }
+    }
+
+    private data class RestoredModelHistory(
+        val messages: List<JsonObject>,
+        val replayedTail: Boolean,
+    )
+
+    private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
+        if (recovery.toolResults.isEmpty()) return
+        recovery.toolResults.forEach { recovered ->
+            val alreadyPresent = modelHistory.any { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
+                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
+            }
+            if (!alreadyPresent) {
+                modelHistory += buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", recovered.callId)
+                    put("content", recovered.content)
+                }
+            }
         }
     }
 
@@ -1695,10 +1744,74 @@ class LocalHarnessEngine @Inject constructor(
     private fun restoreModelHistory(
         sessionId: String,
         fallback: List<JsonObject>,
-    ): List<JsonObject> {
-        val checkpoint = eventLogFor(sessionId).latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
-            ?: return fallback
-        return modelHistoryCheckpointCodec.decode(checkpoint.data) ?: fallback
+    ): RestoredModelHistory {
+        val events = if (sessionId == currentSessionId) {
+            eventLog.snapshot()
+        } else {
+            eventLogFor(sessionId).snapshot()
+        }
+        val checkpointIndex = events.indexOfLast { it.type == ModelHistoryCheckpointCodec.EVENT_TYPE }
+        if (checkpointIndex < 0) return RestoredModelHistory(fallback, replayedTail = false)
+        val checkpoint = events[checkpointIndex]
+        val restored = modelHistoryCheckpointCodec.decode(checkpoint.data)
+            ?: return RestoredModelHistory(fallback, replayedTail = false)
+        val history = restored.toMutableList()
+        var replayed = false
+
+        events.drop(checkpointIndex + 1).forEach { event ->
+            when (event.type) {
+                "system/prompt" -> {
+                    val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                    val message = buildJsonObject {
+                        put("role", "system")
+                        put("content", content)
+                    }
+                    if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+                        history[0] = message
+                    } else {
+                        history.add(0, message)
+                    }
+                    replayed = true
+                }
+                "user/message" -> {
+                    val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                    history += buildJsonObject {
+                        put("role", "user")
+                        put("content", content)
+                    }
+                    replayed = true
+                }
+                "assistant/message" -> {
+                    val message = (event.data["message"] as? JsonObject) ?: event.data
+                    if (message["role"]?.jsonPrimitive?.contentOrNull == "assistant") {
+                        history += message
+                        replayed = true
+                    }
+                }
+                "tool/result" -> {
+                    val nested = event.data["message"] as? JsonObject
+                    if (nested?.get("role")?.jsonPrimitive?.contentOrNull == "tool") {
+                        history += nested
+                        replayed = true
+                    } else {
+                        val callId = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                        val alreadyPresent = history.any { message ->
+                            message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
+                                message["tool_call_id"]?.jsonPrimitive?.contentOrNull == callId
+                        }
+                        if (!alreadyPresent) {
+                            history += buildJsonObject {
+                                put("role", "tool")
+                                put("tool_call_id", callId)
+                                put("content", event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                            }
+                            replayed = true
+                        }
+                    }
+                }
+            }
+        }
+        return RestoredModelHistory(history, replayed)
     }
 
     private fun persist() {

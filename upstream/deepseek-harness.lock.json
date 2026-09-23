@@ -1,6 +1,7 @@
 {
   "repository": "deepseek-ai/deepseek-harness",
-  "version": "0.1.6-alpha.2",
-  "commit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
-  "verifiedAt": "2026-09-21"
+  "version": "0.1.7-alpha.2",
+  "commit": "00102833dfaee1da9f48a3a8eae9d34005a75218",
+  "sessionFormatVersion": 4,
+  "verifiedAt": "2026-09-23"
 }
