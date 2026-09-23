@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 class LocalHarnessSessionApprovalTest {
     private val json = Json {
@@ -14,13 +15,27 @@ class LocalHarnessSessionApprovalTest {
     }
 
     @Test
-    fun legacySessionDefaultsToPerOperationApproval() {
+    fun legacyApprovalFieldIsAcceptedButNoLongerPersistedPerSession() {
         val session = json.decodeFromString(
             LocalHarnessSession.serializer(),
-            """{"id":"legacy","title":"旧会话","planMode":false}""",
+            """{"id":"legacy","title":"旧会话","planMode":false,"autoApproveMutations":true}""",
         )
+        val encoded = json.encodeToString(LocalHarnessSession.serializer(), session)
 
-        assertFalse(session.autoApproveMutations)
+        assertFalse(encoded.contains("autoApproveMutations"))
+    }
+
+    @Test
+    fun legacyApprovalValueCanSeedGlobalMigration() {
+        val enabled = json.parseToJsonElement(
+            """{"id":"legacy","autoApproveMutations":true}""",
+        ).jsonObject
+        val disabled = json.parseToJsonElement(
+            """{"id":"legacy"}""",
+        ).jsonObject
+
+        assertTrue(legacySafeAutoApproval(enabled))
+        assertFalse(legacySafeAutoApproval(disabled))
     }
 
     @Test
@@ -55,16 +70,5 @@ class LocalHarnessSessionApprovalTest {
         assertEquals("lineage", restored.lineageId)
         assertEquals("project", restored.projectId)
         assertEquals("交接摘要", restored.handoffSummary)
-    }
-
-    @Test
-    fun autoApprovalRoundTripsWithSession() {
-        val encoded = json.encodeToString(
-            LocalHarnessSession.serializer(),
-            LocalHarnessSession(id = "auto", autoApproveMutations = true),
-        )
-        val restored = json.decodeFromString(LocalHarnessSession.serializer(), encoded)
-
-        assertTrue(restored.autoApproveMutations)
     }
 }

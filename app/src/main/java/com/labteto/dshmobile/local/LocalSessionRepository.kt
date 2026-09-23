@@ -6,7 +6,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+internal data class LocalSessionRead(
+    val session: LocalHarnessSession,
+    val legacySafeAutoApproval: Boolean,
+)
+
+internal fun legacySafeAutoApproval(payload: JsonObject): Boolean =
+    payload["autoApproveMutations"]?.jsonPrimitive?.booleanOrNull == true
 
 /** Owns durable session encoding and coalesces queued snapshots per session. */
 internal class LocalSessionRepository(
@@ -44,9 +55,15 @@ internal class LocalSessionRepository(
         wakeups.trySend(Unit)
     }
 
-    fun read(id: String): LocalHarnessSession? = store.read(id)?.document?.payload?.let {
-        json.decodeFromString(LocalHarnessSession.serializer(), it.toString())
-    }
+    fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
+
+    fun readWithLegacyApproval(id: String): LocalSessionRead? =
+        store.read(id)?.document?.payload?.let { payload ->
+            LocalSessionRead(
+                session = json.decodeFromString(LocalHarnessSession.serializer(), payload.toString()),
+                legacySafeAutoApproval = legacySafeAutoApproval(payload),
+            )
+        }
 
     fun summaries(): List<LocalSessionSummary> = store.list().mapNotNull { loaded ->
         runCatching {
