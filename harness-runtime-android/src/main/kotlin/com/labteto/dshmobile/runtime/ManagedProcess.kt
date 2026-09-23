@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -80,19 +82,24 @@ suspend fun executeManagedProcess(
                 val output = ByteArrayOutputStream()
                 val buffer = ByteArray(8192)
                 var truncated = false
+                var remainingAfterExit: Int? = null
                 while (true) {
+                    currentCoroutineContext().ensureActive()
                     val available = runCatching { input.available() }.getOrDefault(0)
+                    if (!process.isAlive && remainingAfterExit == null) remainingAfterExit = available
+                    if (remainingAfterExit == 0) break
                     if (available == 0) {
                         if (!process.isAlive) break
                         delay(10)
                         continue
                     }
-                    val count = input.read(buffer, 0, minOf(buffer.size, available))
+                    val count = input.read(buffer, 0, minOf(buffer.size, available, remainingAfterExit ?: Int.MAX_VALUE))
                     if (count < 0) break
+                    remainingAfterExit = remainingAfterExit?.minus(count)
                     val keep = minOf(count, (maxChars * 4 - output.size()).coerceAtLeast(0))
                     output.write(buffer, 0, keep)
                     if (keep < count) truncated = true
-                    progress?.invoke(output.toString("UTF-8").take(maxChars))
+                    if (keep > 0) progress?.invoke(output.toString("UTF-8").take(maxChars))
                 }
                 val text = output.toString("UTF-8")
                 return text.take(maxChars) + if (truncated || text.length > maxChars) "\n[输出已截断]" else ""
