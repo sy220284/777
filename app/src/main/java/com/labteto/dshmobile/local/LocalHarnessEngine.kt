@@ -198,6 +198,7 @@ class LocalHarnessEngine @Inject constructor(
     private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
+    private val historyCompactor = LocalHistoryCompactor()
     private val runtimePlugin = AndroidRuntimePlugin(
         workspaceRoot = File(workspace.path),
         processRuntime = runtimeProcess,
@@ -1654,29 +1655,16 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun compactHistoryIfNeeded() {
-        if (modelHistory.sumOf { it.toString().length } <= MAX_HISTORY_CHARS) return
-        var start = 1
-        var keptChars = 0
-        for (index in modelHistory.lastIndex downTo 1) {
-            keptChars += modelHistory[index].toString().length
-            if (keptChars > HISTORY_TAIL_CHARS) {
-                start = (index + 1 until modelHistory.size).firstOrNull {
-                    modelHistory[it]["role"]?.jsonPrimitive?.contentOrNull == "user"
-                } ?: index + 1
-                break
-            }
-        }
-        if (start <= 1 || start >= modelHistory.size) return
-        val omitted = start - 1
-        val compacted = mutableListOf(modelHistory.first())
-        compacted += buildJsonObject {
-            put("role", "system")
-            put("content", "较早的 $omitted 条会话消息已在安卓端按上下文上限压缩；当前目标、计划、任务清单与工作区文件仍为权威状态。")
-        }
-        compacted += modelHistory.drop(start)
+        val compaction = historyCompactor.compact(modelHistory) ?: return
         modelHistory.clear()
-        modelHistory += compacted
-        eventLog.append("session/compaction", buildJsonObject { put("omitted_messages", omitted) })
+        modelHistory += compaction.messages
+        eventLog.append(
+            "session/compaction",
+            buildJsonObject {
+                put("omitted_messages", compaction.omittedMessages)
+                put("summary", compaction.summary)
+            },
+        )
         checkpointModelHistory("session/compaction")
         persist()
     }
@@ -2073,8 +2061,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_TOOL_RESULT_CHARS = 50_000
         const val TOOL_RESULT_TAIL_CHARS = 4_000
         const val MAX_EVENT_CHARS = 65_536
-        const val MAX_HISTORY_CHARS = 500_000
-        const val HISTORY_TAIL_CHARS = 240_000
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
