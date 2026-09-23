@@ -105,19 +105,11 @@ jobs:
             adb shell pidof com.sy220284.dshmobile.debug
 
             # Reinstall the minified/shrunk build and smoke-test the exact startup path that release
-            # uses. Debug-only launch checks cannot catch R8/resource-shrinker startup crashes.
+            # uses. Keep the condition inside a real script because emulator-runner executes each
+            # YAML script line separately.
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-            adb logcat -c
-            adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
-            sleep 3
-            if ! adb shell pidof com.sy220284.dshmobile.debug; then
-              echo "=== optimized startup crash log ==="
-              adb logcat -d -b crash -v threadtime || true
-              echo "=== optimized startup filtered log ==="
-              adb logcat -d -v threadtime | grep -E "AndroidRuntime|FATAL EXCEPTION|com\.sy220284\.dshmobile\.debug|DshApplication|MainActivity" || true
-              exit 1
-            fi
+            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
   android-17-instrumented:
     runs-on: ubuntu-latest
