@@ -137,9 +137,27 @@ internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval
     approval?.canAutoApproveSafely == true
 
 internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
-    memoryClassMb >= 512 -> HarnessResourceBudget(maxModelRequests = 4, maxAgents = 4)
-    memoryClassMb >= 256 -> HarnessResourceBudget(maxModelRequests = 3, maxAgents = 3)
-    else -> HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2)
+    memoryClassMb >= 512 -> HarnessResourceBudget(
+        maxModelRequests = 4,
+        maxAgents = 4,
+        maxTerminals = 4,
+        maxVirtualDisplays = 2,
+        maxLanguageServers = 4,
+    )
+    memoryClassMb >= 256 -> HarnessResourceBudget(
+        maxModelRequests = 3,
+        maxAgents = 3,
+        maxTerminals = 3,
+        maxVirtualDisplays = 2,
+        maxLanguageServers = 3,
+    )
+    else -> HarnessResourceBudget(
+        maxModelRequests = 2,
+        maxAgents = 2,
+        maxTerminals = 2,
+        maxVirtualDisplays = 1,
+        maxLanguageServers = 2,
+    )
 }
 
 /**
@@ -173,6 +191,12 @@ class LocalHarnessEngine @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
+    private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
+    private val persistentJobStore = LocalPersistentJobStore(
+        file = File(root, "jobs.json"),
+        json = json,
+        scope = scope,
+    )
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
         extraSearchPaths = ::bundledRuntimeSearchPaths,
@@ -215,11 +239,14 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
-    private val runtimePlugin = AndroidRuntimePlugin(
-        workspaceRoot = File(workspace.path),
-        processRuntime = runtimeProcess,
-        terminalProvider = runtimeTerminal,
-    )
+    private val runtimePlugin by lazy {
+        AndroidRuntimePlugin(
+            workspaceRoot = File(workspace.path),
+            processRuntime = runtimeProcess,
+            terminalProvider = runtimeTerminal,
+            resourceScheduler = resourceScheduler,
+        )
+    }
     private val mcpPlugin = McpToolBridgePlugin(
         http = http,
         json = json,
@@ -227,22 +254,29 @@ class LocalHarnessEngine @Inject constructor(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
     )
-    private val lspPlugin = com.labteto.dshmobile.interop.lsp.LspPlugin(
-        root = File(workspace.path),
-        json = json,
-        command = automaticLanguageServerResolver::resolve,
-        commandResolver = runtimeProcess::resolveCommand,
-        environment = { runtimeProcess.processEnvironment() },
-    )
-    private val deviceProvider = AndroidDeviceProvider(context)
-    private val devicePlugin = AndroidDevicePlugin(deviceProvider)
-    private val visionPlugin = LocalVisionPlugin(
-        device = deviceProvider,
-        keyProvider = visionSettings::apiKey,
-        routeProvider = visionSettings::route,
-        analyzer = visionClient,
-        workspaceRoot = File(workspace.path),
-    )
+    private val lspPlugin by lazy {
+        com.labteto.dshmobile.interop.lsp.LspPlugin(
+            root = File(workspace.path),
+            json = json,
+            command = automaticLanguageServerResolver::resolve,
+            commandResolver = runtimeProcess::resolveCommand,
+            environment = { runtimeProcess.processEnvironment() },
+            resourceScheduler = resourceScheduler,
+        )
+    }
+    private val deviceProvider by lazy {
+        AndroidDeviceProvider(context, resourceScheduler = resourceScheduler)
+    }
+    private val devicePlugin by lazy { AndroidDevicePlugin(deviceProvider) }
+    private val visionPlugin by lazy {
+        LocalVisionPlugin(
+            device = deviceProvider,
+            keyProvider = visionSettings::apiKey,
+            routeProvider = visionSettings::route,
+            analyzer = visionClient,
+            workspaceRoot = File(workspace.path),
+        )
+    }
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
     private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
@@ -262,9 +296,7 @@ class LocalHarnessEngine @Inject constructor(
         LocalHarnessState(workspacePath = workspace.path, sessionId = currentSessionId),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
-    private val resourceBudget = localResourceBudgetForMemoryClass(
-        context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
-    )
+    private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
@@ -272,14 +304,21 @@ class LocalHarnessEngine @Inject constructor(
                 it.copy(
                     activeModelRequests = snapshot.activeModelRequests,
                     activeAgents = snapshot.activeAgents,
+                    activeTerminals = snapshot.activeTerminals,
+                    activeVirtualDisplays = snapshot.activeVirtualDisplays,
+                    activeLanguageServers = snapshot.activeLanguageServers,
                     maxModelRequests = snapshot.budget.maxModelRequests,
                     maxAgents = snapshot.budget.maxAgents,
+                    maxTerminals = snapshot.budget.maxTerminals,
+                    maxVirtualDisplays = snapshot.budget.maxVirtualDisplays,
+                    maxLanguageServers = snapshot.budget.maxLanguageServers,
                     resourcePressure = snapshot.pressure.name.lowercase(),
+                    contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
                 )
             }
         },
     )
-    private val jobs = LocalJobManager(scope) { snapshot ->
+    private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
         _state.update { it.copy(jobs = snapshot) }
     }
 
@@ -336,7 +375,11 @@ class LocalHarnessEngine @Inject constructor(
             it.copy(
                 maxModelRequests = initialResources.budget.maxModelRequests,
                 maxAgents = initialResources.budget.maxAgents,
+                maxTerminals = initialResources.budget.maxTerminals,
+                maxVirtualDisplays = initialResources.budget.maxVirtualDisplays,
+                maxLanguageServers = initialResources.budget.maxLanguageServers,
                 resourcePressure = initialResources.pressure.name.lowercase(),
+                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
             )
         }
         seedWorkspace()
