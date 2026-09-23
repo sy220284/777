@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -140,6 +141,14 @@ class LspProcessClient(
             val writer = checkNotNull(output) { "LSP 输出流未就绪" }
             LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
         }
+    }
+
+    suspend fun shutdown(timeoutMillis: Long = 1_500L) {
+        withTimeoutOrNull(timeoutMillis) {
+            runCatching { request("shutdown", JsonObject(emptyMap())) }
+            runCatching { notify("exit", JsonObject(emptyMap())) }
+        }
+        close()
     }
 
     fun drainNotifications(): List<JsonObject> = synchronized(pendingNotifications) {

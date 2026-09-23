@@ -560,19 +560,11 @@ internal fun LocalAgentSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    var languageServerCommand by remember(local.languageServerCommand) { mutableStateOf(local.languageServerCommand) }
     var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
     var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
     var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
 
     SettingsCard("智能体设置", Icons.Outlined.Tune) {
-        OutlinedTextField(
-            value = languageServerCommand,
-            onValueChange = { languageServerCommand = it.take(4_000) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.settings_lsp_command)) },
-            supportingText = { Text(stringResource(R.string.settings_lsp_hint)) },
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             OutlinedTextField(
                 value = mainSteps,
@@ -605,8 +597,7 @@ internal fun LocalAgentSettingsCard(
                     subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
                     modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
                 )
-                val languageServerStatus = viewModel.configureLanguageServer(languageServerCommand)
-                report("智能体设置已保存；$languageServerStatus")
+                report("智能体设置已保存")
             },
             variant = DsButtonVariant.Outline,
         )

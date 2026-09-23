@@ -1357,6 +1357,9 @@ private fun approvalPurpose(approval: LocalApproval): String = when (approval.to
         "Harness 准备创建或完整写入一个工作区文件，用来保存代码、配置、文档或任务产物。批准后会实际改变工作区内容。"
     "edit", "edit_file" ->
         "Harness 准备修改现有工作区文件，用来落实当前任务要求。批准后会对目标文件产生真实改动。"
+    "lsp_definition", "lsp_references", "lsp_hover", "lsp_implementation",
+    "lsp_symbols", "lsp_workspace_symbols", "lsp_rename_preview", "lsp_diagnostics" ->
+        "777 准备启动与当前项目匹配的代码智能分析进程，用来理解定义、引用、类型、实现和诊断信息。它只接收当前工作区内的代码；批准后同一分析进程会在后续查询中复用，不会反复询问。"
     else ->
         "Harness 请求执行一项会改变本机状态的操作。批准后会真实执行；拒绝则跳过这一步并把结果返回给模型。"
 }
