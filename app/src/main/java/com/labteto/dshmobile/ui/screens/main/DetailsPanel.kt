@@ -55,11 +55,13 @@ import com.labteto.dshmobile.core.wire.dto.ContextBreakdownView
 import com.labteto.dshmobile.core.wire.dto.ContextPressureView
 import com.labteto.dshmobile.core.DshCore
 import com.labteto.dshmobile.core.wire.dto.HostDescription
+import com.labteto.dshmobile.core.wire.dto.JobStatus
 import com.labteto.dshmobile.core.wire.dto.JobView
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.data.SessionRow
+import com.labteto.dshmobile.ui.isCommandExecutionTool
 import com.labteto.dshmobile.ui.components.ContextMeterDetail
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
@@ -510,15 +512,29 @@ private fun JobsCard(jobs: List<JobView>) {
                 StateDot(jobStatusDot(job.status))
                 Spacer(Modifier.width(DsSpacing.small))
                 Column(Modifier.weight(1f)) {
+                    val commandExecution = isCommandExecutionTool(job.kind)
                     Text(
-                        job.label,
+                        if (commandExecution) stringResource(R.string.command_execution_purpose) else job.label,
                         style = DsType.small13,
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        job.detail?.let { "${job.kind} · $it" } ?: job.kind,
+                        if (commandExecution) {
+                            stringResource(
+                                when (job.status) {
+                                    JobStatus.RUNNING, JobStatus.STOPPING ->
+                                        R.string.command_execution_status_running
+                                    JobStatus.COMPLETED ->
+                                        R.string.command_execution_status_done
+                                    JobStatus.KILLED, JobStatus.FAILED ->
+                                        R.string.command_execution_status_failed
+                                },
+                            )
+                        } else {
+                            job.detail?.let { "${job.kind} · $it" } ?: job.kind
+                        },
                         style = DsType.caption11,
                         color = colors.labelCaption,
                         maxLines = 1,
