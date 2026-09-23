@@ -103,6 +103,25 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
     )
 }
 
+val generatedUpdatePatcher = layout.buildDirectory.dir("generated/updatePatcher")
+val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
+    group = "build setup"
+    description = "Fetches and verifies the pinned HDiffPatch Android patch runtime."
+    inputs.file(rootProject.file("tools/runtime/prepare-hdiffpatch.sh"))
+    inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
+    outputs.dir(generatedUpdatePatcher)
+    environment(
+        "HDIFFPATCH_CACHE",
+        rootProject.file(".gradle/runtime-cache/hdiffpatch").absolutePath,
+    )
+    environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    commandLine(
+        "bash",
+        rootProject.file("tools/runtime/prepare-hdiffpatch.sh").absolutePath,
+        generatedUpdatePatcher.get().asFile.absolutePath,
+    )
+}
+
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 37
@@ -185,6 +204,7 @@ android {
         jniLibs.srcDir(generatedNodeRuntime.get().dir("jniLibs").asFile)
         jniLibs.srcDir(generatedPythonRuntime.get().dir("jniLibs").asFile)
         jniLibs.srcDir(generatedGitRuntime.get().dir("jniLibs").asFile)
+        jniLibs.srcDir(generatedUpdatePatcher.get().dir("jniLibs").asFile)
         assets.srcDir(generatedNodeRuntime.get().dir("assets").asFile)
         assets.srcDir(generatedPythonRuntime.get().dir("assets").asFile)
         assets.srcDir(generatedGitRuntime.get().dir("assets").asFile)
@@ -214,13 +234,23 @@ tasks.matching {
     it.name.startsWith("merge") &&
         (it.name.endsWith("JniLibFolders") || it.name.endsWith("Assets"))
 }.configureEach {
-    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime, prepareBundledGitRuntime)
+    dependsOn(
+        prepareBundledNodeRuntime,
+        prepareBundledPythonRuntime,
+        prepareBundledGitRuntime,
+        prepareUpdatePatcher,
+    )
 }
 
 // Lint model writers inspect the merged asset source set directly. Without this explicit edge
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
 tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
-    dependsOn(prepareBundledNodeRuntime, prepareBundledPythonRuntime, prepareBundledGitRuntime)
+    dependsOn(
+        prepareBundledNodeRuntime,
+        prepareBundledPythonRuntime,
+        prepareBundledGitRuntime,
+        prepareUpdatePatcher,
+    )
 }
 
 dependencies {
