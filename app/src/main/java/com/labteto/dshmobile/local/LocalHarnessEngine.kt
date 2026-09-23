@@ -487,10 +487,12 @@ class LocalHarnessEngine @Inject constructor(
                     attachments = attachments,
                     visionAnalyses = analyses,
                 )
-                val contentParts = modelMessage["content"] as? JsonArray
-                val content = (contentParts?.firstOrNull() as? JsonObject)
-                    ?.get("text")?.jsonPrimitive?.contentOrNull
-                    ?.takeIf(String::isNotBlank)
+                val content = when (val rawContent = modelMessage["content"]) {
+                    is JsonPrimitive -> rawContent.contentOrNull
+                    is JsonArray -> (rawContent.firstOrNull() as? JsonObject)
+                        ?.get("text")?.jsonPrimitive?.contentOrNull
+                    else -> null
+                }?.takeIf(String::isNotBlank)
                     ?: prompt.ifBlank { "请处理本次附件。" }
                 val job = queueTurn(
                     content = content,
