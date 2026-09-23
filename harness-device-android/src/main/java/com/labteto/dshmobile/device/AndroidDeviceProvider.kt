@@ -220,11 +220,8 @@ class AndroidDeviceProvider(
     }
 
     fun releaseAgentVirtualDisplay(id: String) {
-        try {
-            virtualDisplays.close(id)
-        } finally {
-            virtualDisplayLeases.remove(id)?.close()
-        }
+        runCatching { virtualDisplays.close(id) }
+        virtualDisplayLeases.remove(id)?.close()
     }
 
     private fun deviceInfo(): String = buildString {
