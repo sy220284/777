@@ -97,6 +97,60 @@ class LocalSessionControlProjectionTest {
     }
 
     @Test
+    fun partiallyMalformedStateEventIsIgnoredInsteadOfPartiallyApplied() {
+        val snapshot = LocalHarnessSession(
+            id = "strict",
+            plan = listOf("可信计划"),
+            todos = listOf(LocalTodoItem("可信任务", "pending")),
+            controlProjectedThroughSequence = 10L,
+        )
+        val events = listOf(
+            event(11L, "plan/state", buildJsonObject {
+                put("items", buildJsonArray {
+                    add("新计划")
+                    add(123)
+                })
+            }),
+            event(12L, "todo/state", buildJsonObject {
+                put("items", buildJsonArray {
+                    add(buildJsonObject {
+                        put("content", "新任务")
+                        put("status", "in_progress")
+                    })
+                    add(buildJsonObject {
+                        put("content", "")
+                        put("status", "pending")
+                    })
+                })
+            }),
+        )
+
+        val projected = projectSessionControlTail(snapshot, events, sequenceExclusive = 10L)
+
+        assertEquals(snapshot.plan, projected.plan)
+        assertEquals(snapshot.todos, projected.todos)
+    }
+
+    @Test
+    fun explicitEmptyStateArraysStillClearPlanAndTodos() {
+        val snapshot = LocalHarnessSession(
+            id = "clear",
+            plan = listOf("旧计划"),
+            todos = listOf(LocalTodoItem("旧任务", "completed")),
+            controlProjectedThroughSequence = 20L,
+        )
+        val events = listOf(
+            event(21L, "plan/state", buildJsonObject { put("items", buildJsonArray { }) }),
+            event(22L, "todo/state", buildJsonObject { put("items", buildJsonArray { }) }),
+        )
+
+        val projected = projectSessionControlTail(snapshot, events, sequenceExclusive = 20L)
+
+        assertEquals(emptyList<String>(), projected.plan)
+        assertEquals(emptyList<LocalTodoItem>(), projected.todos)
+    }
+
+    @Test
     fun missingTailKeepsMaterializedSnapshot() {
         val snapshot = LocalHarnessSession(
             id = "s2",
