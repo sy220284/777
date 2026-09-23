@@ -370,25 +370,24 @@ jobs:
                          [ "$((PATCH_SIZE * 100))" -lt "$((NEW_SIZE * 65))" ]; then
                         OLD_SHA="$(sha256sum "$OLD_APK" | awk '{print $1}')"
                         PATCH_SHA="$(sha256sum "$PATCH_PATH" | awk '{print $1}')"
-                        export PATCH_JSON FROM_VERSION TO_VERSION PATCH_NAME PATCH_SIZE PATCH_SHA OLD_SHA NEW_SHA
-                        python3 - <<'PY'
-import json
-import os
-
-patches = [{
-    "fromVersion": os.environ["FROM_VERSION"],
-    "toVersion": os.environ["TO_VERSION"],
-    "algorithm": "hdiffpatch-window-zstd-v1",
-    "asset": os.environ["PATCH_NAME"],
-    "size": int(os.environ["PATCH_SIZE"]),
-    "sha256": os.environ["PATCH_SHA"],
-    "sourceSha256": os.environ["OLD_SHA"],
-    "targetSha256": os.environ["NEW_SHA"],
-}]
-with open(os.environ["PATCH_JSON"], "w", encoding="utf-8") as f:
-    json.dump(patches, f, ensure_ascii=False, separators=(",", ":"))
-    f.write("\n")
-PY
+                        jq -n \
+                          --arg from "$FROM_VERSION" \
+                          --arg to "$TO_VERSION" \
+                          --arg asset "$PATCH_NAME" \
+                          --arg sha256 "$PATCH_SHA" \
+                          --arg sourceSha256 "$OLD_SHA" \
+                          --arg targetSha256 "$NEW_SHA" \
+                          --argjson size "$PATCH_SIZE" \
+                          '[{
+                            fromVersion: $from,
+                            toVersion: $to,
+                            algorithm: "hdiffpatch-window-zstd-v1",
+                            asset: $asset,
+                            size: $size,
+                            sha256: $sha256,
+                            sourceSha256: $sourceSha256,
+                            targetSha256: $targetSha256
+                          }]' > "$PATCH_JSON"
                         echo "::notice::已生成增量包：$PATCH_NAME ($PATCH_SIZE / $NEW_SIZE bytes)"
                       else
                         echo "::notice::增量包校验失败或达到完整 APK 的 65%，本版仅发布完整包。"
@@ -408,30 +407,23 @@ PY
             fi
           fi
 
-          export PATCH_JSON NEW_SHA NEW_SIZE APK_NAME
-          export TARGET_VERSION="$DSH_VERSION_NAME"
-          export MANIFEST_PATH="$ASSET_DIR/update-manifest.json"
-          python3 - <<'PY'
-import json
-import os
-
-with open(os.environ["PATCH_JSON"], "r", encoding="utf-8") as f:
-    patches = json.load(f)
-
-manifest = {
-    "schema": 1,
-    "targetVersion": os.environ["TARGET_VERSION"],
-    "targetApk": {
-        "name": os.environ["APK_NAME"],
-        "size": int(os.environ["NEW_SIZE"]),
-        "sha256": os.environ["NEW_SHA"],
-    },
-    "patches": patches,
-}
-with open(os.environ["MANIFEST_PATH"], "w", encoding="utf-8") as f:
-    json.dump(manifest, f, ensure_ascii=False, indent=2, sort_keys=True)
-    f.write("\n")
-PY
+          MANIFEST_PATH="$ASSET_DIR/update-manifest.json"
+          jq -n \
+            --arg targetVersion "$DSH_VERSION_NAME" \
+            --arg apkName "$APK_NAME" \
+            --arg apkSha256 "$NEW_SHA" \
+            --argjson apkSize "$NEW_SIZE" \
+            --slurpfile patches "$PATCH_JSON" \
+            '{
+              schema: 1,
+              targetVersion: $targetVersion,
+              targetApk: {
+                name: $apkName,
+                size: $apkSize,
+                sha256: $apkSha256
+              },
+              patches: $patches[0]
+            }' > "$MANIFEST_PATH"
 
           (
             cd "$ASSET_DIR"
