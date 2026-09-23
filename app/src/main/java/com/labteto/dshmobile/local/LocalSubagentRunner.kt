@@ -81,13 +81,17 @@ internal class LocalSubagentRunner(
                 )
             }
             boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
-                history += buildJsonObject {
+                val insertion = buildJsonObject {
                     put("role", "system")
                     put(
                         "content",
                         "【父级约束上下文】\n$inherited\n以上约束继承自父任务；若与本子任务的明确新要求冲突，以本子任务要求为准。",
                     )
                 }
+                val index = if (
+                    history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+                ) 1 else 0
+                history.add(index, insertion)
             }
             history += buildJsonObject { put("role", "user"); put("content", task) }
 
