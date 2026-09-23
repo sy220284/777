@@ -32,9 +32,11 @@ class DsDialogOverflowTest {
             }
         }
 
-        compose.onNode(hasScrollAction()).assertExists()
+        val scrollable = compose.onNode(hasScrollAction()).assertExists()
+        repeat(24) {
+            scrollable.performTouchInput { swipeUp() }
+        }
         compose.onNodeWithText("Finish")
-            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
 
