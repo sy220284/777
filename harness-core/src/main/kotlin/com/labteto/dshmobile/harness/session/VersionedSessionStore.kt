@@ -138,17 +138,11 @@ class VersionedSessionStore(
         return changed
     }
 
-    fun list(): List<SessionLoadResult> = root.listFiles().orEmpty()
-        .filter { file ->
-            file.isFile &&
-                file.name.endsWith(SESSION_SUFFIX) &&
-                !file.name.endsWith(TEMP_SUFFIX) &&
-                !file.name.endsWith(BACKUP_SUFFIX) &&
-                !file.name.contains(CHECKPOINT_MARKER) &&
-                !file.name.contains(CORRUPT_MARKER)
-        }
-        .mapNotNull { file ->
-            val id = file.name.removeSuffix(SESSION_SUFFIX)
+    fun ids(): List<String> = sessionFiles()
+        .map { file -> file.name.removeSuffix(SESSION_SUFFIX) }
+
+    fun list(): List<SessionLoadResult> = ids()
+        .mapNotNull { id ->
             try {
                 read(id)
             } catch (future: FutureSessionVersionException) {
@@ -213,6 +207,16 @@ class VersionedSessionStore(
             legacy = legacy,
         )
     }
+
+    private fun sessionFiles(): List<File> = root.listFiles().orEmpty()
+        .filter { file ->
+            file.isFile &&
+                file.name.endsWith(SESSION_SUFFIX) &&
+                !file.name.endsWith(TEMP_SUFFIX) &&
+                !file.name.endsWith(BACKUP_SUFFIX) &&
+                !file.name.contains(CHECKPOINT_MARKER) &&
+                !file.name.contains(CORRUPT_MARKER)
+        }
 
     private fun fileFor(id: String): File {
         validateId(id)
