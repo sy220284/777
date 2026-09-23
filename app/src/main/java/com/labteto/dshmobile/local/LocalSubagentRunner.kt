@@ -11,6 +11,20 @@ import kotlinx.serialization.json.*
 internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
     context.trim().takeIf(String::isNotEmpty)?.take(maxChars.coerceAtLeast(1))
 
+internal fun inheritedHistoryBeforeToolCall(
+    history: List<JsonObject>,
+    parentCallId: String?,
+): MutableList<JsonObject> {
+    if (parentCallId.isNullOrBlank()) return history.toMutableList()
+    val boundary = history.indexOfLast { message ->
+        message["role"]?.jsonPrimitive?.contentOrNull == "assistant" &&
+            message["tool_calls"]?.jsonArray.orEmpty().any { element ->
+                element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == parentCallId
+            }
+    }
+    return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
+}
+
 internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
@@ -28,12 +42,17 @@ internal class LocalSubagentRunner(
         inheritHistory: Boolean,
         allowMutation: Boolean,
         backgroundJobId: String? = null,
+        parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
     ): String {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val key = apiKeys.get() ?: return "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
-        val history = if (inheritHistory) historySnapshot().toMutableList() else mutableListOf()
+        val history = if (inheritHistory) {
+            inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+        } else {
+            mutableListOf()
+        }
         val progress = ArrayDeque<String>()
         val stepLimit = maxSteps.coerceIn(1, 40)
         val snapshot = state.value
