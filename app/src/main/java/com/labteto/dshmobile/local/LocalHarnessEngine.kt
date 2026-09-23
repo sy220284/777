@@ -258,6 +258,7 @@ class LocalHarnessEngine @Inject constructor(
             apiKeys = apiKeys,
             modelClient = modelClient,
             state = state,
+            workspaceRoot = File(workspace.path),
             jobs = jobs,
             historySnapshot = { modelHistory.toList() },
             contextSnapshot = { query ->
