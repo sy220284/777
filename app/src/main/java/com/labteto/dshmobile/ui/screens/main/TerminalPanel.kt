@@ -85,7 +85,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
             }
             key(terminal.id) { TerminalScreen(store, key, terminal, Modifier.weight(1f)) }
             rename?.let { title -> AlertDialog(onDismissRequest = { rename = null }, title = { Text(stringResource(R.string.common_rename)) },
-                text = { OutlinedTextField(title, { rename = it }) },
+                text = { OutlinedTextField(title, { rename = it }, singleLine = true) },
                 confirmButton = { TextButton(enabled = title.isNotBlank() && title.length <= 120 && !busy, onClick = { operation {
                     store.apiForHost(key.host)?.terminalRename(key.sessionId, terminal.id, title)?.requireValue()
                         ?: error(context.getString(R.string.common_offline))
