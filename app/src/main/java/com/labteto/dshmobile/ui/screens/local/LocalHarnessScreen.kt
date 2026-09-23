@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -65,12 +67,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -134,6 +136,10 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
+                onNewSession = {
+                    scope.launch { drawerState.close() }
+                    showNewSessionMode = true
+                },
                 onLocal = { scope.launch { drawerState.close() } },
                 onRemote = {
                     scope.launch { drawerState.close() }
@@ -223,6 +229,7 @@ fun LocalHarnessScreen(
 private fun LocalModeDrawer(
     currentSessionId: String,
     sessions: List<LocalSessionSummary>,
+    onNewSession: () -> Unit,
     onLocal: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
@@ -250,13 +257,14 @@ private fun LocalModeDrawer(
                     Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
                     Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
                 }
-                DsIconButton(
-                    icon = Icons.Outlined.QrCodeScanner,
-                    contentDescription = "远程控制",
-                    onClick = onRemote,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.bgLayer1,
-                    shadowElevation = 2.dp,
+            }
+
+            DsGroupCard {
+                DsCategoryRow(
+                    icon = Icons.Filled.Add,
+                    title = stringResource(R.string.chatlist_new_session),
+                    subtitle = stringResource(R.string.local_new_session_hint),
+                    onClick = onNewSession,
                 )
             }
 
@@ -268,6 +276,12 @@ private fun LocalModeDrawer(
                     subtitle = "完整能力在手机内运行",
                     value = "当前",
                     onClick = onLocal,
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.QrCodeScanner,
+                    title = stringResource(R.string.local_remote_control),
+                    subtitle = stringResource(R.string.local_remote_hint),
+                    onClick = onRemote,
                 )
             }
 
@@ -514,6 +528,7 @@ private fun LocalChat(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -580,68 +595,87 @@ private fun LocalChat(
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.bgBase)) {
         Column(
             Modifier.fillMaxWidth().background(colors.bgBase)
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
         ) {
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 DsIconButton(
                     icon = FeatherIcons.Menu,
-                    contentDescription = "菜单",
+                    contentDescription = stringResource(R.string.local_open_menu),
                     onClick = onOpenMenu,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.bgLayer1,
-                    shadowElevation = 3.dp,
+                    tint = colors.labelSecondary,
                 )
                 Spacer(Modifier.width(DsSpacing.small))
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = colors.bgLayer1,
-                    shadowElevation = 1.dp,
-                    modifier = Modifier.weight(1f, fill = false)
-                        .clickable(onClickLabel = "配置本机 Harness", onClick = onConfigure),
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        StateDot(if (state.running) StateDotState.Running else StateDotState.Done)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        state.sessions.firstOrNull { it.id == state.sessionId }?.title
+                            ?.takeIf { it.isNotBlank() } ?: stringResource(R.string.local_new_chat),
+                        style = DsType.base16Strong,
+                        color = colors.labelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StateDot(
+                            when {
+                                state.pendingApproval != null || state.pendingQuestion != null -> StateDotState.Warning
+                                state.running -> StateDotState.Running
+                                else -> StateDotState.Done
+                            },
+                            size = 7.dp,
+                        )
                         Spacer(Modifier.width(DsSpacing.small))
-                        Column {
-                            Text("本机 Harness", style = DsType.std14Strong, color = colors.labelPrimary)
-                            Text(
-                                when {
-                                    !state.configured -> "未配置 · 点此设置"
-                                    state.pendingApproval != null -> "等待批准"
-                                    state.pendingQuestion != null -> "等待回答"
-                                    state.running -> state.model.removePrefix("deepseek-") + " · 执行中"
-                                    else -> state.model.removePrefix("deepseek-") + " · 已就绪"
-                                },
-                                style = DsType.small13,
-                                color = colors.labelTertiary,
-                            )
-                        }
+                        Text(
+                            when {
+                                !state.configured -> stringResource(R.string.local_status_setup)
+                                state.pendingApproval != null -> stringResource(R.string.local_status_approval)
+                                state.pendingQuestion != null -> stringResource(R.string.local_status_question)
+                                state.running -> stringResource(R.string.local_status_running)
+                                else -> stringResource(R.string.local_status_ready)
+                            },
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-                Spacer(Modifier.weight(1f))
                 DsIconButton(
                     icon = FeatherIcons.FileText,
                     contentDescription = stringResource(R.string.chat_open_files),
                     onClick = onOpenFiles,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.bgLayer1,
-                    shadowElevation = 3.dp,
+                    tint = colors.labelSecondary,
                 )
-                Spacer(Modifier.width(DsSpacing.small))
                 DsIconButton(
                     icon = Icons.Filled.Add,
-                    contentDescription = "新建会话",
+                    contentDescription = stringResource(R.string.chatlist_new_session),
                     onClick = onNewSession,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.bgLayer1,
-                    shadowElevation = 3.dp,
+                    tint = colors.labelSecondary,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = 56.dp)
+                    .heightIn(min = DsSpacing.touchTarget)
+                    .clip(DsShapes.pillFull)
+                    .background(colors.bgModulePlatform)
+                    .clickable(onClickLabel = stringResource(R.string.local_configure_model), onClick = onConfigure)
+                    .padding(horizontal = DsSpacing.medium),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.labelSecondary,
+                    modifier = Modifier.size(18.dp))
+                Text(
+                    if (state.configured) stringResource(
+                        R.string.local_model_action, state.model.removePrefix("deepseek-"),
+                    ) else stringResource(R.string.local_model_setup),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -658,18 +692,21 @@ private fun LocalChat(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                    Column(Modifier.weight(1f)) {
+                    Column(
+                        Modifier.weight(1f)
+                            .heightIn(min = DsSpacing.touchTarget)
+                            .clickable { approvalNoticeExpanded = !approvalNoticeExpanded },
+                        verticalArrangement = Arrangement.Center,
+                    ) {
                         Text(
-                            if (state.deviceApprovalLease) "本轮设备操作已授权" else "安全操作自动批准已开启",
+                            if (state.deviceApprovalLease) stringResource(R.string.local_device_approval_on)
+                            else stringResource(R.string.local_safe_approval_on),
                             style = DsType.small13Strong,
                             color = colors.warnLabel,
                         )
                         Text(
-                            if (state.deviceApprovalLease) {
-                                "当前代理回合中的普通界面点击、输入和滑动会直接执行；Shizuku、高权限、MCP、凭据和命令仍需逐次确认。"
-                            } else {
-                                "工作区内受边界保护的写入、编辑、补丁和下载，以及工作区外纯只读操作会直接执行；该设置跨对话保持。命令、外部写入、联网写入、设备及其他高风险操作仍按影响等级确认。"
-                            },
+                            if (approvalNoticeExpanded) stringResource(R.string.local_approval_scope_hide)
+                            else stringResource(R.string.local_approval_scope_show),
                             style = DsType.caption11,
                             color = colors.labelSecondary,
                         )
@@ -677,8 +714,19 @@ private fun LocalChat(
                     DsButton(
                         "关闭",
                         if (state.deviceApprovalLease) onDisableDeviceTurn else onDisableAutoApprove,
+                        modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
                         variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                    )
+                }
+                if (approvalNoticeExpanded) {
+                    Text(
+                        if (state.deviceApprovalLease) {
+                            stringResource(R.string.local_device_approval_scope)
+                        } else {
+                            stringResource(R.string.local_safe_approval_scope)
+                        },
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
                     )
                 }
             }
@@ -936,42 +984,39 @@ private fun ImportedAttachmentRow(
 @Composable
 private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
     val colors = DsTheme.colors
+    val filesPrompt = stringResource(R.string.local_prompt_files)
+    val researchPrompt = stringResource(R.string.local_prompt_research)
+    val tasksPrompt = stringResource(R.string.local_prompt_tasks)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = 64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.small, vertical = DsSpacing.xlarge),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        WhaleMark(Modifier.size(72.dp).shadow(14.dp, CircleShape, clip = false))
-        Spacer(Modifier.height(DsSpacing.medium))
-        Text("今天想让手机做点什么？", style = DsType.display24, color = colors.labelPrimary)
+        WhaleMark(Modifier.size(40.dp))
+        Text(stringResource(R.string.local_welcome_title), style = DsType.display24, color = colors.labelPrimary)
         Text(
-            "可以直接聊天，也可以让我处理文件、联网查资料、执行命令或拆分复杂任务。",
+            stringResource(R.string.local_welcome_hint),
             style = DsType.std14,
             color = colors.labelSecondary,
-            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(DsSpacing.small))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            DsQuickActionTile(
+        Text(stringResource(R.string.local_suggestions_title), style = DsType.small13Strong, color = colors.labelTertiary)
+        DsGroupCard {
+            DsCategoryRow(
                 icon = FeatherIcons.FileText,
-                label = "整理文件",
-                onClick = { onSuggestion("帮我整理工作区文件，并先给出安全的执行计划") },
-                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.local_suggestion_files),
+                subtitle = stringResource(R.string.local_suggestion_files_hint),
+                onClick = { onSuggestion(filesPrompt) },
             )
-            DsQuickActionTile(
+            DsCategoryRow(
                 icon = FeatherIcons.Globe,
-                label = "联网调研",
-                onClick = { onSuggestion("联网调研这个主题，列出来源、结论和待核实事项：") },
-                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.local_suggestion_research),
+                subtitle = stringResource(R.string.local_suggestion_research_hint),
+                onClick = { onSuggestion(researchPrompt) },
             )
-            DsQuickActionTile(
+            DsCategoryRow(
                 icon = FeatherIcons.CheckSquare,
-                label = "拆解任务",
-                onClick = { onSuggestion("把这项任务拆成可执行步骤，并从第一步开始：") },
-                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.local_suggestion_tasks),
+                subtitle = stringResource(R.string.local_suggestion_tasks_hint),
+                onClick = { onSuggestion(tasksPrompt) },
             )
         }
     }

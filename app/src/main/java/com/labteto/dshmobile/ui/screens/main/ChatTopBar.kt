@@ -65,7 +65,7 @@ internal fun ChatTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
+                .heightIn(min = 56.dp)
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -79,25 +79,14 @@ internal fun ChatTopBar(
                 shadowElevation = 2.dp,
             )
             Spacer(Modifier.width(DsSpacing.medium))
-            Column(
+            Text(
+                title,
+                style = DsType.base16Strong,
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                if (title.isNotBlank()) {
-                    Text(
-                        title,
-                        style = DsType.std14Strong,
-                        color = colors.labelPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                ModelChip(models = models, onClick = onOpenModels)
-            }
-            if (running) {
-                Spacer(Modifier.width(DsSpacing.small))
-                StateDot(StateDotState.Running, size = 8.dp)
-            }
+            )
             Spacer(Modifier.width(DsSpacing.small))
             DsIconButton(
                 icon = FeatherIcons.FileText,
@@ -118,6 +107,29 @@ internal fun ChatTopBar(
                     iconSize = 18.dp,
                     containerColor = colors.bgLayer1,
                     shadowElevation = 2.dp,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .padding(start = DsSpacing.comfortable + DsSpacing.touchTarget + DsSpacing.medium,
+                    end = DsSpacing.comfortable, bottom = DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ModelChip(
+                models = models,
+                onClick = onOpenModels,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (running) {
+                Spacer(Modifier.width(DsSpacing.small))
+                StateDot(StateDotState.Running, size = 7.dp)
+                Spacer(Modifier.width(DsSpacing.tiny))
+                Text(
+                    stringResource(R.string.chat_running_status),
+                    style = DsType.caption11,
+                    color = colors.labelSecondary,
+                    maxLines = 1,
                 )
             }
         }
@@ -156,7 +168,7 @@ private fun ModelChip(
     Row(
         modifier = modifier
             .widthIn(max = 220.dp)
-            .heightIn(min = 30.dp)
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.pillFull)
             .background(colors.hoverSolid)
             .border(1.dp, colors.borderL1, DsShapes.pillFull)
