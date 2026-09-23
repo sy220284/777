@@ -47,6 +47,23 @@ internal fun UserMessageNode.displayText(): String = blocks
     .joinToString("\n") { it.text.orEmpty() }
     .ifBlank { previewText }
 
+/**
+ * A tool-using assistant step is process narration, not the completed answer.
+ *
+ * The harness emits the assistant message first and the matching tool call afterwards with the
+ * same turn/step coordinates. Keeping this predicate protocol-based avoids guessing from wording.
+ */
+internal fun AssistantMessageNode.isWorkProcess(nodes: List<ChatNode>): Boolean {
+    val turnId = turn ?: return false
+    val stepId = step ?: return false
+    return nodes.any { candidate ->
+        candidate is ToolCallNode &&
+            candidate.turn == turnId &&
+            candidate.step == stepId &&
+            candidate.seq > seq
+    }
+}
+
 internal fun ChatNode.rendersContent(): Boolean = when (this) {
     // Structure, not content.
     is TurnStartNode -> false
