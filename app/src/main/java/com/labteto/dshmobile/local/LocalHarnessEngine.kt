@@ -933,7 +933,6 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
-                        completedToolCallIds += event.call.id
                         appendMessage("tool", event.output, event.call.name)
                         eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -947,6 +946,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("content", pruneToolResult(event.output))
                         }
                         checkpointModelHistory("tool/result")
+                        completedToolCallIds += event.call.id
                         persist()
                     }
                     is AgentEvent.StepFinished -> {
