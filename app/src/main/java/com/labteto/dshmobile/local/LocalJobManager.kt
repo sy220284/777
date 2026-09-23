@@ -16,7 +16,7 @@ internal class LocalJobManager(
             onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status) })
         },
         initialSnapshots = store?.read().orEmpty(),
-        onSnapshotsChanged = { snapshots -> store?.writeAsync(snapshots) },
+        onSnapshotsChanged = { snapshots -> store?.write(snapshots) },
     )
 
     fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
