@@ -1,19 +1,71 @@
 name: Release APK
 
 'on':
+  # 合并到主线后立即检查，定时任务用于补偿 GitHub Actions 的偶发延迟。
   push:
     tags:
       - 'v*'
     branches:
       - main
-    paths:
-      - '.github/release-version'
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect unreleased main commit
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LATEST_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name // empty')"
+          LATEST_TARGET="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.target_commitish // empty')"
+          if [ -n "$LATEST_TARGET" ] && [ "$LATEST_TARGET" = "$GITHUB_SHA" ]; then
+            echo "当前主线提交已经发布：$GITHUB_SHA"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          FALLBACK_VERSION="$(tr -d '\r\n' < .github/release-version)"
+          if [[ "$LATEST_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-777\.)([0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}$((BASH_REMATCH[2] + 1))"
+          elif [[ "$FALLBACK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
+            VERSION="$FALLBACK_VERSION"
+          else
+            echo "::error::无法从最新正式版或 .github/release-version 推导发布版本。"
+            exit 1
+          fi
+
+          echo "检测到主线尚未发布：$GITHUB_SHA -> v$VERSION"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   quality-gate:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +103,8 @@ jobs:
           test "$BYTES" -le "$BUDGET"
 
   android-16-instrumented:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +137,8 @@ jobs:
             adb shell pidof com.sy220284.dshmobile.debug
 
   release:
-    needs: [quality-gate, android-16-instrumented]
+    needs: [check-release, quality-gate, android-16-instrumented]
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -169,15 +224,13 @@ jobs:
 
           echo "DSH_RELEASE_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
 
-      # Tags remain supported. Updating the marker file provides a connector-friendly,
-      # auditable release path without changing the signing or verification pipeline.
       - name: Derive release version
         id: version
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="$(tr -d '\r\n' < .github/release-version)"
+            VERSION="${{ needs.check-release.outputs.version }}"
           fi
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
             echo "::error::发布版本格式无效：$VERSION"
