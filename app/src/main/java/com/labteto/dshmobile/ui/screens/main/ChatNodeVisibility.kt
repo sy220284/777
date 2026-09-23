@@ -54,14 +54,29 @@ internal fun UserMessageNode.displayText(): String = blocks
  * same turn/step coordinates. Keeping this predicate protocol-based avoids guessing from wording.
  */
 internal fun AssistantMessageNode.isWorkProcess(nodes: List<ChatNode>): Boolean {
-    val turnId = turn ?: return false
-    val stepId = step ?: return false
-    return nodes.any { candidate ->
-        candidate is ToolCallNode &&
-            candidate.turn == turnId &&
-            candidate.step == stepId &&
-            candidate.seq > seq
+    val turnId = turn
+    val stepId = step
+    if (turnId != null && stepId != null) {
+        val exactMatch = nodes.any { candidate ->
+            candidate is ToolCallNode &&
+                candidate.turn == turnId &&
+                candidate.step == stepId &&
+                candidate.seq > seq
+        }
+        if (exactMatch) return true
     }
+
+    // Older history can omit turn/step on assistant messages. In that case the durable event order
+    // still tells us whether this assistant row immediately led into tool work before the next
+    // assistant/user/turn boundary.
+    return nodes.asSequence()
+        .filter { it.seq > seq }
+        .takeWhile { candidate ->
+            candidate !is AssistantMessageNode &&
+                candidate !is UserMessageNode &&
+                candidate !is TurnEndNode
+        }
+        .any { it is ToolCallNode }
 }
 
 internal fun ChatNode.rendersContent(): Boolean = when (this) {
