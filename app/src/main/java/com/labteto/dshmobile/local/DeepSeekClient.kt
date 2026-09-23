@@ -182,7 +182,7 @@ class DeepSeekClient @Inject constructor(
                     }
                 }
                 if (!sawStreamData && fallback.isNotBlank()) {
-                    return@use parse(fallback.toString())
+                    return@withContext parse(fallback.toString())
                 }
                 val message = buildJsonObject {
                     put("role", "assistant")
@@ -196,7 +196,7 @@ class DeepSeekClient @Inject constructor(
                                     put("type", "function")
                                     put("function", buildJsonObject {
                                         put("name", call.name ?: error("流式工具调用缺少 name"))
-                                        put("arguments", call.arguments.toString())
+                                        put("arguments", call.arguments.toString().ifBlank { "{}" })
                                     })
                                 })
                             }
