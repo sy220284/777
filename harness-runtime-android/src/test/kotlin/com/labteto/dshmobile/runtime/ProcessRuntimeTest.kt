@@ -103,4 +103,21 @@ class ProcessRuntimeTest {
         assertTrue(result.timedOut)
     }
 
+    @Test(timeout = 5000)
+    fun timeoutStopsInheritedDescendants() = kotlinx.coroutines.runBlocking {
+        val directory = createTempDir(prefix = "process-group-test-")
+        try {
+            val marker = File(directory, "unexpected-output")
+            val result = AndroidProcessRuntime().execute(ProcessRequest(
+                command = listOf("sh", "-c", "(sleep 1; printf leftover > \"\$1\") & wait", "check", marker.path),
+                timeoutMillis = 100,
+            ))
+            assertTrue(result.timedOut)
+            kotlinx.coroutines.delay(1200)
+            assertFalse("descendant survived timeout", marker.exists())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
