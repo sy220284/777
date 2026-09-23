@@ -372,9 +372,10 @@ private fun LocalModeDrawer(
                     onClick = onSettings,
                 )
             }
-            LocalUsageFooter(usage)
         }
+        LocalUsageFooter(usage)
     }
+}
 }
 
 @Composable
