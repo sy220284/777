@@ -8,12 +8,30 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
 
+internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
+    context.trim().takeIf(String::isNotEmpty)?.take(maxChars.coerceAtLeast(1))
+
+internal fun inheritedHistoryBeforeToolCall(
+    history: List<JsonObject>,
+    parentCallId: String?,
+): MutableList<JsonObject> {
+    if (parentCallId.isNullOrBlank()) return history.toMutableList()
+    val boundary = history.indexOfLast { message ->
+        message["role"]?.jsonPrimitive?.contentOrNull == "assistant" &&
+            message["tool_calls"]?.jsonArray.orEmpty().any { element ->
+                element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == parentCallId
+            }
+    }
+    return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
+}
+
 internal class LocalSubagentRunner(
     private val apiKeys: LocalApiKeyStore,
     private val modelClient: DeepSeekClient,
     private val state: StateFlow<LocalHarnessState>,
     private val jobs: LocalJobManager,
     private val historySnapshot: () -> List<JsonObject>,
+    private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> String,
@@ -24,12 +42,17 @@ internal class LocalSubagentRunner(
         inheritHistory: Boolean,
         allowMutation: Boolean,
         backgroundJobId: String? = null,
+        parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
     ): String {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val key = apiKeys.get() ?: return "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
-        val history = if (inheritHistory) historySnapshot().toMutableList() else mutableListOf()
+        val history = if (inheritHistory) {
+            inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+        } else {
+            mutableListOf()
+        }
         val progress = ArrayDeque<String>()
         val stepLimit = maxSteps.coerceIn(1, 40)
         val snapshot = state.value
@@ -56,6 +79,19 @@ internal class LocalSubagentRunner(
                         "你是安卓本机 Harness 的只读子代理。完成指定子任务，可读取和搜索工作区、读取技能、获取网页与解析 JSON；禁止修改用户文件和执行命令。"
                     },
                 )
+            }
+            boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
+                val insertion = buildJsonObject {
+                    put("role", "system")
+                    put(
+                        "content",
+                        "【父级约束上下文】\n$inherited\n以上约束继承自父任务；若与本子任务的明确新要求冲突，以本子任务要求为准。",
+                    )
+                }
+                val index = if (
+                    history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+                ) 1 else 0
+                history.add(index, insertion)
             }
             history += buildJsonObject { put("role", "user"); put("content", task) }
 

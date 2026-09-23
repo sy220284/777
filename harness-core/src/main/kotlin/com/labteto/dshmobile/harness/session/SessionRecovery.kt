@@ -39,6 +39,27 @@ object SessionRecovery {
         var started: Boolean,
     )
 
+    /**
+     * Build the model-visible settlement for a tool call interrupted before a durable result exists.
+     *
+     * The same semantic is used both for process-loss recovery and for an in-process cancelled turn,
+     * so a continuation never sees an assistant tool call without a matching tool result.
+     */
+    fun interruptedToolResult(
+        callId: String,
+        name: String?,
+        step: Int?,
+        started: Boolean,
+    ): RecoveredToolResult {
+        val code = if (started) TOOL_OUTCOME_UNKNOWN else TOOL_NOT_STARTED
+        val content = if (started) {
+            "该工具调用在中断前已记录为开始，但没有持久化结果。实际副作用未知；若工具可能改变状态，先检查外部状态，禁止盲目重试。"
+        } else {
+            "该工具调用在中断前尚未记录为开始。如任务仍需要，可重新执行。"
+        }
+        return RecoveredToolResult(callId, name, step, code, content)
+    }
+
     fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
         val events = log.snapshot()
         if (events.isEmpty()) return SessionRepairResult()
@@ -100,20 +121,20 @@ object SessionRecovery {
         val appended = mutableListOf<SessionEvent>()
         val recovered = mutableListOf<RecoveredToolResult>()
         for (call in pending.values) {
-            val code = if (call.started) TOOL_OUTCOME_UNKNOWN else TOOL_NOT_STARTED
-            val content = if (call.started) {
-                "该工具调用在中断前已记录为开始，但没有持久化结果。实际副作用未知；若工具可能改变状态，先检查外部状态，禁止盲目重试。"
-            } else {
-                "该工具调用在中断前尚未记录为开始。如任务仍需要，可重新执行。"
-            }
-            recovered += RecoveredToolResult(call.id, call.name, call.step, code, content)
+            val result = interruptedToolResult(
+                callId = call.id,
+                name = call.name,
+                step = call.step,
+                started = call.started,
+            )
+            recovered += result
             appended += log.append("tool/result", buildJsonObject {
-                call.step?.let { put("step", it) }
-                put("id", call.id)
-                call.name?.let { put("name", it) }
-                put("content", content)
+                result.step?.let { put("step", it) }
+                put("id", result.callId)
+                result.name?.let { put("name", it) }
+                put("content", result.content)
                 put("is_error", true)
-                put("error_code", code)
+                put("error_code", result.code)
                 put("recovered", true)
             })
         }

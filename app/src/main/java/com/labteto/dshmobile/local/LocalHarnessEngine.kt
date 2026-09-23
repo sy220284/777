@@ -32,6 +32,7 @@ import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -242,9 +243,28 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
     private val subagents by lazy {
-        LocalSubagentRunner(apiKeys, modelClient, state, jobs,
-            historySnapshot = { modelHistory.toList() }, eventLog = { eventLog },
-            schemas = ::subagentToolSchemas, execute = ::executeSafely, pruneToolResult = ::pruneToolResult,
+        LocalSubagentRunner(
+            apiKeys = apiKeys,
+            modelClient = modelClient,
+            state = state,
+            jobs = jobs,
+            historySnapshot = { modelHistory.toList() },
+            contextSnapshot = { query ->
+                val snapshot = _state.value
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = snapshot.conversationMode,
+                        projectId = snapshot.projectId,
+                        lineageId = snapshot.lineageId,
+                        handoffSummary = snapshot.handoffSummary,
+                    ),
+                )
+            },
+            eventLog = { eventLog },
+            schemas = ::subagentToolSchemas,
+            execute = ::executeSafely,
+            pruneToolResult = ::pruneToolResult,
         )
     }
 
@@ -764,6 +784,43 @@ class LocalHarnessEngine @Inject constructor(
         var requestPrepared = false
         var ephemeralContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
+        var activeStep: Int? = null
+        var activeToolCalls = emptyList<AgentToolCall>()
+        val startedToolCallIds = linkedSetOf<String>()
+        val completedToolCallIds = linkedSetOf<String>()
+
+        fun settlePendingTools(reason: String) {
+            val settlements = pendingToolSettlements(
+                calls = activeToolCalls,
+                startedCallIds = startedToolCallIds,
+                completedCallIds = completedToolCallIds,
+            )
+            if (settlements.isEmpty()) return
+            settlements.forEach { settlement ->
+                val result = SessionRecovery.interruptedToolResult(
+                    callId = settlement.call.id,
+                    name = settlement.call.name,
+                    step = activeStep,
+                    started = settlement.started,
+                )
+                eventLog.append("tool/result", buildJsonObject {
+                    result.step?.let { put("step", it) }
+                    put("id", result.callId)
+                    result.name?.let { put("name", it) }
+                    put("content", result.content)
+                    put("is_error", true)
+                    put("error_code", result.code)
+                    put("runtime_settlement", true)
+                    put("reason", reason)
+                })
+                modelHistory += buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", result.callId)
+                    put("content", result.content)
+                }
+                completedToolCallIds += result.callId
+            }
+        }
 
         val loop = AgentLoop(
             model = AgentModel {
@@ -844,6 +901,10 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.StepStarted -> {
+                        activeStep = event.step
+                        activeToolCalls = emptyList()
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                         eventLog.append("step/start", buildJsonObject {
                             put("step", event.step)
                         })
@@ -852,6 +913,9 @@ class LocalHarnessEngine @Inject constructor(
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
                         modelHistory += reply.message
+                        activeToolCalls = event.toolCalls
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                         eventLog.append("assistant/message", reply.message)
                         checkpointModelHistory("assistant/message")
                         reply.reasoning?.takeIf { it.isNotBlank() }?.let {
@@ -865,6 +929,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                     is AgentEvent.ToolStarted -> {
+                        startedToolCallIds += event.call.id
                         eventLog.append("tool/call", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
@@ -885,6 +950,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("tool_call_id", event.call.id)
                             put("content", pruneToolResult(event.output))
                         }
+                        completedToolCallIds += event.call.id
                         checkpointModelHistory("tool/result")
                         persist()
                     }
@@ -892,6 +958,10 @@ class LocalHarnessEngine @Inject constructor(
                         eventLog.append("step/end", buildJsonObject {
                             put("step", event.step)
                         })
+                        activeStep = null
+                        activeToolCalls = emptyList()
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                     }
                     is AgentEvent.TurnCompleted -> {
                         eventLog.append("turn/end", buildJsonObject {
@@ -909,6 +979,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnFailed -> {
+                        settlePendingTools("failed")
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "error")
                             put("detail", event.reason.take(2_000))
@@ -916,6 +987,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnCancelled -> {
+                        settlePendingTools("cancelled")
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "aborted")
                             put("messages", _state.value.messages.size)
@@ -1242,9 +1314,10 @@ class LocalHarnessEngine @Inject constructor(
             }
             "subagent_fork", "fork_subagent" ->
                 subagents.run(
-                    args.string("task"),
+                    task = args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
+                    parentCallId = call.id,
                     maxSteps = _state.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
