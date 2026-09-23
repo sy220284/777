@@ -308,7 +308,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                     node.blocks.forEach { block ->
                         when (block.kind) {
                             "text", "reasoning" -> {
-                                if (!block.text.isNullOrBlank()) MarkdownText(block.text.orEmpty())
+                                if (!block.text.isNullOrBlank()) {\n                                    MarkdownText(block.text.orEmpty(), allowCodeCopy = false)\n                                }
                             }
                             // Tool calls/results have their own compact cards in the transcript.
                             "tool-call", "tool-result" -> Unit
@@ -353,7 +353,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                         streaming = streaming,
                     )
                     AnimatedVisibility(visible = expanded) {
-                        MarkdownText(block.text.orEmpty())
+                        MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
                     }
                 }
                 // Tool calls arrive as their own nodes and render as cards; the inline block is a
