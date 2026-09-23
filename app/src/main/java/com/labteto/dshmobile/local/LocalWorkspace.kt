@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.local
 
 import java.io.File
+import java.io.FileOutputStream
 import java.io.Reader
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -50,8 +53,7 @@ class LocalWorkspace(
     fun write(relativePath: String, content: String): String {
         require(content.toByteArray().size <= MAX_WRITE_BYTES) { "单次写入超过 ${MAX_WRITE_BYTES / 1024} KB" }
         val file = resolve(relativePath)
-        file.parentFile?.mkdirs()
-        file.writeText(content)
+        atomicWrite(file, content)
         observations.remove(file.path)
         return "已写入 $relativePath（${content.toByteArray().size} 字节）"
     }
@@ -63,8 +65,7 @@ class LocalWorkspace(
             "工具产物超过 ${MAX_TOOL_ARTIFACT_BYTES / 1024 / 1024} MB：$relativePath"
         }
         val file = resolve(relativePath)
-        file.parentFile?.mkdirs()
-        file.writeText(content)
+        atomicWrite(file, content)
         return file.relativeTo(canonicalRoot).invariantSeparatorsPath
     }
 
@@ -117,7 +118,7 @@ class LocalWorkspace(
         require(source.indexOf(oldText, first + oldText.length) < 0) { "待替换内容出现多次，请提供更长的唯一片段" }
         val result = source.replaceRange(first, first + oldText.length, newText)
         require(result.toByteArray().size <= MAX_WRITE_BYTES) { "编辑结果超过 ${MAX_WRITE_BYTES / 1024} KB" }
-        file.writeText(result)
+        atomicWrite(file, result)
         observations[file.path] = fingerprint(file)
         return "已编辑 $relativePath"
     }
@@ -289,6 +290,28 @@ class LocalWorkspace(
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun atomicWrite(target: File, content: String) {
+        val directory = target.parentFile ?: error("文件缺少父目录")
+        require(directory.isDirectory || directory.mkdirs()) { "无法创建目录：$directory" }
+        val temporary = Files.createTempFile(directory.toPath(), ".write-", ".tmp")
+        try {
+            FileOutputStream(temporary.toFile()).use { output ->
+                output.write(content.toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            if (target.isFile && target.canExecute()) {
+                require(temporary.toFile().setExecutable(true, true)) { "无法保留文件执行权限：$target" }
+            }
+            try {
+                Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 
     private fun resolve(relativePath: String): File {

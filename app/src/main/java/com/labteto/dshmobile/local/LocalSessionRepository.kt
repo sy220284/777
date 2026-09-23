@@ -2,8 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,17 +36,29 @@ internal class LocalSessionRepository(
 
     init {
         scope.launch {
+            var consecutiveFailures = 0
             for (ignored in wakeups) {
                 while (true) {
                     val snapshot = synchronized(lock) {
                         pending.keys.firstOrNull()?.let { pending.remove(it) }
                     } ?: break
-                    runCatching {
+                    try {
                         store.write(snapshot.id, json.parseToJsonElement(
                             json.encodeToString(LocalHarnessSession.serializer(), snapshot),
                         ).jsonObject, updatedAt = snapshot.updatedAt)
                         onWritten()
-                    }.onFailure(onError)
+                        consecutiveFailures = 0
+                    } catch (cancelled: CancellationException) {
+                        synchronized(lock) { pending.putIfAbsent(snapshot.id, snapshot) }
+                        throw cancelled
+                    } catch (error: Exception) {
+                        // Keep the newest snapshot for this session. A failed disk write must not
+                        // silently remove the only queued copy or spin at full speed on a bad disk.
+                        synchronized(lock) { pending.putIfAbsent(snapshot.id, snapshot) }
+                        onError(error)
+                        consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(5)
+                        delay((1_000L shl (consecutiveFailures - 1)).coerceAtMost(30_000L))
+                    }
                 }
             }
         }

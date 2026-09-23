@@ -36,6 +36,17 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun replacingAnExecutableFileKeepsItsExecutePermission() {
+        workspace.write("scripts/run.sh", "#!/bin/sh\necho before\n")
+        val script = root.resolve("scripts/run.sh")
+        assertTrue(script.setExecutable(true, true))
+        workspace.read("scripts/run.sh")
+        workspace.edit("scripts/run.sh", "before", "after")
+        assertTrue(script.canExecute())
+        assertTrue(script.readText().contains("after"))
+    }
+
+    @Test
     fun traversalIsRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.write("../escape.txt", "no")
