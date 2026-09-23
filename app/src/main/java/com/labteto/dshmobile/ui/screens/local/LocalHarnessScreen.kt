@@ -609,7 +609,7 @@ private fun LocalChat(
             }
         }
 
-        if (state.autoApproveMutations || state.deviceApprovalLease) {
+        if (state.safeAutoApprovalEnabled || state.deviceApprovalLease) {
             Surface(
                 color = colors.warnTertiary,
                 shape = RoundedCornerShape(12.dp),
@@ -631,7 +631,7 @@ private fun LocalChat(
                             if (state.deviceApprovalLease) {
                                 "当前代理回合中的普通界面点击、输入和滑动会直接执行；Shizuku、高权限、MCP、凭据和命令仍需逐次确认。"
                             } else {
-                                "当前会话中被工作区沙箱约束的写入、编辑、补丁和下载会直接执行；命令、工作区外写入/删除及其他高风险操作仍需逐次确认。"
+                                "工作区内受边界保护的写入、编辑、补丁和下载，以及工作区外纯只读操作会直接执行；该设置跨对话保持。命令、外部写入、联网写入、设备及其他高风险操作仍按影响等级确认。"
                             },
                             style = DsType.caption11,
                             color = colors.labelSecondary,
@@ -834,7 +834,7 @@ private fun LocalChat(
     state.pendingApproval?.let {
         ApprovalDialog(
             approval = it,
-            safeAutoApprovalEnabled = state.autoApproveMutations,
+            safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
             onApprove = onApprove,
             onDeny = onDeny,
             onAutoApprove = onAutoApprove,
