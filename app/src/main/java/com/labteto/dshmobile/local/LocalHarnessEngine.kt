@@ -307,6 +307,20 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /** Read-only file views used by the local Harness UI. Heavy filesystem work stays off main. */
+    suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
+        workspace.files()
+    }
+
+    suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
+        withContext(Dispatchers.IO) {
+            val files = workspace.files()
+            localConversationFiles(eventLogFor(sessionId).snapshot(), files)
+        }
+
+    suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
+        withContext(Dispatchers.IO) { workspace.preview(path) }
+
     /** Save the local model route and its encrypted credential. */
     fun configure(apiKey: String, model: String, baseUrl: String) {
         scope.launch {

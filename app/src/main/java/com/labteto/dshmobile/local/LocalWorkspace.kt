@@ -176,6 +176,51 @@ class LocalWorkspace(
         return if (matches.isEmpty()) "未找到匹配内容" else matches.joinToString("\n")
     }
 
+    /** Snapshot real files for the app UI without exposing raw File handles outside the sandbox. */
+    fun files(limit: Int = 2_000): List<LocalWorkspaceFile> =
+        safeWalk(canonicalRoot)
+            .filter { it.isFile && isInsideWorkspace(it) }
+            .take(limit.coerceIn(1, 10_000))
+            .map { file ->
+                LocalWorkspaceFile(
+                    path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+                    bytes = file.length(),
+                    modifiedAt = file.lastModified(),
+                )
+            }
+            .sortedBy(LocalWorkspaceFile::path)
+            .toList()
+
+    /** Bounded preview for local workspace files; binary files still return metadata and no text. */
+    fun preview(relativePath: String, maxBytes: Int = 512 * 1024): LocalWorkspaceFilePreview {
+        val file = resolve(relativePath)
+        require(file.isFile) { "文件不存在：$relativePath" }
+        val safeMax = maxBytes.coerceIn(1, 2 * 1024 * 1024)
+        val buffer = ByteArray(minOf(file.length().coerceAtMost(safeMax.toLong()).toInt(), safeMax))
+        val count = file.inputStream().use { input ->
+            var offset = 0
+            while (offset < buffer.size) {
+                val read = input.read(buffer, offset, buffer.size - offset)
+                if (read < 0) break
+                offset += read
+            }
+            offset
+        }
+        val bytes = if (count == buffer.size) buffer else buffer.copyOf(count)
+        val binary = bytes.take(8_192).any { it == 0.toByte() } ||
+            relativePath.substringAfterLast('.', "").lowercase() in BINARY_PREVIEW_EXTENSIONS
+        val info = LocalWorkspaceFile(
+            path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+            bytes = file.length(),
+            modifiedAt = file.lastModified(),
+        )
+        return LocalWorkspaceFilePreview(
+            file = info,
+            text = if (binary) null else String(bytes, Charsets.UTF_8),
+            truncated = file.length() > bytes.size,
+        )
+    }
+
     /** Execute Android's system shell in the workspace with a hard timeout. */
     suspend fun shell(
         command: String,
@@ -302,6 +347,13 @@ class LocalWorkspace(
     }
 
     private companion object {
+        val BINARY_PREVIEW_EXTENSIONS = setOf(
+            "png", "jpg", "jpeg", "gif", "webp", "bmp", "pdf",
+            "zip", "7z", "rar", "gz", "tar", "apk", "jar", "so", "bin",
+            "docx", "xlsx", "pptx", "mp3", "wav", "mp4", "mov", "webm",
+            "db", "sqlite", "woff", "woff2", "ttf", "otf",
+        )
+
         const val MAX_TEXT_BYTES = 5_242_880L
         const val MAX_WRITE_BYTES = 2_097_152
         const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024

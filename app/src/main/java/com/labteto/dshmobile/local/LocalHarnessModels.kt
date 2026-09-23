@@ -53,6 +53,28 @@ data class LocalSessionSummary(
     val blank: Boolean = false,
 )
 
+/** One real file currently present in the app-private local Harness workspace. */
+data class LocalWorkspaceFile(
+    val path: String,
+    val bytes: Long,
+    val modifiedAt: Long,
+)
+
+/** Current-session file projection derived from its durable tool event log. */
+data class LocalConversationFiles(
+    val artifacts: List<LocalWorkspaceFile> = emptyList(),
+    val involved: List<LocalWorkspaceFile> = emptyList(),
+) {
+    val isEmpty: Boolean get() = artifacts.isEmpty() && involved.isEmpty()
+}
+
+/** Lightweight local preview; binary files remain visible without forcing them through UTF-8. */
+data class LocalWorkspaceFilePreview(
+    val file: LocalWorkspaceFile,
+    val text: String? = null,
+    val truncated: Boolean = false,
+)
+
 /** One persisted implementation task, aligned with the official todo tool. */
 @Serializable
 data class LocalTodoItem(

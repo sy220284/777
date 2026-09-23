@@ -62,6 +62,7 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.EmptyHero
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
@@ -146,6 +147,7 @@ fun ChatListDrawer(
     val searchResults by store.searchResults.collectAsStateWithLifecycle()
     val contentSearchAvailable by store.contentSearchAvailable.collectAsStateWithLifecycle()
     val currentSessionId by store.currentSessionId.collectAsStateWithLifecycle()
+    val connection by store.connectionState.collectAsStateWithLifecycle()
     val hostInfo by store.hostInfo.collectAsStateWithLifecycle()
 
     var query by remember { mutableStateOf("") }
@@ -155,6 +157,7 @@ fun ChatListDrawer(
     val sortByRecency = sessionSort == SORT_UPDATED
     var newWorkspaceOpen by remember { mutableStateOf(false) }
     var newSessionOpen by remember { mutableStateOf(false) }
+    var workspacePanelKey by remember { mutableStateOf<ComposerKey?>(null) }
 
     LaunchedEffect(query) {
         delay(250)
@@ -380,6 +383,23 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
+            DsButton(
+                text = stringResource(R.string.chatlist_workspace_files),
+                onClick = {
+                    val sessionId = currentSessionId
+                    val hostKey = connection.host?.let { "${it.baseUrl}|${it.id}" }
+                    if (sessionId != null && hostKey != null) {
+                        val key = ComposerKey(hostKey, sessionId)
+                        store.panels.get(key).section = 0
+                        workspacePanelKey = key
+                        onClose()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Ghost,
+                icon = FeatherIcons.FileText,
+                enabled = currentSessionId != null && connection.host != null,
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -432,6 +452,15 @@ fun ChatListDrawer(
             }
         }
 
+    }
+
+    workspacePanelKey?.let { key ->
+        WorkspacePanels(
+            store = store,
+            state = store.panels.get(key),
+            mode = WorkspacePanelMode.WORKSPACE,
+            onDismiss = { workspacePanelKey = null },
+        )
     }
 
     if (newSessionOpen) {

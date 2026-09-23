@@ -112,6 +112,9 @@ fun ChatScreen(
     val imageLimits by store.imageLimits.collectAsStateWithLifecycle()
 
     val currentSession = sessions.firstOrNull { it.sessionId == currentSessionId }
+    val conversationFiles = remember(conversation?.nodes, currentSession?.cwd) {
+        conversationFileIndex(conversation?.nodes.orEmpty(), currentSession?.cwd)
+    }
     val title = currentSession?.title
         ?: currentSession?.cwd?.let { basename(it) }
         ?: currentSessionId.orEmpty()
@@ -127,6 +130,7 @@ fun ChatScreen(
     val attachments = composer.attachments
 
     var panelKey by remember { mutableStateOf<ComposerKey?>(null) }
+    var panelMode by remember { mutableStateOf(WorkspacePanelMode.WORKSPACE) }
     var feedback by remember { mutableStateOf<Triple<ComposerKey, String, Boolean>?>(null) }
     var sheet by remember { mutableStateOf<ChatSheet?>(null) }
 
@@ -366,7 +370,9 @@ fun ChatScreen(
     androidx.compose.runtime.CompositionLocalProvider(
         com.labteto.dshmobile.ui.media.LocalAttachmentScope provides (composer.key.host to composer.key.sessionId),
         com.labteto.dshmobile.ui.components.LocalFileOpener provides { path: String ->
-        store.panels.get(composer.key).open(path); panelKey = composer.key
+        panelMode = WorkspacePanelMode.WORKSPACE
+        store.panels.get(composer.key).open(path)
+        panelKey = composer.key
     }) {
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
         // The activity draws edge to edge, so every top-level surface has to consume the insets
@@ -380,6 +386,13 @@ fun ChatScreen(
                 detailsOpen = detailsOpen,
                 onOpenDrawer = onOpenDrawer,
                 onOpenModels = { sheet = ChatSheet.Models },
+                onOpenFiles = {
+                    if (currentSessionId != null) {
+                        store.panels.get(composer.key).section = 0
+                        panelMode = WorkspacePanelMode.CONVERSATION
+                        panelKey = composer.key
+                    }
+                },
                 onOpenDetails = onOpenDetails,
             )
 
@@ -580,7 +593,15 @@ fun ChatScreen(
     }
 
     }
-    panelKey?.let { key -> WorkspacePanels(store, store.panels.get(key), onDismiss = { panelKey = null }) }
+    panelKey?.let { key ->
+        WorkspacePanels(
+            store = store,
+            state = store.panels.get(key),
+            mode = panelMode,
+            conversationFiles = if (key == composer.key) conversationFiles else ConversationFileIndex(),
+            onDismiss = { panelKey = null },
+        )
+    }
     feedback?.let { (key, id, positive) -> FeedbackDialog(store, key, id, positive) { feedback = null } }
     when (sheet) {
         ChatSheet.Attachments -> AttachmentSheet(
@@ -614,7 +635,11 @@ fun ChatScreen(
                 sheet = ChatSheet.Presets
             },
             onOpenSubagents = { sheet = ChatSheet.Subagents },
-            onOpenWorkspace = { panelKey = composer.key },
+            onOpenWorkspace = {
+                store.panels.get(composer.key).section = 0
+                panelMode = WorkspacePanelMode.WORKSPACE
+                panelKey = composer.key
+            },
             onTabChange = { tab = it },
             // The sheet only auto-runs commands that take no input at all, and a command that
             // takes no input takes no attachments either — so a pending attachment refuses here

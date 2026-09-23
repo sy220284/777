@@ -67,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +75,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
@@ -117,6 +119,7 @@ fun LocalHarnessScreen(
     val scope = rememberCoroutineScope()
     var editingConfig by rememberSaveable { mutableStateOf(false) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
+    var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -138,6 +141,10 @@ fun LocalHarnessScreen(
                 },
                 onSwitchSession = { sessionId ->
                     viewModel.switchSession(sessionId)
+                    scope.launch { drawerState.close() }
+                },
+                onWorkspaceFiles = {
+                    filesMode = LocalFilesMode.WORKSPACE
                     scope.launch { drawerState.close() }
                 },
                 onTasks = {
@@ -171,6 +178,7 @@ fun LocalHarnessScreen(
             else -> LocalChat(
                 state = state,
                 onOpenMenu = { scope.launch { drawerState.open() } },
+                onOpenFiles = { filesMode = LocalFilesMode.CONVERSATION },
                 onConfigure = { editingConfig = true },
                 onSend = viewModel::send,
                 onImportAttachment = viewModel::importAttachment,
@@ -198,6 +206,17 @@ fun LocalHarnessScreen(
         )
     }
 
+    filesMode?.let { mode ->
+        LocalWorkspaceFilesDialog(
+            mode = mode,
+            sessionId = state.sessionId,
+            loadWorkspace = viewModel::workspaceFiles,
+            loadConversation = viewModel::conversationFiles,
+            loadPreview = viewModel::previewWorkspaceFile,
+            onDismiss = { filesMode = null },
+        )
+    }
+
 }
 
 @Composable
@@ -207,6 +226,7 @@ private fun LocalModeDrawer(
     onLocal: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
+    onWorkspaceFiles: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
@@ -304,6 +324,12 @@ private fun LocalModeDrawer(
 
             Text("功能", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
+                DsCategoryRow(
+                    icon = FeatherIcons.FileText,
+                    title = stringResource(R.string.chatlist_workspace_files),
+                    subtitle = stringResource(R.string.local_files_workspace_subtitle),
+                    onClick = onWorkspaceFiles,
+                )
                 DsCategoryRow(
                     icon = Icons.Outlined.Schedule,
                     title = "任务",
@@ -456,6 +482,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 private fun LocalChat(
     state: LocalHarnessState,
     onOpenMenu: () -> Unit,
+    onOpenFiles: () -> Unit,
     onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
@@ -599,6 +626,15 @@ private fun LocalChat(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                DsIconButton(
+                    icon = FeatherIcons.FileText,
+                    contentDescription = stringResource(R.string.chat_open_files),
+                    onClick = onOpenFiles,
+                    tint = colors.labelPrimary,
+                    containerColor = colors.bgLayer1,
+                    shadowElevation = 3.dp,
+                )
+                Spacer(Modifier.width(DsSpacing.small))
                 DsIconButton(
                     icon = Icons.Filled.Add,
                     contentDescription = "新建会话",

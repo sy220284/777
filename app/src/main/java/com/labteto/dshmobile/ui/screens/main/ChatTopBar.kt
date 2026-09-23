@@ -56,6 +56,7 @@ internal fun ChatTopBar(
     detailsOpen: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenModels: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -97,6 +98,16 @@ internal fun ChatTopBar(
                 Spacer(Modifier.width(DsSpacing.small))
                 StateDot(StateDotState.Running, size = 8.dp)
             }
+            Spacer(Modifier.width(DsSpacing.small))
+            DsIconButton(
+                icon = FeatherIcons.FileText,
+                contentDescription = stringResource(R.string.chat_open_files),
+                onClick = onOpenFiles,
+                tint = colors.labelTertiary,
+                iconSize = 18.dp,
+                containerColor = colors.bgLayer1,
+                shadowElevation = 2.dp,
+            )
             if (!detailsOpen) {
                 Spacer(Modifier.width(DsSpacing.small))
                 DsIconButton(
