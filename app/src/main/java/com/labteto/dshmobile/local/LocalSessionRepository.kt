@@ -8,8 +8,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -43,9 +45,11 @@ internal class LocalSessionRepository(
                         pending.keys.firstOrNull()?.let { pending.remove(it) }
                     } ?: break
                     try {
-                        store.write(snapshot.id, json.parseToJsonElement(
-                            json.encodeToString(LocalHarnessSession.serializer(), snapshot),
-                        ).jsonObject, updatedAt = snapshot.updatedAt)
+                        store.write(
+                            snapshot.id,
+                            json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
+                            updatedAt = snapshot.updatedAt,
+                        )
                         onWritten()
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
@@ -74,20 +78,36 @@ internal class LocalSessionRepository(
     fun readWithLegacyApproval(id: String): LocalSessionRead? =
         store.read(id)?.document?.payload?.let { payload ->
             LocalSessionRead(
-                session = json.decodeFromString(LocalHarnessSession.serializer(), payload.toString()),
+                session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
                 legacySafeAutoApproval = legacySafeAutoApproval(payload),
             )
         }
 
-    fun summaries(): List<LocalSessionSummary> = store.list().mapNotNull { loaded ->
-        runCatching {
-            val session = json.decodeFromString(LocalHarnessSession.serializer(), loaded.document.payload.toString())
-            LocalSessionSummary(
-                id = session.id.ifBlank { loaded.document.id },
-                title = session.title,
-                updatedAt = session.updatedAt.takeIf { it > 0 } ?: loaded.document.updatedAt,
-                blank = session.messages.none { it.content.isNotBlank() },
-            )
-        }.getOrNull()
-    }
+    fun summaries(): List<LocalSessionSummary> = store.ids()
+        .mapNotNull { id ->
+            val loaded = try {
+                store.read(id)
+            } catch (future: FutureSessionVersionException) {
+                throw future
+            } catch (_: Exception) {
+                null
+            } ?: return@mapNotNull null
+
+            runCatching {
+                val payload = loaded.document.payload
+                val messages = payload["messages"] as? JsonArray
+                LocalSessionSummary(
+                    id = payload["id"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: loaded.document.id,
+                    title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
+                    updatedAt = loaded.document.updatedAt,
+                    blank = messages?.none { element ->
+                        val message = element as? JsonObject ?: return@none true
+                        message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
+                    } ?: true,
+                )
+            }.getOrNull()
+        }
+        .sortedByDescending(LocalSessionSummary::updatedAt)
 }
