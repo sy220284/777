@@ -59,6 +59,7 @@ import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -570,36 +571,47 @@ class LocalHarnessEngine @Inject constructor(
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
-        var target = File(dir, safeName)
-        var suffix = 1
-        while (target.exists()) {
-            val dot = safeName.lastIndexOf('.')
-            val stem = if (dot > 0) safeName.substring(0, dot) else safeName
-            val ext = if (dot > 0) safeName.substring(dot) else ""
-            target = File(dir, "$stem-${suffix++}$ext")
-        }
+        val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
+        val digest = MessageDigest.getInstance("SHA-256")
         val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
-        input.use { source ->
-            target.outputStream().use { output ->
-                val buffer = ByteArray(32 * 1024)
-                var total = 0L
-                while (true) {
-                    val read = source.read(buffer)
-                    if (read < 0) break
-                    total += read
-                    if (total > MAX_ATTACHMENT_BYTES) {
-                        target.delete()
-                        error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
+        try {
+            input.use { source ->
+                incoming.outputStream().use { output ->
+                    val buffer = ByteArray(32 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val read = source.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        if (total > MAX_ATTACHMENT_BYTES) {
+                            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
+                        }
+                        digest.update(buffer, 0, read)
+                        output.write(buffer, 0, read)
                     }
-                    output.write(buffer, 0, read)
                 }
             }
+        } catch (error: Throwable) {
+            incoming.delete()
+            throw error
+        }
+        val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+        val extension = safeName.substringAfterLast('.', "")
+            .lowercase()
+            .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
+        val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
+        if (target.exists()) {
+            incoming.delete()
+        } else if (!incoming.renameTo(target)) {
+            incoming.copyTo(target, overwrite = false)
+            incoming.delete()
         }
         LocalImportedAttachment(
-            name = displayName ?: target.name,
+            name = displayName ?: safeName,
             relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
             mediaType = resolver.getType(uri) ?: "application/octet-stream",
             bytes = target.length(),
+            attachmentId = attachmentId,
         )
     }
 
