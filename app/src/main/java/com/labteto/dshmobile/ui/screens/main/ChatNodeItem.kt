@@ -237,6 +237,8 @@ internal val STRUCTURAL_EVENT_TYPES = setOf(
     "assistant/chunk",
     // A model attempt that settled without a message (harness 0.1.3): replay data, not content.
     "assistant/attempt",
+    // Full model request context can contain raw historical tool arguments, including commands.
+    "request/context",
 )
 
 /**
