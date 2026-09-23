@@ -32,6 +32,7 @@ import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -758,6 +759,44 @@ class LocalHarnessEngine @Inject constructor(
         var requestPrepared = false
         var ephemeralContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
+        var activeStep: Int? = null
+        var activeToolCalls = emptyList<AgentToolCall>()
+        val startedToolCallIds = linkedSetOf<String>()
+        val completedToolCallIds = linkedSetOf<String>()
+
+        fun settlePendingTools(reason: String) {
+            val settlements = pendingToolSettlements(
+                calls = activeToolCalls,
+                startedCallIds = startedToolCallIds,
+                completedCallIds = completedToolCallIds,
+            )
+            if (settlements.isEmpty()) return
+            settlements.forEach { settlement ->
+                val result = SessionRecovery.interruptedToolResult(
+                    callId = settlement.call.id,
+                    name = settlement.call.name,
+                    step = activeStep,
+                    started = settlement.started,
+                )
+                eventLog.append("tool/result", buildJsonObject {
+                    result.step?.let { put("step", it) }
+                    put("id", result.callId)
+                    result.name?.let { put("name", it) }
+                    put("content", result.content)
+                    put("is_error", true)
+                    put("error_code", result.code)
+                    put("runtime_settlement", true)
+                    put("reason", reason)
+                })
+                modelHistory += buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", result.callId)
+                    put("content", result.content)
+                }
+                completedToolCallIds += result.callId
+            }
+            checkpointModelHistory("turn/$reason-tool-settlement")
+        }
 
         val loop = AgentLoop(
             model = AgentModel {
@@ -838,6 +877,10 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.StepStarted -> {
+                        activeStep = event.step
+                        activeToolCalls = emptyList()
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                         eventLog.append("step/start", buildJsonObject {
                             put("step", event.step)
                         })
@@ -846,6 +889,9 @@ class LocalHarnessEngine @Inject constructor(
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
                         modelHistory += reply.message
+                        activeToolCalls = event.toolCalls
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                         eventLog.append("assistant/message", reply.message)
                         checkpointModelHistory("assistant/message")
                         reply.reasoning?.takeIf { it.isNotBlank() }?.let {
@@ -859,6 +905,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                     is AgentEvent.ToolStarted -> {
+                        startedToolCallIds += event.call.id
                         eventLog.append("tool/call", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
@@ -867,6 +914,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
+                        completedToolCallIds += event.call.id
                         appendMessage("tool", event.output, event.call.name)
                         eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -886,6 +934,10 @@ class LocalHarnessEngine @Inject constructor(
                         eventLog.append("step/end", buildJsonObject {
                             put("step", event.step)
                         })
+                        activeStep = null
+                        activeToolCalls = emptyList()
+                        startedToolCallIds.clear()
+                        completedToolCallIds.clear()
                     }
                     is AgentEvent.TurnCompleted -> {
                         eventLog.append("turn/end", buildJsonObject {
@@ -903,6 +955,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnFailed -> {
+                        settlePendingTools("failed")
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "error")
                             put("detail", event.reason.take(2_000))
@@ -910,6 +963,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.TurnCancelled -> {
+                        settlePendingTools("cancelled")
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "aborted")
                             put("messages", _state.value.messages.size)
