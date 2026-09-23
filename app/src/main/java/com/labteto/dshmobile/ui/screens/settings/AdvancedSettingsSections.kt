@@ -28,6 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
+import com.labteto.dshmobile.local.DeepSeekBillingSchedule
+import com.labteto.dshmobile.local.DeepSeekPricePeriod
+import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
@@ -52,6 +55,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
 private data class DynamicSettingField(
     val path: List<String>,
@@ -432,6 +438,112 @@ internal fun LocalModelSettingsCard(
         }
     }
 }
+
+@Composable
+internal fun DeepSeekPricingCard(
+    state: DeepSeekPricingState,
+    viewModel: SettingsViewModel,
+) {
+    val colors = DsTheme.colors
+    val currentPeriod = DeepSeekBillingSchedule.periodAt(System.currentTimeMillis())
+    val periodLabel = stringResource(
+        if (currentPeriod == DeepSeekPricePeriod.PEAK) R.string.pricing_period_peak
+        else R.string.pricing_period_off_peak,
+    )
+    val sourceLabel = if (state.lastUpdatedAt > 0L) {
+        stringResource(
+            R.string.pricing_updated_at,
+            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                .format(Date(state.lastUpdatedAt)),
+        )
+    } else {
+        stringResource(R.string.pricing_builtin_source)
+    }
+
+    SettingsCard(stringResource(R.string.pricing_deepseek_title), Icons.Outlined.Cloud) {
+        Text(
+            stringResource(R.string.pricing_current_period, periodLabel),
+            style = DsType.small13Strong,
+            color = colors.labelPrimary,
+        )
+        Text(sourceLabel, style = DsType.caption11, color = colors.labelTertiary)
+        Text(
+            stringResource(R.string.pricing_source_official),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+
+        state.models.forEach { model ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = DsShapes.block,
+                color = colors.bgLayer1,
+            ) {
+                Column(
+                    modifier = Modifier.padding(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                ) {
+                    Text(model.displayName, style = DsType.std14Strong, color = colors.labelPrimary)
+                    Text(
+                        "${model.modelId} · ${model.version}",
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                    Text(
+                        stringResource(R.string.pricing_same_thinking),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.pricing_off_peak_row,
+                            formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
+                            formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
+                            formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
+                        ),
+                        style = DsType.small13,
+                        color = if (currentPeriod == DeepSeekPricePeriod.OFF_PEAK) colors.labelPrimary else colors.labelSecondary,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.pricing_peak_row,
+                            formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
+                            formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
+                            formatDeepSeekPrice(model.peak.outputCnyPerMillion),
+                        ),
+                        style = DsType.small13,
+                        color = if (currentPeriod == DeepSeekPricePeriod.PEAK) colors.labelPrimary else colors.labelSecondary,
+                    )
+                }
+            }
+        }
+
+        Text(
+            stringResource(R.string.pricing_holiday_hint),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        state.error?.let { error ->
+            Text(
+                stringResource(R.string.pricing_refresh_failed, error),
+                style = DsType.caption11,
+                color = colors.error,
+            )
+        }
+        DsButton(
+            text = stringResource(
+                if (state.refreshing) R.string.pricing_refreshing else R.string.pricing_refresh,
+            ),
+            onClick = viewModel::refreshDeepSeekPricing,
+            enabled = !state.refreshing,
+            variant = DsButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+private fun formatDeepSeekPrice(value: Double): String =
+    String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
 @Composable
 internal fun LocalMemorySettingsCard(
