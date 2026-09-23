@@ -738,7 +738,12 @@ private fun LocalChat(
             }
         }
 
-        if (state.plan.isNotEmpty() || state.goal != null || state.todos.isNotEmpty() || state.jobs.isNotEmpty()) {
+        if (
+            state.running || state.plan.isNotEmpty() || state.goal != null ||
+            state.todos.isNotEmpty() || state.jobs.isNotEmpty() ||
+            state.activeAgents > 0 || state.activeTerminals > 0 ||
+            state.activeVirtualDisplays > 0 || state.activeLanguageServers > 0
+        ) {
             ExecutionStatusCard(
                 state = state,
                 modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -772,9 +777,44 @@ private fun LocalChat(
                 }
                 if (state.running) {
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Text(" 代理正在处理…", style = DsType.small13, color = colors.labelTertiary)
+                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(DsSpacing.small))
+                                Text(
+                                    stringResource(R.string.local_streaming_status),
+                                    style = DsType.small13,
+                                    color = colors.labelTertiary,
+                                )
+                            }
+                            if (state.streamingReasoning.isNotBlank()) {
+                                Text(
+                                    stringResource(R.string.local_streaming_reasoning),
+                                    style = DsType.caption11Strong,
+                                    color = colors.labelTertiary,
+                                )
+                                Text(
+                                    state.streamingReasoning,
+                                    style = DsType.small13,
+                                    color = colors.labelSecondary,
+                                    maxLines = 12,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (state.streamingAssistant.isNotBlank()) {
+                                Text(
+                                    stringResource(R.string.local_streaming_answer),
+                                    style = DsType.caption11Strong,
+                                    color = colors.labelTertiary,
+                                )
+                                Text(
+                                    state.streamingAssistant,
+                                    style = DsType.std14,
+                                    color = colors.labelPrimary,
+                                    maxLines = 16,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
@@ -1097,11 +1137,29 @@ private fun ExecutionStatusCard(
     var expanded by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
+    val resourceSummary = stringResource(
+        R.string.local_resource_summary,
+        state.activeAgents,
+        state.maxAgents,
+        state.activeTerminals,
+        state.maxTerminals,
+        state.activeVirtualDisplays,
+        state.maxVirtualDisplays,
+        state.activeLanguageServers,
+        state.maxLanguageServers,
+    )
+    val contextSummary = stringResource(
+        R.string.local_context_summary,
+        state.contextChars,
+        state.contextBudgetChars,
+    )
     val summary = buildList {
         state.goal?.let { add("目标 ${it.status}") }
         if (state.plan.isNotEmpty()) add("计划 ${state.plan.size} 步")
         if (total > 0) add("任务 $completed/$total")
         if (state.jobs.isNotEmpty()) add("后台 ${state.jobs.size}")
+        add(resourceSummary)
+        add(contextSummary)
     }.joinToString(" · ")
 
     Surface(
@@ -1124,7 +1182,7 @@ private fun ExecutionStatusCard(
                 )
                 Spacer(Modifier.size(DsSpacing.small))
                 Column(Modifier.weight(1f)) {
-                    Text("执行状态", style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(stringResource(R.string.local_execution_console), style = DsType.small13Strong, color = colors.labelPrimary)
                     Text(summary, style = DsType.caption11, color = colors.labelTertiary)
                 }
             }
@@ -1151,6 +1209,8 @@ private fun ExecutionStatusCard(
                         Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
                     }
                 }
+                Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
                 if (state.jobs.isNotEmpty()) {
                     Text(
                         "后台 · " + state.jobs.joinToString { "${it.label}[${it.status}]" },
