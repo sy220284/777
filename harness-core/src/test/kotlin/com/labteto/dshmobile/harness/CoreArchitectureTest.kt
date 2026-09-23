@@ -16,6 +16,7 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -153,6 +154,41 @@ class CoreArchitectureTest {
 
         assertTrue(cleaned)
         assertTrue(manager.list().contains("[cancelled]"))
+    }
+
+    @Test
+    fun jobManagerBoundsConcurrencyAndPrunesFinishedRecords() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val ids = ArrayDeque(listOf("job-a", "job-b", "job-c"))
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { ids.removeFirst() },
+            maxConcurrentJobs = 1,
+            maxRetainedJobs = 2,
+        )
+
+        val first = manager.start("first") { _, _ ->
+            gate.await()
+            "first done"
+        }
+        yield()
+        val rejected = manager.start("blocked") { _, _ -> "should not run" }
+
+        assertTrue(first.endsWith("job-a"))
+        assertTrue(rejected.contains("并发已满"))
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        manager.start("second") { _, _ -> "second done" }
+        advanceUntilIdle()
+        manager.start("third") { _, _ -> "third done" }
+        advanceUntilIdle()
+
+        val listing = manager.list()
+        assertFalse(listing.contains("job-a"))
+        assertTrue(listing.contains("job-b"))
+        assertTrue(listing.contains("job-c"))
     }
 
     @Test
