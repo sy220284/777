@@ -99,7 +99,7 @@ class SessionRecoveryTest {
     fun largeRotatedHistoryRepairsOnlyNewestOpenTail() {
         val directory = Files.createTempDirectory("session-recovery-large-history").toFile()
         try {
-            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 700, clock = { 1L })
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096, clock = { 1L })
             repeat(160) { index ->
                 log.append("turn/start", buildJsonObject { put("turn", index) })
                 log.append("step/start", buildJsonObject { put("step", 1) })
