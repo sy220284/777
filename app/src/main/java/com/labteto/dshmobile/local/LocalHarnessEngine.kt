@@ -21,6 +21,7 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
+import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
@@ -1019,6 +1020,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("name", event.call.name)
                             put("content", event.output.take(MAX_EVENT_CHARS))
                             put("model_content", modelOutput)
+                            put("is_error", event.isError)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         modelHistory += buildJsonObject {
@@ -1126,7 +1128,7 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
-    ): List<Pair<LocalToolCall, String>> {
+    ): List<Pair<LocalToolCall, AgentToolResult>> {
         val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
         if (!parallelSubagents) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
@@ -1136,7 +1138,7 @@ class LocalHarnessEngine @Inject constructor(
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
-                call to formatToolFailure(
+                call to toolFailureResult(
                     call,
                     "PARALLEL_TASK_ERROR",
                     error.message ?: error::class.java.simpleName,
@@ -1145,33 +1147,42 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): String = try {
+    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): AgentToolResult = try {
         executeRegistered(call, allowMutation)
     } catch (cancelled: CancellationException) {
         if (!currentCoroutineContext().isActive) throw cancelled
-        formatToolFailure(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
+        toolFailureResult(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
     } catch (error: LocalWebException) {
-        formatToolFailure(call, error.code, error.message ?: "网页工具失败")
+        toolFailureResult(call, error.code, error.message ?: "网页工具失败")
     } catch (error: LocalModelException) {
-        formatToolFailure(call, error.code, error.message ?: "模型请求失败")
+        toolFailureResult(call, error.code, error.message ?: "模型请求失败")
     } catch (error: Exception) {
-        formatToolFailure(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+        toolFailureResult(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
     }
 
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}\n建议：可重试该工具；若为网络问题先运行 network_diagnose，若为超时可改为后台执行。"
 
-    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): String {
+    private fun toolFailureResult(call: LocalToolCall, code: String, detail: String): AgentToolResult =
+        AgentToolResult(
+            content = formatToolFailure(call, code, detail),
+            isError = true,
+        )
+
+    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
-        if (registered == null) return "未知工具：${call.name}"
+            ?: return AgentToolResult("未知工具：${call.name}", isError = true)
         if (
             _state.value.planMode &&
             !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
-            return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
+            return AgentToolResult(
+                "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
+                isError = true,
+            )
         }
-        return toolRegistry.execute(
+        val result = toolRegistry.execute(
             name = call.name,
             input = call.arguments,
             rawArguments = call.rawArguments,
@@ -1193,7 +1204,8 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 },
             ),
-        ).content
+        )
+        return AgentToolResult(result.content, result.isError)
     }
 
     private fun subagentToolSchemas(allowMutation: Boolean): JsonArray {
