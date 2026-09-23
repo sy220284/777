@@ -5,6 +5,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class AgentToolCall(
     val id: String,
@@ -26,10 +28,31 @@ data class AgentModelReply(
     val toolCalls: List<AgentToolCall> = emptyList(),
 )
 
+enum class AgentToolSideEffect {
+    NONE,
+    POSSIBLE,
+}
+
 data class AgentToolResult(
     val content: String,
     val isError: Boolean = false,
+    val errorCode: String? = null,
+    val retryable: Boolean = false,
+    val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
+    val recoveryHint: String? = null,
 )
+
+fun AgentToolResult.modelVisibleContent(): String {
+    if (!isError) return content
+    return buildJsonObject {
+        put("status", "error")
+        put("error_code", errorCode ?: "TOOL_ERROR")
+        put("retryable", retryable)
+        put("side_effect", sideEffect.name.lowercase())
+        recoveryHint?.takeIf(String::isNotBlank)?.let { put("recovery_hint", it) }
+        put("content", content)
+    }.toString()
+}
 
 enum class AgentStopReason {
     COMPLETED,
@@ -76,6 +99,10 @@ sealed interface AgentEvent {
         val call: AgentToolCall,
         val output: String,
         val isError: Boolean = false,
+        val errorCode: String? = null,
+        val retryable: Boolean = false,
+        val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
+        val recoveryHint: String? = null,
     ) : AgentEvent
 
     data class StepFinished(
@@ -200,11 +227,15 @@ class AgentLoop(
                                 call = first,
                                 output = result.content,
                                 isError = result.isError,
+                                errorCode = result.errorCode,
+                                retryable = result.retryable,
+                                sideEffect = result.sideEffect,
+                                recoveryHint = result.recoveryHint,
                             ),
                         )
                         messages += AgentMessage(
                             role = "tool",
-                            content = result.content,
+                            content = result.modelVisibleContent(),
                             toolCallId = first.id,
                             toolName = first.name,
                         )
@@ -230,11 +261,15 @@ class AgentLoop(
                                 call = call,
                                 output = result.content,
                                 isError = result.isError,
+                                errorCode = result.errorCode,
+                                retryable = result.retryable,
+                                sideEffect = result.sideEffect,
+                                recoveryHint = result.recoveryHint,
                             ),
                         )
                         messages += AgentMessage(
                             role = "tool",
-                            content = result.content,
+                            content = result.modelVisibleContent(),
                             toolCallId = call.id,
                             toolName = call.name,
                         )
