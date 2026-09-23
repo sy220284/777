@@ -15,6 +15,10 @@ import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerSer
 import com.labteto.dshmobile.device.shizuku.ShizukuBridge
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceLease
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -24,7 +28,9 @@ class AndroidDeviceProvider(
     private val context: Context,
     private val shizuku: ShizukuBridge = ShizukuBridge(context),
     private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
+    private val resourceScheduler: HarnessResourceScheduler? = null,
 ) : HarnessDeviceProvider {
+    private val virtualDisplayLeases = ConcurrentHashMap<String, HarnessResourceLease>()
 
     override val capabilities: Set<String> = setOf(
         "device_info",
@@ -140,12 +146,22 @@ class AndroidDeviceProvider(
             "clipboard_get" -> clipboardGet()
             "clipboard_set" -> clipboardSet(arguments.required("text"))
             "vscreen_create" -> {
-                val status = virtualDisplays.create(
-                    width = arguments["width"]?.toIntOrNull() ?: 1080,
-                    height = arguments["height"]?.toIntOrNull() ?: 1920,
-                    densityDpi = arguments["density_dpi"]?.toIntOrNull() ?: 420,
+                val lease = resourceScheduler?.acquire(
+                    HarnessResourceKind.VIRTUAL_DISPLAY,
+                    owner = "vscreen:tool",
                 )
-                virtualStatus(status)
+                try {
+                    val status = virtualDisplays.create(
+                        width = arguments["width"]?.toIntOrNull() ?: 1080,
+                        height = arguments["height"]?.toIntOrNull() ?: 1920,
+                        densityDpi = arguments["density_dpi"]?.toIntOrNull() ?: 420,
+                    )
+                    if (lease != null) virtualDisplayLeases[status.id] = lease
+                    virtualStatus(status)
+                } catch (error: Throwable) {
+                    lease?.close()
+                    throw error
+                }
             }
             "vscreen_list" -> virtualDisplays.list().joinToString("\n", transform = ::virtualStatus)
             "vscreen_status" -> virtualStatus(virtualDisplays.status(arguments.required("id")))
@@ -177,9 +193,36 @@ class AndroidDeviceProvider(
                 val png = virtualDisplays.screenshotPng(arguments.required("id"))
                 "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
             }
-            "vscreen_close" -> virtualDisplays.close(arguments.required("id")).toString()
+            "vscreen_close" -> {
+                val id = arguments.required("id")
+                try {
+                    virtualDisplays.close(id).toString()
+                } finally {
+                    virtualDisplayLeases.remove(id)?.close()
+                }
+            }
             else -> error("设备能力不存在：$capability")
         }
+
+    suspend fun acquireAgentVirtualDisplay(owner: String): String {
+        val lease = resourceScheduler?.acquire(
+            HarnessResourceKind.VIRTUAL_DISPLAY,
+            owner = "agent:" + owner.take(80),
+        )
+        return try {
+            val status = virtualDisplays.create()
+            if (lease != null) virtualDisplayLeases[status.id] = lease
+            status.id
+        } catch (error: Throwable) {
+            lease?.close()
+            throw error
+        }
+    }
+
+    fun releaseAgentVirtualDisplay(id: String) {
+        runCatching { virtualDisplays.close(id) }
+        virtualDisplayLeases.remove(id)?.close()
+    }
 
     private fun deviceInfo(): String = buildString {
         appendLine("manufacturer=${Build.MANUFACTURER}")

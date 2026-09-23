@@ -4,12 +4,16 @@ import com.labteto.dshmobile.harness.capability.CapabilityDescriptor
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceLease
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -37,8 +41,10 @@ class AndroidRuntimePlugin(
     private val terminalProvider: PersistentPipeTerminalProvider = PersistentPipeTerminalProvider(
         defaultWorkingDirectory = workspaceRoot,
     ),
+    private val resourceScheduler: HarnessResourceScheduler? = null,
 ) : HarnessPlugin {
     override val id: String = "android-runtime"
+    private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
 
     override suspend fun install(context: HarnessContext) {
         context.tools.register(
@@ -123,7 +129,18 @@ class AndroidRuntimePlugin(
                         ?.takeIf { it.isNotEmpty() }
                         ?: listOf("/system/bin/sh")
                     val workingDirectory = resolveWorkingDirectory(input.optionalString("working_directory"))
-                    ToolResult(terminalProvider.open(command, workingDirectory))
+                    val lease = resourceScheduler?.acquire(
+                        HarnessResourceKind.TERMINAL,
+                        owner = "terminal:" + command.firstOrNull().orEmpty(),
+                    )
+                    try {
+                        val sessionId = terminalProvider.open(command, workingDirectory)
+                        if (lease != null) terminalLeases[sessionId] = lease
+                        ToolResult(sessionId)
+                    } catch (error: Throwable) {
+                        lease?.close()
+                        throw error
+                    }
                 },
             ),
         )
@@ -162,10 +179,12 @@ class AndroidRuntimePlugin(
                 timeoutMillis = 5_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    val alive = terminalProvider.isAlive(sessionId)
+                    if (!alive) terminalLeases.remove(sessionId)?.close()
                     ToolResult(
                         buildJsonObject {
                             put("session_id", sessionId)
-                            put("alive", terminalProvider.isAlive(sessionId))
+                            put("alive", alive)
                             put("native_pty", terminalProvider.nativePtyAvailable())
                         }.toString(),
                     )
@@ -181,7 +200,12 @@ class AndroidRuntimePlugin(
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 10_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
-                    terminalProvider.close(input.requiredString("session_id"))
+                    val sessionId = input.requiredString("session_id")
+                    try {
+                        terminalProvider.close(sessionId)
+                    } finally {
+                        terminalLeases.remove(sessionId)?.close()
+                    }
                     ToolResult("终端会话已关闭")
                 },
             ),
@@ -204,6 +228,10 @@ class AndroidRuntimePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
+        terminalLeases.keys.toList().forEach { sessionId ->
+            runCatching { terminalProvider.close(sessionId) }
+            terminalLeases.remove(sessionId)?.close()
+        }
         TOOL_NAMES.forEach(context.tools::unregister)
         context.capabilities.unregister("android-process-runtime")
         context.capabilities.unregister("android-terminal-provider")

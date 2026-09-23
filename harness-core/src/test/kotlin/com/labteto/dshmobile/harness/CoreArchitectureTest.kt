@@ -192,6 +192,62 @@ class CoreArchitectureTest {
     }
 
     @Test
+    fun persistedRunningJobRestoresInterruptedAndCanResumeSafely() = runTest {
+        val snapshots = mutableListOf<List<com.labteto.dshmobile.harness.jobs.JobSnapshot>>()
+        val restored = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                com.labteto.dshmobile.harness.jobs.JobSnapshot(
+                    id = "job-safe",
+                    label = "只读抓取",
+                    status = "running",
+                    output = "处理中",
+                    resumeKind = "web_fetch",
+                    resumePayload = "{\"url\":\"https://example.com\"}",
+                    updatedAt = 10L,
+                ),
+            ),
+            onSnapshotsChanged = { snapshots += it },
+        )
+
+        assertTrue(restored.list().contains("job-safe [interrupted]"))
+        assertEquals("web_fetch", restored.interruptedSnapshots().single().resumeKind)
+
+        val resumed = restored.resumePersistent("job-safe") { _, report ->
+            report("恢复执行")
+            "恢复完成"
+        }
+        assertTrue(resumed.contains("已恢复"))
+        advanceUntilIdle()
+
+        assertTrue(restored.list().contains("job-safe [completed]"))
+        assertTrue(restored.output("job-safe").contains("恢复完成"))
+        assertTrue(snapshots.last().single().status == "completed")
+    }
+
+    @Test
+    fun nonResumableInterruptedJobIsNotAutoResumeCandidate() = runTest {
+        val restored = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                com.labteto.dshmobile.harness.jobs.JobSnapshot(
+                    id = "job-shell",
+                    label = "shell",
+                    status = "running",
+                    resumeKind = null,
+                    resumePayload = null,
+                ),
+            ),
+        )
+
+        assertTrue(restored.list().contains("job-shell [interrupted]"))
+        assertTrue(restored.interruptedSnapshots().isEmpty())
+        assertTrue(restored.resumePersistent("job-shell") { _, _ -> "no" }.contains("不可恢复"))
+    }
+
+    @Test
     fun legacySessionMigratesWithCheckpointAndRestarts() {
         val root = createTempDir(prefix = "session-store-")
         try {
