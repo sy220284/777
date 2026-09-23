@@ -370,7 +370,7 @@ class UpdateChecker @Inject constructor(
         }
 
         throw IOException(
-            "$purpose连接失败，已自动重试 $MAX_REQUEST_ATTEMPTS 次，请检查网络后重试。",
+            "${purpose}连接失败，已自动重试 $MAX_REQUEST_ATTEMPTS 次，请检查网络后重试。",
             lastTransportError,
         )
     }
