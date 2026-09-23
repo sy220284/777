@@ -198,6 +198,19 @@ internal fun localImageDataUrl(
     return "data:" + attachment.mediaType + ";base64," + Base64.getEncoder().encodeToString(file.readBytes())
 }
 
+internal fun normalizeLocalAttachmentMediaType(declared: String?, displayName: String): String {
+    val normalized = declared?.trim()?.lowercase().orEmpty()
+    if (normalized == "image/jpg" || normalized == "image/pjpeg") return "image/jpeg"
+    if (normalized.isNotEmpty() && normalized != "application/octet-stream") return normalized
+    return when (displayName.substringAfterLast('.', "").lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "webp" -> "image/webp"
+        "gif" -> "image/gif"
+        else -> normalized.ifBlank { "application/octet-stream" }
+    }
+}
+
 internal fun finalizeLocalImportedAttachment(
     tempFile: File,
     workspaceRoot: File,
@@ -206,11 +219,19 @@ internal fun finalizeLocalImportedAttachment(
     mediaType: String,
 ): LocalImportedAttachment {
     val digest = sha256Hex(tempFile)
-    val suffix = displayName.substringAfterLast('.', "")
+    val canonicalMediaType = normalizeLocalAttachmentMediaType(mediaType, displayName)
+    val originalSuffix = displayName.substringAfterLast('.', "")
         .lowercase()
         .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
         ?.let { "." + it }
         .orEmpty()
+    val suffix = when (canonicalMediaType) {
+        "image/png" -> ".png"
+        "image/jpeg" -> ".jpg"
+        "image/webp" -> ".webp"
+        "image/gif" -> ".gif"
+        else -> originalSuffix
+    }
     val shard = File(attachmentsRoot, digest.take(2)).apply { mkdirs() }
     val target = File(shard, digest + suffix)
     if (target.exists()) {
@@ -223,7 +244,7 @@ internal fun finalizeLocalImportedAttachment(
         attachmentId = digest,
         name = displayName,
         relativePath = target.relativeTo(workspaceRoot).invariantSeparatorsPath,
-        mediaType = mediaType,
+        mediaType = canonicalMediaType,
         bytes = target.length(),
     )
 }
