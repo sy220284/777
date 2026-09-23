@@ -1,0 +1,156 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Test
+
+class LocalSessionTranscriptProjectionTest {
+    @Test
+    fun replaysTranscriptTailInSequenceOrderAndDeduplicatesByStableId() {
+        val existing = message("m-old", "user", "旧消息", 10L)
+        val duplicate = existing.copy(content = "不应覆盖")
+        val reasoning = message("m-reason", "reasoning", "分析", 20L)
+        val answer = message("m-answer", "assistant", "完成", 30L)
+
+        val events = listOf(
+            event(4L, encodeTranscriptMessages(listOf(message("too-old", "system", "过期", 1L)))),
+            event(6L, encodeTranscriptMessages(listOf(duplicate, reasoning))),
+            LocalSessionEventLog.Event(
+                sequence = 7L,
+                type = "step/end",
+                createdAt = 1L,
+                data = buildJsonObject { put("step", 1) },
+            ),
+            LocalSessionEventLog.Event(
+                sequence = 8L,
+                type = "assistant/message",
+                createdAt = 1L,
+                data = buildJsonObject {
+                    put("transcript", JsonArray(listOf(buildJsonObject {
+                        put("id", "broken")
+                        put("role", "assistant")
+                    })))
+                },
+            ),
+            event(9L, encodeTranscriptMessages(listOf(answer))),
+        )
+
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = listOf(existing),
+            events = events,
+            sequenceExclusive = 5L,
+        )
+
+        assertEquals(listOf("m-old", "m-reason", "m-answer"), projected.messages.map { it.id })
+        assertEquals("旧消息", projected.messages.first().content)
+        assertEquals(9L, projected.projectedThroughSequence)
+    }
+
+    @Test
+    fun legacyTranscriptUsesDurableBaselineAndNewSessionStartsAtBeginning() {
+        val legacy = LocalHarnessSession(id = "legacy", transcriptProjectedThroughSequence = null)
+
+        assertEquals(
+            44L,
+            transcriptProjectionReplayCursor(
+                snapshot = legacy,
+                persistedSnapshotExists = true,
+                legacyBaselineSequence = 44L,
+            ),
+        )
+        assertEquals(
+            -1L,
+            transcriptProjectionReplayCursor(
+                snapshot = legacy,
+                persistedSnapshotExists = false,
+                legacyBaselineSequence = null,
+            ),
+        )
+    }
+
+    @Test
+    fun assistantTranscriptMetadataNeverLeaksBackIntoModelHistory() {
+        val raw = buildJsonObject {
+            put("role", "assistant")
+            put("content", "模型回答")
+            put("transcript", encodeTranscriptMessages(listOf(
+                message("m1", "assistant", "界面回答", 1L),
+            )))
+        }
+
+        val modelMessage = assistantModelMessageFromEvent(raw)
+
+        assertEquals("assistant", (modelMessage["role"] as JsonPrimitive).content)
+        assertEquals("模型回答", (modelMessage["content"] as JsonPrimitive).content)
+        assertFalse(modelMessage.containsKey("transcript"))
+    }
+
+    @Test
+    fun transcriptMetadataIsStrippedDuringActualModelHistoryReplay() {
+        val raw = buildJsonObject {
+            put("role", "assistant")
+            put("content", "模型回答")
+            put("transcript", encodeTranscriptMessages(listOf(
+                message("m-history", "assistant", "界面回答", 2L),
+            )))
+        }
+        val restored = restoreLocalModelHistory(
+            events = listOf(
+                LocalSessionEventLog.Event(
+                    sequence = 0L,
+                    type = "assistant/message",
+                    createdAt = 2L,
+                    data = raw,
+                ),
+            ),
+            legacyFallback = emptyList(),
+            codec = ModelHistoryCheckpointCodec(),
+        )
+
+        assertEquals(1, restored.messages.size)
+        assertFalse(restored.messages.single().containsKey("transcript"))
+        assertEquals(
+            "模型回答",
+            (restored.messages.single()["content"] as JsonPrimitive).content,
+        )
+    }
+
+    @Test
+    fun transcriptRoundTripPreservesToolMetadata() {
+        val tool = message("tool-1", "tool", "输出", 99L, toolName = "read")
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = emptyList(),
+            events = listOf(event(0L, encodeTranscriptMessages(listOf(tool)))),
+            sequenceExclusive = -1L,
+        )
+
+        assertEquals(listOf(tool), projected.messages)
+        assertEquals(0L, projected.projectedThroughSequence)
+    }
+
+    private fun event(sequence: Long, transcript: JsonArray) = LocalSessionEventLog.Event(
+        sequence = sequence,
+        type = "transcript-bearing",
+        createdAt = 1L,
+        data = buildJsonObject { put("transcript", transcript) },
+    )
+
+    private fun message(
+        id: String,
+        role: String,
+        content: String,
+        createdAt: Long,
+        toolName: String? = null,
+    ) = LocalHarnessMessage(
+        id = id,
+        role = role,
+        content = content,
+        toolName = toolName,
+        createdAt = createdAt,
+    )
+}
