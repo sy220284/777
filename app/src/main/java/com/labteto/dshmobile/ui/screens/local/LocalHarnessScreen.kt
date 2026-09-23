@@ -1111,7 +1111,7 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
                                 )
                             }
                         } else {
-                            MarkdownText(message.content)
+                            MarkdownText(message.content, allowCodeCopy = false)
                         }
                     }
                 }
