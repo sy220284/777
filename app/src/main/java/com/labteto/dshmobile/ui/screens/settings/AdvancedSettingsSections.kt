@@ -394,8 +394,7 @@ internal fun LocalModelSettingsCard(
                 LocalImageInputMode.VISION_MODEL to R.string.local_image_mode_vision,
             ).forEach { (mode, label) ->
                 DsButton(
-                    text = stringResource(label) +
-                        if (mode == local.imageInputMode) " · " + stringResource(R.string.local_image_mode_current) else "",
+                    text = stringResource(label),
                     onClick = { viewModel.configureLocalImageInputMode(mode) },
                     size = DsButtonSize.Small,
                     variant = if (mode == local.imageInputMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
