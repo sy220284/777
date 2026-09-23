@@ -12,10 +12,12 @@ import org.junit.Test
 
 class LocalApprovalPolicyTest {
     @Test
-    fun workspaceAutoApprovalOnlyCoversExplicitlySandboxedTools() {
+    fun safeAutoApprovalCoversConfinedWorkspaceWritesAndReadOnlyTools() {
         for (name in listOf("write", "edit", "apply_patch", "download_file")) {
             assertTrue(canAutoApprove(tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))))
         }
+        assertTrue(canAutoApprove(tool("session_trace", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
+        assertTrue(canAutoApprove(tool("plugin_external_read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
 
         assertFalse(canAutoApprove(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)))
         assertFalse(canAutoApprove(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)))
@@ -37,12 +39,20 @@ class LocalApprovalPolicyTest {
     }
 
     @Test
-    fun sessionEventReadsNeverInheritWorkspaceApproval() {
+    fun sessionEventReadsAreEligibleForPersistentSafeApproval() {
         for (name in listOf("session_event_search", "session_trace", "session_event_trace", "session_event_read")) {
             val definition = tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))
             org.junit.Assert.assertEquals(ToolApprovalPolicy.ALWAYS, definition.approvalPolicy)
-            assertFalse(canAutoApprove(definition))
+            assertTrue(canAutoApprove(definition))
         }
+    }
+
+    @Test
+    fun impactLevelsFollowExternalEffect() {
+        assertTrue(approvalImpact(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.LOW)
+        assertTrue(approvalImpact(tool("memory_update", ToolAccess.SESSION_WRITE, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.MEDIUM)
+        assertTrue(approvalImpact(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.HIGH)
+        assertTrue(approvalImpact(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)) == LocalApprovalImpact.CRITICAL)
     }
 
     private fun tool(
