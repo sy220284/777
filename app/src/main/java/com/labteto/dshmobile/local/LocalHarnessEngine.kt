@@ -1309,9 +1309,10 @@ class LocalHarnessEngine @Inject constructor(
             }
             "subagent_fork", "fork_subagent" ->
                 subagents.run(
-                    args.string("task"),
+                    task = args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
+                    parentCallId = call.id,
                     maxSteps = _state.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-chat\ndeepseek-reasoner"
