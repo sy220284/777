@@ -73,4 +73,11 @@ data class AppSettings(
     val notifyNeedsAction: Boolean = true,
     val themePreference: String = "system", // light | dark | system
     val localeOverride: String? = null, // null = system
+    /**
+     * Absolute path of the copied background image inside app storage, or null for the plain theme
+     * colour. The name of the file in [com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR] is not
+     * stored instead of the path because the path is what `BitmapFactory` wants, and `filesDir`
+     * does not move for an installed app.
+     */
+    val backgroundImagePath: String? = null,
 )

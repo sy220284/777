@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,9 +31,13 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
+import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +45,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
 /** App-language choices deliberately limited to the two maintained translations. */
@@ -131,6 +137,36 @@ class SettingsViewModel @Inject constructor(
 
     fun set(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch { hostsStore.setSetting(transform) }
+    }
+
+    /**
+     * Copy a picked image into app storage and remember it as the app background.
+     *
+     * The bytes are copied rather than the URI remembered: a picker grant is temporary, can be
+     * revoked, and does not outlive the process, so a remembered URI would produce a background that
+     * silently disappears later — indistinguishable, from the outside, from the feature being broken.
+     */
+    fun setBackgroundImage(uri: Uri) {
+        viewModelScope.launch {
+            val stored = runCatching { importBackgroundImage(uri) }.getOrNull() ?: return@launch
+            hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
+        }
+    }
+
+    /** Drop the background image. The copied file stays until the next import overwrites it. */
+    fun clearBackgroundImage() {
+        viewModelScope.launch {
+            hostsStore.setSetting { it.copy(backgroundImagePath = null) }
+        }
+    }
+
+    private suspend fun importBackgroundImage(uri: Uri): String = withContext(Dispatchers.IO) {
+        val directory = File(appContext.filesDir, APP_BACKGROUND_DIR).apply { mkdirs() }
+        val target = File(directory, APP_BACKGROUND_FILE)
+        val source = appContext.contentResolver.openInputStream(uri)
+            ?: error("Cannot open the picked image")
+        source.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+        target.absolutePath
     }
 
     fun disconnect() {
