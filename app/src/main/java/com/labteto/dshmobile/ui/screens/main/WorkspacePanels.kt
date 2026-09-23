@@ -222,6 +222,10 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
                                 val relative = uri.path?.let { com.labteto.dshmobile.core.session.relativePreviewResource(base.path.orEmpty(), it) }
                                     ?.takeIf { it.isNotBlank() } ?: return denied()
                                 return try {
+                                    // WebView requires this callback to return WebResourceResponse synchronously
+                                    // on its worker thread. The workspace API is suspend-only, so this is an
+                                    // intentional synchronous bridge, bounded by the 10s timeout below; it does
+                                    // not block the main thread or ConnectionLoop's Dispatchers.Default workers.
                                     val bytes = runBlocking(Dispatchers.IO) {
                                         withTimeout(10000) {
                                             val api = store.apiForHost(key.host) ?: return@withTimeout null
