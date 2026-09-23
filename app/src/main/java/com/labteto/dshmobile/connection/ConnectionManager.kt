@@ -77,6 +77,7 @@ class ConnectionManager @Inject constructor(
     private val reconnectRequestVersion = AtomicLong(0L)
     private val transportEpoch = AtomicLong(0L)
     private val transportLock = Any()
+    private val connectMutex = Mutex()
     private val reconnectMutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionUiState())
@@ -205,6 +206,10 @@ class ConnectionManager @Inject constructor(
      * is both sooner and specific.
      */
     suspend fun connect(config: HostConfig) {
+        connectMutex.withLock { connectLocked(config) }
+    }
+
+    private suspend fun connectLocked(config: HostConfig) {
         val intentVersion = desiredIntentVersion.incrementAndGet()
         reconnectRequestVersion.incrementAndGet()
         // Keep an already-running foreground service alive while replacing the
