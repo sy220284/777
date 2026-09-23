@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,8 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Image
@@ -111,6 +111,10 @@ internal fun CommandSheet(
     val searchable = commands.size + skills.size > 12
 
     DsBottomSheet(title = stringResource(R.string.chat_context_tools), onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
         // Session capabilities ----------------------------------------------
         SectionHeader(stringResource(R.string.chat_details_title))
         DsGroupCard {
@@ -209,8 +213,8 @@ internal fun CommandSheet(
                 style = DsType.caption11,
                 color = colors.labelTertiary,
             )
-            else -> LazyColumn(Modifier.heightIn(max = 260.dp)) {
-                items(filteredCommands, key = { it.name }) { command ->
+            else -> Column {
+                filteredCommands.forEach { command ->
                     SheetRow(
                         title = when (command.name) {
                             "goal" -> stringResource(R.string.goal_title)
@@ -239,8 +243,8 @@ internal fun CommandSheet(
         // Skills ------------------------------------------------------------
         if (filteredSkills.isNotEmpty()) {
             SectionHeader(stringResource(R.string.skills_title))
-            LazyColumn(Modifier.heightIn(max = 220.dp)) {
-                items(filteredSkills, key = { it.name }) { skill ->
+            Column {
+                filteredSkills.forEach { skill ->
                     SheetRow(
                         title = "/${skill.name}",
                         subtitle = skill.description.ifBlank { null },
@@ -256,6 +260,7 @@ internal fun CommandSheet(
                     )
                 }
             }
+        }
         }
     }
 }
