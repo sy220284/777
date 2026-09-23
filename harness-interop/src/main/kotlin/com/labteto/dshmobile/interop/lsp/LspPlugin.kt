@@ -2,6 +2,9 @@ package com.labteto.dshmobile.interop.lsp
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceLease
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
@@ -37,6 +40,7 @@ class LspPlugin(
     private val command: (String?) -> List<String>,
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environment: () -> Map<String, String> = { emptyMap() },
+    private val resourceScheduler: HarnessResourceScheduler? = null,
 ) : HarnessPlugin {
     override val id = "local-language-server"
 
@@ -44,6 +48,7 @@ class LspPlugin(
         val key: String,
         val command: List<String>,
         val client: LspProcessClient,
+        val lease: HarnessResourceLease? = null,
     )
 
     private val mutex = Mutex()
@@ -184,6 +189,10 @@ class LspPlugin(
             error("用户拒绝启动代码智能进程")
         }
 
+        val lease = resourceScheduler?.acquire(
+            HarnessResourceKind.LANGUAGE_SERVER,
+            owner = "lsp:" + resolved.firstOrNull().orEmpty(),
+        )
         val next = LspProcessClient(
             command = configured,
             json = json,
@@ -195,15 +204,17 @@ class LspPlugin(
             next.initialize(root.canonicalFile.toURI().toString())
         } catch (cancelled: CancellationException) {
             next.close()
+            lease?.close()
             throw cancelled
         } catch (error: Exception) {
             next.close()
+            lease?.close()
             throw IllegalStateException(
                 "语言服务器启动失败（${resolved.firstOrNull().orEmpty()}）：${error.message ?: error::class.java.simpleName}",
                 error,
             )
         }
-        return ClientHandle(key, resolved, next).also { clients[key] = it }
+        return ClientHandle(key, resolved, next, lease).also { clients[key] = it }
     }
 
     private fun startApprovalTool(resolved: List<String>): HarnessTool = HarnessTool(
@@ -234,6 +245,7 @@ class LspPlugin(
         clients.remove(handle.key)
         versions.remove(handle.key)
         handle.client.close()
+        handle.lease?.close()
         throw error
     }
 
@@ -249,6 +261,8 @@ class LspPlugin(
                 throw cancelled
             } catch (_: Exception) {
                 handle.client.close()
+            } finally {
+                handle.lease?.close()
             }
         }
     }
