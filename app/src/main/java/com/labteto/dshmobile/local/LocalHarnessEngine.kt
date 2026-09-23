@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.app.ActivityManager
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -265,6 +266,8 @@ class LocalHarnessEngine @Inject constructor(
     private val resourceBudget = localResourceBudgetForMemoryClass(
         context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
     )
+    private val imageCapabilities = LocalImageCapabilityRegistry()
+    private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
@@ -308,14 +311,23 @@ class LocalHarnessEngine @Inject constructor(
             schemas = ::subagentToolSchemas,
             execute = ::executeSafely,
             pruneToolResult = ::pruneToolResult,
-            prepareMessages = { messages, mode ->
+            prepareMessages = { messages, mode, _, _ ->
                 prepareLocalMultimodalMessages(
                     messages = messages,
                     workspaceRoot = File(workspace.path),
-                    mode = effectiveImageInputMode(mode),
+                    mode = mode,
+                    budget = imageRequestBudget,
                 )
             },
-            onNativeImageRejected = { autoImageNativeRejected = true },
+            resolveImageMode = { mode, baseUrl, model ->
+                resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+            },
+            onNativeImageAccepted = { baseUrl, model ->
+                imageCapabilities.markSupported(baseUrl, model)
+            },
+            onNativeImageRejected = { baseUrl, model ->
+                imageCapabilities.markUnsupported(baseUrl, model)
+            },
             resourceScheduler = resourceScheduler,
         )
     }
@@ -325,7 +337,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    @Volatile private var autoImageNativeRejected = false
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
 
@@ -428,7 +439,6 @@ class LocalHarnessEngine @Inject constructor(
                     .putString(KEY_MODEL, model.ifBlank { DEFAULT_MODEL })
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .apply()
-                autoImageNativeRejected = false
                 _state.update {
                     it.copy(
                         configured = true,
@@ -444,12 +454,8 @@ class LocalHarnessEngine @Inject constructor(
     /** Choose how user image attachments reach the local model. */
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        autoImageNativeRejected = false
         _state.update { it.copy(imageInputMode = mode) }
     }
-
-    private fun effectiveImageInputMode(mode: LocalImageInputMode): LocalImageInputMode =
-        if (mode == LocalImageInputMode.AUTO && autoImageNativeRejected) LocalImageInputMode.TOOL else mode
 
     /** Persist execution limits exposed from Settings. */
     fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
@@ -657,7 +663,7 @@ class LocalHarnessEngine @Inject constructor(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val mediaType = resolver.getType(uri) ?: "application/octet-stream"
+        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -683,8 +689,22 @@ class LocalHarnessEngine @Inject constructor(
             incoming.delete()
             throw error
         }
+        val imageMetadata = inspectImportedImage(incoming)
+        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
+            incoming.delete()
+            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
+        }
+        if (imageMetadata != null) {
+            try {
+                validateLocalImageMetadata(imageMetadata)
+            } catch (error: Throwable) {
+                incoming.delete()
+                throw error
+            }
+        }
+        val mediaType = imageMetadata?.mediaType ?: declaredMediaType
         val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = when (mediaType.lowercase()) {
+        val extension = when (mediaType) {
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
@@ -706,7 +726,20 @@ class LocalHarnessEngine @Inject constructor(
             mediaType = mediaType,
             bytes = target.length(),
             attachmentId = attachmentId,
+            width = imageMetadata?.width,
+            height = imageMetadata?.height,
         )
+    }
+
+    private fun inspectImportedImage(file: File): LocalImageMetadata? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        val mediaType = options.outMimeType?.lowercase()?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
+            ?: return null
+        val width = options.outWidth
+        val height = options.outHeight
+        if (width <= 0 || height <= 0) return null
+        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
     }
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
@@ -1118,29 +1151,41 @@ class LocalHarnessEngine @Inject constructor(
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
-                val selectedMode = effectiveImageInputMode(snapshot.imageInputMode)
+                val selectedMode = resolveLocalImageInputMode(
+                    snapshot.imageInputMode,
+                    imageCapabilities,
+                    snapshot.baseUrl,
+                    snapshot.model,
+                )
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = durableRequestMessages,
                     workspaceRoot = File(workspace.path),
                     mode = selectedMode,
+                    budget = imageRequestBudget,
                 )
+                val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                 val reply = try {
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
                         messages = requestMessages,
                         step = modelStep + 1,
-                    )
+                    ).also {
+                        if (nativeImagesSent) {
+                            imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
+                        }
+                    }
                 } catch (error: Throwable) {
-                    if (
-                        snapshot.imageInputMode == LocalImageInputMode.AUTO &&
-                        selectedMode != LocalImageInputMode.TOOL &&
-                        hasLocalImageRefs(durableRequestMessages) &&
-                        imageInputUnsupported(error)
-                    ) {
-                        autoImageNativeRejected = true
+                    val nativeImageRejected =
+                        nativeImagesSent &&
+                            imageInputUnsupported(error)
+                    if (nativeImageRejected) {
+                        imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                    }
+                    if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
                         eventLog.append("multimodal/fallback", buildJsonObject {
                             put("step", modelStep + 1)
+                            put("model", snapshot.model)
                             put("from", "native")
                             put("to", "vision-tool")
                             put("reason", error.message.orEmpty().take(2_000))
@@ -1152,6 +1197,7 @@ class LocalHarnessEngine @Inject constructor(
                                 messages = durableRequestMessages,
                                 workspaceRoot = File(workspace.path),
                                 mode = LocalImageInputMode.TOOL,
+                                budget = imageRequestBudget,
                             ),
                             step = modelStep + 1,
                         )

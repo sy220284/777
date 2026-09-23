@@ -58,8 +58,10 @@ internal class LocalSubagentRunner(
     private val schemas: (Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
-    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode) -> List<JsonObject>,
-    private val onNativeImageRejected: () -> Unit = {},
+    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
+    private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
+    private val onNativeImageAccepted: (String, String) -> Unit = { _, _ -> },
+    private val onNativeImageRejected: (String, String) -> Unit = { _, _ -> },
     private val resourceScheduler: HarnessResourceScheduler,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
@@ -179,7 +181,14 @@ internal class LocalSubagentRunner(
                     compactSubagentHistory(history, subagentId)
                     modelStep += 1
                     val durableHistory = history.toList()
-                    val preparedHistory = prepareMessages(durableHistory, snapshot.imageInputMode)
+                    val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
+                    val preparedHistory = prepareMessages(
+                        durableHistory,
+                        selectedMode,
+                        snapshot.baseUrl,
+                        routeModel,
+                    )
+                    val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
                         completeSubagentStep(
                             key = key,
@@ -189,17 +198,23 @@ internal class LocalSubagentRunner(
                             tools = schemas(allowMutation),
                             subagentId = subagentId,
                             step = modelStep,
-                        )
+                        ).also {
+                            if (nativeImagesSent) {
+                                onNativeImageAccepted(snapshot.baseUrl, routeModel)
+                            }
+                        }
                     } catch (error: Throwable) {
-                        if (
-                            snapshot.imageInputMode == LocalImageInputMode.AUTO &&
-                            hasLocalImageRefs(durableHistory) &&
-                            imageInputUnsupported(error)
-                        ) {
-                            onNativeImageRejected()
+                        val nativeImageRejected =
+                            nativeImagesSent &&
+                                imageInputUnsupported(error)
+                        if (nativeImageRejected) {
+                            onNativeImageRejected(snapshot.baseUrl, routeModel)
+                        }
+                        if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
                             eventLog().append("subagent/multimodal-fallback", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("step", modelStep)
+                                put("model", routeModel)
                                 put("from", "native")
                                 put("to", "vision-tool")
                                 put("reason", error.message.orEmpty().take(2_000))
@@ -208,7 +223,12 @@ internal class LocalSubagentRunner(
                                 key = key,
                                 baseUrl = snapshot.baseUrl,
                                 model = routeModel,
-                                history = prepareMessages(durableHistory, LocalImageInputMode.TOOL),
+                                history = prepareMessages(
+                                    durableHistory,
+                                    LocalImageInputMode.TOOL,
+                                    snapshot.baseUrl,
+                                    routeModel,
+                                ),
                                 tools = schemas(allowMutation),
                                 subagentId = subagentId,
                                 step = modelStep,

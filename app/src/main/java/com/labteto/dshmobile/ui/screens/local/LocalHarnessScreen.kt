@@ -1037,8 +1037,13 @@ private fun ImportedAttachmentRow(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
+                val dimensions = if (attachment.width != null && attachment.height != null) {
+                    " · ${attachment.width}×${attachment.height}"
+                } else {
+                    ""
+                }
                 Text(
-                    "${attachment.mediaType} · ${attachment.bytes} B",
+                    "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )

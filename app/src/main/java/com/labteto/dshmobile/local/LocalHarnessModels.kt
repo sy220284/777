@@ -61,6 +61,8 @@ data class LocalImportedAttachment(
     val mediaType: String,
     val bytes: Long,
     val attachmentId: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )
 
 data class LocalSessionSummary(
