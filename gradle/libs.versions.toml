@@ -1,12 +1,12 @@
 [versions]
-agp = "8.13.2"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.28"
-hilt = "2.52"
+agp = "9.4.0"
+kotlin = "2.2.10"
+ksp = "2.3.6"
+hilt = "2.59.2"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
-composeBom = "2024.12.01"
+composeBom = "2026.09.00"
 navigationCompose = "2.8.5"
 hiltNavigationCompose = "1.2.0"
 coroutines = "1.9.0"
@@ -71,7 +71,6 @@ shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
