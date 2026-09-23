@@ -32,6 +32,12 @@ class LocalSessionEventLog(
         Event(event.sequence, event.type, event.createdAt, event.data)
     }
 
+    fun latestSequence(): Long = delegate.latestSequence()
+
+    fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
+        Event(event.sequence, event.type, event.createdAt, event.data)
+    }
+
     fun repairInterruptedTail(): SessionRepairResult =
         SessionRecovery.repairInterruptedTail(delegate)
 
