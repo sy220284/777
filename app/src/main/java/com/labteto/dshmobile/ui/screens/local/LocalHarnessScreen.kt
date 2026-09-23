@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.graphics.BitmapFactory
+import java.io.File
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,8 +113,10 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import java.util.Locale
 import com.labteto.dshmobile.ui.theme.rootSurface
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
@@ -633,15 +639,30 @@ private fun LocalChat(
             }
     }
 
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+    val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
+    val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
             scope.launch {
-                runCatching { onImportAttachment(uri) }
-                    .onSuccess {
-                        attachments += it
-                        attachmentError = null
-                    }
-                    .onFailure { attachmentError = it.message ?: "图片导入失败" }
+                val existingImageCount = attachments.count { it.mediaType.startsWith("image/") }
+                val available = (MAX_LOCAL_IMAGE_SELECTION - existingImageCount).coerceAtLeast(0)
+                if (available == 0) {
+                    attachmentError = imageLimitMessage
+                    return@launch
+                }
+                var failure: String? = if (uris.size > available) imageLimitMessage else null
+                uris.take(available).forEach { uri ->
+                    runCatching { onImportAttachment(uri) }
+                        .onSuccess { imported ->
+                            val duplicate = imported.attachmentId != null &&
+                                attachments.any { it.attachmentId == imported.attachmentId }
+                            if (!duplicate) attachments += imported
+                        }
+                        .onFailure { error ->
+                            failure = error.message ?: imageImportFailedMessage
+                        }
+                }
+                attachmentError = failure
             }
         }
     }
@@ -980,6 +1001,7 @@ private fun LocalChat(
                     attachments.forEachIndexed { index, attachment ->
                         ImportedAttachmentRow(
                             attachment = attachment,
+                            workspacePath = state.workspacePath,
                             onRemove = { attachments.removeAt(index) },
                         )
                     }
@@ -1144,15 +1166,35 @@ private fun LocalChat(
 @Composable
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
+    workspacePath: String,
     onRemove: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    var thumbnail by remember(attachment.relativePath, workspacePath) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    LaunchedEffect(attachment.relativePath, workspacePath) {
+        thumbnail = if (attachment.mediaType.startsWith("image/")) {
+            withContext(Dispatchers.IO) {
+                decodeLocalAttachmentThumbnail(workspacePath, attachment.relativePath)
+            }
+        } else {
+            null
+        }
+    }
     DsCard {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            thumbnail?.let { image ->
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier.size(52.dp).clip(DsShapes.block),
+                )
+            }
             Column(Modifier.weight(1f)) {
                 Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
                 val dimensions = if (attachment.width != null && attachment.height != null) {
@@ -1496,6 +1538,30 @@ private fun NewSessionModeDialog(
         )
     }
 }
+
+
+private const val MAX_LOCAL_IMAGE_SELECTION = 20
+
+
+private fun decodeLocalAttachmentThumbnail(
+    workspacePath: String,
+    relativePath: String,
+): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+    val root = File(workspacePath).canonicalFile
+    val file = File(root, relativePath).canonicalFile
+    require(file.toPath().startsWith(root.toPath()) && file.isFile)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= 160 || bounds.outHeight / (sample * 2) >= 160) {
+        sample *= 2
+    }
+    BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply { inSampleSize = sample },
+    )?.asImageBitmap()
+}.getOrNull()
 
 @Composable
 internal fun NetworkDiagnosticDialog(

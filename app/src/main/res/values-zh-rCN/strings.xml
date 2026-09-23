@@ -742,4 +742,6 @@
     <string name="local_usage_estimated_cost">预估金额</string>
     <string name="local_usage_breakdown">输入 %1$s · 输出 %2$s · %3$d 次请求</string>
     <string name="local_usage_unpriced">另有 %1$s Token 暂无匹配官网价格，未计入金额</string>
+    <string name="local_image_selection_limit">一次最多选择 %1$d 张图片</string>
+    <string name="local_image_import_failed">图片导入失败</string>
 </resources>

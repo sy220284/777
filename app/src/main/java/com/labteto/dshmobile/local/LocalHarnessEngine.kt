@@ -2619,6 +2619,39 @@ class LocalHarnessEngine @Inject constructor(
      * here would undo the projection-cursor startup optimization for long-lived sessions. Legacy
      * history still provides the one-time fallback when no valid checkpoint exists.
      */
+    private fun cleanupUnreferencedLocalImages() {
+        val sessionIds = sessionsRoot.listFiles().orEmpty()
+            .asSequence()
+            .filter(File::isFile)
+            .map(File::getName)
+            .filter { name -> ".events.jsonl" in name }
+            .map { name -> name.substringBefore(".events.jsonl") }
+            .filter { id -> id.matches(Regex("[A-Za-z0-9._-]{1,128}")) }
+            .plus(currentSessionId)
+            .distinct()
+            .toList()
+        val references = mergeLocalImageAttachmentReferences(
+            sessionIds.map { id ->
+                collectLocalImageAttachmentReferences(
+                    events = eventLogFor(id).events(),
+                    extraMessages = if (id == currentSessionId) modelHistory.toList() else emptyList(),
+                )
+            },
+        )
+        val result = cleanupLocalImageAttachments(
+            workspaceRoot = File(workspace.path),
+            references = references,
+        )
+        if (result.deletedFiles > 0) {
+            eventLog.append("attachment/gc", buildJsonObject {
+                put("status", "completed")
+                put("deleted_files", result.deletedFiles)
+                put("deleted_bytes", result.deletedBytes)
+                put("retained_image_bytes", result.retainedImageBytes)
+            })
+        }
+    }
+
     private fun modelHistoryReplayEvents(
         legacyFallback: List<JsonObject>,
     ): List<LocalSessionEventLog.Event> {
