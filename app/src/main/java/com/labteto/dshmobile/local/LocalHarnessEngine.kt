@@ -100,9 +100,20 @@ class LocalHarnessBusyException(message: String) : IllegalStateException(message
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
-    runCatching {
-        LocalToolPolicy.autoApprovalScope(tool.name) == LocalAutoApprovalScope.WORKSPACE
-    }.getOrDefault(false)
+    tool.access == ToolAccess.READ_ONLY ||
+        runCatching {
+            LocalToolPolicy.autoApprovalScope(tool.name) in setOf(
+                LocalAutoApprovalScope.WORKSPACE,
+                LocalAutoApprovalScope.READ_ONLY,
+            )
+        }.getOrDefault(false)
+
+internal fun approvalImpact(tool: HarnessTool): LocalApprovalImpact = when (tool.access) {
+    ToolAccess.READ_ONLY, ToolAccess.WORKSPACE_WRITE -> LocalApprovalImpact.LOW
+    ToolAccess.SESSION_WRITE, ToolAccess.AGENT_CONTROL, ToolAccess.NETWORK -> LocalApprovalImpact.MEDIUM
+    ToolAccess.PROCESS, ToolAccess.DEVICE -> LocalApprovalImpact.HIGH
+    ToolAccess.PRIVILEGED -> LocalApprovalImpact.CRITICAL
+}
 
 internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.DEVICE &&
@@ -509,21 +520,24 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(approved)
     }
 
-    /** Approve workspace-confined writes for the current session. */
+    /**
+     * Persist safe automatic approval across sessions.
+     *
+     * Enabling the mode from a high-impact dialog does not approve that current operation;
+     * it only suppresses future prompts for path-confined workspace writes and read-only tools.
+     */
     fun enableAutoApproval() {
         val pending = _state.value.pendingApproval
-        if (pending?.canAutoApproveWorkspace != true) {
-            eventLog.append("approval/mode-rejected", buildJsonObject {
-                put("mode", "workspace-auto")
-                put("reason", "pending-tool-outside-workspace-scope")
-                pending?.toolName?.let { put("tool", it) }
-            })
-            return
-        }
+        preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, true).apply()
         _state.update { it.copy(autoApproveMutations = true) }
-        eventLog.append("approval/mode", buildJsonObject { put("mode", "workspace-auto") })
+        eventLog.append("approval/mode", buildJsonObject {
+            put("mode", "safe-global")
+            pending?.toolName?.let { put("tool", it) }
+        })
         persist()
-        approvalResponse?.complete(true)
+        if (pending?.canAutoApproveSafely == true) {
+            approvalResponse?.complete(true)
+        }
     }
 
     /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
@@ -546,8 +560,9 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
     }
 
-    /** Return the current session to per-operation approval. */
+    /** Return safe operations to per-operation approval for all local sessions. */
     fun disableAutoApproval() {
+        preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, false).apply()
         _state.update { it.copy(autoApproveMutations = false) }
         eventLog.append("approval/mode", buildJsonObject { put("mode", "ask") })
         persist()
@@ -627,7 +642,7 @@ class LocalHarnessEngine @Inject constructor(
                             todos = emptyList(),
                             goal = null,
                             planMode = false,
-                            autoApproveMutations = false,
+                            autoApproveMutations = safeAutoApprovalEnabled(sourceState.autoApproveMutations),
                             deviceApprovalLease = false,
                             jobs = emptyList(),
                             error = null,
@@ -1270,7 +1285,8 @@ class LocalHarnessEngine @Inject constructor(
                 put("tool", call.name)
                 put("summary", summary)
                 put("access", tool.access.name.lowercase())
-                put("mode", "workspace-session")
+                put("impact", approvalImpact(tool).name.lowercase())
+                put("mode", "safe-global")
             })
             return true
         }
@@ -1284,7 +1300,8 @@ class LocalHarnessEngine @Inject constructor(
                     summary = summary,
                     arguments = call.rawArguments,
                     access = tool.access.name.lowercase(),
-                    canAutoApproveWorkspace = canAutoApprove(tool),
+                    impact = approvalImpact(tool),
+                    canAutoApproveSafely = canAutoApprove(tool),
                     canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
                 ),
             )
@@ -1701,7 +1718,7 @@ class LocalHarnessEngine @Inject constructor(
             todos = stored.todos,
             goal = stored.goal,
             planMode = stored.planMode,
-            autoApproveMutations = stored.autoApproveMutations,
+            autoApproveMutations = safeAutoApprovalEnabled(stored.autoApproveMutations),
         )
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
@@ -1813,6 +1830,17 @@ class LocalHarnessEngine @Inject constructor(
         return RestoredModelHistory(history, replayed)
     }
 
+    private fun safeAutoApprovalEnabled(legacySessionValue: Boolean = false): Boolean {
+        if (preferences.contains(KEY_SAFE_AUTO_APPROVAL)) {
+            return preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, false)
+        }
+        if (legacySessionValue) {
+            preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, true).apply()
+            return true
+        }
+        return false
+    }
+
     private fun persist() {
         val state = _state.value
         val snapshot = LocalHarnessSession(
@@ -1888,6 +1916,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MAIN_MAX_STEPS = "main_max_steps"
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
+        const val KEY_SAFE_AUTO_APPROVAL = "safe_auto_approval"
         const val DEFAULT_MODEL = "deepseek-chat"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
