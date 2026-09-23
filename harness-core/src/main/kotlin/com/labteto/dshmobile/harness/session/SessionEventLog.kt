@@ -196,7 +196,7 @@ class SessionEventLog(
 
     private inline fun forEachAfterUnsafe(
         sequenceExclusive: Long,
-        visitor: (SessionEvent) -> Unit,
+        crossinline visitor: (SessionEvent) -> Unit,
     ) {
         val sources = orderedFilesUnsafe()
         if (sources.isEmpty()) return
