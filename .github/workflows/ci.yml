@@ -35,6 +35,7 @@ jobs:
           bash tools/reference-validation/refresh-official-fixtures.sh
           git diff --exit-code -- reference-validation/src/test/resources/official
       - name: Unit tests
+        timeout-minutes: 20
         run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
       - name: Official Harness conformance
         run: ./gradlew :reference-validation:test --stacktrace
