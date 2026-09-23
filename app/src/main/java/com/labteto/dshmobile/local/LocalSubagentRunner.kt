@@ -55,12 +55,15 @@ internal class LocalSubagentRunner(
     private val historySnapshot: () -> List<JsonObject>,
     private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
-    private val schemas: (Boolean) -> JsonArray,
+    private val schemas: (Boolean, Boolean) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode) -> List<JsonObject>,
     private val onNativeImageRejected: () -> Unit = {},
     private val resourceScheduler: HarnessResourceScheduler,
+    private val acquireVirtualScreen: suspend (String) -> String? = { null },
+    private val releaseVirtualScreen: (String) -> Unit = { },
+    private val historyBudget: (() -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
@@ -71,6 +74,7 @@ internal class LocalSubagentRunner(
         parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
+        virtualScreen: Boolean = false,
     ): String = runResult(
         task = task,
         inheritHistory = inheritHistory,
@@ -79,6 +83,7 @@ internal class LocalSubagentRunner(
         parentCallId = parentCallId,
         modelOverride = modelOverride,
         maxSteps = maxSteps,
+        virtualScreen = virtualScreen,
     ).output
 
     suspend fun runResult(
@@ -89,16 +94,29 @@ internal class LocalSubagentRunner(
         parentCallId: String? = null,
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
-    ): LocalSubagentResult = resourceScheduler.withResource(HarnessResourceKind.AGENT) {
-        runResultWithLease(
-            task = task,
-            inheritHistory = inheritHistory,
-            allowMutation = allowMutation,
-            backgroundJobId = backgroundJobId,
-            parentCallId = parentCallId,
-            modelOverride = modelOverride,
-            maxSteps = maxSteps,
-        )
+        virtualScreen: Boolean = false,
+    ): LocalSubagentResult = resourceScheduler.withResource(
+        HarnessResourceKind.AGENT,
+        owner = "subagent:" + task.take(80),
+    ) {
+        var virtualScreenId: String? = null
+        try {
+            if (virtualScreen) {
+                virtualScreenId = acquireVirtualScreen(task.take(80))
+            }
+            runResultWithLease(
+                task = task,
+                inheritHistory = inheritHistory,
+                allowMutation = allowMutation,
+                backgroundJobId = backgroundJobId,
+                parentCallId = parentCallId,
+                modelOverride = modelOverride,
+                maxSteps = maxSteps,
+                virtualScreenId = virtualScreenId,
+            )
+        } finally {
+            virtualScreenId?.let(releaseVirtualScreen)
+        }
     }
 
     private suspend fun runResultWithLease(
@@ -109,6 +127,7 @@ internal class LocalSubagentRunner(
         parentCallId: String?,
         modelOverride: String?,
         maxSteps: Int,
+        virtualScreenId: String?,
     ): LocalSubagentResult {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val history = if (inheritHistory) {
@@ -129,6 +148,7 @@ internal class LocalSubagentRunner(
             put("model", routeModel)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
+            virtualScreenId?.let { put("virtual_screen_id", it) }
         })
         val key = apiKeys.get()
         if (key == null) {
@@ -166,6 +186,15 @@ internal class LocalSubagentRunner(
                 ) 1 else 0
                 history.add(index, insertion)
             }
+            virtualScreenId?.let { id ->
+                history += buildJsonObject {
+                    put("role", "system")
+                    put(
+                        "content",
+                        "【独立虚拟屏】本子任务已分配虚拟屏 id=$id。需要操作 Android 界面时只使用 android_vscreen_* 工具，并始终传入该 id；不要操作主屏。运行时会在子任务结束时自动释放此虚拟屏。",
+                    )
+                }
+            }
             history += buildJsonObject { put("role", "user"); put("content", task) }
 
             val loop = AgentLoop(
@@ -186,7 +215,7 @@ internal class LocalSubagentRunner(
                             baseUrl = snapshot.baseUrl,
                             model = routeModel,
                             history = preparedHistory,
-                            tools = schemas(allowMutation),
+                            tools = schemas(allowMutation, virtualScreenId != null),
                             subagentId = subagentId,
                             step = modelStep,
                         )
@@ -209,7 +238,7 @@ internal class LocalSubagentRunner(
                                 baseUrl = snapshot.baseUrl,
                                 model = routeModel,
                                 history = prepareMessages(durableHistory, LocalImageInputMode.TOOL),
-                                tools = schemas(allowMutation),
+                                tools = schemas(allowMutation, virtualScreenId != null),
                                 subagentId = subagentId,
                                 step = modelStep,
                             )
@@ -231,7 +260,32 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    execute(call.toLocalToolCall(), allowMutation)
+                    val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
+                    val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
+                    when {
+                        !allowMutation && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !virtualAllowed ->
+                            AgentToolResult(
+                                content = "子代理没有可用的虚拟屏租约",
+                                isError = true,
+                                errorCode = "SUBAGENT_VIRTUAL_SCREEN_REQUIRED",
+                                recoveryHint = "重新以 virtual_screen=true 启动该子任务。",
+                            )
+                        !allowMutation && call.name.startsWith("android_") && !virtualAllowed ->
+                            AgentToolResult(
+                                content = "只读子代理未获主屏设备操作权限",
+                                isError = true,
+                                errorCode = "SUBAGENT_DEVICE_SCOPE_BLOCKED",
+                                recoveryHint = "仅使用已分配虚拟屏的受限工具。",
+                            )
+                        virtualAllowed && requestedScreen != virtualScreenId ->
+                            AgentToolResult(
+                                content = "子代理只能操作自己分配的虚拟屏",
+                                isError = true,
+                                errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
+                                recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
+                            )
+                        else -> execute(call.toLocalToolCall(), allowMutation)
+                    }
                 },
                 eventSink = AgentEventSink { event ->
                     when (event) {
@@ -429,7 +483,7 @@ internal class LocalSubagentRunner(
     }
 
     private fun compactSubagentHistory(history: MutableList<JsonObject>, subagentId: String) {
-        val compaction = historyCompactor.compact(history) ?: return
+        val compaction = historyCompactor.compact(history, historyBudget?.invoke()) ?: return
         history.clear()
         history += compaction.messages
         eventLog().append("subagent/compaction", buildJsonObject {
@@ -449,5 +503,13 @@ internal class LocalSubagentRunner(
     private companion object {
         const val SUBAGENT_PROGRESS_ITEMS = 6
         const val SUBAGENT_EVENT_CHARS = 65_536
+        val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
+            "android_vscreen_status",
+            "android_vscreen_launch",
+            "android_vscreen_tap",
+            "android_vscreen_swipe",
+            "android_vscreen_screenshot",
+            "vision_analyze_vscreen",
+        )
     }
 }

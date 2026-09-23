@@ -151,6 +151,12 @@
     <string name="local_status_running">本机 · 执行中</string>
     <string name="local_status_running_queued">本机 · 执行中 · 待处理 %1$d</string>
     <string name="local_queue_message">追加</string>
+    <string name="local_execution_console">执行控制台</string>
+    <string name="local_resource_summary">智能体 %1$d/%2$d · 终端 %3$d/%4$d · 虚拟屏 %5$d/%6$d · 语言服务 %7$d/%8$d</string>
+    <string name="local_context_summary">上下文 %1$d / %2$d 字符</string>
+    <string name="local_streaming_status">代理正在实时响应…</string>
+    <string name="local_streaming_reasoning">实时思考</string>
+    <string name="local_streaming_answer">实时答复</string>
     <string name="local_status_ready">本机 · 已就绪</string>
     <string name="local_device_approval_on">本轮设备操作已授权</string>
     <string name="local_safe_approval_on">安全操作自动批准已开启</string>

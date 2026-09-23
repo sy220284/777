@@ -172,9 +172,19 @@ data class LocalHarnessState(
     val queuedInputCount: Int = 0,
     val activeModelRequests: Int = 0,
     val activeAgents: Int = 0,
+    val activeTerminals: Int = 0,
+    val activeVirtualDisplays: Int = 0,
+    val activeLanguageServers: Int = 0,
     val maxModelRequests: Int = 1,
     val maxAgents: Int = 1,
+    val maxTerminals: Int = 1,
+    val maxVirtualDisplays: Int = 1,
+    val maxLanguageServers: Int = 1,
     val resourcePressure: String = "low",
+    val contextChars: Int = 0,
+    val contextBudgetChars: Int = 0,
+    val streamingAssistant: String = "",
+    val streamingReasoning: String = "",
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
@@ -187,6 +197,11 @@ data class LocalToolCall(
     val name: String,
     val arguments: JsonObject,
     val rawArguments: String,
+)
+
+data class LocalModelDelta(
+    val content: String = "",
+    val reasoning: String = "",
 )
 
 /** Parsed model response retained verbatim for the next request. */
