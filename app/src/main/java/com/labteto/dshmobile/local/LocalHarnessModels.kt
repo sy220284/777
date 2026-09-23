@@ -39,6 +39,8 @@ data class LocalHarnessSession(
     val planMode: Boolean = false,
     /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
     val controlProjectedThroughSequence: Long? = null,
+    /** Highest SessionEvent sequence already reflected in the materialized user-facing transcript. */
+    val transcriptProjectedThroughSequence: Long? = null,
 )
 
 data class LocalImportedAttachment(
