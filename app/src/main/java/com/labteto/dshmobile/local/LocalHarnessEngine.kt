@@ -283,6 +283,7 @@ class LocalHarnessEngine @Inject constructor(
                     mode = effectiveImageInputMode(mode),
                 )
             },
+            onNativeImageRejected = { autoImageNativeRejected = true },
         )
     }
 
