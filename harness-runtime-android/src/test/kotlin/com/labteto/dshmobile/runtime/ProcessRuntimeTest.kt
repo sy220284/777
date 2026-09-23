@@ -3,6 +3,7 @@ package com.labteto.dshmobile.runtime
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import java.io.File
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -78,6 +79,44 @@ class ProcessRuntimeTest {
             assertEquals("ok", environment["EXTRA_FLAG"])
         } finally {
             dir.deleteRecursively()
+        }
+    }
+
+    @Test(timeout = 5000)
+    fun cancellationCompletesWhileProcessIsStillRunning() = kotlinx.coroutines.runBlocking {
+        val running = async(kotlinx.coroutines.Dispatchers.IO) {
+            AndroidProcessRuntime().execute(ProcessRequest(listOf("sh", "-c", "sleep 30")))
+        }
+        kotlinx.coroutines.delay(100)
+        running.cancel()
+        running.join()
+        assertTrue(running.isCancelled)
+    }
+
+    @Test(timeout = 5000)
+    fun timeoutAlsoCoversBlockedStandardInput() = kotlinx.coroutines.runBlocking {
+        val result = AndroidProcessRuntime().execute(ProcessRequest(
+            command = listOf("sh", "-c", "sleep 30"),
+            stdin = "x".repeat(1_000_000),
+            timeoutMillis = 100,
+        ))
+        assertTrue(result.timedOut)
+    }
+
+    @Test(timeout = 5000)
+    fun timeoutStopsInheritedDescendants() = kotlinx.coroutines.runBlocking {
+        val directory = createTempDir(prefix = "process-group-test-")
+        try {
+            val marker = File(directory, "unexpected-output")
+            val result = AndroidProcessRuntime().execute(ProcessRequest(
+                command = listOf("sh", "-c", "(sleep 1; printf leftover > \"\$1\") & wait", "check", marker.path),
+                timeoutMillis = 100,
+            ))
+            assertTrue(result.timedOut)
+            kotlinx.coroutines.delay(1200)
+            assertFalse("descendant survived timeout", marker.exists())
+        } finally {
+            directory.deleteRecursively()
         }
     }
 

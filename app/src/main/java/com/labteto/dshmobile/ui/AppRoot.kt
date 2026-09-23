@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +35,11 @@ import com.labteto.dshmobile.ui.theme.ThemePreference
 
 /** Application root: theme + locale-aware shell, connect vs. main routing. */
 @Composable
-fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
+fun AppRoot(
+    viewModel: AppViewModel = hiltViewModel(),
+    requestedSessionId: String? = null,
+    onSessionRequestConsumed: () -> Unit = {},
+) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
     val themePreference = remember(settings.themePreference) {
@@ -57,6 +62,20 @@ fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
         val showMain = connection.phase == ConnectionPhase.CONNECTED ||
             (connection.phase == ConnectionPhase.RECONNECTING && connection.hasConnected)
         val selectedRemoteMatches = surface == "remote" && connection.host != null
+        LaunchedEffect(requestedSessionId) {
+            if (!requestedSessionId.isNullOrBlank()) viewModel.prepareNotificationNavigation()
+        }
+        LaunchedEffect(requestedSessionId, connection.phase) {
+            val target = requestedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+            showSettings = false
+            utilitySurface = null
+            showPair = false
+            surface = "remote"
+            relayClaimed = true
+            if (connection.phase == ConnectionPhase.CONNECTED && viewModel.openNotificationSession(target)) {
+                onSessionRequestConsumed()
+            }
+        }
         when {
             utilitySurface == "tasks" -> TasksScreen(
                 onClose = { utilitySurface = null },

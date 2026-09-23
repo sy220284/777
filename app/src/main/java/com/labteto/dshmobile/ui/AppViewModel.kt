@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 class AppViewModel @Inject constructor(
     hostsStore: HostsStore,
     private val connectionManager: ConnectionManager,
+    private val sessionStore: com.labteto.dshmobile.data.SessionStore,
     private val updateChecker: UpdateChecker,
     private val updateInstaller: UpdateInstaller,
 ) : ViewModel() {
@@ -66,6 +67,16 @@ class AppViewModel @Inject constructor(
                 "更新失败：" + (error.message ?: error::class.java.simpleName)
             }
         }
+    }
+
+    suspend fun prepareNotificationNavigation() {
+        connectionManager.restoreDesiredConnectionIfNeeded()
+    }
+
+    suspend fun openNotificationSession(id: String): Boolean {
+        if (id.isBlank()) return false
+        sessionStore.openSession(id)
+        return sessionStore.currentSessionId.value == id
     }
 
     fun clearUpdateInstallStatus() {

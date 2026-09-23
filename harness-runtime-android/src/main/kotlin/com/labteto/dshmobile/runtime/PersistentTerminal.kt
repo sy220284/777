@@ -20,7 +20,7 @@ class PersistentPipeTerminalProvider(
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
 ) : HarnessTerminalProvider {
     private data class Session(
-        val process: Process,
+        val managed: ManagedProcess,
         val input: java.io.OutputStream,
         val output: java.io.InputStream,
     )
@@ -33,16 +33,17 @@ class PersistentPipeTerminalProvider(
             val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
             if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
             val resolved = resolveCommand(command)
-            val process = ProcessBuilder(resolved)
+            val managed = ManagedProcess.start(ProcessBuilder(resolved)
                 .directory(directory)
                 .redirectErrorStream(true)
                 .apply {
                     environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
                     environment().putAll(baseEnvironment())
                 }
-                .start()
+            )
+            val process = managed.process
             val id = "term-" + UUID.randomUUID().toString().replace("-", "").take(16)
-            sessions[id] = Session(process, process.outputStream, process.inputStream)
+            sessions[id] = Session(managed, process.outputStream, process.inputStream)
             id
         }
 
@@ -63,12 +64,13 @@ class PersistentPipeTerminalProvider(
 
     override suspend fun close(sessionId: String) = withContext(Dispatchers.IO) {
         val session = sessions.remove(sessionId) ?: return@withContext
+        session.managed.terminate()
         runCatching { session.input.close() }
         runCatching { session.output.close() }
-        if (session.process.isAlive) session.process.destroyForcibly()
+        Unit
     }
 
-    fun isAlive(sessionId: String): Boolean = sessions[sessionId]?.process?.isAlive == true
+    fun isAlive(sessionId: String): Boolean = sessions[sessionId]?.managed?.process?.isAlive == true
 
     fun nativePtyAvailable(): Boolean = false
 
@@ -98,7 +100,7 @@ class PersistentPipeTerminalProvider(
     }
 
     private fun requireSession(id: String): Session =
-        sessions[id]?.takeIf { it.process.isAlive } ?: error("终端会话不存在或已结束：$id")
+        sessions[id]?.takeIf { it.managed.process.isAlive } ?: error("终端会话不存在或已结束：$id")
 
     private companion object {
         const val MAX_READ_BYTES = 64 * 1024

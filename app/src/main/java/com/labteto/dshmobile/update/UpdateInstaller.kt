@@ -180,8 +180,8 @@ class UpdateInstaller @Inject constructor(
         return downloadClient.newCall(request).execute().use { response ->
             require(response.isSuccessful) { "下载校验文件失败：HTTP ${response.code}" }
             val body = response.body ?: error("校验文件为空")
-            val bytes = body.bytes()
-            require(bytes.size <= maxBytes) { "校验文件异常过大" }
+            require(body.contentLength() <= maxBytes) { "校验文件异常过大" }
+            val bytes = body.byteStream().use { readChecksumBytes(it, maxBytes) }
             bytes.toString(Charsets.UTF_8)
         }
     }

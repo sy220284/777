@@ -288,7 +288,9 @@ class HarnessWebhookService : Service() {
         socket.use { client ->
             val token = tokenStore.getOrCreate()
             client.soTimeout = 10_000
-            val request = readHttpRequest(client)
+            val request = try { readHttpRequest(client) } catch (_: WebhookPayloadTooLarge) {
+                return respond(client, 413, """{"error":"payload too large"}""")
+            }
                 ?: return respond(client, 400, """{"error":"bad request"}""")
             val method = request.method
             val path = request.path
@@ -373,8 +375,7 @@ class HarnessWebhookService : Service() {
             }
         }
 
-        val length = headers["content-length"]?.toIntOrNull() ?: 0
-        if (length !in 0..MAX_BODY_BYTES) return null
+        val length = webhookBodyLength(headers["content-length"], MAX_BODY_BYTES) ?: return null
         val body = ByteArray(length)
         var offset = 0
         while (offset < length) {

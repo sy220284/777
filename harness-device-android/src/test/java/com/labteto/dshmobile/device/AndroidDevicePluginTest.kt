@@ -100,6 +100,20 @@ class AndroidDevicePluginTest {
         assertEquals("1", provider.calls.single().second["value"])
     }
 
+    @Test
+    fun sensitiveReadsRequireFreshApprovalBeforeProviderInvocation() = runTest {
+        val provider = RecordingProvider()
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val names = listOf("android_screen", "android_find", "android_wait", "android_screenshot",
+            "android_notification_list", "android_clipboard_get", "android_vscreen_screenshot", "android_dumpsys")
+        for (name in names) {
+            assertTrue(registry.context.tools.execute(name, buildJsonObject {}).isError)
+            assertTrue(provider.calls.isEmpty())
+            assertEquals(ToolApprovalPolicy.ALWAYS, registry.context.tools.get(name)!!.approvalPolicy)
+        }
+    }
+
     private class RecordingProvider : HarnessDeviceProvider {
         override val capabilities: Set<String> = emptySet()
         val calls = mutableListOf<Pair<String, Map<String, String>>>()

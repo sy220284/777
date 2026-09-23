@@ -1631,7 +1631,7 @@ class LocalHarnessEngine @Inject constructor(
         val message = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
             role = role,
-            content = content,
+            content = if (role == "tool") pruneToolResult(content) else content,
             toolName = toolName,
             createdAt = System.currentTimeMillis(),
         )

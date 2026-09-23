@@ -34,7 +34,7 @@ internal object LocalToolPolicy {
 
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
-        "http_request",
+        "http_request", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
     }

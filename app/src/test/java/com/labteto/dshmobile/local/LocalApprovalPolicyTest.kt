@@ -36,6 +36,15 @@ class LocalApprovalPolicyTest {
         ))
     }
 
+    @Test
+    fun sessionEventReadsNeverInheritWorkspaceApproval() {
+        for (name in listOf("session_event_search", "session_trace", "session_event_trace", "session_event_read")) {
+            val definition = tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))
+            org.junit.Assert.assertEquals(ToolApprovalPolicy.ALWAYS, definition.approvalPolicy)
+            assertFalse(canAutoApprove(definition))
+        }
+    }
+
     private fun tool(
         name: String,
         access: ToolAccess,
