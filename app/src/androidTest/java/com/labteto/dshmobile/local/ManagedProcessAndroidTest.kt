@@ -64,7 +64,7 @@ class ManagedProcessAndroidTest {
             timeoutSeconds = 1,
         )
 
-        assertTrue("workspace did not return timeout: \$result", result.contains("[TOOL_TIMEOUT]"))
+        assertTrue("workspace did not return timeout: $result", result.contains("[TOOL_TIMEOUT]"))
         delay(1_200)
         assertFalse("workspace descendant survived timeout", marker.exists())
     }
@@ -94,7 +94,7 @@ class ManagedProcessAndroidTest {
 
     private fun reproRoot(name: String): File {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        return File(context.cacheDir, "managed-process-\$name").apply {
+        return File(context.cacheDir, "managed-process-$name").apply {
             deleteRecursively()
             mkdirs()
         }
