@@ -50,4 +50,28 @@ class LocalSessionRepositoryTest {
         runCurrent()
         assertEquals("latest", repository.read("first")!!.title)
     }
+
+    @Test fun summaryCacheTracksFreshWritesAfterInitialLoad() = runTest {
+        val failures = mutableListOf<Throwable>()
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        repository.enqueue(LocalHarnessSession(id = "first", title = "before"))
+        runCurrent()
+
+        assertEquals("before", repository.summaries().single().title)
+
+        repository.enqueue(
+            LocalHarnessSession(
+                id = "first",
+                title = "after",
+                messages = listOf(LocalHarnessMessage("m1", "user", "hello", createdAt = 1L)),
+            ),
+        )
+        runCurrent()
+
+        val summary = repository.summaries().single()
+        assertEquals("after", summary.title)
+        assertFalse(summary.blank)
+        assertTrue(failures.isEmpty())
+    }
+
 }

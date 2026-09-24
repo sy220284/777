@@ -18,8 +18,14 @@ internal class LocalStreamPreview(
 
     fun append(delta: String) {
         if (delta.isEmpty()) return
-        text.append(delta)
-        if (text.length > maxChars) text.delete(0, text.length - maxChars)
+        if (delta.length >= maxChars) {
+            text.clear()
+            text.append(delta.takeLast(maxChars))
+        } else {
+            val overflow = text.length + delta.length - maxChars
+            if (overflow > 0) text.delete(0, overflow)
+            text.append(delta)
+        }
         dirty = true
         val now = clockMs()
         if (lastPublishMs == null || now - lastPublishMs!! >= minIntervalMs) publishAt(now)

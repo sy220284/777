@@ -126,4 +126,52 @@ class SessionEventLogTest {
             directory.deleteRecursively()
         }
     }
+
+    @Test
+    fun tailAndPointReadRemainCorrectAcrossRotatedSegments() {
+        val directory = Files.createTempDirectory("harness-event-window").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(30) { index ->
+                log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) })
+            }
+
+            val tail = log.tail(3).lineSequence()
+                .map { json.decodeFromString(SessionEvent.serializer(), it).sequence }
+                .toList()
+            assertEquals(listOf(27L, 28L, 29L), tail)
+
+            val window = log.read(sequence = 15L, before = 2, after = 2).lineSequence()
+                .map { json.decodeFromString(SessionEvent.serializer(), it).sequence }
+                .toList()
+            assertEquals(listOf(13L, 14L, 15L, 16L, 17L), window)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun latestOfReturnsNewestMatchingRelevantType() {
+        val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(16) { index ->
+                val type = when (index) {
+                    3 -> "tool/call"
+                    11 -> "user/message"
+                    else -> "checkpoint"
+                }
+                log.append(type, buildJsonObject { put("value", index) })
+            }
+
+            val latest = requireNotNull(log.latestOf(setOf("user/message", "tool/call", "tool/result")))
+            assertEquals(11L, latest.sequence)
+            assertEquals("user/message", latest.type)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }

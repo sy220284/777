@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -87,9 +88,9 @@ private fun applyModelHistoryEvent(
             true
         }
         "user/message" -> {
-            // queued=true records the human-visible transcript immediately, but it does not become
-            // model-visible until a later durable history checkpoint consumes that queue item.
-            // Ignoring an uncheckpointed queued tail prevents stop/crash/restart from resurrecting
+            // queued=true records the human-visible transcript immediately. It becomes model-visible
+            // only when a later user/queue consumed or resumed event carries model_messages.
+            // Ignoring the original queued row prevents stop/crash/restart from resurrecting
             // a message the user already cancelled.
             if (event.data["queued"]?.jsonPrimitive?.booleanOrNull == true) return false
             val structured = event.data["model_message"] as? JsonObject
@@ -104,6 +105,19 @@ private fun applyModelHistoryEvent(
                 }
                 true
             }
+        }
+        "user/queue" -> {
+            val action = event.data["action"]?.jsonPrimitive?.contentOrNull
+            if (action !in setOf("consumed", "resumed")) return false
+            val messages = event.data["model_messages"] as? JsonArray ?: return false
+            var changed = false
+            messages.forEach { element ->
+                val message = element as? JsonObject ?: return@forEach
+                if (message["role"]?.jsonPrimitive?.contentOrNull != "user") return@forEach
+                history += message
+                changed = true
+            }
+            changed
         }
         "assistant/message" -> {
             val message = assistantModelMessageFromEvent(event.data)

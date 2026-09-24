@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -182,4 +183,28 @@ class LocalModelHistoryProjectionTest {
         createdAt = 1L,
         data = data,
     )
+
+    @Test
+    fun consumedAndResumedQueuedMessagesReplayWithoutFullCheckpoint() {
+        for (action in listOf("consumed", "resumed")) {
+            val structured = message("user", "补充消息-$action")
+            val events = listOf(
+                event(0L, "user/message", buildJsonObject {
+                    put("content", "补充消息-$action")
+                    put("queued", true)
+                    put("model_message", structured)
+                }),
+                event(1L, "user/queue", buildJsonObject {
+                    put("action", action)
+                    put("model_messages", JsonArray(listOf(structured)))
+                }),
+            )
+
+            val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+            assertEquals(listOf(structured), restored.messages)
+            assertTrue(restored.replayedTail)
+        }
+    }
+
 }

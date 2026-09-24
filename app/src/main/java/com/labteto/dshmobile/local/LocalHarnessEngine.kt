@@ -319,6 +319,7 @@ class LocalHarnessEngine @Inject constructor(
     private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
+    private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = MutableStateFlow(
         LocalHarnessState(
             workspacePath = workspace.path,
@@ -508,6 +509,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(webhookPlugin)
                 load()
                 scheduleInterruptedSafeJobs()
+                scope.launch { maybeCleanupUnreferencedLocalImages() }
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -528,7 +530,7 @@ class LocalHarnessEngine @Inject constructor(
         withContext(Dispatchers.IO) {
             val files = workspace.files()
             val log = if (sessionId == currentSessionId) eventLog else eventLogFor(sessionId)
-            val eventStamp = log.latestSequence()
+            val eventStamp = log.latestOf(CONVERSATION_FILE_EVENT_TYPES)?.sequence ?: -1L
             val workspaceStamp = workspaceFilesStamp(files)
             synchronized(conversationFilesCacheLock) {
                 conversationFilesCache[sessionId]
@@ -723,7 +725,7 @@ class LocalHarnessEngine @Inject constructor(
             put("content", content)
         }
         recordUserTranscript(content, durableMessage, queued = false)
-        appendUserToModelHistory(durableMessage, "user/message")
+        appendUserToModelHistory(durableMessage)
         persist()
         return scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }
             .also { activeJob = it }
@@ -744,9 +746,8 @@ class LocalHarnessEngine @Inject constructor(
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
     }
 
-    private fun appendUserToModelHistory(message: JsonObject, reason: String) {
+    private fun appendUserToModelHistory(message: JsonObject) {
         modelHistory += message
-        checkpointModelHistory(reason)
         updateContextMetrics()
     }
 
@@ -1204,12 +1205,14 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun drainPendingInputsIntoHistory() {
         val queued = pendingInputs.drain()
         if (queued.isEmpty()) return
+        val durableMessages = mutableListOf<JsonObject>()
         queued.forEach { input ->
             val durableMessage = input.modelMessage ?: buildJsonObject {
                 put("role", "user")
                 put("content", input.content)
             }
             modelHistory += durableMessage
+            durableMessages += durableMessage
             captureAutoMemoryDirective(input.memoryInput)
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
@@ -1217,8 +1220,8 @@ class LocalHarnessEngine @Inject constructor(
             put("action", "consumed")
             put("count", queued.size)
             put("queued_count", pendingInputs.size())
+            put("model_messages", JsonArray(durableMessages))
         })
-        checkpointModelHistory("user/queue-consumed")
         updateContextMetrics()
         persist()
     }
@@ -1231,10 +1234,11 @@ class LocalHarnessEngine @Inject constructor(
             put("content", next.content)
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
-        appendUserToModelHistory(durableMessage, "user/queue-resume")
+        appendUserToModelHistory(durableMessage)
         eventLog.append("user/queue", buildJsonObject {
             put("action", "resumed")
             put("queued_count", pendingInputs.size())
+            put("model_messages", JsonArray(listOf(durableMessage)))
         })
         persist()
         scope.launch(start = CoroutineStart.LAZY) {
@@ -1251,7 +1255,6 @@ class LocalHarnessEngine @Inject constructor(
             val prompt = systemPrompt()
             modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
             eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-            checkpointModelHistory("system/prompt")
         }
         persist()
     }
@@ -1451,7 +1454,6 @@ class LocalHarnessEngine @Inject constructor(
                             withTranscript(reply.message, transcriptMessages),
                         )
                         modelHistory += reply.message
-                        checkpointModelHistory("assistant/message")
                         updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
                         persist()
@@ -1495,7 +1497,6 @@ class LocalHarnessEngine @Inject constructor(
                             put("content", modelOutput)
                         }
                         completedToolCallIds += event.call.id
-                        checkpointModelHistory("tool/result")
                         updateContextMetrics()
                         applyTranscriptMessages(listOf(transcriptMessage), toolEvent.sequence)
                         persist()
@@ -1515,6 +1516,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("steps", event.steps)
                             put("messages", _state.value.messages.size)
                         })
+                        checkpointModelHistoryAtTurnBoundary("turn/completed")
                     }
                     is AgentEvent.TurnStepLimit -> {
                         val transcriptMessage = newTranscriptMessage(
@@ -1528,6 +1530,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        checkpointModelHistoryAtTurnBoundary("turn/step-limit")
                         persist()
                     }
                     is AgentEvent.TurnFailed -> {
@@ -1541,6 +1544,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        checkpointModelHistoryAtTurnBoundary("turn/failed")
                         persist()
                     }
                     is AgentEvent.TurnCancelled -> {
@@ -1552,6 +1556,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
+                        checkpointModelHistoryAtTurnBoundary("turn/cancelled")
                         persist()
                     }
                 }
@@ -2374,7 +2379,6 @@ class LocalHarnessEngine @Inject constructor(
                 val prompt = systemPrompt()
                 modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
                 eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-                checkpointModelHistory("system/prompt")
             }
             persist()
             "计划已获批准，已进入执行模式"
@@ -2529,9 +2533,9 @@ class LocalHarnessEngine @Inject constructor(
     private fun currentHistoryBudget(): LocalHistoryBudget =
         localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure)
 
-    private fun updateContextMetrics() {
+    private fun updateContextMetrics(precomputedChars: Int? = null) {
         val budget = currentHistoryBudget()
-        val chars = modelHistory.sumOf { it.toString().length }
+        val chars = precomputedChars ?: modelHistory.sumOf { it.toString().length }
         _state.update {
             it.copy(
                 contextChars = chars,
@@ -2551,8 +2555,13 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun compactHistoryIfNeeded() {
         val budget = currentHistoryBudget()
-        val compaction = historyCompactor.compact(modelHistory, budget) ?: run {
-            updateContextMetrics()
+        val currentChars = modelHistory.sumOf { it.toString().length }
+        val compaction = historyCompactor.compact(
+            history = modelHistory,
+            budget = budget,
+            currentChars = currentChars,
+        ) ?: run {
+            updateContextMetrics(currentChars)
             return
         }
         modelHistory.clear()
@@ -2580,7 +2589,6 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-        checkpointModelHistory("system/prompt")
         updateContextMetrics()
     }
 
@@ -2705,9 +2713,8 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         if (messages.isNotEmpty() || clearStreamingPreview) {
             _state.update { state ->
-                val knownIds = state.messages.mapTo(hashSetOf(), LocalHarnessMessage::id)
                 state.copy(
-                    messages = state.messages + messages.filter { knownIds.add(it.id) },
+                    messages = if (messages.isEmpty()) state.messages else state.messages + messages,
                     streamingAssistant = if (clearStreamingPreview) "" else state.streamingAssistant,
                     streamingReasoning = if (clearStreamingPreview) "" else state.streamingReasoning,
                 )
@@ -2901,6 +2908,16 @@ class LocalHarnessEngine @Inject constructor(
      * here would undo the projection-cursor startup optimization for long-lived sessions. Legacy
      * history still provides the one-time fallback when no valid checkpoint exists.
      */
+    private fun maybeCleanupUnreferencedLocalImages() {
+        val now = System.currentTimeMillis()
+        val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
+        if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
+        runCatching { cleanupUnreferencedLocalImages() }
+            .onSuccess {
+                preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
+            }
+    }
+
     private fun cleanupUnreferencedLocalImages() {
         val sessionIds = sessionsRoot.listFiles().orEmpty()
             .asSequence()
@@ -2973,6 +2990,14 @@ class LocalHarnessEngine @Inject constructor(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             modelHistoryCheckpointCodec.encode(modelHistory.toList(), reason),
         )
+        turnsSinceModelHistoryCheckpoint = 0
+    }
+
+    private fun checkpointModelHistoryAtTurnBoundary(reason: String) {
+        turnsSinceModelHistoryCheckpoint += 1
+        if (turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+            checkpointModelHistory(reason)
+        }
     }
 
     private fun persist() {
@@ -3057,6 +3082,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
+        const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
@@ -3082,12 +3108,20 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val MAX_PENDING_INPUTS = 16
-        const val MAX_STREAM_PREVIEW_CHARS = 80_000
+        const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
+        const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
+        const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
 
+
+        val CONVERSATION_FILE_EVENT_TYPES = setOf(
+            "user/message",
+            "tool/call",
+            "tool/result",
+        )
 
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",

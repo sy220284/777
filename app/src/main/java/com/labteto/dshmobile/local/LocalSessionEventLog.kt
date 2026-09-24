@@ -70,6 +70,9 @@ class LocalSessionEventLog(
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
     ): Event? = delegate.latest(type, beforeSequenceExclusive)?.toLocalEvent()
 
+    fun latestOf(types: Set<String>): Event? =
+        delegate.latestOf(types)?.toLocalEvent()
+
     fun clear() = delegate.clear()
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
