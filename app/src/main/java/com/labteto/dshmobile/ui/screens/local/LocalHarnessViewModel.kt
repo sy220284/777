@@ -52,13 +52,14 @@ class LocalHarnessViewModel @Inject constructor(
             return Result.failure(IllegalStateException("请先完成模型配置"))
         }
         return runCatching {
-            personaAutoFillService.generate(
+            val generated = personaAutoFillService.generate(
                 model = snapshot.model,
                 baseUrl = snapshot.baseUrl,
                 current = snapshot.chatPersona,
                 recentMessages = snapshot.messages,
                 description = description,
-            ).also(engine::configureChatPersona)
+            )
+            engine.syncDefaultChatPersona(generated)
         }
     }
     fun switchSession(sessionId: String) = engine.switchSession(sessionId)
