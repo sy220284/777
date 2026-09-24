@@ -40,12 +40,12 @@ class ChatNodeVisibilityTest {
     }
 
     @Test
-    fun `bookkeeping event types are filtered, unknown ones survive`() {
-        // The compatibility contract keeps genuinely unknown types visible; the noise is named.
+    fun `raw protocol events stay out of the transcript`() {
         assertFalse(OtherNode(seq = 4, type = "step/start", data = JsonNull).rendersContent())
         assertFalse(OtherNode(seq = 5, type = "assistant/chunk", data = JsonNull).rendersContent())
         assertFalse(OtherNode(seq = 6, type = "request/context", data = JsonNull).rendersContent())
-        assertTrue(OtherNode(seq = 7, type = "something/new", data = JsonNull).rendersContent())
+        assertFalse(OtherNode(seq = 7, type = "something/new", data = JsonNull).rendersContent())
+        assertTrue(OtherNode(seq = 8, type = "deliverables/presented", data = JsonNull).rendersContent())
     }
 
     @Test
@@ -125,7 +125,7 @@ class ChatNodeVisibilityTest {
             OtherNode(seq = 7, type = "step/end", data = JsonNull),
             TurnEndNode(seq = 8, turn = 1, reasonKind = "completed"),
         )
-        assertEquals(listOf(3L, 5L), nodes.filter { it.rendersContent() }.map { it.seq })
+        assertEquals(listOf(5L), nodes.filter { it.rendersContent() }.map { it.seq })
     }
 
     @Test
@@ -225,7 +225,7 @@ class ChatNodeVisibilityTest {
     }
 
     @Test
-    fun `concise mode hides work and tools while full mode restores them`() {
+    fun `full mode shows sanitized tool steps but never raw work narration`() {
         val work = AssistantMessageNode(
             seq = 51,
             messageId = "work",
@@ -264,7 +264,7 @@ class ChatNodeVisibilityTest {
         assertFalse(work.rendersInTranscript(nodes, TranscriptMode.CONCISE))
         assertFalse(tool.rendersInTranscript(nodes, TranscriptMode.CONCISE))
         assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.CONCISE))
-        assertTrue(work.rendersInTranscript(nodes, TranscriptMode.FULL))
+        assertFalse(work.rendersInTranscript(nodes, TranscriptMode.FULL))
         assertTrue(tool.rendersInTranscript(nodes, TranscriptMode.FULL))
         assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.FULL))
     }
