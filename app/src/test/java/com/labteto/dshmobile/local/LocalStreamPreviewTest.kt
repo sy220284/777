@@ -36,4 +36,16 @@ class LocalStreamPreviewTest {
 
         assertEquals(listOf("123", "3456"), published)
     }
+
+    @Test
+    fun oversizedSingleDeltaKeepsOnlyBoundedTail() {
+        var now = 0L
+        val published = mutableListOf<String>()
+        val preview = LocalStreamPreview(4, 50, { now }, published::add)
+
+        preview.append("123456789")
+
+        assertEquals(listOf("6789"), published)
+    }
+
 }
