@@ -357,6 +357,8 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun newSubagentRunner(
         eventLogProvider: () -> LocalSessionEventLog,
+        schemasProvider: (Boolean, Boolean) -> JsonArray,
+        executeTool: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
@@ -376,8 +378,8 @@ class LocalHarnessEngine @Inject constructor(
             )
         },
         eventLog = eventLogProvider,
-        schemas = ::subagentToolSchemas,
-        execute = ::executeSafely,
+        schemas = schemasProvider,
+        execute = executeTool,
         pruneToolResult = ::pruneToolResult,
         prepareMessages = { messages, mode, _, _ ->
             prepareLocalMultimodalMessages(
@@ -403,7 +405,45 @@ class LocalHarnessEngine @Inject constructor(
         historyBudget = ::currentHistoryBudget,
     )
 
-    private val subagents by lazy { newSubagentRunner { eventLog } }
+    private val subagents by lazy {
+        newSubagentRunner(
+            eventLogProvider = { eventLog },
+            schemasProvider = ::subagentToolSchemas,
+            executeTool = ::executeSafely,
+        )
+    }
+
+    private fun persistentSubagentRunner(
+        sessionId: String,
+        boundState: LocalHarnessState,
+    ): LocalSubagentRunner {
+        val boundEventLog = eventLogFor(sessionId)
+        val localEnabledOptionalTools = linkedSetOf<String>()
+        val boundMemoryTools = LocalMemoryTools(
+            memoryStore,
+            memoryManager,
+            state = { boundState },
+            sessionId = { sessionId },
+        )
+        return newSubagentRunner(
+            eventLogProvider = { boundEventLog },
+            schemasProvider = { allowMutation, allowVirtualScreen ->
+                val enabled = synchronized(localEnabledOptionalTools) {
+                    localEnabledOptionalTools.toSet()
+                }
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabled)
+            },
+            executeTool = { call, allowMutation ->
+                executePersistentSubagentTool(
+                    call = call,
+                    allowMutation = allowMutation,
+                    sessionId = sessionId,
+                    memoryTools = boundMemoryTools,
+                    enabledOptionalTools = localEnabledOptionalTools,
+                )
+            },
+        )
+    }
 
     private val runStateLock = Any()
     private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
@@ -1576,6 +1616,56 @@ class LocalHarnessEngine @Inject constructor(
         toolFailureResult(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
     }
 
+    private suspend fun executePersistentSubagentTool(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+        memoryTools: LocalMemoryTools,
+        enabledOptionalTools: MutableSet<String>,
+    ): AgentToolResult {
+        val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+        return try {
+            when (canonical.name) {
+                "capability_search" -> AgentToolResult(
+                    searchCapabilities(canonical.arguments.string("query"), enabledOptionalTools),
+                )
+                "memory_search", "memory_list" -> AgentToolResult(
+                    memoryTools.execute(canonical.name, canonical.arguments, allowMutation = false),
+                )
+                "web_fetch" -> {
+                    val background = canonical.arguments.boolean("run_in_background", false)
+                    if (!background) {
+                        executeSafely(canonical, allowMutation)
+                    } else {
+                        val input = canonical.arguments.string("url")
+                        val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
+                            .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
+                        val format = canonical.arguments.optionalString("format") ?: "text"
+                        AgentToolResult(
+                            startPersistentWebFetch(
+                                url = input,
+                                maxBytes = maxBytes,
+                                format = format,
+                                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
+                                sessionId = sessionId,
+                            ),
+                        )
+                    }
+                }
+                else -> executeSafely(canonical, allowMutation)
+            }
+        } catch (cancelled: CancellationException) {
+            if (!currentCoroutineContext().isActive) throw cancelled
+            toolFailureResult(canonical, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消")
+        } catch (error: LocalWebException) {
+            toolFailureResult(canonical, error.code, error.message ?: "网页工具失败")
+        } catch (error: LocalModelException) {
+            toolFailureResult(canonical, error.code, error.message ?: "模型请求失败")
+        } catch (error: Exception) {
+            toolFailureResult(canonical, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+        }
+    }
+
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}"
 
@@ -1682,8 +1772,21 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun subagentToolSchemas(allowMutation: Boolean, allowVirtualScreen: Boolean): JsonArray {
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() } +
+    private fun subagentToolSchemas(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+    ): JsonArray = subagentToolSchemas(
+        allowMutation = allowMutation,
+        allowVirtualScreen = allowVirtualScreen,
+        enabledOptional = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() },
+    )
+
+    private fun subagentToolSchemas(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+        enabledOptional: Set<String>,
+    ): JsonArray {
+        val enabled = enabledOptional +
             if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
@@ -1703,12 +1806,15 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun searchCapabilities(query: String): String {
+    private fun searchCapabilities(query: String): String =
+        searchCapabilities(query, enabledOptionalTools)
+
+    private fun searchCapabilities(query: String, target: MutableSet<String>): String {
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) return "未找到匹配的扩展能力；可换用 Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
-        synchronized(enabledOptionalTools) {
-            enabledOptionalTools += matches.map(HarnessTool::name)
+        synchronized(target) {
+            target += matches.map(HarnessTool::name)
         }
         return buildString {
             appendLine("已为当前回合启用 ${matches.size} 个扩展工具：")
@@ -1927,9 +2033,10 @@ class LocalHarnessEngine @Inject constructor(
         maxBytes: Int,
         format: String,
         timeoutSeconds: Long,
+        sessionId: String = currentSessionId,
     ): String {
         val payload = buildJsonObject {
-            put("session_id", currentSessionId)
+            put("session_id", sessionId)
             put("url", url)
             put("max_bytes", maxBytes)
             put("format", format)
@@ -1952,8 +2059,8 @@ class LocalHarnessEngine @Inject constructor(
         virtualScreen: Boolean,
     ): String {
         val sessionId = currentSessionId
-        val boundEventLog = eventLogFor(sessionId)
-        val boundSubagents = newSubagentRunner { boundEventLog }
+        val boundState = _state.value
+        val boundSubagents = persistentSubagentRunner(sessionId, boundState)
         val payload = buildJsonObject {
             put("session_id", sessionId)
             put("task", task)
@@ -2056,8 +2163,7 @@ class LocalHarnessEngine @Inject constructor(
                         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
-                        val boundEventLog = eventLogFor(sessionId)
-                        val boundSubagents = newSubagentRunner { boundEventLog }
+                        val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
                             val result = boundSubagents.runResult(
                                 task = task,
