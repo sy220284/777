@@ -31,6 +31,10 @@ internal class LocalJobManager(
 
     fun interruptedSnapshots(): List<JobSnapshot> = delegate.interruptedSnapshots()
 
+    fun availableSlots(): Int = delegate.availableSlots()
+
+    fun failInterrupted(id: String, detail: String): String = delegate.failInterrupted(id, detail)
+
     fun resumePersistent(
         id: String,
         block: suspend (String, (String) -> Unit) -> String,
@@ -51,4 +55,6 @@ internal class LocalJobManager(
     fun stopAll() = delegate.stopAll()
 
     suspend fun stopAllAndJoin() = delegate.stopAllAndJoin()
+
+    suspend fun stopNonPersistentAndJoin() = delegate.stopNonPersistentAndJoin()
 }
