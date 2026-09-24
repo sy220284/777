@@ -12,10 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -41,14 +38,11 @@ import com.labteto.dshmobile.ui.components.formatTokens
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 
-private val MonoCaption = DsType.caption11.copy(fontFamily = DsType.codeFont)
-
 /**
- * The turn-by-turn ledger: what the agent did, in order, with its inputs and outputs.
+ * The turn-by-turn ledger: what the agent did, in order.
  *
- * Where the Chat tab shows the conversation as it reads, this shows it as it *ran* — every tool
- * call with its arguments and result, grouped by turn. It replaces the cramped trajectory section
- * that used to sit inside the details panel; one home per fact.
+ * Execution details stay in the runtime/log layer. This surface shows only semantic operation
+ * categories and lifecycle state, grouped by turn.
  */
 @Composable
 internal fun TrajectoryTab(
@@ -135,7 +129,7 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?
             val result = siblings
                 .filterIsInstance<ToolResultNode>()
                 .firstOrNull { it.callId == node.callId }
-            ToolLedgerRow(node, result, cwd)
+            ToolLedgerRow(node, result)
         }
         is com.labteto.dshmobile.core.session.OtherNode -> Unit
         else -> Unit
@@ -143,7 +137,7 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?
 }
 
 @Composable
-private fun ToolLedgerRow(call: ToolCallNode, result: ToolResultNode?, cwd: String?) {
+private fun ToolLedgerRow(call: ToolCallNode, result: ToolResultNode?) {
     val running = result == null
     val failed = result?.isError == true
     Row(verticalAlignment = Alignment.CenterVertically) {
