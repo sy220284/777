@@ -17,6 +17,13 @@ class ChatStyleGuardTest {
         assertFalse(ChatStyleGuard.bannedPhrases.any { it in scrubbed })
     }
 
+    @Test fun personaSpecificBanIsAlsoEnforced() {
+        val text = "亲爱的，你终于回来了。"
+        val extra = listOf("亲爱的")
+        assertEquals(listOf("亲爱的"), ChatStyleGuard.violations(text, extra))
+        assertFalse("亲爱的" in ChatStyleGuard.scrub(text, extra))
+    }
+
     @Test fun naturalChatPassesUntouched() {
         val text = "……你还知道回来？"
         assertTrue(ChatStyleGuard.violations(text).isEmpty())
