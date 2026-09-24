@@ -1264,22 +1264,78 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun captureAutoMemoryDirective(text: String) {
         val snapshot = _state.value
         if (!snapshot.autoMemory || text.isBlank()) return
-        runCatching {
-            memoryManager.captureExplicitUserDirective(
-                text = text,
-                mode = snapshot.conversationMode,
-                projectId = snapshot.projectId,
-                lineageId = snapshot.lineageId,
-                sourceSessionId = currentSessionId,
-            )
-        }.onSuccess { remembered ->
-            if (remembered != null) {
-                eventLog.append("memory/auto", buildJsonObject {
-                    put("id", remembered.id)
-                    put("scope", remembered.scope.name.lowercase())
-                    put("kind", remembered.kind.name.lowercase())
-                })
-            }
+
+        val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+            runCatching {
+                memoryManager.captureChatRelationshipFact(
+                    text = text,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                )
+            }.getOrNull()
+        } else {
+            runCatching {
+                memoryManager.captureExplicitUserDirective(
+                    text = text,
+                    mode = snapshot.conversationMode,
+                    projectId = snapshot.projectId,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                )
+            }.getOrNull()
+        }
+
+        remembered?.let {
+            eventLog.append("memory/auto", buildJsonObject {
+                put("id", it.id)
+                put("scope", it.scope.name.lowercase())
+                put("kind", it.kind.name.lowercase())
+                put("source", if (snapshot.usageMode == LocalUsageMode.CHAT) "chat-relationship" else "directive")
+            })
+        }
+    }
+
+    private fun chatRelationshipMemoryContext(
+        query: String,
+        snapshot: LocalHarnessState,
+    ): String {
+        if (!snapshot.autoRecall) return ""
+        val relationshipKinds = setOf(
+            MemoryKind.RELATIONSHIP_FACT,
+            MemoryKind.RELATIONSHIP_STATE,
+            MemoryKind.RELATIONSHIP_PREFERENCE,
+        )
+        val semanticQuery = listOf(
+            query,
+            snapshot.chatPersona.name,
+            snapshot.chatPersona.relationship,
+        ).filter(String::isNotBlank).joinToString(" ")
+
+        val globalHits = memoryStore.search(
+            query = semanticQuery,
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            allowedKinds = relationshipKinds,
+            maxItems = 6,
+            maxChars = 2_400,
+        )
+        val lineageRecent = memoryStore.listActive(
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = snapshot.lineageId,
+            limit = 12,
+        ).filter { it.kind in relationshipKinds }
+
+        val recalled = (lineageRecent + globalHits)
+            .distinctBy { it.id }
+            .take(8)
+        if (recalled.isEmpty()) return ""
+
+        return buildString {
+            appendLine("【已确认的长期关系事实】")
+            recalled.forEach { appendLine("- ${it.content}") }
+            append("这些内容来自用户此前明确陈述；若与用户本轮新说法冲突，以更新后的明确事实为准。")
         }
     }
 
@@ -1367,10 +1423,15 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
+            captureAutoMemoryDirective(input)
             val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input)
+            val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
+            val chatPrompt = listOf(chatContext.prompt, relationshipMemory)
+                .filter(String::isNotBlank)
+                .joinToString("\n\n")
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
+                messages = withEphemeralContext(modelHistory.toList(), chatPrompt),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
@@ -1549,11 +1610,16 @@ class LocalHarnessEngine @Inject constructor(
                     compactHistoryIfNeeded()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        ephemeralContext = chatTurnRunner.prepare(
-                            snapshot.personaId,
-                            snapshot.chatState,
-                            input,
-                        ).prompt
+                        captureAutoMemoryDirective(memoryInput)
+                        val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
+                        ephemeralContext = listOf(
+                            chatTurnRunner.prepare(
+                                snapshot.personaId,
+                                snapshot.chatState,
+                                input,
+                            ).prompt,
+                            relationshipMemory,
+                        ).filter(String::isNotBlank).joinToString("\n\n")
                     } else {
                         ephemeralContext = contextComposer.compose(
                             ContextRequest(
