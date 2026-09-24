@@ -215,20 +215,26 @@ class SessionEventLog(
     private fun readLastValidEventUnsafe(source: File): SessionEvent? {
         if (!source.isFile || source.length() == 0L) return null
         RandomAccessFile(source, "r").use { input ->
-            var position = input.length() - 1L
+            var cursor = input.length()
             val reversed = ByteArrayOutputStream()
-            while (position >= 0L) {
-                input.seek(position)
-                val value = input.read()
-                if (value == '\n'.code) {
-                    if (reversed.size() > 0) {
-                        decodeReversedLineUnsafe(reversed)?.let { return it }
-                        reversed.reset()
+            val buffer = ByteArray(REVERSE_READ_BUFFER_BYTES)
+            while (cursor > 0L) {
+                val chunkSize = minOf(buffer.size.toLong(), cursor).toInt()
+                val start = cursor - chunkSize
+                input.seek(start)
+                input.readFully(buffer, 0, chunkSize)
+                for (index in chunkSize - 1 downTo 0) {
+                    val value = buffer[index].toInt() and 0xff
+                    if (value == '\n'.code) {
+                        if (reversed.size() > 0) {
+                            decodeReversedLineUnsafe(reversed)?.let { return it }
+                            reversed.reset()
+                        }
+                    } else {
+                        reversed.write(value)
                     }
-                } else {
-                    reversed.write(value)
                 }
-                position -= 1L
+                cursor = start
             }
             return decodeReversedLineUnsafe(reversed)
         }
@@ -363,5 +369,6 @@ class SessionEventLog(
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
         const val MAX_CONTEXT_LINES = 20
+        const val REVERSE_READ_BUFFER_BYTES = 8 * 1024
     }
 }
