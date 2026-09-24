@@ -91,6 +91,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
+import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
@@ -1330,10 +1331,15 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
                     color = colors.labelTertiary,
                 )
             } else {
+                val grouped = linkedMapOf<com.labteto.dshmobile.ui.AgentOperationKind, MutableList<LocalHarnessMessage>>()
                 toolMessages.forEach { message ->
-                    val failed = toolResultFailed(message.content)
+                    grouped.getOrPut(agentOperationKind(message.toolName)) { mutableListOf() }.add(message)
+                }
+                grouped.values.forEach { group ->
+                    val failed = group.any { toolResultFailed(it.content) }
+                    val exemplar = group.first()
                     Text(
-                        stringResource(agentOperationLabelRes(message.toolName)) + " · " +
+                        stringResource(agentOperationLabelRes(exemplar.toolName)) + " · " +
                             stringResource(agentOperationStatusRes(running = false, failed = failed)),
                         style = DsType.small13,
                         color = if (failed) colors.error else colors.labelTertiary,
