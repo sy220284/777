@@ -74,7 +74,10 @@ class MemoryPolicy @Inject constructor() {
      * model may reason about those in the current turn, but they must not silently become durable
      * memory.
      */
-    fun extractChatRelationshipFact(text: String): MemoryCandidate? {
+    fun extractChatRelationshipFact(
+        text: String,
+        subjectLabel: String? = null,
+    ): MemoryCandidate? {
         val raw = text.trim()
         val clean = REMEMBER.matchEntire(raw)?.groupValues?.getOrNull(1)?.trim() ?: raw
         if (clean.length !in MIN_CHARS..MAX_SOURCE_CHARS) return null
@@ -97,12 +100,22 @@ class MemoryPolicy @Inject constructor() {
         PRONOUN_RELATIONSHIP_STATE.matchEntire(clean)?.let { match ->
             val state = normalizeRelationshipState(match.groupValues[1])
             if (state.isNotBlank()) {
-                return MemoryCandidate(
-                    content = "当前对话关系状态：我们｜$state",
-                    scope = MemoryScope.LINEAGE,
-                    kind = MemoryKind.RELATIONSHIP_STATE,
-                    importance = 82,
-                )
+                val subject = subjectLabel?.trim()?.take(24)?.takeIf(String::isNotBlank)
+                return if (subject != null) {
+                    MemoryCandidate(
+                        content = "关系状态：我和$subject｜$state",
+                        scope = MemoryScope.GLOBAL,
+                        kind = MemoryKind.RELATIONSHIP_STATE,
+                        importance = 86,
+                    )
+                } else {
+                    MemoryCandidate(
+                        content = "当前对话关系状态：我们｜$state",
+                        scope = MemoryScope.LINEAGE,
+                        kind = MemoryKind.RELATIONSHIP_STATE,
+                        importance = 82,
+                    )
+                }
             }
         }
 
