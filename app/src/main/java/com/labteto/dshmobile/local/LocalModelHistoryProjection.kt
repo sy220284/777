@@ -88,9 +88,9 @@ private fun applyModelHistoryEvent(
             true
         }
         "user/message" -> {
-            // queued=true records the human-visible transcript immediately, but it does not become
-            // model-visible until a later durable history checkpoint consumes that queue item.
-            // Ignoring an uncheckpointed queued tail prevents stop/crash/restart from resurrecting
+            // queued=true records the human-visible transcript immediately. It becomes model-visible
+            // only when a later user/queue consumed or resumed event carries model_messages.
+            // Ignoring the original queued row prevents stop/crash/restart from resurrecting
             // a message the user already cancelled.
             if (event.data["queued"]?.jsonPrimitive?.booleanOrNull == true) return false
             val structured = event.data["model_message"] as? JsonObject
