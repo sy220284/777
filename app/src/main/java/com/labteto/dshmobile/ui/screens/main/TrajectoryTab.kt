@@ -27,6 +27,7 @@ import com.labteto.dshmobile.core.session.ToolResultNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
+import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DisclosureRow
@@ -61,7 +62,11 @@ internal fun TrajectoryTab(
             current.journal.map { it.copy(surfaceOp = null, surfaceIntent = null) },
         ).nodes
     }
-    val groups = remember(nodes) { groupByTurn(nodes) }
+    val groups = remember(nodes) {
+        groupByTurn(nodes)
+            .map { (turn, turnNodes) -> turn to trajectoryVisibleNodes(turnNodes) }
+            .filter { (_, turnNodes) -> turnNodes.isNotEmpty() }
+    }
 
     LazyColumn(
         state = listState,
@@ -89,7 +94,7 @@ internal fun TrajectoryTab(
                 count = turnNodes.size,
                 key = { index -> "n-${turnNodes[index].seq}" },
             ) { index ->
-                TrajectoryRow(turnNodes[index], turnNodes, cwd)
+                TrajectoryRow(turnNodes[index], nodes)
             }
         }
         if (stats != null || usage != null) {
@@ -102,7 +107,7 @@ internal fun TrajectoryTab(
 }
 
 @Composable
-private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?) {
+private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>) {
     val colors = DsTheme.colors
     when (node) {
         is UserMessageNode -> {
@@ -125,21 +130,32 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?
                 }
             }
         }
-        is ToolCallNode -> {
-            val result = siblings
-                .filterIsInstance<ToolResultNode>()
-                .firstOrNull { it.callId == node.callId }
-            ToolLedgerRow(node, result)
-        }
+        is ToolCallNode -> ToolLedgerRow(node, siblings)
         is com.labteto.dshmobile.core.session.OtherNode -> Unit
         else -> Unit
     }
 }
 
+private fun trajectoryVisibleNodes(turnNodes: List<ChatNode>): List<ChatNode> {
+    val seenKinds = linkedSetOf<com.labteto.dshmobile.ui.AgentOperationKind>()
+    return turnNodes.filter { node ->
+        when (node) {
+            is UserMessageNode -> true
+            is AssistantMessageNode -> !node.isWorkProcess(turnNodes) && node.plainText.isNotBlank()
+            is ToolCallNode -> seenKinds.add(agentOperationKind(node.name))
+            else -> false
+        }
+    }
+}
+
 @Composable
-private fun ToolLedgerRow(call: ToolCallNode, result: ToolResultNode?) {
-    val running = result == null
-    val failed = result?.isError == true
+private fun ToolLedgerRow(call: ToolCallNode, siblings: List<ChatNode>) {
+    val kind = agentOperationKind(call.name)
+    val peers = siblings.filterIsInstance<ToolCallNode>()
+        .filter { it.turn == call.turn && agentOperationKind(it.name) == kind }
+    val results = siblings.filterIsInstance<ToolResultNode>().associateBy { it.callId }
+    val failed = peers.any { results[it.callId]?.isError == true }
+    val running = peers.any { results[it.callId] == null }
     Row(verticalAlignment = Alignment.CenterVertically) {
         StateDot(
             when {
