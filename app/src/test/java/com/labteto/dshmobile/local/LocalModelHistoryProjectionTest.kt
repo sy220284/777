@@ -88,6 +88,28 @@ class LocalModelHistoryProjectionTest {
         assertTrue(restored.messages.single()["content"].toString().contains(LOCAL_IMAGE_REF))
     }
 
+
+    @Test
+    fun unconsumedQueuedUserMessageIsNotReplayedAfterRestart() {
+        val checkpoint = listOf(message("system", "系统"))
+        val events = listOf(
+            event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(checkpoint, "before-queue")),
+            event(1L, "user/message", buildJsonObject {
+                put("content", "已经取消的补充消息")
+                put("queued", true)
+            }),
+            event(2L, "user/queue", buildJsonObject {
+                put("action", "cancelled")
+                put("count", 1)
+            }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(checkpoint, restored.messages)
+        assertFalse(restored.replayedTail)
+    }
+
     @Test
     fun legacyFallbackIsUsedWithoutReplayingUnknownOverlap() {
         val fallback = listOf(
