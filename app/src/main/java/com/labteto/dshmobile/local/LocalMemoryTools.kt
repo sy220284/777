@@ -141,18 +141,18 @@ internal class LocalMemoryTools(
     private fun JsonObject.optionalString(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
     private fun JsonObject.optionalInt(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
     private fun JsonObject.optionalBoolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
-    private fun allowedMemoryKinds(usageMode: LocalUsageMode): Set<MemoryKind> =
-        if (usageMode == LocalUsageMode.CHAT) {
-            MemoryKind.values().toSet()
+    private fun allowedMemoryKinds(usageMode: LocalUsageMode): Set<MemoryKind> {
+        val relationshipKinds = setOf(
+            MemoryKind.RELATIONSHIP_FACT,
+            MemoryKind.RELATIONSHIP_STATE,
+            MemoryKind.RELATIONSHIP_PREFERENCE,
+        )
+        return if (usageMode == LocalUsageMode.CHAT) {
+            relationshipKinds
         } else {
-            MemoryKind.values().filterNot {
-                it in setOf(
-                    MemoryKind.RELATIONSHIP_FACT,
-                    MemoryKind.RELATIONSHIP_STATE,
-                    MemoryKind.RELATIONSHIP_PREFERENCE,
-                )
-            }.toSet()
+            MemoryKind.values().filterNot(relationshipKinds::contains).toSet()
         }
+    }
 
     private fun allowedMemoryScopes(mode: LocalConversationMode): Set<MemoryScope> = when (mode) {
         LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
