@@ -14,6 +14,20 @@ class MemoryConflictResolver @Inject constructor() {
                 it.scope == candidate.scope &&
                 it.kind == candidate.kind
         }
+        if (candidate.kind == MemoryKind.RELATIONSHIP_STATE) {
+            val slot = relationshipSlot(candidate.content)
+            comparable
+                .filter { relationshipSlot(it.content) == slot }
+                .maxByOrNull(MemoryRecord::updatedAt)
+                ?.let { return it }
+        }
+        if (candidate.kind == MemoryKind.RELATIONSHIP_FACT && candidate.content.startsWith("关系对象：")) {
+            val slot = relationshipSlot(candidate.content)
+            comparable
+                .filter { it.content.startsWith("关系对象：") && relationshipSlot(it.content) == slot }
+                .maxByOrNull(MemoryRecord::updatedAt)
+                ?.let { return it }
+        }
         return comparable
             .map { it to similarity(it.content, candidate.content) }
             .filter { (_, score) -> score >= REPLACE_THRESHOLD }
@@ -51,6 +65,9 @@ class MemoryConflictResolver @Inject constructor() {
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
+
+    private fun relationshipSlot(content: String): String =
+        content.substringBefore("｜").trim().lowercase()
 
     private companion object {
         const val REPLACE_THRESHOLD = 0.76
