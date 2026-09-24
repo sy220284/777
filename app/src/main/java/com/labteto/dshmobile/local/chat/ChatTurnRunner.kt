@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.ChatStyleGuard
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.DeepSeekTokenUsage
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import javax.inject.Singleton
 
 internal data class ChatTurnContext(
@@ -38,6 +39,8 @@ class ChatTurnRunner @Inject constructor(
         recordUsage(reply.usage)
         val repaired = try {
             rewrite(reply.content.orEmpty(), firstViolations)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             onGuardEvent("rewrite-failed", firstViolations)
             return ChatStyleGuard.withContent(
