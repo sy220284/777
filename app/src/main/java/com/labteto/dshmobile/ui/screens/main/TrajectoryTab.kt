@@ -151,8 +151,12 @@ private fun trajectoryVisibleNodes(turnNodes: List<ChatNode>): List<ChatNode> {
 @Composable
 private fun ToolLedgerRow(call: ToolCallNode, siblings: List<ChatNode>) {
     val kind = agentOperationKind(call.name)
-    val peers = siblings.filterIsInstance<ToolCallNode>()
-        .filter { it.turn == call.turn && agentOperationKind(it.name) == kind }
+    val peers = if (call.turn == null) {
+        listOf(call)
+    } else {
+        siblings.filterIsInstance<ToolCallNode>()
+            .filter { it.turn == call.turn && agentOperationKind(it.name) == kind }
+    }
     val results = siblings.filterIsInstance<ToolResultNode>().associateBy { it.callId }
     val failed = peers.any { results[it.callId]?.isError == true }
     val running = peers.any { results[it.callId] == null }
