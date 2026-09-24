@@ -15,10 +15,20 @@ data class ChatTurnContext(
 @Singleton
 class ChatTurnRunner @Inject constructor(
     private val personaStore: ChatPersonaStore,
+    private val relationshipEngine: ChatRelationshipEngine,
 ) {
-    fun prepare(personaId: String): ChatTurnContext {
+    fun prepare(
+        personaId: String,
+        input: String = "",
+        recalledContext: String = "",
+    ): ChatTurnContext {
         val persona = personaStore.get(personaId)
-        return ChatTurnContext(persona = persona, prompt = composePersonaPrompt(persona))
+        val prompt = listOf(
+            recalledContext,
+            composePersonaPrompt(persona),
+            relationshipEngine.prompt(input),
+        ).filter(String::isNotBlank).joinToString("\n\n")
+        return ChatTurnContext(persona = persona, prompt = prompt)
     }
 
     suspend fun finalizeReply(

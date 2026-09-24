@@ -146,6 +146,7 @@ class MemoryStore internal constructor(
         allowedScopes: Set<MemoryScope>,
         projectId: String?,
         lineageId: String?,
+        allowedKinds: Set<MemoryKind> = MemoryKind.values().toSet(),
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
     ): List<MemoryRecord> {
@@ -153,7 +154,7 @@ class MemoryStore internal constructor(
         val boundedChars = maxChars.coerceIn(256, 12_000)
         val terms = terms(query)
         val candidates = readDocument().records.asSequence()
-            .filter { it.active && it.scope in allowedScopes }
+            .filter { it.active && it.scope in allowedScopes && it.kind in allowedKinds }
             .filter {
                 when (it.scope) {
                     MemoryScope.GLOBAL -> true

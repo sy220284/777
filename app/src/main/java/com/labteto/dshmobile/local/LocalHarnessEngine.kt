@@ -1247,23 +1247,48 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun captureAutoMemoryDirective(text: String) {
         val snapshot = _state.value
         if (!snapshot.autoMemory || text.isBlank()) return
-        runCatching {
-            memoryManager.captureExplicitUserDirective(
-                text = text,
-                mode = snapshot.conversationMode,
-                projectId = snapshot.projectId,
-                lineageId = snapshot.lineageId,
-                sourceSessionId = currentSessionId,
-            )
-        }.onSuccess { remembered ->
-            if (remembered != null) {
-                eventLog.append("memory/auto", buildJsonObject {
-                    put("id", remembered.id)
-                    put("scope", remembered.scope.name.lowercase())
-                    put("kind", remembered.kind.name.lowercase())
-                })
-            }
+
+        fun record(
+            remembered: com.labteto.dshmobile.local.memory.MemoryRecord?,
+            source: String,
+        ) {
+            if (remembered == null) return
+            eventLog.append("memory/auto", buildJsonObject {
+                put("id", remembered.id)
+                put("scope", remembered.scope.name.lowercase())
+                put("kind", remembered.kind.name.lowercase())
+                put("source", source)
+            })
         }
+
+        val relationshipMemory = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+            runCatching {
+                memoryManager.captureChatRelationshipFact(
+                    text = text,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                )
+            }.getOrNull()
+        } else {
+            null
+        }
+        if (relationshipMemory != null) {
+            record(relationshipMemory, "chat-relationship")
+            return
+        }
+
+        record(
+            runCatching {
+                memoryManager.captureExplicitUserDirective(
+                    text = text,
+                    mode = snapshot.conversationMode,
+                    projectId = snapshot.projectId,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                )
+            }.getOrNull(),
+            "directive",
+        )
     }
 
     private suspend fun drainPendingInputsIntoHistory() {
@@ -1350,7 +1375,22 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId)
+            val recalledContext = contextComposer.compose(
+                ContextRequest(
+                    query = input,
+                    mode = snapshot.conversationMode,
+                    projectId = snapshot.projectId,
+                    lineageId = snapshot.lineageId,
+                    handoffSummary = snapshot.handoffSummary,
+                    usageMode = snapshot.usageMode,
+                ),
+            )
+            captureAutoMemoryDirective(input)
+            val chatContext = chatTurnRunner.prepare(
+                personaId = snapshot.personaId,
+                input = input,
+                recalledContext = recalledContext,
+            )
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
@@ -1524,19 +1564,25 @@ class LocalHarnessEngine @Inject constructor(
                     ensureSystemMessage()
                     compactHistoryIfNeeded()
                     val snapshot = _state.value
-                    if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        ephemeralContext = chatTurnRunner.prepare(snapshot.personaId).prompt
+                    val recalledContext = contextComposer.compose(
+                        ContextRequest(
+                            query = input,
+                            mode = snapshot.conversationMode,
+                            projectId = snapshot.projectId,
+                            lineageId = snapshot.lineageId,
+                            handoffSummary = snapshot.handoffSummary,
+                            usageMode = snapshot.usageMode,
+                        ),
+                    )
+                    captureAutoMemoryDirective(memoryInput)
+                    ephemeralContext = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                        chatTurnRunner.prepare(
+                            personaId = snapshot.personaId,
+                            input = input,
+                            recalledContext = recalledContext,
+                        ).prompt
                     } else {
-                        ephemeralContext = contextComposer.compose(
-                            ContextRequest(
-                                query = input,
-                                mode = snapshot.conversationMode,
-                                projectId = snapshot.projectId,
-                                lineageId = snapshot.lineageId,
-                                handoffSummary = snapshot.handoffSummary,
-                            ),
-                        )
-                        captureAutoMemoryDirective(memoryInput)
+                        recalledContext
                     }
                     requestPrepared = true
                 }

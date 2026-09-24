@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.context
 import com.labteto.dshmobile.harness.context.AgentContextAssembler
 import com.labteto.dshmobile.harness.context.AgentContextMemory
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -15,6 +17,7 @@ data class ContextRequest(
     val projectId: String?,
     val lineageId: String?,
     val handoffSummary: String?,
+    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
 )
 
 @Singleton
@@ -26,11 +29,25 @@ class ContextComposer @Inject constructor(
 
     fun compose(request: ContextRequest): String {
         val profile = profileStore.read()
-        val allowedScopes = when (request.mode) {
-            LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
-            LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
-            LocalConversationMode.CONTINUATION ->
-                setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
+        val allowedScopes = when {
+            request.usageMode == LocalUsageMode.CHAT -> when (request.mode) {
+                LocalConversationMode.INDEPENDENT ->
+                    setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE)
+                LocalConversationMode.PROJECT,
+                LocalConversationMode.CONTINUATION ->
+                    setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
+            }
+            else -> when (request.mode) {
+                LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
+                LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
+                LocalConversationMode.CONTINUATION ->
+                    setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
+            }
+        }
+        val allowedKinds = if (request.usageMode == LocalUsageMode.CHAT) {
+            MemoryKind.values().toSet()
+        } else {
+            MemoryKind.values().filterNot(RELATIONSHIP_MEMORY_KINDS::contains).toSet()
         }
         val memories = if (profile.autoRecall) {
             memoryStore.search(
@@ -38,6 +55,7 @@ class ContextComposer @Inject constructor(
                 allowedScopes = allowedScopes,
                 projectId = request.projectId,
                 lineageId = request.lineageId,
+                allowedKinds = allowedKinds,
                 maxItems = MAX_MEMORY_ITEMS,
                 maxChars = MAX_MEMORY_CHARS,
             )
@@ -63,5 +81,10 @@ class ContextComposer @Inject constructor(
     private companion object {
         const val MAX_MEMORY_ITEMS = 6
         const val MAX_MEMORY_CHARS = 3_500
+        val RELATIONSHIP_MEMORY_KINDS = setOf(
+            MemoryKind.RELATIONSHIP_FACT,
+            MemoryKind.RELATIONSHIP_STATE,
+            MemoryKind.RELATIONSHIP_PREFERENCE,
+        )
     }
 }
