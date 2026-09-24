@@ -1987,7 +1987,7 @@ class LocalHarnessEngine @Inject constructor(
                         val targetSession = currentSessionId
                         resumeInterruptedSafeJobsPass(targetSession)
                         val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedJobSessionId(snapshot) == targetSession
+                            interruptedJobSessionId(snapshot, targetSession) == targetSession
                         }
                         if (!remaining) break
                         delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
@@ -2076,11 +2076,12 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun interruptedJobSessionId(snapshot: JobSnapshot): String? {
+    private fun interruptedJobSessionId(snapshot: JobSnapshot, fallbackSessionId: String): String? {
         val payloadText = snapshot.resumePayload ?: return null
         return runCatching {
             json.parseToJsonElement(payloadText).jsonObject["session_id"]
                 ?.jsonPrimitive?.contentOrNull
+                ?: fallbackSessionId
         }.getOrNull()
     }
 
