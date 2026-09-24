@@ -67,6 +67,85 @@ class MemoryPolicy @Inject constructor() {
         return null
     }
 
+    /**
+     * Capture only high-confidence relationship facts from Chat mode.
+     *
+     * This intentionally ignores inferred intent, attachment labels and transient emotion. The
+     * model may reason about those in the current turn, but they must not silently become durable
+     * memory.
+     */
+    fun extractChatRelationshipFact(text: String): MemoryCandidate? {
+        val raw = text.trim()
+        val clean = REMEMBER.matchEntire(raw)?.groupValues?.getOrNull(1)?.trim() ?: raw
+        if (clean.length !in MIN_CHARS..MAX_SOURCE_CHARS) return null
+        if (clean.endsWith("?") || clean.endsWith("？")) return null
+        if (containsSensitiveData(clean)) return null
+
+        NAMED_RELATIONSHIP_STATE.matchEntire(clean)?.let { match ->
+            val person = match.groupValues[1].trim()
+            val state = normalizeRelationshipState(match.groupValues[2])
+            if (person.isNotBlank() && state.isNotBlank()) {
+                return MemoryCandidate(
+                    content = "关系状态：我和$person｜$state",
+                    scope = MemoryScope.GLOBAL,
+                    kind = MemoryKind.RELATIONSHIP_STATE,
+                    importance = 86,
+                )
+            }
+        }
+
+        PRONOUN_RELATIONSHIP_STATE.matchEntire(clean)?.let { match ->
+            val state = normalizeRelationshipState(match.groupValues[1])
+            if (state.isNotBlank()) {
+                return MemoryCandidate(
+                    content = "当前对话关系状态：我们｜$state",
+                    scope = MemoryScope.LINEAGE,
+                    kind = MemoryKind.RELATIONSHIP_STATE,
+                    importance = 82,
+                )
+            }
+        }
+
+        OBJECT_IDENTITY.matchEntire(clean)?.let { match ->
+            val person = match.groupValues[1].trim()
+            val relation = match.groupValues[2].trim().lowercase()
+            if (person.isNotBlank()) {
+                return MemoryCandidate(
+                    content = "关系对象：$person｜$relation",
+                    scope = MemoryScope.GLOBAL,
+                    kind = MemoryKind.RELATIONSHIP_FACT,
+                    importance = 88,
+                )
+            }
+        }
+
+        USER_RELATIONSHIP_PREFERENCE.matchEntire(clean)?.let {
+            return MemoryCandidate(
+                content = "用户关系偏好：${clean.take(MAX_MEMORY_CHARS)}",
+                scope = MemoryScope.GLOBAL,
+                kind = MemoryKind.RELATIONSHIP_PREFERENCE,
+                importance = 84,
+            )
+        }
+
+        PARTNER_STABLE_PATTERN.matchEntire(clean)?.let {
+            return MemoryCandidate(
+                content = "关系对象稳定信息：${clean.take(MAX_MEMORY_CHARS)}",
+                scope = MemoryScope.LINEAGE,
+                kind = MemoryKind.RELATIONSHIP_FACT,
+                importance = 78,
+            )
+        }
+
+        return null
+    }
+
+    private fun normalizeRelationshipState(raw: String): String =
+        raw.trim()
+            .removeSuffix("了")
+            .removeSuffix("中")
+            .replace("确认关系", "确定关系")
+
     fun containsSensitiveData(text: String): Boolean {
         if (SENSITIVE_ASSIGNMENT.containsMatchIn(text)) return true
         if (SECRET_AFTER_LABEL.containsMatchIn(text)) return true
@@ -89,6 +168,24 @@ class MemoryPolicy @Inject constructor() {
         const val MAX_SOURCE_CHARS = 1_200
         const val MAX_MEMORY_CHARS = 800
 
+        val NAMED_RELATIONSHIP_STATE = Regex(
+            """^(?:我和|我跟|我与)(.{1,24}?)(?:已经|现在|刚刚|刚|正式)?(在一起了?|分手了?|复合了?|确认关系了?|确定关系了?|暧昧中?|异地中?|订婚了?|结婚了?|离婚了?|同居了?|冷战中?)$""",
+            setOf(RegexOption.IGNORE_CASE),
+        )
+        val PRONOUN_RELATIONSHIP_STATE = Regex(
+            """^我们(?:已经|现在|刚刚|刚|正式)?(在一起了?|分手了?|复合了?|确认关系了?|确定关系了?|暧昧中?|异地中?|订婚了?|结婚了?|离婚了?|同居了?|冷战中?)$""",
+            setOf(RegexOption.IGNORE_CASE),
+        )
+        val OBJECT_IDENTITY = Regex(
+            """^(.{1,24}?)(?:是)?我的(女朋友|男朋友|对象|老婆|老公|前任|暧昧对象|喜欢的人|crush)$""",
+            setOf(RegexOption.IGNORE_CASE),
+        )
+        val USER_RELATIONSHIP_PREFERENCE = Regex(
+            """^我在(?:恋爱|感情|关系)里(?:一直|比较|很|特别)?(?:喜欢|不喜欢|讨厌|介意|希望|不能接受|接受不了).{2,160}$""",
+        )
+        val PARTNER_STABLE_PATTERN = Regex(
+            """^(?:她|他|对方|对象|女朋友|男朋友|老婆|老公|前任|暧昧对象|喜欢的人)(?:一直|平时|通常|明确说过|明确表示|习惯)(?:不喜欢|喜欢|讨厌|介意|在意).{2,160}$""",
+        )
         val REMEMBER = Regex("""^(?:请)?记住[：:，,\s]*(.+)$""", RegexOption.DOT_MATCHES_ALL)
         val DURABLE_RULE = Regex(
             """^(?:以后|后续)(?:都|一律|统一|默认|继续)?[：:，,\s]*.+$""",
