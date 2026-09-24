@@ -35,6 +35,8 @@ data class UserChatPattern(
     val initiative: Int = 50,
     val emojiStyle: String = "",
     val preferredTone: String = "",
+    val observedTurns: Int = 0,
+    val averageMessageChars: Int = 0,
     val updatedAt: Long = 0L,
 )
 
@@ -164,7 +166,11 @@ class ChatInteractionPlanner @Inject constructor(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
-        val pattern = sanitizeUserPattern(value.userPattern, previous.userPattern)
+        val pattern = sanitizeUserPattern(
+            value = value.userPattern,
+            previous = previous.userPattern,
+            userMessage = userMessage,
+        )
         val requestedStage = normalizeStage(value.dynamics.stage)
         val relationshipDescription = when {
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
@@ -198,8 +204,7 @@ class ChatInteractionPlanner @Inject constructor(
         assistantMessage: String,
     ): RelationshipDynamics {
         val candidateStage = normalizeStage(value.stage)
-        val explicitStageEvidence = EXPLICIT_STAGE_SIGNAL.containsMatchIn(userMessage) ||
-            EXPLICIT_STAGE_SIGNAL.containsMatchIn(assistantMessage)
+        val explicitStageEvidence = EXPLICIT_STAGE_SIGNAL.containsMatchIn(userMessage)
         val stage = when {
             candidateStage == previous.stage -> previous.stage
             explicitStageEvidence -> candidateStage
@@ -236,10 +241,30 @@ class ChatInteractionPlanner @Inject constructor(
     private fun sanitizeUserPattern(
         value: UserChatPattern,
         previous: UserChatPattern,
+        userMessage: String,
     ): UserChatPattern {
-        val length = value.replyLength.trim().lowercase()
+        val measuredLength = userMessage.trim().length
+        val hasObservation = measuredLength > 0
+        val previousWeight = previous.observedTurns.coerceIn(0, 19)
+        val averageChars = if (hasObservation) {
+            if (previousWeight == 0) {
+                measuredLength
+            } else {
+                ((previous.averageMessageChars * previousWeight) + measuredLength) / (previousWeight + 1)
+            }
+        } else {
+            previous.averageMessageChars
+        }
+        val measuredReplyLength = when {
+            !hasObservation -> null
+            averageChars < 20 -> "short"
+            averageChars < 80 -> "medium"
+            else -> "long"
+        }
+        val modelLength = value.replyLength.trim().lowercase()
             .takeIf { it in ALLOWED_REPLY_LENGTHS }
-            ?: previous.replyLength
+        val length = measuredReplyLength ?: modelLength ?: previous.replyLength
+
         return value.copy(
             replyLength = length,
             directness = bounded(value.directness, previous.directness, 10),
@@ -247,6 +272,9 @@ class ChatInteractionPlanner @Inject constructor(
             initiative = bounded(value.initiative, previous.initiative, 10),
             emojiStyle = value.emojiStyle.trim().take(120),
             preferredTone = value.preferredTone.trim().take(120),
+            observedTurns = if (hasObservation) (previous.observedTurns + 1).coerceAtMost(1000)
+                else previous.observedTurns,
+            averageMessageChars = averageChars.coerceIn(0, 2_000),
             updatedAt = System.currentTimeMillis(),
         )
     }
