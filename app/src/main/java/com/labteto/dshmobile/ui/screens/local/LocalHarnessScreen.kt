@@ -90,6 +90,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
@@ -149,6 +150,7 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
+                usageMode = state.usageMode,
                 usage = state.usage,
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -196,6 +198,7 @@ fun LocalHarnessScreen(
                 onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
+                onUsageModeChange = viewModel::switchUsageMode,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -237,6 +240,7 @@ fun LocalHarnessScreen(
 private fun LocalModeDrawer(
     currentSessionId: String,
     sessions: List<LocalSessionSummary>,
+    usageMode: LocalUsageMode,
     usage: DeepSeekUsageSnapshot,
     onNewSession: () -> Unit,
     onRemote: () -> Unit,
@@ -250,8 +254,9 @@ private fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
-    val visibleSessions = remember(sessions) {
-        sessions.filter { !it.blank }.sortedByDescending(LocalSessionSummary::updatedAt)
+    val visibleSessions = remember(sessions, usageMode) {
+        sessions.filter { !it.blank && it.usageMode == usageMode }
+            .sortedByDescending(LocalSessionSummary::updatedAt)
     }
     val filteredSessions = remember(visibleSessions, historyQuery) {
         val query = historyQuery.trim()
@@ -327,24 +332,26 @@ private fun LocalModeDrawer(
                             subtitle = stringResource(R.string.local_remote_hint),
                             onClick = onRemote,
                         )
-                        DsCategoryRow(
-                            icon = FeatherIcons.FileText,
-                            title = stringResource(R.string.chatlist_workspace_files),
-                            subtitle = stringResource(R.string.local_files_workspace_subtitle),
-                            onClick = onWorkspaceFiles,
-                        )
-                        DsCategoryRow(
-                            icon = Icons.Outlined.Schedule,
-                            title = "定时任务",
-                            subtitle = "计划任务、周期任务和执行结果",
-                            onClick = onTasks,
-                        )
-                        DsCategoryRow(
-                            icon = Icons.Outlined.Extension,
-                            title = "工具与连接",
-                            subtitle = "外部工具服务与当前扩展",
-                            onClick = onTools,
-                        )
+                        if (usageMode == LocalUsageMode.WORK) {
+                            DsCategoryRow(
+                                icon = FeatherIcons.FileText,
+                                title = stringResource(R.string.chatlist_workspace_files),
+                                subtitle = stringResource(R.string.local_files_workspace_subtitle),
+                                onClick = onWorkspaceFiles,
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Schedule,
+                                title = "定时任务",
+                                subtitle = "计划任务、周期任务和执行结果",
+                                onClick = onTasks,
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Extension,
+                                title = "工具与连接",
+                                subtitle = "外部工具服务与当前扩展",
+                                onClick = onTools,
+                            )
+                        }
                         DsCategoryRow(
                             icon = Icons.Outlined.Settings,
                             title = "设置",
@@ -626,6 +633,7 @@ private fun LocalChat(
     onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
+    onUsageModeChange: (LocalUsageMode) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
@@ -776,18 +784,20 @@ private fun LocalChat(
                     Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null,
                         tint = colors.labelSecondary, modifier = Modifier.size(16.dp))
                 }
-                DsIconButton(
-                    icon = FeatherIcons.FileText,
-                    contentDescription = stringResource(R.string.chat_open_files),
-                    onClick = onOpenFiles,
-                    tint = colors.labelSecondary,
-                )
-                DsIconButton(
-                    icon = Icons.Outlined.Terminal,
-                    contentDescription = stringResource(R.string.local_execution_console),
-                    onClick = { showExecutionConsole = true },
-                    tint = colors.labelSecondary,
-                )
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    DsIconButton(
+                        icon = FeatherIcons.FileText,
+                        contentDescription = stringResource(R.string.chat_open_files),
+                        onClick = onOpenFiles,
+                        tint = colors.labelSecondary,
+                    )
+                    DsIconButton(
+                        icon = Icons.Outlined.Terminal,
+                        contentDescription = stringResource(R.string.local_execution_console),
+                        onClick = { showExecutionConsole = true },
+                        tint = colors.labelSecondary,
+                    )
+                }
                 DsIconButton(
                     icon = Icons.Filled.Add,
                     contentDescription = stringResource(R.string.chatlist_new_session),
@@ -795,9 +805,30 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
             }
+            Row(
+                Modifier.fillMaxWidth().padding(top = DsSpacing.tiny),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = "聊天",
+                    onClick = { onUsageModeChange(LocalUsageMode.CHAT) },
+                    modifier = Modifier.weight(1f),
+                    variant = if (state.usageMode == LocalUsageMode.CHAT) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
+                )
+                DsButton(
+                    text = "工作",
+                    onClick = { onUsageModeChange(LocalUsageMode.WORK) },
+                    modifier = Modifier.weight(1f),
+                    variant = if (state.usageMode == LocalUsageMode.WORK) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    enabled = !state.running,
+                )
+            }
         }
 
-        if (state.deviceApprovalLease) {
+        if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
             Surface(
                 color = colors.warnTertiary,
                 shape = RoundedCornerShape(12.dp),
@@ -859,8 +890,12 @@ private fun LocalChat(
                 if (transcriptItems.isEmpty()) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            EmptyLocalHarness { suggestion ->
-                                drafts[state.sessionId] = suggestion
+                            if (state.usageMode == LocalUsageMode.CHAT) {
+                                EmptyLocalChat()
+                            } else {
+                                EmptyLocalHarness { suggestion ->
+                                    drafts[state.sessionId] = suggestion
+                                }
                             }
                         }
                     }
@@ -1022,7 +1057,12 @@ private fun LocalChat(
                     value = input,
                     onValueChange = { drafts[state.sessionId] = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("问点什么，或直接交给 Harness 执行…") },
+                    placeholder = {
+                        Text(
+                            if (state.usageMode == LocalUsageMode.CHAT) "想说什么就说吧…"
+                            else "问点什么，或直接交给 Harness 执行…",
+                        )
+                    },
                     shape = DsShapes.block,
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = Color.Transparent,
@@ -1044,19 +1084,21 @@ private fun LocalChat(
                         tint = colors.labelPrimary,
                         containerColor = colors.bgModulePlatform,
                     )
-                    DsButton(
-                        if (state.planMode) "规划中" else "规划",
-                        { onPlanModeChange(!state.planMode) },
-                        variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                        enabled = !state.running,
-                    )
-                    DsButton(
-                        "自动批准",
-                        if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                        variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
+                    if (state.usageMode == LocalUsageMode.WORK) {
+                        DsButton(
+                            if (state.planMode) "规划中" else "规划",
+                            { onPlanModeChange(!state.planMode) },
+                            variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                            enabled = !state.running,
+                        )
+                        DsButton(
+                            "自动批准",
+                            if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                            variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
                     if (!state.running) {
                         DsButton(
@@ -1256,6 +1298,25 @@ private fun ImportedAttachmentRow(
             }
             DsButton("移除", onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
         }
+    }
+}
+
+@Composable
+private fun EmptyLocalChat() {
+    val colors = DsTheme.colors
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = DsSpacing.xlarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+    ) {
+        WhaleMark(Modifier.size(40.dp))
+        Text("聊点什么", style = DsType.display24, color = colors.labelPrimary)
+        Text(
+            "这里按聊天来，不走工作流程。后续角色、人设、关系和主动消息都会接在这个模式里。",
+            style = DsType.std14,
+            color = colors.labelSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 

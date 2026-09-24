@@ -20,6 +20,7 @@ class LocalSessionRepositoryTest {
             LocalHarnessSession(
                 id = "second",
                 title = "other",
+                usageMode = LocalUsageMode.CHAT,
                 messages = listOf(LocalHarnessMessage("m1", "user", "hello", createdAt = 1L)),
             ),
         )
@@ -28,11 +29,22 @@ class LocalSessionRepositoryTest {
         val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
         assertEquals("new", reopened.read("first")!!.title)
         assertEquals("other", reopened.read("second")!!.title)
+        assertEquals(LocalUsageMode.CHAT, reopened.read("second")!!.usageMode)
         assertEquals(setOf("first", "second"), reopened.summaries().map { it.id }.toSet())
         val summaries = reopened.summaries().associateBy { it.id }
+        assertEquals(LocalUsageMode.WORK, summaries.getValue("first").usageMode)
+        assertEquals(LocalUsageMode.CHAT, summaries.getValue("second").usageMode)
         assertTrue(summaries.getValue("first").blank)
         assertFalse(summaries.getValue("second").blank)
         assertTrue(failures.isEmpty())
+    }
+
+    @Test fun legacySessionWithoutUsageModeDefaultsToWork() {
+        val legacy = Json.decodeFromString(
+            LocalHarnessSession.serializer(),
+            """{"id":"legacy","title":"old","updatedAt":1}""",
+        )
+        assertEquals(LocalUsageMode.WORK, legacy.usageMode)
     }
 
     @Test fun failedWriteRetriesTheLatestSnapshotAfterStorageRecovers() = runTest {
