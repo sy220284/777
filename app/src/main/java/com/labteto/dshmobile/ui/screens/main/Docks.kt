@@ -64,47 +64,22 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun TodoDock(todos: List<TodoEntry>, modifier: Modifier = Modifier) {
     if (todos.isEmpty()) return
-    var expanded by remember(todos) { mutableStateOf(false) }
     val completed = todos.count { it.status == "completed" }
     DisclosureRow(
         title = stringResource(R.string.chat_todo_title),
         summary = stringResource(R.string.chat_todo_progress, completed, todos.size),
         icon = FeatherIcons.CheckSquare,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
+        expanded = false,
+        onToggle = null,
         modifier = modifier,
-    ) {
-        todos.forEach { todo ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 28.dp, top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StateDot(todoStatusDot(todo.status), size = 8.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(todo.content, style = DsType.small13, color = DsTheme.colors.labelSecondary)
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-    }
+    )
 }
 
 /** The read-only goal summary shown inline in the transcript when a goal event lands. */
 @Composable
 internal fun GoalSummary(goal: GoalSnapshot) {
-    val colors = DsTheme.colors
     SectionHeader(stringResource(R.string.goal_title))
     DsPill(text = stringResource(goalPhaseLabelRes(goal.phase)))
-    Spacer(Modifier.height(4.dp))
-    Text(goal.objective, style = DsType.small13, color = colors.labelSecondary)
-    goal.blockedReason?.let {
-        Text(
-            stringResource(R.string.goal_blocked_reason, it.message),
-            style = DsType.caption11,
-            color = colors.warnLabel,
-        )
-    }
 }
 
 /** The live goal bar above the composer, with its phase verbs. */
@@ -126,11 +101,9 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            goal.objective,
+            stringResource(R.string.goal_title),
             style = DsType.small13,
             color = colors.labelSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(8.dp))
