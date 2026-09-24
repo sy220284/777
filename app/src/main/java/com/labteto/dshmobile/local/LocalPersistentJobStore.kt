@@ -2,6 +2,11 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -15,35 +20,39 @@ import kotlinx.serialization.json.put
 /**
  * Crash-safe snapshot store for background jobs.
  *
- * Writes are synchronous and atomic: once a persistent job API returns, its recovery metadata has
- * already reached app-private storage. Output is bounded separately from the in-memory job buffer
- * so frequent progress updates cannot turn the snapshot file into an unbounded write workload.
+ * Persistent job APIs synchronously write recovery metadata before the job is launched. Writes use
+ * fsync + atomic replace when the filesystem supports it, and keep the previous valid snapshot as
+ * a backup. A corrupt primary is restored from that backup instead of silently becoming an empty
+ * job list.
  */
 internal class LocalPersistentJobStore(
     private val file: File,
     private val json: Json,
 ) {
     private val lock = Any()
+    private val backup = File(file.parentFile, "${file.name}.bak")
 
     fun read(): List<JobSnapshot> = synchronized(lock) {
-        runCatching {
-            if (!file.isFile) return@runCatching emptyList()
-            json.parseToJsonElement(file.readText()).jsonArray.mapNotNull { raw ->
-                val item = raw.jsonObject
-                val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val label = item["label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                JobSnapshot(
-                    id = id,
-                    label = label,
-                    status = status,
-                    output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                    resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull,
-                    resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull,
-                    updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
-                )
+        if (!file.isFile) {
+            return@synchronized if (backup.isFile) readFrom(backup) else emptyList()
+        }
+        try {
+            readFrom(file)
+        } catch (primaryError: Exception) {
+            if (!backup.isFile) throw primaryError
+            val recovered = try {
+                readFrom(backup)
+            } catch (_: Exception) {
+                throw primaryError
             }
-        }.getOrDefault(emptyList())
+            runCatching {
+                File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}").also { corrupt ->
+                    file.copyTo(corrupt, overwrite = true)
+                }
+            }
+            atomicWrite(file, backup.readText())
+            recovered
+        }
     }
 
     fun write(snapshots: List<JobSnapshot>) = synchronized(lock) {
@@ -61,11 +70,62 @@ internal class LocalPersistentJobStore(
                 })
             }
         }.toString()
-        val temp = File(file.parentFile, "${file.name}.tmp")
-        temp.writeText(payload)
-        if (!temp.renameTo(file)) {
-            file.writeText(payload)
-            temp.delete()
+
+        // Preserve the last known-good generation before replacing the primary.
+        if (file.isFile) {
+            val existing = file.readText()
+            readFromText(existing)
+            atomicWrite(backup, existing)
+        }
+        atomicWrite(file, payload)
+        if (!backup.isFile) {
+            atomicWrite(backup, payload)
+        }
+    }
+
+    private fun readFrom(source: File): List<JobSnapshot> = readFromText(source.readText())
+
+    private fun readFromText(text: String): List<JobSnapshot> =
+        json.parseToJsonElement(text).jsonArray.mapNotNull { raw ->
+            val item = raw.jsonObject
+            val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val label = item["label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            JobSnapshot(
+                id = id,
+                label = label,
+                status = status,
+                output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull,
+                resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull,
+                updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+            )
+        }
+
+    private fun atomicWrite(target: File, content: String) {
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        val bytes = content.toByteArray(StandardCharsets.UTF_8)
+        FileOutputStream(temporary).use { output ->
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+        }
+        try {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } finally {
+            if (temporary.exists()) temporary.delete()
         }
     }
 
