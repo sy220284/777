@@ -52,6 +52,50 @@ class MemoryStoreTest {
         assertTrue(restarted.search("apples", setOf(MemoryScope.GLOBAL), null, "lineage").isEmpty())
     }
 
+    @Test fun searchCanExcludeRelationshipMemories() {
+        val memoryStore = store()
+        memoryStore.remember(
+            "关系对象：林晚｜女朋友",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+        )
+        val ordinary = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.PREFERENCE,
+        )
+
+        val allowedKinds = MemoryKind.values()
+            .filterNot {
+                it in setOf(
+                    MemoryKind.RELATIONSHIP_FACT,
+                    MemoryKind.RELATIONSHIP_STATE,
+                    MemoryKind.RELATIONSHIP_PREFERENCE,
+                )
+            }
+            .toSet()
+
+        assertTrue(
+            memoryStore.search(
+                query = "林晚女朋友",
+                allowedScopes = setOf(MemoryScope.GLOBAL),
+                projectId = null,
+                lineageId = null,
+                allowedKinds = allowedKinds,
+            ).isEmpty(),
+        )
+        assertEquals(
+            listOf(ordinary),
+            memoryStore.search(
+                query = "简洁回复",
+                allowedScopes = setOf(MemoryScope.GLOBAL),
+                projectId = null,
+                lineageId = null,
+                allowedKinds = allowedKinds,
+            ),
+        )
+    }
+
     @Test fun replacementDoesNotResurrectSupersededMemoryAfterRestart() {
         val old = store().remember("apples old", MemoryScope.GLOBAL)
         val replacement = store().remember("apples new", MemoryScope.GLOBAL, replaceIds = setOf(old.id))
