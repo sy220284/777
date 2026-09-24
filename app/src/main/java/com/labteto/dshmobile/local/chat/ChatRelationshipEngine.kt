@@ -37,8 +37,9 @@ class ChatRelationshipEngine @Inject constructor() {
         if ("军师" in text) return ChatRelationshipView.STRATEGIST
 
         val relationshipRelevant = RELATIONSHIP_HINTS.any { text.contains(it) }
+        val directRelationshipQuestion = DIRECT_RELATIONSHIP_ANALYSIS_HINTS.any { text.contains(it) }
         val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
-        return if (relationshipRelevant && asksForAnalysis) {
+        return if (directRelationshipQuestion || (relationshipRelevant && asksForAnalysis)) {
             ChatRelationshipView.STRATEGIST
         } else {
             ChatRelationshipView.IMMERSIVE
@@ -181,6 +182,11 @@ class ChatRelationshipEngine @Inject constructor() {
             "帮我分析", "分析一下", "什么意思", "为什么", "怎么推进", "下一步怎么", "该怎么办",
             "该怎么做", "该不该", "要不要继续", "有戏吗", "喜欢我吗", "对我有意思吗",
             "什么信号", "关系怎么样", "现在什么阶段", "怎么看", "怎么判断",
+        )
+        val DIRECT_RELATIONSHIP_ANALYSIS_HINTS = listOf(
+            "我们现在什么阶段", "我们是什么关系", "咱们现在什么阶段", "咱们是什么关系",
+            "我和她什么关系", "我和他什么关系", "我跟她什么关系", "我跟他什么关系",
+            "有戏吗", "喜欢我吗", "对我有意思吗", "关系怎么样",
         )
         val RELATIONSHIP_HINTS = listOf(
             "她", "他", "ta", "对方", "对象", "女朋友", "男朋友", "老婆", "老公",
