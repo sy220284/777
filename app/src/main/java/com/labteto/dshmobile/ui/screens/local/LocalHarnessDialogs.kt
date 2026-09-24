@@ -252,25 +252,25 @@ internal fun ChatPersonaDialog(
         .filter(String::isNotBlank)
         .toList()
 
-    DsDialog(title = "角色人设", onDismiss = onDismiss) {
+    DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
         Text(
-            "固定人设会在每轮聊天重新注入，不跟普通聊天历史一起被压缩。",
+            stringResource(R.string.local_persona_intro),
             style = DsType.small13,
             color = DsTheme.colors.labelSecondary,
         )
-        PersonaTextField("角色名称", name, { name = it }, singleLine = true)
-        PersonaTextField("人物身份", identity, { identity = it })
-        PersonaTextField("背景经历", background, { background = it })
-        PersonaTextField("核心性格", personality, { personality = it })
-        PersonaTextField("说话方式", speechStyle, { speechStyle = it })
-        PersonaTextField("与我的关系", relationship, { relationship = it })
-        PersonaTextField("世界设定", worldSetting, { worldSetting = it })
-        PersonaTextField("不可违反的人设（每行一条）", constraints, { constraints = it })
-        PersonaTextField("对白参考（每行一条）", examples, { examples = it })
-        PersonaTextField("角色专属禁用词（每行一条）", banned, { banned = it })
-        PersonaTextField("角色常用表达（每行一条）", signature, { signature = it })
+        PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
+        PersonaTextField(stringResource(R.string.local_persona_identity), identity, { identity = it })
+        PersonaTextField(stringResource(R.string.local_persona_background), background, { background = it })
+        PersonaTextField(stringResource(R.string.local_persona_personality), personality, { personality = it })
+        PersonaTextField(stringResource(R.string.local_persona_speech_style), speechStyle, { speechStyle = it })
+        PersonaTextField(stringResource(R.string.local_persona_relationship), relationship, { relationship = it })
+        PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
+        PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
+        PersonaTextField(stringResource(R.string.local_persona_examples), examples, { examples = it })
+        PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
+        PersonaTextField(stringResource(R.string.local_persona_signature), signature, { signature = it })
         DsButton(
-            text = "保存人设",
+            text = stringResource(R.string.local_persona_save),
             onClick = {
                 onSave(
                     profile.copy(
