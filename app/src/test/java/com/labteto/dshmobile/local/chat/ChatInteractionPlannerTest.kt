@@ -155,12 +155,42 @@ class ChatInteractionPlannerTest {
             }
         """.trimIndent()
 
-        val plan = planner.parse(payload, previous)!!
+        val plan = planner.parse(
+            payload,
+            previous,
+            userMessage = "她明确说周末有空，我还没约",
+        )!!
 
         assertEquals(1, plan.state.dynamics.facts.size)
         assertEquals("对方明确说周末有空", plan.state.dynamics.facts.single().text)
         assertEquals(1, plan.state.dynamics.hypotheses.size)
         assertEquals(1, plan.state.dynamics.unknowns.size)
+    }
+
+    @Test
+    fun claimedUserFactWithoutTextEvidenceIsRejected() {
+        val previous = ChatCharacterState()
+        val payload = """
+            {
+              "state":{
+                "dynamics":{
+                  "stage":"FAMILIAR",
+                  "facts":[
+                    {"text":"对方明确答应周末单独约会","confidence":99,"source":"user"}
+                  ]
+                }
+              },
+              "suggestions":[]
+            }
+        """.trimIndent()
+
+        val plan = planner.parse(
+            payload,
+            previous,
+            userMessage = "她今天只发了一个表情",
+        )!!
+
+        assertTrue(plan.state.dynamics.facts.isEmpty())
     }
 
     @Test
