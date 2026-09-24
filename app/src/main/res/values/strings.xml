@@ -512,11 +512,11 @@
     <string name="archived_empty">No archived sessions match</string>
     <string name="archived_restore">Restore</string>
     <string name="panel_workspace">Workspace</string>
-    <string name="panel_conversation_files">Conversation files</string>
+    <string name="panel_conversation_files">Conversation outputs</string>
     <string name="panel_artifacts">Outputs</string>
     <string name="panel_involved_files">Working files</string>
-    <string name="panel_conversation_files_empty">No workspace files have been used or produced in this conversation yet.</string>
-    <string name="chat_open_files">Open conversation files</string>
+    <string name="panel_conversation_files_empty">No final outputs have been presented in this conversation yet.</string>
+    <string name="chat_open_files">Open outputs</string>
     <string name="chatlist_workspace_files">Workspace files</string>
     <string name="panel_files">Files</string>
     <string name="panel_preview">Preview</string>
