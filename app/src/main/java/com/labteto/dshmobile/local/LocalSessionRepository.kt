@@ -129,6 +129,12 @@ internal class LocalSessionRepository(
                     updatedAt = payload["updatedAt"]?.jsonPrimitive?.longOrNull
                         ?.takeIf { it > 0L }
                         ?: loaded.document.updatedAt,
+                    usageMode = runCatching {
+                        LocalUsageMode.valueOf(
+                            payload["usageMode"]?.jsonPrimitive?.contentOrNull
+                                ?: LocalUsageMode.WORK.name,
+                        )
+                    }.getOrDefault(LocalUsageMode.WORK),
                     blank = messages?.none { element ->
                         val message = element as? JsonObject ?: return@none false
                         message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
@@ -141,6 +147,7 @@ internal class LocalSessionRepository(
         id = id,
         title = title,
         updatedAt = updatedAt,
+        usageMode = usageMode,
         blank = messages.none { it.content.isNotBlank() },
     )
 }
