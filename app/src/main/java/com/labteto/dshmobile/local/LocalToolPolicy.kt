@@ -89,6 +89,14 @@ internal object LocalToolPolicy {
         else -> error("内置工具尚未声明权限：$name")
     }
 
+    /**
+     * Tools whose execution is gated by the approval pipeline.
+     *
+     * `ALWAYS` means the call reaches the approval decision; it does not mean the user is prompted,
+     * because safe auto-approval can resolve it. `bash` is listed here precisely so that its command
+     * policy is consulted: a shell call should never bypass the pipeline just because most commands
+     * are auto-approved.
+     */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
         "http_request", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
