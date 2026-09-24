@@ -48,6 +48,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -55,6 +56,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -221,6 +223,7 @@ fun LocalHarnessScreen(
         LocalWorkspaceFilesDialog(
             mode = mode,
             sessionId = state.sessionId,
+            workspacePath = state.workspacePath,
             loadWorkspace = viewModel::workspaceFiles,
             loadConversation = viewModel::conversationFiles,
             loadPreview = viewModel::previewWorkspaceFile,
@@ -258,9 +261,9 @@ private fun LocalModeDrawer(
     }
     ModalDrawerSheet(
         drawerContainerColor = colors.sidebar,
-        modifier = Modifier.safeDrawingPadding(),
+        modifier = Modifier.fillMaxHeight(),
     ) {
-        Column(Modifier.fillMaxHeight()) {
+        Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             LazyColumn(
                 Modifier
                     .weight(1f)
@@ -274,7 +277,13 @@ private fun LocalModeDrawer(
                     ) {
                         AppBrandIcon(Modifier.size(44.dp))
                         Spacer(Modifier.size(DsSpacing.medium))
-                        Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
+                        Text(stringResource(R.string.app_name), style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
+                        DsIconButton(
+                            icon = Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.chatlist_new_session),
+                            onClick = onNewSession,
+                            tint = colors.labelPrimary,
+                        )
                     }
                 }
                 item(key = "drawer-search") {
@@ -286,16 +295,6 @@ private fun LocalModeDrawer(
                         singleLine = true,
                         shape = DsShapes.block,
                     )
-                }
-                item(key = "drawer-new-session") {
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = Icons.Filled.Add,
-                            title = stringResource(R.string.chatlist_new_session),
-                            subtitle = stringResource(R.string.local_new_session_hint),
-                            onClick = onNewSession,
-                        )
-                    }
                 }
                 item(key = "drawer-sessions-title") {
                     DrawerSectionTitle("会话")
@@ -657,6 +656,7 @@ private fun LocalChat(
     var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -783,6 +783,12 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
                 DsIconButton(
+                    icon = Icons.Outlined.Terminal,
+                    contentDescription = stringResource(R.string.local_execution_console),
+                    onClick = { showExecutionConsole = true },
+                    tint = colors.labelSecondary,
+                )
+                DsIconButton(
                     icon = Icons.Filled.Add,
                     contentDescription = stringResource(R.string.chatlist_new_session),
                     onClick = onNewSession,
@@ -838,18 +844,6 @@ private fun LocalChat(
             }
         }
 
-        if (
-            state.running || state.plan.isNotEmpty() || state.goal != null ||
-            state.todos.isNotEmpty() || state.jobs.isNotEmpty() ||
-            state.activeAgents > 0 || state.activeTerminals > 0 ||
-            state.activeVirtualDisplays > 0 || state.activeLanguageServers > 0
-        ) {
-            ExecutionStatusCard(
-                state = state,
-                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
-            )
-        }
-
         Box(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 state = listState,
@@ -864,8 +858,10 @@ private fun LocalChat(
             ) {
                 if (transcriptItems.isEmpty()) {
                     item {
-                        EmptyLocalHarness { suggestion ->
-                            drafts[state.sessionId] = suggestion
+                        Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                            EmptyLocalHarness { suggestion ->
+                                drafts[state.sessionId] = suggestion
+                            }
                         }
                     }
                 }
@@ -1205,6 +1201,12 @@ private fun LocalChat(
             }
         }
     }
+
+    if (showExecutionConsole) {
+        Dialog(onDismissRequest = { showExecutionConsole = false }) {
+            ExecutionStatusCard(state = state)
+        }
+    }
 }
 
 @Composable
@@ -1265,6 +1267,7 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
     val tasksPrompt = stringResource(R.string.local_prompt_tasks)
     Column(
         Modifier.fillMaxWidth().padding(horizontal = DsSpacing.small, vertical = DsSpacing.xlarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
         WhaleMark(Modifier.size(40.dp))
@@ -1273,6 +1276,7 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
             stringResource(R.string.local_welcome_hint),
             style = DsType.std14,
             color = colors.labelSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         Text(stringResource(R.string.local_suggestions_title), style = DsType.small13Strong, color = colors.labelTertiary)
         DsGroupCard {
@@ -1304,7 +1308,6 @@ private fun ExecutionStatusCard(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    var expanded by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
     val resourceSummary = stringResource(
@@ -1323,20 +1326,8 @@ private fun ExecutionStatusCard(
         state.contextChars,
         state.contextBudgetChars,
     )
-    val summary = buildList {
-        state.goal?.let { add("目标 ${it.status}") }
-        if (state.plan.isNotEmpty()) add("计划 ${state.plan.size} 步")
-        if (total > 0) add("任务 $completed/$total")
-        if (state.jobs.isNotEmpty()) add("后台 ${state.jobs.size}")
-        add(resourceSummary)
-        add(contextSummary)
-    }.joinToString(" · ")
-
     Surface(
-        modifier = modifier.fillMaxWidth()
-            .clickable(onClickLabel = if (expanded) "收起执行状态" else "展开执行状态") {
-                expanded = !expanded
-            },
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = colors.bgModulePlatform,
     ) {
@@ -1344,37 +1335,24 @@ private fun ExecutionStatusCard(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.local_execution_console), style = DsType.base16Strong, color = colors.labelPrimary)
+            state.goal?.let { goal ->
+                Text("目标 · ${goal.status}", style = DsType.small13, color = colors.labelSecondary)
+            }
+            if (state.plan.isNotEmpty()) {
+                Text("计划 · ${state.plan.size} 步", style = DsType.small13, color = colors.labelSecondary)
+            }
+            if (state.todos.isNotEmpty()) {
+                Text("任务 · $completed/$total", style = DsType.small13, color = colors.labelSecondary)
+            }
+            Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+            Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
+            if (state.jobs.isNotEmpty()) {
                 Text(
-                    if (expanded) "⌄" else "›",
-                    style = DsType.base16Strong,
+                    "后台 · " + state.jobs.joinToString { it.status },
+                    style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
-                Spacer(Modifier.size(DsSpacing.small))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.local_execution_console), style = DsType.small13Strong, color = colors.labelPrimary)
-                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
-                }
-            }
-            if (expanded) {
-                state.goal?.let { goal ->
-                    Text("目标 · ${goal.status}", style = DsType.small13, color = colors.labelSecondary)
-                }
-                if (state.plan.isNotEmpty()) {
-                    Text("计划 · ${state.plan.size} 步", style = DsType.small13, color = colors.labelSecondary)
-                }
-                if (state.todos.isNotEmpty()) {
-                    Text("任务 · $completed/$total", style = DsType.small13, color = colors.labelSecondary)
-                }
-                Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
-                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
-                if (state.jobs.isNotEmpty()) {
-                    Text(
-                        "后台 · " + state.jobs.joinToString { it.status },
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                }
             }
         }
     }

@@ -47,6 +47,7 @@ internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
 internal fun LocalWorkspaceFilesDialog(
     mode: LocalFilesMode,
     sessionId: String,
+    workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
@@ -58,6 +59,7 @@ internal fun LocalWorkspaceFilesDialog(
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
+    var directory by remember(mode, sessionId) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val readFilesFailed = stringResource(R.string.local_files_read_failed)
     val previewFailed = stringResource(R.string.local_files_preview_failed)
@@ -94,18 +96,25 @@ internal fun LocalWorkspaceFilesDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     TextButton(onClick = {
-                        if (preview != null) preview = null else onDismiss()
+                        when {
+                            preview != null -> preview = null
+                            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
+                                directory = directory.substringBeforeLast('/', "")
+                            else -> onDismiss()
+                        }
                     }) {
-                        Text(stringResource(if (preview != null) R.string.local_files_back_to_files else R.string.local_files_back))
+                        Text(stringResource(if (preview != null || directory.isNotEmpty()) R.string.local_files_back_to_files else R.string.local_files_back))
                     }
                     Text(
                         when {
                             preview != null -> preview?.file?.path.orEmpty()
-                            mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.local_files_workspace_title)
+                            mode == LocalFilesMode.WORKSPACE -> workspacePath + if (directory.isEmpty()) "" else "/$directory"
                             else -> stringResource(R.string.local_files_conversation_title)
                         },
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.small),
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                     TextButton(
                         onClick = { scope.launch { reload() } },
@@ -134,10 +143,7 @@ internal fun LocalWorkspaceFilesDialog(
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
                     mode == LocalFilesMode.WORKSPACE -> {
-                        if (workspace.isEmpty()) {
-                            LocalFilesEmpty(stringResource(R.string.local_files_workspace_empty))
-                        } else {
-                            LocalFileList(workspace) { file ->
+                        LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
                                 previewLoading = true
                                 error = null
                                 try {
@@ -150,7 +156,6 @@ internal fun LocalWorkspaceFilesDialog(
                                 } finally {
                                     previewLoading = false
                                 }
-                            }
                         }
                     }
                     conversation.isEmpty -> LocalFilesEmpty(stringResource(R.string.panel_conversation_files_empty))
@@ -230,12 +235,34 @@ private fun ConversationLocalFileList(
 @Composable
 private fun LocalFileList(
     files: List<LocalWorkspaceFile>,
+    directory: String,
+    onDirectory: (String) -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val prefix = if (directory.isEmpty()) "" else "$directory/"
+    val children = files.asSequence().mapNotNull { file ->
+        if (!file.path.startsWith(prefix)) return@mapNotNull null
+        file.path.removePrefix(prefix).takeIf { it.isNotEmpty() }?.substringBefore('/')
+    }.distinct().sorted().toList()
+    val filesByPath = files.associateBy(LocalWorkspaceFile::path)
+    if (children.isEmpty()) {
+        LocalFilesEmpty(stringResource(R.string.local_files_workspace_empty))
+        return
+    }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(files, key = LocalWorkspaceFile::path) { file ->
-            LocalFileRow(file) { scope.launch { onOpen(file) } }
+        items(children, key = { prefix + it }) { name ->
+            val path = prefix + name
+            val file = filesByPath[path]
+            if (file == null) {
+                ListItem(
+                    headlineContent = { Text(name) },
+                    supportingContent = { Text(stringResource(R.string.panel_folder)) },
+                    modifier = Modifier.clickable { onDirectory(path) },
+                )
+            } else {
+                LocalFileRow(file) { scope.launch { onOpen(file) } }
+            }
         }
     }
 }

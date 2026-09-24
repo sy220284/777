@@ -204,7 +204,7 @@ fun ChatListDrawer(
         ) {
             AppBrandIcon(Modifier.size(44.dp))
             Spacer(Modifier.width(DsSpacing.medium))
-            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.app_name), style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,
                 contentDescription = stringResource(R.string.chatlist_new_session),
