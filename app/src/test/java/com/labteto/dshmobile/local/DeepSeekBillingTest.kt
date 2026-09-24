@@ -4,6 +4,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlinx.serialization.json.jsonObject
 
 class DeepSeekBillingTest {
     @Test
@@ -57,6 +58,74 @@ class DeepSeekBillingTest {
             DeepSeekCostCalculator.estimateCny("deepseek-flash", usage, pricing, offPeak)!!,
             0.000001,
         )
+    }
+
+    @Test
+    fun parsesOpenAiAndAnthropicUsageShapes() {
+        val json = kotlinx.serialization.json.Json
+
+        val openAi = parseDeepSeekOpenAiUsage(
+            json.parseToJsonElement(
+                """{"usage":{"prompt_tokens":100,"prompt_cache_hit_tokens":60,"prompt_cache_miss_tokens":40,"completion_tokens":20,"completion_tokens_details":{"reasoning_tokens":10}}}"""
+            ).jsonObject,
+        )
+        assertEquals(100L, openAi.promptTokens)
+        assertEquals(60L, openAi.cacheHitTokens)
+        assertEquals(40L, openAi.cacheMissTokens)
+        assertEquals(20L, openAi.completionTokens)
+        assertEquals(10L, openAi.reasoningTokens)
+
+        val anthropic = parseDeepSeekAnthropicUsage(
+            json.parseToJsonElement(
+                """{"usage":{"input_tokens":30,"cache_read_input_tokens":50,"cache_creation_input_tokens":20,"output_tokens":10}}"""
+            ).jsonObject,
+        )
+        assertEquals(100L, anthropic.promptTokens)
+        assertEquals(50L, anthropic.cacheHitTokens)
+        assertEquals(50L, anthropic.cacheMissTokens)
+        assertEquals(10L, anthropic.completionTokens)
+        assertEquals(true, anthropic.reported)
+    }
+
+    @Test
+    fun unreportedUsageIsCountedWithoutInventingTokens() {
+        val current = DeepSeekUsageSnapshot(requestCount = 2, inputTokens = 100)
+        val next = accumulateDeepSeekUsage(
+            current = current,
+            model = "deepseek-flash",
+            usage = DeepSeekTokenUsage(reported = false),
+            pricing = DeepSeekPricingState(),
+            epochMillis = 1234L,
+        )
+
+        assertEquals(2L, next.requestCount)
+        assertEquals(1L, next.unreportedRequestCount)
+        assertEquals(3L, next.totalRequestCount)
+        assertEquals(100L, next.inputTokens)
+        assertEquals(1234L, next.updatedAt)
+    }
+
+    @Test
+    fun reportedUsageStillAccumulatesMeasuredRequests() {
+        val next = accumulateDeepSeekUsage(
+            current = DeepSeekUsageSnapshot(unreportedRequestCount = 2),
+            model = "deepseek-flash",
+            usage = DeepSeekTokenUsage(
+                promptTokens = 100,
+                cacheHitTokens = 60,
+                cacheMissTokens = 40,
+                completionTokens = 20,
+                reported = true,
+            ),
+            pricing = DeepSeekPricingState(),
+            epochMillis = 5678L,
+        )
+
+        assertEquals(1L, next.requestCount)
+        assertEquals(2L, next.unreportedRequestCount)
+        assertEquals(3L, next.totalRequestCount)
+        assertEquals(100L, next.inputTokens)
+        assertEquals(20L, next.outputTokens)
     }
 
     @Test

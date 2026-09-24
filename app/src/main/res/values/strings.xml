@@ -754,6 +754,7 @@
     <string name="local_usage_estimated_cost">Estimated cost</string>
     <string name="local_usage_breakdown">Input %1$s · output %2$s · %3$d requests</string>
     <string name="local_usage_unpriced">%1$s tokens have no matching official price and are excluded</string>
+    <string name="local_usage_unreported">%1$d request(s) did not return token usage; their tokens and cost are not included.</string>
     <string name="local_image_selection_limit">Select up to %1$d images at a time</string>
     <string name="local_image_import_failed">Image import failed</string>
     <string name="local_new_session_dialog_title">New chat</string>

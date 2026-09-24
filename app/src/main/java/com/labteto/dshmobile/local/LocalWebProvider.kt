@@ -47,6 +47,7 @@ class LocalWebProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val http: OkHttpClient,
     private val json: Json,
+    private val usageTracker: DeepSeekUsageTracker,
 ) {
     suspend fun fetch(
         input: String,
@@ -379,7 +380,9 @@ class LocalWebProvider @Inject constructor(
                     val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
                     throw LocalWebException(code, "网页搜索失败（HTTP ${response.code}）：${body.take(500)}")
                 }
-                formatSearch(query, json.parseToJsonElement(body).jsonObject)
+                val root = json.parseToJsonElement(body).jsonObject
+                usageTracker.record(SEARCH_MODEL, parseDeepSeekAnthropicUsage(root))
+                formatSearch(query, root)
             }
         } catch (error: LocalWebException) {
             throw error

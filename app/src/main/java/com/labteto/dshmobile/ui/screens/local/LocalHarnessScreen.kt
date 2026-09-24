@@ -448,11 +448,18 @@ private fun LocalUsageFooter(usage: DeepSeekUsageSnapshot) {
                     R.string.local_usage_breakdown,
                     formatTokenCount(usage.inputTokens),
                     formatTokenCount(usage.outputTokens),
-                    usage.requestCount,
+                    usage.totalRequestCount,
                 ),
                 style = DsType.caption11,
                 color = colors.labelTertiary,
             )
+            if (usage.unreportedRequestCount > 0L) {
+                Text(
+                    stringResource(R.string.local_usage_unreported, usage.unreportedRequestCount),
+                    style = DsType.caption11,
+                    color = colors.warnLabel,
+                )
+            }
             if (usage.unpricedTokens > 0L) {
                 Text(
                     stringResource(R.string.local_usage_unpriced, formatTokenCount(usage.unpricedTokens)),

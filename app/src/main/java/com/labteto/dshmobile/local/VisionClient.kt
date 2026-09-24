@@ -35,7 +35,16 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class VisionClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
+    private val usageTracker: javax.inject.Provider<DeepSeekUsageTracker>,
 ) : LocalVisionAnalyzer {
+    internal constructor(
+        http: OkHttpClient,
+        json: Json,
+    ) : this(
+        http,
+        json,
+        javax.inject.Provider { error("测试构造器没有用量追踪器") },
+    )
     private val client = http.newBuilder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -89,7 +98,12 @@ class VisionClient @Inject constructor(
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
-                parse(body)
+                val root = json.parseToJsonElement(body).jsonObject
+                val result = parseRoot(root)
+                if (isDeepSeekEndpoint(baseUrl)) {
+                    usageTracker.get().record(model, parseDeepSeekOpenAiUsage(root))
+                }
+                result
             }
         } catch (error: LocalModelException) {
             throw error
@@ -144,8 +158,10 @@ class VisionClient @Inject constructor(
         })
     }
 
-    internal fun parse(body: String): String {
-        val root = json.parseToJsonElement(body).jsonObject
+    internal fun parse(body: String): String =
+        parseRoot(json.parseToJsonElement(body).jsonObject)
+
+    private fun parseRoot(root: JsonObject): String {
         val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject
             ?.get("content")
@@ -164,6 +180,12 @@ class VisionClient @Inject constructor(
             else -> ""
         }.trim().ifBlank { error("视觉模型返回了空文本") }
     }
+
+    private fun isDeepSeekEndpoint(baseUrl: String): Boolean = runCatching {
+        val normalized = normalizeModelBaseUrl(baseUrl)
+        val host = java.net.URI(normalized).host.orEmpty().lowercase()
+        host == "api.deepseek.com" || host.endsWith(".deepseek.com")
+    }.getOrDefault(false)
 
     private fun endpoint(baseUrl: String): String {
         val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')

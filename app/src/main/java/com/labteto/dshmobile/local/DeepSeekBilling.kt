@@ -13,6 +13,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -70,11 +74,13 @@ data class DeepSeekUsageSnapshot(
     val outputTokens: Long = 0L,
     val reasoningTokens: Long = 0L,
     val requestCount: Long = 0L,
+    val unreportedRequestCount: Long = 0L,
     val estimatedCostCny: Double = 0.0,
     val unpricedTokens: Long = 0L,
     val updatedAt: Long = 0L,
 ) {
     val totalTokens: Long get() = inputTokens + outputTokens
+    val totalRequestCount: Long get() = requestCount + unreportedRequestCount
     val cacheMeasuredTokens: Long get() = cacheHitTokens + cacheMissTokens
     val cacheHitRate: Double
         get() = if (cacheMeasuredTokens <= 0L) 0.0 else cacheHitTokens.toDouble() / cacheMeasuredTokens.toDouble()
@@ -117,6 +123,81 @@ object DeepSeekCostCalculator {
                 usage.completionTokens * tier.outputCnyPerMillion
             ) / 1_000_000.0
     }
+}
+
+
+
+internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
+    val usage = root["usage"] as? JsonObject ?: return DeepSeekTokenUsage(reported = false)
+    val promptTokens = usage["prompt_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val cacheHitTokens = usage["prompt_cache_hit_tokens"]?.jsonPrimitive?.longOrNull
+        ?: usage["prompt_tokens_details"]?.jsonObject
+            ?.get("cached_tokens")?.jsonPrimitive?.longOrNull
+        ?: 0L
+    val cacheMissTokens = usage["prompt_cache_miss_tokens"]?.jsonPrimitive?.longOrNull
+        ?: (promptTokens - cacheHitTokens).coerceAtLeast(0L)
+    val completionTokens = usage["completion_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val reasoningTokens = usage["completion_tokens_details"]?.jsonObject
+        ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
+        ?: 0L
+    return DeepSeekTokenUsage(
+        promptTokens = promptTokens,
+        cacheHitTokens = cacheHitTokens,
+        cacheMissTokens = cacheMissTokens,
+        completionTokens = completionTokens,
+        reasoningTokens = reasoningTokens,
+        reported = true,
+    )
+}
+
+internal fun parseDeepSeekAnthropicUsage(root: JsonObject): DeepSeekTokenUsage {
+    val usage = root["usage"] as? JsonObject ?: return DeepSeekTokenUsage(reported = false)
+    val uncachedInput = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val cacheRead = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val cacheCreation = usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val promptTokens = uncachedInput + cacheRead + cacheCreation
+    return DeepSeekTokenUsage(
+        promptTokens = promptTokens,
+        cacheHitTokens = cacheRead,
+        cacheMissTokens = uncachedInput + cacheCreation,
+        completionTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
+        reported = true,
+    )
+}
+
+internal fun accumulateDeepSeekUsage(
+    current: DeepSeekUsageSnapshot,
+    model: String,
+    usage: DeepSeekTokenUsage,
+    pricing: DeepSeekPricingState,
+    epochMillis: Long,
+): DeepSeekUsageSnapshot {
+    if (!usage.reported) {
+        return current.copy(
+            unreportedRequestCount = current.unreportedRequestCount + 1L,
+            updatedAt = epochMillis,
+        )
+    }
+    val miss = usage.cacheMissTokens.takeIf { it > 0L }
+        ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
+    val normalized = usage.copy(cacheMissTokens = miss)
+    val cost = DeepSeekCostCalculator.estimateCny(
+        model = model,
+        usage = normalized,
+        pricing = pricing,
+        epochMillis = epochMillis,
+    )
+    return current.copy(
+        inputTokens = current.inputTokens + usage.promptTokens,
+        cacheHitTokens = current.cacheHitTokens + usage.cacheHitTokens,
+        cacheMissTokens = current.cacheMissTokens + miss,
+        outputTokens = current.outputTokens + usage.completionTokens,
+        reasoningTokens = current.reasoningTokens + usage.reasoningTokens,
+        requestCount = current.requestCount + 1L,
+        estimatedCostCny = current.estimatedCostCny + (cost ?: 0.0),
+        unpricedTokens = current.unpricedTokens + if (cost == null) usage.totalTokens else 0L,
+        updatedAt = epochMillis,
+    )
 }
 
 @Singleton
@@ -234,27 +315,13 @@ class DeepSeekUsageTracker @Inject constructor(
         usage: DeepSeekTokenUsage,
         epochMillis: Long = System.currentTimeMillis(),
     ) {
-        if (!usage.reported) return
         synchronized(lock) {
-            val current = _state.value
-            val miss = usage.cacheMissTokens.takeIf { it > 0L }
-                ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
-            val cost = DeepSeekCostCalculator.estimateCny(
+            val next = accumulateDeepSeekUsage(
+                current = _state.value,
                 model = model,
-                usage = usage.copy(cacheMissTokens = miss),
+                usage = usage,
                 pricing = pricingRepository.state.value,
                 epochMillis = epochMillis,
-            )
-            val next = current.copy(
-                inputTokens = current.inputTokens + usage.promptTokens,
-                cacheHitTokens = current.cacheHitTokens + usage.cacheHitTokens,
-                cacheMissTokens = current.cacheMissTokens + miss,
-                outputTokens = current.outputTokens + usage.completionTokens,
-                reasoningTokens = current.reasoningTokens + usage.reasoningTokens,
-                requestCount = current.requestCount + 1L,
-                estimatedCostCny = current.estimatedCostCny + (cost ?: 0.0),
-                unpricedTokens = current.unpricedTokens + if (cost == null) usage.totalTokens else 0L,
-                updatedAt = epochMillis,
             )
             persist(next)
             _state.value = next
@@ -268,6 +335,7 @@ class DeepSeekUsageTracker @Inject constructor(
         outputTokens = preferences.getLong(KEY_OUTPUT, 0L),
         reasoningTokens = preferences.getLong(KEY_REASONING, 0L),
         requestCount = preferences.getLong(KEY_REQUESTS, 0L),
+        unreportedRequestCount = preferences.getLong(KEY_UNREPORTED_REQUESTS, 0L),
         estimatedCostCny = preferences.getString(KEY_COST, null)?.toDoubleOrNull() ?: 0.0,
         unpricedTokens = preferences.getLong(KEY_UNPRICED, 0L),
         updatedAt = preferences.getLong(KEY_UPDATED_AT, 0L),
@@ -281,6 +349,7 @@ class DeepSeekUsageTracker @Inject constructor(
             .putLong(KEY_OUTPUT, value.outputTokens)
             .putLong(KEY_REASONING, value.reasoningTokens)
             .putLong(KEY_REQUESTS, value.requestCount)
+            .putLong(KEY_UNREPORTED_REQUESTS, value.unreportedRequestCount)
             .putString(KEY_COST, value.estimatedCostCny.toString())
             .putLong(KEY_UNPRICED, value.unpricedTokens)
             .putLong(KEY_UPDATED_AT, value.updatedAt)
@@ -295,6 +364,7 @@ class DeepSeekUsageTracker @Inject constructor(
         private const val KEY_OUTPUT = "output_tokens"
         private const val KEY_REASONING = "reasoning_tokens"
         private const val KEY_REQUESTS = "request_count"
+        private const val KEY_UNREPORTED_REQUESTS = "unreported_request_count"
         private const val KEY_COST = "estimated_cost_cny"
         private const val KEY_UNPRICED = "unpriced_tokens"
         private const val KEY_UPDATED_AT = "updated_at"
