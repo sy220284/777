@@ -101,7 +101,7 @@ class ConversationFilesTest {
     }
 
     @Test
-    fun explicitArtifactToolIsVisibleAsCompatibilityFallback() {
+    fun artifactNamedToolWithoutPresentedDeliverableStaysHidden() {
         val nodes = listOf<ChatNode>(
             ToolCallNode(
                 1,
@@ -114,10 +114,9 @@ class ConversationFilesTest {
             ToolResultNode(2, "export", JsonArray(emptyList()), false, 1, 1),
         )
 
-        assertEquals(
-            listOf("output/result.zip"),
-            conversationFileIndex(nodes, "/work/app").artifacts.map { it.path },
-        )
+        val index = conversationFileIndex(nodes, "/work/app")
+        assertTrue(index.artifacts.isEmpty())
+        assertTrue(index.involved.isEmpty())
     }
 
     @Test
