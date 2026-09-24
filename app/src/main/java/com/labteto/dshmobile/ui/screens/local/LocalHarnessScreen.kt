@@ -992,7 +992,28 @@ private fun LocalChat(
                         size = DsButtonSize.Small,
                     )
                     Spacer(Modifier.weight(1f))
-                    if (state.running) {
+                    if (!state.running) {
+                        DsButton(
+                            "发送",
+                            onClick = {
+                                if (!state.configured) {
+                                    onConfigure()
+                                } else {
+                                    val selected = attachments.toList()
+                                    onSend(input, selected)
+                                    drafts[state.sessionId] = ""
+                                    attachments.clear()
+                                }
+                            },
+                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                        )
+                    }
+                }
+                if (state.running) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.End),
+                    ) {
                         DsButton(
                             "停止",
                             onStop,
@@ -1008,21 +1029,6 @@ private fun LocalChat(
                                 attachments.clear()
                             },
                             size = DsButtonSize.Small,
-                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
-                        )
-                    } else {
-                        DsButton(
-                            "发送",
-                            onClick = {
-                                if (!state.configured) {
-                                    onConfigure()
-                                } else {
-                                    val selected = attachments.toList()
-                                    onSend(input, selected)
-                                    drafts[state.sessionId] = ""
-                                    attachments.clear()
-                                }
-                            },
                             enabled = input.isNotBlank() || attachments.isNotEmpty(),
                         )
                     }
