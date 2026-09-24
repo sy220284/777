@@ -424,28 +424,11 @@ private fun GoalCard(conversation: ConversationSnapshot, store: com.labteto.dshm
     val goal = parseGoal(conversation.projections["goal"])
     Card(
         title = stringResource(R.string.goal_title),
-        summary = goal?.objective?.take(40),
+        summary = goal?.let { stringResource(goalPhaseLabelRes(it.phase)) },
     ) {
         if (goal == null) {
             Text(stringResource(R.string.goal_none), style = DsType.caption11, color = colors.labelTertiary)
             return@Card
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                goal.objective,
-                style = DsType.small13,
-                color = colors.labelPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            DsPill(text = stringResource(goalPhaseLabelRes(goal.phase)))
-        }
-        goal.blockedReason?.let {
-            Text(
-                stringResource(R.string.goal_blocked_reason, it.message),
-                style = DsType.caption11,
-                color = colors.warnLabel,
-            )
         }
         if (goal.maxGoalRounds > 0) {
             Text(
