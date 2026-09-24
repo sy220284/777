@@ -12,10 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalApprovalImpact
@@ -29,6 +31,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun NewSessionModeDialog(
@@ -226,6 +229,7 @@ internal fun ChatPersonaDialog(
     profile: PersonaProfile,
     onSave: (PersonaProfile) -> Unit,
     onDismiss: () -> Unit,
+    viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var identity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.identity) }
@@ -246,11 +250,30 @@ internal fun ChatPersonaDialog(
     var signature by rememberSaveable(profile.id, profile.updatedAt) {
         mutableStateOf(profile.signaturePhrases.joinToString("\n"))
     }
+    var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
+    var aiGenerating by rememberSaveable(profile.id) { mutableStateOf(false) }
+    var aiSucceeded by rememberSaveable(profile.id) { mutableStateOf(false) }
+    var aiError by rememberSaveable(profile.id) { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     fun lines(value: String): List<String> = value.lineSequence()
         .map(String::trim)
         .filter(String::isNotBlank)
         .toList()
+
+    fun applyGenerated(generated: PersonaProfile) {
+        name = generated.name
+        identity = generated.identity
+        background = generated.background
+        personality = generated.personality
+        speechStyle = generated.speechStyle
+        relationship = generated.relationship
+        worldSetting = generated.worldSetting
+        constraints = generated.hardConstraints.joinToString("\n")
+        examples = generated.exampleDialogues.joinToString("\n")
+        banned = generated.bannedPhrases.joinToString("\n")
+        signature = generated.signaturePhrases.joinToString("\n")
+    }
 
     DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
         Text(
@@ -258,6 +281,83 @@ internal fun ChatPersonaDialog(
             style = DsType.small13,
             color = DsTheme.colors.labelSecondary,
         )
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = DsTheme.colors.bgModulePlatform,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Text(
+                    stringResource(R.string.local_persona_ai_title),
+                    style = DsType.base16Strong,
+                    color = DsTheme.colors.labelPrimary,
+                )
+                Text(
+                    stringResource(R.string.local_persona_ai_hint),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelSecondary,
+                )
+                OutlinedTextField(
+                    value = aiDescription,
+                    onValueChange = { aiDescription = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.local_persona_ai_description)) },
+                    minLines = 2,
+                    maxLines = 5,
+                    enabled = !aiGenerating,
+                )
+                DsButton(
+                    text = stringResource(
+                        if (aiGenerating) R.string.local_persona_ai_generating
+                        else R.string.local_persona_ai_generate
+                    ),
+                    onClick = {
+                        if (aiGenerating) return@DsButton
+                        aiGenerating = true
+                        aiSucceeded = false
+                        aiError = null
+                        coroutineScope.launch {
+                            viewModel.autoFillChatPersona(aiDescription)
+                                .onSuccess { generated ->
+                                    applyGenerated(generated)
+                                    aiSucceeded = true
+                                }
+                                .onFailure { error ->
+                                    aiError = error.message ?: "生成人设失败"
+                                }
+                            aiGenerating = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !aiGenerating,
+                )
+                if (aiGenerating) {
+                    Text(
+                        stringResource(R.string.local_persona_ai_working_hint),
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelTertiary,
+                    )
+                } else if (aiSucceeded) {
+                    Text(
+                        stringResource(R.string.local_persona_ai_synced),
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelSecondary,
+                    )
+                }
+                aiError?.takeIf(String::isNotBlank)?.let { error ->
+                    Text(
+                        error,
+                        style = DsType.caption11,
+                        color = DsTheme.colors.error,
+                    )
+                }
+            }
+        }
+
         PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
         PersonaTextField(stringResource(R.string.local_persona_identity), identity, { identity = it })
         PersonaTextField(stringResource(R.string.local_persona_background), background, { background = it })
@@ -290,10 +390,11 @@ internal fun ChatPersonaDialog(
                 onDismiss()
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = name.isNotBlank(),
+            enabled = name.isNotBlank() && !aiGenerating,
         )
     }
 }
+
 
 @Composable
 private fun PersonaTextField(
