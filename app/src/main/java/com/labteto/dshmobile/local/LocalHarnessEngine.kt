@@ -1367,7 +1367,7 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState)
+            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input)
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
@@ -1552,6 +1552,7 @@ class LocalHarnessEngine @Inject constructor(
                         ephemeralContext = chatTurnRunner.prepare(
                             snapshot.personaId,
                             snapshot.chatState,
+                            input,
                         ).prompt
                     } else {
                         ephemeralContext = contextComposer.compose(
@@ -2738,6 +2739,8 @@ class LocalHarnessEngine @Inject constructor(
         val plan = chatInteractionPlanner.parse(
             plannerReply.content.orEmpty(),
             previous = before.chatState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
         )
         if (plan == null) {
             eventLog.append("chat/post-turn", buildJsonObject {
