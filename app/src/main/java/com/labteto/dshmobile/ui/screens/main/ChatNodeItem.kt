@@ -157,7 +157,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             warn = true,
         )
 
-        is CompactionNode -> CompactionRow(node)
+        is CompactionNode -> CompactionRow()
 
         is RetryNode -> {
             val delayMs = (node.data as? JsonObject)?.let { obj ->
@@ -189,7 +189,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
 
         is CommandNode -> CommandRow(node)
 
-        is WorkflowNode -> WorkflowRow(node.data, context.onOpenSubagent)
+        is WorkflowNode -> WorkflowRow(node.data)
 
         is TitleNode -> Text(node.title, style = DsType.caption11, color = colors.labelTertiary)
         is SubagentNode -> Text(
@@ -218,20 +218,6 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
         }
     }
 }
-
-/** Event types that carry no user-facing content; they frame the transcript rather than fill it. */
-internal val STRUCTURAL_EVENT_TYPES = setOf(
-    "step/start",
-    "step/end",
-    "session/end-seed",
-    "session/title-llm-request",
-    "agent/inbox/spliced",
-    "assistant/chunk",
-    // A model attempt that settled without a message (harness 0.1.3): replay data, not content.
-    "assistant/attempt",
-    // Full model request context can contain raw historical tool arguments, including commands.
-    "request/context",
-)
 
 /**
  * One stored file in a message: its display name and exact size, nothing more.
@@ -444,7 +430,7 @@ private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun CompactionRow(node: CompactionNode) {
+private fun CompactionRow() {
     DisclosureRow(
         title = stringResource(R.string.chat_compaction),
         summary = stringResource(R.string.chat_compaction_summary),
@@ -470,7 +456,6 @@ private fun CommandRow(node: CommandNode) {
 @Composable
 private fun WorkflowRow(
     data: kotlinx.serialization.json.JsonElement,
-    onOpenMember: (String) -> Unit,
 ) {
     val obj = data as? JsonObject ?: return
     val status = obj["status"].asString() ?: obj["stopReason"].asString() ?: obj["outcome"].asString()
