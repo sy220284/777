@@ -115,6 +115,8 @@ import okhttp3.OkHttpClient
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
 
+internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
+
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
         runCatching {
@@ -991,6 +993,11 @@ class LocalHarnessEngine @Inject constructor(
     /** Resolve the current model-authored question. */
     fun answerQuestion(answer: String) {
         questionResponse?.complete(answer.trim())
+    }
+
+    /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
+    fun cancelQuestion() {
+        questionResponse?.complete(LOCAL_QUESTION_CANCELLED_RESPONSE)
     }
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */

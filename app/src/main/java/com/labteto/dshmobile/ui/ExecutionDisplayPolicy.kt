@@ -110,6 +110,14 @@ internal fun agentOperationLabelRes(toolName: String?): Int = when (agentOperati
 }
 
 @StringRes
+internal fun agentApprovalPurposeRes(toolName: String?): Int = when (agentOperationKind(toolName)) {
+    AgentOperationKind.Update -> R.string.local_approval_purpose_update
+    AgentOperationKind.Execute -> R.string.local_approval_purpose_shell
+    AgentOperationKind.Inspect -> R.string.local_approval_purpose_inspect
+    else -> R.string.local_approval_purpose_default
+}
+
+@StringRes
 internal fun agentOperationStatusRes(running: Boolean, failed: Boolean): Int = when {
     failed -> R.string.agent_operation_status_failed
     running -> R.string.agent_operation_status_running
