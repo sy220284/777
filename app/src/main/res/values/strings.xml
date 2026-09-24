@@ -255,6 +255,9 @@
     <string name="operation_other">Processing the current step</string>
     <string name="operation_reasoning">Analyzing the task</string>
     <string name="operation_progress">Advancing the task</string>
+    <string name="operation_goal_status">Goal · %1$s</string>
+    <string name="operation_plan_count">Plan · %1$d steps</string>
+    <string name="operation_task_count">Tasks · %1$d/%2$d completed</string>
     <string name="operation_result_ready">Task result is ready</string>
     <string name="command_execution_title">Executing operation</string>
     <string name="command_execution_purpose">Run a local operation for the current task</string>
