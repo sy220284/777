@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui
 
+import com.labteto.dshmobile.R
+
 /**
  * Presentation-only policy for agent work.
  *
@@ -77,4 +79,17 @@ internal fun operationDisplayKind(toolName: String?): OperationDisplayKind {
 
         else -> OperationDisplayKind.Other
     }
+}
+
+internal fun operationLabelRes(toolName: String?): Int = when (operationDisplayKind(toolName)) {
+    OperationDisplayKind.Search -> R.string.operation_search
+    OperationDisplayKind.Inspect -> R.string.operation_inspect
+    OperationDisplayKind.Modify -> R.string.operation_modify
+    OperationDisplayKind.Save -> R.string.operation_save
+    OperationDisplayKind.Execute -> R.string.operation_execute
+    OperationDisplayKind.Network -> R.string.operation_network
+    OperationDisplayKind.Device -> R.string.operation_device
+    OperationDisplayKind.Analyze -> R.string.operation_analyze
+    OperationDisplayKind.Delegate -> R.string.operation_delegate
+    OperationDisplayKind.Other -> R.string.operation_other
 }
