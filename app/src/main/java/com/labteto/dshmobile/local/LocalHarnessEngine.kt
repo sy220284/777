@@ -686,6 +686,31 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /**
+     * Persist AI-generated fields into the real default persona and make the current chat use it.
+     * This is suspendable so the UI only reports "synced" after the profile file and session state
+     * have both been updated.
+     */
+    suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
+        val snapshot = _state.value
+        check(!snapshot.running && !snapshot.loading && snapshot.usageMode == LocalUsageMode.CHAT) {
+            "当前状态暂时不能同步默认角色"
+        }
+        return withContext(Dispatchers.IO) {
+            val saved = chatPersonaStore.upsert(
+                profile.copy(id = PersonaProfile.DEFAULT_PERSONA_ID),
+            )
+            _state.update { state ->
+                if (state.sessionId != snapshot.sessionId) state else state.copy(
+                    personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+                    chatPersona = saved,
+                )
+            }
+            if (_state.value.sessionId == snapshot.sessionId) persist()
+            saved
+        }
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
