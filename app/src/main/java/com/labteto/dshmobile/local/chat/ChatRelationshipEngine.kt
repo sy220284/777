@@ -29,7 +29,7 @@ internal enum class RelationshipScenario {
 @Singleton
 class ChatRelationshipEngine @Inject constructor() {
 
-    fun classify(input: String): ChatRelationshipView {
+    internal fun classify(input: String): ChatRelationshipView {
         val text = input.trim().lowercase()
         if (text.isBlank()) return ChatRelationshipView.IMMERSIVE
         if (REPLY_COACH_HINTS.any { text.contains(it) }) return ChatRelationshipView.REPLY_COACH
@@ -45,7 +45,7 @@ class ChatRelationshipEngine @Inject constructor() {
         }
     }
 
-    fun classifyScenario(input: String): RelationshipScenario {
+    internal fun classifyScenario(input: String): RelationshipScenario {
         val text = input.trim().lowercase()
         return when {
             BOUNDARY_HINTS.any { text.contains(it) } -> RelationshipScenario.BOUNDARY_SAFETY
