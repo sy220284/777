@@ -13,6 +13,7 @@ import com.labteto.dshmobile.core.notify.CompletionEvent
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.agentOperationLabelRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -171,7 +172,10 @@ class NotificationObserver @Inject constructor(
                 if (!settings.notifyNeedsAction) return
                 Spec(
                     channel = DshNotifications.CHANNEL_ACTION,
-                    title = context.getString(R.string.notif_review_requested, event.toolName),
+                    title = context.getString(
+                        R.string.notif_review_requested,
+                        context.getString(agentOperationLabelRes(event.toolName)),
+                    ),
                     actionLabel = context.getString(R.string.notif_open),
                 )
             }
