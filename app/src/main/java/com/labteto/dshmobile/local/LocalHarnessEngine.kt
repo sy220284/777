@@ -1238,6 +1238,7 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("user/queue", buildJsonObject {
             put("action", "resumed")
             put("queued_count", pendingInputs.size())
+            put("model_messages", JsonArray(listOf(durableMessage)))
         })
         persist()
         scope.launch(start = CoroutineStart.LAZY) {
@@ -2588,7 +2589,6 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-        checkpointModelHistory("system/prompt")
         updateContextMetrics()
     }
 
