@@ -32,22 +32,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * keeping image bytes out of the text model's durable conversation history.
  */
 @Singleton
-class VisionClient private constructor(
+class VisionClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
-    private val usageTracker: DeepSeekUsageTracker?,
+    private val usageTracker: javax.inject.Provider<DeepSeekUsageTracker>,
 ) : LocalVisionAnalyzer {
-    @Inject
-    constructor(
-        http: OkHttpClient,
-        json: Json,
-        usageTracker: DeepSeekUsageTracker,
-    ) : this(http, json, usageTracker)
-
     internal constructor(
         http: OkHttpClient,
         json: Json,
-    ) : this(http, json, null)
+    ) : this(
+        http,
+        json,
+        javax.inject.Provider { error("测试构造器没有用量追踪器") },
+    )
     private val client = http.newBuilder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -104,7 +101,7 @@ class VisionClient private constructor(
                 val root = json.parseToJsonElement(body).jsonObject
                 val result = parseRoot(root)
                 if (isDeepSeekEndpoint(baseUrl)) {
-                    usageTracker?.record(model, parseDeepSeekOpenAiUsage(root))
+                    usageTracker.get().record(model, parseDeepSeekOpenAiUsage(root))
                 }
                 result
             }
