@@ -819,28 +819,6 @@ private fun LocalChat(
                                     color = colors.labelTertiary,
                                 )
                             }
-                            if (state.streamingReasoning.isNotBlank()) {
-                                Text(
-                                    stringResource(R.string.agent_operation_generic) + " · " +
-                                        stringResource(R.string.agent_operation_status_running),
-                                    style = DsType.small13,
-                                    color = colors.labelSecondary,
-                                )
-                            }
-                            if (state.streamingAssistant.isNotBlank()) {
-                                Text(
-                                    stringResource(R.string.local_streaming_answer),
-                                    style = DsType.caption11Strong,
-                                    color = colors.labelTertiary,
-                                )
-                                Text(
-                                    state.streamingAssistant,
-                                    style = DsType.std14,
-                                    color = colors.labelPrimary,
-                                    maxLines = 16,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
                         }
                     }
                 }
