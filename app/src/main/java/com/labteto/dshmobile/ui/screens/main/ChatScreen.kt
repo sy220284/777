@@ -115,9 +115,6 @@ fun ChatScreen(
     val imageLimits by store.imageLimits.collectAsStateWithLifecycle()
 
     val currentSession = sessions.firstOrNull { it.sessionId == currentSessionId }
-    val conversationFiles = remember(conversation?.nodes, currentSession?.cwd) {
-        conversationFileIndex(conversation?.nodes.orEmpty(), currentSession?.cwd)
-    }
     val title = currentSession?.title
         ?: currentSession?.cwd?.let { basename(it) }
         ?: currentSessionId.orEmpty()
@@ -597,11 +594,20 @@ fun ChatScreen(
 
     }
     panelKey?.let { key ->
+        // File deliverables are only shown in this panel. Avoid scanning the whole transcript on
+        // every streamed reply while the panel is closed.
+        val conversationFiles = if (key == composer.key) {
+            remember(conversation?.nodes, currentSession?.cwd) {
+                conversationFileIndex(conversation?.nodes.orEmpty(), currentSession?.cwd)
+            }
+        } else {
+            ConversationFileIndex()
+        }
         WorkspacePanels(
             store = store,
             state = store.panels.get(key),
             mode = panelMode,
-            conversationFiles = if (key == composer.key) conversationFiles else ConversationFileIndex(),
+            conversationFiles = conversationFiles,
             onDismiss = { panelKey = null },
         )
     }

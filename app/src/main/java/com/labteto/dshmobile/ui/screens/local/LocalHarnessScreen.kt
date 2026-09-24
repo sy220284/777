@@ -243,116 +243,128 @@ private fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
+    val visibleSessions = remember(sessions) {
+        sessions.filter { !it.blank }.sortedByDescending(LocalSessionSummary::updatedAt)
+    }
+    val filteredSessions = remember(visibleSessions, historyQuery) {
+        val query = historyQuery.trim()
+        if (query.isEmpty()) visibleSessions else visibleSessions.filter {
+            it.title.contains(query, ignoreCase = true)
+        }
+    }
     ModalDrawerSheet(
         drawerContainerColor = colors.sidebar,
         modifier = Modifier.safeDrawingPadding(),
     ) {
         Column(Modifier.fillMaxHeight()) {
-            Column(
+            LazyColumn(
                 Modifier
                     .weight(1f)
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                WhaleMark(Modifier.size(44.dp))
-                Spacer(Modifier.size(DsSpacing.medium))
-                Column(Modifier.weight(1f)) {
-                    Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
-                    Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
-                }
-            }
-
-            OutlinedTextField(
-                value = historyQuery,
-                onValueChange = { historyQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("搜索会话") },
-                singleLine = true,
-                shape = DsShapes.block,
-            )
-
-            DsGroupCard {
-                DsCategoryRow(
-                    icon = Icons.Filled.Add,
-                    title = stringResource(R.string.chatlist_new_session),
-                    subtitle = stringResource(R.string.local_new_session_hint),
-                    onClick = onNewSession,
-                )
-            }
-
-            Text("远程控制", style = DsType.std14, color = colors.labelTertiary)
-            DsGroupCard {
-                DsCategoryRow(
-                    icon = Icons.Outlined.QrCodeScanner,
-                    title = stringResource(R.string.local_remote_control),
-                    subtitle = stringResource(R.string.local_remote_hint),
-                    onClick = onRemote,
-                )
-            }
-
-            val visibleSessions = sessions
-                .filter { !it.blank }
-                .sortedByDescending(LocalSessionSummary::updatedAt)
-            Text("会话", style = DsType.std14, color = colors.labelTertiary)
-            if (visibleSessions.isNotEmpty()) {
-                val filteredSessions = visibleSessions.filter {
-                    historyQuery.isBlank() || it.title.contains(historyQuery.trim(), ignoreCase = true)
-                }
-                if (filteredSessions.isEmpty()) {
-                    Text(
-                        "没有匹配的会话",
-                        style = DsType.small13,
-                        color = colors.labelTertiary,
-                        modifier = Modifier.padding(horizontal = DsSpacing.small),
-                    )
-                } else {
-                    DsGroupCard {
-                        filteredSessions.forEach { session ->
-                            DsCategoryRow(
-                                icon = Icons.Outlined.History,
-                                title = session.title,
-                                subtitle = if (session.id == currentSessionId) "正在进行" else "本机会话",
-                                value = if (session.id == currentSessionId) "当前" else null,
-                                onClick = { onSwitchSession(session.id) },
-                            )
+                item(key = "drawer-header") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        WhaleMark(Modifier.size(44.dp))
+                        Spacer(Modifier.size(DsSpacing.medium))
+                        Column(Modifier.weight(1f)) {
+                            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
+                            Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
                         }
                     }
                 }
+                item(key = "drawer-search") {
+                    OutlinedTextField(
+                        value = historyQuery,
+                        onValueChange = { historyQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("搜索会话") },
+                        singleLine = true,
+                        shape = DsShapes.block,
+                    )
+                }
+                item(key = "drawer-new-session") {
+                    DsGroupCard {
+                        DsCategoryRow(
+                            icon = Icons.Filled.Add,
+                            title = stringResource(R.string.chatlist_new_session),
+                            subtitle = stringResource(R.string.local_new_session_hint),
+                            onClick = onNewSession,
+                        )
+                    }
+                }
+                item(key = "drawer-remote-title") {
+                    Text("远程控制", style = DsType.std14, color = colors.labelTertiary)
+                }
+                item(key = "drawer-remote") {
+                    DsGroupCard {
+                        DsCategoryRow(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            title = stringResource(R.string.local_remote_control),
+                            subtitle = stringResource(R.string.local_remote_hint),
+                            onClick = onRemote,
+                        )
+                    }
+                }
+                item(key = "drawer-sessions-title") {
+                    Text("会话", style = DsType.std14, color = colors.labelTertiary)
+                }
+                if (visibleSessions.isNotEmpty() && filteredSessions.isEmpty()) {
+                    item(key = "drawer-no-sessions") {
+                        Text(
+                            "没有匹配的会话",
+                            style = DsType.small13,
+                            color = colors.labelTertiary,
+                            modifier = Modifier.padding(horizontal = DsSpacing.small),
+                        )
+                    }
+                }
+                items(filteredSessions, key = { "session:${it.id}" }) { session ->
+                    DsGroupCard {
+                        DsCategoryRow(
+                            icon = Icons.Outlined.History,
+                            title = session.title,
+                            subtitle = if (session.id == currentSessionId) "正在进行" else "本机会话",
+                            value = if (session.id == currentSessionId) "当前" else null,
+                            onClick = { onSwitchSession(session.id) },
+                        )
+                    }
+                }
+                item(key = "drawer-tools-title") {
+                    Text("功能", style = DsType.std14, color = colors.labelTertiary)
+                }
+                item(key = "drawer-tools") {
+                    DsGroupCard {
+                        DsCategoryRow(
+                            icon = FeatherIcons.FileText,
+                            title = stringResource(R.string.chatlist_workspace_files),
+                            subtitle = stringResource(R.string.local_files_workspace_subtitle),
+                            onClick = onWorkspaceFiles,
+                        )
+                        DsCategoryRow(
+                            icon = Icons.Outlined.Schedule,
+                            title = "定时任务",
+                            subtitle = "计划任务、周期任务和执行结果",
+                            onClick = onTasks,
+                        )
+                        DsCategoryRow(
+                            icon = Icons.Outlined.Extension,
+                            title = "工具与连接",
+                            subtitle = "外部工具服务与当前扩展",
+                            onClick = onTools,
+                        )
+                        DsCategoryRow(
+                            icon = Icons.Outlined.Settings,
+                            title = "设置",
+                            subtitle = "模型、个性化、权限与高级选项",
+                            onClick = onSettings,
+                        )
+                    }
+                }
             }
-
-            Text("功能", style = DsType.std14, color = colors.labelTertiary)
-            DsGroupCard {
-                DsCategoryRow(
-                    icon = FeatherIcons.FileText,
-                    title = stringResource(R.string.chatlist_workspace_files),
-                    subtitle = stringResource(R.string.local_files_workspace_subtitle),
-                    onClick = onWorkspaceFiles,
-                )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Schedule,
-                    title = "定时任务",
-                    subtitle = "计划任务、周期任务和执行结果",
-                    onClick = onTasks,
-                )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Extension,
-                    title = "工具与连接",
-                    subtitle = "外部工具服务与当前扩展",
-                    onClick = onTools,
-                )
-                DsCategoryRow(
-                    icon = Icons.Outlined.Settings,
-                    title = "设置",
-                    subtitle = "模型、个性化、权限与高级选项",
-                    onClick = onSettings,
-                )
-            }
+            LocalUsageFooter(usage)
         }
-        LocalUsageFooter(usage)
     }
-}
 }
 
 @Composable
@@ -850,6 +862,34 @@ private fun LocalChat(
                         listState.animateScrollToItem(target)
                         scrollShortcut = null
                     }
+                }
+            }
+        }
+
+        if (state.running && state.streamingAssistant.isNotBlank()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                shape = RoundedCornerShape(12.dp),
+                color = colors.bgModulePlatform,
+            ) {
+                Column(
+                    Modifier.padding(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                ) {
+                    Text(
+                        stringResource(R.string.local_streaming_status),
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                    val preview = state.streamingAssistant
+                    Text(
+                        if (preview.length > 1_200) "…" + preview.takeLast(1_200) else preview,
+                        style = DsType.std14,
+                        color = colors.labelPrimary,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

@@ -307,7 +307,9 @@ class LocalHarnessEngine @Inject constructor(
     private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
-    private var eventLog = eventLogFor(currentSessionId)
+    // Opening the log scans its latest segment. The startup coroutine initializes it after any
+    // legacy migration, before the loading screen admits session actions.
+    @Volatile private lateinit var eventLog: LocalSessionEventLog
     private data class ConversationFilesCacheEntry(
         val eventStamp: Long,
         val workspaceStamp: Long,
@@ -481,11 +483,6 @@ class LocalHarnessEngine @Inject constructor(
                 contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
             )
         }
-        seedWorkspace()
-        migrateLegacySession()
-        // Legacy migration may have copied an event log after the field was first constructed.
-        // Reopen it so the append sequence is derived from the migrated durable tail.
-        eventLog = eventLogFor(currentSessionId)
         scope.launch {
             usageTracker.state.collect { usage ->
                 _state.update { it.copy(usage = usage) }
@@ -493,6 +490,11 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             runCatching {
+                seedWorkspace()
+                migrateLegacySession()
+                // Migration may have copied an event log after the field was first constructed.
+                // Reopen it before any session load or tool can append to the migrated log.
+                eventLog = eventLogFor(currentSessionId)
                 bundledNodeRuntime.prepare()
                 bundledPythonRuntime.prepare()
                 bundledGitRuntime.prepare()
@@ -1451,8 +1453,7 @@ class LocalHarnessEngine @Inject constructor(
                         modelHistory += reply.message
                         checkpointModelHistory("assistant/message")
                         updateContextMetrics()
-                        applyTranscriptMessages(transcriptMessages, assistantEvent.sequence)
-                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                        applyTranscriptMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
                         persist()
                     }
                     is AgentEvent.ToolStarted -> {
@@ -2500,24 +2501,27 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         return executor.execute {
+            // The request executor retries this block. A new buffer prevents text from a failed
+            // attempt being prepended to the next attempt's visible answer.
+            val streamPreview = LocalStreamPreview(
+                maxChars = MAX_STREAM_PREVIEW_CHARS,
+                minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
+                clockMs = { System.nanoTime() / 1_000_000 },
+                publish = { preview ->
+                    _state.update { it.copy(streamingAssistant = preview) }
+                },
+            )
             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                modelClient.completeStreaming(
+                val reply = modelClient.completeStreaming(
                     apiKey = key,
                     baseUrl = snapshot.baseUrl,
                     model = snapshot.model,
                     messages = messages,
                     tools = tools,
-                    onDelta = { delta ->
-                        _state.update { state ->
-                            state.copy(
-                                streamingAssistant = (state.streamingAssistant + delta.content)
-                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
-                                streamingReasoning = (state.streamingReasoning + delta.reasoning)
-                                    .takeLast(MAX_STREAM_PREVIEW_CHARS),
-                            )
-                        }
-                    },
+                    onDelta = { delta -> streamPreview.append(delta.content) },
                 )
+                streamPreview.flush()
+                reply
             }
         }
     }
@@ -2697,11 +2701,16 @@ class LocalHarnessEngine @Inject constructor(
     private fun applyTranscriptMessages(
         messages: List<LocalHarnessMessage>,
         eventSequence: Long,
+        clearStreamingPreview: Boolean = false,
     ) {
-        if (messages.isNotEmpty()) {
+        if (messages.isNotEmpty() || clearStreamingPreview) {
             _state.update { state ->
                 val knownIds = state.messages.mapTo(hashSetOf(), LocalHarnessMessage::id)
-                state.copy(messages = state.messages + messages.filter { knownIds.add(it.id) })
+                state.copy(
+                    messages = state.messages + messages.filter { knownIds.add(it.id) },
+                    streamingAssistant = if (clearStreamingPreview) "" else state.streamingAssistant,
+                    streamingReasoning = if (clearStreamingPreview) "" else state.streamingReasoning,
+                )
             }
         }
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, eventSequence)
@@ -3074,6 +3083,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 80_000
+        const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
         const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
