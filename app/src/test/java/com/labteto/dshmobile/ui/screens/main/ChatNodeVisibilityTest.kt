@@ -269,4 +269,18 @@ class ChatNodeVisibilityTest {
         assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.FULL))
     }
 
+    @Test
+    fun `repeated tool categories collapse to one step per turn`() {
+        val read1 = ToolCallNode(61, "r1", "read", """{"path":"a.kt"}""", 9, 1)
+        val read2 = ToolCallNode(62, "r2", "read", """{"path":"b.kt"}""", 9, 2)
+        val grep = ToolCallNode(63, "g1", "grep", """{"pattern":"x"}""", 9, 3)
+        val edit1 = ToolCallNode(64, "e1", "edit", """{"path":"a.kt"}""", 9, 4)
+        val edit2 = ToolCallNode(65, "e2", "write", """{"path":"b.kt"}""", 9, 5)
+        val nodes = listOf<ChatNode>(read1, read2, grep, edit1, edit2)
+
+        val visible = nodes.filter { it.rendersInTranscript(nodes, TranscriptMode.CONCISE) }
+        assertEquals(listOf(61L, 63L, 64L), visible.map { it.seq })
+    }
+
+
 }
