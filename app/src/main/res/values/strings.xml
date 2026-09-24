@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">DSH Mobile</string>
+    <string name="app_name" translatable="false">神言神语</string>
     <string name="app_long_name">DeepSeek Harness Remote</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_ok">OK</string>
@@ -34,7 +34,7 @@
     <string name="time_months">%1$dmo</string>
     <string name="time_years">%1$dy</string>
     <string name="connect_title">Connect to Harness</string>
-    <string name="connect_subtitle">DSH Mobile mirrors the DeepSeek Harness running on your computer.</string>
+    <string name="connect_subtitle">神言神语 mirrors the DeepSeek Harness running on your computer.</string>
     <string name="connect_manual_title">Connect manually</string>
     <string name="connect_host_label">Host address</string>
     <string name="connect_host_hint">192.168.1.20</string>
@@ -477,7 +477,7 @@
     <string name="pair_key_first_use">A typed address carries no key, so this trusts whatever answers the first time. Scanning the QR code checks it instead.</string>
     <string name="pair_key_plaintext">This address is not encrypted, so the token and everything you send travel in the clear.</string>
     <string name="pair_fail_not_a_code">That is not a relay pairing code.</string>
-    <string name="pair_fail_too_new">That code comes from a newer relay (version %1$d) than this app understands. Update DSH Mobile.</string>
+    <string name="pair_fail_too_new">That code comes from a newer relay (version %1$d) than this app understands. Update 神言神语.</string>
     <string name="pair_fail_expired">That code has expired. Reload the relay\'s pairing page for a new one.</string>
     <string name="pair_fail_rejected">The relay refused that code. Codes work once and expire after a few minutes — reload the pairing page and try the new one.</string>
     <string name="pair_fail_rate_limited">Too many attempts. Wait %1$d seconds and try again.</string>
