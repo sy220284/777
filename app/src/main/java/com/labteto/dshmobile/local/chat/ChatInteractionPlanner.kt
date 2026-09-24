@@ -224,6 +224,7 @@ class ChatInteractionPlanner @Inject constructor(
                 incoming = value.facts,
                 minimumConfidence = 80,
                 maximumConfidence = 100,
+                allowedSources = FACT_SOURCES,
                 limit = 12,
             ),
             hypotheses = mergeEvidence(
@@ -231,6 +232,7 @@ class ChatInteractionPlanner @Inject constructor(
                 incoming = value.hypotheses,
                 minimumConfidence = 10,
                 maximumConfidence = 85,
+                allowedSources = null,
                 limit = 6,
             ),
             unknowns = mergeStrings(previous.unknowns, value.unknowns, 6, 160),
@@ -284,18 +286,21 @@ class ChatInteractionPlanner @Inject constructor(
         incoming: List<RelationshipEvidence>,
         minimumConfidence: Int,
         maximumConfidence: Int,
+        allowedSources: Set<String>?,
         limit: Int,
     ): List<RelationshipEvidence> {
         val merged = linkedMapOf<String, RelationshipEvidence>()
         (previous + incoming).forEach { item ->
             val text = item.text.trim().take(220)
             if (text.isBlank()) return@forEach
+            val source = item.source.trim().lowercase().take(40)
+            if (allowedSources != null && source !in allowedSources) return@forEach
             val confidence = item.confidence.coerceIn(minimumConfidence, maximumConfidence)
             if (item.confidence < minimumConfidence) return@forEach
             val clean = item.copy(
                 text = text,
                 confidence = confidence,
-                source = item.source.trim().take(40),
+                source = source,
             )
             merged[normalize(text)] = clean
         }
@@ -358,6 +363,7 @@ class ChatInteractionPlanner @Inject constructor(
     private companion object {
         const val MAX_MESSAGE_CHARS = 2_000
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
+        val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
         val ALLOWED_STAGES = setOf(
             "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",
             "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
