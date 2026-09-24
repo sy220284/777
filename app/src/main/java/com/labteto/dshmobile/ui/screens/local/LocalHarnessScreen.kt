@@ -110,6 +110,7 @@ import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
+import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
