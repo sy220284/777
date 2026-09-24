@@ -91,7 +91,8 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -820,16 +821,10 @@ private fun LocalChat(
                             }
                             if (state.streamingReasoning.isNotBlank()) {
                                 Text(
-                                    stringResource(R.string.local_streaming_reasoning),
-                                    style = DsType.caption11Strong,
-                                    color = colors.labelTertiary,
-                                )
-                                Text(
-                                    state.streamingReasoning,
+                                    stringResource(R.string.agent_operation_generic) + " · " +
+                                        stringResource(R.string.agent_operation_status_running),
                                     style = DsType.small13,
                                     color = colors.labelSecondary,
-                                    maxLines = 12,
-                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             if (state.streamingAssistant.isNotBlank()) {
@@ -892,7 +887,8 @@ private fun LocalChat(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Text(
-                        error,
+                        stringResource(R.string.agent_operation_generic) + " · " +
+                            stringResource(R.string.agent_operation_status_failed),
                         style = DsType.small13,
                         color = colors.error,
                         modifier = Modifier.weight(1f),
@@ -1286,21 +1282,10 @@ private fun ExecutionStatusCard(
                     goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
                 }
                 if (state.plan.isNotEmpty()) {
-                    Text("计划", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.plan.forEachIndexed { index, item ->
-                        Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
-                    }
+                    Text("计划 · ${state.plan.size} 步", style = DsType.small13, color = colors.labelSecondary)
                 }
                 if (state.todos.isNotEmpty()) {
-                    Text("任务", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.todos.forEach { item ->
-                        val mark = when (item.status) {
-                            "completed" -> "✓"
-                            "in_progress" -> "●"
-                            else -> "○"
-                        }
-                        Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
-                    }
+                    Text("任务 · $completed/$total", style = DsType.small13, color = colors.labelSecondary)
                 }
                 Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
                 Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
@@ -1361,92 +1346,42 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
     if (messages.isEmpty()) return
 
     val colors = DsTheme.colors
-    var expanded by rememberSaveable(messages.first().id) { mutableStateOf(false) }
-    val toolCount = messages.count { it.role == "tool" }
-    val summary = buildList {
-        add("已折叠 ${messages.size} 条过程")
-        if (toolCount > 0) add("${toolCount} 次工具调用")
-    }.joinToString(" · ")
-
+    val toolMessages = messages.filter { it.role == "tool" }
     Surface(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(onClickLabel = if (expanded) "收起工作过程" else "展开工作过程") {
-                expanded = !expanded
-            },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = colors.bgModulePlatform,
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
+            Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
+            if (toolMessages.isEmpty()) {
                 Text(
-                    if (expanded) "⌄" else "›",
-                    style = DsType.base16Strong,
+                    stringResource(R.string.agent_operation_generic) + " · " +
+                        stringResource(R.string.agent_operation_status_running),
+                    style = DsType.small13,
                     color = colors.labelTertiary,
                 )
-                Column(Modifier.weight(1f)) {
-                    Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
-                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
-                }
-            }
-
-            if (expanded) {
-                messages.forEach { message ->
-                    val commandExecution = message.role == "tool" && isCommandExecutionTool(message.toolName)
-                    val title = when {
-                        commandExecution -> stringResource(R.string.command_execution_title)
-                        message.role == "reasoning" -> "思考"
-                        message.role == "tool" -> "工具 · ${message.toolName ?: "执行结果"}"
-                        else -> "执行说明"
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                        Text(title, style = DsType.caption11Strong, color = colors.labelTertiary)
-                        if (message.role == "tool") {
-                            if (commandExecution) {
-                                Text(
-                                    stringResource(R.string.command_execution_purpose),
-                                    style = DsType.small13,
-                                    color = colors.labelSecondary,
-                                )
-                            }
-                            Text(
-                                toolResultMeta(message.content),
-                                style = DsType.caption11,
-                                color = colors.labelTertiary,
-                            )
-                            if (!commandExecution) {
-                                SelectionContainer {
-                                    Text(
-                                        message.content,
-                                        style = DsType.mdCode,
-                                        color = colors.labelSecondary,
-                                    )
-                                }
-                            }
-                        } else {
-                            MarkdownText(message.content, allowCodeCopy = false)
-                        }
-                    }
+            } else {
+                toolMessages.forEach { message ->
+                    val failed = toolResultFailed(message.content)
+                    Text(
+                        stringResource(agentOperationLabelRes(message.toolName)) + " · " +
+                            stringResource(agentOperationStatusRes(running = false, failed = failed)),
+                        style = DsType.small13,
+                        color = if (failed) colors.error else colors.labelTertiary,
+                    )
                 }
             }
         }
     }
 }
 
-private fun toolResultMeta(content: String): String = when {
+private fun toolResultFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
-        "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content ->
-        "执行失败"
-    "已自动降级" in content || ("达到" in content && "步上限" in content) ->
-        "已降级/未完整结束"
-    else -> "已完成"
-}
+        "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
 
 @Composable
 private fun ScrollShortcut(
@@ -1622,10 +1557,9 @@ private fun ApprovalDialog(
     onApproveDeviceTurn: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    val commandExecution = isCommandExecutionTool(approval.toolName)
     DsDialog(title = "执行前确认", onDismiss = onDeny) {
         Text(
-            if (commandExecution) stringResource(R.string.command_execution_title) else approval.summary,
+            stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong,
             color = colors.labelPrimary,
         )
@@ -1654,18 +1588,6 @@ private fun ApprovalDialog(
                     approvalPurpose(approval),
                     style = DsType.small13,
                     color = colors.labelSecondary,
-                )
-            }
-        }
-
-        if (!commandExecution) {
-            Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
-            SelectionContainer {
-                Text(
-                    approval.arguments,
-                    style = DsType.mdCode,
-                    color = colors.labelSecondary,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
                 )
             }
         }
@@ -1727,17 +1649,15 @@ private fun approvalImpactLabel(impact: com.labteto.dshmobile.local.LocalApprova
 }
 
 private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
+    "write", "write_file", "edit", "edit_file", "apply_patch", "patch" ->
+        "更新工作区内容以完成当前任务。"
     "bash", "pwsh", "shell", "run_shell", "process_exec", "terminal_open", "terminal_send", "terminal_write" ->
-        "Harness 准备在手机的本机执行环境中完成当前任务所需的操作。操作可能读写工作区、访问网络或启动进程；界面仅展示用途、状态与影响等级。"
-    "write", "write_file" ->
-        "Harness 准备创建或完整写入一个工作区文件，用来保存代码、配置、文档或任务产物。批准后会实际改变工作区内容。"
-    "edit", "edit_file" ->
-        "Harness 准备修改现有工作区文件，用来落实当前任务要求。批准后会对目标文件产生真实改动。"
+        "运行当前任务所需的本机步骤。"
     "lsp_definition", "lsp_references", "lsp_hover", "lsp_implementation",
     "lsp_symbols", "lsp_workspace_symbols", "lsp_rename_preview", "lsp_diagnostics" ->
-        "777 准备启动与当前项目匹配的代码智能分析进程，用来理解定义、引用、类型、实现和诊断信息。它只接收当前工作区内的代码；批准后同一分析进程会在后续查询中复用，不会反复询问。"
+        "分析项目内容以确认当前任务所需的信息。"
     else ->
-        "Harness 请求执行一项会改变本机状态的操作。批准后会真实执行；拒绝则跳过这一步并把结果返回给模型。"
+        "执行当前任务所需的操作。"
 }
 
 @Composable
