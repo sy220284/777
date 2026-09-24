@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 internal fun PersonaGalleryDialog(
     entries: List<PersonaGalleryEntry>,
     currentPersona: PersonaProfile,
+    currentGalleryId: String?,
     currentSessionId: String,
     canSave: Boolean,
     onSaveCurrent: suspend (String, String?) -> Result<PersonaGalleryEntry>,
@@ -152,7 +153,7 @@ internal fun PersonaGalleryDialog(
                     }
                 }, modifier = Modifier.fillMaxWidth(), enabled = !busy)
             }
-            if (canSave && (currentSessionId == selected.sourceSessionId || currentPersona.id == selected.id)) {
+            if (canSave && (currentSessionId == selected.sourceSessionId || currentGalleryId == selected.id)) {
                 DsButton(text = "用当前会话更新人设与故事", onClick = {
                     busy = true
                     scope.launch {

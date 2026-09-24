@@ -704,6 +704,7 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { state ->
                 if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+                    galleryId = null,
                     chatPersona = saved,
                 )
             }
@@ -1134,7 +1135,7 @@ class LocalHarnessEngine @Inject constructor(
                         null
                     }
                     val personaId = if (galleryEntry != null) {
-                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = galleryEntry.id)).id
+                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}")).id
                     } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         sourceState.usageMode == LocalUsageMode.CHAT
@@ -1151,6 +1152,9 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = currentSessionId,
                             usageMode = usageMode,
                             personaId = personaId,
+                            galleryId = galleryEntry?.id ?: sourceState.galleryId.takeIf {
+                                usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT
+                            },
                             chatPersona = chatPersona,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
@@ -3188,6 +3192,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionId = sessionId,
             usageMode = stored.usageMode,
             personaId = stored.personaId,
+            galleryId = stored.galleryId,
             chatPersona = chatPersonaStore.get(stored.personaId),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
@@ -3367,6 +3372,7 @@ class LocalHarnessEngine @Inject constructor(
             updatedAt = System.currentTimeMillis(),
             usageMode = state.usageMode,
             personaId = state.personaId,
+            galleryId = state.galleryId,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,

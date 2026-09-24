@@ -248,6 +248,7 @@ fun LocalHarnessScreen(
         PersonaGalleryDialog(
             entries = gallery,
             currentPersona = state.chatPersona,
+            currentGalleryId = state.galleryId,
             currentSessionId = state.sessionId,
             canSave = !state.loading && !state.running,
             onSaveCurrent = viewModel::saveCurrentToGallery,
