@@ -33,8 +33,9 @@ class MemoryManager @Inject constructor(
         text: String,
         lineageId: String?,
         sourceSessionId: String,
+        subjectLabel: String? = null,
     ): MemoryRecord? {
-        val candidate = policy.extractChatRelationshipFact(text) ?: return null
+        val candidate = policy.extractChatRelationshipFact(text, subjectLabel) ?: return null
         return remember(
             content = candidate.content,
             scope = candidate.scope,
