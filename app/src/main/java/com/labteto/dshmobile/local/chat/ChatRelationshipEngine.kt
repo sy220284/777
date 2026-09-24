@@ -32,12 +32,12 @@ class ChatRelationshipEngine @Inject constructor() {
     fun classify(input: String): ChatRelationshipView {
         val text = input.trim().lowercase()
         if (text.isBlank()) return ChatRelationshipView.IMMERSIVE
-        if (REPLY_COACH_HINTS.any(text::contains)) return ChatRelationshipView.REPLY_COACH
+        if (REPLY_COACH_HINTS.any { text.contains(it) }) return ChatRelationshipView.REPLY_COACH
         if (STRATEGY_COMMANDS.any { text.startsWith(it) }) return ChatRelationshipView.STRATEGIST
         if ("军师" in text) return ChatRelationshipView.STRATEGIST
 
-        val relationshipRelevant = RELATIONSHIP_HINTS.any(text::contains)
-        val asksForAnalysis = ANALYSIS_HINTS.any(text::contains)
+        val relationshipRelevant = RELATIONSHIP_HINTS.any { text.contains(it) }
+        val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
         return if (relationshipRelevant && asksForAnalysis) {
             ChatRelationshipView.STRATEGIST
         } else {
@@ -48,12 +48,12 @@ class ChatRelationshipEngine @Inject constructor() {
     fun classifyScenario(input: String): RelationshipScenario {
         val text = input.trim().lowercase()
         return when {
-            BOUNDARY_HINTS.any(text::contains) -> RelationshipScenario.BOUNDARY_SAFETY
-            BREAKUP_HINTS.any(text::contains) -> RelationshipScenario.BREAKUP_RECONCILIATION
-            CONFLICT_HINTS.any(text::contains) -> RelationshipScenario.CONFLICT_REPAIR
-            IMBALANCE_HINTS.any(text::contains) -> RelationshipScenario.INVESTMENT_IMBALANCE
-            COOLING_HINTS.any(text::contains) -> RelationshipScenario.COOLING
-            DATE_HINTS.any(text::contains) -> RelationshipScenario.INVITE_DATE
+            BOUNDARY_HINTS.any { text.contains(it) } -> RelationshipScenario.BOUNDARY_SAFETY
+            BREAKUP_HINTS.any { text.contains(it) } -> RelationshipScenario.BREAKUP_RECONCILIATION
+            CONFLICT_HINTS.any { text.contains(it) } -> RelationshipScenario.CONFLICT_REPAIR
+            IMBALANCE_HINTS.any { text.contains(it) } -> RelationshipScenario.INVESTMENT_IMBALANCE
+            COOLING_HINTS.any { text.contains(it) } -> RelationshipScenario.COOLING
+            DATE_HINTS.any { text.contains(it) } -> RelationshipScenario.INVITE_DATE
             else -> RelationshipScenario.GENERAL
         }
     }
