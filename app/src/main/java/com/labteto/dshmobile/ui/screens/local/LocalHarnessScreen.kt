@@ -826,7 +826,7 @@ private fun LocalChat(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 DsButton(
-                    text = "聊天",
+                    text = stringResource(R.string.local_usage_chat),
                     onClick = { onUsageModeChange(LocalUsageMode.CHAT) },
                     modifier = Modifier.weight(1f),
                     variant = if (state.usageMode == LocalUsageMode.CHAT) DsButtonVariant.Info else DsButtonVariant.Ghost,
@@ -834,7 +834,7 @@ private fun LocalChat(
                     enabled = !state.running,
                 )
                 DsButton(
-                    text = "工作",
+                    text = stringResource(R.string.local_usage_work),
                     onClick = { onUsageModeChange(LocalUsageMode.WORK) },
                     modifier = Modifier.weight(1f),
                     variant = if (state.usageMode == LocalUsageMode.WORK) DsButtonVariant.Info else DsButtonVariant.Ghost,
@@ -1075,7 +1075,7 @@ private fun LocalChat(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
-                            if (state.usageMode == LocalUsageMode.CHAT) "想说什么就说吧…"
+                            if (state.usageMode == LocalUsageMode.CHAT) stringResource(R.string.local_chat_composer_hint)
                             else "问点什么，或直接交给 Harness 执行…",
                         )
                     },
@@ -1335,7 +1335,7 @@ private fun EmptyLocalChat(personaName: String) {
         WhaleMark(Modifier.size(40.dp))
         Text(personaName, style = DsType.display24, color = colors.labelPrimary)
         Text(
-            "想说什么就说。这里按角色聊天来，不走工作流程。",
+            stringResource(R.string.local_chat_empty_hint),
             style = DsType.std14,
             color = colors.labelSecondary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
