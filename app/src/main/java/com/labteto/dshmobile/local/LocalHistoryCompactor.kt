@@ -26,11 +26,13 @@ internal class LocalHistoryCompactor(
     fun compact(
         history: List<JsonObject>,
         budget: LocalHistoryBudget? = null,
+        currentChars: Int? = null,
     ): LocalHistoryCompaction? {
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
         val effectiveSummaryChars = budget?.maxSummaryChars ?: maxSummaryChars
-        if (history.size < 3 || history.sumOf { it.toString().length } <= effectiveMaxHistoryChars) return null
+        val encodedChars = currentChars ?: history.sumOf { it.toString().length }
+        if (history.size < 3 || encodedChars <= effectiveMaxHistoryChars) return null
 
         var start = 1
         var keptChars = 0
