@@ -10,4 +10,5 @@
     <string name="local_persona_ai_busy">当前回合还在运行，暂时不能生成人设。</string>
     <string name="local_persona_ai_unconfigured">请先完成模型配置。</string>
     <string name="local_persona_ai_failed">生成人设失败，请再试一次。</string>
+    <string name="local_persona_ai_example">例如：神里绫人，保留原作气质，和我更亲近一点，说话自然，别有客服腔。</string>
 </resources>
