@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -38,6 +39,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
     fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
+    fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
     fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     fun clearCredential() = engine.clearCredential()
 }
