@@ -4,6 +4,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class RelationshipEvidence(
@@ -129,9 +131,13 @@ class ChatInteractionPlanner @Inject constructor(
         assistantMessage: String = "",
     ): ChatPostTurnPlan? {
         val body = extractJsonObject(text) ?: return null
+        val root = runCatching {
+            json.parseToJsonElement(body).jsonObject
+        }.getOrNull() ?: return null
         val decoded = runCatching {
             json.decodeFromString(ChatPostTurnPlan.serializer(), body)
         }.getOrNull() ?: return null
+        val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
 
         return decoded.copy(
             state = sanitizeState(
@@ -139,6 +145,7 @@ class ChatInteractionPlanner @Inject constructor(
                 previous = previous,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
+                rawState = rawState,
             ),
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
@@ -159,38 +166,67 @@ class ChatInteractionPlanner @Inject constructor(
         previous: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        rawState: JsonObject?,
     ): ChatCharacterState {
-        val dynamics = sanitizeDynamics(
-            value = value.dynamics,
-            previous = previous.dynamics,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
-        val pattern = sanitizeUserPattern(
-            value = value.userPattern,
-            previous = previous.userPattern,
-            userMessage = userMessage,
-        )
-        val requestedStage = normalizeStage(value.dynamics.stage)
+        val rawDynamics = rawState?.get("dynamics")?.let { runCatching { it.jsonObject }.getOrNull() }
+        val rawPattern = rawState?.get("userPattern")?.let { runCatching { it.jsonObject }.getOrNull() }
+        val dynamics = if (rawDynamics == null) {
+            previous.dynamics
+        } else {
+            sanitizeDynamics(
+                value = value.dynamics,
+                previous = previous.dynamics,
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+                raw = rawDynamics,
+            )
+        }
+        val pattern = if (rawPattern == null && userMessage.isBlank()) {
+            previous.userPattern
+        } else {
+            sanitizeUserPattern(
+                value = value.userPattern,
+                previous = previous.userPattern,
+                userMessage = userMessage,
+                raw = rawPattern,
+            )
+        }
+        val requestedStage = if (rawDynamics?.containsKey("stage") == true) {
+            normalizeStage(value.dynamics.stage)
+        } else previous.dynamics.stage
         val relationshipDescription = when {
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
             requestedStage != previous.dynamics.stage -> previous.relationshipState
-            else -> value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
+            rawState?.containsKey("relationshipState") == true ->
+                value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
+            else -> previous.relationshipState
         }
         return value.copy(
-            mood = value.mood.trim().take(80).ifBlank { previous.mood },
+            mood = if (rawState?.containsKey("mood") == true) {
+                value.mood.trim().take(80).ifBlank { previous.mood }
+            } else previous.mood,
             relationshipState = relationshipDescription,
-            currentFocus = value.currentFocus.trim().take(240),
-            recentImpression = value.recentImpression.trim().take(320),
-            unresolvedThreads = value.unresolvedThreads.asSequence()
-                .map(String::trim)
-                .filter(String::isNotBlank)
-                .map { it.take(200) }
-                .distinct()
-                .take(3)
-                .toList(),
-            initiative = bounded(value.initiative, previous.initiative, 15),
-            shareDesire = bounded(value.shareDesire, previous.shareDesire, 15),
+            currentFocus = if (rawState?.containsKey("currentFocus") == true) {
+                value.currentFocus.trim().take(240)
+            } else previous.currentFocus,
+            recentImpression = if (rawState?.containsKey("recentImpression") == true) {
+                value.recentImpression.trim().take(320)
+            } else previous.recentImpression,
+            unresolvedThreads = if (rawState?.containsKey("unresolvedThreads") == true) {
+                value.unresolvedThreads.asSequence()
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .map { it.take(200) }
+                    .distinct()
+                    .take(3)
+                    .toList()
+            } else previous.unresolvedThreads,
+            initiative = if (rawState?.containsKey("initiative") == true) {
+                bounded(value.initiative, previous.initiative, 15)
+            } else previous.initiative,
+            shareDesire = if (rawState?.containsKey("shareDesire") == true) {
+                bounded(value.shareDesire, previous.shareDesire, 15)
+            } else previous.shareDesire,
             dynamics = dynamics,
             userPattern = pattern,
             updatedAt = System.currentTimeMillis(),
@@ -202,8 +238,9 @@ class ChatInteractionPlanner @Inject constructor(
         previous: RelationshipDynamics,
         userMessage: String,
         assistantMessage: String,
+        raw: JsonObject,
     ): RelationshipDynamics {
-        val candidateStage = normalizeStage(value.stage)
+        val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
         val explicitStageEvidence = EXPLICIT_STAGE_SIGNAL.containsMatchIn(userMessage)
         val stage = when {
             candidateStage == previous.stage -> previous.stage
@@ -213,30 +250,36 @@ class ChatInteractionPlanner @Inject constructor(
 
         return RelationshipDynamics(
             stage = stage,
-            warmth = bounded(value.warmth, previous.warmth, 10),
-            trust = bounded(value.trust, previous.trust, 8),
-            reciprocity = bounded(value.reciprocity, previous.reciprocity, 8),
-            tension = bounded(value.tension, previous.tension, 12),
-            stability = bounded(value.stability, previous.stability, 8),
-            unresolvedConflict = value.unresolvedConflict.trim().take(240),
-            facts = mergeEvidence(
+            warmth = if (raw.containsKey("warmth")) bounded(value.warmth, previous.warmth, 10) else previous.warmth,
+            trust = if (raw.containsKey("trust")) bounded(value.trust, previous.trust, 8) else previous.trust,
+            reciprocity = if (raw.containsKey("reciprocity")) bounded(value.reciprocity, previous.reciprocity, 8) else previous.reciprocity,
+            tension = if (raw.containsKey("tension")) bounded(value.tension, previous.tension, 12) else previous.tension,
+            stability = if (raw.containsKey("stability")) bounded(value.stability, previous.stability, 8) else previous.stability,
+            unresolvedConflict = if (raw.containsKey("unresolvedConflict")) {
+                value.unresolvedConflict.trim().take(240)
+            } else previous.unresolvedConflict,
+            facts = if (raw.containsKey("facts")) mergeEvidence(
                 previous = previous.facts,
                 incoming = value.facts,
                 minimumConfidence = 80,
                 maximumConfidence = 100,
                 allowedSources = FACT_SOURCES,
                 limit = 12,
-            ),
-            hypotheses = mergeEvidence(
+            ) else previous.facts,
+            hypotheses = if (raw.containsKey("hypotheses")) mergeEvidence(
                 previous = previous.hypotheses,
                 incoming = value.hypotheses,
                 minimumConfidence = 10,
                 maximumConfidence = 85,
                 allowedSources = null,
                 limit = 6,
-            ),
-            unknowns = mergeStrings(previous.unknowns, value.unknowns, 6, 160),
-            sharedMoments = mergeStrings(previous.sharedMoments, value.sharedMoments, 8, 180),
+            ) else previous.hypotheses,
+            unknowns = if (raw.containsKey("unknowns")) {
+                mergeStrings(previous.unknowns, value.unknowns, 6, 160)
+            } else previous.unknowns,
+            sharedMoments = if (raw.containsKey("sharedMoments")) {
+                mergeStrings(previous.sharedMoments, value.sharedMoments, 8, 180)
+            } else previous.sharedMoments,
         )
     }
 
@@ -244,6 +287,7 @@ class ChatInteractionPlanner @Inject constructor(
         value: UserChatPattern,
         previous: UserChatPattern,
         userMessage: String,
+        raw: JsonObject?,
     ): UserChatPattern {
         val measuredLength = userMessage.trim().length
         val hasObservation = measuredLength > 0
@@ -264,16 +308,26 @@ class ChatInteractionPlanner @Inject constructor(
             else -> "long"
         }
         val modelLength = value.replyLength.trim().lowercase()
-            .takeIf { it in ALLOWED_REPLY_LENGTHS }
+            .takeIf { raw?.containsKey("replyLength") == true && it in ALLOWED_REPLY_LENGTHS }
         val length = measuredReplyLength ?: modelLength ?: previous.replyLength
 
         return value.copy(
             replyLength = length,
-            directness = bounded(value.directness, previous.directness, 10),
-            playfulness = bounded(value.playfulness, previous.playfulness, 10),
-            initiative = bounded(value.initiative, previous.initiative, 10),
-            emojiStyle = value.emojiStyle.trim().take(120),
-            preferredTone = value.preferredTone.trim().take(120),
+            directness = if (raw?.containsKey("directness") == true) {
+                bounded(value.directness, previous.directness, 10)
+            } else previous.directness,
+            playfulness = if (raw?.containsKey("playfulness") == true) {
+                bounded(value.playfulness, previous.playfulness, 10)
+            } else previous.playfulness,
+            initiative = if (raw?.containsKey("initiative") == true) {
+                bounded(value.initiative, previous.initiative, 10)
+            } else previous.initiative,
+            emojiStyle = if (raw?.containsKey("emojiStyle") == true) {
+                value.emojiStyle.trim().take(120)
+            } else previous.emojiStyle,
+            preferredTone = if (raw?.containsKey("preferredTone") == true) {
+                value.preferredTone.trim().take(120)
+            } else previous.preferredTone,
             observedTurns = if (hasObservation) (previous.observedTurns + 1).coerceAtMost(1000)
                 else previous.observedTurns,
             averageMessageChars = averageChars.coerceIn(0, 2_000),
