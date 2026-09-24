@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -15,6 +16,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val engine: LocalHarnessEngine,
+    private val personaAutoFillService: PersonaAutoFillService,
 ) : ViewModel() {
     val state = engine.state
 
@@ -40,6 +42,26 @@ class LocalHarnessViewModel @Inject constructor(
     fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
+
+    suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
+        val snapshot = state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
+            return Result.failure(IllegalStateException("persona_autofill_busy"))
+        }
+        if (!snapshot.configured) {
+            return Result.failure(IllegalStateException("persona_autofill_unconfigured"))
+        }
+        return runCatching {
+            val generated = personaAutoFillService.generate(
+                model = snapshot.model,
+                baseUrl = snapshot.baseUrl,
+                current = snapshot.chatPersona,
+                recentMessages = snapshot.messages,
+                description = description,
+            )
+            engine.syncDefaultChatPersona(generated)
+        }
+    }
     fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     fun clearCredential() = engine.clearCredential()
 }

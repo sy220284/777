@@ -201,6 +201,7 @@ fun LocalHarnessScreen(
                 onNewSession = { showNewSessionMode = true },
                 onUsageModeChange = viewModel::switchUsageMode,
                 onConfigureChatPersona = viewModel::configureChatPersona,
+                onAutoFillChatPersona = viewModel::autoFillChatPersona,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -637,6 +638,7 @@ private fun LocalChat(
     onNewSession: () -> Unit,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
@@ -1183,6 +1185,7 @@ private fun LocalChat(
         ChatPersonaDialog(
             profile = state.chatPersona,
             onSave = onConfigureChatPersona,
+            onAutoFill = onAutoFillChatPersona,
             onDismiss = { showPersonaEditor = false },
         )
     }
