@@ -814,4 +814,7 @@
     <string name="local_persona_banned">Character-specific banned phrases (one per line)</string>
     <string name="local_persona_signature">Characteristic phrases (one per line)</string>
     <string name="local_persona_save">Save persona</string>
+
+    <string name="local_reply_suggestions_title">Reply ideas</string>
+    <string name="local_reply_suggestions_open">Reply ideas</string>
 </resources>
