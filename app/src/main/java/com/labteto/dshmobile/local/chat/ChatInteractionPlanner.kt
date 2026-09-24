@@ -165,10 +165,11 @@ class ChatInteractionPlanner @Inject constructor(
             assistantMessage = assistantMessage,
         )
         val pattern = sanitizeUserPattern(value.userPattern, previous.userPattern)
-        val relationshipDescription = if (dynamics.stage != previous.dynamics.stage) {
-            stageLabel(dynamics.stage)
-        } else {
-            value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
+        val requestedStage = normalizeStage(value.dynamics.stage)
+        val relationshipDescription = when {
+            dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
+            requestedStage != previous.dynamics.stage -> previous.relationshipState
+            else -> value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
         }
         return value.copy(
             mood = value.mood.trim().take(80).ifBlank { previous.mood },
