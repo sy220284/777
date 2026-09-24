@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import com.labteto.dshmobile.core.session.AssistantMessageNode
+import com.labteto.dshmobile.core.session.ChatNode
 import com.labteto.dshmobile.core.session.ChatBlock
 import com.labteto.dshmobile.core.session.OtherNode
 import com.labteto.dshmobile.core.session.ToolCallNode
