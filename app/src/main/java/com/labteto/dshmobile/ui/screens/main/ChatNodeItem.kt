@@ -271,20 +271,11 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     var actionsVisible by remember(node.seq) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
-    if (streaming) {
-        DisclosureRow(
-            title = stringResource(R.string.agent_operation_generic),
-            summary = stringResource(R.string.agent_operation_status_running),
-            icon = FeatherIcons.Tool,
-            state = DisclosureState.Running,
-            expanded = false,
-            onToggle = null,
-        )
-        return
-    }
     if (isWorkProcess) return
 
-    if (!node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
+    // A running conversation does not make the durable/streaming answer itself execution detail.
+    // Only protocol-matched work-process narration is hidden; user-facing answer text stays visible.
+    if (!streaming && !node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
     val finalText = node.finalAnswerText(context.nodes).ifBlank { node.plainText }
 
     Surface(
