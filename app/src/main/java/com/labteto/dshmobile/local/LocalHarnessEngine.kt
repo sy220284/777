@@ -2500,15 +2500,17 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
         )
-        val streamPreview = LocalStreamPreview(
-            maxChars = MAX_STREAM_PREVIEW_CHARS,
-            minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
-            clockMs = { System.nanoTime() / 1_000_000 },
-            publish = { preview ->
-                _state.update { it.copy(streamingAssistant = preview) }
-            },
-        )
         return executor.execute {
+            // The request executor retries this block. A new buffer prevents text from a failed
+            // attempt being prepended to the next attempt's visible answer.
+            val streamPreview = LocalStreamPreview(
+                maxChars = MAX_STREAM_PREVIEW_CHARS,
+                minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
+                clockMs = { System.nanoTime() / 1_000_000 },
+                publish = { preview ->
+                    _state.update { it.copy(streamingAssistant = preview) }
+                },
+            )
             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
                 val reply = modelClient.completeStreaming(
                     apiKey = key,
