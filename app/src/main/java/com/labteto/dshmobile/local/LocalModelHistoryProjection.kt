@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -104,6 +105,18 @@ private fun applyModelHistoryEvent(
                 }
                 true
             }
+        }
+        "user/queue" -> {
+            if (event.data["action"]?.jsonPrimitive?.contentOrNull != "consumed") return false
+            val messages = event.data["model_messages"] as? JsonArray ?: return false
+            var changed = false
+            messages.forEach { element ->
+                val message = element as? JsonObject ?: return@forEach
+                if (message["role"]?.jsonPrimitive?.contentOrNull != "user") return@forEach
+                history += message
+                changed = true
+            }
+            changed
         }
         "assistant/message" -> {
             val message = assistantModelMessageFromEvent(event.data)
