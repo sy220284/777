@@ -35,6 +35,17 @@ class ChatInteractionPlannerTest {
         assertTrue(plan.state.updatedAt > 0L)
     }
 
+    @Test fun extractsJsonEvenWhenModelAddsSurroundingNoise() {
+        val previous = ChatCharacterState()
+        val payload = "状态如下：\n" +
+            "{\"state\":{\"mood\":\"平静\"},\"suggestions\":[{\"label\":\"接话\",\"text\":\"然后呢？\"}]}\n" +
+            "就这些。"
+        val result = planner.parse(payload, previous)
+        assertNotNull(result)
+        assertEquals("平静", result!!.state.mood)
+        assertEquals("然后呢？", result.suggestions.single().text)
+    }
+
     @Test fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
