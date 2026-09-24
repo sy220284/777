@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
@@ -83,9 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
-import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
@@ -101,7 +98,6 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
@@ -143,7 +139,7 @@ fun LocalHarnessScreen(
         scope.launch { drawerState.close() }
     }
     BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
-    BackHandler(enabled = state.pendingQuestion != null) { viewModel.answerQuestion("用户取消了问题") }
+    BackHandler(enabled = state.pendingQuestion != null) { viewModel.cancelQuestion() }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -206,6 +202,7 @@ fun LocalHarnessScreen(
                 onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
                 onDisableAutoApprove = viewModel::disableAutoApproval,
                 onAnswerQuestion = viewModel::answerQuestion,
+                onCancelQuestion = viewModel::cancelQuestion,
             )
         }
     }
@@ -631,6 +628,7 @@ private fun LocalChat(
     onDisableDeviceTurn: () -> Unit,
     onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String) -> Unit,
+    onCancelQuestion: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -1112,7 +1110,14 @@ private fun LocalChat(
             onApproveDeviceTurn = onApproveDeviceTurn,
         )
     }
-    state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
+    state.pendingQuestion?.let {
+        QuestionDialog(
+            question = it.question,
+            options = it.options,
+            onAnswer = onAnswerQuestion,
+            onDismiss = onCancelQuestion,
+        )
+    }
     if (showModelPicker) {
         DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
             state.configuredModels.forEach { model ->
@@ -1466,54 +1471,6 @@ private fun ScrollShortcut(
     }
 }
 
-@Composable
-private fun NewSessionModeDialog(
-    onDismiss: () -> Unit,
-    onSelect: (LocalConversationMode) -> Unit,
-) {
-    val colors = DsTheme.colors
-    DsDialog(title = "新建对话", onDismiss = onDismiss) {
-        Text(
-            "选择新对话可以使用哪些已有上下文。长期规则始终保留，其他内容按作用域隔离。",
-            style = DsType.small13,
-            color = colors.labelSecondary,
-        )
-        DsButton(
-            text = "继续当前任务",
-            onClick = { onSelect(LocalConversationMode.CONTINUATION) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            "继承当前项目、对话链记忆和精简交接摘要，不复制整段旧聊天。",
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-        DsButton(
-            text = "同项目新对话",
-            onClick = { onSelect(LocalConversationMode.PROJECT) },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-        Text(
-            "保留全局和当前项目记忆，不带上一条对话的临时任务状态。",
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-        DsButton(
-            text = "独立新对话",
-            onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
-        )
-        Text(
-            "只使用全局规则和全局长期记忆。",
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-    }
-}
-
-
 private const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 
@@ -1536,217 +1493,3 @@ private fun decodeLocalAttachmentThumbnail(
         BitmapFactory.Options().apply { inSampleSize = sample },
     )?.asImageBitmap()
 }.getOrNull()
-
-@Composable
-internal fun NetworkDiagnosticDialog(
-    onDismiss: () -> Unit,
-    diagnose: suspend (String) -> String,
-) {
-    val colors = DsTheme.colors
-    val scope = rememberCoroutineScope()
-    var target by rememberSaveable { mutableStateOf("https://github.com") }
-    var result by remember { mutableStateOf<String?>(null) }
-    var running by remember { mutableStateOf(false) }
-    DsDialog(title = "网络诊断", onDismiss = onDismiss) {
-        Text(
-            "检查实际解析地址、系统代理、VPN/TUN、安全策略，并发起受限 HTTP/TLS 探测验证真实连通性。",
-            style = DsType.small13,
-            color = colors.labelSecondary,
-        )
-        OutlinedTextField(
-            value = target,
-            onValueChange = { target = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("网址或域名") },
-            singleLine = true,
-        )
-        DsButton(
-            if (running) "诊断中…" else "开始诊断",
-            onClick = {
-                running = true
-                scope.launch {
-                    result = runCatching { diagnose(target) }.getOrElse { it.message ?: "诊断失败" }
-                    running = false
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = target.isNotBlank() && !running,
-        )
-        result?.let {
-            SelectionContainer {
-                Text(
-                    it,
-                    style = DsType.mdCode,
-                    color = colors.labelPrimary,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun EnvironmentInfoDialog(
-    text: String,
-    onDismiss: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    DsDialog(title = "环境能力", onDismiss = onDismiss) {
-        Text(
-            "这里展示手机本机 Harness 当前可依赖的系统能力和沙箱限制。",
-            style = DsType.small13,
-            color = colors.labelSecondary,
-        )
-        SelectionContainer {
-            Text(
-                text,
-                style = DsType.mdCode,
-                color = colors.labelPrimary,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ApprovalDialog(
-    approval: LocalApproval,
-    safeAutoApprovalEnabled: Boolean,
-    onApprove: () -> Unit,
-    onDeny: () -> Unit,
-    onAutoApprove: () -> Unit,
-    onApproveDeviceTurn: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    DsDialog(title = "执行前确认", onDismiss = onDeny) {
-        Text(
-            stringResource(agentOperationLabelRes(approval.toolName)),
-            style = DsType.base16Strong,
-            color = colors.labelPrimary,
-        )
-        Text(
-            "影响等级：${approvalImpactLabel(approval.impact)}",
-            style = DsType.caption11Strong,
-            color = when (approval.impact) {
-                com.labteto.dshmobile.local.LocalApprovalImpact.LOW -> colors.labelTertiary
-                com.labteto.dshmobile.local.LocalApprovalImpact.MEDIUM -> colors.warnLabel
-                com.labteto.dshmobile.local.LocalApprovalImpact.HIGH,
-                com.labteto.dshmobile.local.LocalApprovalImpact.CRITICAL -> colors.error
-            },
-        )
-
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = colors.bgModulePlatform,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                Text("这项操作是做什么的？", style = DsType.small13Strong, color = colors.labelPrimary)
-                Text(
-                    approvalPurpose(approval),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                )
-            }
-        }
-
-        Text(
-            when {
-                approval.canAutoApproveSafely ->
-                    "该操作属于安全自动批准范围：受工作区边界约束的写入，或不会改变外部状态的只读操作。开启后会跨对话持续生效。"
-                approval.canApproveDeviceTurn ->
-                    "该操作影响设备状态，需要确认。可只批准本次，或仅在当前代理回合内授权普通设备界面操作；高权限设备能力仍逐次确认。"
-                else ->
-                    "该操作会影响工作区外状态、进程、网络、设备或高权限资源，需要按影响等级确认。安全自动批准不会绕过当前操作。"
-            },
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-
-        DsButton(
-            "仅批准本次",
-            onApprove,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        DsButton(
-            "拒绝",
-            onDeny,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-        if (!safeAutoApprovalEnabled) {
-            DsButton(
-                "开启安全操作自动批准",
-                onAutoApprove,
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
-            )
-        } else {
-            Text(
-                "安全操作自动批准已开启，并会在后续对话继续生效。",
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-        }
-        if (approval.canApproveDeviceTurn) {
-            DsButton(
-                "批准本轮普通设备操作",
-                onApproveDeviceTurn,
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
-            )
-        }
-    }
-}
-
-private fun approvalImpactLabel(impact: com.labteto.dshmobile.local.LocalApprovalImpact): String = when (impact) {
-    com.labteto.dshmobile.local.LocalApprovalImpact.LOW -> "低"
-    com.labteto.dshmobile.local.LocalApprovalImpact.MEDIUM -> "中"
-    com.labteto.dshmobile.local.LocalApprovalImpact.HIGH -> "高"
-    com.labteto.dshmobile.local.LocalApprovalImpact.CRITICAL -> "关键"
-}
-
-private fun approvalPurpose(approval: LocalApproval): String = when (approval.toolName) {
-    "write", "write_file", "edit", "edit_file", "apply_patch", "patch" ->
-        "更新工作区内容以完成当前任务。"
-    "bash", "pwsh", "shell", "run_shell", "process_exec", "terminal_open", "terminal_send", "terminal_write" ->
-        "运行当前任务所需的本机步骤。"
-    "lsp_definition", "lsp_references", "lsp_hover", "lsp_implementation",
-    "lsp_symbols", "lsp_workspace_symbols", "lsp_rename_preview", "lsp_diagnostics" ->
-        "分析项目内容以确认当前任务所需的信息。"
-    else ->
-        "执行当前任务所需的操作。"
-}
-
-@Composable
-private fun QuestionDialog(question: String, options: List<String>, onAnswer: (String) -> Unit) {
-    val colors = DsTheme.colors
-    var answer by rememberSaveable(question) { mutableStateOf("") }
-    DsDialog(title = "Harness 需要你的决定", onDismiss = { onAnswer("用户取消了问题") }) {
-        Text(question, style = DsType.base16Strong, color = colors.labelPrimary)
-        options.forEach { option ->
-            DsButton(
-                text = option,
-                onClick = { onAnswer(option) },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
-            )
-        }
-        OutlinedTextField(
-            value = answer,
-            onValueChange = { answer = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("自定义回答") },
-            maxLines = 4,
-        )
-        DsButton(
-            text = "提交回答",
-            onClick = { onAnswer(answer) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = answer.isNotBlank(),
-        )
-    }
-}

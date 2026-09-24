@@ -88,8 +88,6 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
-import com.labteto.dshmobile.ui.screens.local.EnvironmentInfoDialog
-import com.labteto.dshmobile.ui.screens.local.NetworkDiagnosticDialog
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
