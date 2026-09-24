@@ -18,6 +18,7 @@ import com.labteto.dshmobile.core.session.TurnErrorNode
 import com.labteto.dshmobile.core.session.TurnStartNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.session.WorkflowNode
+import com.labteto.dshmobile.ui.agentOperationKind
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -138,14 +139,25 @@ internal fun ChatNode.rendersInTranscript(nodes: List<ChatNode>, mode: Transcrip
         }
         is UserMessageNode, is TurnErrorNode -> true
         is TurnEndNode -> reasonKind != "completed"
-        // Semantic operation rows are concise enough to remain visible in either transcript mode.
-        is ToolCallNode, is CommandNode -> true
+        // One semantic category per turn: dozens of file reads become one "检查相关内容" step.
+        is ToolCallNode -> isSemanticToolStepAnchor(nodes)
+        is CommandNode -> true
         is TodoNode, is GoalNode, is PlanModeNode, is CompactionNode,
         is RetryNode, is WorkflowNode, is TitleNode, is SubagentNode -> mode == TranscriptMode.FULL
         // Raw protocol events stay hidden; only user-facing final deliverables survive.
         is OtherNode -> type == "deliverables/presented"
         is TurnStartNode, is ToolResultNode -> false
     }
+}
+
+private fun ToolCallNode.isSemanticToolStepAnchor(nodes: List<ChatNode>): Boolean {
+    val turnId = turn ?: return true
+    val kind = agentOperationKind(name)
+    return nodes.asSequence()
+        .filterIsInstance<ToolCallNode>()
+        .filter { it.turn == turnId && agentOperationKind(it.name) == kind }
+        .minByOrNull(ToolCallNode::seq)
+        ?.seq == seq
 }
 
 internal fun ChatNode.rendersContent(): Boolean = when (this) {
