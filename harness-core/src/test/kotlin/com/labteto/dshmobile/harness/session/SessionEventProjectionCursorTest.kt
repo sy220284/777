@@ -98,4 +98,31 @@ class SessionEventProjectionCursorTest {
         }
     }
 
+    @Test
+    fun streamedTailVisitsOnlyEventsAfterCursorAcrossRotatedSegments() {
+        val directory = Files.createTempDirectory("session-streamed-tail").toFile()
+        try {
+            val log = SessionEventLog(
+                file = directory.resolve("events.jsonl"),
+                json = json,
+                maxBytes = 700,
+                clock = { 1L },
+            )
+            repeat(40) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) },
+                )
+            }
+
+            val visited = mutableListOf<Long>()
+            log.forEachAfter(36L) { event -> visited += event.sequence }
+
+            assertEquals(listOf(37L, 38L, 39L), visited)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+
 }
