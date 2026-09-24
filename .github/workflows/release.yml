@@ -142,7 +142,7 @@ jobs:
             # The publishing path must launch a minified/shrunk build, not only debug.
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
+            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug 15
 
   android-17-instrumented:
     needs: check-release
