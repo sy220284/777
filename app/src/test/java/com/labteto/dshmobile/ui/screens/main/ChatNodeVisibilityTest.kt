@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import com.labteto.dshmobile.core.session.AssistantMessageNode
+import com.labteto.dshmobile.core.session.ChatNode
 import com.labteto.dshmobile.core.session.ChatBlock
 import com.labteto.dshmobile.core.session.OtherNode
 import com.labteto.dshmobile.core.session.ToolCallNode
@@ -40,12 +41,12 @@ class ChatNodeVisibilityTest {
     }
 
     @Test
-    fun `bookkeeping event types are filtered, unknown ones survive`() {
-        // The compatibility contract keeps genuinely unknown types visible; the noise is named.
+    fun `raw protocol events are hidden and deliverables remain visible`() {
         assertFalse(OtherNode(seq = 4, type = "step/start", data = JsonNull).rendersContent())
         assertFalse(OtherNode(seq = 5, type = "assistant/chunk", data = JsonNull).rendersContent())
         assertFalse(OtherNode(seq = 6, type = "request/context", data = JsonNull).rendersContent())
-        assertTrue(OtherNode(seq = 7, type = "something/new", data = JsonNull).rendersContent())
+        assertFalse(OtherNode(seq = 7, type = "something/new", data = JsonNull).rendersContent())
+        assertTrue(OtherNode(seq = 8, type = "deliverables/presented", data = JsonNull).rendersContent())
     }
 
     @Test
@@ -125,7 +126,7 @@ class ChatNodeVisibilityTest {
             OtherNode(seq = 7, type = "step/end", data = JsonNull),
             TurnEndNode(seq = 8, turn = 1, reasonKind = "completed"),
         )
-        assertEquals(listOf(3L, 5L), nodes.filter { it.rendersContent() }.map { it.seq })
+        assertEquals(listOf(5L), nodes.filter { it.rendersContent() }.map { it.seq })
     }
 
     @Test
@@ -225,7 +226,7 @@ class ChatNodeVisibilityTest {
     }
 
     @Test
-    fun `concise mode hides work and tools while full mode restores them`() {
+    fun `semantic tool steps stay visible while raw work narration stays hidden`() {
         val work = AssistantMessageNode(
             seq = 51,
             messageId = "work",
@@ -262,11 +263,25 @@ class ChatNodeVisibilityTest {
         )
 
         assertFalse(work.rendersInTranscript(nodes, TranscriptMode.CONCISE))
-        assertFalse(tool.rendersInTranscript(nodes, TranscriptMode.CONCISE))
+        assertTrue(tool.rendersInTranscript(nodes, TranscriptMode.CONCISE))
         assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.CONCISE))
-        assertTrue(work.rendersInTranscript(nodes, TranscriptMode.FULL))
+        assertFalse(work.rendersInTranscript(nodes, TranscriptMode.FULL))
         assertTrue(tool.rendersInTranscript(nodes, TranscriptMode.FULL))
         assertTrue(answer.rendersInTranscript(nodes, TranscriptMode.FULL))
     }
+
+    @Test
+    fun `repeated tool categories collapse to one step per turn`() {
+        val read1 = ToolCallNode(61, "r1", "read", """{"path":"a.kt"}""", 9, 1)
+        val read2 = ToolCallNode(62, "r2", "read", """{"path":"b.kt"}""", 9, 2)
+        val grep = ToolCallNode(63, "g1", "grep", """{"pattern":"x"}""", 9, 3)
+        val edit1 = ToolCallNode(64, "e1", "edit", """{"path":"a.kt"}""", 9, 4)
+        val edit2 = ToolCallNode(65, "e2", "write", """{"path":"b.kt"}""", 9, 5)
+        val nodes = listOf<ChatNode>(read1, read2, grep, edit1, edit2)
+
+        val visible = nodes.filter { it.rendersInTranscript(nodes, TranscriptMode.CONCISE) }
+        assertEquals(listOf(61L, 63L, 64L), visible.map { it.seq })
+    }
+
 
 }

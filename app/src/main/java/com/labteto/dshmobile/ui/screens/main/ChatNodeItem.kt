@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,7 +54,9 @@ import com.labteto.dshmobile.core.session.TurnErrorNode
 import com.labteto.dshmobile.core.session.TurnStartNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.session.WorkflowNode
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.agentOperationKind
+import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.AttachmentImage
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DisclosureState
@@ -68,8 +68,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.ThinkingRow
-import com.labteto.dshmobile.ui.components.ToolCard
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -83,7 +81,7 @@ internal data class ChatNodeContext(
     val nodes: List<ChatNode>,
     val running: Boolean,
     val cwd: String?,
-    /** Host account home, used only to abbreviate a leftover home-rooted path as `~`. */
+    /** Host account home retained for context compatibility. */
     val home: String? = null,
     val onOpenSubagent: (String) -> Unit,
     val onBranchFrom: (Long) -> Unit,
@@ -142,7 +140,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
                 StateDot(StateDotState.Error, size = 8.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    stringResource(R.string.chat_error_turn) + node.reasonDetail?.let { " · $it" }.orEmpty(),
+                    stringResource(R.string.chat_error_turn),
                     style = DsType.small13,
                     color = colors.error,
                 )
@@ -160,7 +158,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             warn = true,
         )
 
-        is CompactionNode -> CompactionRow(node)
+        is CompactionNode -> CompactionRow()
 
         is RetryNode -> {
             val delayMs = (node.data as? JsonObject)?.let { obj ->
@@ -184,16 +182,15 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             StateDot(StateDotState.Error, size = 8.dp)
             Spacer(Modifier.width(6.dp))
             Text(
-                stringResource(R.string.chat_error_turn) + " · " + node.message,
+                stringResource(R.string.chat_error_turn),
                 style = DsType.small13,
                 color = colors.error,
             )
-            node.code?.let { Text(" · $it", style = DsType.caption11, color = colors.labelTertiary) }
         }
 
         is CommandNode -> CommandRow(node)
 
-        is WorkflowNode -> WorkflowRow(node.data, context.onOpenSubagent)
+        is WorkflowNode -> WorkflowRow(node.data)
 
         is TitleNode -> Text(node.title, style = DsType.caption11, color = colors.labelTertiary)
         is SubagentNode -> Text(
@@ -201,45 +198,27 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        // Unknown event types stay visible — that is the compatibility contract — but the
-        // structural ones are not "unknown", they are bookkeeping, and printing `step/start` /
-        // `step/end` between every tool call buried the actual work in noise.
-        is OtherNode -> if (node.type !in STRUCTURAL_EVENT_TYPES) {
-            if (node.type == "deliverables/presented") {
-                val open = com.labteto.dshmobile.ui.components.LocalFileOpener.current
-                ((node.data as? JsonObject)?.get("files") as? JsonArray)?.forEach { file ->
-                    val obj = file as? JsonObject
-                    val path = obj?.get("path").asString()
-                    if (!path.isNullOrBlank()) androidx.compose.material3.OutlinedCard(onClick = { open(path) }, modifier = Modifier.fillMaxWidth()) {
+        // Raw protocol/debug events are execution details. Only final deliverables remain visible.
+        is OtherNode -> if (node.type == "deliverables/presented") {
+            val open = com.labteto.dshmobile.ui.components.LocalFileOpener.current
+            ((node.data as? JsonObject)?.get("files") as? JsonArray)?.forEach { file ->
+                val obj = file as? JsonObject
+                val path = obj?.get("path").asString()
+                if (!path.isNullOrBlank()) {
+                    androidx.compose.material3.OutlinedCard(
+                        onClick = { open(path) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(basename(path), style = DsType.std14)
-                            Text(path, style = DsType.caption11)
                             obj?.get("description").asString()?.let { Text(it, style = DsType.small13) }
                         }
                     }
                 }
-            } else JsonDisclosure(when (node.type) {
-                "system/message", "request/context" -> stringResource(R.string.system_prompt)
-                "image/offload" -> stringResource(R.string.image_offload)
-                else -> node.type
-            }, node.data)
+            }
         }
     }
 }
-
-/** Event types that carry no user-facing content; they frame the transcript rather than fill it. */
-internal val STRUCTURAL_EVENT_TYPES = setOf(
-    "step/start",
-    "step/end",
-    "session/end-seed",
-    "session/title-llm-request",
-    "agent/inbox/spliced",
-    "assistant/chunk",
-    // A model attempt that settled without a message (harness 0.1.3): replay data, not content.
-    "assistant/attempt",
-    // Full model request context can contain raw historical tool arguments, including commands.
-    "request/context",
-)
 
 /**
  * One stored file in a message: its display name and exact size, nothing more.
@@ -289,54 +268,13 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     val isLast = context.nodes.lastOrNull()?.seq == node.seq
     val streaming = context.running && isLast && !node.interrupted
     val isWorkProcess = node.isWorkProcess(context.nodes)
-    val reasoningExpanded = remember(node.seq) { mutableStateMapOf<Int, Boolean>() }
-    var processExpanded by remember(node.seq) { mutableStateOf(false) }
     var actionsVisible by remember(node.seq) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
-    if (isWorkProcess) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            ThinkingRow(
-                summary = stringResource(R.string.chat_work_process),
-                expanded = processExpanded,
-                onToggle = { processExpanded = !processExpanded },
-                streaming = streaming,
-            )
-            AnimatedVisibility(visible = processExpanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    node.blocks.forEach { block ->
-                        when (block.kind) {
-                            "text", "reasoning" -> {
-                                if (!block.text.isNullOrBlank()) {
-                                    MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
-                                }
-                            }
-                            "tool-call", "tool-result" -> Unit
-                            "image" -> parseImageRef(block)?.let { ref ->
-                                AttachmentImage(
-                                    attachmentId = ref.attachmentId,
-                                    intrinsicWidth = ref.width,
-                                    intrinsicHeight = ref.height,
-                                    contentDescription = ref.name,
-                                )
-                            }
-                            "file" -> parseFileRef(block)?.let { ref ->
-                                FileChip(name = ref.name, bytes = ref.bytes)
-                            }
-                            else -> block.text?.let {
-                                Text(it, style = DsType.caption11, color = colors.labelTertiary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
+    if (isWorkProcess) return
 
+    // A running conversation does not make the durable/streaming answer itself execution detail.
+    // Only protocol-matched work-process narration is hidden; user-facing answer text stays visible.
     if (!streaming && !node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
     val finalText = node.finalAnswerText(context.nodes).ifBlank { node.plainText }
 
@@ -377,21 +315,9 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                 }
             }
 
-            node.blocks.forEachIndexed { index, block ->
+            node.blocks.forEach { block ->
                 when (block.kind) {
-                    "reasoning" -> {
-                        val expanded = reasoningExpanded[index] ?: false
-                        ThinkingRow(
-                            summary = block.text?.lineSequence()?.firstOrNull()
-                                ?: stringResource(R.string.chat_thinking),
-                            expanded = expanded,
-                            onToggle = { reasoningExpanded[index] = !expanded },
-                            streaming = streaming,
-                        )
-                        AnimatedVisibility(visible = expanded) {
-                            MarkdownText(block.text.orEmpty(), allowCodeCopy = false)
-                        }
-                    }
+                    "reasoning" -> Unit
                     "image" -> parseImageRef(block)?.let { ref ->
                         AttachmentImage(
                             attachmentId = ref.attachmentId,
@@ -470,118 +396,54 @@ private fun ActionIcon(
 
 @Composable
 private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
-    val colors = DsTheme.colors
-    val result = context.nodes
-        .filterIsInstance<ToolResultNode>()
-        .firstOrNull { it.callId == node.callId }
-
-    val card = buildToolCardView(
-        call = node,
-        result = result,
-        running = result == null && context.running,
-        cwd = context.cwd,
-        home = context.home,
-    )
-    // The row header is derived here rather than taken from the card: only this layer knows the
-    // tool's name and the session's cwd, which is what turns an absolute path into `app\build.gradle.kts`.
-    val row = toolRowModel(
-        toolName = node.name,
-        argumentsJson = node.arguments,
-        cwd = context.cwd,
-        // Derived from the call itself now: 0.1.2 sends no presenter title to prefer over it.
-        viewTitle = null,
-    )
-    var expanded by remember(node.callId) { mutableStateOf(false) }
-    // The leading slot carries the outcome: a red dot for a failed call, the tool glyph otherwise.
+    val kind = agentOperationKind(node.name)
+    val peers = if (node.turn == null) {
+        listOf(node)
+    } else {
+        context.nodes.filterIsInstance<ToolCallNode>()
+            .filter { it.turn == node.turn && agentOperationKind(it.name) == kind }
+    }
+    val results = context.nodes.filterIsInstance<ToolResultNode>().associateBy { it.callId }
+    val failed = peers.any { results[it.callId]?.isError == true }
+    val running = context.running && peers.any { results[it.callId] == null }
     val state = when {
-        result?.isError == true -> DisclosureState.Error
-        result == null && context.running -> DisclosureState.Running
+        failed -> DisclosureState.Error
+        running -> DisclosureState.Running
         else -> DisclosureState.Idle
     }
-    val startedAt = context.eventTimes[node.seq]
-    val endedAt = result?.let { context.eventTimes[it.seq] }
-    if (startedAt != null && endedAt != null) Text(
-        com.labteto.dshmobile.ui.components.formatDurationMs((endedAt - startedAt).coerceAtLeast(0)),
-        style = DsType.caption11, color = colors.labelCaption,
-    )
-    if (isCommandExecutionTool(node.name)) {
-        val purpose = row.summary ?: stringResource(R.string.command_execution_purpose)
-        val status = stringResource(
-            when {
-                result?.isError == true -> R.string.command_execution_status_failed
-                result == null && context.running -> R.string.command_execution_status_running
-                else -> R.string.command_execution_status_done
-            },
-        )
-        DisclosureRow(
-            title = stringResource(R.string.command_execution_title),
-            summary = "$purpose · $status",
-            icon = row.variant.featherIcon(),
-            state = state,
-            expanded = false,
-            onToggle = null,
-        )
-        return
-    }
-    ToolCard(
-        view = card,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-        titleOverride = row.title,
-        summaryOverride = row.summary,
-        iconOverride = row.variant.featherIcon(),
+    DisclosureRow(
+        title = stringResource(agentOperationLabelRes(node.name)),
+        summary = stringResource(agentOperationStatusRes(running = running, failed = failed)),
+        icon = FeatherIcons.Tool,
         state = state,
+        expanded = false,
+        onToggle = null,
     )
-    if (expanded) {
-        result?.content?.let { JsonDisclosure(stringResource(R.string.chat_output_placeholder), it) }
-        result?.meta?.let { JsonDisclosure(node.name, it) }
-        PtcChildren(node.callId, context.nodes.filterIsInstance<OtherNode>())
-    }
-    if (result?.isError == true) {
-        // The dot is colour-only, so the word stays — but without a second dot beside it.
-        Text(
-            stringResource(R.string.common_error),
-            style = DsType.caption11,
-            color = colors.error,
-            modifier = Modifier.padding(start = 26.dp),
-        )
-    }
 }
+
 
 // ---------------------------------------------------------------------------
 // Compaction / commands / workflow
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun CompactionRow(node: CompactionNode) {
-    val summaryText = remember(node.seq) {
-        runCatching {
-            val array = (node.data as? JsonObject)?.get("summary") as? JsonArray
-            array?.mapNotNull { (it as? JsonObject)?.get("text").asString() }?.joinToString("\n")
-        }.getOrNull()
-    }
-    var expanded by remember(node.seq) { mutableStateOf(false) }
+private fun CompactionRow() {
     DisclosureRow(
         title = stringResource(R.string.chat_compaction),
         summary = stringResource(R.string.chat_compaction_summary),
         icon = FeatherIcons.Archive,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    ) {
-        if (!summaryText.isNullOrBlank()) MarkdownText(summaryText)
-    }
+        expanded = false,
+        onToggle = null,
+    )
 }
 
 @Composable
 private fun CommandRow(node: CommandNode) {
     val running = node.kind == "command/run"
     DisclosureRow(
-        title = stringResource(R.string.command_execution_title),
-        summary = stringResource(
-            if (running) R.string.command_execution_status_running
-            else R.string.command_execution_status_done,
-        ),
-        icon = FeatherIcons.Terminal,
+        title = stringResource(R.string.agent_operation_execute),
+        summary = stringResource(agentOperationStatusRes(running = running, failed = false)),
+        icon = FeatherIcons.Tool,
         state = if (running) DisclosureState.Running else DisclosureState.Idle,
         expanded = false,
         onToggle = null,
@@ -591,55 +453,14 @@ private fun CommandRow(node: CommandNode) {
 @Composable
 private fun WorkflowRow(
     data: kotlinx.serialization.json.JsonElement,
-    onOpenMember: (String) -> Unit,
 ) {
-    val colors = DsTheme.colors
     val obj = data as? JsonObject ?: return
-    val name = obj["name"].asString()
     val status = obj["status"].asString() ?: obj["stopReason"].asString() ?: obj["outcome"].asString()
-    val members = remember(data) { parseWorkflowMembers(data) }
-    var expanded by remember(data) { mutableStateOf(false) }
     DisclosureRow(
-        title = stringResource(R.string.workflow_title),
-        summary = listOfNotNull(name, workflowStatusLabel(status)).joinToString(" · ").ifEmpty { null },
-        icon = FeatherIcons.GitBranch,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    ) {
-        members.forEach { member ->
-            val memberChildId = member.childId
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 28.dp, top = 2.dp)
-                    .then(
-                        if (memberChildId != null) {
-                            Modifier.clickable { onOpenMember(memberChildId) }
-                        } else {
-                            Modifier
-                        },
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StateDot(workflowMemberDot(member.status), size = 8.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    member.label ?: memberChildId.orEmpty(),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                member.status?.let {
-                    Text(
-                        workflowStatusLabel(it) ?: it,
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-    }
+        title = stringResource(R.string.agent_operation_delegate),
+        summary = workflowStatusLabel(status),
+        icon = FeatherIcons.Tool,
+        expanded = false,
+        onToggle = null,
+    )
 }

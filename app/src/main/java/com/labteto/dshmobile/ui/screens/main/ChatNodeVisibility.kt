@@ -18,6 +18,7 @@ import com.labteto.dshmobile.core.session.TurnErrorNode
 import com.labteto.dshmobile.core.session.TurnStartNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.session.WorkflowNode
+import com.labteto.dshmobile.ui.agentOperationKind
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -130,17 +131,33 @@ internal fun ChatNode.rendersInTranscript(nodes: List<ChatNode>, mode: Transcrip
     if (!rendersContent()) return false
     return when (this) {
         is AssistantMessageNode -> when {
-            isWorkProcess(nodes) -> mode == TranscriptMode.FULL
+            // Intermediate narration can contain commands, paths and tool arguments. The semantic
+            // ToolCallNode rows below are the only user-facing representation of execution work.
+            isWorkProcess(nodes) -> false
             interrupted -> true
             else -> isFinalAnswerAnchor(nodes)
         }
         is UserMessageNode, is TurnErrorNode -> true
         is TurnEndNode -> reasonKind != "completed"
-        is ToolCallNode, is TodoNode, is GoalNode, is PlanModeNode, is CompactionNode,
-        is RetryNode, is CommandNode, is WorkflowNode, is TitleNode, is SubagentNode,
-        is OtherNode -> mode == TranscriptMode.FULL
+        // One semantic category per turn: dozens of file reads become one "检查相关内容" step.
+        is ToolCallNode -> isSemanticToolStepAnchor(nodes)
+        is CommandNode -> true
+        is TodoNode, is GoalNode, is PlanModeNode, is CompactionNode,
+        is RetryNode, is WorkflowNode, is TitleNode, is SubagentNode -> mode == TranscriptMode.FULL
+        // Raw protocol events stay hidden; only user-facing final deliverables survive.
+        is OtherNode -> type == "deliverables/presented"
         is TurnStartNode, is ToolResultNode -> false
     }
+}
+
+private fun ToolCallNode.isSemanticToolStepAnchor(nodes: List<ChatNode>): Boolean {
+    val turnId = turn ?: return true
+    val kind = agentOperationKind(name)
+    return nodes.asSequence()
+        .filterIsInstance<ToolCallNode>()
+        .filter { it.turn == turnId && agentOperationKind(it.name) == kind }
+        .minByOrNull(ToolCallNode::seq)
+        ?.seq == seq
 }
 
 internal fun ChatNode.rendersContent(): Boolean = when (this) {
@@ -151,7 +168,7 @@ internal fun ChatNode.rendersContent(): Boolean = when (this) {
     // Only an unclean ending says anything; a completed turn is the frame.
     is TurnEndNode -> reasonKind != "completed"
     // Bookkeeping event types are not "unknown" — they are noise between the tool calls.
-    is OtherNode -> type !in STRUCTURAL_EVENT_TYPES
+    is OtherNode -> type == "deliverables/presented"
 
     // Content that can still fold to nothing.
     is UserMessageNode -> blocks.any { it.kind == "image" } || displayText().isNotBlank()

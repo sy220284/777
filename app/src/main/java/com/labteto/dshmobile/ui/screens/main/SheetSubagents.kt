@@ -226,7 +226,7 @@ private fun SubagentRow(entry: SubagentListEntry, selected: Boolean, onClick: ()
         StateDot(if (subagentRunning(entry)) StateDotState.Running else StateDotState.Idle)
         Spacer(Modifier.width(DsSpacing.small))
         Text(
-            subagentLabel(entry) ?: subagentId(entry).orEmpty(),
+            stringResource(R.string.agent_operation_delegate),
             style = DsType.small13,
             color = colors.labelPrimary,
             maxLines = 1,

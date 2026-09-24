@@ -65,6 +65,24 @@ class LocalTranscriptPresentationTest {
         assertEquals("第二答", (items[4] as LocalTranscriptItem.Message).message.content)
     }
 
+
+    @Test
+    fun internalSystemPayloadsAreNotUserFacingTranscriptRows() {
+        val items = buildLocalTranscript(
+            listOf(
+                message("u1", "user", "开始"),
+                message("s1", "system", "内部路径 /work/private.kt"),
+                message("t1", "tool", "raw output", toolName = "read"),
+                message("a1", "assistant", "完成"),
+            ),
+        )
+
+        assertEquals(3, items.size)
+        assertEquals("user", (items[0] as LocalTranscriptItem.Message).message.role)
+        assertTrue(items[1] is LocalTranscriptItem.WorkProcess)
+        assertEquals("assistant", (items[2] as LocalTranscriptItem.Message).message.role)
+    }
+
     private fun message(
         id: String,
         role: String,

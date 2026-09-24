@@ -61,7 +61,8 @@ import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.data.SessionRow
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.ContextMeterDetail
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
@@ -423,28 +424,11 @@ private fun GoalCard(conversation: ConversationSnapshot, store: com.labteto.dshm
     val goal = parseGoal(conversation.projections["goal"])
     Card(
         title = stringResource(R.string.goal_title),
-        summary = goal?.objective?.take(40),
+        summary = goal?.let { stringResource(goalPhaseLabelRes(it.phase)) },
     ) {
         if (goal == null) {
             Text(stringResource(R.string.goal_none), style = DsType.caption11, color = colors.labelTertiary)
             return@Card
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                goal.objective,
-                style = DsType.small13,
-                color = colors.labelPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            DsPill(text = stringResource(goalPhaseLabelRes(goal.phase)))
-        }
-        goal.blockedReason?.let {
-            Text(
-                stringResource(R.string.goal_blocked_reason, it.message),
-                style = DsType.caption11,
-                color = colors.warnLabel,
-            )
         }
         if (goal.maxGoalRounds > 0) {
             Text(
@@ -512,29 +496,17 @@ private fun JobsCard(jobs: List<JobView>) {
                 StateDot(jobStatusDot(job.status))
                 Spacer(Modifier.width(DsSpacing.small))
                 Column(Modifier.weight(1f)) {
-                    val commandExecution = isCommandExecutionTool(job.kind)
+                    val running = job.status == JobStatus.RUNNING || job.status == JobStatus.STOPPING
+                    val failed = job.status == JobStatus.KILLED || job.status == JobStatus.FAILED
                     Text(
-                        if (commandExecution) stringResource(R.string.command_execution_purpose) else job.label,
+                        stringResource(agentOperationLabelRes(job.kind)),
                         style = DsType.small13,
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        if (commandExecution) {
-                            stringResource(
-                                when (job.status) {
-                                    JobStatus.RUNNING, JobStatus.STOPPING ->
-                                        R.string.command_execution_status_running
-                                    JobStatus.COMPLETED ->
-                                        R.string.command_execution_status_done
-                                    JobStatus.KILLED, JobStatus.FAILED ->
-                                        R.string.command_execution_status_failed
-                                },
-                            )
-                        } else {
-                            job.detail?.let { "${job.kind} · $it" } ?: job.kind
-                        },
+                        stringResource(agentOperationStatusRes(running = running, failed = failed)),
                         style = DsType.caption11,
                         color = colors.labelCaption,
                         maxLines = 1,
@@ -618,7 +590,7 @@ private fun SubagentsCard(subagents: List<SubagentListEntry>, onOpen: (String) -
                 Spacer(Modifier.width(DsSpacing.small))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        subagentLabel(entry) ?: id.orEmpty(),
+                        stringResource(R.string.agent_operation_delegate),
                         style = DsType.small13,
                         color = colors.labelPrimary,
                         maxLines = 1,
@@ -626,8 +598,8 @@ private fun SubagentsCard(subagents: List<SubagentListEntry>, onOpen: (String) -
                     )
                     Text(
                         stringResource(
-                            if (subagentRunning(entry)) R.string.subagents_running
-                            else R.string.subagents_inactive,
+                            if (subagentRunning(entry)) R.string.agent_operation_status_running
+                            else R.string.agent_operation_status_done,
                         ),
                         style = DsType.caption11,
                         color = colors.labelCaption,
@@ -648,7 +620,7 @@ private fun WorkflowCard(nodes: List<ChatNode>) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        workflow.name,
+                        stringResource(R.string.agent_operation_delegate),
                         style = DsType.small13,
                         color = colors.labelPrimary,
                         maxLines = 1,
