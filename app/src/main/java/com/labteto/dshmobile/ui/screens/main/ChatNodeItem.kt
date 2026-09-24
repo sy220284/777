@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,8 +67,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.ThinkingRow
-import com.labteto.dshmobile.ui.components.ToolCard
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -84,7 +80,7 @@ internal data class ChatNodeContext(
     val nodes: List<ChatNode>,
     val running: Boolean,
     val cwd: String?,
-    /** Host account home, used only to abbreviate a leftover home-rooted path as `~`. */
+    /** Host account home retained for context compatibility. */
     val home: String? = null,
     val onOpenSubagent: (String) -> Unit,
     val onBranchFrom: (Long) -> Unit,
@@ -341,7 +337,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                 }
             }
 
-            node.blocks.forEachIndexed { index, block ->
+            node.blocks.forEach { block ->
                 when (block.kind) {
                     "reasoning" -> Unit
                     "image" -> parseImageRef(block)?.let { ref ->
