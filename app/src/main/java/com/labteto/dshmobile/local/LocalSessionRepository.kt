@@ -35,6 +35,8 @@ internal class LocalSessionRepository(
 ) {
     private val store = VersionedSessionStore(root, json)
     private val lock = Any()
+    private val storageLock = Any()
+    private val deletedIds = mutableSetOf<String>()
     private val pending = linkedMapOf<String, LocalHarnessSession>()
     private val summaryCache = linkedMapOf<String, LocalSessionSummary>()
     private var summariesLoaded = false
@@ -49,23 +51,25 @@ internal class LocalSessionRepository(
                         pending.keys.firstOrNull()?.let { pending.remove(it) }
                     } ?: break
                     try {
-                        store.write(
-                            snapshot.id,
-                            json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
-                            updatedAt = snapshot.updatedAt,
-                        )
+                        synchronized(storageLock) {
+                            if (snapshot.id !in deletedIds) store.write(
+                                snapshot.id,
+                                json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
+                                updatedAt = snapshot.updatedAt,
+                            )
+                        }
                         synchronized(lock) {
-                            summaryCache[snapshot.id] = snapshot.toSummary()
+                            if (snapshot.id !in deletedIds) summaryCache[snapshot.id] = snapshot.toSummary()
                         }
                         onWritten()
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
-                        synchronized(lock) { pending.putIfAbsent(snapshot.id, snapshot) }
+                        synchronized(lock) { if (snapshot.id !in deletedIds) pending.putIfAbsent(snapshot.id, snapshot) }
                         throw cancelled
                     } catch (error: Exception) {
                         // Keep the newest snapshot for this session. A failed disk write must not
                         // silently remove the only queued copy or spin at full speed on a bad disk.
-                        synchronized(lock) { pending.putIfAbsent(snapshot.id, snapshot) }
+                        synchronized(lock) { if (snapshot.id !in deletedIds) pending.putIfAbsent(snapshot.id, snapshot) }
                         onError(error)
                         consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(5)
                         delay((1_000L shl (consecutiveFailures - 1)).coerceAtMost(30_000L))
@@ -76,8 +80,23 @@ internal class LocalSessionRepository(
     }
 
     fun enqueue(snapshot: LocalHarnessSession) {
-        synchronized(lock) { pending[snapshot.id] = snapshot }
+        synchronized(lock) {
+            if (snapshot.id in deletedIds) return
+            pending[snapshot.id] = snapshot
+        }
         wakeups.trySend(Unit)
+    }
+
+    /** Block a queued or in-flight snapshot from recreating a deleted session. */
+    fun delete(id: String): Boolean = synchronized(storageLock) {
+        val removed = store.delete(id)
+        check(store.read(id) == null) { "会话文件删除失败：$id" }
+        synchronized(lock) {
+            deletedIds += id
+            pending.remove(id)
+            summaryCache.remove(id)
+        }
+        removed
     }
 
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
@@ -98,7 +117,9 @@ internal class LocalSessionRepository(
                 if (!summariesLoaded) {
                     // Fresh writes may have populated entries while the disk scan was running.
                     // Keep those newer in-memory summaries and fill only missing sessions from disk.
-                    loaded.forEach { summary -> summaryCache.putIfAbsent(summary.id, summary) }
+                    loaded.forEach { summary ->
+                        if (summary.id !in deletedIds) summaryCache.putIfAbsent(summary.id, summary)
+                    }
                     summariesLoaded = true
                 }
             }

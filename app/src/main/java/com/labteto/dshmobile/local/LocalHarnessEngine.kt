@@ -733,6 +733,69 @@ class LocalHarnessEngine @Inject constructor(
         queueHumanTurn(content, prompt, modelMessage)?.start()
     }
 
+    /** Re-run the latest answer against the same turn; never re-execute work tools. */
+    fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
+        val state = _state.value
+        if (!state.configured || state.loading ||
+            sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
+        ) return@synchronized false
+        val last = state.messages.lastOrNull() ?: return@synchronized false
+        if (last.id != messageId || last.role != "assistant") return@synchronized false
+        val prompt = state.messages.dropLast(1).lastOrNull { it.role == "user" }?.content
+            ?: return@synchronized false
+        if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
+            return@synchronized false
+        }
+        scope.launch(start = CoroutineStart.LAZY) {
+            if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
+            else regenerateWorkReply(messageId)
+        }
+            .also { activeJob = it; it.start() }
+        true
+    }
+
+    private suspend fun regenerateWorkReply(messageId: String) {
+        _state.update { it.copy(running = true, error = null) }
+        try {
+            val snapshot = _state.value
+            val key = apiKeys.get() ?: error("请先配置模型密钥")
+            val messages = withEphemeralContext(
+                modelHistory.dropLast(1),
+                "根据本轮已有的工具结果重新组织最终回复。只回答用户，不调用工具，也不要声称再次执行了操作。",
+            )
+            val reply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = messages,
+                step = 1,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+            val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
+            usageTracker.record(snapshot.model, reply.usage)
+            val transcript = listOf(newTranscriptMessage("assistant", content))
+            val data = withTranscript(reply.message, transcript)
+            val event = eventLog.append("assistant/message", JsonObject(
+                data + ("replaces" to JsonPrimitive(messageId)),
+            ))
+            resetModelHistory(modelHistory.dropLast(1))
+            appendModelHistory(reply.message)
+            updateContextMetrics()
+            _state.update { it.copy(messages = it.messages.filterNot { message -> message.id == messageId }) }
+            applyTranscriptMessages(transcript, event.sequence, clearStreamingPreview = true)
+            checkpointModelHistory("work/regenerated")
+            persist()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _state.update { it.copy(error = error.message ?: "重新生成失败") }
+        } finally {
+            _state.update { it.copy(running = false, streamingAssistant = "", streamingReasoning = "") }
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
+        }
+    }
+
     private fun queueHumanTurn(
         content: String,
         memoryInput: String = content,
@@ -1216,6 +1279,53 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /** Permanently remove selected local sessions and their durable event segments. */
+    suspend fun deleteSessions(requestedIds: Set<String>): Int {
+        if (requestedIds.isEmpty() || !beginSessionTransition()) return 0
+        _state.update { it.copy(loading = true) }
+        return try {
+            sessionTransitionMutex.withLock {
+                cancelActiveRunAndJoin()
+                jobs.stopNonPersistentAndJoin()
+                persist()
+                val available = sessionRepository.summaries()
+                val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
+                if (currentSessionId in ids) {
+                    val previous = _state.value
+                    val replacement = available.firstOrNull { it.id !in ids && it.usageMode == previous.usageMode }
+                        ?: available.firstOrNull { it.id !in ids }
+                    currentSessionId = replacement?.id ?: UUID.randomUUID().toString()
+                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+                    eventLog = eventLogFor(currentSessionId)
+                    transcriptProjectionCursor = null
+                    loadSession(currentSessionId)
+                    if (replacement == null) {
+                        _state.update { it.copy(
+                            usageMode = previous.usageMode,
+                            personaId = previous.personaId,
+                            chatPersona = previous.chatPersona,
+                        ) }
+                    }
+                }
+                withContext(Dispatchers.IO) {
+                    ids.forEach { id ->
+                        sessionRepository.delete(id)
+                        sessionsRoot.listFiles().orEmpty()
+                            .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
+                            .forEach(File::delete)
+                    }
+                }
+                synchronized(conversationFilesCacheLock) { ids.forEach(conversationFilesCache::remove) }
+                _state.update { it.copy(sessions = sessionSummaries()) }
+                persist()
+                ids.size
+            }
+        } finally {
+            endSessionTransition()
+            _state.update { it.copy(loading = false) }
+        }
+    }
+
     /** Remove the local API key after an in-flight turn has finished cancelling. */
     fun clearCredential() {
         if (!beginSessionTransition()) return
@@ -1361,7 +1471,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runChatTurn(input: String) {
+    private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
         _state.update {
             it.copy(
                 running = true,
@@ -1378,7 +1488,10 @@ class LocalHarnessEngine @Inject constructor(
             val chatContext = chatTurnRunner.prepare(snapshot.personaId)
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
+                messages = withEphemeralContext(
+                    if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                    chatContext.prompt,
+                ),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
@@ -1425,15 +1538,26 @@ class LocalHarnessEngine @Inject constructor(
                 },
             )
 
+            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
+                error("模型没有返回可用回复")
+            }
+
             val transcriptMessages = buildList {
                 reply.content?.takeIf(String::isNotBlank)?.let { content ->
                     add(newTranscriptMessage("assistant", content))
                 }
             }
+            val assistantData = withTranscript(reply.message, transcriptMessages)
             val assistantEvent = eventLog.append(
                 "assistant/message",
-                withTranscript(reply.message, transcriptMessages),
+                if (replacingMessageId == null) assistantData else JsonObject(
+                    assistantData + ("replaces" to JsonPrimitive(replacingMessageId)),
+                ),
             )
+            if (replacingMessageId != null) {
+                resetModelHistory(modelHistory.dropLast(1))
+                _state.update { state -> state.copy(messages = state.messages.filterNot { it.id == replacingMessageId }) }
+            }
             appendModelHistory(reply.message)
             updateContextMetrics()
             applyTranscriptMessages(
@@ -1447,7 +1571,8 @@ class LocalHarnessEngine @Inject constructor(
                 put("messages", _state.value.messages.size)
                 put("mode", "chat")
             })
-            checkpointModelHistoryAtTurnBoundary("chat/completed")
+            if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
+            else checkpointModelHistoryAtTurnBoundary("chat/completed")
             persist()
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {

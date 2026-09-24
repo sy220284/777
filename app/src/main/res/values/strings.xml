@@ -17,6 +17,9 @@
     <string name="common_offline">Offline</string>
     <string name="common_error">Something went wrong</string>
     <string name="common_close">Close</string>
+    <string name="local_delete_session">Delete conversation</string>
+    <string name="local_selected_count">Selected: %1$d</string>
+    <string name="local_regenerate_reply">Regenerate reply</string>
     <string name="common_back">Back</string>
     <string name="common_edit">Edit</string>
     <string name="common_rename">Rename</string>
