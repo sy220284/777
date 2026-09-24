@@ -59,6 +59,9 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
+import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.ChatTurnRunner
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -212,6 +215,8 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
+    private val chatPersonaStore: ChatPersonaStore,
+    private val chatTurnRunner: ChatTurnRunner,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
@@ -663,6 +668,20 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    fun configureChatPersona(profile: PersonaProfile) {
+        if (_state.value.running || _state.value.loading) return
+        scope.launch {
+            val saved = chatPersonaStore.upsert(profile.copy(id = _state.value.personaId))
+            _state.update { state ->
+                state.copy(
+                    personaId = saved.id,
+                    chatPersona = saved,
+                )
+            }
+            persist()
+        }
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
@@ -1068,12 +1087,23 @@ class LocalHarnessEngine @Inject constructor(
                     } else {
                         null
                     }
+                    val personaId = if (
+                        usageMode == LocalUsageMode.CHAT &&
+                        sourceState.usageMode == LocalUsageMode.CHAT
+                    ) {
+                        sourceState.personaId
+                    } else {
+                        PersonaProfile.DEFAULT_PERSONA_ID
+                    }
+                    val chatPersona = chatPersonaStore.get(personaId)
 
                     _state.update {
                         it.copy(
                             loading = false,
                             sessionId = currentSessionId,
                             usageMode = usageMode,
+                            personaId = personaId,
+                            chatPersona = chatPersona,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -1290,6 +1320,137 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
+        val directChat = _state.value.usageMode == LocalUsageMode.CHAT &&
+            !hasLocalImageRefs(modelHistory.takeLast(1))
+        if (directChat) {
+            runChatTurn(input)
+        } else {
+            runWorkTurn(input, memoryInput)
+        }
+    }
+
+    private suspend fun runChatTurn(input: String) {
+        _state.update {
+            it.copy(
+                running = true,
+                error = null,
+                deviceApprovalLease = false,
+                pendingApproval = null,
+                pendingQuestion = null,
+            )
+        }
+        try {
+            ensureSystemMessage()
+            compactHistoryIfNeeded()
+            val snapshot = _state.value
+            val chatContext = chatTurnRunner.prepare(snapshot.personaId)
+            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+            val requestMessages = withEphemeralContext(modelHistory.toList(), chatContext.prompt)
+
+            eventLog.append("turn/start", buildJsonObject {
+                put("model", snapshot.model)
+                put("mode", "chat")
+                put("persona_id", chatContext.persona.id)
+            })
+
+            val rawReply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = requestMessages,
+                step = 1,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+
+            val reply = chatTurnRunner.finalizeReply(
+                persona = chatContext.persona,
+                reply = rawReply,
+                rewrite = { candidate, violations ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withEphemeralContext(
+                            requestMessages,
+                            ChatStyleGuard.repairPrompt(candidate, violations),
+                        ),
+                        step = 1,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                    )
+                },
+                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+                onGuardEvent = { action, violations ->
+                    eventLog.append("chat/style-guard", buildJsonObject {
+                        put("step", 1)
+                        put("action", action)
+                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                    })
+                },
+            )
+
+            val transcriptMessages = buildList {
+                reply.content?.takeIf(String::isNotBlank)?.let { content ->
+                    add(newTranscriptMessage("assistant", content))
+                }
+            }
+            val assistantEvent = eventLog.append(
+                "assistant/message",
+                withTranscript(reply.message, transcriptMessages),
+            )
+            appendModelHistory(reply.message)
+            updateContextMetrics()
+            applyTranscriptMessages(
+                transcriptMessages,
+                assistantEvent.sequence,
+                clearStreamingPreview = true,
+            )
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "completed")
+                put("steps", 1)
+                put("messages", _state.value.messages.size)
+                put("mode", "chat")
+            })
+            checkpointModelHistoryAtTurnBoundary("chat/completed")
+            persist()
+        } catch (cancelled: CancellationException) {
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "aborted")
+                put("mode", "chat")
+            })
+            checkpointModelHistoryAtTurnBoundary("chat/cancelled")
+            persist()
+            throw cancelled
+        } catch (error: Exception) {
+            val detail = error.message ?: "聊天请求失败"
+            _state.update { it.copy(error = detail) }
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "error")
+                put("detail", detail.take(2_000))
+                put("mode", "chat")
+            })
+            checkpointModelHistoryAtTurnBoundary("chat/failed")
+            persist()
+        } finally {
+            _state.update {
+                it.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
+                )
+            }
+            persist()
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) {
+                if (activeJob === completedJob) activeJob = null
+            }
+            startNextQueuedTurnIfIdle()?.start()
+        }
+    }
+
+    private suspend fun runWorkTurn(input: String, memoryInput: String = input) {
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
         _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
@@ -2988,6 +3149,8 @@ class LocalHarnessEngine @Inject constructor(
             workspacePath = workspace.path,
             sessionId = sessionId,
             usageMode = stored.usageMode,
+            personaId = stored.personaId,
+            chatPersona = chatPersonaStore.get(stored.personaId),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -3165,6 +3328,7 @@ class LocalHarnessEngine @Inject constructor(
                 ?.take(40) ?: "新会话",
             updatedAt = System.currentTimeMillis(),
             usageMode = state.usageMode,
+            personaId = state.personaId,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,
