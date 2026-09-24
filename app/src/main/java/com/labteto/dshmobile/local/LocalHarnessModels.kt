@@ -15,6 +15,12 @@ data class LocalHarnessMessage(
 )
 
 @Serializable
+enum class LocalUsageMode {
+    CHAT,
+    WORK,
+}
+
+@Serializable
 enum class LocalConversationMode {
     INDEPENDENT,
     PROJECT,
@@ -27,6 +33,7 @@ data class LocalHarnessSession(
     val id: String = "",
     val title: String = "新会话",
     val updatedAt: Long = 0L,
+    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
@@ -69,6 +76,7 @@ data class LocalSessionSummary(
     val id: String,
     val title: String,
     val updatedAt: Long,
+    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val blank: Boolean = false,
 )
 
@@ -155,6 +163,7 @@ data class LocalHarnessState(
     val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
     val workspacePath: String = "",
     val sessionId: String = "",
+    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
