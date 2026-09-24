@@ -91,7 +91,7 @@ class ChatInteractionPlannerTest {
         )!!
 
         assertEquals("FAMILIAR", plan.state.dynamics.stage)
-        assertEquals("稳定关系", plan.state.relationshipState)
+        assertEquals("熟悉中", plan.state.relationshipState)
     }
 
     @Test
