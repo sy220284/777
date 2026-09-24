@@ -45,6 +45,10 @@ class LocalSessionRepositoryTest {
             """{"id":"legacy","title":"old","updatedAt":1}""",
         )
         assertEquals(LocalUsageMode.WORK, legacy.usageMode)
+        assertEquals(
+            com.labteto.dshmobile.local.chat.PersonaProfile.DEFAULT_PERSONA_ID,
+            legacy.personaId,
+        )
     }
 
     @Test fun failedWriteRetriesTheLatestSnapshotAfterStorageRecovers() = runTest {
