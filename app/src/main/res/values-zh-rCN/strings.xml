@@ -810,7 +810,7 @@
     <string name="local_persona_constraints">不可违反的人设（每行一条）</string>
     <string name="local_persona_examples">对白参考（每行一条）</string>
     <string name="local_persona_banned">角色专属禁用词（每行一条）</string>
-    <string name="local_persona_signature">角色常用表达（每行一条）</string>
+    <string name="local_persona_signature">角色常用表达（每行一条）</string>\n    <string name="local_persona_corrections">已学到的人设纠正（每行一条，可编辑或删除）</string>
     <string name="local_persona_save">保存人设</string>
 
     <string name="local_reply_suggestions_title">回复建议</string>
