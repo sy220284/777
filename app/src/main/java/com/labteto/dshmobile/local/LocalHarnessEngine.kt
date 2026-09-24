@@ -2379,7 +2379,7 @@ class LocalHarnessEngine @Inject constructor(
                 val prompt = systemPrompt()
                 modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
                 eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-                }
+            }
             persist()
             "计划已获批准，已进入执行模式"
         } else {
