@@ -36,6 +36,29 @@ private data class PersonaDocument(
     val personas: List<PersonaProfile> = listOf(PersonaProfile()),
 )
 
+internal fun extractPersonaCorrection(userText: String): String? {
+    val clean = userText.trim()
+    if (clean.length !in 4..280) return null
+
+    EXPLICIT_PERSONA_CORRECTION.matchEntire(clean)?.groupValues?.getOrNull(1)?.trim()
+        ?.takeIf(String::isNotBlank)
+        ?.let { return it.take(240) }
+
+    if (NATURAL_PERSONA_CORRECTION.containsMatchIn(clean)) {
+        return clean.take(240)
+    }
+    return null
+}
+
+private val EXPLICIT_PERSONA_CORRECTION = Regex(
+    """^(?:人设纠正|角色纠正|纠正人设)[：:\s]*(.+)$""",
+    RegexOption.DOT_MATCHES_ALL,
+)
+
+private val NATURAL_PERSONA_CORRECTION = Regex(
+    """^(?:你|这个角色|她|他)(?:不会这么说|不会这样说|不这么说|不该这么说|不说这种话|不会这样做|不该这样做|不会这么做|说话不会这么|平时不会这么).{0,160}$""",
+)
+
 @Singleton
 class ChatPersonaStore @Inject constructor(
     @ApplicationContext context: Context,
@@ -65,7 +88,7 @@ class ChatPersonaStore @Inject constructor(
      */
     @Synchronized
     fun captureExplicitCorrection(personaId: String, userText: String): PersonaProfile? {
-        val correction = extractCorrection(userText) ?: return null
+        val correction = extractPersonaCorrection(userText) ?: return null
         val current = get(personaId)
         val normalized = normalize(correction)
         if (current.corrections.any { normalize(it) == normalized }) return current
@@ -91,20 +114,6 @@ class ChatPersonaStore @Inject constructor(
         signaturePhrases = cleanLines(profile.signaturePhrases, 20),
         corrections = cleanLines(profile.corrections, MAX_CORRECTIONS),
     )
-
-    private fun extractCorrection(userText: String): String? {
-        val clean = userText.trim()
-        if (clean.length !in 4..280) return null
-
-        EXPLICIT_CORRECTION.matchEntire(clean)?.groupValues?.getOrNull(1)?.trim()
-            ?.takeIf(String::isNotBlank)
-            ?.let { return it.take(240) }
-
-        if (NATURAL_CORRECTION.containsMatchIn(clean)) {
-            return clean.take(240)
-        }
-        return null
-    }
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
@@ -139,12 +148,5 @@ class ChatPersonaStore @Inject constructor(
         const val MAX_FIELD_CHARS = 2_000
         const val MAX_LONG_FIELD_CHARS = 4_000
         const val MAX_CORRECTIONS = 20
-        val EXPLICIT_CORRECTION = Regex(
-            """^(?:人设纠正|角色纠正|纠正人设)[：:\s]*(.+)$""",
-            RegexOption.DOT_MATCHES_ALL,
-        )
-        val NATURAL_CORRECTION = Regex(
-            """^(?:你|这个角色|她|他)(?:不会这么说|不会这样说|不这么说|不该这么说|不说这种话|不会这样做|不该这样做|不会这么做|说话不会这么|平时不会这么).{0,160}$""",
-        )
     }
 }
