@@ -195,19 +195,6 @@ private fun ConversationFileList(
                 ConversationFileRow(ref, state)
             }
         }
-        if (files.involved.isNotEmpty()) {
-            item(key = "conversation-involved-header") {
-                Text(
-                    stringResource(R.string.panel_involved_files),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = DsTheme.colors.labelSecondary,
-                )
-            }
-            items(files.involved, key = { "involved:" + it.path }) { ref ->
-                ConversationFileRow(ref, state)
-            }
-        }
     }
 }
 
@@ -215,12 +202,6 @@ private fun ConversationFileList(
 private fun ConversationFileRow(ref: ConversationFileRef, state: PanelState) {
     ListItem(
         headlineContent = { Text(ref.path.substringAfterLast('/').substringAfterLast('\\')) },
-        supportingContent = {
-            Column {
-                Text(ref.path)
-                Text(ref.tool, style = MaterialTheme.typography.labelSmall)
-            }
-        },
         modifier = Modifier.clickable { state.open(ref.path) },
     )
 }
