@@ -91,7 +91,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.operationLabelRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -1361,77 +1361,35 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
     if (messages.isEmpty()) return
 
     val colors = DsTheme.colors
-    var expanded by rememberSaveable(messages.first().id) { mutableStateOf(false) }
-    val toolCount = messages.count { it.role == "tool" }
-    val summary = buildList {
-        add("已折叠 ${messages.size} 条过程")
-        if (toolCount > 0) add("${toolCount} 次工具调用")
-    }.joinToString(" · ")
-
     Surface(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(onClickLabel = if (expanded) "收起工作过程" else "展开工作过程") {
-                expanded = !expanded
-            },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = colors.bgModulePlatform,
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                Text(
-                    if (expanded) "⌄" else "›",
-                    style = DsType.base16Strong,
-                    color = colors.labelTertiary,
-                )
-                Column(Modifier.weight(1f)) {
-                    Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
-                    Text(summary, style = DsType.caption11, color = colors.labelTertiary)
+            messages.forEach { message ->
+                val title = when (message.role) {
+                    "tool" -> stringResource(operationLabelRes(message.toolName))
+                    "reasoning" -> stringResource(R.string.operation_reasoning)
+                    else -> stringResource(R.string.operation_progress)
                 }
-            }
-
-            if (expanded) {
-                messages.forEach { message ->
-                    val commandExecution = message.role == "tool" && isCommandExecutionTool(message.toolName)
-                    val title = when {
-                        commandExecution -> stringResource(R.string.command_execution_title)
-                        message.role == "reasoning" -> "思考"
-                        message.role == "tool" -> "工具 · ${message.toolName ?: "执行结果"}"
-                        else -> "执行说明"
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                        Text(title, style = DsType.caption11Strong, color = colors.labelTertiary)
-                        if (message.role == "tool") {
-                            if (commandExecution) {
-                                Text(
-                                    stringResource(R.string.command_execution_purpose),
-                                    style = DsType.small13,
-                                    color = colors.labelSecondary,
-                                )
-                            }
-                            Text(
-                                toolResultMeta(message.content),
-                                style = DsType.caption11,
-                                color = colors.labelTertiary,
-                            )
-                            if (!commandExecution) {
-                                SelectionContainer {
-                                    Text(
-                                        message.content,
-                                        style = DsType.mdCode,
-                                        color = colors.labelSecondary,
-                                    )
-                                }
-                            }
-                        } else {
-                            MarkdownText(message.content, allowCodeCopy = false)
-                        }
+                val status = if (message.role == "tool") toolResultMeta(message.content) else null
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Text(
+                        title,
+                        style = DsType.small13,
+                        color = colors.labelSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    status?.let {
+                        Text(it, style = DsType.caption11, color = colors.labelTertiary)
                     }
                 }
             }
