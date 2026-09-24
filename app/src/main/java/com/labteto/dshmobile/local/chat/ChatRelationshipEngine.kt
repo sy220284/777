@@ -9,6 +9,16 @@ internal enum class ChatRelationshipView {
     REPLY_COACH,
 }
 
+internal enum class RelationshipScenario {
+    GENERAL,
+    CONFLICT_REPAIR,
+    INVESTMENT_IMBALANCE,
+    INVITE_DATE,
+    COOLING,
+    BREAKUP_RECONCILIATION,
+    BOUNDARY_SAFETY,
+}
+
 /**
  * Relationship cognition core for Chat mode.
  *
@@ -23,7 +33,7 @@ class ChatRelationshipEngine @Inject constructor() {
         val text = input.trim().lowercase()
         if (text.isBlank()) return ChatRelationshipView.IMMERSIVE
         if (REPLY_COACH_HINTS.any(text::contains)) return ChatRelationshipView.REPLY_COACH
-        if (STRATEGY_COMMANDS.any(text::startsWith)) return ChatRelationshipView.STRATEGIST
+        if (STRATEGY_COMMANDS.any { text.startsWith(it) }) return ChatRelationshipView.STRATEGIST
         if ("军师" in text) return ChatRelationshipView.STRATEGIST
 
         val relationshipRelevant = RELATIONSHIP_HINTS.any(text::contains)
@@ -32,6 +42,19 @@ class ChatRelationshipEngine @Inject constructor() {
             ChatRelationshipView.STRATEGIST
         } else {
             ChatRelationshipView.IMMERSIVE
+        }
+    }
+
+    fun classifyScenario(input: String): RelationshipScenario {
+        val text = input.trim().lowercase()
+        return when {
+            BOUNDARY_HINTS.any(text::contains) -> RelationshipScenario.BOUNDARY_SAFETY
+            BREAKUP_HINTS.any(text::contains) -> RelationshipScenario.BREAKUP_RECONCILIATION
+            CONFLICT_HINTS.any(text::contains) -> RelationshipScenario.CONFLICT_REPAIR
+            IMBALANCE_HINTS.any(text::contains) -> RelationshipScenario.INVESTMENT_IMBALANCE
+            COOLING_HINTS.any(text::contains) -> RelationshipScenario.COOLING
+            DATE_HINTS.any(text::contains) -> RelationshipScenario.INVITE_DATE
+            else -> RelationshipScenario.GENERAL
         }
     }
 
@@ -72,7 +95,44 @@ class ChatRelationshipEngine @Inject constructor() {
                 appendLine("随后只补最必要的发送时机，以及对方积极、含糊、拒绝时怎么接。证据不足时不要替对方读心。")
             }
         }
+
+        appendScenarioGuidance(classifyScenario(input))
     }.trim()
+
+    private fun StringBuilder.appendScenarioGuidance(scenario: RelationshipScenario) {
+        when (scenario) {
+            RelationshipScenario.GENERAL -> Unit
+            RelationshipScenario.CONFLICT_REPAIR -> {
+                appendLine("【场景路由：冲突修复】")
+                appendLine("先分触发事件、真正诉求、双方边界和仍未解决的问题；判断是否存在修复动作，而不是只看谁嘴上认错。")
+                appendLine("优先给降温、澄清、承担自己部分、提出具体修复的动作；不要把争输赢当成关系修复。")
+            }
+            RelationshipScenario.INVESTMENT_IMBALANCE -> {
+                appendLine("【场景路由：投入失衡】")
+                appendLine("比较一段时间内双方发起联系、兑现邀约、时间精力、情绪劳动和现实投入，避免按单条消息下结论。")
+                appendLine("若持续单向投入，优先建议降级投入和设置观察窗口，让真实互惠决定是否继续。")
+            }
+            RelationshipScenario.INVITE_DATE -> {
+                appendLine("【场景路由：邀约推进】")
+                appendLine("动作要具体、轻量、可退出：明确时间或活动，同时给对方真实拒绝空间；一次含糊可以澄清，一再回避就降低推进。")
+            }
+            RelationshipScenario.COOLING -> {
+                appendLine("【场景路由：冷淡降温】")
+                appendLine("先确认这是相对其平时基线的变化，再看持续时间、主动性、兑现和是否有现实压力。")
+                appendLine("不要用连发消息追着验证爱意；给有限观察窗口，再根据行为调整投入。")
+            }
+            RelationshipScenario.BREAKUP_RECONCILIATION -> {
+                appendLine("【场景路由：分手/复合】")
+                appendLine("先识别原分手原因是否真的发生结构性变化，再看双方是否都有持续修复行为。")
+                appendLine("复合需要新的相处机制和信任重建，不能只靠怀念、道歉或短期情绪回潮。")
+            }
+            RelationshipScenario.BOUNDARY_SAFETY -> {
+                appendLine("【场景路由：边界与安全】")
+                appendLine("明确拒绝、持续躲避、胁迫、跟踪、隐私威胁、财务控制或人身危险出现时，停止推进关系。")
+                appendLine("优先保护安全、边界、证据和现实支持，不把危险行为包装成占有欲、吃醋或爱得深。")
+            }
+        }
+    }
 
     private fun StringBuilder.appendDynamics(dynamics: RelationshipDynamics) {
         appendLine("【关系动力】")
@@ -126,6 +186,15 @@ class ChatRelationshipEngine @Inject constructor() {
             "她", "他", "ta", "对方", "对象", "女朋友", "男朋友", "老婆", "老公",
             "前任", "暧昧", "喜欢", "关系", "约会", "聊天", "消息", "回复", "表白",
             "追她", "追他", "分手", "复合", "冷淡", "不回", "吃醋", "见面", "吵架",
+        )
+        val CONFLICT_HINTS = listOf("吵架", "闹矛盾", "生气", "道歉", "冷战", "争执", "冲突", "和好")
+        val IMBALANCE_HINTS = listOf("都是我主动", "只有我主动", "付出不对等", "投入失衡", "单方面", "一直是我")
+        val DATE_HINTS = listOf("邀约", "约她", "约他", "约出来", "见面", "第一次见", "约会")
+        val COOLING_HINTS = listOf("冷淡", "变冷", "回复慢", "不回", "敷衍", "降温", "突然变了")
+        val BREAKUP_HINTS = listOf("分手", "复合", "前任", "挽回", "重新在一起", "断联")
+        val BOUNDARY_HINTS = listOf(
+            "明确拒绝", "别联系", "不要联系", "拉黑", "威胁", "跟踪", "偷拍", "强迫",
+            "控制我", "控制她", "控制他", "泄露隐私", "勒索", "家暴",
         )
     }
 }
