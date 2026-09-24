@@ -38,6 +38,60 @@ class HarnessJobPersistenceTest {
         assertTrue(manager.list() == "没有后台任务")
     }
 
+
+    @Test
+    fun interruptedPersistentJobsCanResumeInBatchesWithoutStrandingOverflow() = runTest {
+        val gates = (1..8).associateWith { CompletableDeferred<Unit>() }
+        val snapshots = (1..8).map { index ->
+            JobSnapshot(
+                id = "job-$index",
+                label = "persistent-$index",
+                status = "running",
+                resumeKind = "web_fetch",
+                resumePayload = "{\"url\":\"https://example.com/$index\"}",
+            )
+        }
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            maxConcurrentJobs = 4,
+            initialSnapshots = snapshots,
+        )
+
+        fun fillAvailableSlots() {
+            manager.interruptedSnapshots()
+                .take(manager.availableSlots())
+                .forEach { snapshot ->
+                    val index = snapshot.id.substringAfterLast('-').toInt()
+                    manager.resumePersistent(snapshot.id) { _, _ ->
+                        gates.getValue(index).await()
+                        "done-$index"
+                    }
+                }
+        }
+
+        fillAvailableSlots()
+        runCurrent()
+
+        assertTrue(manager.availableSlots() == 0)
+        assertTrue(manager.interruptedSnapshots().size == 4)
+
+        (1..4).forEach { gates.getValue(it).complete(Unit) }
+        advanceUntilIdle()
+
+        assertTrue(manager.availableSlots() == 4)
+        fillAvailableSlots()
+        runCurrent()
+        assertTrue(manager.interruptedSnapshots().isEmpty())
+
+        (5..8).forEach { gates.getValue(it).complete(Unit) }
+        advanceUntilIdle()
+
+        assertTrue((1..8).all { index ->
+            manager.output("job-$index").contains("[completed]")
+        })
+    }
+
     @Test
     fun sessionTransitionCanStopEphemeralJobsWithoutCancellingPersistentJobs() = runTest {
         val ephemeralGate = CompletableDeferred<Unit>()
