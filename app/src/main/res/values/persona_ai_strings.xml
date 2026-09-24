@@ -10,4 +10,5 @@
     <string name="local_persona_ai_busy">Persona generation is unavailable while the current turn is running.</string>
     <string name="local_persona_ai_unconfigured">Configure the model first.</string>
     <string name="local_persona_ai_failed">Could not generate the persona. Please try again.</string>
+    <string name="local_persona_ai_example">Example: Kamisato Ayato, keep the original characterization, make the relationship with me a little closer, and keep the dialogue natural.</string>
 </resources>
