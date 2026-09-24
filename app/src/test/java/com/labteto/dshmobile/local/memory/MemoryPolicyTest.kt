@@ -151,6 +151,19 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun pronounRelationshipStateBindsToKnownPersonaAcrossChats() {
+        val candidate = policy.extractChatRelationshipFact(
+            text = "我们刚在一起了",
+            subjectLabel = "林晚",
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+        assertEquals(MemoryKind.RELATIONSHIP_STATE, candidate.kind)
+        assertEquals("关系状态：我和林晚｜在一起", candidate.content)
+    }
+
+    @Test
     fun explicitRelationshipObjectIsRememberedAsFact() {
         val candidate = policy.extractChatRelationshipFact("林晚是我的女朋友")
         val explicitRemember = policy.extractChatRelationshipFact("记住林晚是我的女朋友")
