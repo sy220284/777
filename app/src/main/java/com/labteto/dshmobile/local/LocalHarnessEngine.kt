@@ -1345,7 +1345,12 @@ class LocalHarnessEngine @Inject constructor(
             val snapshot = _state.value
             val chatContext = chatTurnRunner.prepare(snapshot.personaId)
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
-            val requestMessages = withEphemeralContext(modelHistory.toList(), chatContext.prompt)
+            val requestMessages = prepareLocalMultimodalMessages(
+                messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
+                workspaceRoot = File(workspace.path),
+                mode = LocalImageInputMode.NATIVE,
+                budget = imageRequestBudget,
+            )
 
             eventLog.append("turn/start", buildJsonObject {
                 put("model", snapshot.model)
@@ -1512,16 +1517,20 @@ class LocalHarnessEngine @Inject constructor(
                     ensureSystemMessage()
                     compactHistoryIfNeeded()
                     val snapshot = _state.value
-                    ephemeralContext = contextComposer.compose(
-                        ContextRequest(
-                            query = input,
-                            mode = snapshot.conversationMode,
-                            projectId = snapshot.projectId,
-                            lineageId = snapshot.lineageId,
-                            handoffSummary = snapshot.handoffSummary,
-                        ),
-                    )
-                    captureAutoMemoryDirective(memoryInput)
+                    if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                        ephemeralContext = chatTurnRunner.prepare(snapshot.personaId).prompt
+                    } else {
+                        ephemeralContext = contextComposer.compose(
+                            ContextRequest(
+                                query = input,
+                                mode = snapshot.conversationMode,
+                                projectId = snapshot.projectId,
+                                lineageId = snapshot.lineageId,
+                                handoffSummary = snapshot.handoffSummary,
+                            ),
+                        )
+                        captureAutoMemoryDirective(memoryInput)
+                    }
                     requestPrepared = true
                 }
                 drainPendingInputsIntoHistory()
@@ -2654,51 +2663,32 @@ class LocalHarnessEngine @Inject constructor(
             usageTracker.record(snapshot.model, reply.usage)
             return reply
         }
-        val candidate = reply.content.orEmpty()
-        val violations = ChatStyleGuard.violations(candidate)
-        if (violations.isEmpty()) {
-            usageTracker.record(snapshot.model, reply.usage)
-            return reply
-        }
-
-        eventLog.append("chat/style-guard", buildJsonObject {
-            put("step", step)
-            put("action", "rewrite")
-            put("violations", JsonArray(violations.map(::JsonPrimitive)))
-        })
-        // The first candidate still consumed model tokens even though it will never reach the user.
-        usageTracker.record(snapshot.model, reply.usage)
-        val repairContext = ChatStyleGuard.repairPrompt(candidate, violations)
-        val repaired = try {
-            completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = withEphemeralContext(messages, repairContext),
-                step = step,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            eventLog.append("chat/style-guard", buildJsonObject {
-                put("step", step)
-                put("action", "rewrite-failed")
-                put("detail", error.message.orEmpty().take(1_000))
-            })
-            return ChatStyleGuard.withContent(reply, ChatStyleGuard.scrub(candidate))
-        }
-
-        usageTracker.record(snapshot.model, repaired.usage)
-        val remaining = ChatStyleGuard.violations(repaired.content.orEmpty())
-        if (remaining.isEmpty()) return repaired
-
-        eventLog.append("chat/style-guard", buildJsonObject {
-            put("step", step)
-            put("action", "scrub")
-            put("violations", JsonArray(remaining.map(::JsonPrimitive)))
-        })
-        return ChatStyleGuard.withContent(repaired, ChatStyleGuard.scrub(repaired.content.orEmpty()))
+        val persona = chatTurnRunner.prepare(snapshot.personaId).persona
+        return chatTurnRunner.finalizeReply(
+            persona = persona,
+            reply = reply,
+            rewrite = { candidate, violations ->
+                completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = withEphemeralContext(
+                        messages,
+                        ChatStyleGuard.repairPrompt(candidate, violations),
+                    ),
+                    step = step,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                )
+            },
+            recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+            onGuardEvent = { action, violations ->
+                eventLog.append("chat/style-guard", buildJsonObject {
+                    put("step", step)
+                    put("action", action)
+                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                })
+            },
+        )
     }
 
     private suspend fun completeWithRetry(
