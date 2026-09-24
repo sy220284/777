@@ -104,6 +104,8 @@ class HarnessJobManager(
         id: String,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
+        var previousOutput = ""
+        var previousUpdatedAt = 0L
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
@@ -112,13 +114,26 @@ class HarnessJobManager(
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
+            previousOutput = found.output
+            previousUpdatedAt = found.updatedAt
             found.status = "running"
             found.output = "正在从安全检查点恢复…"
             found.updatedAt = System.currentTimeMillis()
             found
         }
+        try {
+            persistCurrentSnapshots()
+        } catch (error: Exception) {
+            synchronized(lock) {
+                record.status = "interrupted"
+                record.output = previousOutput
+                record.updatedAt = previousUpdatedAt
+            }
+            notifyChanged()
+            throw IllegalStateException("持久任务恢复元数据写入失败，任务未启动", error)
+        }
         launchRecord(record, block)
-        publish()
+        notifyChanged()
         return "后台任务已恢复：${record.id}"
     }
 
@@ -129,6 +144,22 @@ class HarnessJobManager(
     }
 
     fun snapshots(): List<JobSnapshot> = synchronized(lock) { records.values.map(::snapshot) }
+
+    fun availableSlots(): Int = synchronized(lock) {
+        (maxConcurrentJobs - records.values.count { it.status == "running" }).coerceAtLeast(0)
+    }
+
+    fun failInterrupted(id: String, detail: String): String {
+        synchronized(lock) {
+            val record = records[id] ?: return "后台任务不存在：$id"
+            if (record.status != "interrupted") return "后台任务无需标记失败：$id [${record.status}]"
+            record.status = "failed"
+            record.output = detail.takeLast(MAX_OUTPUT)
+            record.updatedAt = System.currentTimeMillis()
+        }
+        publish()
+        return "后台任务恢复失败：$id"
+    }
 
     private fun startInternal(
         label: String,
@@ -153,8 +184,20 @@ class HarnessJobManager(
                 resumePayload = resumePayload,
             ).also { records[id] = it }
         }
-        launchRecord(record, block)
-        publish()
+        if (!resumeKind.isNullOrBlank()) {
+            try {
+                persistCurrentSnapshots()
+            } catch (error: Exception) {
+                synchronized(lock) { records.remove(record.id) }
+                notifyChanged()
+                throw IllegalStateException("持久任务元数据写入失败，任务未启动", error)
+            }
+            launchRecord(record, block)
+            notifyChanged()
+        } else {
+            launchRecord(record, block)
+            publish()
+        }
         return "后台任务已启动：${record.id}"
     }
 
@@ -258,14 +301,21 @@ class HarnessJobManager(
     }
 
     suspend fun stopAllAndJoin() {
-        val jobs = markRunningJobsCancelled()
+        val jobs = markRunningJobsCancelled { true }
         jobs.forEach { it.cancel() }
         jobs.joinAll()
         publish()
     }
 
-    private fun markRunningJobsCancelled(): List<Job> = synchronized(lock) {
-        records.values.filter { it.status == "running" }.onEach {
+    suspend fun stopNonPersistentAndJoin() {
+        val jobs = markRunningJobsCancelled { it.resumeKind.isNullOrBlank() }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
+    private fun markRunningJobsCancelled(predicate: (Record) -> Boolean = { true }): List<Job> = synchronized(lock) {
+        records.values.filter { it.status == "running" && predicate(it) }.onEach {
             it.status = "cancelled"
             it.output = "任务已取消"
             it.updatedAt = System.currentTimeMillis()
@@ -305,7 +355,18 @@ class HarnessJobManager(
             snapshots = records.values.map(::snapshot)
         }
         onChanged(infos)
-        onSnapshotsChanged(snapshots)
+        // A transient persistence failure must not rewrite the task's execution result. The next
+        // state publication retries the full snapshot. Persistent start/resume use the strict
+        // preflight path below so they never launch before recovery metadata is durable.
+        runCatching { onSnapshotsChanged(snapshots) }
+    }
+
+    private fun notifyChanged() {
+        onChanged(snapshotRecords())
+    }
+
+    private fun persistCurrentSnapshots() {
+        onSnapshotsChanged(synchronized(lock) { records.values.map(::snapshot) })
     }
 
     private companion object {

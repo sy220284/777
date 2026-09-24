@@ -30,6 +30,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
@@ -354,14 +355,50 @@ class LocalHarnessEngine @Inject constructor(
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
+    private fun newSubagentRunner(
+        eventLogProvider: () -> LocalSessionEventLog,
+        contextSnapshotProvider: (String) -> String,
+        schemasProvider: (Boolean, Boolean) -> JsonArray,
+        executeTool: suspend (LocalToolCall, Boolean) -> AgentToolResult,
+    ): LocalSubagentRunner = LocalSubagentRunner(
+        apiKeys = apiKeys,
+        modelClient = modelClient,
+        state = state,
+        jobs = jobs,
+        historySnapshot = { modelHistory.toList() },
+        contextSnapshot = contextSnapshotProvider,
+        eventLog = eventLogProvider,
+        schemas = schemasProvider,
+        execute = executeTool,
+        pruneToolResult = ::pruneToolResult,
+        prepareMessages = { messages, mode, _, _ ->
+            prepareLocalMultimodalMessages(
+                messages = messages,
+                workspaceRoot = File(workspace.path),
+                mode = mode,
+                budget = imageRequestBudget,
+            )
+        },
+        resolveImageMode = { mode, baseUrl, model ->
+            resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+        },
+        onNativeImageAccepted = { baseUrl, model ->
+            imageCapabilities.markSupported(baseUrl, model)
+        },
+        onUsage = { model, usage -> usageTracker.record(model, usage) },
+        onNativeImageRejected = { baseUrl, model ->
+            imageCapabilities.markUnsupported(baseUrl, model)
+        },
+        resourceScheduler = resourceScheduler,
+        acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
+        releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
+        historyBudget = ::currentHistoryBudget,
+    )
+
     private val subagents by lazy {
-        LocalSubagentRunner(
-            apiKeys = apiKeys,
-            modelClient = modelClient,
-            state = state,
-            jobs = jobs,
-            historySnapshot = { modelHistory.toList() },
-            contextSnapshot = { query ->
+        newSubagentRunner(
+            eventLogProvider = { eventLog },
+            contextSnapshotProvider = { query ->
                 val snapshot = _state.value
                 contextComposer.compose(
                     ContextRequest(
@@ -373,32 +410,51 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             },
-            eventLog = { eventLog },
-            schemas = ::subagentToolSchemas,
-            execute = ::executeSafely,
-            pruneToolResult = ::pruneToolResult,
-            prepareMessages = { messages, mode, _, _ ->
-                prepareLocalMultimodalMessages(
-                    messages = messages,
-                    workspaceRoot = File(workspace.path),
-                    mode = mode,
-                    budget = imageRequestBudget,
+            schemasProvider = ::subagentToolSchemas,
+            executeTool = ::executeSafely,
+        )
+    }
+
+    private fun persistentSubagentRunner(
+        sessionId: String,
+        boundState: LocalHarnessState,
+    ): LocalSubagentRunner {
+        val boundEventLog = eventLogFor(sessionId)
+        val localEnabledOptionalTools = linkedSetOf<String>()
+        val boundMemoryTools = LocalMemoryTools(
+            memoryStore,
+            memoryManager,
+            state = { boundState },
+            sessionId = { sessionId },
+        )
+        return newSubagentRunner(
+            eventLogProvider = { boundEventLog },
+            contextSnapshotProvider = { query ->
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = boundState.conversationMode,
+                        projectId = boundState.projectId,
+                        lineageId = boundState.lineageId,
+                        handoffSummary = boundState.handoffSummary,
+                    ),
                 )
             },
-            resolveImageMode = { mode, baseUrl, model ->
-                resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+            schemasProvider = { allowMutation, allowVirtualScreen ->
+                val enabled = synchronized(localEnabledOptionalTools) {
+                    localEnabledOptionalTools.toSet()
+                }
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabled)
             },
-            onNativeImageAccepted = { baseUrl, model ->
-                imageCapabilities.markSupported(baseUrl, model)
+            executeTool = { call, allowMutation ->
+                executePersistentSubagentTool(
+                    call = call,
+                    allowMutation = allowMutation,
+                    sessionId = sessionId,
+                    memoryTools = boundMemoryTools,
+                    enabledOptionalTools = localEnabledOptionalTools,
+                )
             },
-            onUsage = { model, usage -> usageTracker.record(model, usage) },
-            onNativeImageRejected = { baseUrl, model ->
-                imageCapabilities.markUnsupported(baseUrl, model)
-            },
-            resourceScheduler = resourceScheduler,
-            acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
-            releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
-            historyBudget = ::currentHistoryBudget,
         )
     }
 
@@ -407,6 +463,7 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
+    private var persistentRecoveryJob: Job? = null
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
 
@@ -448,7 +505,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
                 load()
-                resumeInterruptedSafeJobs()
+                scheduleInterruptedSafeJobs()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -935,7 +992,14 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(false)
         questionResponse?.cancel()
         val running = synchronized(runStateLock) {
-            pendingInputs.clear()
+            val discarded = pendingInputs.clear()
+            if (discarded > 0) {
+                eventLog.append("user/queue", buildJsonObject {
+                    put("action", "cancelled")
+                    put("count", discarded)
+                    put("queued_count", 0)
+                })
+            }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
         }
@@ -963,7 +1027,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitionMutex.withLock {
                 try {
                     cancelActiveRunAndJoin()
-                    jobs.stopAllAndJoin()
+                    jobs.stopNonPersistentAndJoin()
                     persist()
 
                     currentSessionId = UUID.randomUUID().toString()
@@ -1007,11 +1071,12 @@ class LocalHarnessEngine @Inject constructor(
                             planMode = false,
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = emptyList(),
+                            jobs = jobs.snapshotInfos(),
                             error = null,
                         )
                     }
                     persist()
+                    restartInterruptedSafeJobs()
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -1044,12 +1109,13 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitionMutex.withLock {
                 try {
                     persist()
-                    jobs.stopAllAndJoin()
+                    jobs.stopNonPersistentAndJoin()
                     currentSessionId = sessionId
                     preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
                     eventLog = eventLogFor(sessionId)
                     transcriptProjectionCursor = null
                     loadSession(sessionId)
+                    restartInterruptedSafeJobs()
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -1094,7 +1160,14 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(false)
         questionResponse?.cancel()
         val job = synchronized(runStateLock) {
-            pendingInputs.clear()
+            val discarded = pendingInputs.clear()
+            if (discarded > 0) {
+                eventLog.append("user/queue", buildJsonObject {
+                    put("action", "cancelled")
+                    put("count", discarded)
+                    put("queued_count", 0)
+                })
+            }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
         }
@@ -1556,6 +1629,56 @@ class LocalHarnessEngine @Inject constructor(
         toolFailureResult(call, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
     }
 
+    private suspend fun executePersistentSubagentTool(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+        memoryTools: LocalMemoryTools,
+        enabledOptionalTools: MutableSet<String>,
+    ): AgentToolResult {
+        val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+        return try {
+            when (canonical.name) {
+                "capability_search" -> AgentToolResult(
+                    searchCapabilities(canonical.arguments.string("query"), enabledOptionalTools),
+                )
+                "memory_search", "memory_list" -> AgentToolResult(
+                    memoryTools.execute(canonical.name, canonical.arguments, allowMutation = false),
+                )
+                "web_fetch" -> {
+                    val background = canonical.arguments.boolean("run_in_background", false)
+                    if (!background) {
+                        executeSafely(canonical, allowMutation)
+                    } else {
+                        val input = canonical.arguments.string("url")
+                        val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
+                            .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
+                        val format = canonical.arguments.optionalString("format") ?: "text"
+                        AgentToolResult(
+                            startPersistentWebFetch(
+                                url = input,
+                                maxBytes = maxBytes,
+                                format = format,
+                                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
+                                sessionId = sessionId,
+                            ),
+                        )
+                    }
+                }
+                else -> executeSafely(canonical, allowMutation)
+            }
+        } catch (cancelled: CancellationException) {
+            if (!currentCoroutineContext().isActive) throw cancelled
+            toolFailureResult(canonical, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消")
+        } catch (error: LocalWebException) {
+            toolFailureResult(canonical, error.code, error.message ?: "网页工具失败")
+        } catch (error: LocalModelException) {
+            toolFailureResult(canonical, error.code, error.message ?: "模型请求失败")
+        } catch (error: Exception) {
+            toolFailureResult(canonical, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+        }
+    }
+
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}"
 
@@ -1662,8 +1785,21 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun subagentToolSchemas(allowMutation: Boolean, allowVirtualScreen: Boolean): JsonArray {
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() } +
+    private fun subagentToolSchemas(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+    ): JsonArray = subagentToolSchemas(
+        allowMutation = allowMutation,
+        allowVirtualScreen = allowVirtualScreen,
+        enabledOptional = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() },
+    )
+
+    private fun subagentToolSchemas(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+        enabledOptional: Set<String>,
+    ): JsonArray {
+        val enabled = enabledOptional +
             if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
@@ -1683,12 +1819,15 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun searchCapabilities(query: String): String {
+    private fun searchCapabilities(query: String): String =
+        searchCapabilities(query, enabledOptionalTools)
+
+    private fun searchCapabilities(query: String, target: MutableSet<String>): String {
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) return "未找到匹配的扩展能力；可换用 Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
-        synchronized(enabledOptionalTools) {
-            enabledOptionalTools += matches.map(HarnessTool::name)
+        synchronized(target) {
+            target += matches.map(HarnessTool::name)
         }
         return buildString {
             appendLine("已为当前回合启用 ${matches.size} 个扩展工具：")
@@ -1907,9 +2046,10 @@ class LocalHarnessEngine @Inject constructor(
         maxBytes: Int,
         format: String,
         timeoutSeconds: Long,
+        sessionId: String = currentSessionId,
     ): String {
         val payload = buildJsonObject {
-            put("session_id", currentSessionId)
+            put("session_id", sessionId)
             put("url", url)
             put("max_bytes", maxBytes)
             put("format", format)
@@ -1931,8 +2071,11 @@ class LocalHarnessEngine @Inject constructor(
         maxSteps: Int,
         virtualScreen: Boolean,
     ): String {
+        val sessionId = currentSessionId
+        val boundState = _state.value
+        val boundSubagents = persistentSubagentRunner(sessionId, boundState)
         val payload = buildJsonObject {
-            put("session_id", currentSessionId)
+            put("session_id", sessionId)
             put("task", task)
             model?.let { put("model", it) }
             put("max_steps", maxSteps)
@@ -1943,7 +2086,7 @@ class LocalHarnessEngine @Inject constructor(
             resumeKind = "subagent_readonly",
             resumePayload = payload,
         ) { jobId, _ ->
-            val result = subagents.runResult(
+            val result = boundSubagents.runResult(
                 task = task,
                 inheritHistory = false,
                 allowMutation = false,
@@ -1956,15 +2099,57 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun resumeInterruptedSafeJobs() {
-        jobs.interruptedSnapshots().forEach { snapshot ->
-            val payloadText = snapshot.resumePayload ?: return@forEach
-            runCatching {
-                val payload = json.parseToJsonElement(payloadText).jsonObject
-                val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull
-                require(sessionId == null || sessionId == currentSessionId) {
-                    "恢复任务属于其他会话：$sessionId"
+    private fun restartInterruptedSafeJobs() {
+        synchronized(runStateLock) {
+            persistentRecoveryJob?.cancel()
+            persistentRecoveryJob = null
+        }
+        scheduleInterruptedSafeJobs()
+    }
+
+    private fun scheduleInterruptedSafeJobs() {
+        synchronized(runStateLock) {
+            if (persistentRecoveryJob?.isActive == true) return
+            persistentRecoveryJob = scope.launch {
+                try {
+                    while (true) {
+                        val targetSession = currentSessionId
+                        resumeInterruptedSafeJobsPass(targetSession)
+                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
+                            interruptedJobSessionId(snapshot, targetSession) == targetSession
+                        }
+                        if (!remaining) break
+                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
+                    }
+                } finally {
+                    val completed = currentCoroutineContext()[Job]
+                    synchronized(runStateLock) {
+                        if (persistentRecoveryJob === completed) persistentRecoveryJob = null
+                    }
                 }
+            }
+        }
+    }
+
+    private fun resumeInterruptedSafeJobsPass(targetSession: String) {
+        jobs.interruptedSnapshots().forEach { snapshot ->
+            val payloadText = snapshot.resumePayload
+            if (payloadText.isNullOrBlank()) {
+                jobs.failInterrupted(snapshot.id, "任务恢复失败：缺少恢复元数据")
+                return@forEach
+            }
+            val payload = try {
+                json.parseToJsonElement(payloadText).jsonObject
+            } catch (error: Exception) {
+                jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
+                recordJobResumeError(snapshot, targetSession, error)
+                return@forEach
+            }
+            val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
+            if (sessionId != targetSession) return@forEach
+            if (jobs.availableSlots() <= 0) return
+
+            try {
                 when (snapshot.resumeKind) {
                     "web_fetch" -> {
                         val url = payload["url"]?.jsonPrimitive?.contentOrNull
@@ -1991,8 +2176,9 @@ class LocalHarnessEngine @Inject constructor(
                         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+                        val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
-                            val result = subagents.runResult(
+                            val result = boundSubagents.runResult(
                                 task = task,
                                 inheritHistory = false,
                                 allowMutation = false,
@@ -2004,16 +2190,35 @@ class LocalHarnessEngine @Inject constructor(
                             result.requireCompletedOutput()
                         }
                     }
-                    else -> Unit
+                    else -> {
+                        jobs.failInterrupted(
+                            snapshot.id,
+                            "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
+                        )
+                    }
                 }
-            }.onFailure { error ->
-                eventLog.append("job/resume-error", buildJsonObject {
-                    put("job_id", snapshot.id)
-                    put("kind", snapshot.resumeKind.orEmpty())
-                    put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
-                })
+            } catch (error: Exception) {
+                // Persistence failures leave the record interrupted so the coordinator can retry.
+                recordJobResumeError(snapshot, sessionId, error)
             }
         }
+    }
+
+    private fun interruptedJobSessionId(snapshot: JobSnapshot, fallbackSessionId: String): String? {
+        val payloadText = snapshot.resumePayload ?: return null
+        return runCatching {
+            json.parseToJsonElement(payloadText).jsonObject["session_id"]
+                ?.jsonPrimitive?.contentOrNull
+                ?: fallbackSessionId
+        }.getOrNull()
+    }
+
+    private fun recordJobResumeError(snapshot: JobSnapshot, sessionId: String, error: Throwable) {
+        eventLogFor(sessionId).append("job/resume-error", buildJsonObject {
+            put("job_id", snapshot.id)
+            put("kind", snapshot.resumeKind.orEmpty())
+            put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
+        })
     }
     private suspend fun approve(
         call: LocalToolCall,
@@ -2638,6 +2843,7 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
+            jobs = jobs.snapshotInfos(),
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
             activeAgents = resourceScheduler.snapshot().activeAgents,
@@ -2849,6 +3055,7 @@ class LocalHarnessEngine @Inject constructor(
         const val DEFAULT_MODEL_ATTEMPTS = 3
         const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
+        const val PERSISTENT_RECOVERY_RETRY_MILLIS = 500L
         const val DEFAULT_DOWNLOAD_BYTES = 20 * 1024 * 1024
         const val MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
         const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L

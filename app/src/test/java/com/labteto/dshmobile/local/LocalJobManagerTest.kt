@@ -65,6 +65,49 @@ class LocalJobManagerTest {
         assertTrue(manager.output(secondId).contains("second done"))
     }
 
+
+    @Test
+    fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {
+        val root = createTempDir(prefix = "persistent-jobs-backup-")
+        try {
+            val file = File(root, "jobs.json")
+            val store = LocalPersistentJobStore(
+                file = file,
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-first",
+                        label = "第一代",
+                        status = "completed",
+                        output = "first",
+                    ),
+                ),
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-second",
+                        label = "第二代",
+                        status = "completed",
+                        output = "second",
+                    ),
+                ),
+            )
+
+            file.writeText("{broken")
+
+            val recovered = store.read()
+
+            assertEquals("job-first", recovered.single().id)
+            assertEquals("first", recovered.single().output)
+            assertTrue(store.read().single().id == "job-first")
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-")
