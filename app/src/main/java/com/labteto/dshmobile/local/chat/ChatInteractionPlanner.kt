@@ -270,7 +270,7 @@ class ChatInteractionPlanner @Inject constructor(
             )
             merged[normalize(text)] = clean
         }
-        return merged.values.takeLast(limit)
+        return merged.values.toList().takeLast(limit)
     }
 
     private fun mergeStrings(
@@ -284,7 +284,7 @@ class ChatInteractionPlanner @Inject constructor(
             val text = raw.trim().take(maxChars)
             if (text.isNotBlank()) merged[normalize(text)] = text
         }
-        return merged.values.takeLast(limit)
+        return merged.values.toList().takeLast(limit)
     }
 
     private fun bounded(value: Int, previous: Int, maxDelta: Int): Int =
