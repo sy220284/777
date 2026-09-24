@@ -465,53 +465,13 @@ private fun WorkflowRow(
     data: kotlinx.serialization.json.JsonElement,
     onOpenMember: (String) -> Unit,
 ) {
-    val colors = DsTheme.colors
     val obj = data as? JsonObject ?: return
-    val name = obj["name"].asString()
     val status = obj["status"].asString() ?: obj["stopReason"].asString() ?: obj["outcome"].asString()
-    val members = remember(data) { parseWorkflowMembers(data) }
-    var expanded by remember(data) { mutableStateOf(false) }
     DisclosureRow(
-        title = stringResource(R.string.workflow_title),
-        summary = listOfNotNull(name, workflowStatusLabel(status)).joinToString(" · ").ifEmpty { null },
-        icon = FeatherIcons.GitBranch,
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    ) {
-        members.forEach { member ->
-            val memberChildId = member.childId
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 28.dp, top = 2.dp)
-                    .then(
-                        if (memberChildId != null) {
-                            Modifier.clickable { onOpenMember(memberChildId) }
-                        } else {
-                            Modifier
-                        },
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StateDot(workflowMemberDot(member.status), size = 8.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    member.label ?: memberChildId.orEmpty(),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                member.status?.let {
-                    Text(
-                        workflowStatusLabel(it) ?: it,
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-    }
+        title = stringResource(R.string.agent_operation_delegate),
+        summary = workflowStatusLabel(status),
+        icon = FeatherIcons.Tool,
+        expanded = false,
+        onToggle = null,
+    )
 }
