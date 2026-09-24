@@ -143,7 +143,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
                 StateDot(StateDotState.Error, size = 8.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    stringResource(R.string.chat_error_turn) + node.reasonDetail?.let { " · $it" }.orEmpty(),
+                    stringResource(R.string.chat_error_turn),
                     style = DsType.small13,
                     color = colors.error,
                 )
@@ -288,9 +288,20 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     var actionsVisible by remember(node.seq) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
+    if (streaming) {
+        DisclosureRow(
+            title = stringResource(R.string.agent_operation_generic),
+            summary = stringResource(R.string.agent_operation_status_running),
+            icon = FeatherIcons.Tool,
+            state = DisclosureState.Running,
+            expanded = false,
+            onToggle = null,
+        )
+        return
+    }
     if (isWorkProcess) return
 
-    if (!streaming && !node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
+    if (!node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
     val finalText = node.finalAnswerText(context.nodes).ifBlank { node.plainText }
 
     Surface(
