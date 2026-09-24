@@ -51,7 +51,6 @@ class PersonaAutoFillService @Inject constructor(
             ?: error("请先在模型设置里配置密钥")
 
         val recentContext = recentMessages
-            .asSequence()
             .filter { message -> message.role == "user" || message.role == "assistant" }
             .takeLast(MAX_CONTEXT_MESSAGES)
             .joinToString("\n") { message ->
