@@ -7,7 +7,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import javax.inject.Singleton
 
-internal data class ChatTurnContext(
+data class ChatTurnContext(
     val persona: PersonaProfile,
     val prompt: String,
 )
