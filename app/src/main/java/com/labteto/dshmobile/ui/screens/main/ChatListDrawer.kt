@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +56,7 @@ import com.labteto.dshmobile.data.SessionRow
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
+import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -65,10 +67,7 @@ import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.SectionHeader
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.relativeTime
-import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.rememberHostsStore
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -203,16 +202,9 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            WhaleMark(Modifier.size(44.dp))
+            AppBrandIcon(Modifier.size(44.dp))
             Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
-                Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
-                Text(
-                    stringResource(R.string.chatlist_title),
-                    style = DsType.caption11,
-                    color = colors.labelTertiary,
-                )
-            }
+            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,
                 contentDescription = stringResource(R.string.chatlist_new_session),
@@ -682,6 +674,7 @@ private fun SessionRowItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = (depth * 16).dp)
+                .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
                 .background(if (isCurrent) colors.sidebarNavActive else androidx.compose.ui.graphics.Color.Transparent)
                 .combinedClickable(
@@ -693,74 +686,26 @@ private fun SessionRowItem(
                     },
                     onLongClick = { menuOpen = true },
                 )
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // A current-session accent rail reads faster than a background tint alone on a
-            // low-contrast sidebar.
-            Box(
-                Modifier
-                    .width(2.dp)
-                    .height(24.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(if (isCurrent) colors.accent else androidx.compose.ui.graphics.Color.Transparent),
+            Text(
+                text = sessionTitle(session),
+                style = DsType.std14,
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(DsSpacing.small))
-            // The chevron is its own tap target: opening a session and looking at what it spawned
-            // are different intentions, and conflating them means you cannot do one without the
-            // other. The spacer keeps titles aligned down a column of mixed rows.
-            if (childCount > 0) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.chatlist_subagents),
-                    tint = colors.labelTertiary,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .graphicsLayer { rotationZ = chevronRotation }
-                        .clickable(onClick = onToggleChildren),
-                )
-            } else {
-                Spacer(Modifier.width(16.dp))
-            }
-            Spacer(Modifier.width(DsSpacing.tiny))
-            StateDot(
-                state = when {
-                    session.running -> StateDotState.Running
-                    session.pendingInteraction != null -> StateDotState.Warning
-                    else -> StateDotState.Idle
-                },
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = sessionTitle(session),
-                    style = DsType.std14,
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    session.cwd?.takeIf { it.isNotBlank() }?.let {
-                        Text(
-                            basename(it),
-                            style = DsType.caption11,
-                            color = colors.labelCaption,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Text(" · ", style = DsType.caption11, color = colors.labelCaption)
-                    }
-                    Text(
-                        relativeTime(session.updatedAt),
-                        style = DsType.caption11,
-                        color = colors.labelCaption,
-                    )
-                }
-            }
             if (session.pendingInteraction != null) {
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 DsPill(text = stringResource(R.string.chatlist_needs_action), warn = true)
+            } else if (session.running) {
+                Spacer(Modifier.width(DsSpacing.xsmall))
+                Text(stringResource(R.string.subagents_running), style = DsType.caption11, color = colors.accent)
+            } else {
+                Spacer(Modifier.width(DsSpacing.xsmall))
+                Text(relativeTime(session.updatedAt), style = DsType.caption11, color = colors.labelCaption)
             }
             // The count replaces the old "Subagents" pill on parents: with the children indented
             // underneath, what is worth saying is how many are down there when the row is closed.
@@ -772,6 +717,19 @@ private fun SessionRowItem(
                 // indent cannot say what the row is.
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 DsPill(text = stringResource(R.string.chatlist_subagents))
+            }
+            // Expansion stays available without placing an icon before the session title.
+            if (childCount > 0) {
+                Spacer(Modifier.width(DsSpacing.xsmall))
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.chatlist_subagents),
+                    tint = colors.labelTertiary,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = chevronRotation }
+                        .clickable(onClick = onToggleChildren),
+                )
             }
         }
 

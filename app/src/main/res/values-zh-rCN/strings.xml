@@ -299,8 +299,6 @@
     <string name="settings_notifications_goal">目标完成或受阻时通知</string>
     <string name="settings_notifications_action">需要你操作时通知</string>
     <string name="settings_background">在后台保持连接</string>
-    <string name="settings_about">关于</string>
-    <string name="settings_about_version">应用版本 %1$s · 协议 %2$s</string>
     <string name="settings_host_info">主机信息</string>
     <string name="notif_channel_completions">完成通知</string>
     <string name="notif_channel_action">需要你的操作</string>
@@ -402,11 +400,6 @@
     <string name="settings_connection_disconnect_confirm">要断开与 Harness 的连接吗？</string>
     <string name="settings_connection_disconnect_message">你将返回连接界面。</string>
     <string name="settings_harness">Harness</string>
-    <string name="settings_data">数据</string>
-    <string name="settings_forget_hosts">忘记已记住的 Harness</string>
-    <string name="settings_forget_hosts_done">已清除记住的 Harness</string>
-    <string name="settings_clear_last_sessions">忘记要打开的会话</string>
-    <string name="settings_clear_last_sessions_done">下次将打开最新的会话</string>
     <string name="settings_notifications_turn_hint">应用在后台时回合结束</string>
     <string name="settings_notifications_goal_hint">目标完成或被阻塞</string>
     <string name="settings_notifications_action_hint">有审批、提问或计划等待你处理</string>
@@ -620,9 +613,7 @@
     <string name="settings_page_memory">个性化与记忆</string>
     <string name="settings_page_permissions">连接与权限</string>
     <string name="settings_page_notifications">通知</string>
-    <string name="settings_page_data">数据</string>
     <string name="settings_page_advanced">高级</string>
-    <string name="settings_page_about">关于</string>
     <string name="settings_group_experience">体验</string>
     <string name="settings_group_system">系统</string>
     <string name="settings_group_maintenance">维护</string>
@@ -631,9 +622,7 @@
     <string name="settings_general_subtitle">语言、主题与会话排序</string>
     <string name="settings_permissions_subtitle">远程连接、后台连接与设备授权</string>
     <string name="settings_notifications_subtitle">完成、目标与需要处理的提醒</string>
-    <string name="settings_data_subtitle">已记住的连接与会话恢复数据</string>
     <string name="settings_advanced_subtitle">智能体执行、项目配置与诊断</string>
-    <string name="settings_about_subtitle">版本与应用更新</string>
     <string name="settings_runtime_diagnostics">运行与诊断</string>
     <string name="settings_network_diagnostic">网络诊断</string>
     <string name="settings_environment_capabilities">环境能力</string>
