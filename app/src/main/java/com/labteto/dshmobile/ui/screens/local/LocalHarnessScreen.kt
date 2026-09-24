@@ -1255,9 +1255,7 @@ private fun ExecutionStatusCard(
             }
             if (expanded) {
                 state.goal?.let { goal ->
-                    Text("目标 · ${goal.status}", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
-                    goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
+                    Text("目标 · ${goal.status}", style = DsType.small13, color = colors.labelSecondary)
                 }
                 if (state.plan.isNotEmpty()) {
                     Text("计划 · ${state.plan.size} 步", style = DsType.small13, color = colors.labelSecondary)
