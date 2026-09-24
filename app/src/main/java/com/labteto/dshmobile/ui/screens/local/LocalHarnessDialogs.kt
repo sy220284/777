@@ -306,6 +306,7 @@ internal fun ChatPersonaDialog(
                     onValueChange = { aiDescription = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.local_persona_ai_description)) },
+                    placeholder = { Text(stringResource(R.string.local_persona_ai_example)) },
                     minLines = 2,
                     maxLines = 5,
                     enabled = !aiGenerating,
