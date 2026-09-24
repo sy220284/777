@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import com.labteto.dshmobile.core.session.ChatNode
+import com.labteto.dshmobile.core.session.OtherNode
 import com.labteto.dshmobile.core.session.ToolCallNode
 import com.labteto.dshmobile.core.session.ToolResultNode
 import com.labteto.dshmobile.core.wire.WireJson
@@ -36,47 +37,57 @@ internal fun conversationFileIndex(
 ): ConversationFileIndex {
     val results = nodes.filterIsInstance<ToolResultNode>().associateBy { it.callId }
     val artifacts = linkedMapOf<String, ConversationFileRef>()
-    val involved = linkedMapOf<String, ConversationFileRef>()
 
-    fun remember(raw: String?, artifact: Boolean, tool: String, seq: Long) {
+    fun rememberArtifact(raw: String?, tool: String, seq: Long) {
         val path = workspaceRelativePath(raw, cwd) ?: return
         val ref = ConversationFileRef(path = path, tool = tool, seq = seq)
-        if (artifact) {
-            artifacts[path] = newer(artifacts[path], ref)
-            involved.remove(path)
-        } else if (path !in artifacts) {
-            involved[path] = newer(involved[path], ref)
-        }
+        artifacts[path] = newer(artifacts[path], ref)
     }
 
+    // Explicit user-facing deliverables are the canonical source.
+    nodes.filterIsInstance<OtherNode>()
+        .filter { it.type == "deliverables/presented" }
+        .forEach { node ->
+            val files = (node.data as? JsonObject)?.get("files") as? JsonArray
+            files.orEmpty().forEach { item ->
+                val obj = item as? JsonObject ?: return@forEach
+                primitiveString(obj["path"])?.let {
+                    rememberArtifact(it, "deliverable", node.seq)
+                }
+            }
+        }
+
+    // Compatibility fallback for tools whose purpose is explicitly to export/download/present.
     nodes.filterIsInstance<ToolCallNode>().forEach { call ->
         val args = runCatching { WireJson.parseToJsonElement(call.arguments) as? JsonObject }.getOrNull()
+        if (!isArtifactTool(call.name, args)) return@forEach
         val result = results[call.callId]
-        val artifactTool = isArtifactTool(call.name, args)
 
         args?.let { objectArgs ->
             for (key in FILE_KEYS) {
-                if (key == "path" && call.name.lowercase() in DIRECTORY_PATH_TOOLS) continue
                 primitiveString(objectArgs[key])?.let { value ->
-                    remember(value, artifactTool || key in ARTIFACT_PATH_KEYS, call.name, call.seq)
+                    rememberArtifact(value, call.name, call.seq)
                 }
             }
-            primitiveStrings(objectArgs["paths"]).forEach { remember(it, artifactTool, call.name, call.seq) }
-            primitiveStrings(objectArgs["files"]).forEach { remember(it, artifactTool, call.name, call.seq) }
+            primitiveStrings(objectArgs["paths"]).forEach {
+                rememberArtifact(it, call.name, call.seq)
+            }
+            primitiveStrings(objectArgs["files"]).forEach {
+                rememberArtifact(it, call.name, call.seq)
+            }
         }
 
         val meta = result?.meta as? JsonObject
         if (meta != null) {
-            primitiveString(meta["path"])?.let { remember(it, artifactTool, call.name, result.seq) }
-            primitiveStrings(meta["paths"]).forEach { remember(it, artifactTool, call.name, result.seq) }
-            (meta["diffs"] as? JsonArray).orEmpty().forEach { item ->
-                primitiveString((item as? JsonObject)?.get("path"))?.let {
-                    remember(it, artifactTool, call.name, result.seq)
-                }
+            primitiveString(meta["path"])?.let {
+                rememberArtifact(it, call.name, result.seq)
+            }
+            primitiveStrings(meta["paths"]).forEach {
+                rememberArtifact(it, call.name, result.seq)
             }
             (meta["files"] as? JsonArray).orEmpty().forEach { item ->
                 primitiveString((item as? JsonObject)?.get("path"))?.let {
-                    remember(it, artifactTool, call.name, result.seq)
+                    rememberArtifact(it, call.name, result.seq)
                 }
             }
         }
@@ -85,15 +96,17 @@ internal fun conversationFileIndex(
             resultText(settled.content).forEach { text ->
                 ARTIFACT_RESULT_PATH.findAll(text).forEach { match ->
                     val rawPath = match.groupValues[1].substringBefore('（').trim()
-                    remember(rawPath, true, call.name, settled.seq)
+                    rememberArtifact(rawPath, call.name, settled.seq)
                 }
             }
         }
     }
 
     return ConversationFileIndex(
-        artifacts = artifacts.values.sortedWith(compareByDescending<ConversationFileRef> { it.seq }.thenBy { it.path }),
-        involved = involved.values.sortedWith(compareByDescending<ConversationFileRef> { it.seq }.thenBy { it.path }),
+        artifacts = artifacts.values.sortedWith(
+            compareByDescending<ConversationFileRef> { it.seq }.thenBy { it.path },
+        ),
+        involved = emptyList(),
     )
 }
 
@@ -104,9 +117,6 @@ private fun isArtifactTool(name: String, args: JsonObject?): Boolean {
     val tool = name.lowercase()
     if (tool in ARTIFACT_TOOLS) return true
     if ("download" in tool || "export" in tool || "generate_file" in tool) return true
-    if (tool == "str_replace_editor") {
-        return primitiveString(args?.get("command")) == "create"
-    }
     return false
 }
 
@@ -172,9 +182,8 @@ private val ARTIFACT_PATH_KEYS = setOf(
 )
 
 private val ARTIFACT_TOOLS = setOf(
-    "write", "write_file", "create_file", "download_file", "present", "copy_file",
+    "download_file", "present", "present_file", "export_file", "copy_file", "generate_file",
 )
-
 private val DIRECTORY_PATH_TOOLS = setOf(
     "list", "list_files", "ls",
     "glob", "glob_files",
