@@ -357,6 +357,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun newSubagentRunner(
         eventLogProvider: () -> LocalSessionEventLog,
+        contextSnapshotProvider: (String) -> String,
         schemasProvider: (Boolean, Boolean) -> JsonArray,
         executeTool: suspend (LocalToolCall, Boolean) -> AgentToolResult,
     ): LocalSubagentRunner = LocalSubagentRunner(
@@ -365,18 +366,7 @@ class LocalHarnessEngine @Inject constructor(
         state = state,
         jobs = jobs,
         historySnapshot = { modelHistory.toList() },
-        contextSnapshot = { query ->
-            val snapshot = _state.value
-            contextComposer.compose(
-                ContextRequest(
-                    query = query,
-                    mode = snapshot.conversationMode,
-                    projectId = snapshot.projectId,
-                    lineageId = snapshot.lineageId,
-                    handoffSummary = snapshot.handoffSummary,
-                ),
-            )
-        },
+        contextSnapshot = contextSnapshotProvider,
         eventLog = eventLogProvider,
         schemas = schemasProvider,
         execute = executeTool,
@@ -408,6 +398,18 @@ class LocalHarnessEngine @Inject constructor(
     private val subagents by lazy {
         newSubagentRunner(
             eventLogProvider = { eventLog },
+            contextSnapshotProvider = { query ->
+                val snapshot = _state.value
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = snapshot.conversationMode,
+                        projectId = snapshot.projectId,
+                        lineageId = snapshot.lineageId,
+                        handoffSummary = snapshot.handoffSummary,
+                    ),
+                )
+            },
             schemasProvider = ::subagentToolSchemas,
             executeTool = ::executeSafely,
         )
@@ -427,6 +429,17 @@ class LocalHarnessEngine @Inject constructor(
         )
         return newSubagentRunner(
             eventLogProvider = { boundEventLog },
+            contextSnapshotProvider = { query ->
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = boundState.conversationMode,
+                        projectId = boundState.projectId,
+                        lineageId = boundState.lineageId,
+                        handoffSummary = boundState.handoffSummary,
+                    ),
+                )
+            },
             schemasProvider = { allowMutation, allowVirtualScreen ->
                 val enabled = synchronized(localEnabledOptionalTools) {
                     localEnabledOptionalTools.toSet()
