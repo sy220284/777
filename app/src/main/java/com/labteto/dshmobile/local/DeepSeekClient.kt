@@ -17,7 +17,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -109,6 +108,7 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
+            put("stream_options", buildJsonObject { put("include_usage", true) })
             if (tools.isNotEmpty()) {
                 put("tools", tools)
                 put("tool_choice", "auto")
@@ -139,6 +139,7 @@ class DeepSeekClient @Inject constructor(
                 val reasoning = StringBuilder()
                 val fallback = StringBuilder()
                 val toolCalls = linkedMapOf<Int, StreamToolCall>()
+                var streamUsage: JsonObject? = null
                 var totalBytes = 0
                 var sawStreamData = false
                 responseBody.charStream().buffered().use { reader ->
@@ -161,8 +162,10 @@ class DeepSeekClient @Inject constructor(
                         if (data.isBlank()) continue
                         if (data == "[DONE]") break
                         val root = json.parseToJsonElement(data).jsonObject
+                        (root["usage"] as? JsonObject)?.let { streamUsage = it }
                         val delta = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-                            ?.get("delta")?.jsonObject ?: continue
+                            ?.get("delta") as? JsonObject
+                        if (delta == null) continue
                         val textDelta = assistantText(delta["content"]).orEmpty()
                         val reasoningDelta = delta["reasoning_content"]?.jsonPrimitive?.contentOrNull.orEmpty()
                         if (textDelta.isNotEmpty()) content.append(textDelta)
@@ -208,6 +211,7 @@ class DeepSeekClient @Inject constructor(
                     put("choices", buildJsonArray {
                         add(buildJsonObject { put("message", message) })
                     })
+                    streamUsage?.let { put("usage", it) }
                 }
                 parse(synthetic.toString())
             }
@@ -252,31 +256,13 @@ class DeepSeekClient @Inject constructor(
                 rawArguments = raw,
             )
         }
-        val usageObject = root["usage"]?.jsonObject
-        val promptTokens = usageObject?.get("prompt_tokens")?.jsonPrimitive?.longOrNull ?: 0L
-        val cacheHitTokens = usageObject?.get("prompt_cache_hit_tokens")?.jsonPrimitive?.longOrNull
-            ?: usageObject?.get("prompt_tokens_details")?.jsonObject
-                ?.get("cached_tokens")?.jsonPrimitive?.longOrNull
-            ?: 0L
-        val cacheMissTokens = usageObject?.get("prompt_cache_miss_tokens")?.jsonPrimitive?.longOrNull
-            ?: (promptTokens - cacheHitTokens).coerceAtLeast(0L)
-        val completionTokens = usageObject?.get("completion_tokens")?.jsonPrimitive?.longOrNull ?: 0L
-        val reasoningTokens = usageObject?.get("completion_tokens_details")?.jsonObject
-            ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
-            ?: 0L
+        val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
             message = message,
             content = assistantText(message["content"]),
             reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
             toolCalls = calls,
-            usage = DeepSeekTokenUsage(
-                promptTokens = promptTokens,
-                cacheHitTokens = cacheHitTokens,
-                cacheMissTokens = cacheMissTokens,
-                completionTokens = completionTokens,
-                reasoningTokens = reasoningTokens,
-                reported = usageObject != null,
-            ),
+            usage = usage,
         )
     }
 

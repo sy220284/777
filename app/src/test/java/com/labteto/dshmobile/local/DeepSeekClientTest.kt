@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,9 +49,12 @@ class DeepSeekClientTest {
             "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"先查\",\"content\":\"好\"}}]}",
             "data: {\"choices\":[{\"delta\":{\"content\":\"的\",\"tool_calls\":[{\"index\":0,\"id\":\"call-1\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\"}}]}}]}",
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"a.txt\\\"}\"}}]}}]}",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":100,\"prompt_cache_hit_tokens\":80,\"prompt_cache_miss_tokens\":20,\"completion_tokens\":12}}",
             "data: [DONE]",
         ).joinToString("\n")
+        var requestBody = ""
         val http = OkHttpClient.Builder().addInterceptor { chain ->
+            requestBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
             Response.Builder()
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
@@ -75,7 +79,47 @@ class DeepSeekClientTest {
         assertEquals("read", reply.toolCalls.single().name)
         assertEquals("a.txt", reply.toolCalls.single().arguments["path"]?.toString()?.trim('"'))
         assertTrue(deltas.any { it.content == "好" && it.reasoning == "先查" })
+        assertEquals(100L, reply.usage.promptTokens)
+        assertEquals(80L, reply.usage.cacheHitTokens)
+        assertEquals(20L, reply.usage.cacheMissTokens)
+        assertEquals(12L, reply.usage.completionTokens)
+        assertTrue(reply.usage.reported)
+        assertTrue(requestBody.contains("\"stream_options\":{\"include_usage\":true}"))
     }
+
+    @Test
+    fun capturesUsageBeforeSkippingEmptyChoicesChunk() = runBlocking {
+        val body = listOf(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"完成\"}}]}",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"prompt_cache_hit_tokens\":10,\"prompt_cache_miss_tokens\":40,\"completion_tokens\":5}}",
+            "data: [DONE]",
+        ).joinToString("\n")
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body(body.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+
+        val reply = streamingClient.completeStreaming(
+            apiKey = "test",
+            baseUrl = "https://example.com",
+            model = "deepseek-chat",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+        )
+
+        assertEquals("完成", reply.content)
+        assertEquals(50L, reply.usage.promptTokens)
+        assertEquals(10L, reply.usage.cacheHitTokens)
+        assertEquals(40L, reply.usage.cacheMissTokens)
+        assertEquals(5L, reply.usage.completionTokens)
+        assertTrue(reply.usage.reported)
+    }
+
     @Test
     fun parsesDeepSeekUsageAndCacheBreakdown() {
         val reply = client.parse(
