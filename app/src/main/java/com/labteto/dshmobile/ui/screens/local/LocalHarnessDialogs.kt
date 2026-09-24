@@ -20,6 +20,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalApprovalImpact
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.agentApprovalPurposeRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
@@ -217,4 +218,97 @@ internal fun QuestionDialog(
             enabled = answer.isNotBlank(),
         )
     }
+}
+
+
+@Composable
+internal fun ChatPersonaDialog(
+    profile: PersonaProfile,
+    onSave: (PersonaProfile) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
+    var identity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.identity) }
+    var background by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.background) }
+    var personality by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.personality) }
+    var speechStyle by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.speechStyle) }
+    var relationship by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.relationship) }
+    var worldSetting by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.worldSetting) }
+    var constraints by rememberSaveable(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.hardConstraints.joinToString("\n"))
+    }
+    var examples by rememberSaveable(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.exampleDialogues.joinToString("\n"))
+    }
+    var banned by rememberSaveable(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.bannedPhrases.joinToString("\n"))
+    }
+    var signature by rememberSaveable(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.signaturePhrases.joinToString("\n"))
+    }
+
+    fun lines(value: String): List<String> = value.lineSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .toList()
+
+    DsDialog(title = "角色人设", onDismiss = onDismiss) {
+        Text(
+            "固定人设会在每轮聊天重新注入，不跟普通聊天历史一起被压缩。",
+            style = DsType.small13,
+            color = DsTheme.colors.labelSecondary,
+        )
+        PersonaTextField("角色名称", name, { name = it }, singleLine = true)
+        PersonaTextField("人物身份", identity, { identity = it })
+        PersonaTextField("背景经历", background, { background = it })
+        PersonaTextField("核心性格", personality, { personality = it })
+        PersonaTextField("说话方式", speechStyle, { speechStyle = it })
+        PersonaTextField("与我的关系", relationship, { relationship = it })
+        PersonaTextField("世界设定", worldSetting, { worldSetting = it })
+        PersonaTextField("不可违反的人设（每行一条）", constraints, { constraints = it })
+        PersonaTextField("对白参考（每行一条）", examples, { examples = it })
+        PersonaTextField("角色专属禁用词（每行一条）", banned, { banned = it })
+        PersonaTextField("角色常用表达（每行一条）", signature, { signature = it })
+        DsButton(
+            text = "保存人设",
+            onClick = {
+                onSave(
+                    profile.copy(
+                        name = name,
+                        identity = identity,
+                        background = background,
+                        personality = personality,
+                        speechStyle = speechStyle,
+                        relationship = relationship,
+                        worldSetting = worldSetting,
+                        hardConstraints = lines(constraints),
+                        exampleDialogues = lines(examples),
+                        bannedPhrases = lines(banned),
+                        signaturePhrases = lines(signature),
+                    ),
+                )
+                onDismiss()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = name.isNotBlank(),
+        )
+    }
+}
+
+@Composable
+private fun PersonaTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    singleLine: Boolean = false,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(label) },
+        singleLine = singleLine,
+        minLines = if (singleLine) 1 else 2,
+        maxLines = if (singleLine) 1 else 6,
+    )
 }
