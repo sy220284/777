@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
@@ -9,16 +10,65 @@ import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /** UI adapter for the process-wide on-device Harness engine. */
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val engine: LocalHarnessEngine,
     private val personaAutoFillService: PersonaAutoFillService,
+    private val galleryStore: ChatPersonaGalleryStore,
 ) : ViewModel() {
     val state = engine.state
+    private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
+    val gallery = _gallery.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }
+        }
+    }
+
+    suspend fun saveCurrentToGallery(notes: String, existingId: String? = null): Result<PersonaGalleryEntry> = runCatching {
+        val snapshot = state.value
+        check(!snapshot.loading && !snapshot.running && snapshot.usageMode == LocalUsageMode.CHAT) {
+            "请在聊天空闲时保存人设与故事"
+        }
+        withContext(Dispatchers.IO) {
+            galleryStore.save(snapshot.chatPersona, snapshot.sessionId, snapshot.messages, notes, existingId)
+                .also { _gallery.value = galleryStore.list() }
+        }
+    }
+
+    suspend fun editGalleryNotes(id: String, notes: String): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) {
+            check(galleryStore.updateNotes(id, notes)) { "图集条目已不存在" }
+            _gallery.value = galleryStore.list()
+        }
+    }
+
+    suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) {
+            check(galleryStore.delete(id)) { "图集条目已不存在" }
+            _gallery.value = galleryStore.list()
+        }
+    }
+
+    fun startFromGallery(id: String): Boolean {
+        val snapshot = state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
+        val entry = gallery.value.firstOrNull { it.id == id } ?: return false
+        engine.createSession(LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT, entry)
+        return true
+    }
 
     fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = engine.selectModel(model)

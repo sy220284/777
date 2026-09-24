@@ -60,6 +60,7 @@ import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -1078,7 +1079,11 @@ class LocalHarnessEngine @Inject constructor(
     fun createSession(mode: LocalConversationMode) =
         createSession(mode, _state.value.usageMode)
 
-    fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode) {
+    fun createSession(
+        mode: LocalConversationMode,
+        usageMode: LocalUsageMode,
+        galleryEntry: PersonaGalleryEntry? = null,
+    ) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
         val sourceState = _state.value
@@ -1114,12 +1119,23 @@ class LocalHarnessEngine @Inject constructor(
                         LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
-                    val handoff = if (mode == LocalConversationMode.CONTINUATION) {
-                        buildHandoffSummary(sourceState)
+                    val handoff = if (galleryEntry != null) {
+                        galleryEntry.storyContext()
+                    } else if (mode == LocalConversationMode.CONTINUATION) {
+                        if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
+                            listOfNotNull(
+                                sourceState.handoffSummary?.takeIf(String::isNotBlank),
+                                buildHandoffSummary(sourceState),
+                            ).joinToString("\n\n").takeLast(5_500)
+                        } else {
+                            buildHandoffSummary(sourceState)
+                        }
                     } else {
                         null
                     }
-                    val personaId = if (
+                    val personaId = if (galleryEntry != null) {
+                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = galleryEntry.id)).id
+                    } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         sourceState.usageMode == LocalUsageMode.CHAT
                     ) {
@@ -1375,7 +1391,7 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId)
+            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.handoffSummary)
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withEphemeralContext(modelHistory.toList(), chatContext.prompt),
@@ -1550,7 +1566,7 @@ class LocalHarnessEngine @Inject constructor(
                     compactHistoryIfNeeded()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        ephemeralContext = chatTurnRunner.prepare(snapshot.personaId).prompt
+                        ephemeralContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.handoffSummary).prompt
                     } else {
                         ephemeralContext = contextComposer.compose(
                             ContextRequest(
