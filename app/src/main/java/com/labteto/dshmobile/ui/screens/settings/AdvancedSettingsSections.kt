@@ -362,6 +362,18 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
+        if (local.configured && local.configuredModels.isNotEmpty()) {
+            Text(
+                stringResource(R.string.local_saved_models, local.configuredModels.joinToString("、")),
+                style = DsType.caption11,
+                color = colors.labelSecondary,
+            )
+        }
+        Text(
+            stringResource(R.string.local_saved_models_hint),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
         OutlinedTextField(
             value = model,
             onValueChange = { model = it },

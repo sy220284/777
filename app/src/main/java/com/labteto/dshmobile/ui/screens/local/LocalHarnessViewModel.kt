@@ -17,6 +17,7 @@ class LocalHarnessViewModel @Inject constructor(
     val state = engine.state
 
     fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
+    fun selectModel(model: String) = engine.selectModel(model)
     fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)

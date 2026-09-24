@@ -28,6 +28,15 @@ class LocalApprovalPreferencesAndroidTest {
     }
 
     @Test
+    fun safeApprovalDefaultsOnAndExplicitDisablePersists() {
+        val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        assertTrue(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled())
+
+        LocalApprovalPreferences(shared).setSafeAutoApprovalEnabled(false)
+        assertFalse(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled())
+    }
+
+    @Test
     fun safeApprovalSurvivesNewPreferenceWrapper() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
         LocalApprovalPreferences(shared).setSafeAutoApprovalEnabled(true)

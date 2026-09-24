@@ -299,9 +299,6 @@ fun ChatListDrawer(
             }
 
             currentListSession?.let { current ->
-                item(key = "current-session-header") {
-                    SectionHeader("当前会话")
-                }
                 item(key = "current-session-" + current.sessionId) {
                     SessionRowItem(
                         session = current,
@@ -314,10 +311,6 @@ fun ChatListDrawer(
             }
 
             if (historySessions.isNotEmpty()) {
-                item(key = "history-session-header") {
-                    Spacer(Modifier.height(DsSpacing.small))
-                    SectionHeader("历史会话")
-                }
                 items(historySessions, key = { it.sessionId }) { session ->
                     Box(Modifier.animateItem()) {
                         SessionRowItem(
@@ -405,7 +398,7 @@ fun ChatListDrawer(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 DsButton(
-                    text = "任务",
+                    text = "定时任务",
                     onClick = {
                         onClose()
                         onOpenTasks()
@@ -430,7 +423,7 @@ fun ChatListDrawer(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 DsButton(
-                    text = "本机 Harness",
+                    text = "退出远程控制",
                     onClick = {
                         onClose()
                         onOpenLocalHarness()

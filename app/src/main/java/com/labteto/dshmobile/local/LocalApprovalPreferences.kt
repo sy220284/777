@@ -13,13 +13,13 @@ internal class LocalApprovalPreferences(
 ) {
     fun isSafeAutoApprovalEnabled(legacySessionValue: Boolean = false): Boolean {
         if (preferences.contains(KEY_SAFE_AUTO_APPROVAL)) {
-            return preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, false)
+            return preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, true)
         }
         if (legacySessionValue) {
             preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, true).apply()
             return true
         }
-        return false
+        return true
     }
 
     fun setSafeAutoApprovalEnabled(enabled: Boolean) {
