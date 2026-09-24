@@ -107,7 +107,8 @@ private fun applyModelHistoryEvent(
             }
         }
         "user/queue" -> {
-            if (event.data["action"]?.jsonPrimitive?.contentOrNull != "consumed") return false
+            val action = event.data["action"]?.jsonPrimitive?.contentOrNull
+            if (action !in setOf("consumed", "resumed")) return false
             val messages = event.data["model_messages"] as? JsonArray ?: return false
             var changed = false
             messages.forEach { element ->
