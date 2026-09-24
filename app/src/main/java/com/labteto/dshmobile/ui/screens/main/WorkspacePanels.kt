@@ -245,7 +245,11 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
     LaunchedEffect(tab) { load() }
     LaunchedEffect(tab.stat) { if (tab.stat == null) load() }
     Column(modifier.fillMaxWidth()) {
-        SelectionContainer { Text(tab.path, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall) }
+        Text(
+            tab.path.substringAfterLast('/').substringAfterLast('\\'),
+            Modifier.padding(horizontal = 16.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
         if (tab.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         tab.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
         TextButton(onClick = { scope.launch {
