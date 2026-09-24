@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui
 
+import androidx.annotation.StringRes
+import com.labteto.dshmobile.R
+
 /**
  * Presentation-only policy for agent-driven execution.
  *
@@ -89,4 +92,26 @@ internal fun agentOperationKind(toolName: String?): AgentOperationKind {
 
         else -> AgentOperationKind.Generic
     }
+}
+
+@StringRes
+internal fun agentOperationLabelRes(toolName: String?): Int = when (agentOperationKind(toolName)) {
+    AgentOperationKind.Inspect -> R.string.agent_operation_inspect
+    AgentOperationKind.Search -> R.string.agent_operation_search
+    AgentOperationKind.Update -> R.string.agent_operation_update
+    AgentOperationKind.Execute -> R.string.agent_operation_execute
+    AgentOperationKind.Web -> R.string.agent_operation_web
+    AgentOperationKind.Device -> R.string.agent_operation_device
+    AgentOperationKind.Image -> R.string.agent_operation_image
+    AgentOperationKind.Background -> R.string.agent_operation_background
+    AgentOperationKind.Delegate -> R.string.agent_operation_delegate
+    AgentOperationKind.External -> R.string.agent_operation_external
+    AgentOperationKind.Generic -> R.string.agent_operation_generic
+}
+
+@StringRes
+internal fun agentOperationStatusRes(running: Boolean, failed: Boolean): Int = when {
+    failed -> R.string.agent_operation_status_failed
+    running -> R.string.agent_operation_status_running
+    else -> R.string.agent_operation_status_done
 }
