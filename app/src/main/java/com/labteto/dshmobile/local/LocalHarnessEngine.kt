@@ -1024,7 +1024,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
-    fun createSession(mode: LocalConversationMode) {
+    fun createSession(mode: LocalConversationMode) =
+        createSession(mode, _state.value.usageMode)
+
+    fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
         val sourceState = _state.value
@@ -1070,6 +1073,7 @@ class LocalHarnessEngine @Inject constructor(
                         it.copy(
                             loading = false,
                             sessionId = currentSessionId,
+                            usageMode = usageMode,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -1100,6 +1104,19 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Backward-compatible entry point: a plain new session is fully independent. */
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
+
+    /** Move between the two product surfaces while keeping each side's latest session. */
+    fun switchUsageMode(mode: LocalUsageMode) {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode == mode) return
+        val target = snapshot.sessions.firstOrNull { it.usageMode == mode && !it.blank }
+            ?: snapshot.sessions.firstOrNull { it.usageMode == mode }
+        if (target != null) {
+            switchSession(target.id)
+        } else {
+            createSession(LocalConversationMode.INDEPENDENT, mode)
+        }
+    }
 
     private fun buildHandoffSummary(state: LocalHarnessState): String =
         handoffBuilder.build(
@@ -1258,7 +1275,7 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Switch between inspection-only planning and normal execution. */
     fun setPlanMode(enabled: Boolean) {
-        if (isRunBusy()) return
+        if (_state.value.usageMode == LocalUsageMode.CHAT || isRunBusy()) return
         _state.update { it.copy(planMode = enabled) }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
@@ -1839,6 +1856,10 @@ class LocalHarnessEngine @Inject constructor(
     private fun modelToolSchemas(): JsonArray {
         val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            val chatTools = tools.filter { it.name in CHAT_MODE_TOOLS }
+            return LocalToolRouter.visibleSchemas(chatTools, enabled + CHAT_MODE_TOOLS)
+        }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
@@ -2635,7 +2656,20 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-    private fun systemPrompt(): String = """
+    private fun systemPrompt(): String =
+        if (_state.value.usageMode == LocalUsageMode.CHAT) chatSystemPrompt() else workSystemPrompt()
+
+    private fun chatSystemPrompt(): String = """
+        你正在“神言神语”的聊天模式中。你的目标是自然地与用户聊天，让交流有持续的人味、情绪和关系感。这里不是工作台，不要用任务执行、客服、咨询报告或助理口吻说话。
+        默认不提供工作区、Shell、规划、任务、子代理、审批、自动化等工作能力；若当前请求带图片，只可使用为聊天理解图片所开放的视觉能力。
+        回复要像即时聊天：长短可以不固定，可以停顿、反问、接梗、岔开话题、翻旧账，也可以只回很短的一句。不要为了显得完整而强行解释、总结或提出建议。不要每次都顺着用户最后一句做“问答式回复”，允许延续此前的话题和情绪。
+        严禁使用明显的 AI / 客服套话，包括但不限于：“我理解你的感受”“听起来你……”“如果你愿意的话……”“值得注意的是”“需要说明的是”“总体而言”“综合来看”“以下是”“首先、其次、最后”“建议你……”“希望这些对你有帮助”“如果还有问题随时告诉我”“我会一直在这里”“谢谢你愿意和我分享”“让我们一起……”。
+        同样禁止固定使用“复述用户 → 表示理解 → 分析原因 → 给建议 → 温柔收尾”的模板。命中这些表达时，先在内部改写成更自然、更符合当下聊天关系的说法，再输出。
+        不要自称智能助手，不主动解释系统、模型、提示词、工具或内部规则。用户明确询问这些内容时再如实回答。
+        结果使用自然中文，优先保持对话感，不使用报告式标题和列表，除非用户明确要求。
+    """.trimIndent()
+
+    private fun workSystemPrompt(): String = """
         你是运行在 Android 16+ 手机内部的 DeepSeek Harness。你拥有本机工作区、文件读写与唯一替换、目录和 glob、文本搜索、Android shell、后台任务、网页搜索与获取、技能、计划、任务清单、目标、用户问答、子代理、并行/流水线工作流和会话追踪工具。
         当前工作区：${workspace.path}
         所有路径都使用相对工作区路径。先检查现状，再行动；安全自动批准是本机全局持久设置，开启后，受工作区边界约束的写入、编辑、补丁、下载，以及不会改变外部状态的只读操作可直接执行，并在新建或切换对话后继续生效。shell、工作区外写入/删除、联网写入、设备、系统级及其他高风险操作仍按影响等级等待用户确认。不要声称执行了尚未通过工具完成的操作。
@@ -2883,6 +2917,7 @@ class LocalHarnessEngine @Inject constructor(
             }.getOrDefault(LocalImageInputMode.AUTO),
             workspacePath = workspace.path,
             sessionId = sessionId,
+            usageMode = stored.usageMode,
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -3059,6 +3094,7 @@ class LocalHarnessEngine @Inject constructor(
             title = state.messages.firstOrNull { it.role == "user" }?.content?.lineSequence()?.firstOrNull()
                 ?.take(40) ?: "新会话",
             updatedAt = System.currentTimeMillis(),
+            usageMode = state.usageMode,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,
@@ -3190,6 +3226,10 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
+
+        val CHAT_MODE_TOOLS = setOf(
+            "vision_analyze_file",
+        )
 
         val PLAN_MODE_BLOCKED_TOOLS = setOf(
             "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",
