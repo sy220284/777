@@ -36,6 +36,8 @@ internal class LocalSessionRepository(
     private val store = VersionedSessionStore(root, json)
     private val lock = Any()
     private val pending = linkedMapOf<String, LocalHarnessSession>()
+    private val summaryCache = linkedMapOf<String, LocalSessionSummary>()
+    private var summariesLoaded = false
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
 
     init {
@@ -52,6 +54,9 @@ internal class LocalSessionRepository(
                             json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                             updatedAt = snapshot.updatedAt,
                         )
+                        synchronized(lock) {
+                            summaryCache[snapshot.id] = snapshot.toSummary()
+                        }
                         onWritten()
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
@@ -85,7 +90,25 @@ internal class LocalSessionRepository(
             )
         }
 
-    fun summaries(): List<LocalSessionSummary> = store.ids()
+    fun summaries(): List<LocalSessionSummary> {
+        val needsLoad = synchronized(lock) { !summariesLoaded }
+        if (needsLoad) {
+            val loaded = loadSummaries()
+            synchronized(lock) {
+                if (!summariesLoaded) {
+                    // Fresh writes may have populated entries while the disk scan was running.
+                    // Keep those newer in-memory summaries and fill only missing sessions from disk.
+                    loaded.forEach { summary -> summaryCache.putIfAbsent(summary.id, summary) }
+                    summariesLoaded = true
+                }
+            }
+        }
+        return synchronized(lock) {
+            summaryCache.values.sortedByDescending(LocalSessionSummary::updatedAt)
+        }
+    }
+
+    private fun loadSummaries(): List<LocalSessionSummary> = store.ids()
         .mapNotNull { id ->
             val loaded = try {
                 store.read(id)
@@ -113,5 +136,11 @@ internal class LocalSessionRepository(
                 )
             }.getOrNull()
         }
-        .sortedByDescending(LocalSessionSummary::updatedAt)
+
+    private fun LocalHarnessSession.toSummary(): LocalSessionSummary = LocalSessionSummary(
+        id = id,
+        title = title,
+        updatedAt = updatedAt,
+        blank = messages.none { it.content.isNotBlank() },
+    )
 }
