@@ -1287,18 +1287,7 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
     when (message.role) {
         "user" -> UserBubble(message.content)
 
-        "system" -> Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = colors.warnTertiary,
-        ) {
-            Text(
-                message.content,
-                style = DsType.small13,
-                color = colors.labelSecondary,
-                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            )
-        }
+        "system" -> Unit
 
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
