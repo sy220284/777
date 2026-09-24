@@ -246,6 +246,9 @@ internal fun ChatPersonaDialog(
     var signature by rememberSaveable(profile.id, profile.updatedAt) {
         mutableStateOf(profile.signaturePhrases.joinToString("\n"))
     }
+    var corrections by rememberSaveable(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.corrections.joinToString("\n"))
+    }
 
     fun lines(value: String): List<String> = value.lineSequence()
         .map(String::trim)
@@ -269,6 +272,11 @@ internal fun ChatPersonaDialog(
         PersonaTextField(stringResource(R.string.local_persona_examples), examples, { examples = it })
         PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
         PersonaTextField(stringResource(R.string.local_persona_signature), signature, { signature = it })
+        PersonaTextField(
+            stringResource(R.string.local_persona_corrections),
+            corrections,
+            { corrections = it },
+        )
         DsButton(
             text = stringResource(R.string.local_persona_save),
             onClick = {
@@ -285,6 +293,7 @@ internal fun ChatPersonaDialog(
                         exampleDialogues = lines(examples),
                         bannedPhrases = lines(banned),
                         signaturePhrases = lines(signature),
+                        corrections = lines(corrections),
                     ),
                 )
                 onDismiss()
