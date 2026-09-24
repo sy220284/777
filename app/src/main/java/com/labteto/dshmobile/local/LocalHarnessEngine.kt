@@ -1430,7 +1430,6 @@ class LocalHarnessEngine @Inject constructor(
                     step = modelStep + 1,
                     reply = rawReply,
                 )
-                usageTracker.record(snapshot.model, reply.usage)
                 modelStep += 1
                 repliesByStep[modelStep] = reply
                 AgentModelReply(
@@ -2490,10 +2489,16 @@ class LocalHarnessEngine @Inject constructor(
         step: Int,
         reply: LocalModelReply,
     ): LocalModelReply {
-        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) return reply
+        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
+            usageTracker.record(snapshot.model, reply.usage)
+            return reply
+        }
         val candidate = reply.content.orEmpty()
         val violations = ChatStyleGuard.violations(candidate)
-        if (violations.isEmpty()) return reply
+        if (violations.isEmpty()) {
+            usageTracker.record(snapshot.model, reply.usage)
+            return reply
+        }
 
         eventLog.append("chat/style-guard", buildJsonObject {
             put("step", step)
@@ -2523,6 +2528,7 @@ class LocalHarnessEngine @Inject constructor(
             return ChatStyleGuard.withContent(reply, ChatStyleGuard.scrub(candidate))
         }
 
+        usageTracker.record(snapshot.model, repaired.usage)
         val remaining = ChatStyleGuard.violations(repaired.content.orEmpty())
         if (remaining.isEmpty()) return repaired
 
