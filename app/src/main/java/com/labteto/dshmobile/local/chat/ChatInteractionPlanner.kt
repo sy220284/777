@@ -114,7 +114,7 @@ class ChatInteractionPlanner @Inject constructor(
         )
         appendLine("要求：")
         appendLine("1. stage 只能取 NEW / FAMILIAR / AMBIGUOUS / DATING / COMMITTED / CONFLICT / COOLING / SEPARATED / REPAIRING。")
-        appendLine("2. facts 只记录本轮明确说出或明确发生、以后仍有价值的事实；不得把动机、爱意、依恋类型、人格猜测写进 facts。")
+        appendLine("2. facts 只记录本轮明确说出或明确发生、以后仍有价值的事实；尽量保留原话关键短语，便于证据核对；不得把动机、爱意、依恋类型、人格猜测写进 facts。")
         appendLine("3. hypotheses 专门放暂定解释，必须给置信度；证据不足就放 unknowns，不为完整感硬猜。")
         appendLine("4. warmth/trust/reciprocity/tension/stability 每轮通常只小幅变化；普通一句话禁止关系数值剧烈跳变。")
         appendLine("5. stage 只有出现明确关系事件或连续强证据时才建议变化；一次回复慢、一个表情、一次冷淡都不足以改阶段。")
@@ -260,7 +260,13 @@ class ChatInteractionPlanner @Inject constructor(
             } else previous.unresolvedConflict,
             facts = if (raw.containsKey("facts")) mergeEvidence(
                 previous = previous.facts,
-                incoming = value.facts,
+                incoming = value.facts.filter {
+                    evidenceGrounded(
+                        evidence = it,
+                        userMessage = userMessage,
+                        assistantMessage = assistantMessage,
+                    )
+                },
                 minimumConfidence = 80,
                 maximumConfidence = 100,
                 allowedSources = FACT_SOURCES,
@@ -334,6 +340,37 @@ class ChatInteractionPlanner @Inject constructor(
             updatedAt = System.currentTimeMillis(),
         )
     }
+
+    private fun evidenceGrounded(
+        evidence: RelationshipEvidence,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val source = evidence.source.trim().lowercase()
+        val evidenceText = normalize(evidence.text)
+        if (evidenceText.length < 2) return false
+
+        val sourceText = when (source) {
+            "user", "explicit" -> normalize(userMessage)
+            "observed", "dialogue" -> normalize(userMessage + assistantMessage)
+            else -> return false
+        }
+        if (sourceText.length < 2) return false
+        if (sourceText.contains(evidenceText) || evidenceText.contains(sourceText)) return true
+
+        val evidenceBigrams = bigrams(evidenceText)
+        val sourceBigrams = bigrams(sourceText)
+        if (evidenceBigrams.isEmpty() || sourceBigrams.isEmpty()) return false
+        val shared = evidenceBigrams.count(sourceBigrams::contains)
+        val ratio = shared.toDouble() / evidenceBigrams.size
+        return shared >= 2 && ratio >= 0.25
+    }
+
+    private fun bigrams(text: String): Set<String> =
+        if (text.length < 2) emptySet()
+        else (0 until text.length - 1).mapTo(linkedSetOf()) { index ->
+            text.substring(index, index + 2)
+        }
 
     private fun mergeEvidence(
         previous: List<RelationshipEvidence>,
