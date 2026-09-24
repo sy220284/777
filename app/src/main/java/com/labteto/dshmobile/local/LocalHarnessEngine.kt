@@ -1380,12 +1380,13 @@ class LocalHarnessEngine @Inject constructor(
                     budget = imageRequestBudget,
                 )
                 val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
-                val reply = try {
+                val rawReply = try {
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
                         messages = requestMessages,
                         step = modelStep + 1,
+                        publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
                     ).also {
                         if (nativeImagesSent) {
                             imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
@@ -1416,11 +1417,19 @@ class LocalHarnessEngine @Inject constructor(
                                 budget = imageRequestBudget,
                             ),
                             step = modelStep + 1,
+                            publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
                         )
                     } else {
                         throw error
                     }
                 }
+                val reply = enforceChatStyle(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = modelStep + 1,
+                    reply = rawReply,
+                )
                 usageTracker.record(snapshot.model, reply.usage)
                 modelStep += 1
                 repliesByStep[modelStep] = reply
@@ -2474,13 +2483,66 @@ class LocalHarnessEngine @Inject constructor(
         return eventLogFor(id)
     }
 
+    private suspend fun enforceChatStyle(
+        key: String,
+        snapshot: LocalHarnessState,
+        messages: List<JsonObject>,
+        step: Int,
+        reply: LocalModelReply,
+    ): LocalModelReply {
+        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) return reply
+        val candidate = reply.content.orEmpty()
+        val violations = ChatStyleGuard.violations(candidate)
+        if (violations.isEmpty()) return reply
+
+        eventLog.append("chat/style-guard", buildJsonObject {
+            put("step", step)
+            put("action", "rewrite")
+            put("violations", JsonArray(violations.map(::JsonPrimitive)))
+        })
+        // The first candidate still consumed model tokens even though it will never reach the user.
+        usageTracker.record(snapshot.model, reply.usage)
+        val repairContext = ChatStyleGuard.repairPrompt(candidate, violations)
+        val repaired = try {
+            completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = withEphemeralContext(messages, repairContext),
+                step = step,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            eventLog.append("chat/style-guard", buildJsonObject {
+                put("step", step)
+                put("action", "rewrite-failed")
+                put("detail", error.message.orEmpty().take(1_000))
+            })
+            return ChatStyleGuard.withContent(reply, ChatStyleGuard.scrub(candidate))
+        }
+
+        val remaining = ChatStyleGuard.violations(repaired.content.orEmpty())
+        if (remaining.isEmpty()) return repaired
+
+        eventLog.append("chat/style-guard", buildJsonObject {
+            put("step", step)
+            put("action", "scrub")
+            put("violations", JsonArray(remaining.map(::JsonPrimitive)))
+        })
+        return ChatStyleGuard.withContent(repaired, ChatStyleGuard.scrub(repaired.content.orEmpty()))
+    }
+
     private suspend fun completeWithRetry(
         key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
+        toolsOverride: JsonArray? = null,
+        publishPreview: Boolean = true,
     ): LocalModelReply {
-        val tools = modelToolSchemas()
+        val tools = toolsOverride ?: modelToolSchemas()
         val logMessages = redactModelImages(messages)
         eventLog.append("request/header", buildJsonObject {
             put("model", snapshot.model)
@@ -2553,7 +2615,9 @@ class LocalHarnessEngine @Inject constructor(
                 minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
                 clockMs = { System.nanoTime() / 1_000_000 },
                 publish = { preview ->
-                    _state.update { it.copy(streamingAssistant = preview) }
+                    if (publishPreview) {
+                        _state.update { it.copy(streamingAssistant = preview) }
+                    }
                 },
             )
             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
