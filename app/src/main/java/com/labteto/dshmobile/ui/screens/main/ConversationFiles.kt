@@ -19,18 +19,13 @@ internal data class ConversationFileRef(
 
 internal data class ConversationFileIndex(
     val artifacts: List<ConversationFileRef> = emptyList(),
+    // Compatibility field: execution-touched files are intentionally never populated.
     val involved: List<ConversationFileRef> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = artifacts.isEmpty() && involved.isEmpty()
+    val isEmpty: Boolean get() = artifacts.isEmpty()
 }
 
-/**
- * Files the current session actually touched.
- *
- * The workspace protocol exposes the directory tree, but it does not expose a separate
- * conversation-file projection. Rebuild that view from durable tool calls and their result
- * metadata instead of guessing from timestamps in the workspace.
- */
+/** Final user-facing deliverables for the current session. */
 internal fun conversationFileIndex(
     nodes: List<ChatNode>,
     cwd: String?,
@@ -60,7 +55,7 @@ internal fun conversationFileIndex(
     // Compatibility fallback for tools whose purpose is explicitly to export/download/present.
     nodes.filterIsInstance<ToolCallNode>().forEach { call ->
         val args = runCatching { WireJson.parseToJsonElement(call.arguments) as? JsonObject }.getOrNull()
-        if (!isArtifactTool(call.name, args)) return@forEach
+        if (!isArtifactTool(call.name)) return@forEach
         val result = results[call.callId]
 
         args?.let { objectArgs ->
@@ -113,7 +108,7 @@ internal fun conversationFileIndex(
 private fun newer(old: ConversationFileRef?, next: ConversationFileRef): ConversationFileRef =
     if (old == null || next.seq >= old.seq) next else old
 
-private fun isArtifactTool(name: String, args: JsonObject?): Boolean {
+private fun isArtifactTool(name: String): Boolean {
     val tool = name.lowercase()
     if (tool in ARTIFACT_TOOLS) return true
     if ("download" in tool || "export" in tool || "generate_file" in tool) return true
@@ -176,16 +171,6 @@ private val FILE_KEYS = setOf(
     "save_path", "savePath", "target_path", "targetPath",
 )
 
-private val ARTIFACT_PATH_KEYS = setOf(
-    "output_path", "outputPath", "destination", "destination_path", "destinationPath",
-    "save_path", "savePath",
-)
-
 private val ARTIFACT_TOOLS = setOf(
     "download_file", "present", "present_file", "export_file", "copy_file", "generate_file",
-)
-private val DIRECTORY_PATH_TOOLS = setOf(
-    "list", "list_files", "ls",
-    "glob", "glob_files",
-    "grep", "search", "search_text", "file_search",
 )
