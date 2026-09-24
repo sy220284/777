@@ -137,7 +137,7 @@ class ChatRelationshipEngine @Inject constructor() {
     private fun StringBuilder.appendDynamics(dynamics: RelationshipDynamics) {
         appendLine("【关系动力】")
         appendLine(
-            "阶段=${dynamics.stage.name}；温度=${dynamics.warmth}/100；信任=${dynamics.trust}/100；" +
+            "阶段=${dynamics.stage}；温度=${dynamics.warmth}/100；信任=${dynamics.trust}/100；" +
                 "互惠=${dynamics.reciprocity}/100；张力=${dynamics.tension}/100；稳定=${dynamics.stability}/100",
         )
         dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let {
