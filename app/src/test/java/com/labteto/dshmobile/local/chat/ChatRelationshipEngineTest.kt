@@ -41,6 +41,10 @@ class ChatRelationshipEngineTest {
             ChatRelationshipView.REPLY_COACH,
             engine.classify("她说刚下班，这句怎么回"),
         )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("帮我分析一下这个项目现在什么阶段"),
+        )
     }
 
     @Test
