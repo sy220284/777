@@ -46,10 +46,10 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
-            return Result.failure(IllegalStateException("当前状态暂时不能生成人设"))
+            return Result.failure(IllegalStateException("persona_autofill_busy"))
         }
         if (!snapshot.configured) {
-            return Result.failure(IllegalStateException("请先完成模型配置"))
+            return Result.failure(IllegalStateException("persona_autofill_unconfigured"))
         }
         return runCatching {
             val generated = personaAutoFillService.generate(
