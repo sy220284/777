@@ -54,6 +54,7 @@ import com.labteto.dshmobile.core.session.TurnErrorNode
 import com.labteto.dshmobile.core.session.TurnStartNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.session.WorkflowNode
+import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.AttachmentImage
@@ -404,11 +405,16 @@ private fun ActionIcon(
 
 @Composable
 private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
-    val result = context.nodes
-        .filterIsInstance<ToolResultNode>()
-        .firstOrNull { it.callId == node.callId }
-    val running = result == null && context.running
-    val failed = result?.isError == true
+    val kind = agentOperationKind(node.name)
+    val peers = if (node.turn == null) {
+        listOf(node)
+    } else {
+        context.nodes.filterIsInstance<ToolCallNode>()
+            .filter { it.turn == node.turn && agentOperationKind(it.name) == kind }
+    }
+    val results = context.nodes.filterIsInstance<ToolResultNode>().associateBy { it.callId }
+    val failed = peers.any { results[it.callId]?.isError == true }
+    val running = context.running && peers.any { results[it.callId] == null }
     val state = when {
         failed -> DisclosureState.Error
         running -> DisclosureState.Running
