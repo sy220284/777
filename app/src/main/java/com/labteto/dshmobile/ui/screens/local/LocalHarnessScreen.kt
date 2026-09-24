@@ -91,6 +91,7 @@ import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
@@ -199,6 +200,7 @@ fun LocalHarnessScreen(
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
                 onUsageModeChange = viewModel::switchUsageMode,
+                onConfigureChatPersona = viewModel::configureChatPersona,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -634,6 +636,7 @@ private fun LocalChat(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onUsageModeChange: (LocalUsageMode) -> Unit,
+    onConfigureChatPersona: (PersonaProfile) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: () -> Unit,
     onDeny: () -> Unit,
@@ -664,6 +667,7 @@ private fun LocalChat(
     var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -765,7 +769,13 @@ private fun LocalChat(
                         .clip(DsShapes.pillFull)
                         .background(colors.bgModulePlatform)
                         .clickable(enabled = !state.running) {
-                            if (state.configured) showModelPicker = true else onConfigure()
+                            if (state.usageMode == LocalUsageMode.CHAT) {
+                                showPersonaEditor = true
+                            } else if (state.configured) {
+                                showModelPicker = true
+                            } else {
+                                onConfigure()
+                            }
                         }
                         .padding(horizontal = DsSpacing.small),
                     verticalAlignment = Alignment.CenterVertically,
@@ -774,7 +784,13 @@ private fun LocalChat(
                     Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.labelSecondary,
                         modifier = Modifier.size(16.dp))
                     Text(
-                        if (state.configured) state.model else stringResource(R.string.local_model_setup),
+                        if (state.usageMode == LocalUsageMode.CHAT) {
+                            state.chatPersona.name
+                        } else if (state.configured) {
+                            state.model
+                        } else {
+                            stringResource(R.string.local_model_setup)
+                        },
                         style = DsType.small13Strong,
                         color = colors.labelPrimary,
                         maxLines = 1,
@@ -891,7 +907,7 @@ private fun LocalChat(
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
-                                EmptyLocalChat()
+                                EmptyLocalChat(state.chatPersona.name)
                             } else {
                                 EmptyLocalHarness { suggestion ->
                                     drafts[state.sessionId] = suggestion
@@ -1163,6 +1179,13 @@ private fun LocalChat(
             onDismiss = onCancelQuestion,
         )
     }
+    if (showPersonaEditor) {
+        ChatPersonaDialog(
+            profile = state.chatPersona,
+            onSave = onConfigureChatPersona,
+            onDismiss = { showPersonaEditor = false },
+        )
+    }
     if (showModelPicker) {
         DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
             state.configuredModels.forEach { model ->
@@ -1302,7 +1325,7 @@ private fun ImportedAttachmentRow(
 }
 
 @Composable
-private fun EmptyLocalChat() {
+private fun EmptyLocalChat(personaName: String) {
     val colors = DsTheme.colors
     Column(
         Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = DsSpacing.xlarge),
@@ -1310,9 +1333,9 @@ private fun EmptyLocalChat() {
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
         WhaleMark(Modifier.size(40.dp))
-        Text("聊点什么", style = DsType.display24, color = colors.labelPrimary)
+        Text(personaName, style = DsType.display24, color = colors.labelPrimary)
         Text(
-            "这里按聊天来，不走工作流程。后续角色、人设、关系和主动消息都会接在这个模式里。",
+            "想说什么就说。这里按角色聊天来，不走工作流程。",
             style = DsType.std14,
             color = colors.labelSecondary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
