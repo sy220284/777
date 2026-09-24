@@ -11,6 +11,38 @@ import org.junit.Test
 
 class LocalSessionTranscriptProjectionTest {
     @Test
+    fun regeneratedAnswerReplacesOldBubbleAndOldModelReplyOnRestart() {
+        val old = message("old", "assistant", "原回答", 1L)
+        val replacement = message("new", "assistant", "新回答", 2L)
+        val event = LocalSessionEventLog.Event(
+            sequence = 4L,
+            type = "assistant/message",
+            createdAt = 2L,
+            data = buildJsonObject {
+                put("role", "assistant")
+                put("content", "新回答")
+                put("replaces", "old")
+                put("transcript", encodeTranscriptMessages(listOf(replacement)))
+            },
+        )
+        val projected = projectSessionTranscriptTail(listOf(old), listOf(event), 3L)
+        assertEquals(listOf(replacement), projected.messages)
+        val history = restoreLocalModelHistory(
+            events = listOf(
+                LocalSessionEventLog.Event(1L, "user/message", 1L, buildJsonObject { put("content", "问题") }),
+                LocalSessionEventLog.Event(2L, "assistant/message", 1L, buildJsonObject {
+                    put("role", "assistant"); put("content", "原回答")
+                }),
+                event,
+            ),
+            legacyFallback = emptyList(),
+            codec = ModelHistoryCheckpointCodec(),
+        )
+        assertEquals(listOf("问题", "新回答"), history.messages.map { it["content"].toString().trim('"') })
+        assertFalse(history.messages.last().containsKey("replaces"))
+    }
+
+    @Test
     fun replaysTranscriptTailInSequenceOrderAndDeduplicatesByStableId() {
         val existing = message("m-old", "user", "旧消息", 10L)
         val duplicate = existing.copy(content = "不应覆盖")

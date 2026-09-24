@@ -24,6 +24,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun selectModel(model: String) = engine.selectModel(model)
     fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
+    fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
+    suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
     suspend fun workspaceFiles() = engine.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = engine.conversationFilesForUi(sessionId)

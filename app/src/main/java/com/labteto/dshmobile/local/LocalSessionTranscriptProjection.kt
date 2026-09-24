@@ -37,7 +37,7 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
     )
 
 internal fun assistantModelMessageFromEvent(data: JsonObject): JsonObject =
-    (data["message"] as? JsonObject) ?: JsonObject(data - "transcript")
+    (data["message"] as? JsonObject) ?: JsonObject(data - "transcript" - "replaces")
 
 internal fun projectSessionTranscriptTail(
     snapshotMessages: List<LocalHarnessMessage>,
@@ -53,6 +53,13 @@ internal fun projectSessionTranscriptTail(
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy { event -> event.sequence }
         .forEach { event ->
+            if (event.type == "assistant/message") {
+                val replacedId = (event.data["replaces"] as? JsonPrimitive)?.contentOrNull
+                if (replacedId != null) {
+                    messages.removeAll { it.id == replacedId }
+                    knownIds.remove(replacedId)
+                }
+            }
             val decoded = decodeTranscriptMessages(event.data)
             if (decoded != null) {
                 decoded.forEach { message ->
