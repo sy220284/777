@@ -1281,26 +1281,25 @@ private fun ExecutionStatusCard(
             }
             if (expanded) {
                 state.goal?.let { goal ->
-                    Text("目标 · ${goal.status}", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    Text(goal.description, style = DsType.small13, color = colors.labelSecondary)
-                    goal.note?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary) }
+                    Text(
+                        stringResource(R.string.operation_goal_status, goal.status),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
                 }
                 if (state.plan.isNotEmpty()) {
-                    Text("计划", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.plan.forEachIndexed { index, item ->
-                        Text("${index + 1}. $item", style = DsType.small13, color = colors.labelSecondary)
-                    }
+                    Text(
+                        stringResource(R.string.operation_plan_count, state.plan.size),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
                 }
                 if (state.todos.isNotEmpty()) {
-                    Text("任务", style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.todos.forEach { item ->
-                        val mark = when (item.status) {
-                            "completed" -> "✓"
-                            "in_progress" -> "●"
-                            else -> "○"
-                        }
-                        Text("$mark ${item.content}", style = DsType.small13, color = colors.labelSecondary)
-                    }
+                    Text(
+                        stringResource(R.string.operation_task_count, completed, total),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
                 }
                 Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
                 Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
