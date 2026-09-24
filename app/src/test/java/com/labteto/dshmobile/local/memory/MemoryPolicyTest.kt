@@ -146,7 +146,7 @@ class MemoryPolicyTest {
 
         requireNotNull(candidate)
         assertEquals(MemoryScope.LINEAGE, candidate.scope)
-        assertEquals(MemoryKind.STATE, candidate.kind)
+        assertEquals(MemoryKind.RELATIONSHIP_STATE, candidate.kind)
         assertEquals("当前对话关系状态：我们｜确定关系", candidate.content)
     }
 
