@@ -327,7 +327,7 @@ internal fun ChatPersonaDialog(
                                     aiSucceeded = true
                                 }
                                 .onFailure { error ->
-                                    aiError = error.message ?: "生成人设失败"
+                                    aiError = error.message ?: "persona_autofill_failed"
                                 }
                             aiGenerating = false
                         }
@@ -349,8 +349,14 @@ internal fun ChatPersonaDialog(
                     )
                 }
                 aiError?.takeIf(String::isNotBlank)?.let { error ->
+                    val message = when (error) {
+                        "persona_autofill_busy" -> stringResource(R.string.local_persona_ai_busy)
+                        "persona_autofill_unconfigured" -> stringResource(R.string.local_persona_ai_unconfigured)
+                        "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
+                        else -> error
+                    }
                     Text(
-                        error,
+                        message,
                         style = DsType.caption11,
                         color = DsTheme.colors.error,
                     )
