@@ -1400,6 +1400,9 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            captureChatPersonaCorrection(memoryInput)
+        }
         val directChat = _state.value.usageMode == LocalUsageMode.CHAT &&
             !hasLocalImageRefs(modelHistory.takeLast(1))
         if (directChat) {
@@ -1407,6 +1410,23 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             runWorkTurn(input, memoryInput)
         }
+    }
+
+    private fun captureChatPersonaCorrection(text: String) {
+        val snapshot = _state.value
+        if (snapshot.usageMode != LocalUsageMode.CHAT || text.isBlank()) return
+        val updated = chatPersonaStore.captureExplicitCorrection(snapshot.personaId, text) ?: return
+        if (updated.corrections == snapshot.chatPersona.corrections) return
+
+        _state.update { current ->
+            if (current.personaId == updated.id) current.copy(chatPersona = updated) else current
+        }
+        eventLog.append("chat/persona-correction", buildJsonObject {
+            put("persona_id", updated.id)
+            put("count", updated.corrections.size)
+            put("latest", updated.corrections.lastOrNull().orEmpty())
+        })
+        persist()
     }
 
     private suspend fun runChatTurn(input: String) {
