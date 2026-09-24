@@ -88,6 +88,11 @@ class ChatTurnRunner @Inject constructor(
             appendLine("【不可违反的人设】")
             persona.hardConstraints.forEach { appendLine("- $it") }
         }
+        if (persona.corrections.isNotEmpty()) {
+            appendLine("【用户明确纠正过的人设】")
+            appendLine("这些纠正优先于模型自行概括的风格，不要重复犯同类偏差。")
+            persona.corrections.takeLast(12).forEach { appendLine("- $it") }
+        }
         if (persona.signaturePhrases.isNotEmpty()) {
             appendLine("【常用表达】")
             persona.signaturePhrases.forEach { appendLine("- $it") }
