@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.HttpUrl
 
 /** The subset of a GitHub release this app reads. */
 @Serializable
@@ -99,6 +101,24 @@ internal fun parseGithubSha256(digest: String?): String? {
 private fun normalizeVersion(value: String): String =
     value.trim().removePrefix("v").substringBefore('+')
 
+/** Accept only this repository's published release URLs before constructing asset links. */
+internal fun releaseFromWebsiteUrl(url: HttpUrl): AvailableUpdate? {
+    if (url.scheme != "https" || url.host != "github.com") return null
+    val path = url.pathSegments
+    if (path.size != 5 || path.subList(0, 4) !=
+        listOf("sy220284", "777", "releases", "tag")) return null
+    val tag = path[4]
+    if (!tag.matches(Regex("v[0-9]+\\.[0-9]+\\.[0-9]+-777\\.[0-9]+"))) return null
+    val base = "https://github.com/sy220284/777/releases"
+    return AvailableUpdate(
+        version = tag.removePrefix("v"),
+        url = "$base/tag/$tag",
+        apkUrl = "$base/download/$tag/app-release.apk",
+        apkName = "app-release.apk",
+        checksumUrl = "$base/download/$tag/SHA256SUMS.txt",
+    )
+}
+
 /** Is [candidate] a later version than [current]? */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
     data class ParsedVersion(
@@ -179,8 +199,28 @@ class UpdateChecker @Inject constructor(
         .build()
 
     suspend fun checkNow(currentVersion: String): AvailableUpdate? {
-        val releases = fetchRecentReleases()
-            .filterNot { it.draft || it.prerelease }
+        // The small latest-release endpoint is sufficient for a verified full APK update.
+        // Release history is only needed to save bandwidth with a patch chain.
+        val latest = try {
+            fetchLatestRelease()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+        val releases = if (latest != null) {
+            listOf(latest)
+        } else {
+            try {
+                fetchRecentReleases()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                return fetchLatestFromWebsite().takeIf {
+                    isNewerVersion(it.version, currentVersion)
+                }
+            }
+        }.filterNot { it.draft || it.prerelease }
         val release = releases.firstOrNull { candidate ->
             val version = normalizeVersion(candidate.tagName)
             version.isNotEmpty() && isNewerVersion(version, currentVersion)
@@ -193,10 +233,21 @@ class UpdateChecker @Inject constructor(
         }
         val apkDigest = parseGithubSha256(apk?.digest)
         val candidateChain = if (apkDigest != null) {
+            val history = if (latest == null) {
+                releases
+            } else {
+                try {
+                    fetchRecentReleases()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
             resolvePatchChain(
                 currentVersion = normalizeVersion(currentVersion),
                 latestVersion = version,
-                releases = releases,
+                releases = listOf(release) + history,
             )
         } else {
             emptyList()
@@ -300,6 +351,30 @@ class UpdateChecker @Inject constructor(
         json.decodeFromString(ListSerializer, body)
     }
 
+    private suspend fun fetchLatestRelease(): GithubRelease = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(LATEST_RELEASE_API)
+            .header("Accept", "application/vnd.github+json")
+            .header("Cache-Control", "no-cache")
+            .get()
+            .build()
+        json.decodeFromString(GithubRelease.serializer(), executeGithubText(request, "检查最新发行版"))
+    }
+
+    private suspend fun fetchLatestFromWebsite(): AvailableUpdate = withContext(Dispatchers.IO) {
+        // GitHub redirects /releases/latest to /releases/tag/<tag>. The page response
+        // identifies the published tag without parsing HTML. The APK is still verified
+        // against the release's SHA256SUMS before Android is asked to install it.
+        val request = Request.Builder().url(RELEASES_URL).get().build()
+        githubClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("访问 GitHub 发行页失败：HTTP ${response.code}")
+            }
+            releaseFromWebsiteUrl(response.request.url)
+                ?: throw IOException("GitHub 发行页没有返回有效的正式版地址")
+        }
+    }
+
     private suspend fun fetchManifest(asset: GithubAsset): UpdateManifest? = withContext(Dispatchers.IO) {
         val expected = parseGithubSha256(asset.digest) ?: return@withContext null
         if (asset.size !in 1..MAX_MANIFEST_BYTES) return@withContext null
@@ -384,6 +459,7 @@ class UpdateChecker @Inject constructor(
         const val MAX_REQUEST_ATTEMPTS = 3
         const val REQUEST_RETRY_BACKOFF_MS = 400L
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
+        const val LATEST_RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
         const val RECENT_RELEASES_API =
             "https://api.github.com/repos/$REPO/releases?per_page=$MAX_RELEASES_TO_SCAN"
         const val UPDATE_MANIFEST_NAME = "update-manifest.json"
