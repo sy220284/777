@@ -76,7 +76,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -114,8 +113,6 @@ import okhttp3.OkHttpClient
 
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
-
-internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
@@ -470,8 +467,7 @@ class LocalHarnessEngine @Inject constructor(
     private var sessionTransitioning = false
     private var activeJob: Job? = null
     private var persistentRecoveryJob: Job? = null
-    private var approvalResponse: CompletableDeferred<Boolean>? = null
-    private var questionResponse: CompletableDeferred<String>? = null
+    private val interactions = LocalInteractionCoordinator(_state)
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
@@ -938,8 +934,8 @@ class LocalHarnessEngine @Inject constructor(
     fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
     /** Resolve the current write or shell approval. */
-    fun answerApproval(approved: Boolean) {
-        approvalResponse?.complete(approved)
+    fun answerApproval(callId: String, approved: Boolean) {
+        interactions.answerApproval(callId, approved)
     }
 
     /**
@@ -949,7 +945,16 @@ class LocalHarnessEngine @Inject constructor(
      * it only suppresses future prompts for path-confined workspace writes and read-only tools.
      */
     fun enableAutoApproval() {
+        enableAutoApprovalInternal(expectedCallId = null)
+    }
+
+    fun enableAutoApprovalForPending(callId: String) {
+        enableAutoApprovalInternal(expectedCallId = callId)
+    }
+
+    private fun enableAutoApprovalInternal(expectedCallId: String?) {
         val pending = _state.value.pendingApproval
+        if (expectedCallId != null && pending?.callId != expectedCallId) return
         approvalPreferences.setSafeAutoApprovalEnabled(true)
         _state.update { it.copy(safeAutoApprovalEnabled = true) }
         eventLog.append("approval/mode", buildJsonObject {
@@ -958,13 +963,13 @@ class LocalHarnessEngine @Inject constructor(
         })
         persist()
         if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
-            approvalResponse?.complete(true)
+            pending?.callId?.let { interactions.answerApproval(it, true) }
         }
     }
 
     /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
-    fun enableDeviceApprovalLease() {
-        val pending = _state.value.pendingApproval
+    fun enableDeviceApprovalLease(callId: String) {
+        val pending = _state.value.pendingApproval?.takeIf { it.callId == callId }
         if (pending?.canApproveDeviceTurn != true) {
             eventLog.append("approval/device-lease-rejected", buildJsonObject {
                 put("reason", "pending-tool-requires-explicit-approval")
@@ -974,7 +979,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         _state.update { it.copy(deviceApprovalLease = true) }
         eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
-        approvalResponse?.complete(true)
+        interactions.answerApproval(pending.callId, true)
     }
 
     fun disableDeviceApprovalLease() {
@@ -991,19 +996,18 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Resolve the current model-authored question. */
-    fun answerQuestion(answer: String) {
-        questionResponse?.complete(answer.trim())
+    fun answerQuestion(callId: String, answer: String) {
+        interactions.answerQuestion(callId, answer)
     }
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    fun cancelQuestion() {
-        questionResponse?.complete(LOCAL_QUESTION_CANCELLED_RESPONSE)
+    fun cancelQuestion(callId: String) {
+        interactions.cancelQuestion(callId)
     }
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
-        approvalResponse?.complete(false)
-        questionResponse?.cancel()
+        interactions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.clear()
             if (discarded > 0) {
@@ -1170,8 +1174,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun cancelActiveRunAndJoin() {
-        approvalResponse?.complete(false)
-        questionResponse?.cancel()
+        interactions.cancelAll()
         val job = synchronized(runStateLock) {
             val discarded = pendingInputs.clear()
             if (discarded > 0) {
@@ -1589,8 +1592,7 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { it.copy(error = error.message ?: "本机 Harness 执行失败") }
             // TurnFailed durably records and projects the visible failure message.
         } finally {
-            approvalResponse = null
-            questionResponse = null
+            interactions.cancelAll()
             _state.update {
                 it.copy(
                     running = false,
@@ -2267,28 +2269,18 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        val response = CompletableDeferred<Boolean>()
-        approvalResponse = response
-        _state.update {
-            it.copy(
-                pendingApproval = LocalApproval(
-                    callId = call.id,
-                    toolName = call.name,
-                    summary = summary,
-                    arguments = call.rawArguments,
-                    access = tool.access.name.lowercase(),
-                    impact = approvalImpact(tool),
-                    canAutoApproveSafely = canAutoApprove(tool, call.arguments),
-                    canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
-                ),
-            )
-        }
-        return try {
-            response.await()
-        } finally {
-            approvalResponse = null
-            _state.update { it.copy(pendingApproval = null) }
-        }
+        return interactions.awaitApproval(
+            LocalApproval(
+                callId = call.id,
+                toolName = call.name,
+                summary = summary,
+                arguments = call.rawArguments,
+                access = tool.access.name.lowercase(),
+                impact = approvalImpact(tool),
+                canAutoApproveSafely = canAutoApprove(tool, call.arguments),
+                canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
+            ),
+        )
     }
 
     private fun updatePlan(args: JsonObject): String {
@@ -2356,19 +2348,10 @@ class LocalHarnessEngine @Inject constructor(
         return "目标状态已更新为 $status"
     }
 
-    private suspend fun askUser(call: LocalToolCall, question: String, options: List<String>): String {
-        val response = CompletableDeferred<String>()
-        questionResponse = response
-        _state.update {
-            it.copy(pendingQuestion = LocalQuestion(call.id, question.take(2_000), options.take(6)))
-        }
-        return try {
-            response.await().ifBlank { "用户未提供文字回答" }
-        } finally {
-            questionResponse = null
-            _state.update { it.copy(pendingQuestion = null) }
-        }
-    }
+    private suspend fun askUser(call: LocalToolCall, question: String, options: List<String>): String =
+        interactions.awaitQuestion(
+            LocalQuestion(call.id, question.take(2_000), options.take(6)),
+        )
 
     private suspend fun exitPlanMode(call: LocalToolCall, plan: String): String {
         if (!_state.value.planMode) return "当前未启用规划模式"

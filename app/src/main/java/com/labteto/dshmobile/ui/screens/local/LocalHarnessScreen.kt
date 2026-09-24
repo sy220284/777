@@ -138,8 +138,14 @@ fun LocalHarnessScreen(
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
-    BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
-    BackHandler(enabled = state.pendingQuestion != null) { viewModel.cancelQuestion() }
+    val pendingApprovalCallId = state.pendingApproval?.callId
+    val pendingQuestionCallId = state.pendingQuestion?.callId
+    BackHandler(enabled = pendingApprovalCallId != null) {
+        pendingApprovalCallId?.let(viewModel::deny)
+    }
+    BackHandler(enabled = pendingQuestionCallId != null) {
+        pendingQuestionCallId?.let(viewModel::cancelQuestion)
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -198,6 +204,7 @@ fun LocalHarnessScreen(
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
                 onAutoApprove = viewModel::enableAutoApproval,
+                onAutoApprovePending = viewModel::enableAutoApprovalForPending,
                 onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
                 onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
                 onDisableAutoApprove = viewModel::disableAutoApproval,
@@ -628,14 +635,15 @@ private fun LocalChat(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
-    onApprove: () -> Unit,
-    onDeny: () -> Unit,
+    onApprove: (String) -> Unit,
+    onDeny: (String) -> Unit,
     onAutoApprove: () -> Unit,
-    onApproveDeviceTurn: () -> Unit,
+    onAutoApprovePending: (String) -> Unit,
+    onApproveDeviceTurn: (String) -> Unit,
     onDisableDeviceTurn: () -> Unit,
     onDisableAutoApprove: () -> Unit,
-    onAnswerQuestion: (String) -> Unit,
-    onCancelQuestion: () -> Unit,
+    onAnswerQuestion: (String, String) -> Unit,
+    onCancelQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -1107,22 +1115,22 @@ private fun LocalChat(
         }
     }
 
-    state.pendingApproval?.let {
+    state.pendingApproval?.let { approval ->
         ApprovalDialog(
-            approval = it,
+            approval = approval,
             safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
-            onApprove = onApprove,
-            onDeny = onDeny,
-            onAutoApprove = onAutoApprove,
-            onApproveDeviceTurn = onApproveDeviceTurn,
+            onApprove = { onApprove(approval.callId) },
+            onDeny = { onDeny(approval.callId) },
+            onAutoApprove = { onAutoApprovePending(approval.callId) },
+            onApproveDeviceTurn = { onApproveDeviceTurn(approval.callId) },
         )
     }
-    state.pendingQuestion?.let {
+    state.pendingQuestion?.let { question ->
         QuestionDialog(
-            question = it.question,
-            options = it.options,
-            onAnswer = onAnswerQuestion,
-            onDismiss = onCancelQuestion,
+            question = question.question,
+            options = question.options,
+            onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
+            onDismiss = { onCancelQuestion(question.callId) },
         )
     }
     if (showModelPicker) {
