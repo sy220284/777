@@ -11,13 +11,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalApprovalImpact
@@ -228,8 +228,8 @@ internal fun QuestionDialog(
 internal fun ChatPersonaDialog(
     profile: PersonaProfile,
     onSave: (PersonaProfile) -> Unit,
+    onAutoFill: suspend (String) -> Result<PersonaProfile>,
     onDismiss: () -> Unit,
-    viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var identity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.identity) }
@@ -251,9 +251,9 @@ internal fun ChatPersonaDialog(
         mutableStateOf(profile.signaturePhrases.joinToString("\n"))
     }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
-    var aiGenerating by rememberSaveable(profile.id) { mutableStateOf(false) }
-    var aiSucceeded by rememberSaveable(profile.id) { mutableStateOf(false) }
-    var aiError by rememberSaveable(profile.id) { mutableStateOf<String?>(null) }
+    var aiGenerating by remember(profile.id) { mutableStateOf(false) }
+    var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
+    var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     fun lines(value: String): List<String> = value.lineSequence()
@@ -321,7 +321,7 @@ internal fun ChatPersonaDialog(
                         aiSucceeded = false
                         aiError = null
                         coroutineScope.launch {
-                            viewModel.autoFillChatPersona(aiDescription)
+                            onAutoFill(aiDescription)
                                 .onSuccess { generated ->
                                     applyGenerated(generated)
                                     aiSucceeded = true
