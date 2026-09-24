@@ -669,16 +669,20 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     fun configureChatPersona(profile: PersonaProfile) {
-        if (_state.value.running || _state.value.loading) return
+        val snapshot = _state.value
+        if (snapshot.running || snapshot.loading || snapshot.usageMode != LocalUsageMode.CHAT) return
         scope.launch {
-            val saved = chatPersonaStore.upsert(profile.copy(id = _state.value.personaId))
+            val personaId = snapshot.personaId.takeUnless {
+                it == PersonaProfile.DEFAULT_PERSONA_ID
+            } ?: "persona-${UUID.randomUUID()}"
+            val saved = chatPersonaStore.upsert(profile.copy(id = personaId))
             _state.update { state ->
-                state.copy(
+                if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = saved.id,
                     chatPersona = saved,
                 )
             }
-            persist()
+            if (_state.value.sessionId == snapshot.sessionId) persist()
         }
     }
 
