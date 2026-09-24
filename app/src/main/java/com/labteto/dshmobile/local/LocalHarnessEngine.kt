@@ -516,19 +516,42 @@ class LocalHarnessEngine @Inject constructor(
                 else require(apiKeys.get() != null) { "请填写 DeepSeek API 密钥" }
                 val normalizedModel = normalizeConfiguredModel(model)
                 val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl.ifBlank { DEFAULT_BASE_URL })
+                val previousBaseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL)
+                val configuredModels = if (previousBaseUrl == normalizedBaseUrl) {
+                    configuredModelNames(normalizedModel).toMutableSet()
+                } else {
+                    mutableSetOf(normalizedModel)
+                }
+                configuredModels += normalizedModel
                 preferences.edit()
                     .putString(KEY_MODEL, normalizedModel)
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
+                    .putStringSet(KEY_CONFIGURED_MODELS, configuredModels)
                     .apply()
                 _state.update {
                     it.copy(
                         configured = true,
                         model = normalizedModel,
                         baseUrl = normalizedBaseUrl,
+                        configuredModels = configuredModels.sorted(),
                         error = null,
                     )
                 }
             }.onFailure { error -> _state.update { it.copy(error = error.message) } }
+        }
+    }
+
+    /** Switch only between models saved for the current endpoint and credential. */
+    fun selectModel(model: String) {
+        val selected = model.trim()
+        val current = _state.value
+        if (!current.configured || current.loading || current.running ||
+            selected !in current.configuredModels || selected == current.model
+        ) return
+        preferences.edit().putString(KEY_MODEL, selected).apply()
+        _state.update { state ->
+            if (state.running || selected !in state.configuredModels) state
+            else state.copy(model = selected)
         }
     }
 
@@ -2489,6 +2512,14 @@ class LocalHarnessEngine @Inject constructor(
         loadSession(currentSessionId, model, baseUrl)
     }
 
+    private fun configuredModelNames(currentModel: String): List<String> =
+        (preferences.getStringSet(KEY_CONFIGURED_MODELS, emptySet())
+            .orEmpty() + currentModel)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
+
     private fun normalizeConfiguredModel(model: String): String {
         val value = model.trim().ifBlank { DEFAULT_MODEL }
         return when (value.lowercase()) {
@@ -2577,6 +2608,7 @@ class LocalHarnessEngine @Inject constructor(
             configured = apiKeys.get() != null,
             model = model,
             baseUrl = baseUrl,
+            configuredModels = configuredModelNames(model),
             mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
@@ -2803,6 +2835,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private companion object {
         const val KEY_MODEL = "model"
+        const val KEY_CONFIGURED_MODELS = "configured_models"
         const val KEY_BASE_URL = "base_url"
         const val KEY_SESSION_ID = "session_id"
         const val KEY_MAIN_MAX_STEPS = "main_max_steps"

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -53,6 +54,14 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
     var detailsOpen by remember { mutableStateOf(false) }
     val detailsWidth = 300.dp
+
+    BackHandler {
+        when {
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+            detailsOpen -> detailsOpen = false
+            else -> onOpenLocalHarness()
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

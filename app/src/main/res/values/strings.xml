@@ -184,6 +184,8 @@
     <string name="local_new_session_hint">Start a fresh conversation</string>
     <string name="local_configure_model">Configure model and key</string>
     <string name="local_model_action">Model: %1$s · Configure</string>
+    <string name="local_saved_models">Configured models: %1$s</string>
+    <string name="local_saved_models_hint">Save another model name to add it to the home screen switcher for this endpoint. Changing the endpoint starts a new list.</string>
     <string name="local_model_setup">Set up the model and key</string>
     <string name="local_remote_control">Remote control</string>
     <string name="local_remote_hint">Connect to a paired computer</string>
@@ -531,7 +533,7 @@
     <string name="chat_view_mode">Conversation view</string>
     <string name="chat_view_concise">Concise</string>
     <string name="chat_view_full">Full</string>
-    <string name="tasks_title">Tasks</string>
+    <string name="tasks_title">Scheduled tasks</string>
     <string name="tasks_subtitle">Scheduled, recurring, and recent background work</string>
     <string name="tasks_refresh">Refresh tasks</string>
     <string name="tasks_empty_title">No background tasks</string>

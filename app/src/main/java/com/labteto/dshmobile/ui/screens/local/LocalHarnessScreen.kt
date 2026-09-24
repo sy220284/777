@@ -41,11 +41,11 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
@@ -131,7 +131,6 @@ fun LocalHarnessScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var editingConfig by rememberSaveable { mutableStateOf(false) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
 
@@ -140,7 +139,6 @@ fun LocalHarnessScreen(
     }
     BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
     BackHandler(enabled = state.pendingQuestion != null) { viewModel.answerQuestion("用户取消了问题") }
-    BackHandler(enabled = editingConfig) { editingConfig = false }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -153,7 +151,6 @@ fun LocalHarnessScreen(
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
                 },
-                onLocal = { scope.launch { drawerState.close() } },
                 onRemote = {
                     scope.launch { drawerState.close() }
                     onOpenRemote()
@@ -183,22 +180,12 @@ fun LocalHarnessScreen(
     ) {
         when {
             state.loading -> LoadingScreen()
-            editingConfig -> LocalConfiguration(
-                state = state,
-                canCancel = true,
-                onOpenMenu = { scope.launch { drawerState.open() } },
-                onCancel = { editingConfig = false },
-                onSave = { key, model, base ->
-                    viewModel.configure(key, model, base)
-                    editingConfig = false
-                },
-                onClearCredential = viewModel::clearCredential,
-            )
             else -> LocalChat(
                 state = state,
                 onOpenMenu = { scope.launch { drawerState.open() } },
                 onOpenFiles = { filesMode = LocalFilesMode.CONVERSATION },
-                onConfigure = { editingConfig = true },
+                onConfigure = onOpenSettings,
+                onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
@@ -245,7 +232,6 @@ private fun LocalModeDrawer(
     sessions: List<LocalSessionSummary>,
     usage: DeepSeekUsageSnapshot,
     onNewSession: () -> Unit,
-    onLocal: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
@@ -276,6 +262,15 @@ private fun LocalModeDrawer(
                 }
             }
 
+            OutlinedTextField(
+                value = historyQuery,
+                onValueChange = { historyQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("搜索会话") },
+                singleLine = true,
+                shape = DsShapes.block,
+            )
+
             DsGroupCard {
                 DsCategoryRow(
                     icon = Icons.Filled.Add,
@@ -285,15 +280,8 @@ private fun LocalModeDrawer(
                 )
             }
 
-            Text("运行方式", style = DsType.std14, color = colors.labelTertiary)
+            Text("远程控制", style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
-                DsCategoryRow(
-                    icon = Icons.Outlined.PhoneAndroid,
-                    title = "本机 Harness",
-                    subtitle = "完整能力在手机内运行",
-                    value = "当前",
-                    onClick = onLocal,
-                )
                 DsCategoryRow(
                     icon = Icons.Outlined.QrCodeScanner,
                     title = stringResource(R.string.local_remote_control),
@@ -302,37 +290,15 @@ private fun LocalModeDrawer(
                 )
             }
 
-            val current = sessions.firstOrNull { it.id == currentSessionId && !it.blank }
-            if (current != null) {
-                Text("当前会话", style = DsType.std14, color = colors.labelTertiary)
-                DsGroupCard {
-                    DsCategoryRow(
-                        icon = Icons.Outlined.History,
-                        title = current.title,
-                        subtitle = "正在进行",
-                        value = "当前",
-                        onClick = { onSwitchSession(current.id) },
-                    )
-                }
-            }
-
-            val history = sessions
-                .filter { it.id != currentSessionId && !it.blank }
+            val visibleSessions = sessions
+                .filter { !it.blank }
                 .sortedByDescending(LocalSessionSummary::updatedAt)
-            if (history.isNotEmpty()) {
-                Text("历史会话", style = DsType.std14, color = colors.labelTertiary)
-                OutlinedTextField(
-                    value = historyQuery,
-                    onValueChange = { historyQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("搜索会话") },
-                    singleLine = true,
-                    shape = DsShapes.block,
-                )
-                val filteredHistory = history.filter {
+            Text("会话", style = DsType.std14, color = colors.labelTertiary)
+            if (visibleSessions.isNotEmpty()) {
+                val filteredSessions = visibleSessions.filter {
                     historyQuery.isBlank() || it.title.contains(historyQuery.trim(), ignoreCase = true)
                 }
-                if (filteredHistory.isEmpty()) {
+                if (filteredSessions.isEmpty()) {
                     Text(
                         "没有匹配的会话",
                         style = DsType.small13,
@@ -341,11 +307,12 @@ private fun LocalModeDrawer(
                     )
                 } else {
                     DsGroupCard {
-                        filteredHistory.forEach { session ->
+                        filteredSessions.forEach { session ->
                             DsCategoryRow(
                                 icon = Icons.Outlined.History,
                                 title = session.title,
-                                subtitle = "本机会话",
+                                subtitle = if (session.id == currentSessionId) "正在进行" else "本机会话",
+                                value = if (session.id == currentSessionId) "当前" else null,
                                 onClick = { onSwitchSession(session.id) },
                             )
                         }
@@ -363,7 +330,7 @@ private fun LocalModeDrawer(
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Schedule,
-                    title = "任务",
+                    title = "定时任务",
                     subtitle = "计划任务、周期任务和执行结果",
                     onClick = onTasks,
                 )
@@ -586,6 +553,7 @@ private fun LocalChat(
     onOpenMenu: () -> Unit,
     onOpenFiles: () -> Unit,
     onConfigure: () -> Unit,
+    onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
@@ -619,6 +587,7 @@ private fun LocalChat(
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
+    var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -713,41 +682,30 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
                 Spacer(Modifier.width(DsSpacing.small))
-                Column(Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.weight(1f)
+                        .heightIn(min = DsSpacing.touchTarget)
+                        .clip(DsShapes.pillFull)
+                        .background(colors.bgModulePlatform)
+                        .clickable(enabled = !state.running) {
+                            if (state.configured) showModelPicker = true else onConfigure()
+                        }
+                        .padding(horizontal = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.labelSecondary,
+                        modifier = Modifier.size(16.dp))
                     Text(
-                        state.sessions.firstOrNull { it.id == state.sessionId }?.title
-                            ?.takeIf { it.isNotBlank() } ?: stringResource(R.string.local_new_chat),
-                        style = DsType.base16Strong,
+                        if (state.configured) state.model else stringResource(R.string.local_model_setup),
+                        style = DsType.small13Strong,
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StateDot(
-                            when {
-                                state.pendingApproval != null || state.pendingQuestion != null -> StateDotState.Warning
-                                state.running -> StateDotState.Running
-                                else -> StateDotState.Done
-                            },
-                            size = 7.dp,
-                        )
-                        Spacer(Modifier.width(DsSpacing.small))
-                        Text(
-                            when {
-                                !state.configured -> stringResource(R.string.local_status_setup)
-                                state.pendingApproval != null -> stringResource(R.string.local_status_approval)
-                                state.pendingQuestion != null -> stringResource(R.string.local_status_question)
-                                state.running && state.queuedInputCount > 0 ->
-                                    stringResource(R.string.local_status_running_queued, state.queuedInputCount)
-                                state.running -> stringResource(R.string.local_status_running)
-                                else -> stringResource(R.string.local_status_ready)
-                            },
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null,
+                        tint = colors.labelSecondary, modifier = Modifier.size(16.dp))
                 }
                 DsIconButton(
                     icon = FeatherIcons.FileText,
@@ -762,32 +720,9 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(start = 56.dp)
-                    .heightIn(min = DsSpacing.touchTarget)
-                    .clip(DsShapes.pillFull)
-                    .background(colors.bgModulePlatform)
-                    .clickable(onClickLabel = stringResource(R.string.local_configure_model), onClick = onConfigure)
-                    .padding(horizontal = DsSpacing.medium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.labelSecondary,
-                    modifier = Modifier.size(18.dp))
-                Text(
-                    if (state.configured) stringResource(
-                        R.string.local_model_action, state.model.removePrefix("deepseek-"),
-                    ) else stringResource(R.string.local_model_setup),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
 
-        if (state.safeAutoApprovalEnabled || state.deviceApprovalLease) {
+        if (state.deviceApprovalLease) {
             Surface(
                 color = colors.warnTertiary,
                 shape = RoundedCornerShape(12.dp),
@@ -806,8 +741,7 @@ private fun LocalChat(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            if (state.deviceApprovalLease) stringResource(R.string.local_device_approval_on)
-                            else stringResource(R.string.local_safe_approval_on),
+                            stringResource(R.string.local_device_approval_on),
                             style = DsType.small13Strong,
                             color = colors.warnLabel,
                         )
@@ -820,18 +754,14 @@ private fun LocalChat(
                     }
                     DsButton(
                         "关闭",
-                        if (state.deviceApprovalLease) onDisableDeviceTurn else onDisableAutoApprove,
+                        onDisableDeviceTurn,
                         modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
                         variant = DsButtonVariant.Ghost,
                     )
                 }
                 if (approvalNoticeExpanded) {
                     Text(
-                        if (state.deviceApprovalLease) {
-                            stringResource(R.string.local_device_approval_scope)
-                        } else {
-                            stringResource(R.string.local_safe_approval_scope)
-                        },
+                        stringResource(R.string.local_device_approval_scope),
                         style = DsType.caption11,
                         color = colors.labelSecondary,
                     )
@@ -1055,6 +985,12 @@ private fun LocalChat(
                         size = DsButtonSize.Small,
                         enabled = !state.running,
                     )
+                    DsButton(
+                        "自动批准",
+                        if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                        variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
                     Spacer(Modifier.weight(1f))
                     if (state.running) {
                         DsButton(
@@ -1106,6 +1042,30 @@ private fun LocalChat(
         )
     }
     state.pendingQuestion?.let { QuestionDialog(it.question, it.options, onAnswerQuestion) }
+    if (showModelPicker) {
+        DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
+            state.configuredModels.forEach { model ->
+                DsButton(
+                    text = model,
+                    onClick = {
+                        onSelectModel(model)
+                        showModelPicker = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = if (model == state.model) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                )
+            }
+            DsButton(
+                text = "管理模型配置",
+                onClick = {
+                    showModelPicker = false
+                    onConfigure()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Outline,
+            )
+        }
+    }
     if (showAttachmentPicker) {
         DsBottomSheet(title = "添加附件", onDismiss = { showAttachmentPicker = false }) {
             Row(

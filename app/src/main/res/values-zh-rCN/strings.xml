@@ -142,6 +142,8 @@
     <string name="local_new_session_hint">开始一段新对话</string>
     <string name="local_configure_model">配置模型与密钥</string>
     <string name="local_model_action">模型：%1$s · 设置</string>
+    <string name="local_saved_models">已配置模型：%1$s</string>
+    <string name="local_saved_models_hint">输入模型名称并保存，可将同一接口下的模型加入主界面切换列表。更换接口地址时，列表会重新开始。</string>
     <string name="local_model_setup">设置模型与密钥</string>
     <string name="local_remote_control">远程控制</string>
     <string name="local_remote_hint">连接已配对的电脑</string>
@@ -529,7 +531,7 @@
     <string name="chat_view_mode">对话视图</string>
     <string name="chat_view_concise">简洁</string>
     <string name="chat_view_full">完整</string>
-    <string name="tasks_title">任务</string>
+    <string name="tasks_title">定时任务</string>
     <string name="tasks_subtitle">查看计划任务、周期任务和最近执行结果</string>
     <string name="tasks_refresh">刷新任务</string>
     <string name="tasks_empty_title">暂无后台任务</string>

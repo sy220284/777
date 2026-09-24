@@ -126,6 +126,7 @@ fun AppRoot(
                 onOpenTasks = { utilitySurface = "tasks" },
                 onOpenTools = { utilitySurface = "tools" },
                 onOpenLocalHarness = {
+                    viewModel.disconnectRemote()
                     relayClaimed = false
                     surface = "local"
                 },
