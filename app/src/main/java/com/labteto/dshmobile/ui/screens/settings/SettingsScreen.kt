@@ -143,6 +143,7 @@ fun SettingsScreen(
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
+    var environmentInfo by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
@@ -152,6 +153,13 @@ fun SettingsScreen(
     }
     LaunchedEffect(page) {
         if (page == SettingsPage.MEMORY) viewModel.refreshMemories()
+    }
+    LaunchedEffect(showEnvironment) {
+        environmentInfo = if (showEnvironment) {
+            runCatching { viewModel.environmentInfo() }.getOrElse { it.message.orEmpty() }
+        } else {
+            null
+        }
     }
 
     val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
@@ -414,7 +422,7 @@ fun SettingsScreen(
 
     if (showEnvironment) {
         EnvironmentInfoDialog(
-            text = viewModel.environmentInfo(),
+            text = environmentInfo ?: stringResource(R.string.common_loading),
             onDismiss = { showEnvironment = false },
         )
     }

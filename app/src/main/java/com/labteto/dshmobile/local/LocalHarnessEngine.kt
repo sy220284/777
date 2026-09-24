@@ -319,6 +319,7 @@ class LocalHarnessEngine @Inject constructor(
     private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
+    @Volatile private var modelHistoryChars = 0
     private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = MutableStateFlow(
         LocalHarnessState(
@@ -747,7 +748,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun appendUserToModelHistory(message: JsonObject) {
-        modelHistory += message
+        appendModelHistory(message)
         updateContextMetrics()
     }
 
@@ -909,7 +910,9 @@ class LocalHarnessEngine @Inject constructor(
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
-    fun environmentInfoForUi(): String = environmentInfo()
+    suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
+        environmentInfo()
+    }
 
     suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
@@ -1037,7 +1040,7 @@ class LocalHarnessEngine @Inject constructor(
                     preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
                     eventLog = eventLogFor(currentSessionId)
                     transcriptProjectionCursor = -1L
-                    modelHistory.clear()
+                    resetModelHistory()
 
                     val lineageId = when (mode) {
                         LocalConversationMode.CONTINUATION ->
@@ -1211,7 +1214,7 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "user")
                 put("content", input.content)
             }
-            modelHistory += durableMessage
+            appendModelHistory(durableMessage)
             durableMessages += durableMessage
             captureAutoMemoryDirective(input.memoryInput)
         }
@@ -1253,8 +1256,11 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
-            modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
+            replaceSystemModelHistory(
+                buildJsonObject { put("role", "system"); put("content", prompt) },
+            )
             eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+            updateContextMetrics()
         }
         persist()
     }
@@ -1302,11 +1308,13 @@ class LocalHarnessEngine @Inject constructor(
                     put("runtime_settlement", true)
                     put("reason", reason)
                 })
-                modelHistory += buildJsonObject {
-                    put("role", "tool")
-                    put("tool_call_id", result.callId)
-                    put("content", result.modelContent)
-                }
+                appendModelHistory(
+                    buildJsonObject {
+                        put("role", "tool")
+                        put("tool_call_id", result.callId)
+                        put("content", result.modelContent)
+                    },
+                )
                 completedToolCallIds += result.callId
             }
         }
@@ -1453,7 +1461,7 @@ class LocalHarnessEngine @Inject constructor(
                             "assistant/message",
                             withTranscript(reply.message, transcriptMessages),
                         )
-                        modelHistory += reply.message
+                        appendModelHistory(reply.message)
                         updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
                         persist()
@@ -1491,11 +1499,13 @@ class LocalHarnessEngine @Inject constructor(
                             event.recoveryHint?.let { put("recovery_hint", it) }
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
-                        modelHistory += buildJsonObject {
-                            put("role", "tool")
-                            put("tool_call_id", event.call.id)
-                            put("content", modelOutput)
-                        }
+                        appendModelHistory(
+                            buildJsonObject {
+                                put("role", "tool")
+                                put("tool_call_id", event.call.id)
+                                put("content", modelOutput)
+                            },
+                        )
                         completedToolCallIds += event.call.id
                         updateContextMetrics()
                         applyTranscriptMessages(listOf(transcriptMessage), toolEvent.sequence)
@@ -2377,8 +2387,11 @@ class LocalHarnessEngine @Inject constructor(
             eventLog.append("plan/mode", buildJsonObject { put("active", false) })
             if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 val prompt = systemPrompt()
-                modelHistory[0] = buildJsonObject { put("role", "system"); put("content", prompt) }
+                replaceSystemModelHistory(
+                    buildJsonObject { put("role", "system"); put("content", prompt) },
+                )
                 eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+                updateContextMetrics()
             }
             persist()
             "计划已获批准，已进入执行模式"
@@ -2533,15 +2546,41 @@ class LocalHarnessEngine @Inject constructor(
     private fun currentHistoryBudget(): LocalHistoryBudget =
         localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure)
 
-    private fun updateContextMetrics(precomputedChars: Int? = null) {
+    private fun updateContextMetrics() {
         val budget = currentHistoryBudget()
-        val chars = precomputedChars ?: modelHistory.sumOf { it.toString().length }
         _state.update {
             it.copy(
-                contextChars = chars,
+                contextChars = modelHistoryChars,
                 contextBudgetChars = budget.maxHistoryChars,
             )
         }
+    }
+
+    private fun encodedModelMessageChars(message: JsonObject): Int = message.toString().length
+
+    private fun appendModelHistory(message: JsonObject) {
+        modelHistory += message
+        modelHistoryChars += encodedModelMessageChars(message)
+    }
+
+    private fun prependModelHistory(message: JsonObject) {
+        modelHistory.add(0, message)
+        modelHistoryChars += encodedModelMessageChars(message)
+    }
+
+    private fun replaceSystemModelHistory(message: JsonObject) {
+        require(modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+            "模型历史首条消息不是 system"
+        }
+        modelHistoryChars -= encodedModelMessageChars(modelHistory[0])
+        modelHistory[0] = message
+        modelHistoryChars += encodedModelMessageChars(message)
+    }
+
+    private fun resetModelHistory(messages: List<JsonObject> = emptyList()) {
+        modelHistory.clear()
+        modelHistory += messages
+        modelHistoryChars = messages.sumOf(::encodedModelMessageChars)
     }
 
     private fun pruneToolResult(result: String): String {
@@ -2555,17 +2594,15 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun compactHistoryIfNeeded() {
         val budget = currentHistoryBudget()
-        val currentChars = modelHistory.sumOf { it.toString().length }
         val compaction = historyCompactor.compact(
             history = modelHistory,
             budget = budget,
-            currentChars = currentChars,
+            currentChars = modelHistoryChars,
         ) ?: run {
-            updateContextMetrics(currentChars)
+            updateContextMetrics()
             return
         }
-        modelHistory.clear()
-        modelHistory += compaction.messages
+        resetModelHistory(compaction.messages)
         eventLog.append(
             "session/compaction",
             buildJsonObject {
@@ -2581,8 +2618,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun ensureSystemMessage() {
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") return
         val prompt = systemPrompt()
-        modelHistory.add(
-            0,
+        prependModelHistory(
             buildJsonObject {
                 put("role", "system")
                 put("content", prompt)
@@ -2677,7 +2713,7 @@ class LocalHarnessEngine @Inject constructor(
                     "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
                     "压力 ${resources.pressure.name.lowercase()}",
             )
-            appendLine("上下文：${modelHistory.sumOf { it.toString().length }}/${currentHistoryBudget().maxHistoryChars} 字符")
+            appendLine("上下文：$modelHistoryChars/${currentHistoryBudget().maxHistoryChars} 字符")
             appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
             appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
@@ -2814,8 +2850,7 @@ class LocalHarnessEngine @Inject constructor(
             legacyFallback = stored.legacyModelHistory,
             codec = modelHistoryCheckpointCodec,
         )
-        modelHistory.clear()
-        modelHistory += restoredHistory.messages
+        resetModelHistory(restoredHistory.messages)
         applyRecoveredToolResults(recovery)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
@@ -2872,12 +2907,15 @@ class LocalHarnessEngine @Inject constructor(
             maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
             maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
-            contextChars = modelHistory.sumOf { it.toString().length },
+            contextChars = modelHistoryChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
         )
         var wroteHistoryCheckpoint = false
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-            modelHistory[0] = buildJsonObject { put("role", "system"); put("content", systemPrompt()) }
+            replaceSystemModelHistory(
+                buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
+            )
+            updateContextMetrics()
             checkpointModelHistory("load/system-refresh")
             wroteHistoryCheckpoint = true
         } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
@@ -2976,11 +3014,13 @@ class LocalHarnessEngine @Inject constructor(
                     message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
             }
             if (!alreadyPresent) {
-                modelHistory += buildJsonObject {
-                    put("role", "tool")
-                    put("tool_call_id", recovered.callId)
-                    put("content", recovered.modelContent)
-                }
+                appendModelHistory(
+                    buildJsonObject {
+                        put("role", "tool")
+                        put("tool_call_id", recovered.callId)
+                        put("content", recovered.modelContent)
+                    },
+                )
             }
         }
     }
