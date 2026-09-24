@@ -143,7 +143,7 @@ class ChatInteractionPlannerTest {
                   "stability":50,
                   "facts":[
                     {"text":"对方明确说周末有空","confidence":96,"source":"user"},
-                    {"text":"她大概很喜欢用户","confidence":50,"source":"inference"}
+                    {"text":"她大概很喜欢用户","confidence":99,"source":"inference"}
                   ],
                   "hypotheses":[
                     {"text":"她可能愿意继续了解","confidence":65,"source":"inference"}
@@ -195,6 +195,40 @@ class ChatInteractionPlannerTest {
         assertEquals(50, plan.state.userPattern.directness)
         assertEquals(50, plan.state.userPattern.playfulness)
         assertEquals(50, plan.state.userPattern.initiative)
+    }
+
+    @Test
+    fun observedMessageLengthGroundsReplyLengthProfile() {
+        val previous = ChatCharacterState(
+            userPattern = UserChatPattern(
+                replyLength = "long",
+                observedTurns = 3,
+                averageMessageChars = 12,
+            ),
+        )
+        val payload = """
+            {
+              "state":{
+                "userPattern":{
+                  "replyLength":"long",
+                  "directness":50,
+                  "playfulness":50,
+                  "initiative":50
+                }
+              },
+              "suggestions":[]
+            }
+        """.trimIndent()
+
+        val plan = planner.parse(
+            payload,
+            previous,
+            userMessage = "嗯，行",
+        )!!
+
+        assertEquals("short", plan.state.userPattern.replyLength)
+        assertEquals(4, plan.state.userPattern.observedTurns)
+        assertTrue(plan.state.userPattern.averageMessageChars < 20)
     }
 
     @Test
