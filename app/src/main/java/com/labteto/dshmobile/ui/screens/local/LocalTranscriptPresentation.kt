@@ -35,6 +35,10 @@ internal fun buildLocalTranscript(messages: List<LocalHarnessMessage>): List<Loc
     val result = mutableListOf<LocalTranscriptItem>()
     var index = 0
     while (index < messages.size) {
+        if (messages[index].role == "system") {
+            index += 1
+            continue
+        }
         if (!isWorkProcessMessage(messages, index)) {
             result += LocalTranscriptItem.Message(messages[index])
             index += 1
