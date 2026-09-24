@@ -423,7 +423,7 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
 
-    fun environmentInfo(): String = localHarness.environmentInfoForUi()
+    suspend fun environmentInfo(): String = localHarness.environmentInfoForUi()
 
     fun configureLocalVision(
         apiKey: String,

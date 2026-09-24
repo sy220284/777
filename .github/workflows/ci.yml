@@ -53,6 +53,8 @@ jobs:
         run: python3 .github/scripts/check-ui-hardcoded-cjk.py
       - name: Guard Kotlin risk patterns
         run: python3 .github/scripts/check-kotlin-risk-patterns.py
+      - name: Guard local performance invariants
+        run: python3 .github/scripts/check-local-performance-invariants.py
       - name: Assemble optimized APK
         run: ./gradlew :app:assembleOptimized --stacktrace
       - name: Verify Android 16 APK

@@ -22,7 +22,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
     suspend fun diagnoseNetwork(target: String): String = engine.diagnoseNetwork(target)
-    fun environmentInfo(): String = engine.environmentInfoForUi()
+    suspend fun environmentInfo(): String = engine.environmentInfoForUi()
     suspend fun workspaceFiles() = engine.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = engine.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = engine.previewWorkspaceFileForUi(path)
