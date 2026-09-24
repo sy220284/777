@@ -790,6 +790,9 @@ class LocalHarnessEngine @Inject constructor(
             while (_state.value.loading) delay(50)
         }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            throw LocalHarnessBusyException("当前处于聊天模式，工作型后台任务等待工作模式后重试")
+        }
         if (isRunBusy()) throw LocalHarnessBusyException("本机 Harness 正在执行其他任务或切换会话")
 
         val beforeCount = _state.value.messages.size
