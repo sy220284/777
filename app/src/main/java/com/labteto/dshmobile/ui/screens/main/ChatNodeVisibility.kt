@@ -130,15 +130,16 @@ internal fun ChatNode.rendersInTranscript(nodes: List<ChatNode>, mode: Transcrip
     if (!rendersContent()) return false
     return when (this) {
         is AssistantMessageNode -> when {
-            isWorkProcess(nodes) -> mode == TranscriptMode.FULL
+            isWorkProcess(nodes) -> false
             interrupted -> true
             else -> isFinalAnswerAnchor(nodes)
         }
         is UserMessageNode, is TurnErrorNode -> true
         is TurnEndNode -> reasonKind != "completed"
         is ToolCallNode, is TodoNode, is GoalNode, is PlanModeNode, is CompactionNode,
-        is RetryNode, is CommandNode, is WorkflowNode, is TitleNode, is SubagentNode,
-        is OtherNode -> mode == TranscriptMode.FULL
+        is RetryNode, is CommandNode, is WorkflowNode, is TitleNode, is SubagentNode ->
+            mode == TranscriptMode.FULL
+        is OtherNode -> mode == TranscriptMode.FULL && type == "deliverables/presented"
         is TurnStartNode, is ToolResultNode -> false
     }
 }
@@ -150,8 +151,9 @@ internal fun ChatNode.rendersContent(): Boolean = when (this) {
     is ToolResultNode -> false
     // Only an unclean ending says anything; a completed turn is the frame.
     is TurnEndNode -> reasonKind != "completed"
-    // Bookkeeping event types are not "unknown" — they are noise between the tool calls.
-    is OtherNode -> type !in STRUCTURAL_EVENT_TYPES
+    // Raw protocol events are never transcript content. Only the high-level deliverable marker
+    // survives, and its renderer intentionally hides names and paths.
+    is OtherNode -> type == "deliverables/presented"
 
     // Content that can still fold to nothing.
     is UserMessageNode -> blocks.any { it.kind == "image" } || displayText().isNotBlank()
