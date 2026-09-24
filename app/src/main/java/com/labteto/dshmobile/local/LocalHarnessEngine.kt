@@ -1018,11 +1018,12 @@ class LocalHarnessEngine @Inject constructor(
                             planMode = false,
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = emptyList(),
+                            jobs = jobs.snapshotInfos(),
                             error = null,
                         )
                     }
                     persist()
+                    restartInterruptedSafeJobs()
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -1061,7 +1062,7 @@ class LocalHarnessEngine @Inject constructor(
                     eventLog = eventLogFor(sessionId)
                     transcriptProjectionCursor = null
                     loadSession(sessionId)
-                    scheduleInterruptedSafeJobs()
+                    restartInterruptedSafeJobs()
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -1978,6 +1979,14 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun restartInterruptedSafeJobs() {
+        synchronized(runStateLock) {
+            persistentRecoveryJob?.cancel()
+            persistentRecoveryJob = null
+        }
+        scheduleInterruptedSafeJobs()
+    }
+
     private fun scheduleInterruptedSafeJobs() {
         synchronized(runStateLock) {
             if (persistentRecoveryJob?.isActive == true) return
@@ -2715,6 +2724,7 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
+            jobs = jobs.snapshotInfos(),
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
             activeAgents = resourceScheduler.snapshot().activeAgents,
