@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_persona_ai_title">让 AI 代填</string>
+    <string name="local_persona_ai_hint">一句话说清角色，或者直接留空，让 AI 从最近聊天里整理人设。生成后会自动同步到默认角色，下面仍可继续手改。</string>
+    <string name="local_persona_ai_description">角色描述（可留空）</string>
+    <string name="local_persona_ai_generate">AI 生成并同步默认角色</string>
+    <string name="local_persona_ai_generating">正在生成人设…</string>
+    <string name="local_persona_ai_working_hint">正在结合你的描述和最近聊天，拆成人设字段并同步…</string>
+    <string name="local_persona_ai_synced">已生成并同步到默认角色，下面可以继续微调。</string>
+</resources>
