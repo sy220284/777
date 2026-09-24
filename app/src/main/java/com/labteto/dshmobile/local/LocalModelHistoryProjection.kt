@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -86,6 +87,11 @@ private fun applyModelHistoryEvent(
             true
         }
         "user/message" -> {
+            // queued=true records the human-visible transcript immediately, but it does not become
+            // model-visible until a later durable history checkpoint consumes that queue item.
+            // Ignoring an uncheckpointed queued tail prevents stop/crash/restart from resurrecting
+            // a message the user already cancelled.
+            if (event.data["queued"]?.jsonPrimitive?.booleanOrNull == true) return false
             val structured = event.data["model_message"] as? JsonObject
             if (structured != null) {
                 history += structured
