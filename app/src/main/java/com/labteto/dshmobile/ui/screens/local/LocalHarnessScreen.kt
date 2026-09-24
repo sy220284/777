@@ -1579,10 +1579,10 @@ private fun ApprovalDialog(
     onApproveDeviceTurn: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    val commandExecution = isCommandExecutionTool(approval.toolName)
+    val operationTitle = stringResource(operationLabelRes(approval.toolName))
     DsDialog(title = "执行前确认", onDismiss = onDeny) {
         Text(
-            if (commandExecution) stringResource(R.string.command_execution_title) else approval.summary,
+            operationTitle,
             style = DsType.base16Strong,
             color = colors.labelPrimary,
         )
@@ -1611,18 +1611,6 @@ private fun ApprovalDialog(
                     approvalPurpose(approval),
                     style = DsType.small13,
                     color = colors.labelSecondary,
-                )
-            }
-        }
-
-        if (!commandExecution) {
-            Text("具体内容", style = DsType.small13Strong, color = colors.labelPrimary)
-            SelectionContainer {
-                Text(
-                    approval.arguments,
-                    style = DsType.mdCode,
-                    color = colors.labelSecondary,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
                 )
             }
         }
