@@ -28,8 +28,14 @@ internal object ChatStyleGuard {
         "让我们一起",
     )
 
-    fun violations(text: String): List<String> =
-        bannedPhrases.filter { phrase -> phrase in text }
+    fun violations(text: String, extraBannedPhrases: List<String> = emptyList()): List<String> =
+        (bannedPhrases + extraBannedPhrases)
+            .asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .filter { phrase -> phrase in text }
+            .toList()
 
     fun repairPrompt(candidate: String, violations: List<String>): String = buildString {
         appendLine("上一版聊天回复命中了禁止使用的 AI / 客服套话，请重新写一版。")
@@ -39,9 +45,11 @@ internal object ChatStyleGuard {
         append(candidate.take(MAX_CANDIDATE_CHARS))
     }
 
-    fun scrub(text: String): String {
+    fun scrub(text: String, extraBannedPhrases: List<String> = emptyList()): String {
         var result = text
-        bannedPhrases.forEach { phrase -> result = result.replace(phrase, "") }
+        (bannedPhrases + extraBannedPhrases).distinct().forEach { phrase ->
+            if (phrase.isNotBlank()) result = result.replace(phrase, "")
+        }
         return result
             .replace(Regex("[ \\t]{2,}"), " ")
             .replace(Regex("\\n{3,}"), "\n\n")
