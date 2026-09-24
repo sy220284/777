@@ -1271,6 +1271,8 @@ class LocalHarnessEngine @Inject constructor(
                     text = text,
                     lineageId = snapshot.lineageId,
                     sourceSessionId = currentSessionId,
+                    subjectLabel = snapshot.chatPersona.name
+                        .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
                 )
             }.getOrNull()
         } else {
@@ -1339,6 +1341,71 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun hydrateNewChatStateFromRelationshipMemory() {
+        val snapshot = _state.value
+        if (
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.autoRecall ||
+            snapshot.chatState.updatedAt != 0L
+        ) return
+
+        val subject = snapshot.chatPersona.name.trim()
+            .takeIf { it.isNotBlank() && it != "默认角色" }
+            ?: return
+        val prefix = "关系状态：我和$subject｜"
+        val latest = memoryStore.listActive(
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            limit = 200,
+        ).asSequence()
+            .filter { it.kind == MemoryKind.RELATIONSHIP_STATE && it.content.startsWith(prefix) }
+            .maxByOrNull { it.updatedAt }
+            ?: return
+
+        val stored = latest.content.substringAfter("｜", "").trim()
+        val stage = when (stored) {
+            "暧昧" -> "AMBIGUOUS"
+            "在一起", "确定关系", "异地", "订婚", "结婚", "同居" -> "COMMITTED"
+            "冷战" -> "CONFLICT"
+            "分手", "离婚" -> "SEPARATED"
+            "复合" -> "REPAIRING"
+            else -> return
+        }
+        val label = when (stage) {
+            "AMBIGUOUS" -> "暧昧期"
+            "COMMITTED" -> "稳定关系"
+            "CONFLICT" -> "矛盾期"
+            "SEPARATED" -> "已分开"
+            "REPAIRING" -> "修复中"
+            else -> snapshot.chatState.relationshipState
+        }
+        if (
+            snapshot.chatState.dynamics.stage == stage &&
+            snapshot.chatState.relationshipState == label
+        ) return
+
+        _state.update { current ->
+            if (current.sessionId != snapshot.sessionId || current.chatState.updatedAt != 0L) {
+                current
+            } else {
+                current.copy(
+                    chatState = current.chatState.copy(
+                        relationshipState = label,
+                        dynamics = current.chatState.dynamics.copy(stage = stage),
+                    ),
+                )
+            }
+        }
+        eventLog.append("chat/relationship-hydrate", buildJsonObject {
+            put("subject", subject)
+            put("state", stored)
+            put("stage", stage)
+            put("memory_id", latest.id)
+        })
+        persist()
+    }
+
     private suspend fun drainPendingInputsIntoHistory() {
         val queued = pendingInputs.drain()
         if (queued.isEmpty()) return
@@ -1402,6 +1469,7 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun runTurn(input: String, memoryInput: String = input) {
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
+            hydrateNewChatStateFromRelationshipMemory()
         }
         val directChat = _state.value.usageMode == LocalUsageMode.CHAT &&
             !hasLocalImageRefs(modelHistory.takeLast(1))
