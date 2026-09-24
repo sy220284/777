@@ -119,28 +119,11 @@ internal fun toolRowModel(
     viewTitle: String? = null,
 ): ToolRowModel {
     val variant = classifyTool(toolName)
-    val arguments = parseArguments(argumentsJson)
-    val derived = if (isCommandExecutionTool(toolName)) {
-        arguments?.get("description").asSummary()?.takeIf { it.isNotBlank() }
-    } else {
-        SUMMARY_KEYS[variant]
-            .orEmpty()
-            .firstNotNullOfOrNull { key -> arguments?.get(key).asSummary()?.takeIf { it.isNotBlank() } }
-    }
-    val relative = derived?.let { relativizeToCwd(it, cwd) }
-    // An unclassified tool with no presenter title would otherwise render as a bare "Tool call"
-    // with nothing identifying it, so its raw name carries the summary instead.
-    val needsToolName = variant == ToolRowVariant.Other && viewTitle == null && toolName.isNotBlank()
-    val summary = when {
-        relative == null -> if (needsToolName) toolName else null
-        needsToolName -> "$toolName · $relative"
-        else -> relative
-    }
     return ToolRowModel(
         variant = variant,
-        title = viewTitle?.takeIf { it.isNotBlank() } ?: variant.title,
-        summary = summary,
-        filePath = filePathOf(variant, arguments),
+        title = variant.title,
+        summary = null,
+        filePath = null,
     )
 }
 
