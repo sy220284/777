@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -48,11 +48,9 @@ fun ApprovalPanel(
 ) {
     val colors = DsTheme.colors
     val bodyScroll = rememberScrollState()
-    val displayReason = if (isCommandExecutionTool(toolName)) {
-        stringResource(R.string.command_execution_purpose)
-    } else {
-        reason ?: toolName
-    }
+    // Approval UI shows purpose, never raw tool reasons: reasons may contain commands,
+    // file paths, URLs or serialized arguments.
+    val displayReason = stringResource(agentOperationLabelRes(toolName))
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cap = questionCardMaxHeight(maxHeight)
         Surface(
