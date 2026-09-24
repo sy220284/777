@@ -30,6 +30,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
@@ -354,59 +355,62 @@ class LocalHarnessEngine @Inject constructor(
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
-    private val subagents by lazy {
-        LocalSubagentRunner(
-            apiKeys = apiKeys,
-            modelClient = modelClient,
-            state = state,
-            jobs = jobs,
-            historySnapshot = { modelHistory.toList() },
-            contextSnapshot = { query ->
-                val snapshot = _state.value
-                contextComposer.compose(
-                    ContextRequest(
-                        query = query,
-                        mode = snapshot.conversationMode,
-                        projectId = snapshot.projectId,
-                        lineageId = snapshot.lineageId,
-                        handoffSummary = snapshot.handoffSummary,
-                    ),
-                )
-            },
-            eventLog = { eventLog },
-            schemas = ::subagentToolSchemas,
-            execute = ::executeSafely,
-            pruneToolResult = ::pruneToolResult,
-            prepareMessages = { messages, mode, _, _ ->
-                prepareLocalMultimodalMessages(
-                    messages = messages,
-                    workspaceRoot = File(workspace.path),
-                    mode = mode,
-                    budget = imageRequestBudget,
-                )
-            },
-            resolveImageMode = { mode, baseUrl, model ->
-                resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
-            },
-            onNativeImageAccepted = { baseUrl, model ->
-                imageCapabilities.markSupported(baseUrl, model)
-            },
-            onUsage = { model, usage -> usageTracker.record(model, usage) },
-            onNativeImageRejected = { baseUrl, model ->
-                imageCapabilities.markUnsupported(baseUrl, model)
-            },
-            resourceScheduler = resourceScheduler,
-            acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
-            releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
-            historyBudget = ::currentHistoryBudget,
-        )
-    }
+    private fun newSubagentRunner(
+        eventLogProvider: () -> LocalSessionEventLog,
+    ): LocalSubagentRunner = LocalSubagentRunner(
+        apiKeys = apiKeys,
+        modelClient = modelClient,
+        state = state,
+        jobs = jobs,
+        historySnapshot = { modelHistory.toList() },
+        contextSnapshot = { query ->
+            val snapshot = _state.value
+            contextComposer.compose(
+                ContextRequest(
+                    query = query,
+                    mode = snapshot.conversationMode,
+                    projectId = snapshot.projectId,
+                    lineageId = snapshot.lineageId,
+                    handoffSummary = snapshot.handoffSummary,
+                ),
+            )
+        },
+        eventLog = eventLogProvider,
+        schemas = ::subagentToolSchemas,
+        execute = ::executeSafely,
+        pruneToolResult = ::pruneToolResult,
+        prepareMessages = { messages, mode, _, _ ->
+            prepareLocalMultimodalMessages(
+                messages = messages,
+                workspaceRoot = File(workspace.path),
+                mode = mode,
+                budget = imageRequestBudget,
+            )
+        },
+        resolveImageMode = { mode, baseUrl, model ->
+            resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
+        },
+        onNativeImageAccepted = { baseUrl, model ->
+            imageCapabilities.markSupported(baseUrl, model)
+        },
+        onUsage = { model, usage -> usageTracker.record(model, usage) },
+        onNativeImageRejected = { baseUrl, model ->
+            imageCapabilities.markUnsupported(baseUrl, model)
+        },
+        resourceScheduler = resourceScheduler,
+        acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
+        releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
+        historyBudget = ::currentHistoryBudget,
+    )
+
+    private val subagents by lazy { newSubagentRunner { eventLog } }
 
     private val runStateLock = Any()
     private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
+    private var persistentRecoveryJob: Job? = null
     private var approvalResponse: CompletableDeferred<Boolean>? = null
     private var questionResponse: CompletableDeferred<String>? = null
 
@@ -448,7 +452,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
                 load()
-                resumeInterruptedSafeJobs()
+                scheduleInterruptedSafeJobs()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -935,7 +939,14 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(false)
         questionResponse?.cancel()
         val running = synchronized(runStateLock) {
-            pendingInputs.clear()
+            val discarded = pendingInputs.clear()
+            if (discarded > 0) {
+                eventLog.append("user/queue", buildJsonObject {
+                    put("action", "cancelled")
+                    put("count", discarded)
+                    put("queued_count", 0)
+                })
+            }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
         }
@@ -963,7 +974,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitionMutex.withLock {
                 try {
                     cancelActiveRunAndJoin()
-                    jobs.stopAllAndJoin()
+                    jobs.stopNonPersistentAndJoin()
                     persist()
 
                     currentSessionId = UUID.randomUUID().toString()
@@ -1044,12 +1055,13 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitionMutex.withLock {
                 try {
                     persist()
-                    jobs.stopAllAndJoin()
+                    jobs.stopNonPersistentAndJoin()
                     currentSessionId = sessionId
                     preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
                     eventLog = eventLogFor(sessionId)
                     transcriptProjectionCursor = null
                     loadSession(sessionId)
+                    scheduleInterruptedSafeJobs()
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -1094,7 +1106,14 @@ class LocalHarnessEngine @Inject constructor(
         approvalResponse?.complete(false)
         questionResponse?.cancel()
         val job = synchronized(runStateLock) {
-            pendingInputs.clear()
+            val discarded = pendingInputs.clear()
+            if (discarded > 0) {
+                eventLog.append("user/queue", buildJsonObject {
+                    put("action", "cancelled")
+                    put("count", discarded)
+                    put("queued_count", 0)
+                })
+            }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
         }
@@ -1931,8 +1950,11 @@ class LocalHarnessEngine @Inject constructor(
         maxSteps: Int,
         virtualScreen: Boolean,
     ): String {
+        val sessionId = currentSessionId
+        val boundEventLog = eventLogFor(sessionId)
+        val boundSubagents = newSubagentRunner { boundEventLog }
         val payload = buildJsonObject {
-            put("session_id", currentSessionId)
+            put("session_id", sessionId)
             put("task", task)
             model?.let { put("model", it) }
             put("max_steps", maxSteps)
@@ -1943,7 +1965,7 @@ class LocalHarnessEngine @Inject constructor(
             resumeKind = "subagent_readonly",
             resumePayload = payload,
         ) { jobId, _ ->
-            val result = subagents.runResult(
+            val result = boundSubagents.runResult(
                 task = task,
                 inheritHistory = false,
                 allowMutation = false,
@@ -1956,15 +1978,49 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun resumeInterruptedSafeJobs() {
-        jobs.interruptedSnapshots().forEach { snapshot ->
-            val payloadText = snapshot.resumePayload ?: return@forEach
-            runCatching {
-                val payload = json.parseToJsonElement(payloadText).jsonObject
-                val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull
-                require(sessionId == null || sessionId == currentSessionId) {
-                    "恢复任务属于其他会话：$sessionId"
+    private fun scheduleInterruptedSafeJobs() {
+        synchronized(runStateLock) {
+            if (persistentRecoveryJob?.isActive == true) return
+            persistentRecoveryJob = scope.launch {
+                try {
+                    while (true) {
+                        val targetSession = currentSessionId
+                        resumeInterruptedSafeJobsPass(targetSession)
+                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
+                            interruptedJobSessionId(snapshot) == targetSession
+                        }
+                        if (!remaining) break
+                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
+                    }
+                } finally {
+                    val completed = currentCoroutineContext()[Job]
+                    synchronized(runStateLock) {
+                        if (persistentRecoveryJob === completed) persistentRecoveryJob = null
+                    }
                 }
+            }
+        }
+    }
+
+    private fun resumeInterruptedSafeJobsPass(targetSession: String) {
+        jobs.interruptedSnapshots().forEach { snapshot ->
+            val payloadText = snapshot.resumePayload
+            if (payloadText.isNullOrBlank()) {
+                jobs.failInterrupted(snapshot.id, "任务恢复失败：缺少恢复元数据")
+                return@forEach
+            }
+            val payload = try {
+                json.parseToJsonElement(payloadText).jsonObject
+            } catch (error: Exception) {
+                jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
+                recordJobResumeError(snapshot, targetSession, error)
+                return@forEach
+            }
+            val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
+            if (sessionId != targetSession) return@forEach
+            if (jobs.availableSlots() <= 0) return
+
+            try {
                 when (snapshot.resumeKind) {
                     "web_fetch" -> {
                         val url = payload["url"]?.jsonPrimitive?.contentOrNull
@@ -1991,8 +2047,10 @@ class LocalHarnessEngine @Inject constructor(
                         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+                        val boundEventLog = eventLogFor(sessionId)
+                        val boundSubagents = newSubagentRunner { boundEventLog }
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
-                            val result = subagents.runResult(
+                            val result = boundSubagents.runResult(
                                 task = task,
                                 inheritHistory = false,
                                 allowMutation = false,
@@ -2004,16 +2062,34 @@ class LocalHarnessEngine @Inject constructor(
                             result.requireCompletedOutput()
                         }
                     }
-                    else -> Unit
+                    else -> {
+                        jobs.failInterrupted(
+                            snapshot.id,
+                            "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
+                        )
+                    }
                 }
-            }.onFailure { error ->
-                eventLog.append("job/resume-error", buildJsonObject {
-                    put("job_id", snapshot.id)
-                    put("kind", snapshot.resumeKind.orEmpty())
-                    put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
-                })
+            } catch (error: Exception) {
+                // Persistence failures leave the record interrupted so the coordinator can retry.
+                recordJobResumeError(snapshot, sessionId, error)
             }
         }
+    }
+
+    private fun interruptedJobSessionId(snapshot: JobSnapshot): String? {
+        val payloadText = snapshot.resumePayload ?: return null
+        return runCatching {
+            json.parseToJsonElement(payloadText).jsonObject["session_id"]
+                ?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
+    }
+
+    private fun recordJobResumeError(snapshot: JobSnapshot, sessionId: String, error: Throwable) {
+        eventLogFor(sessionId).append("job/resume-error", buildJsonObject {
+            put("job_id", snapshot.id)
+            put("kind", snapshot.resumeKind.orEmpty())
+            put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
+        })
     }
     private suspend fun approve(
         call: LocalToolCall,
@@ -2849,6 +2925,7 @@ class LocalHarnessEngine @Inject constructor(
         const val DEFAULT_MODEL_ATTEMPTS = 3
         const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
         const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
+        const val PERSISTENT_RECOVERY_RETRY_MILLIS = 500L
         const val DEFAULT_DOWNLOAD_BYTES = 20 * 1024 * 1024
         const val MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
         const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
