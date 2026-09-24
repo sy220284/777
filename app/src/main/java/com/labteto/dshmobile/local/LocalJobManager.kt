@@ -40,6 +40,10 @@ internal class LocalJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ): String = delegate.resumePersistent(id, block)
 
+    fun snapshotInfos(): List<LocalJobInfo> = delegate.snapshots().map {
+        LocalJobInfo(it.id, it.label, it.status)
+    }
+
     fun list(): String = delegate.list()
 
     fun listAgents(): String = delegate.listAgents()
