@@ -120,6 +120,10 @@ fun AppRoot(
                 onOpenSettings = { showSettings = true },
                 onOpenTasks = { utilitySurface = "tasks" },
                 onOpenTools = { utilitySurface = "tools" },
+                onCheckUpdate = {
+                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                },
+                updateStatus = updateInstallStatus,
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = { showSettings = true },

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
@@ -41,7 +42,6 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -65,12 +65,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
-import com.labteto.dshmobile.core.DshCore
 import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.core.wire.dto.PluginInventoryEntry
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
@@ -115,9 +113,7 @@ private enum class SettingsPage {
     MEMORY,
     PERMISSIONS,
     NOTIFICATIONS,
-    DATA,
     ADVANCED,
-    ABOUT,
 }
 
 @Composable
@@ -162,8 +158,6 @@ fun SettingsScreen(
         }
     }
 
-    val hostsCleared = stringResource(R.string.settings_forget_hosts_done)
-    val sessionsCleared = stringResource(R.string.settings_clear_last_sessions_done)
     val title = when (page) {
         SettingsPage.ROOT -> stringResource(R.string.settings_title)
         SettingsPage.GENERAL -> stringResource(R.string.settings_page_general)
@@ -172,9 +166,7 @@ fun SettingsScreen(
         SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
         SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
-        SettingsPage.DATA -> stringResource(R.string.settings_page_data)
         SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
-        SettingsPage.ABOUT -> stringResource(R.string.settings_page_about)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
@@ -256,22 +248,24 @@ fun SettingsScreen(
                         Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14, color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
-                                icon = Icons.Outlined.Storage,
-                                title = stringResource(R.string.settings_page_data),
-                                subtitle = stringResource(R.string.settings_data_subtitle),
-                                onClick = { page = SettingsPage.DATA },
-                            )
-                            DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
                                 onClick = { page = SettingsPage.ADVANCED },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.Info,
-                                title = stringResource(R.string.settings_page_about),
-                                subtitle = stringResource(R.string.settings_about_subtitle),
-                                onClick = { page = SettingsPage.ABOUT },
+                                icon = Icons.Outlined.CloudDownload,
+                                title = stringResource(R.string.settings_update_check),
+                                subtitle = stringResource(R.string.settings_update_check_hint),
+                                onClick = onCheckUpdate,
+                            )
+                        }
+                        updateStatus?.let { status ->
+                            Text(
+                                status,
+                                style = DsType.small13,
+                                color = colors.labelSecondary,
+                                modifier = Modifier.padding(horizontal = DsSpacing.small),
                             )
                         }
                     }
@@ -342,23 +336,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsPage.DATA -> {
-                        SettingsCard(stringResource(R.string.settings_data), Icons.Outlined.Storage) {
-                            DsButton(
-                                text = stringResource(R.string.settings_forget_hosts),
-                                onClick = { viewModel.forgetHosts { toast.second(hostsCleared) } },
-                                variant = DsButtonVariant.Outline,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            DsButton(
-                                text = stringResource(R.string.settings_clear_last_sessions),
-                                onClick = { viewModel.clearLastSessions { toast.second(sessionsCleared) } },
-                                variant = DsButtonVariant.Ghost,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-
                     SettingsPage.ADVANCED -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
@@ -378,33 +355,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsPage.ABOUT -> {
-                        SettingsCard(stringResource(R.string.settings_about), Icons.Outlined.Info) {
-                            DsButton(
-                                text = stringResource(R.string.settings_update_check),
-                                onClick = onCheckUpdate,
-                                variant = DsButtonVariant.Outline,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                text = stringResource(R.string.settings_update_check_hint),
-                                style = DsType.caption11,
-                                color = colors.labelTertiary,
-                            )
-                            updateStatus?.let { status ->
-                                Text(status, style = DsType.small13, color = colors.labelSecondary)
-                            }
-                            Text(
-                                stringResource(
-                                    R.string.settings_about_version,
-                                    BuildConfig.VERSION_NAME,
-                                    DshCore.PROTOCOL_BASELINE,
-                                ),
-                                style = DsType.small13,
-                                color = colors.labelTertiary,
-                            )
-                        }
-                    }
                 }
 
                 Spacer(Modifier.height(DsSpacing.xlarge))

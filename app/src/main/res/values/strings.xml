@@ -351,8 +351,6 @@
     <string name="settings_notifications_goal">Notify when a goal completes or blocks</string>
     <string name="settings_notifications_action">Notify when your action is needed</string>
     <string name="settings_background">Keep connected in background</string>
-    <string name="settings_about">About</string>
-    <string name="settings_about_version">App version %1$s · protocol %2$s</string>
     <string name="settings_host_info">Host information</string>
     <string name="settings_connection">Connection</string>
     <string name="settings_connection_status">Status</string>
@@ -361,11 +359,6 @@
     <string name="settings_connection_disconnect_confirm">Disconnect from harness?</string>
     <string name="settings_connection_disconnect_message">You will return to the connection screen.</string>
     <string name="settings_harness">Harness</string>
-    <string name="settings_data">Data</string>
-    <string name="settings_forget_hosts">Forget remembered harnesses</string>
-    <string name="settings_forget_hosts_done">Remembered harnesses cleared</string>
-    <string name="settings_clear_last_sessions">Forget which session to open</string>
-    <string name="settings_clear_last_sessions_done">The app will open the newest session next time</string>
     <string name="settings_notifications_turn_hint">A turn finishing while the app is in the background</string>
     <string name="settings_notifications_goal_hint">A goal completing or getting blocked</string>
     <string name="settings_notifications_action_hint">An approval, question, or plan waiting on you</string>
@@ -448,7 +441,7 @@
     <string name="update_open">Download &amp; install</string>
     <string name="update_later">Later</string>
     <string name="settings_update_check">Check for updates</string>
-    <string name="settings_update_check_hint">Asks GitHub for the latest release when the app starts.</string>
+    <string name="settings_update_check_hint">Checks GitHub when tapped; a newer release downloads and is verified before installation.</string>
     <!-- Relay: choosing how to connect, pairing, and the failures that need a different fix. -->
     <string name="connect_relay_banner">A relay checks that it is you, and nothing else. Once paired, this device can run commands on that computer, exactly as a terminal on it could.</string>
     <string name="connect_relay_remembered">Paired relays</string>
@@ -622,9 +615,7 @@
     <string name="settings_page_memory">Personalization &amp; memory</string>
     <string name="settings_page_permissions">Connections &amp; permissions</string>
     <string name="settings_page_notifications">Notifications</string>
-    <string name="settings_page_data">Data</string>
     <string name="settings_page_advanced">Advanced</string>
-    <string name="settings_page_about">About</string>
     <string name="settings_group_experience">Experience</string>
     <string name="settings_group_system">System</string>
     <string name="settings_group_maintenance">Maintenance</string>
@@ -633,9 +624,7 @@
     <string name="settings_general_subtitle">Language, theme, and session ordering</string>
     <string name="settings_permissions_subtitle">Remote connection, background connection, and device access</string>
     <string name="settings_notifications_subtitle">Completion, goal, and action-needed alerts</string>
-    <string name="settings_data_subtitle">Remembered connections and session recovery data</string>
     <string name="settings_advanced_subtitle">Agent execution, project configuration, and diagnostics</string>
-    <string name="settings_about_subtitle">Version and app updates</string>
     <string name="settings_runtime_diagnostics">Runtime &amp; diagnostics</string>
     <string name="settings_network_diagnostic">Network diagnostics</string>
     <string name="settings_environment_capabilities">Environment capabilities</string>

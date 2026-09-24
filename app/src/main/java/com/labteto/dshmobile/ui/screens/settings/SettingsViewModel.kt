@@ -11,7 +11,6 @@ import com.labteto.dshmobile.connection.ConnectionManager
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.connection.RelayCredentialStore
 import com.labteto.dshmobile.core.wire.RpcResult
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.LlmDiscoveredModel
@@ -86,7 +85,6 @@ data class DeviceCapabilitiesState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
-    private val credentials: RelayCredentialStore,
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalHarnessEngine,
     private val deepSeekPricingRepository: DeepSeekPricingRepository,
@@ -516,21 +514,4 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    /** Forget every remembered harness and its locally stored relay credential. */
-    fun forgetHosts(onDone: () -> Unit = {}) {
-        connectionManager.disconnect()
-        viewModelScope.launch {
-            hostsStore.clearHosts()
-            credentials.clear()
-            onDone()
-        }
-    }
-
-    /** Forget which session to reopen per harness; the app lands on the newest one next time. */
-    fun clearLastSessions(onDone: () -> Unit = {}) {
-        viewModelScope.launch {
-            hostsStore.clearLastSessions()
-            onDone()
-        }
-    }
 }

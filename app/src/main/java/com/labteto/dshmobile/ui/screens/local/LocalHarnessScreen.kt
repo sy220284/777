@@ -43,8 +43,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Schedule
@@ -95,6 +95,7 @@ import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -128,6 +129,8 @@ fun LocalHarnessScreen(
     onOpenSettings: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenTools: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    updateStatus: String?,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -177,6 +180,8 @@ fun LocalHarnessScreen(
                     scope.launch { drawerState.close() }
                     onOpenSettings()
                 },
+                onCheckUpdate = onCheckUpdate,
+                updateStatus = updateStatus,
             )
         },
     ) {
@@ -240,6 +245,8 @@ private fun LocalModeDrawer(
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    updateStatus: String?,
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
@@ -261,23 +268,23 @@ private fun LocalModeDrawer(
                 Modifier
                     .weight(1f)
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 item(key = "drawer-header") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        WhaleMark(Modifier.size(44.dp))
+                    Row(
+                        modifier = Modifier.padding(bottom = DsSpacing.medium),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppBrandIcon(Modifier.size(44.dp))
                         Spacer(Modifier.size(DsSpacing.medium))
-                        Column(Modifier.weight(1f)) {
-                            Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
-                            Text("运行中心", style = DsType.caption11, color = colors.labelTertiary)
-                        }
+                        Text("DSH Mobile", style = DsType.large20, color = colors.labelPrimary)
                     }
                 }
                 item(key = "drawer-search") {
                     OutlinedTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.medium),
                         placeholder = { Text("搜索会话") },
                         singleLine = true,
                         shape = DsShapes.block,
@@ -293,21 +300,8 @@ private fun LocalModeDrawer(
                         )
                     }
                 }
-                item(key = "drawer-remote-title") {
-                    Text("远程控制", style = DsType.std14, color = colors.labelTertiary)
-                }
-                item(key = "drawer-remote") {
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            subtitle = stringResource(R.string.local_remote_hint),
-                            onClick = onRemote,
-                        )
-                    }
-                }
                 item(key = "drawer-sessions-title") {
-                    Text("会话", style = DsType.std14, color = colors.labelTertiary)
+                    DrawerSectionTitle("会话")
                 }
                 if (visibleSessions.isNotEmpty() && filteredSessions.isEmpty()) {
                     item(key = "drawer-no-sessions") {
@@ -320,21 +314,23 @@ private fun LocalModeDrawer(
                     }
                 }
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = Icons.Outlined.History,
-                            title = session.title,
-                            subtitle = if (session.id == currentSessionId) "正在进行" else "本机会话",
-                            value = if (session.id == currentSessionId) "当前" else null,
-                            onClick = { onSwitchSession(session.id) },
-                        )
-                    }
+                    LocalSessionDrawerRow(
+                        title = session.title,
+                        current = session.id == currentSessionId,
+                        onClick = { onSwitchSession(session.id) },
+                    )
                 }
                 item(key = "drawer-tools-title") {
-                    Text("功能", style = DsType.std14, color = colors.labelTertiary)
+                    DrawerSectionTitle("功能")
                 }
                 item(key = "drawer-tools") {
                     DsGroupCard {
+                        DsCategoryRow(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            title = stringResource(R.string.local_remote_control),
+                            subtitle = stringResource(R.string.local_remote_hint),
+                            onClick = onRemote,
+                        )
                         DsCategoryRow(
                             icon = FeatherIcons.FileText,
                             title = stringResource(R.string.chatlist_workspace_files),
@@ -359,10 +355,64 @@ private fun LocalModeDrawer(
                             subtitle = "模型、个性化、权限与高级选项",
                             onClick = onSettings,
                         )
+                        DsCategoryRow(
+                            icon = Icons.Outlined.CloudDownload,
+                            title = stringResource(R.string.settings_update_check),
+                            subtitle = stringResource(R.string.settings_update_check_hint),
+                            onClick = onCheckUpdate,
+                        )
+                    }
+                }
+                if (updateStatus != null) {
+                    item(key = "drawer-update-status") {
+                        Text(
+                            updateStatus,
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        )
                     }
                 }
             }
             LocalUsageFooter(usage)
+        }
+    }
+}
+
+@Composable
+private fun DrawerSectionTitle(title: String) {
+    Text(
+        title,
+        style = DsType.std14,
+        color = DsTheme.colors.labelTertiary,
+        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
+    )
+}
+
+@Composable
+private fun LocalSessionDrawerRow(title: String, current: Boolean, onClick: () -> Unit) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
+            .clip(DsShapes.row)
+            .background(if (current) colors.sidebarNavActive else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = DsType.std14,
+            color = colors.labelPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (current) {
+            Spacer(Modifier.width(DsSpacing.small))
+            Text("当前", style = DsType.caption11, color = colors.accent)
         }
     }
 }
