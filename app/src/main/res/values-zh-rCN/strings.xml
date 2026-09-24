@@ -213,6 +213,9 @@
     <string name="operation_other">正在处理当前步骤</string>
     <string name="operation_reasoning">正在分析任务</string>
     <string name="operation_progress">正在推进任务</string>
+    <string name="operation_goal_status">目标 · %1$s</string>
+    <string name="operation_plan_count">计划 · %1$d 步</string>
+    <string name="operation_task_count">任务 · 已完成 %1$d/%2$d</string>
     <string name="operation_result_ready">任务结果已准备好</string>
     <string name="command_execution_title">执行操作</string>
     <string name="command_execution_purpose">执行本机操作以完成当前任务</string>
