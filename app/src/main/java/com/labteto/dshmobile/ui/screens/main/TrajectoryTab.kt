@@ -30,7 +30,8 @@ import com.labteto.dshmobile.core.session.ToolResultNode
 import com.labteto.dshmobile.core.session.UserMessageNode
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
-import com.labteto.dshmobile.ui.isCommandExecutionTool
+import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
@@ -117,15 +118,17 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?
             }
         }
         is AssistantMessageNode -> {
-            val snippet = node.plainText.trim().take(160)
-            if (snippet.isNotEmpty()) {
-                Text(
-                    snippet,
-                    style = DsType.caption11,
-                    color = colors.labelTertiary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (!node.isWorkProcess(siblings)) {
+                val snippet = node.plainText.trim().take(160)
+                if (snippet.isNotEmpty()) {
+                    Text(
+                        snippet,
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         is ToolCallNode -> {
@@ -134,68 +137,32 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>, cwd: String?
                 .firstOrNull { it.callId == node.callId }
             ToolLedgerRow(node, result, cwd)
         }
-        is com.labteto.dshmobile.core.session.OtherNode -> JsonDisclosure(node.type, node.data)
+        is com.labteto.dshmobile.core.session.OtherNode -> Unit
         else -> Unit
     }
 }
 
 @Composable
 private fun ToolLedgerRow(call: ToolCallNode, result: ToolResultNode?, cwd: String?) {
-    val colors = DsTheme.colors
-    val row = remember(call.callId, cwd) { toolRowModel(call.name, call.arguments, cwd) }
-    var expanded by remember(call.callId) { mutableStateOf(false) }
+    val running = result == null
+    val failed = result?.isError == true
     Row(verticalAlignment = Alignment.CenterVertically) {
         StateDot(
             when {
-                result == null -> StateDotState.Running
-                result.isError -> StateDotState.Error
+                failed -> StateDotState.Error
+                running -> StateDotState.Running
                 else -> StateDotState.Done
             },
             size = 8.dp,
         )
         Spacer(Modifier.width(6.dp))
-        if (isCommandExecutionTool(call.name)) {
-            val purpose = row.summary ?: stringResource(R.string.command_execution_purpose)
-            val status = stringResource(
-                when {
-                    result == null -> R.string.command_execution_status_running
-                    result.isError -> R.string.command_execution_status_failed
-                    else -> R.string.command_execution_status_done
-                },
-            )
-            DisclosureRow(
-                title = stringResource(R.string.command_execution_title),
-                summary = "$purpose · $status",
-                icon = row.variant.featherIcon(),
-                expanded = false,
-                onToggle = null,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            DisclosureRow(
-                title = row.title,
-                summary = row.summary,
-                // The ledger already leads with its own state dot, so the slot keeps the glyph.
-                icon = row.variant.featherIcon(),
-                expanded = expanded,
-                onToggle = { expanded = !expanded },
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(Modifier.padding(start = 28.dp, top = 2.dp)) {
-                    Text(stringResource(R.string.chat_input_placeholder), style = DsType.caption11, color = colors.labelCaption)
-                    JsonDisclosure(call.name, runCatching { kotlinx.serialization.json.Json.parseToJsonElement(call.arguments) }.getOrElse { kotlinx.serialization.json.JsonPrimitive(call.arguments) })
-                    result?.content?.let { content ->
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.chat_output_placeholder), style = DsType.caption11, color = colors.labelCaption)
-                        Text(
-                            content.toString(),
-                            style = MonoCaption,
-                            color = if (result.isError) colors.error else colors.labelTertiary,
-                        )
-                    }
-                }
-            }
-        }
+        DisclosureRow(
+            title = stringResource(agentOperationLabelRes(call.name)),
+            summary = stringResource(agentOperationStatusRes(running = running, failed = failed)),
+            expanded = false,
+            onToggle = null,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
