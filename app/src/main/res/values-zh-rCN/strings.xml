@@ -793,4 +793,23 @@
     <string name="local_question_title">Harness 需要你的决定</string>
     <string name="local_question_custom_answer">自定义回答</string>
     <string name="local_question_submit">提交回答</string>
+
+    <string name="local_usage_chat">聊天</string>
+    <string name="local_usage_work">工作</string>
+    <string name="local_chat_composer_hint">想说什么就说吧…</string>
+    <string name="local_chat_empty_hint">想说什么就说。这里按角色聊天来，不走工作流程。</string>
+    <string name="local_persona_title">角色人设</string>
+    <string name="local_persona_intro">固定人设会在每轮聊天重新注入，不跟普通聊天历史一起被压缩。</string>
+    <string name="local_persona_name">角色名称</string>
+    <string name="local_persona_identity">人物身份</string>
+    <string name="local_persona_background">背景经历</string>
+    <string name="local_persona_personality">核心性格</string>
+    <string name="local_persona_speech_style">说话方式</string>
+    <string name="local_persona_relationship">与我的关系</string>
+    <string name="local_persona_world_setting">世界设定</string>
+    <string name="local_persona_constraints">不可违反的人设（每行一条）</string>
+    <string name="local_persona_examples">对白参考（每行一条）</string>
+    <string name="local_persona_banned">角色专属禁用词（每行一条）</string>
+    <string name="local_persona_signature">角色常用表达（每行一条）</string>
+    <string name="local_persona_save">保存人设</string>
 </resources>

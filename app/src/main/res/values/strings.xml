@@ -795,4 +795,23 @@
     <string name="local_question_title">Harness needs your decision</string>
     <string name="local_question_custom_answer">Custom answer</string>
     <string name="local_question_submit">Submit answer</string>
+
+    <string name="local_usage_chat">Chat</string>
+    <string name="local_usage_work">Work</string>
+    <string name="local_chat_composer_hint">Say whatever is on your mind…</string>
+    <string name="local_chat_empty_hint">Say whatever you want. This space is for character chat, not work tasks.</string>
+    <string name="local_persona_title">Character persona</string>
+    <string name="local_persona_intro">This fixed persona is injected again on every chat turn and is kept outside normal history compression.</string>
+    <string name="local_persona_name">Character name</string>
+    <string name="local_persona_identity">Identity</string>
+    <string name="local_persona_background">Background</string>
+    <string name="local_persona_personality">Core personality</string>
+    <string name="local_persona_speech_style">Speaking style</string>
+    <string name="local_persona_relationship">Relationship with me</string>
+    <string name="local_persona_world_setting">World setting</string>
+    <string name="local_persona_constraints">Hard persona rules (one per line)</string>
+    <string name="local_persona_examples">Dialogue examples (one per line)</string>
+    <string name="local_persona_banned">Character-specific banned phrases (one per line)</string>
+    <string name="local_persona_signature">Characteristic phrases (one per line)</string>
+    <string name="local_persona_save">Save persona</string>
 </resources>
