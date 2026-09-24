@@ -17,6 +17,10 @@ class ChatRelationshipEngineTest {
             ChatRelationshipView.IMMERSIVE,
             engine.classify("陪我聊会儿"),
         )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("她最近有点冷淡，真烦"),
+        )
     }
 
     @Test
@@ -30,8 +34,28 @@ class ChatRelationshipEngineTest {
             engine.classify("帮我分析一下我们现在什么阶段"),
         )
         assertEquals(
+            ChatRelationshipView.STRATEGIST,
+            engine.classify("她为什么突然冷淡"),
+        )
+        assertEquals(
             ChatRelationshipView.REPLY_COACH,
             engine.classify("她说刚下班，这句怎么回"),
+        )
+    }
+
+    @Test
+    fun scenariosUseDifferentReasoningRoutes() {
+        assertEquals(
+            RelationshipScenario.CONFLICT_REPAIR,
+            engine.classifyScenario("我们昨天吵架了，怎么修复"),
+        )
+        assertEquals(
+            RelationshipScenario.INVESTMENT_IMBALANCE,
+            engine.classifyScenario("一直都是我主动，感觉投入失衡"),
+        )
+        assertEquals(
+            RelationshipScenario.BOUNDARY_SAFETY,
+            engine.classifyScenario("她明确说别联系了"),
         )
     }
 
