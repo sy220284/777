@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +35,7 @@ data class LocalHarnessSession(
     val title: String = "新会话",
     val updatedAt: Long = 0L,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
+    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
@@ -164,6 +166,8 @@ data class LocalHarnessState(
     val workspacePath: String = "",
     val sessionId: String = "",
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
+    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
+    val chatPersona: PersonaProfile = PersonaProfile(),
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
