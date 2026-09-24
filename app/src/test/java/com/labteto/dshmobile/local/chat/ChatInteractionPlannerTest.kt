@@ -232,6 +232,52 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun partialPlannerPayloadPreservesOmittedState() {
+        val previous = ChatCharacterState(
+            mood = "有点委屈",
+            relationshipState = "暧昧期",
+            currentFocus = "昨天的失约",
+            initiative = 72,
+            shareDesire = 66,
+            dynamics = RelationshipDynamics(
+                stage = "AMBIGUOUS",
+                warmth = 73,
+                trust = 64,
+                reciprocity = 61,
+                tension = 29,
+                stability = 58,
+                unresolvedConflict = "失约还没解释",
+            ),
+            userPattern = UserChatPattern(
+                replyLength = "short",
+                directness = 62,
+                playfulness = 71,
+                initiative = 59,
+            ),
+        )
+        val payload = """
+            {
+              "state":{
+                "mood":"缓和了一点"
+              },
+              "suggestions":[
+                {"label":"自然","text":"行，那你先忙。"}
+              ]
+            }
+        """.trimIndent()
+
+        val plan = planner.parse(payload, previous)!!
+
+        assertEquals("缓和了一点", plan.state.mood)
+        assertEquals("暧昧期", plan.state.relationshipState)
+        assertEquals("昨天的失约", plan.state.currentFocus)
+        assertEquals(72, plan.state.initiative)
+        assertEquals(66, plan.state.shareDesire)
+        assertEquals(previous.dynamics, plan.state.dynamics)
+        assertEquals(previous.userPattern, plan.state.userPattern)
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
