@@ -93,5 +93,5 @@
 
 - 本机会话事件日志改为分段追加：单段仍受大小限制，但历史段永久保留，不再为新事件裁掉旧事实。
 - 启动/切换会话时会修复中断的开放轮次：已记录开始但无结果的工具标记为 `TOOL_OUTCOME_UNKNOWN`；尚未记录开始的调用标记为 `TOOL_NOT_STARTED`。
-- 模型请求的完整消息与工具视图使用 `request/context` 落盘；失败或取消的模型尝试使用 `assistant/attempt` 结算。
+- 模型请求的轻量路由与上下文规模使用 `request/context` 落盘；仅失败尝试额外使用 `request/context-full` 保留一次完整消息与工具现场，失败或取消的模型尝试使用 `assistant/attempt` 结算。
 - 会话 JSON 中的 `modelHistory` 已降级为旧版本迁移字段；新快照不再复制模型上下文。运行时 `modelHistory` 只是内存投影，启动时由 Session 事件中的有效检查点与语义尾部重建；旧快照仅在首次迁移时作为兼容输入。

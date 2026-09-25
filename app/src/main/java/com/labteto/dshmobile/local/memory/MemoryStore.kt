@@ -22,6 +22,9 @@ class MemoryStore internal constructor(
     private val file = File(root, "memories.json")
     private val backup = File(root, "memories.json.bak")
 
+    private var cachedDocument: MemoryDocument? = null
+    private var cachedStamp: DocumentStamp? = null
+
     @Synchronized
     fun remember(
         content: String,
@@ -259,19 +262,27 @@ class MemoryStore internal constructor(
     }
 
     private fun readDocument(): MemoryDocument {
-        decodeDocument(file)?.let { return it }
-        if (!file.isFile) return decodeDocument(backup) ?: MemoryDocument()
+        val stamp = documentStamp()
+        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
-        val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
-        val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
-        if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
+        val document = decodeDocument(file) ?: if (!file.isFile) {
+            decodeDocument(backup) ?: MemoryDocument()
+        } else {
+            val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
+            val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
+            if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
 
-        val recovered = decodeDocument(backup)
-        if (recovered != null) {
-            runCatching { backup.copyTo(file, overwrite = true) }
-            return recovered
+            val recovered = decodeDocument(backup)
+            if (recovered != null) {
+                runCatching { backup.copyTo(file, overwrite = true) }
+                recovered
+            } else {
+                MemoryDocument()
+            }
         }
-        return MemoryDocument()
+        cachedDocument = document
+        cachedStamp = documentStamp()
+        return document
     }
 
     private fun decodeDocument(source: File): MemoryDocument? {
@@ -302,7 +313,23 @@ class MemoryStore internal constructor(
         if (decodeDocument(backup) == null && decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
+        cachedDocument = document
+        cachedStamp = documentStamp()
     }
+
+    private fun documentStamp(): DocumentStamp = DocumentStamp(
+        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
+        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
+        backupModified = backup.takeIf(File::isFile)?.lastModified() ?: -1L,
+        backupLength = backup.takeIf(File::isFile)?.length() ?: -1L,
+    )
+
+    private data class DocumentStamp(
+        val primaryModified: Long,
+        val primaryLength: Long,
+        val backupModified: Long,
+        val backupLength: Long,
+    )
 
     private companion object {
         const val MAX_MEMORY_CONTENT_CHARS = 2_000
