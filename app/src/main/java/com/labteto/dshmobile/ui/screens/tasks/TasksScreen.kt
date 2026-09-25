@@ -104,6 +104,7 @@ class TasksViewModel @Inject constructor(
 @Composable
 fun TasksScreen(
     onClose: () -> Unit,
+    onOpenSession: (String) -> Unit = {},
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -253,7 +254,11 @@ fun TasksScreen(
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     items(state.tasks, key = AutomationTask::id) { task ->
-                        TaskCard(task = task, onCancel = { viewModel.cancel(task.id) })
+                        TaskCard(
+                            task = task,
+                            onCancel = { viewModel.cancel(task.id) },
+                            onOpenSession = onOpenSession,
+                        )
                     }
                 }
             }
@@ -339,7 +344,11 @@ private fun showSchedulePicker(
 }
 
 @Composable
-private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
+private fun TaskCard(
+    task: AutomationTask,
+    onCancel: () -> Unit,
+    onOpenSession: (String) -> Unit,
+) {
     val colors = DsTheme.colors
     val scheduleLabel = when (task.recurringMinutes) {
         null -> stringResource(R.string.tasks_once)
@@ -394,6 +403,28 @@ private fun TaskCard(task: AutomationTask, onCancel: () -> Unit) {
                 color = colors.error,
                 modifier = Modifier.padding(start = DsSpacing.xlarge),
             )
+        }
+        task.lastResult?.takeIf(String::isNotBlank)?.let {
+            Text(
+                stringResource(R.string.tasks_last_result, it.replace("\n", " ").take(180)),
+                style = DsType.caption11,
+                color = colors.labelSecondary,
+                modifier = Modifier.padding(start = DsSpacing.xlarge),
+                maxLines = 2,
+            )
+        }
+        task.workSessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.tasks_open_result),
+                    onClick = { onOpenSession(sessionId) },
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Outline,
+                )
+            }
         }
     }
 }
