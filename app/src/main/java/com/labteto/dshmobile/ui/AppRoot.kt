@@ -88,6 +88,7 @@ fun AppRoot(
             )
             utilitySurface == "tools" -> ToolsScreen(
                 onClose = { utilitySurface = null },
+                onOpenTasks = { utilitySurface = "tasks" },
             )
             showSettings -> SettingsScreen(
                 onClose = { showSettings = false },

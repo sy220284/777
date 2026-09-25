@@ -56,7 +56,7 @@ internal fun AttachmentSheet(
     onAttachFile: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    DsBottomSheet(title = "添加附件", onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = onDismiss) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),

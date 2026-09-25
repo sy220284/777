@@ -81,6 +81,7 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
@@ -178,25 +179,13 @@ fun SettingsScreen(
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    DsIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.common_back),
-                        onClick = {
-                            if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
-                        },
-                        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                        shadowElevation = 3.dp,
-                    )
-                    Text(
-                        title,
-                        style = DsType.large20,
-                        color = colors.labelPrimary,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.width(48.dp))
-                }
+                DsTopBar(
+                    title = title,
+                    onBack = {
+                        if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+                    },
+                    backContentDescription = stringResource(R.string.common_back),
+                )
 
                 when (page) {
                     SettingsPage.ROOT -> {
