@@ -963,4 +963,14 @@
     <string name="persona_gallery_rename_story">Rename storyline</string>
 
     <string name="persona_gallery_save_edits_before_switch">Save or cancel the current story edits before switching.</string>
+
+    <string name="local_persona_picker_title">Choose character</string>
+    <string name="local_persona_picker_intro">A new chat can use any saved character or a brand-new one. Choosing a saved character starts a fresh storyline without importing an old story.</string>
+    <string name="local_persona_picker_current">Current character: %1$s</string>
+    <string name="local_persona_picker_new">Create new character</string>
+    <string name="local_persona_picker_edit_current">Edit current character</string>
+    <string name="local_persona_picker_saved">Saved characters</string>
+    <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
+    <string name="local_persona_picker_saved_hint">Saved character</string>
+
 </resources>
