@@ -4,7 +4,7 @@
 > 适用项目：`sy220284/777`  
 > 平台范围：Android 16+（API 36+）  
 > 当前 777 基线：`0.12.0-777.5`  
-> 官方对照基线：`deepseek-ai/deepseek-harness@00102833dfaee1da9f48a3a8eae9d34005a75218`（`0.1.7-alpha.2`）
+> 官方对照基线：`deepseek-ai/deepseek-harness@477b4f420553e8a52c2fbccc464d7561b239c443`（`0.1.7-rc.2`）
 
 ## 1. 最终目标
 
@@ -523,10 +523,10 @@ upstream/deepseek-harness.lock.json
 ```json
 {
   "repository": "deepseek-ai/deepseek-harness",
-  "version": "0.1.7-alpha.2",
-  "commit": "00102833dfaee1da9f48a3a8eae9d34005a75218",
+  "version": "0.1.7-rc.2",
+  "commit": "477b4f420553e8a52c2fbccc464d7561b239c443",
   "sessionFormatVersion": 4,
-  "verifiedAt": "2026-09-23"
+  "verifiedAt": "2026-09-25"
 }
 ```
 

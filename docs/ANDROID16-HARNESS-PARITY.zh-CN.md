@@ -1,7 +1,7 @@
 # Android 16 本机 Harness 适配审计
 
-审计基线：`deepseek-ai/deepseek-harness@00102833dfaee1da9f48a3a8eae9d34005a75218`
-（官方 `master`，`0.1.7-alpha.2`）。本文件只评价 APK 内的本机模式；电脑远程模式继续使用官方
+审计基线：`deepseek-ai/deepseek-harness@477b4f420553e8a52c2fbccc464d7561b239c443`
+（官方 `0.1.7-rc.2`）。本文件只评价 APK 内的本机模式；电脑远程模式继续使用官方
 网页协议，范围见 `COMPATIBILITY.md`。官方该基线的 Session 写入格式为 V4；本机侧以语义等价为目标，不直接复刻其物理载体。
 
 ## 结论
@@ -23,7 +23,7 @@
 | Agent loop / DeepSeek 适配器 | 多步模型—工具循环，保留 `reasoning_content` 和原始工具消息 | 已适配 |
 | Session / persistence / projection | 多会话快照、有界追加式事件日志、会话列表与切换 | Android 等价实现 |
 | LLM retry / cancellation | 408、429、5xx 与网络错误有界重试；轮次可停止 | 已适配 |
-| Compaction / spill | 工具结果头尾裁剪、历史上限压缩、事件日志按 8 MB 保留最新完整记录 | Android 等价实现 |
+| Compaction / spill | 字符资源预算与模型上下文预算双层治理；每个模型 step 检查压力；超长工具结果安全保留头尾，完整内容进入 Session 私有 spill 并可分页回读 | Android 等价实现 |
 | `read` / `write` / `edit` | 保留官方工具名；有界读取、完整写入、唯一字面量替换、路径穿越防护 | 已适配 |
 | `glob` / `grep` | 保留官方工具名；原生 glob 与递归文本搜索，不依赖设备预装 `rg` | 已适配 |
 | `bash` | 保留官方工具名；以 `/system/bin/sh` 执行，支持超时、取消、输出上限、审批 | Android 等价实现 |
@@ -95,3 +95,14 @@
 - 启动/切换会话时会修复中断的开放轮次：已记录开始但无结果的工具标记为 `TOOL_OUTCOME_UNKNOWN`；尚未记录开始的调用标记为 `TOOL_NOT_STARTED`。
 - 模型请求的完整消息与工具视图使用 `request/context` 落盘；失败或取消的模型尝试使用 `assistant/attempt` 结算。
 - 会话 JSON 中的 `modelHistory` 已降级为旧版本迁移字段；新快照不再复制模型上下文。运行时 `modelHistory` 只是内存投影，启动时由 Session 事件中的有效检查点与语义尾部重建；旧快照仅在首次迁移时作为兼容输入。
+
+
+## 0.1.7-rc.2 基线补强
+
+- 上下文治理改为双层预算：原有字符上限继续负责 Android 内存与序列化压力；官方 DeepSeek 路由同时使用模型上下文预算。当前官方 `deepseek-flash` / `deepseek-v4-pro` 按 1,000,000 token 窗口、256,000 token 输出预留、65,536 token 额外余量与 0.8 压力阈值计算；未知第三方模型不猜测窗口，只保留字符保护。
+- 主 Agent 在每个模型 step 前重新检查上下文压力，并把当前临时上下文与实际工具 schema 纳入估算；长工具链不会只在整轮开始时检查一次。
+- 工具结果统一通过 UTF-8 / Unicode 安全保留器进入模型上下文，避免在代理对或 UTF-8 字符中间截断。超限原文在 16 MiB 单项上限内写入 `noBackupFilesDir` 下的 Session 私有 spill，模型可用只读 `tool_output_read` 按原工具调用编号分页回读；删除 Session 同时删除对应 spill。
+- 动态扩展工具继续按需发现。前台普通子 Agent、持久子 Agent 与自动化子 Agent 的可选工具启用集合改为单次 Agent Run 独立作用域，子 Agent 发现能力不会污染父 Agent 或兄弟分支。
+- 固定提示词与工具描述删除运行时已经硬性执行的重复审批说明，保留能力导航、安全边界和必要前置条件，减少每轮固定 token。
+- 自动化任务新增有界轻量运行回执：最多保留 200 条、30 天；完整工作结果仍只保存在既有 `workSessionId` 对应会话中。聊天模式界面继续采用 60 分钟周期下限，工作模式底层允许 Android WorkManager 的 15 分钟周期；不复制桌面常驻进程的一分钟调度语义。
+- 官方本次仍使用 Session V4，因此无需新增 Session 格式迁移。
