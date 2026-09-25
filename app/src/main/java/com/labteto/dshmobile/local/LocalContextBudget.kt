@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import java.net.URI
 
 /**
  * Two independent guards share one policy object:
@@ -37,6 +38,7 @@ internal fun localHistoryBudgetFor(
     pressure: HarnessResourcePressure,
     usageMode: LocalUsageMode,
     model: String?,
+    baseUrl: String? = null,
 ): LocalHistoryBudget {
     val base = when {
         memoryClassMb >= 512 -> LocalHistoryBudget(
@@ -64,7 +66,7 @@ internal fun localHistoryBudgetFor(
         HarnessResourcePressure.HIGH -> 0.65
     }
 
-    val routed = officialDeepSeekContext(model)
+    val routed = officialDeepSeekContext(model, baseUrl)
     val toolTokensBase = if (usageMode == LocalUsageMode.CHAT) {
         DEFAULT_CHAT_TOOL_RESULT_TOKENS
     } else {
@@ -90,9 +92,10 @@ private data class RoutedContextBudget(
     val headroomTokens: Int,
 )
 
-private fun officialDeepSeekContext(model: String?): RoutedContextBudget? {
+private fun officialDeepSeekContext(model: String?, baseUrl: String?): RoutedContextBudget? {
     val normalized = model?.trim()?.lowercase() ?: return null
     if (normalized !in OFFICIAL_DEEPSEEK_MODELS) return null
+    if (!isOfficialDeepSeekEndpoint(baseUrl)) return null
 
     val messageBudget = minOf(
         (OFFICIAL_CONTEXT_WINDOW_TOKENS * CONTEXT_TRIGGER_RATIO).toInt(),
@@ -107,6 +110,16 @@ private fun officialDeepSeekContext(model: String?): RoutedContextBudget? {
         outputReserveTokens = OFFICIAL_OUTPUT_RESERVE_TOKENS,
         headroomTokens = OFFICIAL_HEADROOM_TOKENS,
     )
+}
+
+private fun isOfficialDeepSeekEndpoint(baseUrl: String?): Boolean {
+    val value = baseUrl?.trim()?.takeIf(String::isNotEmpty) ?: return false
+    return runCatching {
+        val normalized = normalizeModelBaseUrl(value)
+        val uri = URI(normalized)
+        uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host.equals("api.deepseek.com", ignoreCase = true)
+    }.getOrDefault(false)
 }
 
 private val OFFICIAL_DEEPSEEK_MODELS = setOf("deepseek-flash", "deepseek-v4-pro")
