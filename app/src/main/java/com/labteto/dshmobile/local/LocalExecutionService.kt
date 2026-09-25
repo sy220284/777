@@ -96,6 +96,7 @@ class LocalExecutionService : Service() {
         }
 
         if (turns.isEmpty() && jobs.isEmpty()) {
+            dispatchedActive = false
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
@@ -201,7 +202,10 @@ class LocalExecutionService : Service() {
         const val OUTCOME_FAILED = "failed"
         const val OUTCOME_CANCELLED = "cancelled"
 
+        @Volatile private var dispatchedActive = false
+
         fun holdTurn(context: Context, sessionId: String, step: Int = 0) {
+            dispatchedActive = true
             dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
@@ -214,6 +218,7 @@ class LocalExecutionService : Service() {
         }
 
         fun releaseTurn(context: Context, sessionId: String, outcome: String) {
+            if (!dispatchedActive) return
             dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
@@ -225,6 +230,8 @@ class LocalExecutionService : Service() {
         }
 
         fun syncJobs(context: Context, sessionId: String, activeJobs: List<LocalJobInfo>) {
+            if (activeJobs.isEmpty() && !dispatchedActive) return
+            if (activeJobs.isNotEmpty()) dispatchedActive = true
             dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
