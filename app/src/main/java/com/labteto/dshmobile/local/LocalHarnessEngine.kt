@@ -2002,7 +2002,7 @@ class LocalHarnessEngine @Inject constructor(
         val finalMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
             role = finalRole,
-            content = finalContent.take(MAX_EVENT_CHARS),
+            content = truncateWithoutSplittingSurrogatePair(finalContent, MAX_EVENT_CHARS),
             createdAt = System.currentTimeMillis(),
         )
         val event = eventLog.append(
@@ -4322,7 +4322,7 @@ class LocalHarnessEngine @Inject constructor(
         log.append("tool/result", buildJsonObject {
             put("id", normalized.id)
             put("name", normalized.name)
-            put("content", result.content.take(MAX_EVENT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
             put("is_error", result.isError)
             put("automation", true)
         })
@@ -5646,7 +5646,7 @@ class LocalHarnessEngine @Inject constructor(
         if (context.isBlank()) return history
         val insertion = buildJsonObject {
             put("role", "system")
-            put("content", context.take(MAX_EPHEMERAL_CONTEXT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
         }
         val index = if (
             history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
