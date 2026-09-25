@@ -118,6 +118,16 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
+    suspend fun deleteGalleryHistoryMessage(
+        id: String,
+        messageKey: String,
+    ): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) {
+            check(galleryStore.deleteHistoryMessage(id, messageKey)) { "gallery_archive_missing" }
+            _gallery.value = galleryStore.list()
+        }
+    }
+
     fun startFromGallery(id: String): Boolean {
         val snapshot = state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false

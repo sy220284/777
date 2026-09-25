@@ -896,4 +896,13 @@
     <string name="persona_gallery_suggestions_title">可追加到固定人设</string>
     <string name="persona_gallery_evidence">依据：%1$s</string>
 
+
+    <string name="persona_gallery_long_press_delete_hint">长按人物卡可删除已保存的图集档案。</string>
+    <string name="persona_gallery_delete_saved_confirm">删除“%1$s”的这份保存档案（%2$d 条对白）？</string>
+    <string name="persona_gallery_delete_saved_hint">这里只删除人设图集里的保存档案，不会删除已有会话。</string>
+    <string name="persona_gallery_history_long_press_hint">长按任意一条归档对白，可从人设图集中删除。</string>
+    <string name="persona_gallery_delete_dialogue_confirm">删除这条归档对白？</string>
+    <string name="persona_gallery_delete_dialogue_hint">只删除人设图集里的副本，原会话内容保持不变。</string>
+    <string name="persona_gallery_archive_deleted">归档对白已删除</string>
+
 </resources>

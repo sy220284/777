@@ -898,4 +898,13 @@
     <string name="persona_gallery_suggestions_title">Can be added to the fixed persona</string>
     <string name="persona_gallery_evidence">Evidence: %1$s</string>
 
+
+    <string name="persona_gallery_long_press_delete_hint">Long-press a character card to delete a saved archive.</string>
+    <string name="persona_gallery_delete_saved_confirm">Delete the saved archive for %1$s (%2$d dialogue lines)?</string>
+    <string name="persona_gallery_delete_saved_hint">This removes only the gallery archive and does not delete existing chats.</string>
+    <string name="persona_gallery_history_long_press_hint">Long-press any archived dialogue line to remove it from the gallery.</string>
+    <string name="persona_gallery_delete_dialogue_confirm">Delete this archived dialogue line?</string>
+    <string name="persona_gallery_delete_dialogue_hint">Only the gallery copy is removed; the original chat stays unchanged.</string>
+    <string name="persona_gallery_archive_deleted">Archived dialogue removed</string>
+
 </resources>
