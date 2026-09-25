@@ -811,6 +811,17 @@
 
     <string name="local_usage_chat">Chat</string>
     <string name="local_usage_work">Work</string>
+    <string name="local_group_chat">Group chat</string>
+    <string name="local_group_chat_title">Group chat</string>
+    <string name="local_group_chat_member_count">%1$d characters</string>
+    <string name="local_group_chat_active_speaker">%1$s is replying…</string>
+    <string name="local_group_chat_members_title">Group characters</string>
+    <string name="local_group_chat_members_hint">Choose %1$d–%2$d saved characters. Each character runs as an isolated role agent with its own full persona and relationship state.</string>
+    <string name="local_group_chat_no_characters">No saved characters are available yet. Create or save characters in the character gallery first.</string>
+    <string name="local_group_chat_selected_count">Selected %1$d/%2$d</string>
+    <string name="local_group_chat_apply_members">Save group characters</string>
+    <string name="local_group_chat_setup_required">Add at least two characters to start the group chat.</string>
+    <string name="local_group_chat_manage_members">Manage group characters</string>
     <string name="local_chat_composer_hint">Say whatever is on your mind…</string>
     <string name="local_chat_empty_hint">Say whatever you want. This space is for character chat, not work tasks.</string>
     <string name="local_persona_title">Character persona</string>
