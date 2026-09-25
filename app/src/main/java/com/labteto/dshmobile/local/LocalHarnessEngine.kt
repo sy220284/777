@@ -1549,10 +1549,18 @@ class LocalHarnessEngine @Inject constructor(
         galleryEntry: PersonaGalleryEntry? = null,
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
+        chatMode: LocalChatMode? = null,
     ) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
         val sourceState = _state.value
+        val resolvedChatMode = when {
+            usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
+            galleryEntry != null -> LocalChatMode.SINGLE
+            chatMode != null -> chatMode
+            sourceState.usageMode == LocalUsageMode.CHAT -> sourceState.groupChat.mode
+            else -> LocalChatMode.SINGLE
+        }
         _state.update {
             it.copy(
                 loading = true,
@@ -1649,6 +1657,20 @@ class LocalHarnessEngine @Inject constructor(
                             chatState = chatState,
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),
+                            groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
+                                if (
+                                    mode == LocalConversationMode.CONTINUATION &&
+                                    sourceState.usageMode == LocalUsageMode.CHAT &&
+                                    sourceState.groupChat.enabled
+                                ) {
+                                    sourceState.groupChat
+                                } else {
+                                    LocalGroupChatState(mode = LocalChatMode.GROUP)
+                                }
+                            } else {
+                                LocalGroupChatState()
+                            },
+                            groupActiveSpeakerName = null,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -4119,7 +4141,7 @@ class LocalHarnessEngine @Inject constructor(
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
-            chatBranches = if (stored.usageMode == LocalUsageMode.CHAT) {
+            chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 syncChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = projectedTranscript.messages,
@@ -4129,6 +4151,7 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 LocalChatBranchState()
             },
+            groupChat = if (stored.usageMode == LocalUsageMode.CHAT) stored.groupChat else LocalGroupChatState(),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -4322,6 +4345,7 @@ class LocalHarnessEngine @Inject constructor(
             chatState = state.chatState,
             replySuggestions = state.replySuggestions,
             chatBranches = state.chatBranches,
+            groupChat = state.groupChat,
             galleryId = state.galleryId,
             galleryStoryId = state.galleryStoryId,
             gallerySaveSuppressedThrough = state.gallerySaveSuppressedThrough,
