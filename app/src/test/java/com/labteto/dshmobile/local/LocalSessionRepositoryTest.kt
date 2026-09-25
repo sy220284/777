@@ -12,6 +12,20 @@ import org.junit.rules.TemporaryFolder
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalSessionRepositoryTest {
     @get:Rule val temporary = TemporaryFolder()
+    @Test fun deletionCannotBeUndoneByQueuedSnapshots() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.enqueue(LocalHarnessSession(id = "gone", title = "old"))
+        runCurrent()
+        repository.enqueue(LocalHarnessSession(id = "gone", title = "queued"))
+        repository.delete("gone")
+        runCurrent()
+        assertEquals(null, repository.read("gone"))
+        assertTrue(repository.summaries().none { it.id == "gone" })
+        repository.enqueue(LocalHarnessSession(id = "gone", title = "late"))
+        runCurrent()
+        assertEquals(null, repository.read("gone"))
+    }
+
     @Test fun coalescesSnapshotsWithoutDroppingOtherSessions() = runTest {
         val failures = mutableListOf<Throwable>()
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)

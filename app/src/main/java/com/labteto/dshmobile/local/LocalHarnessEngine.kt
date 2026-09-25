@@ -81,7 +81,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -119,8 +118,6 @@ import okhttp3.OkHttpClient
 
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
 class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
-
-internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
@@ -478,8 +475,7 @@ class LocalHarnessEngine @Inject constructor(
     private var sessionTransitioning = false
     private var activeJob: Job? = null
     private var persistentRecoveryJob: Job? = null
-    private var approvalResponse: CompletableDeferred<Boolean>? = null
-    private var questionResponse: CompletableDeferred<String>? = null
+    private val interactions = LocalInteractionCoordinator(_state)
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
@@ -689,6 +685,31 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /**
+     * Persist AI-generated fields into the real default persona and make the current chat use it.
+     * This is suspendable so the UI only reports "synced" after the profile file and session state
+     * have both been updated.
+     */
+    suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
+        val snapshot = _state.value
+        check(!snapshot.running && !snapshot.loading && snapshot.usageMode == LocalUsageMode.CHAT) {
+            "当前状态暂时不能同步默认角色"
+        }
+        return withContext(Dispatchers.IO) {
+            val saved = chatPersonaStore.upsert(
+                profile.copy(id = PersonaProfile.DEFAULT_PERSONA_ID),
+            )
+            _state.update { state ->
+                if (state.sessionId != snapshot.sessionId) state else state.copy(
+                    personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+                    chatPersona = saved,
+                )
+            }
+            if (_state.value.sessionId == snapshot.sessionId) persist()
+            saved
+        }
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
@@ -709,6 +730,69 @@ class LocalHarnessEngine @Inject constructor(
         }
         val modelMessage = buildLocalUserModelMessage(content, attachments)
         queueHumanTurn(content, prompt, modelMessage)?.start()
+    }
+
+    /** Re-run the latest answer against the same turn; never re-execute work tools. */
+    fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
+        val state = _state.value
+        if (!state.configured || state.loading ||
+            sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
+        ) return@synchronized false
+        val last = state.messages.lastOrNull() ?: return@synchronized false
+        if (last.id != messageId || last.role != "assistant") return@synchronized false
+        val prompt = state.messages.dropLast(1).lastOrNull { it.role == "user" }?.content
+            ?: return@synchronized false
+        if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
+            return@synchronized false
+        }
+        scope.launch(start = CoroutineStart.LAZY) {
+            if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
+            else regenerateWorkReply(messageId)
+        }
+            .also { activeJob = it; it.start() }
+        true
+    }
+
+    private suspend fun regenerateWorkReply(messageId: String) {
+        _state.update { it.copy(running = true, error = null) }
+        try {
+            val snapshot = _state.value
+            val key = apiKeys.get() ?: error("请先配置模型密钥")
+            val messages = withEphemeralContext(
+                modelHistory.dropLast(1),
+                "根据本轮已有的工具结果重新组织最终回复。只回答用户，不调用工具，也不要声称再次执行了操作。",
+            )
+            val reply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = messages,
+                step = 1,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+            val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
+            usageTracker.record(snapshot.model, reply.usage)
+            val transcript = listOf(newTranscriptMessage("assistant", content))
+            val data = withTranscript(reply.message, transcript)
+            val event = eventLog.append("assistant/message", JsonObject(
+                data + ("replaces" to JsonPrimitive(messageId)),
+            ))
+            resetModelHistory(modelHistory.dropLast(1))
+            appendModelHistory(reply.message)
+            updateContextMetrics()
+            _state.update { it.copy(messages = it.messages.filterNot { message -> message.id == messageId }) }
+            applyTranscriptMessages(transcript, event.sequence, clearStreamingPreview = true)
+            checkpointModelHistory("work/regenerated")
+            persist()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _state.update { it.copy(error = error.message ?: "重新生成失败") }
+        } finally {
+            _state.update { it.copy(running = false, streamingAssistant = "", streamingReasoning = "") }
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
+        }
     }
 
     private fun queueHumanTurn(
@@ -970,8 +1054,8 @@ class LocalHarnessEngine @Inject constructor(
     fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
     /** Resolve the current write or shell approval. */
-    fun answerApproval(approved: Boolean) {
-        approvalResponse?.complete(approved)
+    fun answerApproval(callId: String, approved: Boolean) {
+        interactions.answerApproval(callId, approved)
     }
 
     /**
@@ -981,7 +1065,16 @@ class LocalHarnessEngine @Inject constructor(
      * it only suppresses future prompts for path-confined workspace writes and read-only tools.
      */
     fun enableAutoApproval() {
+        enableAutoApprovalInternal(expectedCallId = null)
+    }
+
+    fun enableAutoApprovalForPending(callId: String) {
+        enableAutoApprovalInternal(expectedCallId = callId)
+    }
+
+    private fun enableAutoApprovalInternal(expectedCallId: String?) {
         val pending = _state.value.pendingApproval
+        if (expectedCallId != null && pending?.callId != expectedCallId) return
         approvalPreferences.setSafeAutoApprovalEnabled(true)
         _state.update { it.copy(safeAutoApprovalEnabled = true) }
         eventLog.append("approval/mode", buildJsonObject {
@@ -990,13 +1083,13 @@ class LocalHarnessEngine @Inject constructor(
         })
         persist()
         if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
-            approvalResponse?.complete(true)
+            pending?.callId?.let { interactions.answerApproval(it, true) }
         }
     }
 
     /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
-    fun enableDeviceApprovalLease() {
-        val pending = _state.value.pendingApproval
+    fun enableDeviceApprovalLease(callId: String) {
+        val pending = _state.value.pendingApproval?.takeIf { it.callId == callId }
         if (pending?.canApproveDeviceTurn != true) {
             eventLog.append("approval/device-lease-rejected", buildJsonObject {
                 put("reason", "pending-tool-requires-explicit-approval")
@@ -1006,7 +1099,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         _state.update { it.copy(deviceApprovalLease = true) }
         eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
-        approvalResponse?.complete(true)
+        interactions.answerApproval(pending.callId, true)
     }
 
     fun disableDeviceApprovalLease() {
@@ -1023,19 +1116,18 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Resolve the current model-authored question. */
-    fun answerQuestion(answer: String) {
-        questionResponse?.complete(answer.trim())
+    fun answerQuestion(callId: String, answer: String) {
+        interactions.answerQuestion(callId, answer)
     }
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    fun cancelQuestion() {
-        questionResponse?.complete(LOCAL_QUESTION_CANCELLED_RESPONSE)
+    fun cancelQuestion(callId: String) {
+        interactions.cancelQuestion(callId)
     }
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
-        approvalResponse?.complete(false)
-        questionResponse?.cancel()
+        interactions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.clear()
             if (discarded > 0) {
@@ -1208,6 +1300,53 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /** Permanently remove selected local sessions and their durable event segments. */
+    suspend fun deleteSessions(requestedIds: Set<String>): Int {
+        if (requestedIds.isEmpty() || !beginSessionTransition()) return 0
+        _state.update { it.copy(loading = true) }
+        return try {
+            sessionTransitionMutex.withLock {
+                cancelActiveRunAndJoin()
+                jobs.stopNonPersistentAndJoin()
+                persist()
+                val available = sessionRepository.summaries()
+                val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
+                if (currentSessionId in ids) {
+                    val previous = _state.value
+                    val replacement = available.firstOrNull { it.id !in ids && it.usageMode == previous.usageMode }
+                        ?: available.firstOrNull { it.id !in ids }
+                    currentSessionId = replacement?.id ?: UUID.randomUUID().toString()
+                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+                    eventLog = eventLogFor(currentSessionId)
+                    transcriptProjectionCursor = null
+                    loadSession(currentSessionId)
+                    if (replacement == null) {
+                        _state.update { it.copy(
+                            usageMode = previous.usageMode,
+                            personaId = previous.personaId,
+                            chatPersona = previous.chatPersona,
+                        ) }
+                    }
+                }
+                withContext(Dispatchers.IO) {
+                    ids.forEach { id ->
+                        sessionRepository.delete(id)
+                        sessionsRoot.listFiles().orEmpty()
+                            .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
+                            .forEach(File::delete)
+                    }
+                }
+                synchronized(conversationFilesCacheLock) { ids.forEach(conversationFilesCache::remove) }
+                _state.update { it.copy(sessions = sessionSummaries()) }
+                persist()
+                ids.size
+            }
+        } finally {
+            endSessionTransition()
+            _state.update { it.copy(loading = false) }
+        }
+    }
+
     /** Remove the local API key after an in-flight turn has finished cancelling. */
     fun clearCredential() {
         if (!beginSessionTransition()) return
@@ -1241,8 +1380,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun cancelActiveRunAndJoin() {
-        approvalResponse?.complete(false)
-        questionResponse?.cancel()
+        interactions.cancelAll()
         val job = synchronized(runStateLock) {
             val discarded = pendingInputs.clear()
             if (discarded > 0) {
@@ -1497,7 +1635,7 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private suspend fun runChatTurn(input: String) {
+    private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
         _state.update {
             it.copy(
                 running = true,
@@ -1519,7 +1657,10 @@ class LocalHarnessEngine @Inject constructor(
                 .joinToString("\n\n")
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withEphemeralContext(modelHistory.toList(), chatPrompt),
+                messages = withEphemeralContext(
+                    if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                    chatPrompt,
+                ),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
@@ -1566,15 +1707,26 @@ class LocalHarnessEngine @Inject constructor(
                 },
             )
 
+            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
+                error("模型没有返回可用回复")
+            }
+
             val transcriptMessages = buildList {
                 reply.content?.takeIf(String::isNotBlank)?.let { content ->
                     add(newTranscriptMessage("assistant", content))
                 }
             }
+            val assistantData = withTranscript(reply.message, transcriptMessages)
             val assistantEvent = eventLog.append(
                 "assistant/message",
-                withTranscript(reply.message, transcriptMessages),
+                if (replacingMessageId == null) assistantData else JsonObject(
+                    assistantData + ("replaces" to JsonPrimitive(replacingMessageId)),
+                ),
             )
+            if (replacingMessageId != null) {
+                resetModelHistory(modelHistory.dropLast(1))
+                _state.update { state -> state.copy(messages = state.messages.filterNot { it.id == replacingMessageId }) }
+            }
             appendModelHistory(reply.message)
             updateContextMetrics()
             applyTranscriptMessages(
@@ -1595,7 +1747,8 @@ class LocalHarnessEngine @Inject constructor(
                 put("messages", _state.value.messages.size)
                 put("mode", "chat")
             })
-            checkpointModelHistoryAtTurnBoundary("chat/completed")
+            if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
+            else checkpointModelHistoryAtTurnBoundary("chat/completed")
             persist()
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
@@ -1984,8 +2137,7 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { it.copy(error = error.message ?: "本机 Harness 执行失败") }
             // TurnFailed durably records and projects the visible failure message.
         } finally {
-            approvalResponse = null
-            questionResponse = null
+            interactions.cancelAll()
             _state.update {
                 it.copy(
                     running = false,
@@ -2666,28 +2818,18 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        val response = CompletableDeferred<Boolean>()
-        approvalResponse = response
-        _state.update {
-            it.copy(
-                pendingApproval = LocalApproval(
-                    callId = call.id,
-                    toolName = call.name,
-                    summary = summary,
-                    arguments = call.rawArguments,
-                    access = tool.access.name.lowercase(),
-                    impact = approvalImpact(tool),
-                    canAutoApproveSafely = canAutoApprove(tool, call.arguments),
-                    canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
-                ),
-            )
-        }
-        return try {
-            response.await()
-        } finally {
-            approvalResponse = null
-            _state.update { it.copy(pendingApproval = null) }
-        }
+        return interactions.awaitApproval(
+            LocalApproval(
+                callId = call.id,
+                toolName = call.name,
+                summary = summary,
+                arguments = call.rawArguments,
+                access = tool.access.name.lowercase(),
+                impact = approvalImpact(tool),
+                canAutoApproveSafely = canAutoApprove(tool, call.arguments),
+                canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
+            ),
+        )
     }
 
     private fun updatePlan(args: JsonObject): String {
@@ -2755,19 +2897,10 @@ class LocalHarnessEngine @Inject constructor(
         return "目标状态已更新为 $status"
     }
 
-    private suspend fun askUser(call: LocalToolCall, question: String, options: List<String>): String {
-        val response = CompletableDeferred<String>()
-        questionResponse = response
-        _state.update {
-            it.copy(pendingQuestion = LocalQuestion(call.id, question.take(2_000), options.take(6)))
-        }
-        return try {
-            response.await().ifBlank { "用户未提供文字回答" }
-        } finally {
-            questionResponse = null
-            _state.update { it.copy(pendingQuestion = null) }
-        }
-    }
+    private suspend fun askUser(call: LocalToolCall, question: String, options: List<String>): String =
+        interactions.awaitQuestion(
+            LocalQuestion(call.id, question.take(2_000), options.take(6)),
+        )
 
     private suspend fun exitPlanMode(call: LocalToolCall, plan: String): String {
         if (!_state.value.planMode) return "当前未启用规划模式"

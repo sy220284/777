@@ -6,8 +6,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,12 +46,16 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Terminal
@@ -72,6 +82,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
@@ -116,6 +131,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import java.util.Locale
+import kotlin.math.roundToInt
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -142,8 +158,14 @@ fun LocalHarnessScreen(
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
-    BackHandler(enabled = state.pendingApproval != null) { viewModel.deny() }
-    BackHandler(enabled = state.pendingQuestion != null) { viewModel.cancelQuestion() }
+    val pendingApprovalCallId = state.pendingApproval?.callId
+    val pendingQuestionCallId = state.pendingQuestion?.callId
+    BackHandler(enabled = pendingApprovalCallId != null) {
+        pendingApprovalCallId?.let(viewModel::deny)
+    }
+    BackHandler(enabled = pendingQuestionCallId != null) {
+        pendingQuestionCallId?.let(viewModel::cancelQuestion)
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -165,6 +187,7 @@ fun LocalHarnessScreen(
                     viewModel.switchSession(sessionId)
                     scope.launch { drawerState.close() }
                 },
+                onDeleteSessions = { ids -> scope.launch { viewModel.deleteSessions(ids) } },
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
                     scope.launch { drawerState.close() }
@@ -195,16 +218,19 @@ fun LocalHarnessScreen(
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
+                onRegenerate = viewModel::regenerateReply,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
                 onUsageModeChange = viewModel::switchUsageMode,
                 onConfigureChatPersona = viewModel::configureChatPersona,
+                onAutoFillChatPersona = viewModel::autoFillChatPersona,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
                 onAutoApprove = viewModel::enableAutoApproval,
+                onAutoApprovePending = viewModel::enableAutoApprovalForPending,
                 onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
                 onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
                 onDisableAutoApprove = viewModel::disableAutoApproval,
@@ -247,6 +273,7 @@ private fun LocalModeDrawer(
     onNewSession: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
+    onDeleteSessions: (Set<String>) -> Unit,
     onWorkspaceFiles: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
@@ -256,6 +283,8 @@ private fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
+    var selectionOpen by remember { mutableStateOf(false) }
+    val selectedIds = remember { mutableStateListOf<String>() }
     val visibleSessions = remember(sessions, usageMode) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
             .sortedByDescending(LocalSessionSummary::updatedAt)
@@ -320,7 +349,19 @@ private fun LocalModeDrawer(
                     LocalSessionDrawerRow(
                         title = session.title,
                         current = session.id == currentSessionId,
-                        onClick = { onSwitchSession(session.id) },
+                        selected = session.id in selectedIds,
+                        selectionOpen = selectionOpen,
+                        onClick = {
+                            if (selectionOpen) {
+                                if (session.id in selectedIds) selectedIds.remove(session.id)
+                                else selectedIds.add(session.id)
+                            } else onSwitchSession(session.id)
+                        },
+                        onLongClick = {
+                            if (session.id !in selectedIds) selectedIds.add(session.id)
+                            selectionOpen = true
+                        },
+                        onDelete = { onDeleteSessions(setOf(session.id)) },
                     )
                 }
                 item(key = "drawer-tools-title") {
@@ -382,6 +423,55 @@ private fun LocalModeDrawer(
             LocalUsageFooter(usage)
         }
     }
+    if (selectionOpen) {
+        var position by remember { mutableStateOf(IntOffset(24, 160)) }
+        Popup(
+            alignment = Alignment.TopStart,
+            offset = position,
+            properties = PopupProperties(focusable = false, clippingEnabled = true),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = colors.bgModulePlatform,
+                shadowElevation = 10.dp,
+                modifier = Modifier.pointerInput(Unit) {
+                    detectDragGestures { change, drag ->
+                        change.consume()
+                        position = IntOffset(
+                            (position.x + drag.x.roundToInt()).coerceAtLeast(0),
+                            (position.y + drag.y.roundToInt()).coerceAtLeast(0),
+                        )
+                    }
+                },
+            ) {
+                Row(
+                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Text(stringResource(R.string.local_selected_count, selectedIds.size), color = colors.labelPrimary)
+                    DsButton(
+                        text = stringResource(R.string.local_delete_session),
+                        onClick = {
+                            val ids = selectedIds.toSet()
+                            selectionOpen = false
+                            selectedIds.clear()
+                            if (ids.isNotEmpty()) onDeleteSessions(ids)
+                        },
+                        enabled = selectedIds.isNotEmpty(),
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                    DsIconButton(
+                        icon = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        onClick = { selectionOpen = false; selectedIds.clear() },
+                        tint = colors.labelSecondary,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -395,18 +485,49 @@ private fun DrawerSectionTitle(title: String) {
 }
 
 @Composable
-private fun LocalSessionDrawerRow(title: String, current: Boolean, onClick: () -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+private fun LocalSessionDrawerRow(
+    title: String,
+    current: Boolean,
+    selected: Boolean,
+    selectionOpen: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val colors = DsTheme.colors
+    val density = LocalDensity.current
+    val reveal = with(density) { 76.dp.toPx() }
+    var swipe by remember { mutableStateOf(0f) }
+    Box(Modifier.fillMaxWidth()) {
+        DsIconButton(
+            icon = Icons.Outlined.DeleteOutline,
+            contentDescription = stringResource(R.string.local_delete_session),
+            onClick = { swipe = 0f; onDelete() },
+            tint = colors.error,
+            modifier = Modifier.align(Alignment.CenterStart),
+        )
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .offset { IntOffset(swipe.roundToInt(), 0) }
+            .pointerInput(reveal, selectionOpen) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        swipe = (swipe + amount).coerceIn(0f, reveal)
+                    },
+                    onDragEnd = { swipe = if (swipe > reveal / 2) reveal else 0f },
+                )
+            }
             .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
-            .background(if (current) colors.sidebarNavActive else Color.Transparent)
-            .clickable(onClick = onClick)
+            .background(if (current || selected) colors.sidebarNavActive else colors.sidebar)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selectionOpen) Checkbox(checked = selected, onCheckedChange = { onClick() })
         Text(
             title,
             style = DsType.std14,
@@ -419,6 +540,7 @@ private fun LocalSessionDrawerRow(title: String, current: Boolean, onClick: () -
             Spacer(Modifier.width(DsSpacing.small))
             Text("当前", style = DsType.caption11, color = colors.accent)
         }
+    }
     }
 }
 
@@ -631,21 +753,24 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
+    onRegenerate: (String) -> Boolean,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onPlanModeChange: (Boolean) -> Unit,
-    onApprove: () -> Unit,
-    onDeny: () -> Unit,
+    onApprove: (String) -> Unit,
+    onDeny: (String) -> Unit,
     onAutoApprove: () -> Unit,
-    onApproveDeviceTurn: () -> Unit,
+    onAutoApprovePending: (String) -> Unit,
+    onApproveDeviceTurn: (String) -> Unit,
     onDisableDeviceTurn: () -> Unit,
     onDisableAutoApprove: () -> Unit,
-    onAnswerQuestion: (String) -> Unit,
-    onCancelQuestion: () -> Unit,
+    onAnswerQuestion: (String, String) -> Unit,
+    onCancelQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -943,7 +1068,11 @@ private fun LocalChat(
                 }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
-                        is LocalTranscriptItem.Message -> LocalMessageRow(transcriptItem.message)
+                        is LocalTranscriptItem.Message -> LocalMessageRow(
+                            transcriptItem.message,
+                            canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            onRegenerate = onRegenerate,
+                        )
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                     }
                 }
@@ -1197,28 +1326,29 @@ private fun LocalChat(
         }
     }
 
-    state.pendingApproval?.let {
+    state.pendingApproval?.let { approval ->
         ApprovalDialog(
-            approval = it,
+            approval = approval,
             safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
-            onApprove = onApprove,
-            onDeny = onDeny,
-            onAutoApprove = onAutoApprove,
-            onApproveDeviceTurn = onApproveDeviceTurn,
+            onApprove = { onApprove(approval.callId) },
+            onDeny = { onDeny(approval.callId) },
+            onAutoApprove = { onAutoApprovePending(approval.callId) },
+            onApproveDeviceTurn = { onApproveDeviceTurn(approval.callId) },
         )
     }
-    state.pendingQuestion?.let {
+    state.pendingQuestion?.let { question ->
         QuestionDialog(
-            question = it.question,
-            options = it.options,
-            onAnswer = onAnswerQuestion,
-            onDismiss = onCancelQuestion,
+            question = question.question,
+            options = question.options,
+            onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
+            onDismiss = { onCancelQuestion(question.callId) },
         )
     }
     if (showPersonaEditor) {
         ChatPersonaDialog(
             profile = state.chatPersona,
             onSave = onConfigureChatPersona,
+            onAutoFill = onAutoFillChatPersona,
             onDismiss = { showPersonaEditor = false },
         )
     }
@@ -1497,7 +1627,11 @@ private fun ExecutionStatusCard(
 }
 
 @Composable
-private fun LocalMessageRow(message: LocalHarnessMessage) {
+private fun LocalMessageRow(
+    message: LocalHarnessMessage,
+    canRegenerate: Boolean,
+    onRegenerate: (String) -> Boolean,
+) {
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
 
@@ -1513,12 +1647,18 @@ private fun LocalMessageRow(message: LocalHarnessMessage) {
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             MarkdownText(message.content)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                DsButton(
-                    "复制答复",
-                    { clipboard.setText(AnnotatedString(message.content)) },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                DsIconButton(
+                    icon = Icons.Outlined.ContentCopy,
+                    contentDescription = stringResource(R.string.chat_copy_answer),
+                    onClick = { clipboard.setText(AnnotatedString(message.content)) },
+                    tint = colors.labelTertiary,
+                )
+                if (canRegenerate) DsIconButton(
+                    icon = Icons.Outlined.Refresh,
+                    contentDescription = stringResource(R.string.local_regenerate_reply),
+                    onClick = { onRegenerate(message.id) },
+                    tint = colors.labelTertiary,
                 )
             }
         }

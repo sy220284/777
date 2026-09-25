@@ -16,6 +16,9 @@
     <string name="common_offline">离线</string>
     <string name="common_error">出了点问题</string>
     <string name="common_close">关闭</string>
+    <string name="local_delete_session">删除会话</string>
+    <string name="local_selected_count">已选择 %1$d 项</string>
+    <string name="local_regenerate_reply">重新生成回复</string>
     <string name="common_back">返回</string>
     <string name="common_edit">编辑</string>
     <string name="common_rename">重命名</string>
@@ -293,6 +296,8 @@
     <string name="settings_background_image_active">正在使用自定义图片</string>
     <string name="settings_background_image_choose">选择图片</string>
     <string name="settings_background_image_clear">移除</string>
+    <string name="settings_background_adaptive_contrast">背景自适应</string>
+    <string name="settings_background_adaptive_contrast_hint">根据当前浅色或深色主题自动调整背景遮罩，让聊天文字、气泡和操作区在自定义背景上保持清晰。</string>
     <string name="settings_readonly_banner">设置通过网络为只读。请在 Harness 所在的电脑上打开它以更改设置。</string>
     <string name="settings_notifications">通知</string>
     <string name="settings_notifications_turn">回合完成时通知</string>

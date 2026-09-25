@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.theme
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ val LocalAppBackground = staticCompositionLocalOf<ImageBitmap?> { null }
 @Composable
 fun AppBackgroundHost(
     path: String?,
+    adaptiveSurfaceColor: Color = Color.Transparent,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -63,6 +65,13 @@ fun AppBackgroundHost(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
+                if (adaptiveSurfaceColor.alpha > 0f) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(adaptiveSurfaceColor),
+                    )
+                }
             }
             content()
         }

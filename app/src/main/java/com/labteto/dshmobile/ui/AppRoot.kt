@@ -54,6 +54,7 @@ fun AppRoot(
     DshTheme(
         preference = themePreference,
         backgroundPath = settings.backgroundImagePath,
+        backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
     ) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }

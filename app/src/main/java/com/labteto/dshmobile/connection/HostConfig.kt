@@ -80,4 +80,9 @@ data class AppSettings(
      * does not move for an installed app.
      */
     val backgroundImagePath: String? = null,
+    /**
+     * Keeps custom backgrounds readable by applying a theme-aware veil behind the app surface.
+     * Defaults on so existing users benefit immediately after upgrading.
+     */
+    val backgroundAdaptiveContrast: Boolean = true,
 )

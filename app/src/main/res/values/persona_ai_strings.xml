@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_persona_ai_title">Let AI fill this in</string>
+    <string name="local_persona_ai_hint">Describe the character in one or two sentences, or leave it blank and let AI organize the persona from your recent chat. Generated fields are saved to the default persona automatically.</string>
+    <string name="local_persona_ai_description">Character description (optional)</string>
+    <string name="local_persona_ai_generate">Generate and sync to default persona</string>
+    <string name="local_persona_ai_generating">Generating persona…</string>
+    <string name="local_persona_ai_working_hint">Reading the description and recent chat, then filling the structured fields…</string>
+    <string name="local_persona_ai_synced">Generated fields have been synced to the default persona. You can still edit them below.</string>
+    <string name="local_persona_ai_busy">Persona generation is unavailable while the current turn is running.</string>
+    <string name="local_persona_ai_unconfigured">Configure the model first.</string>
+    <string name="local_persona_ai_failed">Could not generate the persona. Please try again.</string>
+    <string name="local_persona_ai_example">Example: Kamisato Ayato, keep the original characterization, make the relationship with me a little closer, and keep the dialogue natural.</string>
+</resources>

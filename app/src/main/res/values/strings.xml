@@ -17,6 +17,9 @@
     <string name="common_offline">Offline</string>
     <string name="common_error">Something went wrong</string>
     <string name="common_close">Close</string>
+    <string name="local_delete_session">Delete conversation</string>
+    <string name="local_selected_count">Selected: %1$d</string>
+    <string name="local_regenerate_reply">Regenerate reply</string>
     <string name="common_back">Back</string>
     <string name="common_edit">Edit</string>
     <string name="common_rename">Rename</string>
@@ -345,6 +348,8 @@
     <string name="settings_background_image_active">Custom image in use</string>
     <string name="settings_background_image_choose">Choose image</string>
     <string name="settings_background_image_clear">Remove</string>
+    <string name="settings_background_adaptive_contrast">Adaptive readability</string>
+    <string name="settings_background_adaptive_contrast_hint">Automatically adjusts the background veil for the current theme so chat text, bubbles and controls stay clear over custom images.</string>
     <string name="settings_readonly_banner">Settings are read-only over the network. Open the harness on its own computer to change them.</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>

@@ -184,6 +184,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 fun DshTheme(
     preference: ThemePreference = ThemePreference.SYSTEM,
     backgroundPath: String? = null,
+    backgroundAdaptiveContrast: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val dark = when (preference) {
@@ -196,7 +197,17 @@ fun DshTheme(
     CompositionLocalProvider(LocalDsColors provides ds) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
         // screens draw their own Material surfaces on top of whatever is beneath them.
-        AppBackgroundHost(path = backgroundPath) {
+        AppBackgroundHost(
+            path = backgroundPath,
+            adaptiveSurfaceColor = if (backgroundAdaptiveContrast) {
+                // Bright photos need a stronger dark veil for light text than dark photos need a
+                // light veil for dark text. Both values keep the image visible while stabilizing
+                // foreground contrast across detailed or high-key wallpapers.
+                ds.bgBase.copy(alpha = if (dark) 0.64f else 0.56f)
+            } else {
+                Color.Transparent
+            },
+        ) {
             MaterialTheme(
                 colorScheme = scheme,
                 typography = DsTypography,

@@ -62,6 +62,16 @@ class ConnectionPersistenceAndroidTest {
     }
 
     @Test
+    fun adaptiveBackgroundContrastDefaultsOnAndPersists() = withStore { dataStore, _ ->
+        val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
+        assertEquals(true, store.settingsOnce().backgroundAdaptiveContrast)
+
+        store.setSetting { it.copy(backgroundAdaptiveContrast = false) }
+
+        assertEquals(false, store.settingsOnce().backgroundAdaptiveContrast)
+    }
+
+    @Test
     fun repairingWithoutANewPinClearsTheOldFingerprint() = withStore { dataStore, _ ->
         val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
         store.rememberHost(

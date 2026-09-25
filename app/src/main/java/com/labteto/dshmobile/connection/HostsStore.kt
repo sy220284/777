@@ -31,6 +31,7 @@ class HostsStore @Inject constructor(
         val HOSTS = stringPreferencesKey("hosts_json")
         val BACKGROUND = booleanPreferencesKey("background")
         val BACKGROUND_IMAGE = stringPreferencesKey("background_image_path")
+        val BACKGROUND_ADAPTIVE_CONTRAST = booleanPreferencesKey("background_adaptive_contrast")
         val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
         val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
         val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
@@ -212,6 +213,7 @@ class HostsStore @Inject constructor(
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
+            backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
             localeOverride = when (val tag = prefs[Keys.LOCALE]) {
                 "en" -> "en"
                 "zh", "zh-CN", "zh_CN" -> "zh-CN"
@@ -249,6 +251,7 @@ class HostsStore @Inject constructor(
             prefs[Keys.THEME] = next.themePreference
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }
                 ?: prefs.remove(Keys.BACKGROUND_IMAGE)
+            prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
             next.localeOverride?.let { prefs[Keys.LOCALE] = it } ?: prefs.remove(Keys.LOCALE)
             committed = next
         }
