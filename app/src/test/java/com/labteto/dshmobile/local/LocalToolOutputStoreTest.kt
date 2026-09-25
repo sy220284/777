@@ -79,6 +79,7 @@ class LocalToolOutputStoreTest {
             .filter(File::isFile)
             .sumOf(File::length)
         assertTrue(retainedBytes <= 12L)
+        assertTrue(store.read("session-a", "call-2").contains("abcdefgh"))
     }
 
     @Test
@@ -99,6 +100,7 @@ class LocalToolOutputStoreTest {
             .filter(File::isFile)
             .sumOf(File::length)
         assertTrue(retainedBytes <= 12L)
+        assertTrue(store.read("session-b", "call-2").contains("abcdefgh"))
     }
 
     @Test
