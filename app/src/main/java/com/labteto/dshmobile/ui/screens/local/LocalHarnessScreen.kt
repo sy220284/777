@@ -112,6 +112,7 @@ import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
+import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
@@ -1362,7 +1363,7 @@ private fun LocalChat(
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
                             canEdit = state.usageMode == LocalUsageMode.CHAT &&
                                 !state.running &&
-                                "本次附件已导入本机工作区：" !in transcriptItem.message.content,
+                                !chatMessageHasAttachmentContext(transcriptItem.message),
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             branchInfo = if (state.usageMode == LocalUsageMode.CHAT) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
