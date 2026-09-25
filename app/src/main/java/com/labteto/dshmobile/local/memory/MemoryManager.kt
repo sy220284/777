@@ -112,6 +112,7 @@ class MemoryManager @Inject constructor(
             projectId = projectId.takeIf { candidate.scope == MemoryScope.PROJECT },
             lineageId = lineageId.takeIf { candidate.scope == MemoryScope.LINEAGE },
             sourceSessionId = sourceSessionId,
+            subjectKey = candidate.subjectKey,
             importance = candidate.importance,
             replaceIds = replaced?.let { setOf(it.id) }.orEmpty(),
         )
