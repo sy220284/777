@@ -32,14 +32,18 @@ class ChatRelationshipEngine @Inject constructor() {
     internal fun classify(input: String): ChatRelationshipView {
         val text = input.trim().lowercase()
         if (text.isBlank()) return ChatRelationshipView.IMMERSIVE
-        if (REPLY_COACH_HINTS.any { text.contains(it) }) return ChatRelationshipView.REPLY_COACH
         if (STRATEGY_COMMANDS.any { text.startsWith(it) }) return ChatRelationshipView.STRATEGIST
         if ("军师" in text) return ChatRelationshipView.STRATEGIST
 
-        val relationshipRelevant = RELATIONSHIP_HINTS.any { text.contains(it) }
+        val nonRelationshipContext = NON_RELATIONSHIP_CONTEXT_HINTS.any { text.contains(it) }
+        if (REPLY_COACH_HINTS.any { text.contains(it) } && !nonRelationshipContext) {
+            return ChatRelationshipView.REPLY_COACH
+        }
+
+        val relationshipRelevant = isRelationshipContext(text)
         val directRelationshipQuestion = DIRECT_RELATIONSHIP_ANALYSIS_HINTS.any { text.contains(it) }
         val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
-        return if (directRelationshipQuestion || (relationshipRelevant && asksForAnalysis)) {
+        return if (relationshipRelevant && (directRelationshipQuestion || asksForAnalysis)) {
             ChatRelationshipView.STRATEGIST
         } else {
             ChatRelationshipView.IMMERSIVE
@@ -48,6 +52,7 @@ class ChatRelationshipEngine @Inject constructor() {
 
     internal fun classifyScenario(input: String): RelationshipScenario {
         val text = input.trim().lowercase()
+        if (!isRelationshipContext(text)) return RelationshipScenario.GENERAL
         return when {
             BOUNDARY_HINTS.any { text.contains(it) } -> RelationshipScenario.BOUNDARY_SAFETY
             BREAKUP_HINTS.any { text.contains(it) } -> RelationshipScenario.BREAKUP_RECONCILIATION
@@ -57,6 +62,19 @@ class ChatRelationshipEngine @Inject constructor() {
             DATE_HINTS.any { text.contains(it) } -> RelationshipScenario.INVITE_DATE
             else -> RelationshipScenario.GENERAL
         }
+    }
+
+    private fun isRelationshipContext(text: String): Boolean {
+        val hasStrongRelationshipCue = STRONG_RELATIONSHIP_HINTS.any { text.contains(it) }
+        val hasNonRelationshipContext = NON_RELATIONSHIP_CONTEXT_HINTS.any { text.contains(it) }
+        if (hasNonRelationshipContext && !hasStrongRelationshipCue) return false
+        if (DIRECT_RELATIONSHIP_ANALYSIS_HINTS.any { text.contains(it) }) return true
+        if (hasStrongRelationshipCue) return true
+
+        val hasActor = RELATIONSHIP_ACTOR_HINTS.any { text.contains(it) }
+        val hasSignal = RELATIONSHIP_SIGNAL_HINTS.any { text.contains(it) }
+        val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
+        return hasActor && (hasSignal || asksForAnalysis)
     }
 
     fun prompt(
@@ -188,10 +206,20 @@ class ChatRelationshipEngine @Inject constructor() {
             "我和她什么关系", "我和他什么关系", "我跟她什么关系", "我跟他什么关系",
             "有戏吗", "喜欢我吗", "对我有意思吗", "关系怎么样",
         )
-        val RELATIONSHIP_HINTS = listOf(
-            "她", "他", "ta", "对方", "对象", "女朋友", "男朋友", "老婆", "老公",
-            "前任", "暧昧", "喜欢", "关系", "约会", "聊天", "消息", "回复", "表白",
-            "追她", "追他", "分手", "复合", "冷淡", "不回", "吃醋", "见面", "吵架",
+        val STRONG_RELATIONSHIP_HINTS = listOf(
+            "对象", "女朋友", "男朋友", "老婆", "老公", "前任", "暧昧", "约会", "表白",
+            "追她", "追他", "分手", "复合", "吃醋", "挽回", "断联", "都是我主动",
+            "只有我主动", "投入失衡", "付出不对等",
+        )
+        val RELATIONSHIP_ACTOR_HINTS = listOf("她", "他", "ta", "对方", "我们", "咱们")
+        val RELATIONSHIP_SIGNAL_HINTS = listOf(
+            "喜欢", "关系", "聊天", "消息", "回复", "冷淡", "回复慢", "不回", "敷衍",
+            "见面", "吵架", "冷战", "生气", "道歉", "和好", "主动", "联系", "别联系", "拉黑",
+        )
+        val NON_RELATIONSHIP_CONTEXT_HINTS = listOf(
+            "邮件", "项目", "客户", "同事", "领导", "老板", "工作", "会议", "需求", "代码",
+            "仓库", "提交", "文档", "接口", "任务", "小说", "剧情", "章节", "作者", "台词",
+            "角色", "剧本", "设定",
         )
         val CONFLICT_HINTS = listOf("吵架", "闹矛盾", "生气", "道歉", "冷战", "争执", "冲突", "和好")
         val IMBALANCE_HINTS = listOf("都是我主动", "只有我主动", "付出不对等", "投入失衡", "单方面", "一直是我")

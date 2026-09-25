@@ -22,6 +22,24 @@ class PersonaCorrectionPolicyTest {
     }
 
     @Test
+    fun rhetoricalQuestionIsNotPersistedAsPermanentCorrection() {
+        assertNull(extractPersonaCorrection("你不会这么说吧？"))
+        assertNull(extractPersonaCorrection("她不会这样做吧"))
+    }
+
+    @Test
+    fun taAndKnownPersonaNameCanExpressNaturalCorrection() {
+        assertEquals(
+            "TA不会这么说，她会先损我一句",
+            extractPersonaCorrection("TA不会这么说，她会先损我一句"),
+        )
+        assertEquals(
+            "小岚不会这么说，她会直接问清楚",
+            extractPersonaCorrection("小岚不会这么说，她会直接问清楚", personaName = "小岚"),
+        )
+    }
+
+    @Test
     fun ordinaryChatIsNotPersistedAsPersonaCorrection() {
         assertNull(extractPersonaCorrection("你今天怎么这么开心"))
         assertNull(extractPersonaCorrection("她今天没有回我"))

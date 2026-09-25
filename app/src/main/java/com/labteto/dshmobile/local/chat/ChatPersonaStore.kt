@@ -36,7 +36,10 @@ private data class PersonaDocument(
     val personas: List<PersonaProfile> = listOf(PersonaProfile()),
 )
 
-internal fun extractPersonaCorrection(userText: String): String? {
+internal fun extractPersonaCorrection(
+    userText: String,
+    personaName: String? = null,
+): String? {
     val clean = userText.trim()
     if (clean.length !in 4..280) return null
 
@@ -44,10 +47,18 @@ internal fun extractPersonaCorrection(userText: String): String? {
         ?.takeIf(String::isNotBlank)
         ?.let { return it.take(240) }
 
-    if (NATURAL_PERSONA_CORRECTION.containsMatchIn(clean)) {
-        return clean.take(240)
-    }
-    return null
+    if (looksLikeCorrectionQuestion(clean)) return null
+
+    val subjects = buildList {
+        addAll(listOf("你", "这个角色", "她", "他", "它", "ta"))
+        personaName?.trim()?.takeIf { it.length in 1..80 }?.let(::add)
+    }.distinct()
+    val subjectPattern = subjects.joinToString("|") { Regex.escape(it) }
+    val naturalCorrection = Regex(
+        """^(?:$subjectPattern)(?:不会这么说|不会这样说|不这么说|不该这么说|不说这种话|不会这样做|不该这样做|不会这么做|说话不会这么|平时不会这么).{0,160}$""",
+        RegexOption.IGNORE_CASE,
+    )
+    return clean.take(240).takeIf { naturalCorrection.matches(clean) }
 }
 
 private val EXPLICIT_PERSONA_CORRECTION = Regex(
@@ -55,16 +66,24 @@ private val EXPLICIT_PERSONA_CORRECTION = Regex(
     RegexOption.DOT_MATCHES_ALL,
 )
 
-private val NATURAL_PERSONA_CORRECTION = Regex(
-    """^(?:你|这个角色|她|他)(?:不会这么说|不会这样说|不这么说|不该这么说|不说这种话|不会这样做|不该这样做|不会这么做|说话不会这么|平时不会这么).{0,160}$""",
-)
+private fun looksLikeCorrectionQuestion(text: String): Boolean {
+    val trimmed = text.trim()
+    if (trimmed.endsWith("?") || trimmed.endsWith("？")) return true
+    val declarativeTail = trimmed.trimEnd('。', '！', '!', '～', '~')
+    return QUESTION_LIKE_CORRECTION_END.containsMatchIn(declarativeTail)
+}
+
+private val QUESTION_LIKE_CORRECTION_END = Regex("""(?:吗|么|吧|是不是|对不对|会不会)$""")
 
 @Singleton
-class ChatPersonaStore @Inject constructor(
-    @ApplicationContext context: Context,
+class ChatPersonaStore internal constructor(
+    private val file: File,
     private val json: Json,
 ) {
-    private val file = File(context.filesDir, "local-harness/chat/personas.json")
+    @Inject constructor(@ApplicationContext context: Context, json: Json) :
+        this(File(context.filesDir, "local-harness/chat/personas.json"), json)
+
+    private val durableFile = RecoveringChatDocumentFile(file)
 
     @Synchronized
     fun list(): List<PersonaProfile> = read().personas.sortedByDescending(PersonaProfile::updatedAt)
@@ -88,8 +107,8 @@ class ChatPersonaStore @Inject constructor(
      */
     @Synchronized
     fun captureExplicitCorrection(personaId: String, userText: String): PersonaProfile? {
-        val correction = extractPersonaCorrection(userText) ?: return null
         val current = get(personaId)
+        val correction = extractPersonaCorrection(userText, current.name) ?: return null
         val normalized = normalize(correction)
         if (current.corrections.any { normalize(it) == normalized }) return current
         return upsert(
@@ -127,20 +146,18 @@ class ChatPersonaStore @Inject constructor(
             .take(limit)
             .toList()
 
-    private fun read(): PersonaDocument {
-        if (!file.isFile) return PersonaDocument()
-        return runCatching {
-            json.decodeFromString(PersonaDocument.serializer(), file.readText())
-        }.getOrDefault(PersonaDocument())
-    }
+    private fun read(): PersonaDocument =
+        durableFile.read(
+            defaultValue = ::PersonaDocument,
+            decode = { encoded -> json.decodeFromString(PersonaDocument.serializer(), encoded) },
+        )
 
     private fun write(document: PersonaDocument) {
-        file.parentFile?.mkdirs()
-        val temp = File(file.parentFile, file.name + ".tmp")
-        temp.writeText(json.encodeToString(PersonaDocument.serializer(), document))
-        if (!temp.renameTo(file)) {
-            file.writeText(temp.readText())
-            temp.delete()
+        val encoded = json.encodeToString(PersonaDocument.serializer(), document)
+        durableFile.write(encoded) { candidate ->
+            runCatching {
+                json.decodeFromString(PersonaDocument.serializer(), candidate)
+            }.isSuccess
         }
     }
 

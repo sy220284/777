@@ -46,11 +46,24 @@ internal object ChatStyleGuard {
     }
 
     fun scrub(text: String, extraBannedPhrases: List<String> = emptyList()): String {
-        var result = text
-        (bannedPhrases + extraBannedPhrases).distinct().forEach { phrase ->
-            if (phrase.isNotBlank()) result = result.replace(phrase, "")
-        }
+        val builtIn = bannedPhrases.map(String::trim).filter(String::isNotBlank).distinct()
+        var result = CHAT_SENTENCE.findAll(text)
+            .map { it.value }
+            .filterNot { segment ->
+                segment.isNotBlank() && builtIn.any { phrase -> phrase in segment }
+            }
+            .joinToString("")
+
+        extraBannedPhrases
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .forEach { phrase -> result = result.replace(phrase, "") }
+
         return result
+            .replace(Regex("""(^|[。！？!?\n])[\s，、；：,:;]+""")) { match ->
+                match.groupValues[1]
+            }
             .replace(Regex("[ \\t]{2,}"), " ")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
@@ -62,5 +75,6 @@ internal object ChatStyleGuard {
         return reply.copy(message = message, content = content)
     }
 
+    private val CHAT_SENTENCE = Regex("[^。！？!?\\n]+[。！？!?]*|\\n+")
     private const val MAX_CANDIDATE_CHARS = 6_000
 }

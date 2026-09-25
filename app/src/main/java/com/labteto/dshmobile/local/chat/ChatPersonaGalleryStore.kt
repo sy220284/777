@@ -273,11 +273,14 @@ private val DEFAULT_PERSONA_NAMES = setOf(
 )
 
 @Singleton
-class ChatPersonaGalleryStore @Inject constructor(
-    @ApplicationContext context: Context,
+class ChatPersonaGalleryStore internal constructor(
+    private val file: File,
     private val json: Json,
 ) {
-    private val file = File(context.filesDir, "local-harness/chat/persona-gallery.json")
+    @Inject constructor(@ApplicationContext context: Context, json: Json) :
+        this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
+
+    private val durableFile = RecoveringChatDocumentFile(file)
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
@@ -367,20 +370,18 @@ class ChatPersonaGalleryStore @Inject constructor(
         return normalized
     }
 
-    private fun read(): GalleryDocument {
-        if (!file.isFile) return GalleryDocument()
-        return runCatching {
-            json.decodeFromString(GalleryDocument.serializer(), file.readText())
-        }.getOrDefault(GalleryDocument())
-    }
+    private fun read(): GalleryDocument =
+        durableFile.read(
+            defaultValue = ::GalleryDocument,
+            decode = { encoded -> json.decodeFromString(GalleryDocument.serializer(), encoded) },
+        )
 
     private fun write(doc: GalleryDocument) {
-        file.parentFile?.mkdirs()
-        val temp = File(file.parentFile, file.name + ".tmp")
-        temp.writeText(json.encodeToString(GalleryDocument.serializer(), doc))
-        if (!temp.renameTo(file)) {
-            temp.copyTo(file, overwrite = true)
-            temp.delete()
+        val encoded = json.encodeToString(GalleryDocument.serializer(), doc)
+        durableFile.write(encoded) { candidate ->
+            runCatching {
+                json.decodeFromString(GalleryDocument.serializer(), candidate)
+            }.isSuccess
         }
     }
 }
