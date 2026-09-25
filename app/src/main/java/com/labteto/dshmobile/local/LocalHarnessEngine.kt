@@ -159,6 +159,26 @@ internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.DEVICE &&
         tool.approvalPolicy == ToolApprovalPolicy.MUTATION
 
+/**
+ * Execution jobs belong to the work surface. They may legitimately keep running while the user
+ * switches to chat, but chat must not present those global Harness jobs as if its role conversation
+ * spawned a child agent.
+ */
+internal fun projectExecutionJobs(
+    usageMode: LocalUsageMode,
+    jobs: List<LocalJobInfo>,
+): List<LocalJobInfo> = if (usageMode == LocalUsageMode.WORK) jobs else emptyList()
+
+/**
+ * Resource scheduler counters are process-wide. Agent/terminal/display/LSP leases therefore need
+ * the same product-surface projection as jobs; otherwise a background work subagent leaks an
+ * "agent running" state into an unrelated chat session.
+ */
+internal fun projectWorkResourceCount(
+    usageMode: LocalUsageMode,
+    count: Int,
+): Int = if (usageMode == LocalUsageMode.WORK) count else 0
+
 internal fun canResolvePendingByEnablingSafeAutoApproval(approval: LocalApproval?): Boolean =
     approval?.canAutoApproveSafely == true
 
@@ -343,13 +363,19 @@ class LocalHarnessEngine @Inject constructor(
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
-            _state.update {
-                it.copy(
+            _state.update { current ->
+                current.copy(
                     activeModelRequests = snapshot.activeModelRequests,
-                    activeAgents = snapshot.activeAgents,
-                    activeTerminals = snapshot.activeTerminals,
-                    activeVirtualDisplays = snapshot.activeVirtualDisplays,
-                    activeLanguageServers = snapshot.activeLanguageServers,
+                    activeAgents = projectWorkResourceCount(current.usageMode, snapshot.activeAgents),
+                    activeTerminals = projectWorkResourceCount(current.usageMode, snapshot.activeTerminals),
+                    activeVirtualDisplays = projectWorkResourceCount(
+                        current.usageMode,
+                        snapshot.activeVirtualDisplays,
+                    ),
+                    activeLanguageServers = projectWorkResourceCount(
+                        current.usageMode,
+                        snapshot.activeLanguageServers,
+                    ),
                     maxModelRequests = snapshot.budget.maxModelRequests,
                     maxAgents = snapshot.budget.maxAgents,
                     maxTerminals = snapshot.budget.maxTerminals,
@@ -362,7 +388,9 @@ class LocalHarnessEngine @Inject constructor(
         },
     )
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
-        _state.update { it.copy(jobs = snapshot) }
+        _state.update { current ->
+            current.copy(jobs = projectExecutionJobs(current.usageMode, snapshot))
+        }
     }
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
@@ -1277,7 +1305,23 @@ class LocalHarnessEngine @Inject constructor(
                             planMode = false,
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = jobs.snapshotInfos(),
+                            jobs = projectExecutionJobs(usageMode, jobs.snapshotInfos()),
+                            activeAgents = projectWorkResourceCount(
+                                usageMode,
+                                resourceScheduler.snapshot().activeAgents,
+                            ),
+                            activeTerminals = projectWorkResourceCount(
+                                usageMode,
+                                resourceScheduler.snapshot().activeTerminals,
+                            ),
+                            activeVirtualDisplays = projectWorkResourceCount(
+                                usageMode,
+                                resourceScheduler.snapshot().activeVirtualDisplays,
+                            ),
+                            activeLanguageServers = projectWorkResourceCount(
+                                usageMode,
+                                resourceScheduler.snapshot().activeLanguageServers,
+                            ),
                             error = null,
                         )
                     }
@@ -3605,13 +3649,25 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
-            jobs = jobs.snapshotInfos(),
+            jobs = projectExecutionJobs(stored.usageMode, jobs.snapshotInfos()),
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
-            activeAgents = resourceScheduler.snapshot().activeAgents,
-            activeTerminals = resourceScheduler.snapshot().activeTerminals,
-            activeVirtualDisplays = resourceScheduler.snapshot().activeVirtualDisplays,
-            activeLanguageServers = resourceScheduler.snapshot().activeLanguageServers,
+            activeAgents = projectWorkResourceCount(
+                stored.usageMode,
+                resourceScheduler.snapshot().activeAgents,
+            ),
+            activeTerminals = projectWorkResourceCount(
+                stored.usageMode,
+                resourceScheduler.snapshot().activeTerminals,
+            ),
+            activeVirtualDisplays = projectWorkResourceCount(
+                stored.usageMode,
+                resourceScheduler.snapshot().activeVirtualDisplays,
+            ),
+            activeLanguageServers = projectWorkResourceCount(
+                stored.usageMode,
+                resourceScheduler.snapshot().activeLanguageServers,
+            ),
             maxModelRequests = resourceScheduler.budget.maxModelRequests,
             maxAgents = resourceScheduler.budget.maxAgents,
             maxTerminals = resourceScheduler.budget.maxTerminals,
