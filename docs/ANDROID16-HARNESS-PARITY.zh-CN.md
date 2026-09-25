@@ -100,8 +100,9 @@
 ## 0.1.7-rc.2 基线补强
 
 - 上下文治理改为双层预算：原有字符上限继续负责 Android 内存与序列化压力；官方 DeepSeek 路由同时使用模型上下文预算。当前官方 `deepseek-flash` / `deepseek-v4-pro` 按 1,000,000 token 窗口、256,000 token 输出预留、65,536 token 额外余量与 0.8 压力阈值计算；未知第三方模型不猜测窗口，只保留字符保护。
-- 主 Agent 在每个模型 step 前重新检查上下文压力，并把当前临时上下文与实际工具 schema 纳入估算；长工具链不会只在整轮开始时检查一次。
-- 工具结果统一通过 UTF-8 / Unicode 安全保留器进入模型上下文，避免在代理对或 UTF-8 字符中间截断。超限原文在 16 MiB 单项上限内写入 `noBackupFilesDir` 下的 Session 私有 spill，模型可用只读 `tool_output_read` 按原工具调用编号分页回读；删除 Session 同时删除对应 spill。
+- 主 Agent 在每个模型 step 前重新检查上下文压力，并把当前临时上下文与实际工具 schema 纳入估算；长工具链不会只在整轮开始时检查一次。若提供方仍明确返回上下文窗口超限，当前请求会保留全部 system 指令、强制压缩较早非 system 历史并仅重试一次；普通 400/422 错误不会进入该恢复路径。
+- 压缩检查点以带 `<compacted-summary>` 标记的 user 消息进入模型历史，不追加第二条 system 摘要，避免 DeepSeek“最新 system”语义覆盖真正系统提示。
+- 工具结果统一通过 UTF-8 / Unicode 安全保留器进入模型上下文，避免在代理对或 UTF-8 字符中间截断。超限原文在 16 MiB 单项上限内写入 `noBackupFilesDir` 下的 Session 私有 spill，模型可用只读 `tool_output_read` 按原工具调用编号和 UTF-8 字节偏移分页回读；单 Session 与全局 spill 均有容量上限，删除 Session 同时删除对应 spill。
 - 动态扩展工具继续按需发现。前台普通子 Agent、持久子 Agent 与自动化子 Agent 的可选工具启用集合改为单次 Agent Run 独立作用域，子 Agent 发现能力不会污染父 Agent 或兄弟分支。
 - 固定提示词与工具描述删除运行时已经硬性执行的重复审批说明，保留能力导航、安全边界和必要前置条件，减少每轮固定 token。
 - 自动化任务新增有界轻量运行回执：最多保留 200 条、30 天；完整工作结果仍只保存在既有 `workSessionId` 对应会话中。聊天模式界面继续采用 60 分钟周期下限，工作模式底层允许 Android WorkManager 的 15 分钟周期；不复制桌面常驻进程的一分钟调度语义。
