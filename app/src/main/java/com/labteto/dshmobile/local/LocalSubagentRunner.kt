@@ -464,6 +464,7 @@ internal class LocalSubagentRunner(
         tools: JsonArray,
         subagentId: String,
         step: Int,
+        allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
         val executor = AgentRequestExecutor(
             maxAttempts = state.value.modelAttempts.coerceIn(1, 5),
@@ -511,10 +512,36 @@ internal class LocalSubagentRunner(
                 }
             },
         )
-        return executor.execute {
-            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                modelClient.complete(key, baseUrl, model, history, tools)
+        return try {
+            executor.execute {
+                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                    modelClient.complete(key, baseUrl, model, history, tools)
+                }
             }
+        } catch (error: Throwable) {
+            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+            val compacted = historyCompactor.compactForOverflow(
+                history,
+                LocalHistorySummaryMode.WORK,
+            ) ?: throw error
+            eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                put("agent_id", subagentId)
+                put("step", step)
+                put("model", model)
+                put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                put("omitted_messages", compacted.omittedMessages)
+            })
+            completeSubagentStep(
+                key = key,
+                baseUrl = baseUrl,
+                model = model,
+                history = compacted.messages,
+                tools = tools,
+                subagentId = subagentId,
+                step = step,
+                allowContextOverflowRecovery = false,
+            )
         }
     }
 
