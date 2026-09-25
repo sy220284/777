@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -79,6 +80,9 @@ import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val PERSONA_GALLERY_UI_PREFS = "persona_gallery_ui"
+private const val HIDDEN_PERSONA_PRESET_IDS = "hidden_persona_preset_ids"
 
 @Composable
 internal fun PersonaGallerySavePromptDialog(
@@ -179,6 +183,16 @@ internal fun PersonaGalleryScreen(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val galleryUiPrefs = remember(context) {
+        context.getSharedPreferences(PERSONA_GALLERY_UI_PREFS, android.content.Context.MODE_PRIVATE)
+    }
+    var hiddenPresetIds by remember(galleryUiPrefs) {
+        mutableStateOf(
+            galleryUiPrefs.getStringSet(HIDDEN_PERSONA_PRESET_IDS, emptySet())
+                .orEmpty()
+                .toSet(),
+        )
+    }
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
@@ -194,6 +208,7 @@ internal fun PersonaGalleryScreen(
     var deletingCharacter by remember { mutableStateOf(false) }
     var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
+    var pendingPresetDeleteId by remember { mutableStateOf<String?>(null) }
     var visibleHistory by remember(selectedId, selectedStoryId) { mutableStateOf(8) }
     var showHistory by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
@@ -320,6 +335,21 @@ internal fun PersonaGalleryScreen(
 
     BackHandler(onBack = ::navigateBack)
 
+    presets.firstOrNull { it.id == pendingPresetDeleteId }?.let { pending ->
+        DeletePresetConfirmDialog(
+            preset = pending,
+            onCancel = { pendingPresetDeleteId = null },
+            onConfirm = {
+                val updated = hiddenPresetIds + pending.id
+                hiddenPresetIds = updated
+                galleryUiPrefs.edit()
+                    .putStringSet(HIDDEN_PERSONA_PRESET_IDS, updated)
+                    .apply()
+                pendingPresetDeleteId = null
+            },
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = DsTheme.colors.bgBase,
@@ -344,44 +374,74 @@ internal fun PersonaGalleryScreen(
                 if (selected == null) {
             GalleryOverviewHeader(entries.size)
 
-            if (presets.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.persona_gallery_presets_title),
-                    style = DsType.std14,
-                    color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            val installedPresetIds = entries
+                .map { it.persona.presetId }
+                .filter(String::isNotBlank)
+                .toSet()
+            val visiblePresets = presets.filter { preset ->
+                preset.id !in installedPresetIds && preset.id !in hiddenPresetIds
+            }
+            if (visiblePresets.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.persona_gallery_presets_title),
+                        style = DsType.std14,
+                        color = DsTheme.colors.labelPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    GalleryPill(visiblePresets.size.toString())
+                }
                 Text(
                     stringResource(R.string.persona_gallery_presets_hint),
                     style = DsType.caption11,
                     color = DsTheme.colors.labelTertiary,
                 )
+                Text(
+                    stringResource(R.string.persona_gallery_preset_long_press_delete_hint),
+                    style = DsType.caption11,
+                    color = DsTheme.colors.labelTertiary,
+                )
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                    presets.forEach { preset ->
-                        val installed = entries.any { entry -> entry.persona.presetId == preset.id }
-                        PersonaPresetCard(
-                            preset = preset,
-                            installed = installed,
-                            busy = busy,
-                            onInstall = {
-                                busy = true
-                                error = null
-                                notice = null
-                                scope.launch {
-                                    onInstallPreset(preset.id)
-                                        .onSuccess { entry ->
-                                            notice = presetInstalledText
-                                            selectedId = entry.id
-                                            selectedStoryId = null
+                    visiblePresets.chunked(2).forEach { rowPresets ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            rowPresets.forEach { preset ->
+                                PersonaPresetCard(
+                                    preset = preset,
+                                    busy = busy,
+                                    modifier = Modifier.weight(1f),
+                                    onInstall = {
+                                        busy = true
+                                        error = null
+                                        notice = null
+                                        scope.launch {
+                                            onInstallPreset(preset.id)
+                                                .onSuccess { entry ->
+                                                    notice = presetInstalledText
+                                                    selectedId = entry.id
+                                                    selectedStoryId = null
+                                                }
+                                                .onFailure { error = it.message ?: presetInstallFailedText }
+                                            busy = false
                                         }
-                                        .onFailure { error = it.message ?: presetInstallFailedText }
-                                    busy = false
-                                }
-                            },
-                        )
+                                    },
+                                    onLongClick = {
+                                        pendingPresetDeleteId = preset.id
+                                        error = null
+                                    },
+                                )
+                            }
+                            if (rowPresets.size == 1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -1043,6 +1103,43 @@ private fun readPersonaShareText(context: android.content.Context, uri: android.
 }
 
 @Composable
+private fun DeletePresetConfirmDialog(
+    preset: PersonaPreset,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    DsDialog(
+        title = stringResource(R.string.persona_gallery_preset_delete_title),
+        onDismiss = onCancel,
+    ) {
+        Text(
+            stringResource(R.string.persona_gallery_preset_delete_confirm, preset.persona.name),
+            style = DsType.small13,
+            color = DsTheme.colors.labelPrimary,
+        )
+        Text(
+            stringResource(R.string.persona_gallery_preset_delete_hint),
+            style = DsType.caption11,
+            color = DsTheme.colors.labelTertiary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DsButton(
+                text = stringResource(R.string.persona_gallery_cancel),
+                onClick = onCancel,
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.weight(1f),
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_confirm_delete),
+                onClick = onConfirm,
+                variant = DsButtonVariant.Danger,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun DeleteCharacterConfirm(
     entry: PersonaGalleryEntry,
     busy: Boolean,
@@ -1269,48 +1366,53 @@ private fun GalleryOverviewHeader(count: Int) {
 @Composable
 private fun PersonaPresetCard(
     preset: PersonaPreset,
-    installed: Boolean,
     busy: Boolean,
+    modifier: Modifier = Modifier,
     onInstall: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
-    DsCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PersonaAvatar(preset.persona.name)
-            Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        preset.persona.name,
-                        style = DsType.std14,
-                        color = DsTheme.colors.labelPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    GalleryPill(preset.franchise)
-                }
-                Text(
-                    preset.summary,
-                    style = DsType.caption11,
-                    color = DsTheme.colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        DsButton(
-            text = stringResource(
-                if (installed) R.string.persona_gallery_preset_added
-                else R.string.persona_gallery_preset_add
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = DsTheme.colors.bgLayer1,
+        shadowElevation = 2.dp,
+        modifier = modifier
+            .heightIn(min = 196.dp)
+            .combinedClickable(
+                enabled = !busy,
+                onClick = onInstall,
+                onLongClick = onLongClick,
             ),
-            onClick = onInstall,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !installed && !busy,
-            variant = if (installed) DsButtonVariant.Ghost else DsButtonVariant.Outline,
-        )
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.medium),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            PersonaAvatar(preset.persona.name)
+            Text(
+                preset.persona.name,
+                style = DsType.std14,
+                color = DsTheme.colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            GalleryPill(preset.franchise)
+            Text(
+                preset.summary,
+                style = DsType.caption11,
+                color = DsTheme.colors.labelSecondary,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_preset_add),
+                onClick = onInstall,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                variant = DsButtonVariant.Outline,
+            )
+        }
     }
 }
 
