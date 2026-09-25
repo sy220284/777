@@ -53,7 +53,6 @@ class PersonaInspectionService @Inject constructor(
         val apiKey = apiKeys.get()?.trim()?.takeIf(String::isNotEmpty)
             ?: error("请先在模型设置里配置密钥")
         val dialogue = messages
-            .asSequence()
             .filter { it.role == "user" || it.role == "assistant" }
             .takeLast(MAX_CONTEXT_MESSAGES)
             .joinToString("\n") { message ->
