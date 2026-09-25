@@ -76,19 +76,24 @@ class LocalHarnessViewModel @Inject constructor(
         val persona = snapshot.chatPersona
         if (!isMeaningfulGalleryPersona(persona)) return false
 
+        val relevantMessages = snapshot.messages.filter { message ->
+            (message.role == "user" || message.role == "assistant") &&
+                message.createdAt > snapshot.gallerySaveSuppressedThrough
+        }
+        if (snapshot.gallerySaveSuppressedThrough > 0L && relevantMessages.isEmpty()) return false
+
         val bound = snapshot.galleryId?.let { id -> gallery.value.firstOrNull { it.id == id } }
         if (snapshot.galleryId != null) {
             return bound == null || galleryEntryHasUnsavedChanges(
                 entry = bound,
                 storyId = snapshot.galleryStoryId,
                 persona = persona,
-                history = snapshot.messages,
+                history = relevantMessages,
                 chatState = snapshot.chatState,
             )
         }
 
-        val hasDialogue = snapshot.messages.any { it.role == "user" || it.role == "assistant" }
-        if (hasDialogue) return true
+        if (relevantMessages.isNotEmpty()) return true
         return gallery.value.none { samePersonaIdentity(it.persona, persona) }
     }
 
