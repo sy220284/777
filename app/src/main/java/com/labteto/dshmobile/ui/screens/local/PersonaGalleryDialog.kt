@@ -1,21 +1,35 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.graphics.BitmapFactory
+import java.io.File
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.Checkbox
@@ -28,10 +42,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,12 +65,14 @@ import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
+import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -128,8 +152,9 @@ internal fun PersonaGallerySavePromptDialog(
 }
 
 @Composable
-internal fun PersonaGalleryDialog(
+internal fun PersonaGalleryScreen(
     entries: List<PersonaGalleryEntry>,
+    presets: List<PersonaPreset>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
     currentGalleryStoryId: String?,
@@ -146,6 +171,9 @@ internal fun PersonaGalleryDialog(
     onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
     onExport: suspend (String, Boolean) -> Result<String>,
     onImport: suspend (String) -> Result<PersonaGalleryEntry>,
+    onInstallPreset: suspend (String) -> Result<PersonaGalleryEntry>,
+    onSetPortrait: suspend (String, android.net.Uri) -> Result<PersonaGalleryEntry>,
+    onRemovePortrait: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -176,6 +204,7 @@ internal fun PersonaGalleryDialog(
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportPayload by remember { mutableStateOf<String?>(null) }
+    var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
@@ -195,6 +224,9 @@ internal fun PersonaGalleryDialog(
     val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
     val exportFailedText = stringResource(R.string.persona_gallery_export_failed)
     val importFailedText = stringResource(R.string.persona_gallery_import_failed)
+    val presetInstallFailedText = stringResource(R.string.persona_gallery_preset_install_failed)
+    val presetInstalledText = stringResource(R.string.persona_gallery_preset_installed)
+    val portraitSaveFailedText = stringResource(R.string.persona_gallery_portrait_save_failed)
 
     val exportDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -244,6 +276,22 @@ internal fun PersonaGalleryDialog(
         }
     }
 
+    val portraitPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val targetId = portraitTargetId
+        portraitTargetId = null
+        if (uri != null && targetId != null) {
+            busy = true
+            error = null
+            scope.launch {
+                onSetPortrait(targetId, uri)
+                    .onFailure { error = it.message ?: portraitSaveFailedText }
+                busy = false
+            }
+        }
+    }
+
     LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
         val entry = selected ?: return@LaunchedEffect
         if (entry.stories.none { it.id == selectedStoryId }) {
@@ -256,12 +304,88 @@ internal fun PersonaGalleryDialog(
         }
     }
 
-    DsDialog(
-        title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
-        onDismiss = onDismiss,
-    ) {
+    fun navigateBack() {
         if (selected == null) {
+            onDismiss()
+        } else if (hasLocalStoryEdits) {
+            error = saveEditsBeforeSwitchText
+        } else {
+            selectedId = null
+            selectedStoryId = null
+            deletingCharacter = false
+            error = null
+            notice = null
+        }
+    }
+
+    BackHandler(onBack = ::navigateBack)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = DsTheme.colors.bgBase,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding(),
+        ) {
+            PersonaGalleryTopBar(
+                title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
+                onBack = ::navigateBack,
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                if (selected == null) {
             GalleryOverviewHeader(entries.size)
+
+            if (presets.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.persona_gallery_presets_title),
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.persona_gallery_presets_hint),
+                    style = DsType.caption11,
+                    color = DsTheme.colors.labelTertiary,
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    presets.forEach { preset ->
+                        val installed = entries.any { entry -> entry.persona.presetId == preset.id }
+                        PersonaPresetCard(
+                            preset = preset,
+                            installed = installed,
+                            busy = busy,
+                            onInstall = {
+                                busy = true
+                                error = null
+                                notice = null
+                                scope.launch {
+                                    onInstallPreset(preset.id)
+                                        .onSuccess { entry ->
+                                            notice = presetInstalledText
+                                            selectedId = entry.id
+                                            selectedStoryId = null
+                                        }
+                                        .onFailure { error = it.message ?: presetInstallFailedText }
+                                    busy = false
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
             DsButton(
                 text = stringResource(R.string.persona_gallery_import_file),
                 onClick = { importDocument.launch(arrayOf("application/json", "text/plain")) },
@@ -363,23 +487,36 @@ internal fun PersonaGalleryDialog(
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
-                    filtered.forEach { entry ->
-                        GalleryPersonaCard(
-                            entry = entry,
-                            unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
-                            onClick = {
-                                selectedId = entry.id
-                                selectedStoryId = null
-                                error = null
-                                notice = null
-                            },
-                            onLongClick = {
-                                pendingEntryDeleteId = entry.id
-                                error = null
-                            },
-                        )
+                    filtered.chunked(2).forEach { rowEntries ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        ) {
+                            rowEntries.forEach { entry ->
+                                GalleryPersonaCard(
+                                    entry = entry,
+                                    unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
+                                    modifier = Modifier.weight(1f),
+                                    onChoosePortrait = {
+                                        portraitTargetId = entry.id
+                                        portraitPicker.launch(arrayOf("image/*"))
+                                    },
+                                    onClick = {
+                                        selectedId = entry.id
+                                        selectedStoryId = null
+                                        error = null
+                                        notice = null
+                                    },
+                                    onLongClick = {
+                                        pendingEntryDeleteId = entry.id
+                                        error = null
+                                    },
+                                )
+                            }
+                            if (rowEntries.size == 1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -390,6 +527,47 @@ internal fun PersonaGalleryDialog(
                 selected.stories.size,
                 totalDialogue,
             )
+            SpatialPortraitStandee(
+                entry = selected,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(380.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(
+                        if (selected.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
+                        else R.string.persona_gallery_portrait_replace,
+                    ),
+                    onClick = {
+                        portraitTargetId = selected.id
+                        portraitPicker.launch(arrayOf("image/*"))
+                    },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+                if (selected.portraitPath.isNotBlank()) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_portrait_remove),
+                        onClick = {
+                            busy = true
+                            error = null
+                            scope.launch {
+                                onRemovePortrait(selected.id)
+                                    .onFailure { error = it.message ?: portraitSaveFailedText }
+                                busy = false
+                            }
+                        },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.weight(1f),
+                        enabled = !busy,
+                    )
+                }
+            }
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
 
             DsButton(
@@ -793,16 +971,52 @@ internal fun PersonaGalleryDialog(
             )
         }
 
-        error?.let {
+                error?.let {
+                    Text(
+                        it,
+                        style = DsType.small13,
+                        color = DsTheme.colors.error,
+                        modifier = Modifier.padding(top = DsSpacing.small),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonaGalleryTopBar(
+    title: String,
+    onBack: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        color = colors.bgBase,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsIconButton(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = stringResource(R.string.common_back),
+                onClick = onBack,
+            )
             Text(
-                it,
-                style = DsType.small13,
-                color = DsTheme.colors.error,
-                modifier = Modifier.padding(top = DsSpacing.small),
+                text = title,
+                style = DsType.large20,
+                color = colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
     }
-
 }
 
 private fun personaExportFileName(name: String): String {
@@ -1053,9 +1267,59 @@ private fun GalleryOverviewHeader(count: Int) {
 }
 
 @Composable
+private fun PersonaPresetCard(
+    preset: PersonaPreset,
+    installed: Boolean,
+    busy: Boolean,
+    onInstall: () -> Unit,
+) {
+    DsCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PersonaAvatar(preset.persona.name)
+            Spacer(Modifier.width(DsSpacing.medium))
+            Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        preset.persona.name,
+                        style = DsType.std14,
+                        color = DsTheme.colors.labelPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    GalleryPill(preset.franchise)
+                }
+                Text(
+                    preset.summary,
+                    style = DsType.caption11,
+                    color = DsTheme.colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        DsButton(
+            text = stringResource(
+                if (installed) R.string.persona_gallery_preset_added
+                else R.string.persona_gallery_preset_add
+            ),
+            onClick = onInstall,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !installed && !busy,
+            variant = if (installed) DsButtonVariant.Ghost else DsButtonVariant.Outline,
+        )
+    }
+}
+
+@Composable
 private fun GalleryPersonaCard(
     entry: PersonaGalleryEntry,
     unsaved: Boolean,
+    modifier: Modifier = Modifier,
+    onChoosePortrait: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -1065,44 +1329,184 @@ private fun GalleryPersonaCard(
         entry.persona.personality.isNotBlank() -> entry.persona.personality
         else -> waitingText
     }
-    DsCard(
-        modifier = Modifier.combinedClickable(
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = DsTheme.colors.bgLayer1,
+        shadowElevation = 4.dp,
+        modifier = modifier.combinedClickable(
             onClick = onClick,
             onLongClick = onLongClick,
         ),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PersonaAvatar(entry.persona.name)
-            Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    entry.persona.name,
-                    style = DsType.std14,
-                    color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        Column(
+            modifier = Modifier.padding(DsSpacing.small),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Box(Modifier.fillMaxWidth()) {
+                SpatialPortraitStandee(
+                    entry = entry,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(230.dp),
                 )
-                Text(
-                    subtitle,
-                    style = DsType.small13,
-                    color = DsTheme.colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                DsIconButton(
+                    icon = Icons.Outlined.Image,
+                    contentDescription = stringResource(
+                        if (entry.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
+                        else R.string.persona_gallery_portrait_replace,
+                    ),
+                    onClick = onChoosePortrait,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    containerColor = DsTheme.colors.bgLayer2.copy(alpha = 0.88f),
                 )
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                entry.persona.name,
+                style = DsType.std14,
+                color = DsTheme.colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                subtitle,
+                style = DsType.caption11,
+                color = DsTheme.colors.labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(
+                    R.string.persona_gallery_standee_meta,
+                    entry.stories.size,
+                    entry.totalDialogueCount(),
+                ),
+                style = DsType.caption11,
+                color = DsTheme.colors.labelTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (unsaved) {
                 GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
             }
-            GalleryPill(stringResource(R.string.persona_gallery_story_count, entry.stories.size))
-            GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.totalDialogueCount()))
-            if (entry.persona.corrections.isNotEmpty()) {
-                GalleryPill(stringResource(R.string.persona_gallery_corrections_count, entry.persona.corrections.size))
-            }
         }
     }
+}
+
+@Composable
+private fun SpatialPortraitStandee(
+    entry: PersonaGalleryEntry,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    var rotationX by remember(entry.id) { mutableStateOf(0f) }
+    var rotationY by remember(entry.id) { mutableStateOf(0f) }
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = entry.portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            decodeGalleryPortrait(entry.portraitPath)
+        }
+    }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pointerInput(entry.id, entry.portraitPath) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            rotationX = 0f
+                            rotationY = 0f
+                        },
+                        onDragCancel = {
+                            rotationX = 0f
+                            rotationY = 0f
+                        },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        rotationY = (rotationY + dragAmount.x / 28f).coerceIn(-11f, 11f)
+                        rotationX = (rotationX - dragAmount.y / 36f).coerceIn(-7f, 7f)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = colors.accent.copy(alpha = 0.07f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .shadow(12.dp, RoundedCornerShape(28.dp))
+                    .graphicsLayer {
+                        this.rotationX = rotationX
+                        this.rotationY = rotationY
+                        cameraDistance = 24f * density
+                    },
+            ) {
+                if (portrait != null) {
+                    Image(
+                        bitmap = portrait!!,
+                        contentDescription = entry.persona.name,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(22.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(colors.accent.copy(alpha = 0.04f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            PersonaAvatar(entry.persona.name, large = true)
+                            Spacer(Modifier.size(DsSpacing.small))
+                            Text(
+                                stringResource(R.string.persona_gallery_portrait_empty),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = colors.labelTertiary.copy(alpha = 0.16f),
+            modifier = Modifier
+                .fillMaxWidth(0.56f)
+                .height(10.dp)
+                .graphicsLayer {
+                    rotationX = 65f
+                    cameraDistance = 18f * density
+                },
+        ) {}
+    }
+}
+
+private fun decodeGalleryPortrait(path: String): ImageBitmap? {
+    if (path.isBlank()) return null
+    val file = File(path)
+    if (!file.isFile) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    while (longest / sample > 1_600) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeFile(file.absolutePath, options)?.asImageBitmap()
 }
 
 @Composable
@@ -1253,8 +1657,18 @@ private fun PersonaDetails(persona: PersonaProfile) {
         stringResource(R.string.persona_field_speech_style) to persona.speechStyle,
         stringResource(R.string.persona_field_relationship) to persona.relationship,
         stringResource(R.string.persona_field_world_setting) to persona.worldSetting,
+        stringResource(R.string.persona_field_franchise) to persona.franchise,
+        stringResource(R.string.persona_field_timeline) to persona.timelinePosition,
     ).filter { it.second.isNotBlank() }
     val listSections = listOf(
+        stringResource(R.string.persona_field_motivations) to persona.coreMotivations,
+        stringResource(R.string.persona_field_values) to persona.valuePriorities,
+        stringResource(R.string.persona_field_behavior_patterns) to persona.behaviorPatterns,
+        stringResource(R.string.persona_field_internal_contradictions) to persona.internalContradictions,
+        stringResource(R.string.persona_field_knowledge_boundary) to persona.knowledgeBoundary,
+        stringResource(R.string.persona_field_lore) to persona.loreEntries.map { entry ->
+            entry.title.ifBlank { entry.content.take(80) }
+        },
         stringResource(R.string.persona_field_constraints) to persona.hardConstraints,
         stringResource(R.string.persona_field_dialogues) to persona.exampleDialogues,
         stringResource(R.string.persona_field_banned) to persona.bannedPhrases,
@@ -1404,6 +1818,13 @@ private fun personaFieldLabel(field: String): String = when (field) {
     "speechStyle" -> stringResource(R.string.persona_field_speech_style)
     "relationship" -> stringResource(R.string.persona_field_relationship)
     "worldSetting" -> stringResource(R.string.persona_field_world_setting)
+    "franchise" -> stringResource(R.string.persona_field_franchise)
+    "timelinePosition" -> stringResource(R.string.persona_field_timeline)
+    "coreMotivations" -> stringResource(R.string.persona_field_motivations)
+    "valuePriorities" -> stringResource(R.string.persona_field_values)
+    "behaviorPatterns" -> stringResource(R.string.persona_field_behavior_patterns)
+    "internalContradictions" -> stringResource(R.string.persona_field_internal_contradictions)
+    "knowledgeBoundary" -> stringResource(R.string.persona_field_knowledge_boundary)
     "hardConstraints" -> stringResource(R.string.persona_field_constraints)
     "exampleDialogues" -> stringResource(R.string.persona_field_dialogues)
     "bannedPhrases" -> stringResource(R.string.persona_field_banned)

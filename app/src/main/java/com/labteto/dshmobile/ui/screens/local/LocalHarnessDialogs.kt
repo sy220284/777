@@ -337,6 +337,7 @@ internal fun ChatPersonaDialog(
     onAutoFill: suspend (String) -> Result<PersonaProfile>,
     onDismiss: () -> Unit,
 ) {
+    var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var identity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.identity) }
     var background by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.background) }
@@ -371,6 +372,7 @@ internal fun ChatPersonaDialog(
         .toList()
 
     fun applyGenerated(generated: PersonaProfile) {
+        runtimeProfile = generated
         name = generated.name
         identity = generated.identity
         background = generated.background
@@ -494,7 +496,7 @@ internal fun ChatPersonaDialog(
             text = stringResource(R.string.local_persona_save),
             onClick = {
                 onSave(
-                    profile.copy(
+                    runtimeProfile.copy(
                         name = name,
                         identity = identity,
                         background = background,

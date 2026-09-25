@@ -72,6 +72,13 @@ class PersonaInspectionService @Inject constructor(
             appendField("说话方式", persona.speechStyle)
             appendField("与用户关系", persona.relationship)
             appendField("世界设定", persona.worldSetting)
+            appendField("作品来源", persona.franchise)
+            appendField("当前时间线", persona.timelinePosition)
+            appendList("核心动机", persona.coreMotivations)
+            appendList("价值排序", persona.valuePriorities)
+            appendList("稳定行为模式", persona.behaviorPatterns)
+            appendList("内在矛盾", persona.internalContradictions)
+            appendList("知识边界", persona.knowledgeBoundary)
             appendList("硬约束", persona.hardConstraints)
             appendList("对白参考", persona.exampleDialogues)
             appendList("禁用表达", persona.bannedPhrases)
@@ -180,6 +187,13 @@ class PersonaInspectionService @Inject constructor(
             "speechStyle",
             "relationship",
             "worldSetting",
+            "franchise",
+            "timelinePosition",
+            "coreMotivations",
+            "valuePriorities",
+            "behaviorPatterns",
+            "internalContradictions",
+            "knowledgeBoundary",
             "hardConstraints",
             "exampleDialogues",
             "bannedPhrases",
@@ -207,11 +221,15 @@ class PersonaInspectionService @Inject constructor(
             4. 用户明确纠正角色“不会这么说/不会这么做”等内容优先放 corrections。
             5. 人物身份、经历、能力等事实分别放 identity/background；稳定性格放 personality；可执行说话习惯放 speechStyle。
             6. 与用户长期关系定位、称呼习惯和互动边界放 relationship；世界规则放 worldSetting。
-            7. 一条建议只写一个可直接追加的小事实或规则，不要把整份人设重新生成一遍。
-            8. field 只能使用 identity, background, personality, speechStyle, relationship, worldSetting,
-               hardConstraints, exampleDialogues, bannedPhrases, signaturePhrases, corrections。
-            9. 没有冲突或新增内容时返回空数组。
-            10. 不要 Markdown，不要解释，只输出标准 JSON。
+            7. 长期驱动力放 coreMotivations；价值冲突顺序放 valuePriorities；重复稳定行动方式放 behaviorPatterns；人物自身长期拉扯放 internalContradictions；角色知道/不知道什么放 knowledgeBoundary；剧情阶段放 timelinePosition。
+            8. 一条建议只写一个可直接追加的小事实或规则，不要把整份人设重新生成一遍。不要在人物检查里自动生成世界书条目。
+            9. field 只能使用 identity, background, personality, speechStyle, relationship, worldSetting,
+               franchise, timelinePosition, coreMotivations, valuePriorities, behaviorPatterns,
+               internalContradictions, knowledgeBoundary, hardConstraints, exampleDialogues,
+               bannedPhrases, signaturePhrases, corrections。
+            10. 没有冲突或新增内容时返回空数组。
+            11. 同时检查知识越界、关系突然跳变、过度迎合、把推测当事实、说话方式长期偏离等运行时跑偏；只有有明确对话证据时才报 conflicts。
+            12. 不要 Markdown，不要解释，只输出标准 JSON。
         """.trimIndent()
     }
 }

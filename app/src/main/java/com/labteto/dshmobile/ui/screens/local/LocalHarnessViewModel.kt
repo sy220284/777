@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalImportedAttachment
@@ -10,6 +13,9 @@ import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
@@ -19,12 +25,16 @@ import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+
+private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 
 /** UI adapter for the process-wide on-device Harness engine. */
 @HiltViewModel
@@ -33,10 +43,12 @@ class LocalHarnessViewModel @Inject constructor(
     private val personaAutoFillService: PersonaAutoFillService,
     private val personaInspectionService: PersonaInspectionService,
     private val galleryStore: ChatPersonaGalleryStore,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val state = engine.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
+    val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -186,6 +198,74 @@ class LocalHarnessViewModel @Inject constructor(
         updated
     }
 
+    suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> = runCatching {
+        val previous = gallery.value.firstOrNull { it.id == id }
+            ?: error("图集条目已不存在")
+        val updated = withContext(Dispatchers.IO) {
+            val resolver = appContext.contentResolver
+            val mimeType = resolver.getType(uri).orEmpty()
+            require(mimeType.startsWith("image/")) { "请选择图片文件" }
+            val extension = MimeTypeMap.getSingleton()
+                .getExtensionFromMimeType(mimeType)
+                ?.lowercase()
+                ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "heic", "heif") }
+                ?: "jpg"
+            val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
+                check(exists() || mkdirs()) { "无法创建人物立绘目录" }
+            }
+            val safeId = id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
+            val target = File(portraitDir, "$safeId-${System.currentTimeMillis()}.$extension")
+            try {
+                resolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().buffered().use { output ->
+                        val buffer = ByteArray(16 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= MAX_PERSONA_PORTRAIT_BYTES) { "人物形象图过大，请选择 20MB 以内的图片" }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                } ?: error("无法读取人物形象图")
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(target.absolutePath, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
+                val saved = galleryStore.updatePortraitPath(id, target.absolutePath)
+                    ?: error("图集条目已不存在")
+                deleteManagedPortrait(previous.portraitPath, keepPath = target.absolutePath)
+                saved
+            } catch (error: Throwable) {
+                target.delete()
+                throw error
+            }
+        }
+        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        updated
+    }
+
+    suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = runCatching {
+        val previous = gallery.value.firstOrNull { it.id == id }
+            ?: error("图集条目已不存在")
+        val updated = withContext(Dispatchers.IO) {
+            galleryStore.updatePortraitPath(id, "")
+                ?: error("图集条目已不存在")
+        }
+        deleteManagedPortrait(previous.portraitPath)
+        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        updated
+    }
+
+    private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
+        if (path.isBlank() || path == keepPath) return
+        runCatching {
+            val root = File(appContext.filesDir, "local-harness/chat/persona-portraits").canonicalFile
+            val candidate = File(path).canonicalFile
+            if (candidate.path.startsWith(root.path + File.separator)) candidate.delete()
+        }
+    }
+
     suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
         withContext(Dispatchers.IO) {
             check(galleryStore.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
@@ -210,11 +290,27 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
+    suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
+        val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
+        val entry = withContext(Dispatchers.IO) {
+            galleryStore.save(
+                persona = preset.persona,
+                sourceSessionId = "",
+                history = emptyList(),
+                chatState = ChatCharacterState(),
+                notes = "",
+            ).entry.also { _gallery.value = galleryStore.list() }
+        }
+        entry
+    }
+
     suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
+        val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
         withContext(Dispatchers.IO) {
             check(galleryStore.delete(id)) { "图集条目已不存在" }
             _gallery.value = galleryStore.list()
         }
+        deleteManagedPortrait(portraitPath)
         engine.clearChatGalleryBinding(expectedGalleryId = id)
     }
 

@@ -48,6 +48,10 @@ data class ChatCharacterState(
     val relationshipState: String = "熟悉中",
     val currentFocus: String = "",
     val recentImpression: String = "",
+    val activeGoal: String = "",
+    val currentAgenda: String = "",
+    val internalConflict: String = "",
+    val immediateConcern: String = "",
     val unresolvedThreads: List<String> = emptyList(),
     val initiative: Int = 50,
     val shareDesire: Int = 50,
@@ -79,6 +83,7 @@ data class ChatReplySuggestion(
 data class ChatPostTurnPlan(
     val state: ChatCharacterState = ChatCharacterState(),
     val suggestions: List<ChatReplySuggestion> = emptyList(),
+    val turnSignificance: String = "MINOR",
 )
 
 @Singleton
@@ -95,6 +100,8 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。")
         appendLine("角色：${persona.name}")
         if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality}")
+        if (persona.coreMotivations.isNotEmpty()) appendLine("核心动机：${persona.coreMotivations.joinToString("；")}")
+        if (persona.behaviorPatterns.isNotEmpty()) appendLine("稳定行为：${persona.behaviorPatterns.joinToString("；")}")
         if (persona.relationship.isNotBlank()) appendLine("关系设定：${persona.relationship}")
         appendLine()
         appendLine("上一状态：")
@@ -107,6 +114,10 @@ class ChatInteractionPlanner @Inject constructor(
         )
         appendLine("关注点=${state.currentFocus}")
         appendLine("近期印象=${state.recentImpression}")
+        appendLine("当前目标=${state.activeGoal}")
+        appendLine("行动倾向=${state.currentAgenda}")
+        appendLine("内在矛盾=${state.internalConflict}")
+        appendLine("眼下最在意=${state.immediateConcern}")
         appendLine("未完话题=${state.unresolvedThreads.joinToString("；")}")
         appendLine("角色主动欲=${state.initiative}；分享欲=${state.shareDesire}")
         appendLine(
@@ -123,7 +134,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine()
         appendLine("输出结构必须严格为：")
         appendLine(
-            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字短标签","style":"自然/俏皮/直球/放飞","text":"用户可以直接发送的下一句","bold":false}]}""",
+            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","activeGoal":"角色眼下真正想达成什么","currentAgenda":"准备如何行动或回应","internalConflict":"当前内在拉扯，没有则空字符串","immediateConcern":"眼下最在意的人或事","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字短标签","style":"自然/俏皮/直球/放飞","text":"用户可以直接发送的下一句","bold":false}],"turnSignificance":"NONE|MINOR|MAJOR"}""",
         )
         appendLine("要求：")
         appendLine("1. stage 只能取 NEW / FAMILIAR / AMBIGUOUS / DATING / COMMITTED / CONFLICT / COOLING / SEPARATED / REPAIRING。")
@@ -140,6 +151,9 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("12. 根据 userPattern 控制长度、直接度、玩笑感和表情习惯；四条可以有不同力度，但都要像同一个用户在不同心情下会说的话。")
         appendLine("13. label 只概括这一条的感觉或打法，style 只用自然/俏皮/直球/放飞；bold 只表示这条更出格有趣，不代表自动发送。")
         appendLine("14. 用户实际发言和明确纠正始终优先；不得虚构已发生的事实、强制关系升级或诱导越界。")
+        appendLine("15. turnSignificance 只能是 NONE / MINOR / MAJOR。寒暄、纯表情、重复问候或没有新信息通常为 NONE；短期情绪/关注变化为 MINOR；承诺、关系事件、重大共同经历、稳定人物事实才可为 MAJOR。")
+        appendLine("16. NONE 时人物状态保持原样，不为完整感编造新的情绪、关系、目标或记忆；但只要角色回复仍有自然接话空间，回复建议照常生成。")
+        appendLine("17. activeGoal/currentAgenda/internalConflict/immediateConcern 描述角色此刻的内在驱动，不凭空制造阴谋、爱意或模型分析口吻。")
     }.trim()
 
     fun parse(
@@ -156,15 +170,20 @@ class ChatInteractionPlanner @Inject constructor(
             json.decodeFromString(ChatPostTurnPlan.serializer(), body)
         }.getOrNull() ?: return null
         val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val significance = normalizeSignificance(decoded.turnSignificance)
 
         return decoded.copy(
-            state = sanitizeState(
-                value = decoded.state,
-                previous = previous,
-                userMessage = userMessage,
-                assistantMessage = assistantMessage,
-                rawState = rawState,
-            ),
+            state = if (significance == "NONE") {
+                previous
+            } else {
+                sanitizeState(
+                    value = decoded.state,
+                    previous = previous,
+                    userMessage = userMessage,
+                    assistantMessage = assistantMessage,
+                    rawState = rawState,
+                )
+            },
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
                     val style = suggestion.style.trim().take(12)
@@ -181,6 +200,7 @@ class ChatInteractionPlanner @Inject constructor(
                 .distinctBy { normalize(it.text) }
                 .take(4)
                 .toList(),
+            turnSignificance = significance,
         )
     }
 
@@ -235,6 +255,18 @@ class ChatInteractionPlanner @Inject constructor(
             recentImpression = if (rawState?.containsKey("recentImpression") == true) {
                 value.recentImpression.trim().take(320)
             } else previous.recentImpression,
+            activeGoal = if (rawState?.containsKey("activeGoal") == true) {
+                value.activeGoal.trim().take(240)
+            } else previous.activeGoal,
+            currentAgenda = if (rawState?.containsKey("currentAgenda") == true) {
+                value.currentAgenda.trim().take(240)
+            } else previous.currentAgenda,
+            internalConflict = if (rawState?.containsKey("internalConflict") == true) {
+                value.internalConflict.trim().take(240)
+            } else previous.internalConflict,
+            immediateConcern = if (rawState?.containsKey("immediateConcern") == true) {
+                value.immediateConcern.trim().take(240)
+            } else previous.immediateConcern,
             unresolvedThreads = if (rawState?.containsKey("unresolvedThreads") == true) {
                 value.unresolvedThreads.asSequence()
                     .map(String::trim)
@@ -439,6 +471,9 @@ class ChatInteractionPlanner @Inject constructor(
     private fun bounded(value: Int, previous: Int, maxDelta: Int): Int =
         value.coerceIn(previous - maxDelta, previous + maxDelta).coerceIn(0, 100)
 
+    private fun normalizeSignificance(raw: String): String =
+        raw.trim().uppercase().takeIf { it in ALLOWED_SIGNIFICANCE } ?: "MINOR"
+
     private fun normalizeStage(raw: String): String {
         val stage = raw.trim().uppercase()
         return stage.takeIf { it in ALLOWED_STAGES } ?: "FAMILIAR"
@@ -478,6 +513,7 @@ class ChatInteractionPlanner @Inject constructor(
     private companion object {
         const val MAX_MESSAGE_CHARS = 2_000
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
+        val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
         val ALLOWED_STAGES = setOf(
             "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",

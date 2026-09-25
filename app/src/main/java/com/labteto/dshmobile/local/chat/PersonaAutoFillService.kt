@@ -21,6 +21,14 @@ private data class PersonaDraft(
     val speechStyle: String = "",
     val relationship: String = "",
     val worldSetting: String = "",
+    val franchise: String = "",
+    val timelinePosition: String = "",
+    val coreMotivations: List<String> = emptyList(),
+    val valuePriorities: List<String> = emptyList(),
+    val behaviorPatterns: List<String> = emptyList(),
+    val internalContradictions: List<String> = emptyList(),
+    val knowledgeBoundary: List<String> = emptyList(),
+    val loreEntries: List<PersonaLoreEntry> = emptyList(),
     val hardConstraints: List<String> = emptyList(),
     val exampleDialogues: List<String> = emptyList(),
     val bannedPhrases: List<String> = emptyList(),
@@ -77,6 +85,13 @@ class PersonaAutoFillService @Inject constructor(
             if (current.speechStyle.isNotBlank()) appendLine("说话方式：${current.speechStyle}")
             if (current.relationship.isNotBlank()) appendLine("与用户关系：${current.relationship}")
             if (current.worldSetting.isNotBlank()) appendLine("世界设定：${current.worldSetting}")
+            if (current.franchise.isNotBlank()) appendLine("作品来源：${current.franchise}")
+            if (current.timelinePosition.isNotBlank()) appendLine("时间线：${current.timelinePosition}")
+            if (current.coreMotivations.isNotEmpty()) appendLine("核心动机：${current.coreMotivations.joinToString("；")}")
+            if (current.valuePriorities.isNotEmpty()) appendLine("价值排序：${current.valuePriorities.joinToString("；")}")
+            if (current.behaviorPatterns.isNotEmpty()) appendLine("行为模式：${current.behaviorPatterns.joinToString("；")}")
+            if (current.internalContradictions.isNotEmpty()) appendLine("内在矛盾：${current.internalContradictions.joinToString("；")}")
+            if (current.knowledgeBoundary.isNotEmpty()) appendLine("知识边界：${current.knowledgeBoundary.joinToString("；")}")
             if (current.hardConstraints.isNotEmpty()) {
                 appendLine("不可违反：${current.hardConstraints.joinToString("；")}")
             }
@@ -143,6 +158,14 @@ class PersonaAutoFillService @Inject constructor(
             speechStyle = draft.speechStyle.ifBlank { current.speechStyle },
             relationship = draft.relationship.ifBlank { current.relationship },
             worldSetting = draft.worldSetting.ifBlank { current.worldSetting },
+            franchise = draft.franchise.ifBlank { current.franchise },
+            timelinePosition = draft.timelinePosition.ifBlank { current.timelinePosition },
+            coreMotivations = draft.coreMotivations.ifEmpty { current.coreMotivations },
+            valuePriorities = draft.valuePriorities.ifEmpty { current.valuePriorities },
+            behaviorPatterns = draft.behaviorPatterns.ifEmpty { current.behaviorPatterns },
+            internalContradictions = draft.internalContradictions.ifEmpty { current.internalContradictions },
+            knowledgeBoundary = draft.knowledgeBoundary.ifEmpty { current.knowledgeBoundary },
+            loreEntries = draft.loreEntries.ifEmpty { current.loreEntries },
             hardConstraints = draft.hardConstraints.ifEmpty { current.hardConstraints },
             exampleDialogues = draft.exampleDialogues.ifEmpty { current.exampleDialogues },
             bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
@@ -173,6 +196,8 @@ class PersonaAutoFillService @Inject constructor(
 
             只输出一个 JSON 对象，不要 Markdown，不要解释。必须包含这些字段：
             name, identity, background, personality, speechStyle, relationship, worldSetting,
+            franchise, timelinePosition, coreMotivations, valuePriorities, behaviorPatterns,
+            internalContradictions, knowledgeBoundary, loreEntries,
             hardConstraints, exampleDialogues, bannedPhrases, signaturePhrases。
 
             规则：
@@ -181,13 +206,16 @@ class PersonaAutoFillService @Inject constructor(
             3. identity 要同时抓住身份定位、外在辨识度和关键能力；background 主要写经历与处境。
             4. personality 要包含性格驱动力、克制点、软肋和情绪边界；speechStyle 要写成可执行的说话规则。
             5. relationship 要明确角色如何看待用户、亲疏边界、称呼习惯和互动倾向。
-            6. hardConstraints 写 4-10 条真正会影响扮演稳定性的硬规则，重要禁忌也放在这里。
-            7. exampleDialogues 写 3-6 条短对白，体现语气、节奏和潜台词，不写长段剧情。
-            8. bannedPhrases 只放会明显破坏角色感或产生机械 AI 味的表达。
-            9. signaturePhrases 放少量自然常用表达，避免每句话都重复口头禅。
-            10. “默认角色”只是占位名；只要描述或聊天里出现明确角色名，就应替换成真实角色名。
-            11. 数组字段必须是 JSON 字符串数组；没有合适内容时返回空数组。
-            12. 输出必须是可直接解析的标准 JSON。
+            6. coreMotivations 写角色长期驱动力；valuePriorities 写发生冲突时的价值排序；behaviorPatterns 写可重复观察到的行动方式；internalContradictions 写真实存在的内在拉扯。
+            7. knowledgeBoundary 明确角色知道/不知道什么，尤其避免观众上帝视角；timelinePosition 说明采用哪个剧情阶段。
+            8. loreEntries 只拆稳定世界资料，每项结构为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}。普通人物建议 3-12 条，不要把整份人设重复塞进去；默认只生成 spoilerLevel=0 的无剧透条目。
+            9. hardConstraints 写 4-10 条真正会影响扮演稳定性的硬规则，重要禁忌也放在这里。
+            10. exampleDialogues 写 3-6 条短对白，体现语气、节奏和潜台词，不写长段剧情。
+            11. bannedPhrases 只放会明显破坏角色感或产生机械 AI 味的表达。
+            12. signaturePhrases 放少量自然常用表达，避免每句话都重复口头禅。
+            13. “默认角色”只是占位名；只要描述或聊天里出现明确角色名，就应替换成真实角色名。
+            14. 除 loreEntries 外的数组字段必须是 JSON 字符串数组；没有合适内容时返回空数组。
+            15. 输出必须是可直接解析的标准 JSON。
         """.trimIndent()
     }
 }
