@@ -434,7 +434,7 @@ private fun GroupChatMemberAvatar(
         value = withContext(Dispatchers.IO) {
             member.portraitPath
                 .takeIf(String::isNotBlank)
-                ?.let(BitmapFactory::decodeFile)
+                ?.let { path -> BitmapFactory.decodeFile(path) }
                 ?.asImageBitmap()
         }
     }
