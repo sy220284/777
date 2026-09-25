@@ -46,6 +46,23 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun ordinaryTurnCapsNaturalRespondersToAvoidEveryoneTalkingAtOnce() {
+        val extra = LocalGroupChatMember(
+            galleryId = "extra",
+            personaId = "extra",
+            displayName = "黎深",
+            chatState = ChatCharacterState(),
+        )
+        val responders = groupChatResponders(
+            input = "大家随便聊聊",
+            members = listOf(ayaka, kafka, zhao, extra),
+        )
+
+        assertEquals(MAX_GROUP_CHAT_RESPONDERS_PER_TURN, responders.size)
+        assertEquals(listOf("ayaka", "kafka", "zhao"), responders.map { it.galleryId })
+    }
+
+    @Test
     fun transcriptLineKeepsSpeakerVisibleToTheNextAgent() {
         val message = LocalHarnessMessage(
             id = "a1",
