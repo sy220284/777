@@ -972,5 +972,6 @@
     <string name="local_persona_picker_saved">Saved characters</string>
     <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
     <string name="local_persona_picker_saved_hint">Saved character</string>
+    <string name="local_persona_picker_switch_requires_new_chat">This chat already has dialogue. Start a new chat before switching or creating a character so storylines do not mix.</string>
 
 </resources>
