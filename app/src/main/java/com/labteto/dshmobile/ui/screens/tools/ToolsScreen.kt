@@ -44,6 +44,7 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
@@ -155,6 +156,7 @@ class ToolsViewModel @Inject constructor(
 @Composable
 fun ToolsScreen(
     onClose: () -> Unit,
+    onOpenTasks: () -> Unit = {},
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -177,59 +179,59 @@ fun ToolsScreen(
                 .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                DsIconButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.common_back),
-                    onClick = onClose,
-                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                    shadowElevation = 3.dp,
-                )
-                Column(Modifier.weight(1f).padding(horizontal = DsSpacing.medium)) {
-                    Text(stringResource(R.string.tools_title), style = DsType.large20, color = colors.labelPrimary)
-                    Text(stringResource(R.string.tools_subtitle), style = DsType.caption11, color = colors.labelTertiary)
-                }
-                DsIconButton(
-                    icon = Icons.Outlined.Refresh,
-                    contentDescription = stringResource(R.string.tools_refresh),
-                    onClick = viewModel::refresh,
-                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                )
-            }
+            DsTopBar(
+                title = stringResource(R.string.tools_title),
+                subtitle = stringResource(R.string.tools_subtitle),
+                onBack = onClose,
+                backContentDescription = stringResource(R.string.common_back),
+                actionIcon = Icons.Outlined.Refresh,
+                actionContentDescription = stringResource(R.string.tools_refresh),
+                onAction = viewModel::refresh,
+            )
 
-            Text(stringResource(R.string.tools_capability_group), style = DsType.std14, color = colors.labelTertiary)
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Text(stringResource(R.string.tools_capability_group), style = DsType.std14, color = colors.labelTertiary)
+                Text(stringResource(R.string.tools_capability_group_hint), style = DsType.caption11, color = colors.labelTertiary)
+            }
             DsGroupCard {
                 DsCategoryRow(
                     icon = Icons.Outlined.Extension,
                     title = stringResource(R.string.skills_title),
+                    subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("local-builtin" in state.localPlugins),
                 )
                 DsCategoryRow(
                     icon = FeatherIcons.Terminal,
                     title = stringResource(R.string.tools_capability_terminal),
+                    subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("android-runtime" in state.localPlugins),
                 )
                 DsCategoryRow(
                     icon = FeatherIcons.Code,
                     title = stringResource(R.string.tools_capability_code),
+                    subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("local-language-server" in state.localPlugins),
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.PhoneAndroid,
                     title = stringResource(R.string.tools_capability_device),
+                    subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("android-device" in state.localPlugins),
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Image,
                     title = stringResource(R.string.tools_capability_vision),
+                    subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("local-vision" in state.localPlugins),
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Schedule,
                     title = stringResource(R.string.tools_capability_automation),
+                    subtitle = stringResource(R.string.tools_capability_automation_hint),
                     value = capabilityStateLabel(
                         "android-automation" in state.localPlugins || "android-webhook" in state.localPlugins,
                     ),
+                    onClick = onOpenTasks,
                 )
             }
 
