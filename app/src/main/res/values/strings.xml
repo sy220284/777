@@ -872,6 +872,10 @@
     <string name="persona_gallery_preset_added">Already in gallery</string>
     <string name="persona_gallery_preset_installed">Character preset added to gallery</string>
     <string name="persona_gallery_preset_install_failed">Could not add character preset</string>
+    <string name="persona_gallery_preset_long_press_delete_hint">Long-press a preset to remove it</string>
+    <string name="persona_gallery_preset_delete_title">Remove character preset</string>
+    <string name="persona_gallery_preset_delete_confirm">Remove the “%1$s” preset?</string>
+    <string name="persona_gallery_preset_delete_hint">This hides the preset from this device. Characters already added to your gallery are not affected.</string>
     <string name="persona_gallery_sync_current">Sync current character · %1$s</string>
     <string name="persona_gallery_update_current">Update current character · %1$s</string>
     <string name="persona_gallery_merged_notice">Character details merged into the same master card</string>

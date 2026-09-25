@@ -870,6 +870,10 @@
     <string name="persona_gallery_preset_added">已在人物图谱</string>
     <string name="persona_gallery_preset_installed">人物预置已加入图谱</string>
     <string name="persona_gallery_preset_install_failed">人物预置加入失败</string>
+    <string name="persona_gallery_preset_long_press_delete_hint">长按作品预置可删除</string>
+    <string name="persona_gallery_preset_delete_title">删除作品预置</string>
+    <string name="persona_gallery_preset_delete_confirm">确定删除“%1$s”作品预置？</string>
+    <string name="persona_gallery_preset_delete_hint">删除后将从当前设备的作品预置列表隐藏，不影响已经加入人物图谱的角色。</string>
     <string name="persona_gallery_sync_current">同步当前人物 · %1$s</string>
     <string name="persona_gallery_update_current">更新当前人物 · %1$s</string>
     <string name="persona_gallery_merged_notice">人物资料已合并到同一张主卡</string>
