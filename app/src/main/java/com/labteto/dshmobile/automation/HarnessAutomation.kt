@@ -20,8 +20,8 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.local.LocalAutomationWorkException
 import com.labteto.dshmobile.local.LocalHarnessBlockedException
-import com.labteto.dshmobile.local.LocalHarnessBusyException
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -271,14 +271,6 @@ class HarnessAutomationWorker(
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (busy: LocalHarnessBusyException) {
-            store.update(id) {
-                it.copy(
-                    status = "queued",
-                    lastError = "前台或其他后台任务正在运行，等待重试",
-                )
-            }
-            Result.retry()
         } catch (blocked: LocalHarnessBlockedException) {
             val sessionId = blocked.sessionId ?: task.workSessionId
             store.update(id) {
@@ -293,6 +285,24 @@ class HarnessAutomationWorker(
                 task = task,
                 titleRes = R.string.tasks_notification_blocked,
                 sessionId = sessionId,
+            )
+            Result.success()
+        } catch (error: LocalAutomationWorkException) {
+            store.update(id) {
+                it.copy(
+                    workSessionId = error.sessionId,
+                    status = if (it.recurringMinutes == null) "failed" else "scheduled",
+                    nextRunAt = it.recurringMinutes?.let { minutes ->
+                        System.currentTimeMillis() + minutes * 60_000L
+                    } ?: it.nextRunAt,
+                    lastError = (error.message ?: "后台任务失败").take(4_000),
+                )
+            }
+            maybeNotify(
+                entry = entry,
+                task = task,
+                titleRes = R.string.tasks_notification_failed,
+                sessionId = error.sessionId,
             )
             Result.success()
         } catch (error: Throwable) {
