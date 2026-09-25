@@ -167,7 +167,7 @@ class ChatInteractionPlanner @Inject constructor(
         val significance = normalizeSignificance(decoded.turnSignificance)
         if (significance == "NONE") {
             return ChatPostTurnPlan(
-                state = previous.copy(updatedAt = System.currentTimeMillis()),
+                state = previous,
                 suggestions = emptyList(),
                 turnSignificance = significance,
             )
