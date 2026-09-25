@@ -374,6 +374,8 @@ fun LocalHarnessScreen(
             onDelete = viewModel::deleteGalleryEntry,
             onDeleteStory = viewModel::deleteGalleryStory,
             onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
+            onExport = viewModel::exportGalleryPersona,
+            onImport = viewModel::importGalleryPersona,
             onStart = { id, storyId, freshStory ->
                 if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
             },
