@@ -131,6 +131,10 @@ internal fun PersonaGalleryDialog(
     val appendFailedText = stringResource(R.string.persona_gallery_append_failed)
     val updateFailedText = stringResource(R.string.persona_gallery_update_failed)
     val deleteFailedText = stringResource(R.string.persona_gallery_delete_failed)
+    val mergedNoticeText = stringResource(R.string.persona_gallery_merged_notice)
+    val appendDoneText = stringResource(R.string.persona_gallery_append_done)
+    val storySavedText = stringResource(R.string.persona_gallery_story_saved)
+    val mergeDoneText = stringResource(R.string.persona_gallery_merge_done)
 
     DsDialog(title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name, onDismiss = onDismiss) {
         if (selected == null) {
@@ -144,7 +148,7 @@ internal fun PersonaGalleryDialog(
                         onSaveCurrent("", currentGalleryId)
                             .onSuccess {
                                 selectedId = it.id
-                                notice = stringResource(R.string.persona_gallery_merged_notice)
+                                notice = mergedNoticeText
                             }
                             .onFailure { error = it.message ?: saveFailedText }
                         busy = false
@@ -196,14 +200,18 @@ internal fun PersonaGalleryDialog(
                 }
             }
         } else {
+            val dialogueSummary = stringResource(R.string.persona_gallery_dialogue_count, selected.history.size)
+            val relationSummary = if (selected.chatState.dynamics.sharedMoments.isNotEmpty()) {
+                dialogueSummary + " · " + stringResource(
+                    R.string.persona_gallery_moment_count,
+                    selected.chatState.dynamics.sharedMoments.size,
+                )
+            } else {
+                dialogueSummary
+            }
             PersonaHero(
                 persona = selected.persona,
-                subtitle = buildString {
-                    append(stringResource(R.string.persona_gallery_dialogue_count, selected.history.size))
-                    if (selected.chatState.dynamics.sharedMoments.isNotEmpty()) {
-                        append(" · ").append(stringResource(R.string.persona_gallery_moment_count, selected.chatState.dynamics.sharedMoments.size))
-                    }
-                },
+                subtitle = relationSummary,
             )
             notice?.let {
                 Surface(
@@ -288,7 +296,7 @@ internal fun PersonaGalleryDialog(
                                     .onSuccess {
                                         inspection = null
                                         selectedSuggestionKeys.clear()
-                                        notice = stringResource(R.string.persona_gallery_append_done)
+                                        notice = appendDoneText
                                     }
                                     .onFailure { error = it.message ?: appendFailedText }
                                 busy = false
@@ -354,7 +362,7 @@ internal fun PersonaGalleryDialog(
                         busy = true
                         scope.launch {
                             onEditNotes(selected.id, notes)
-                                .onSuccess { notice = stringResource(R.string.persona_gallery_story_saved) }
+                                .onSuccess { notice = storySavedText }
                                 .onFailure { error = it.message ?: saveFailedText }
                             busy = false
                         }
@@ -372,7 +380,7 @@ internal fun PersonaGalleryDialog(
                         error = null
                         scope.launch {
                             onSaveCurrent(notes, selected.id)
-                                .onSuccess { notice = stringResource(R.string.persona_gallery_merge_done) }
+                                .onSuccess { notice = mergeDoneText }
                                 .onFailure { error = it.message ?: updateFailedText }
                             busy = false
                         }
@@ -495,6 +503,12 @@ private fun GalleryOverviewHeader(count: Int) {
 
 @Composable
 private fun GalleryPersonaCard(entry: PersonaGalleryEntry, onClick: () -> Unit) {
+    val waitingText = stringResource(R.string.persona_gallery_waiting)
+    val subtitle = when {
+        entry.persona.identity.isNotBlank() -> entry.persona.identity
+        entry.persona.personality.isNotBlank() -> entry.persona.personality
+        else -> waitingText
+    }
     DsCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(entry.persona.name)
@@ -509,7 +523,7 @@ private fun GalleryPersonaCard(entry: PersonaGalleryEntry, onClick: () -> Unit) 
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    entry.persona.identity.ifBlank { entry.persona.personality.ifBlank { stringResource(R.string.persona_gallery_waiting) } },
+                    subtitle,
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                     maxLines = 2,
@@ -560,6 +574,8 @@ private fun PersonaHero(persona: PersonaProfile, subtitle: String) {
 @Composable
 private fun PersonaAvatar(name: String, large: Boolean = false) {
     val size = if (large) 56.dp else 44.dp
+    val fallback = stringResource(R.string.persona_gallery_avatar_fallback)
+    val initial = name.trim().firstOrNull()?.toString().orEmpty().ifBlank { fallback }
     Surface(
         shape = CircleShape,
         color = DsTheme.colors.accent.copy(alpha = 0.13f),
@@ -567,7 +583,7 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                name.trim().firstOrNull()?.toString().orEmpty().ifBlank { stringResource(R.string.persona_gallery_avatar_fallback) },
+                initial,
                 style = if (large) DsType.large20 else DsType.std14,
                 color = DsTheme.colors.accent,
                 fontWeight = FontWeight.SemiBold,
