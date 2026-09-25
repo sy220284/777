@@ -1562,6 +1562,8 @@ private fun LocalChat(
             entries = gallery,
             currentPersona = state.chatPersona,
             currentGalleryId = state.galleryId,
+            canSwitchPersona = !state.running &&
+                state.messages.none { it.role == "user" || it.role == "assistant" },
             onSelect = onSelectGalleryPersona,
             onCreate = {
                 showPersonaPicker = false
