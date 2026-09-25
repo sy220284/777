@@ -92,6 +92,10 @@ internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
         persona.speechStyle.isNotBlank() ||
         persona.relationship.isNotBlank() ||
         persona.worldSetting.isNotBlank() ||
+        persona.coreMotivations.isNotEmpty() ||
+        persona.behaviorPatterns.isNotEmpty() ||
+        persona.knowledgeBoundary.isNotEmpty() ||
+        persona.loreEntries.isNotEmpty() ||
         persona.hardConstraints.isNotEmpty() ||
         persona.corrections.isNotEmpty()
 }
@@ -125,6 +129,15 @@ internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile
         speechStyle = mergePersonaText(base.speechStyle, incoming.speechStyle, 2_000),
         relationship = mergePersonaText(base.relationship, incoming.relationship, 2_000),
         worldSetting = mergePersonaText(base.worldSetting, incoming.worldSetting, 4_000),
+        franchise = mergePersonaText(base.franchise, incoming.franchise, 120),
+        timelinePosition = mergePersonaText(base.timelinePosition, incoming.timelinePosition, 2_000),
+        coreMotivations = mergePersonaLines(base.coreMotivations, incoming.coreMotivations, 12),
+        valuePriorities = mergePersonaLines(base.valuePriorities, incoming.valuePriorities, 12),
+        behaviorPatterns = mergePersonaLines(base.behaviorPatterns, incoming.behaviorPatterns, 20),
+        internalContradictions = mergePersonaLines(base.internalContradictions, incoming.internalContradictions, 12),
+        knowledgeBoundary = mergePersonaLines(base.knowledgeBoundary, incoming.knowledgeBoundary, 20),
+        loreEntries = mergeLoreEntries(base.loreEntries, incoming.loreEntries, 80),
+        presetId = base.presetId.ifBlank { incoming.presetId }.take(120),
         hardConstraints = mergePersonaLines(base.hardConstraints, incoming.hardConstraints, 20),
         exampleDialogues = mergePersonaLines(base.exampleDialogues, incoming.exampleDialogues, 12),
         bannedPhrases = mergePersonaLines(base.bannedPhrases, incoming.bannedPhrases, 30),
@@ -148,6 +161,13 @@ internal fun applyPersonaSuggestions(
             "speechStyle" -> result.copy(speechStyle = mergePersonaText(result.speechStyle, value, 2_000))
             "relationship" -> result.copy(relationship = mergePersonaText(result.relationship, value, 2_000))
             "worldSetting" -> result.copy(worldSetting = mergePersonaText(result.worldSetting, value, 4_000))
+            "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
+            "timelinePosition" -> result.copy(timelinePosition = mergePersonaText(result.timelinePosition, value, 2_000))
+            "coreMotivations" -> result.copy(coreMotivations = mergePersonaLines(result.coreMotivations, listOf(value), 12))
+            "valuePriorities" -> result.copy(valuePriorities = mergePersonaLines(result.valuePriorities, listOf(value), 12))
+            "behaviorPatterns" -> result.copy(behaviorPatterns = mergePersonaLines(result.behaviorPatterns, listOf(value), 20))
+            "internalContradictions" -> result.copy(internalContradictions = mergePersonaLines(result.internalContradictions, listOf(value), 12))
+            "knowledgeBoundary" -> result.copy(knowledgeBoundary = mergePersonaLines(result.knowledgeBoundary, listOf(value), 20))
             "hardConstraints" -> result.copy(hardConstraints = mergePersonaLines(result.hardConstraints, listOf(value), 20))
             "exampleDialogues" -> result.copy(exampleDialogues = mergePersonaLines(result.exampleDialogues, listOf(value), 12))
             "bannedPhrases" -> result.copy(bannedPhrases = mergePersonaLines(result.bannedPhrases, listOf(value), 30))
@@ -318,6 +338,21 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.speechStyle,
     persona.relationship,
     persona.worldSetting,
+    persona.franchise,
+    persona.timelinePosition,
+    persona.coreMotivations.joinToString("\u0000"),
+    persona.valuePriorities.joinToString("\u0000"),
+    persona.behaviorPatterns.joinToString("\u0000"),
+    persona.internalContradictions.joinToString("\u0000"),
+    persona.knowledgeBoundary.joinToString("\u0000"),
+    persona.loreEntries.joinToString("\u0000") { entry ->
+        listOf(
+            entry.id, entry.title, entry.content,
+            entry.keywords.joinToString("|"), entry.secondaryKeywords.joinToString("|"),
+            entry.priority.toString(), entry.alwaysOn.toString(), entry.spoilerLevel.toString(),
+        ).joinToString("~")
+    },
+    persona.presetId,
     persona.hardConstraints.joinToString("\u0000"),
     persona.exampleDialogues.joinToString("\u0000"),
     persona.bannedPhrases.joinToString("\u0000"),
@@ -402,6 +437,33 @@ private fun mergePersonaText(base: String, incoming: String, limit: Int): String
     val additions = splitPersonaClauses(fresh).filter { known.add(normalizePersonaText(it)) }
     if (additions.isEmpty()) return current.take(limit)
     return (existingClauses + additions).joinToString("；").take(limit)
+}
+
+private fun mergeLoreEntries(
+    base: List<PersonaLoreEntry>,
+    incoming: List<PersonaLoreEntry>,
+    limit: Int,
+): List<PersonaLoreEntry> {
+    val merged = linkedMapOf<String, PersonaLoreEntry>()
+    (base + incoming).forEach { entry ->
+        val key = normalizePersonaText(entry.id.ifBlank { entry.title.ifBlank { entry.content.take(80) } })
+        if (key.isBlank() || entry.content.isBlank()) return@forEach
+        val existing = merged[key]
+        merged[key] = if (existing == null) {
+            entry
+        } else {
+            existing.copy(
+                title = mergePersonaText(existing.title, entry.title, 120),
+                content = mergePersonaText(existing.content, entry.content, 4_000),
+                keywords = mergePersonaLines(existing.keywords, entry.keywords, 16),
+                secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
+                priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
+                alwaysOn = existing.alwaysOn || entry.alwaysOn,
+                spoilerLevel = minOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
+            )
+        }
+    }
+    return merged.values.takeLast(limit)
 }
 
 private fun mergePersonaLines(base: List<String>, incoming: List<String>, limit: Int): List<String> {
@@ -664,6 +726,15 @@ class ChatPersonaGalleryStore internal constructor(
         speechStyle = profile.speechStyle.trim().take(2_000),
         relationship = profile.relationship.trim().take(2_000),
         worldSetting = profile.worldSetting.trim().take(4_000),
+        franchise = profile.franchise.trim().take(120),
+        timelinePosition = profile.timelinePosition.trim().take(2_000),
+        coreMotivations = shareLines(profile.coreMotivations, 12, 240),
+        valuePriorities = shareLines(profile.valuePriorities, 12, 240),
+        behaviorPatterns = shareLines(profile.behaviorPatterns, 20, 240),
+        internalContradictions = shareLines(profile.internalContradictions, 12, 240),
+        knowledgeBoundary = shareLines(profile.knowledgeBoundary, 20, 240),
+        loreEntries = shareLoreEntries(profile.loreEntries, 80),
+        presetId = profile.presetId.trim().take(120),
         hardConstraints = shareLines(profile.hardConstraints, 20, 240),
         exampleDialogues = shareLines(profile.exampleDialogues, 12, 240),
         bannedPhrases = shareLines(profile.bannedPhrases, 30, 240),
@@ -681,6 +752,15 @@ class ChatPersonaGalleryStore internal constructor(
         speechStyle = profile.speechStyle.trim().take(160),
         relationship = profile.relationship.trim().take(120),
         worldSetting = profile.worldSetting.trim().take(180),
+        franchise = profile.franchise.trim().take(60),
+        timelinePosition = profile.timelinePosition.trim().take(100),
+        coreMotivations = shareLines(profile.coreMotivations, 2, 60),
+        valuePriorities = shareLines(profile.valuePriorities, 2, 60),
+        behaviorPatterns = shareLines(profile.behaviorPatterns, 2, 60),
+        internalContradictions = shareLines(profile.internalContradictions, 1, 60),
+        knowledgeBoundary = shareLines(profile.knowledgeBoundary, 2, 60),
+        loreEntries = emptyList(),
+        presetId = profile.presetId.trim().take(80),
         hardConstraints = shareLines(profile.hardConstraints, 4, 60),
         exampleDialogues = shareLines(profile.exampleDialogues, 2, 80),
         bannedPhrases = shareLines(profile.bannedPhrases, 6, 30),
@@ -688,6 +768,23 @@ class ChatPersonaGalleryStore internal constructor(
         corrections = emptyList(),
         updatedAt = 0L,
     )
+
+    private fun shareLoreEntries(values: List<PersonaLoreEntry>, limit: Int): List<PersonaLoreEntry> =
+        values.asSequence()
+            .filter { it.content.isNotBlank() }
+            .map { entry ->
+                entry.copy(
+                    id = entry.id.trim().take(80),
+                    title = entry.title.trim().take(120),
+                    content = entry.content.trim().take(4_000),
+                    keywords = shareLines(entry.keywords, 16, 80),
+                    secondaryKeywords = shareLines(entry.secondaryKeywords, 16, 80),
+                    priority = entry.priority.coerceIn(0, 100),
+                    spoilerLevel = entry.spoilerLevel.coerceIn(0, 3),
+                )
+            }
+            .take(limit)
+            .toList()
 
     private fun shareLines(values: List<String>, limit: Int, maxChars: Int): List<String> =
         values.asSequence()
