@@ -943,7 +943,16 @@ class LocalHarnessEngine @Inject constructor(
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
         scope.launch {
             val members = selected.map { entry ->
-                val saved = chatPersonaStore.upsert(entry.persona.copy(id = entry.id))
+                val existingPersona = chatPersonaStore.get(entry.id)
+                val saved = chatPersonaStore.upsert(
+                    entry.persona.copy(
+                        id = entry.id,
+                        corrections = (entry.persona.corrections + existingPersona.corrections)
+                            .map(String::trim)
+                            .filter(String::isNotBlank)
+                            .distinct(),
+                    ),
+                )
                 val previous = snapshot.groupChat.members.firstOrNull { it.galleryId == entry.id }
                 LocalGroupChatMember(
                     galleryId = entry.id,
