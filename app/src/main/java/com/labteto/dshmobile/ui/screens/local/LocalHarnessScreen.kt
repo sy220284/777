@@ -198,11 +198,17 @@ fun LocalHarnessScreen(
     }
 
     fun switchUsageMode(target: LocalUsageMode) {
-        if (target == state.usageMode) return
-        val key = "shown_" + target.name.lowercase()
-        if (!modeIntroPreferences.getBoolean(key, false)) {
-            modeIntroPreferences.edit().putBoolean(key, true).apply()
-            modeIntro = target
+        val returningFromGroupToSingle =
+            target == LocalUsageMode.CHAT &&
+                state.usageMode == LocalUsageMode.CHAT &&
+                state.groupChat.enabled
+        if (target == state.usageMode && !returningFromGroupToSingle) return
+        if (target != state.usageMode) {
+            val key = "shown_" + target.name.lowercase()
+            if (!modeIntroPreferences.getBoolean(key, false)) {
+                modeIntroPreferences.edit().putBoolean(key, true).apply()
+                modeIntro = target
+            }
         }
         viewModel.switchUsageMode(target)
     }
