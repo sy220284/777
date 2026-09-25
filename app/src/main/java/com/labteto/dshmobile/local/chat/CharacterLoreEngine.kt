@@ -55,8 +55,7 @@ class CharacterLoreEngine @Inject constructor() {
         val active = activated(persona, query, maxSpoilerLevel)
         if (active.isEmpty()) return ""
         return buildString {
-            appendLine("【本轮相关世界信息】")
-            appendLine("只把下面内容当作角色已知的背景资料；没有激活的条目不要自行补成已知事实。")
+            appendLine("【相关世界信息】仅作角色已知背景；未激活内容不补写。")
             active.forEach { entry ->
                 if (entry.title.isNotBlank()) appendLine("【${entry.title}】")
                 appendLine(entry.content)
