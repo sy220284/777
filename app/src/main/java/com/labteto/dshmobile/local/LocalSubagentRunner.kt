@@ -55,8 +55,8 @@ internal class LocalSubagentRunner(
     private val historySnapshot: () -> List<JsonObject>,
     private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
-    private val schemas: (Boolean, Boolean) -> JsonArray,
-    private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
+    private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
+    private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
     private val pruneToolResult: (String) -> String,
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -144,6 +144,9 @@ internal class LocalSubagentRunner(
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
+        // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
+        // runtime capability must never make that capability appear in its parent or sibling run.
+        val enabledOptionalTools = linkedSetOf<String>()
 
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
@@ -225,7 +228,7 @@ internal class LocalSubagentRunner(
                             baseUrl = snapshot.baseUrl,
                             model = routeModel,
                             history = preparedHistory,
-                            tools = schemas(allowMutation, virtualScreenId != null),
+                            tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                             subagentId = subagentId,
                             step = modelStep,
                         ).also {
@@ -259,7 +262,7 @@ internal class LocalSubagentRunner(
                                     snapshot.baseUrl,
                                     routeModel,
                                 ),
-                                tools = schemas(allowMutation, virtualScreenId != null),
+                                tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                                 subagentId = subagentId,
                                 step = modelStep,
                             )
@@ -306,7 +309,7 @@ internal class LocalSubagentRunner(
                                 errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
-                        else -> execute(call.toLocalToolCall(), allowMutation)
+                        else -> execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                     }
                 },
                 eventSink = AgentEventSink { event ->
@@ -343,14 +346,18 @@ internal class LocalSubagentRunner(
                             ).modelVisibleContent()
                             rememberSubagentProgress(
                                 progress,
-                                "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
+                                "第 ${event.step} 步 · ${event.call.name}：" +
+                                    truncateWithoutSplittingSurrogatePair(event.output, 1_500),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
-                                put("content", event.output.take(SUBAGENT_EVENT_CHARS))
+                                put(
+                                    "content",
+                                    truncateWithoutSplittingSurrogatePair(event.output, SUBAGENT_EVENT_CHARS),
+                                )
                                 put("model_content", modelOutput)
                                 put("is_error", event.isError)
                                 event.errorCode?.let { put("error_code", it) }
@@ -512,6 +519,8 @@ internal class LocalSubagentRunner(
             put("agent_id", subagentId)
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
         })
     }
 

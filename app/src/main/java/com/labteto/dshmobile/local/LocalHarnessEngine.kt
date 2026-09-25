@@ -374,6 +374,7 @@ class LocalHarnessEngine @Inject constructor(
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     @Volatile private var modelHistoryChars = 0
+    @Volatile private var modelHistoryEstimatedTokens = 0
     private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = MutableStateFlow(
         LocalHarnessState(
@@ -430,8 +431,8 @@ class LocalHarnessEngine @Inject constructor(
     private fun newSubagentRunner(
         eventLogProvider: () -> LocalSessionEventLog,
         contextSnapshotProvider: (String) -> String,
-        schemasProvider: (Boolean, Boolean) -> JsonArray,
-        executeTool: suspend (LocalToolCall, Boolean) -> AgentToolResult,
+        schemasProvider: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
+        executeTool: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
         runnerState: StateFlow<LocalHarnessState> = state,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
@@ -465,7 +466,15 @@ class LocalHarnessEngine @Inject constructor(
         resourceScheduler = resourceScheduler,
         acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
-        historyBudget = ::currentHistoryBudget,
+        historyBudget = {
+            val runnerSnapshot = runnerState.value
+            localHistoryBudgetFor(
+                memoryClassMb = memoryClassMb,
+                pressure = resourceScheduler.snapshot().pressure,
+                usageMode = runnerSnapshot.usageMode,
+                model = runnerSnapshot.model,
+            )
+        },
     )
 
     private val subagents by lazy {
@@ -483,8 +492,19 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             },
-            schemasProvider = ::subagentToolSchemas,
-            executeTool = ::executeSafely,
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabledOptional)
+            },
+            executeTool = { call, allowMutation, enabledOptional ->
+                val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+                if (canonical.name == "capability_search") {
+                    AgentToolResult(
+                        searchCapabilities(canonical.arguments.string("query"), enabledOptional),
+                    )
+                } else {
+                    executeSafely(canonical, allowMutation)
+                }
+            },
         )
     }
 
@@ -493,7 +513,6 @@ class LocalHarnessEngine @Inject constructor(
         boundState: LocalHarnessState,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
-        val localEnabledOptionalTools = linkedSetOf<String>()
         val boundMemoryTools = LocalMemoryTools(
             memoryStore,
             memoryManager,
@@ -513,19 +532,16 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             },
-            schemasProvider = { allowMutation, allowVirtualScreen ->
-                val enabled = synchronized(localEnabledOptionalTools) {
-                    localEnabledOptionalTools.toSet()
-                }
-                subagentToolSchemas(allowMutation, allowVirtualScreen, enabled)
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabledOptional.toSet())
             },
-            executeTool = { call, allowMutation ->
+            executeTool = { call, allowMutation, enabledOptional ->
                 executePersistentSubagentTool(
                     call = call,
                     allowMutation = allowMutation,
                     sessionId = sessionId,
                     memoryTools = boundMemoryTools,
-                    enabledOptionalTools = localEnabledOptionalTools,
+                    enabledOptionalTools = enabledOptional,
                 )
             },
             runnerState = MutableStateFlow(boundState),
@@ -546,7 +562,6 @@ class LocalHarnessEngine @Inject constructor(
         onApprovalBlocked: (String) -> Unit,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
-        val localEnabledOptionalTools = linkedSetOf<String>()
         val boundMemoryTools = LocalMemoryTools(
             memoryStore,
             memoryManager,
@@ -566,19 +581,16 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             },
-            schemasProvider = { allowMutation, allowVirtualScreen ->
-                val enabled = synchronized(localEnabledOptionalTools) {
-                    localEnabledOptionalTools.toSet()
-                }
-                subagentToolSchemas(allowMutation, allowVirtualScreen, enabled)
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabledOptional.toSet())
             },
-            executeTool = { call, allowMutation ->
+            executeTool = { call, allowMutation, enabledOptional ->
                 executeAutomationSubagentTool(
                     call = call,
                     allowMutation = allowMutation,
                     sessionId = sessionId,
                     memoryTools = boundMemoryTools,
-                    enabledOptionalTools = localEnabledOptionalTools,
+                    enabledOptionalTools = enabledOptional,
                     onApprovalBlocked = onApprovalBlocked,
                 )
             },
@@ -3747,7 +3759,6 @@ class LocalHarnessEngine @Inject constructor(
                 // assembled per request and are deliberately never written back into modelHistory.
                 if (!requestPrepared) {
                     ensureSystemMessage()
-                    compactHistoryIfNeeded()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
                         captureAutoMemoryDirective(memoryInput)
@@ -3778,6 +3789,13 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory()
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
+                val tools = modelToolSchemas()
+                // Re-check before every model step. Tool results and queued user messages can grow
+                // substantially inside one turn, so checking only at turn start is insufficient.
+                compactHistoryIfNeeded(
+                    extraTokens = estimateModelTokens(ephemeralContext) +
+                        estimateModelTokens(tools.toString()),
+                )
                 val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
                 val selectedMode = resolveLocalImageInputMode(
                     snapshot.imageInputMode,
@@ -3798,6 +3816,7 @@ class LocalHarnessEngine @Inject constructor(
                         snapshot = snapshot,
                         messages = requestMessages,
                         step = modelStep + 1,
+                        toolsOverride = tools,
                         publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
                     ).also {
                         if (nativeImagesSent) {
@@ -3829,6 +3848,7 @@ class LocalHarnessEngine @Inject constructor(
                                 budget = imageRequestBudget,
                             ),
                             step = modelStep + 1,
+                            toolsOverride = tools,
                             publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
                         )
                     } else {
@@ -3937,7 +3957,10 @@ class LocalHarnessEngine @Inject constructor(
                             put("step", event.step)
                             put("id", event.call.id)
                             put("name", event.call.name)
-                            put("content", event.output.take(MAX_EVENT_CHARS))
+                            put(
+                                "content",
+                                truncateWithoutSplittingSurrogatePair(event.output, MAX_EVENT_CHARS),
+                            )
                             put("model_content", modelOutput)
                             put("is_error", event.isError)
                             event.errorCode?.let { put("error_code", it) }
@@ -5233,8 +5256,15 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun currentHistoryBudget(): LocalHistoryBudget =
-        localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure)
+    private fun currentHistoryBudget(): LocalHistoryBudget {
+        val snapshot = _state.value
+        return localHistoryBudgetFor(
+            memoryClassMb = memoryClassMb,
+            pressure = resourceScheduler.snapshot().pressure,
+            usageMode = snapshot.usageMode,
+            model = snapshot.model,
+        )
+    }
 
     private fun updateContextMetrics() {
         val budget = currentHistoryBudget()
@@ -5247,15 +5277,18 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun encodedModelMessageChars(message: JsonObject): Int = message.toString().length
+    private fun encodedModelMessageTokens(message: JsonObject): Int = estimateModelTokens(message.toString())
 
     private fun appendModelHistory(message: JsonObject) {
         modelHistory += message
         modelHistoryChars += encodedModelMessageChars(message)
+        modelHistoryEstimatedTokens += encodedModelMessageTokens(message)
     }
 
     private fun prependModelHistory(message: JsonObject) {
         modelHistory.add(0, message)
         modelHistoryChars += encodedModelMessageChars(message)
+        modelHistoryEstimatedTokens += encodedModelMessageTokens(message)
     }
 
     private fun replaceSystemModelHistory(message: JsonObject) {
@@ -5263,31 +5296,36 @@ class LocalHarnessEngine @Inject constructor(
             "模型历史首条消息不是 system"
         }
         modelHistoryChars -= encodedModelMessageChars(modelHistory[0])
+        modelHistoryEstimatedTokens -= encodedModelMessageTokens(modelHistory[0])
         modelHistory[0] = message
         modelHistoryChars += encodedModelMessageChars(message)
+        modelHistoryEstimatedTokens += encodedModelMessageTokens(message)
     }
 
     private fun resetModelHistory(messages: List<JsonObject> = emptyList()) {
         modelHistory.clear()
         modelHistory += messages
         modelHistoryChars = messages.sumOf(::encodedModelMessageChars)
+        modelHistoryEstimatedTokens = messages.sumOf(::encodedModelMessageTokens)
     }
 
     private fun pruneToolResult(result: String): String {
-        val limit = currentHistoryBudget().maxToolResultChars
-        if (result.length <= limit) return result
-        val tailChars = minOf(TOOL_RESULT_TAIL_CHARS, limit / 4)
-        val tail = result.takeLast(tailChars)
-        return result.take((limit - tailChars).coerceAtLeast(1)) +
-            "\n…工具结果过长，中间内容已压缩…\n" + tail
+        val budget = currentHistoryBudget()
+        return retainTextForModel(
+            value = result,
+            maxTokens = budget.maxToolResultTokens,
+            maxChars = budget.maxToolResultChars,
+        ).text
     }
 
-    private fun compactHistoryIfNeeded() {
+    private fun compactHistoryIfNeeded(extraTokens: Int = 0) {
         val budget = currentHistoryBudget()
         val compaction = historyCompactor.compact(
             history = modelHistory,
             budget = budget,
             currentChars = modelHistoryChars,
+            currentTokens = modelHistoryEstimatedTokens,
+            extraTokens = extraTokens,
         ) ?: run {
             updateContextMetrics()
             return
@@ -5298,6 +5336,9 @@ class LocalHarnessEngine @Inject constructor(
             buildJsonObject {
                 put("omitted_messages", compaction.omittedMessages)
                 put("summary", compaction.summary)
+                put("estimated_tokens_before", compaction.estimatedTokensBefore)
+                put("estimated_tokens_after", compaction.estimatedTokensAfter)
+                put("extra_request_tokens", extraTokens)
             },
         )
         checkpointModelHistory("session/compaction")
@@ -5900,7 +5941,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS = 900
         const val MAX_PATCH_CHARS = 512_000
         const val MAX_TOOL_RESULT_CHARS = 50_000
-        const val TOOL_RESULT_TAIL_CHARS = 4_000
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
