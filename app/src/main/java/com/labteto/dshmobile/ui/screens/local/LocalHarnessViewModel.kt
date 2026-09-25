@@ -101,6 +101,31 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun currentGalleryHasUnsavedChanges(): Boolean = hasUnsavedCurrentPersona()
 
+    fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
+        val snapshot = state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+        ) return false
+        val entry = gallery.value.firstOrNull { it.id == id } ?: return false
+        engine.selectChatPersona(entry.persona, galleryId = entry.id)
+        return true
+    }
+
+    fun createPersonaForCurrentChat(profile: PersonaProfile): Boolean {
+        val snapshot = state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+        ) return false
+        engine.createChatPersona(profile)
+        return true
+    }
+
     suspend fun inspectGalleryPersona(
         id: String,
         storyId: String?,
