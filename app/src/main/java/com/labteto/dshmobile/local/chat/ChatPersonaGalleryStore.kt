@@ -153,6 +153,7 @@ internal fun compactDuplicateGalleryEntries(
             compacted[duplicateIndex] = mergeGalleryEntries(canonical, entry).copy(
                 id = canonical.id,
                 persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
+                sourceSessionId = canonical.sourceSessionId.ifBlank { entry.sourceSessionId },
                 updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
             )
         }
