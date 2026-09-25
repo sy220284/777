@@ -62,6 +62,7 @@ import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -702,6 +703,7 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { state ->
                 if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+                    galleryId = null,
                     chatPersona = saved,
                 )
             }
@@ -1151,7 +1153,11 @@ class LocalHarnessEngine @Inject constructor(
     fun createSession(mode: LocalConversationMode) =
         createSession(mode, _state.value.usageMode)
 
-    fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode) {
+    fun createSession(
+        mode: LocalConversationMode,
+        usageMode: LocalUsageMode,
+        galleryEntry: PersonaGalleryEntry? = null,
+    ) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
         val sourceState = _state.value
@@ -1187,12 +1193,23 @@ class LocalHarnessEngine @Inject constructor(
                         LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
-                    val handoff = if (mode == LocalConversationMode.CONTINUATION) {
-                        buildHandoffSummary(sourceState)
+                    val handoff = if (galleryEntry != null) {
+                        galleryEntry.storyContext()
+                    } else if (mode == LocalConversationMode.CONTINUATION) {
+                        if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
+                            listOfNotNull(
+                                sourceState.handoffSummary?.takeIf(String::isNotBlank),
+                                buildHandoffSummary(sourceState),
+                            ).joinToString("\n\n").takeLast(5_500)
+                        } else {
+                            buildHandoffSummary(sourceState)
+                        }
                     } else {
                         null
                     }
-                    val personaId = if (
+                    val personaId = if (galleryEntry != null) {
+                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}")).id
+                    } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         sourceState.usageMode == LocalUsageMode.CHAT
                     ) {
@@ -1217,6 +1234,9 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = currentSessionId,
                             usageMode = usageMode,
                             personaId = personaId,
+                            galleryId = galleryEntry?.id ?: sourceState.galleryId.takeIf {
+                                usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT
+                            },
                             chatPersona = chatPersona,
                             chatState = chatState,
                             replySuggestions = emptyList(),
@@ -1650,7 +1670,7 @@ class LocalHarnessEngine @Inject constructor(
             compactHistoryIfNeeded()
             val snapshot = _state.value
             captureAutoMemoryDirective(input)
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input)
+            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input, snapshot.handoffSummary)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
             val chatPrompt = listOf(chatContext.prompt, relationshipMemory)
                 .filter(String::isNotBlank)
@@ -1858,6 +1878,7 @@ class LocalHarnessEngine @Inject constructor(
                                 snapshot.personaId,
                                 snapshot.chatState,
                                 input,
+                                snapshot.handoffSummary,
                             ).prompt,
                             relationshipMemory,
                         ).filter(String::isNotBlank).joinToString("\n\n")
@@ -3539,6 +3560,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionId = sessionId,
             usageMode = stored.usageMode,
             personaId = stored.personaId,
+            galleryId = stored.galleryId,
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
@@ -3722,6 +3744,7 @@ class LocalHarnessEngine @Inject constructor(
             personaId = state.personaId,
             chatState = state.chatState,
             replySuggestions = state.replySuggestions,
+            galleryId = state.galleryId,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,

@@ -155,10 +155,12 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
+    var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -196,6 +198,11 @@ fun LocalHarnessScreen(
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
                     scope.launch { drawerState.close() }
+                },
+                galleryCount = gallery.size,
+                onOpenPersonaGallery = {
+                    scope.launch { drawerState.close() }
+                    showPersonaGallery = true
                 },
                 onTasks = {
                     scope.launch { drawerState.close() }
@@ -267,6 +274,23 @@ fun LocalHarnessScreen(
         )
     }
 
+    if (showPersonaGallery && state.usageMode == LocalUsageMode.CHAT) {
+        PersonaGalleryDialog(
+            entries = gallery,
+            currentPersona = state.chatPersona,
+            currentGalleryId = state.galleryId,
+            currentSessionId = state.sessionId,
+            canSave = !state.loading && !state.running,
+            onSaveCurrent = viewModel::saveCurrentToGallery,
+            onEditNotes = viewModel::editGalleryNotes,
+            onDelete = viewModel::deleteGalleryEntry,
+            onStart = { id ->
+                if (viewModel.startFromGallery(id)) showPersonaGallery = false
+            },
+            onDismiss = { showPersonaGallery = false },
+        )
+    }
+
 }
 
 @Composable
@@ -280,6 +304,8 @@ private fun LocalModeDrawer(
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    galleryCount: Int,
+    onOpenPersonaGallery: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
@@ -339,6 +365,16 @@ private fun LocalModeDrawer(
                 }
                 item(key = "drawer-sessions-title") {
                     DrawerSectionTitle("会话")
+                }
+                if (usageMode == LocalUsageMode.CHAT) {
+                    item(key = "drawer-persona-gallery") {
+                        DsCategoryRow(
+                            icon = Icons.Outlined.Image,
+                            title = "人设图集",
+                            subtitle = "保存角色和故事 · 已收录 $galleryCount 个",
+                            onClick = onOpenPersonaGallery,
+                        )
+                    }
                 }
                 if (visibleSessions.isNotEmpty() && filteredSessions.isEmpty()) {
                     item(key = "drawer-no-sessions") {
