@@ -21,6 +21,8 @@ internal class LocalToolOutputStore(
         root.mkdirs()
     }
 
+    private var knownGlobalBytes: Long? = null
+
     data class Stored(val bytes: Int)
 
     @Synchronized
@@ -30,6 +32,8 @@ internal class LocalToolOutputStore(
 
         val dir = sessionDir(sessionId).apply { mkdirs() }
         val target = File(dir, key(callId) + ".txt")
+        val previousBytes = target.takeIf(File::isFile)?.length() ?: 0L
+        val cachedBefore = knownGlobalBytes
         val temp = File(dir, "." + target.name + ".tmp")
         temp.writeBytes(bytes)
         if (!temp.renameTo(target)) {
@@ -37,8 +41,22 @@ internal class LocalToolOutputStore(
             temp.delete()
         }
         target.setLastModified(System.currentTimeMillis())
-        pruneSession(dir, target)
-        pruneGlobal(target)
+
+        val removedFromSession = pruneSession(dir, target)
+        var globalBytes = if (cachedBefore == null) {
+            measureGlobalBytes()
+        } else {
+            (
+                cachedBefore -
+                    previousBytes +
+                    (target.takeIf(File::isFile)?.length() ?: 0L) -
+                    removedFromSession
+            ).coerceAtLeast(0L)
+        }
+        if (globalBytes > maxGlobalBytes) {
+            globalBytes = pruneGlobal(target)
+        }
+        knownGlobalBytes = globalBytes
         return if (target.isFile) Stored(bytes.size) else null
     }
 
@@ -119,13 +137,17 @@ internal class LocalToolOutputStore(
 
     @Synchronized
     fun deleteSession(sessionId: String) {
-        sessionDir(sessionId).deleteRecursively()
+        val dir = sessionDir(sessionId)
+        val removedBytes = if (knownGlobalBytes != null) storedBytes(dir) else 0L
+        dir.deleteRecursively()
+        knownGlobalBytes = knownGlobalBytes?.let { (it - removedBytes).coerceAtLeast(0L) }
     }
 
     private fun sessionDir(sessionId: String): File = File(root, key(sessionId))
 
-    private fun pruneSession(dir: File, protectedFile: File) {
+    private fun pruneSession(dir: File, protectedFile: File): Long {
         var keptBytes = 0L
+        var removedBytes = 0L
         dir.listFiles()
             .orEmpty()
             .filter { it.isFile && !it.name.startsWith(".") }
@@ -134,16 +156,18 @@ internal class LocalToolOutputStore(
                     .thenByDescending(File::lastModified),
             )
             .forEachIndexed { index, file ->
-                val nextBytes = keptBytes + file.length()
+                val length = file.length()
+                val nextBytes = keptBytes + length
                 if (index >= maxFilesPerSession || nextBytes > maxSessionBytes) {
-                    file.delete()
+                    if (file.delete()) removedBytes += length
                 } else {
                     keptBytes = nextBytes
                 }
             }
+        return removedBytes
     }
 
-    private fun pruneGlobal(protectedFile: File) {
+    private fun pruneGlobal(protectedFile: File): Long {
         var keptBytes = 0L
         root.walkTopDown()
             .filter { it.isFile && !it.name.startsWith(".") }
@@ -152,7 +176,8 @@ internal class LocalToolOutputStore(
                     .thenByDescending(File::lastModified),
             )
             .forEach { file ->
-                val nextBytes = keptBytes + file.length()
+                val length = file.length()
+                val nextBytes = keptBytes + length
                 if (nextBytes > maxGlobalBytes) {
                     file.delete()
                 } else {
@@ -164,7 +189,15 @@ internal class LocalToolOutputStore(
             .filter(File::isDirectory)
             .filter { it.listFiles().isNullOrEmpty() }
             .forEach(File::delete)
+        return keptBytes
     }
+
+    private fun measureGlobalBytes(): Long = storedBytes(root)
+
+    private fun storedBytes(dir: File): Long =
+        dir.walkTopDown()
+            .filter { it.isFile && !it.name.startsWith(".") }
+            .sumOf(File::length)
 
     private fun key(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -176,7 +209,9 @@ internal class LocalToolOutputStore(
         const val DEFAULT_READ_BYTES = 24 * 1024
         const val MAX_READ_BYTES = 48 * 1024
         private const val MIN_READ_BYTES = 1_024
-        private const val MAX_OUTPUT_BYTES = 16 * 1024 * 1024
-        private const val MAX_FILES_PER_SESSION = 64
+        private const val DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+        private const val DEFAULT_MAX_FILES_PER_SESSION = 64
+        private const val DEFAULT_MAX_SESSION_BYTES = 64L * 1024L * 1024L
+        private const val DEFAULT_MAX_GLOBAL_BYTES = 256L * 1024L * 1024L
     }
 }
