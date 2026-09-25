@@ -711,6 +711,11 @@ class LocalHarnessEngine @Inject constructor(
                     personaId = saved.id,
                     galleryId = state.galleryId.takeIf { sameBoundCharacter },
                     galleryStoryId = state.galleryStoryId.takeIf { sameBoundCharacter },
+                    gallerySaveSuppressedThrough = if (sameBoundCharacter) {
+                        state.gallerySaveSuppressedThrough
+                    } else {
+                        state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis()
+                    },
                     chatPersona = saved,
                 )
             }
@@ -725,6 +730,7 @@ class LocalHarnessEngine @Inject constructor(
             if (state.sessionId != snapshot.sessionId) state else state.copy(
                 galleryId = galleryId,
                 galleryStoryId = galleryStoryId,
+                gallerySaveSuppressedThrough = 0L,
             )
         }
         if (_state.value.sessionId == snapshot.sessionId) persist()
@@ -742,6 +748,8 @@ class LocalHarnessEngine @Inject constructor(
             if (state.sessionId != snapshot.sessionId) state else state.copy(
                 galleryId = if (keepCharacter) state.galleryId else null,
                 galleryStoryId = null,
+                gallerySaveSuppressedThrough =
+                    state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis(),
             )
         }
         if (_state.value.sessionId == snapshot.sessionId) persist()
@@ -787,6 +795,8 @@ class LocalHarnessEngine @Inject constructor(
                     personaId = PersonaProfile.DEFAULT_PERSONA_ID,
                     galleryId = null,
                     galleryStoryId = null,
+                    gallerySaveSuppressedThrough =
+                        state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis(),
                     chatPersona = saved,
                 )
             }
@@ -1337,6 +1347,7 @@ class LocalHarnessEngine @Inject constructor(
                                     mode == LocalConversationMode.CONTINUATION -> sourceState.galleryStoryId
                                 else -> null
                             },
+                            gallerySaveSuppressedThrough = 0L,
                             chatPersona = chatPersona,
                             chatState = chatState,
                             replySuggestions = emptyList(),
@@ -3678,6 +3689,7 @@ class LocalHarnessEngine @Inject constructor(
             personaId = stored.personaId,
             galleryId = stored.galleryId,
             galleryStoryId = stored.galleryStoryId,
+            gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
@@ -3875,6 +3887,7 @@ class LocalHarnessEngine @Inject constructor(
             replySuggestions = state.replySuggestions,
             galleryId = state.galleryId,
             galleryStoryId = state.galleryStoryId,
+            gallerySaveSuppressedThrough = state.gallerySaveSuppressedThrough,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,
