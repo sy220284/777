@@ -31,11 +31,6 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
 
-    if (HARD_MINOR_CONTEXT_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
-    val hasSoftMinorContext = SOFT_MINOR_CONTEXT_HINTS.any { text.contains(it) }
-    val softMinorNegated = NEGATED_MINOR_CONTEXT_HINTS.any { text.contains(it) }
-    if (hasSoftMinorContext && !softMinorNegated) return ChatInteractionIntent.NORMAL
-
     if (STRATEGIST_INTENT_HINTS.any { text.contains(it) }) {
         return ChatInteractionIntent.STRATEGIST
     }
@@ -44,8 +39,11 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
     if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
 
+    val intimateRequested =
+        directIntimateAction || ADULT_INTIMACY_HINTS.any { text.contains(it) }
+
     return when {
-        directIntimateAction || ADULT_INTIMACY_HINTS.any { text.contains(it) } ->
+        intimateRequested && hasAdultConfirmation(text) ->
             ChatInteractionIntent.INTIMATE
         RELATIONSHIP_PROGRESS_HINTS.any { text.contains(it) } ->
             ChatInteractionIntent.RELATIONSHIP_PROGRESS
@@ -98,7 +96,7 @@ internal fun hasAdultIntimacyIntent(
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
 internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
-    "【统一安全边界】成年、自愿的亲密互动可以继续，但不得扩写露骨性行为过程或明确器官细节；该边界不由普通聊天优先级覆盖。"
+    "【统一安全边界】仅在参与者成年、自愿且内容处于允许范围时继续亲密互动；普通聊天优先级不能覆盖该边界。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -116,11 +114,17 @@ private val NON_INTERACTION_INTENT_HINTS = listOf(
     "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
     "小说", "剧情", "台词", "设定", "翻译",
 )
-private val HARD_MINOR_CONTEXT_HINTS = listOf("儿童", "小学生", "初中生", "高中生", "萝莉", "正太")
-private val SOFT_MINOR_CONTEXT_HINTS = listOf("未成年", "未满18", "未满十八")
-private val NEGATED_MINOR_CONTEXT_HINTS = listOf(
-    "不是未成年", "已经成年", "已成年", "都是成年人", "均为成年人", "双方都是成年人",
+private val ADULT_CONFIRMATION_HINTS = listOf(
+    "成年人", "已经成年", "已成年", "双方成年", "双方都是成年人", "都是成年人", "均为成年人",
 )
+private val AGE_VALUE = Regex("""(?<!\d)(\d{1,3})\s*岁""")
+
+private fun hasAdultConfirmation(text: String): Boolean {
+    if (ADULT_CONFIRMATION_HINTS.any { text.contains(it) }) return true
+    return AGE_VALUE.findAll(text)
+        .mapNotNull { match -> match.groupValues.getOrNull(1)?.toIntOrNull() }
+        .any { age -> age >= 18 }
+}
 private val CONTINUATION_HINTS = listOf(
     "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才",
 )
