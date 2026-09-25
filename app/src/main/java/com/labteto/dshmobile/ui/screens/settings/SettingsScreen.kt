@@ -108,6 +108,7 @@ private enum class SettingsPage {
     MODELS,
     PRICING,
     MEMORY,
+    CHAT,
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
@@ -159,6 +160,7 @@ fun SettingsScreen(
         SettingsPage.MODELS -> stringResource(R.string.settings_page_models)
         SettingsPage.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
+        SettingsPage.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
@@ -215,6 +217,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
                                 onClick = { page = SettingsPage.MEMORY },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_chat),
+                                subtitle = stringResource(R.string.settings_chat_subtitle),
+                                onClick = { page = SettingsPage.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
@@ -287,6 +295,44 @@ fun SettingsScreen(
                     SettingsPage.MEMORY -> {
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
                         MemoryManagementCard(memories, viewModel, toast.second)
+                    }
+
+                    SettingsPage.CHAT -> {
+                        SettingsCard(stringResource(R.string.settings_chat_style_guard), Icons.Outlined.Tune) {
+                            ToggleRow(
+                                stringResource(R.string.settings_chat_style_guard),
+                                localHarness.chatStyleGuardEnabled,
+                                stringResource(R.string.settings_chat_style_guard_hint),
+                            ) {
+                                viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
+                            }
+                            Text(
+                                stringResource(R.string.settings_chat_guard_hits_title),
+                                style = DsType.small13,
+                                color = colors.labelSecondary,
+                            )
+                            if (localHarness.styleGuardHits.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.settings_chat_guard_hits_empty),
+                                    style = DsType.caption11,
+                                    color = colors.labelTertiary,
+                                )
+                            } else {
+                                localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
+                                    Text(
+                                        "• " + hit,
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                    )
+                                }
+                                DsButton(
+                                    text = stringResource(R.string.settings_chat_guard_hits_clear),
+                                    onClick = viewModel::clearChatStyleGuardHits,
+                                    variant = DsButtonVariant.Ghost,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
                     }
 
                     SettingsPage.PERMISSIONS -> {
