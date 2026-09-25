@@ -57,6 +57,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
@@ -256,6 +257,11 @@ fun LocalHarnessScreen(
                     showRunCenter = true
                 },
                 galleryCount = gallery.size,
+                groupMemberCount = state.groupChat.members.size,
+                onOpenGroupChat = {
+                    scope.launch { drawerState.close() }
+                    if (!state.groupChat.enabled) viewModel.createGroupChatSession()
+                },
                 onOpenPersonaGallery = {
                     scope.launch { drawerState.close() }
                     if (viewModel.hasUnsavedCurrentPersona()) {
@@ -327,6 +333,7 @@ fun LocalHarnessScreen(
                 onNewSession = { showNewSessionMode = true },
                 onOpenRunCenter = { showRunCenter = true },
                 onConfigureChatPersona = viewModel::configureChatPersona,
+                onConfigureGroupMembers = viewModel::configureGroupChatMembers,
                 onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
                 onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
@@ -413,6 +420,8 @@ private fun LocalModeDrawer(
     onWorkspaceFiles: () -> Unit,
     onOpenRunCenter: () -> Unit,
     galleryCount: Int,
+    groupMemberCount: Int,
+    onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
@@ -516,8 +525,14 @@ private fun LocalModeDrawer(
 
                 if (usageMode == LocalUsageMode.CHAT) {
                     DrawerPrimaryAction(
+                        icon = Icons.Outlined.PersonSearch,
+                        title = stringResource(R.string.local_group_chat),
+                        trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
+                        onClick = onOpenGroupChat,
+                    )
+                    DrawerPrimaryAction(
                         icon = Icons.Outlined.Image,
-                        title = "人设图集",
+                        title = stringResource(R.string.persona_gallery_title),
                         trailing = galleryCount.toString(),
                         onClick = onOpenPersonaGallery,
                     )
@@ -1010,6 +1025,7 @@ private fun LocalChat(
     onNewSession: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
     onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
