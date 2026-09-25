@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /**
  * A grouped surface: rounded, filled, hairline-bordered.
@@ -35,7 +37,7 @@ fun DsCard(
             .fillMaxWidth()
             .shadow(1.dp, DsShapes.block, clip = false)
             .clip(DsShapes.block)
-            .background(colors.bgLayer1)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
             .border(1.dp, colors.borderL1, DsShapes.block)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),

@@ -9,8 +9,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Theme preference, mirroring the harness Appearance row (light|dark|system). */
-enum class ThemePreference { LIGHT, DARK, SYSTEM }
+/** Theme preference exposed by the app Appearance row. */
+enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
 
 /** Full DeepSeek Harness semantic palette for one scheme. */
 data class DsColors(
@@ -130,6 +130,49 @@ object DsThemeTokens {
         inlineCode = DsDark.inlineCode, citation = DsDark.citation,
         markdownTag = DsDark.markdownTag, overlayMask = DsDark.overlayMask,
     )
+    /**
+     * A warmer, low-glare dark palette for the optional matte-black appearance.
+     *
+     * It deliberately keeps the normal dark theme intact. Surfaces move to neutral charcoal while
+     * text uses warm off-white values, giving the UI a softer "matte black / matte white" contrast.
+     */
+    val matteBlack = dark.copy(
+        bgBase = Color(0xFF11110F),
+        bgLayer1 = Color(0xFF1B1B19),
+        bgLayer2 = Color(0xFF242421),
+        bgLayer3 = Color(0xFF2D2C29),
+        bgModulePlatform = Color(0xFF242421),
+        borderL1 = Color(0x0FF3F0E8),
+        borderL2 = Color(0x1FF3F0E8),
+        borderL3 = Color(0x29F3F0E8),
+        brandPrimary = Color(0xFFF3F0E8),
+        onBrandPrimary = Color(0xFF11110F),
+        onAccent = Color(0xFFF3F0E8),
+        labelPrimary = Color(0xFFF3F0E8),
+        labelSecondary = Color(0xFFD5D1C9),
+        labelTertiary = Color(0xFFAAA69E),
+        labelCaption = Color(0xFF7F7C75),
+        labelDimmed = Color(0xFF5B5954),
+        hoverSolid = Color(0xFF242421),
+        buttonPrimaryHover = Color(0xFFD5D1C9),
+        buttonPrimaryDimmed = Color(0xFF4B4944),
+        toastBg = Color(0xFF363431),
+        tooltipBg = Color(0xFF363431),
+        userBubble = Color(0xFF242421),
+        userBubbleHighlight = Color(0xFF363431),
+        composerCard = Color(0xFF242421),
+        sidebar = Color(0xFF181816),
+        sidebarNavActive = Color(0xFF363431),
+        sidebarNavAccent = Color(0xFF2D2C29),
+        sidebarNavHover = Color(0xFF242421),
+        tipSurface = Color(0xFF2D2C29),
+        codeBlockBg = Color(0xFF181816),
+        codeBlockBanner = Color(0xFF1B1B19),
+        inlineCode = Color(0xFF242421),
+        citation = Color(0xFF2D2C29),
+        markdownTag = Color(0xFF242421),
+    )
+
 }
 
 /** The full DeepSeek palette as a CompositionLocal. */
@@ -155,7 +198,7 @@ private fun materialLightScheme(c: DsColors) = lightColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = Color.White,
+    onError = c.onAccent,
 )
 
 private fun materialDarkScheme(c: DsColors) = darkColorScheme(
@@ -173,7 +216,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = Color.White,
+    onError = c.onAccent,
 )
 
 /**
@@ -187,12 +230,18 @@ fun DshTheme(
     backgroundAdaptiveContrast: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val systemDark = isSystemInDarkTheme()
     val dark = when (preference) {
         ThemePreference.LIGHT -> false
-        ThemePreference.DARK -> true
-        ThemePreference.SYSTEM -> isSystemInDarkTheme()
+        ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
+        ThemePreference.SYSTEM -> systemDark
     }
-    val ds = if (dark) DsThemeTokens.dark else DsThemeTokens.light
+    val ds = when (preference) {
+        ThemePreference.LIGHT -> DsThemeTokens.light
+        ThemePreference.DARK -> DsThemeTokens.dark
+        ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
+        ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
+    }
     val scheme = if (dark) materialDarkScheme(ds) else materialLightScheme(ds)
     CompositionLocalProvider(LocalDsColors provides ds) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and

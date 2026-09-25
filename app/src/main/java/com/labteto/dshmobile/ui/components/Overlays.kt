@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,6 +43,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
@@ -77,7 +78,7 @@ fun DsDialog(
                     .fillMaxWidth(0.92f)
                     .heightIn(max = maxHeight),
                 shape = DsShapes.dialog,
-                color = colors.bgLayer2,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL1),
                 shadowElevation = 8.dp,
             ) {
@@ -135,7 +136,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
             Text(
                 message,
                 style = DsType.small13,
-                color = Color.White,
+                color = DsTheme.colors.onAccent,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
         }
@@ -164,7 +165,7 @@ fun DsMenu(anchor: @Composable () -> Unit, items: List<MenuItem>) {
             expanded = expanded,
             onDismissRequest = { expanded = false },
             shape = DsShapes.menu,
-            containerColor = colors.bgLayer3,
+            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
             tonalElevation = 0.dp,
             border = BorderStroke(1.dp, colors.borderL1),
         ) {

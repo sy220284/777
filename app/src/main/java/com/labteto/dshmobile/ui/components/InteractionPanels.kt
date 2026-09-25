@@ -28,8 +28,11 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 // ---------------------------------------------------------------------------
 // Interaction takeovers: sandbox-approval and plan review. The ask_user_question
@@ -58,7 +61,7 @@ fun ApprovalPanel(
                 .fillMaxWidth()
                 .heightIn(max = cap),
             shape = DsShapes.approvalCard,
-            color = colors.composerCard,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.BOTTOM, colors.composerCard),
             border = BorderStroke(1.dp, colors.warnSecondary),
             shadowElevation = 2.dp,
         ) {
@@ -150,7 +153,7 @@ internal fun PlanReviewPanel(
                 .fillMaxWidth()
                 .heightIn(max = cap),
             shape = DsShapes.approvalCard,
-            color = colors.composerCard,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.BOTTOM, colors.composerCard),
             border = BorderStroke(1.dp, colors.warnSecondary),
             shadowElevation = 2.dp,
         ) {

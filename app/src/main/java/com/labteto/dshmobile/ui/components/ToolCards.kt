@@ -26,6 +26,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -436,7 +438,7 @@ private fun GenericBody(card: ToolCardView.GenericCard) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(DsShapes.row)
-                    .background(colors.bgLayer2)
+                    .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
                     .border(1.dp, colors.borderL1, DsShapes.row)
                     .padding(10.dp),
             )

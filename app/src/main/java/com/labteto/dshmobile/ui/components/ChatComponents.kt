@@ -25,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -143,14 +142,14 @@ fun ConnectionBanner(message: String) {
         Icon(
             Icons.Filled.Warning,
             contentDescription = null,
-            tint = Color.White,
+            tint = DsTheme.colors.onAccent,
             modifier = Modifier.size(16.dp),
         )
         Spacer(Modifier.width(8.dp))
         Text(
             message,
             style = DsType.small13,
-            color = Color.White,
+            color = DsTheme.colors.onAccent,
             modifier = Modifier.weight(1f),
         )
     }

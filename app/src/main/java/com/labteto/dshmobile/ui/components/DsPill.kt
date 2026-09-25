@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -66,7 +68,7 @@ fun DsPill(
     val background = when {
         warn -> colors.warnTertiary
         selected -> colors.accentTertiary
-        else -> colors.bgModulePlatform
+        else -> colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING)
     }
     val contentColor = when {
         warn -> colors.warnLabel

@@ -1013,4 +1013,18 @@
     <string name="persona_gallery_export_failed">人物导出失败</string>
     <string name="persona_gallery_import_failed">人物导入失败</string>
 
+<string name="settings_appearance_matte_black">磨砂黑</string>
+<string name="tasks_schedule_label">执行方式</string>
+<string name="tasks_schedule_once">一次</string>
+<string name="tasks_schedule_daily">每天</string>
+<string name="tasks_schedule_weekly">每周</string>
+<string name="tasks_schedule_custom">自定义</string>
+<string name="tasks_first_run_value">首次执行：%1$s</string>
+<string name="tasks_custom_hours">重复间隔（小时）</string>
+<string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
+<string name="tasks_every_hours">每 %1$d 小时</string>
+<string name="tools_capability_group_hint">这里展示当前已加载能力；带箭头的项目可直接管理，其余由智能体按任务需要调用。</string>
+<string name="tools_capability_agent_available">由智能体按需调用</string>
+<string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
+<string name="chat_composer_add_attachment">添加附件</string>
 </resources>

@@ -23,7 +23,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 
 /**
@@ -50,7 +53,7 @@ fun DsBottomSheet(
         sheetState = state,
         modifier = modifier,
         shape = DsShapes.dialog,
-        containerColor = colors.bgLayer2,
+        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.BOTTOM),
         scrimColor = colors.overlayMask,
         dragHandle = null,
         contentWindowInsets = { WindowInsets.navigationBars },

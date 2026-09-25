@@ -72,6 +72,8 @@ import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -233,7 +235,7 @@ internal fun FileChip(name: String, bytes: Long, modifier: Modifier = Modifier) 
     Row(
         modifier = modifier
             .clip(DsShapes.block)
-            .background(colors.bgModulePlatform)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
             .border(1.dp, colors.borderL3, DsShapes.block)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -281,7 +283,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL2),
     ) {
         Column(

@@ -1014,4 +1014,18 @@
     <string name="persona_gallery_export_failed">Could not export character</string>
     <string name="persona_gallery_import_failed">Could not import character</string>
 
+<string name="settings_appearance_matte_black">Matte black</string>
+<string name="tasks_schedule_label">Schedule</string>
+<string name="tasks_schedule_once">Once</string>
+<string name="tasks_schedule_daily">Daily</string>
+<string name="tasks_schedule_weekly">Weekly</string>
+<string name="tasks_schedule_custom">Custom</string>
+<string name="tasks_first_run_value">First run: %1$s</string>
+<string name="tasks_custom_hours">Repeat interval (hours)</string>
+<string name="tasks_custom_hours_hint">Custom intervals must be at least 1 hour</string>
+<string name="tasks_every_hours">Every %1$d hours</string>
+<string name="tools_capability_group_hint">Shows capabilities currently loaded. Rows with arrows can be managed directly; the rest are invoked by the agent when needed.</string>
+<string name="tools_capability_agent_available">Used by the agent when needed</string>
+<string name="tools_capability_automation_hint">View, create, and cancel scheduled tasks</string>
+<string name="chat_composer_add_attachment">Add attachment</string>
 </resources>

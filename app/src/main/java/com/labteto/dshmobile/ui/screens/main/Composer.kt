@@ -77,11 +77,14 @@ import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.ContextMeter
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.skeleton
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /**
  * Something picked and waiting to be sent with the next message.
@@ -197,7 +200,7 @@ internal fun Composer(
             .shadow(6.dp, DsShapes.composer, clip = false)
             .animateContentSize(),
         shape = DsShapes.composer,
-        color = colors.composerCard,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.BOTTOM, colors.composerCard),
         border = BorderStroke(1.dp, colors.borderL1),
     ) {
         Column(
@@ -301,7 +304,7 @@ internal fun Composer(
                     description = stringResource(R.string.chat_composer_send),
                     size = 36,
                     background = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-                    tint = if (canSend) Color.White else colors.labelTertiary,
+                    tint = if (canSend) colors.onAccent else colors.labelTertiary,
                     enabled = canSend,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -319,7 +322,7 @@ internal fun Composer(
                         description = stringResource(R.string.chat_composer_stop),
                         size = 36,
                         background = colors.error,
-                        tint = Color.White,
+                        tint = colors.onAccent,
                         enabled = true,
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
