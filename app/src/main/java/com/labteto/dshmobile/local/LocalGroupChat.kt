@@ -52,30 +52,46 @@ internal fun groupChatMentionedMembers(
     val text = input.trim()
     if (text.isBlank() || members.isEmpty()) return emptyList()
 
-    fun directAddressIndex(name: String): Int {
-        if (name.isBlank()) return -1
-        if (text == name) return 0
+    data class AddressMatch(
+        val strength: Int,
+        val index: Int,
+        val member: LocalGroupChatMember,
+    )
+
+    fun addressMatch(member: LocalGroupChatMember): AddressMatch? {
+        val name = member.displayName.trim()
+        if (name.isBlank()) return null
+        if (text == name) return AddressMatch(strength = 3, index = 0, member = member)
+
         val escaped = Regex.escape(name)
-        val patterns = listOf(
+        val strongPatterns = listOf(
             Regex("""[@＠]$escaped(?=$|[\s，,。！？!?；;：:、])"""),
-            Regex("""$escaped(?=$|[，,。！？!?；;：:、]|你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
+            Regex("""$escaped(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
             Regex("""(?:找|问|叫|让|请|喊)$escaped(?=$|[\s，,。！？!?；;：:、]|来|帮|看|聊|说|回答|告诉)"""),
             Regex("""$escaped\s+(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
         )
-        return patterns.asSequence()
+        strongPatterns.asSequence()
             .mapNotNull { regex -> regex.find(text)?.range?.first }
             .minOrNull()
-            ?: -1
+            ?.let { return AddressMatch(strength = 3, index = it, member = member) }
+
+        val punctuationIndex = Regex("""$escaped(?=$|[，,。！？!?；;：:、])""")
+            .find(text)
+            ?.range
+            ?.first
+            ?: return null
+        return AddressMatch(strength = 2, index = punctuationIndex, member = member)
     }
 
-    return members.mapNotNull { member ->
-        val index = directAddressIndex(member.displayName.trim())
-        index.takeIf { it >= 0 }?.let { it to member }
-    }
-        .sortedBy { it.first }
-        .map { it.second }
+    val matches = members.mapNotNull(::addressMatch)
+    val strongest = matches.maxOfOrNull(AddressMatch::strength) ?: return emptyList()
+    return matches.asSequence()
+        .filter { it.strength == strongest }
+        .sortedBy(AddressMatch::index)
+        .map(AddressMatch::member)
         .distinctBy(LocalGroupChatMember::galleryId)
         .take(MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN)
+        .toList()
 }
 
 internal fun groupChatResponders(
