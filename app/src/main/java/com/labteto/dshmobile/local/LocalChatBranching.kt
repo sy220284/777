@@ -38,12 +38,18 @@ private val chatBranchJson = Json {
     encodeDefaults = true
 }
 
-internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean =
-    messages.all { message ->
-        message.role == "user" || message.role == "assistant" || message.role == "system"
-    } && messages.none { message ->
-        message.role == "user" && "本次附件已导入本机工作区：" in message.content
-    }
+internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean {
+    if (messages.any { message ->
+            message.role !in setOf("user", "assistant", "system")
+        }) return false
+    val dialogue = messages.filter { it.role == "user" || it.role == "assistant" }
+    if (dialogue.isEmpty()) return true
+    if (dialogue.first().role != "user") return false
+    if (dialogue.any { message ->
+            message.role == "user" && "本次附件已导入本机工作区：" in message.content
+        }) return false
+    return dialogue.zipWithNext().all { (left, right) -> left.role != right.role }
+}
 
 internal fun syncChatBranchState(
     current: LocalChatBranchState,
@@ -149,7 +155,6 @@ internal fun chatBranchInfo(
     val node = state.nodes.firstOrNull { it.message.id == messageId } ?: return null
     val siblings = state.nodes
         .filter { it.parentId == node.parentId && it.message.role == node.message.role }
-        .sortedWith(compareBy<LocalChatBranchNode> { it.message.createdAt }.thenBy { it.message.id })
     if (siblings.size <= 1) return null
     val index = siblings.indexOfFirst { it.message.id == messageId }
     if (index < 0) return null
@@ -164,7 +169,6 @@ internal fun selectChatBranchVariant(
     val node = state.nodes.firstOrNull { it.message.id == messageId } ?: return null
     val siblings = state.nodes
         .filter { it.parentId == node.parentId && it.message.role == node.message.role }
-        .sortedWith(compareBy<LocalChatBranchNode> { it.message.createdAt }.thenBy { it.message.id })
     val target = siblings.getOrNull(targetIndex) ?: return null
     val selected = state.selectedChildByParent.toMutableMap()
     selected[branchParentKey(node.parentId)] = target.message.id
