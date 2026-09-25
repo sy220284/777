@@ -110,11 +110,43 @@ internal fun groupChatResponders(
     }
 }
 
+internal fun stripGroupSpeakerPrefix(
+    content: String,
+    vararg speakerNames: String?,
+): String {
+    val trimmed = content.trim()
+    if (trimmed.isBlank()) return trimmed
+
+    val names = speakerNames.asSequence()
+        .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+        .distinct()
+        .sortedByDescending { it.length }
+        .toList()
+
+    names.forEach { name ->
+        val escaped = Regex.escape(name)
+        val prefix = Regex(
+            """^\s*(?:\*\*|__)?(?:[@＠])?(?:【|\[)?$escaped(?:】|\])?(?:\*\*|__)?\s*(?:[:：]\s*|[-—]\s+|\r?\n+)""",
+        )
+        prefix.find(trimmed)?.let { match ->
+            return trimmed.removeRange(match.range).trimStart()
+        }
+    }
+    return trimmed
+}
+
+internal fun groupMessageVisibleContent(message: LocalHarnessMessage): String =
+    if (message.role == "assistant") {
+        stripGroupSpeakerPrefix(message.content, message.speakerName)
+    } else {
+        message.content
+    }
+
 internal fun groupTranscriptLine(message: LocalHarnessMessage): String = when (message.role) {
     "user" -> "用户：${message.content}"
     "assistant" -> {
         val speaker = message.speakerName?.takeIf(String::isNotBlank) ?: "角色"
-        "$speaker：${message.content}"
+        "$speaker：${groupMessageVisibleContent(message)}"
     }
     else -> message.content
 }
