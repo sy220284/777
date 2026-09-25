@@ -94,6 +94,15 @@
             android:foregroundServiceType="dataSync" />
 
         <service
+            android:name=".local.LocalExecutionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated on-device AI task execution" />
+        </service>
+
+        <service
             android:name=".automation.HarnessWebhookService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
