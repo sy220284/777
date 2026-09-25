@@ -9,12 +9,14 @@ ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
+DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
 
 violations: list[str] = []
 
 engine = ENGINE.read_text(encoding="utf-8")
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
+deepseek = DEEPSEEK.read_text(encoding="utf-8")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
@@ -67,6 +69,9 @@ if "RandomAccessFile(source, \"r\")" not in event_log or "REVERSE_READ_BUFFER_BY
 
 if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")
+
+if "parse(synthetic.toString())" in deepseek:
+    violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
 
 if violations:
     print("Local performance invariant guard failed:", file=sys.stderr)
