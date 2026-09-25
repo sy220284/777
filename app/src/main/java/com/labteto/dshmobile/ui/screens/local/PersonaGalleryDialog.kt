@@ -43,6 +43,7 @@ import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
+import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
@@ -130,6 +131,7 @@ internal fun PersonaGallerySavePromptDialog(
 @Composable
 internal fun PersonaGalleryDialog(
     entries: List<PersonaGalleryEntry>,
+    presets: List<PersonaPreset>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
     currentGalleryStoryId: String?,
@@ -146,6 +148,7 @@ internal fun PersonaGalleryDialog(
     onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
     onExport: suspend (String, Boolean) -> Result<String>,
     onImport: suspend (String) -> Result<PersonaGalleryEntry>,
+    onInstallPreset: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -195,6 +198,8 @@ internal fun PersonaGalleryDialog(
     val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
     val exportFailedText = stringResource(R.string.persona_gallery_export_failed)
     val importFailedText = stringResource(R.string.persona_gallery_import_failed)
+    val presetInstallFailedText = stringResource(R.string.persona_gallery_preset_install_failed)
+    val presetInstalledText = stringResource(R.string.persona_gallery_preset_installed)
 
     val exportDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -262,6 +267,49 @@ internal fun PersonaGalleryDialog(
     ) {
         if (selected == null) {
             GalleryOverviewHeader(entries.size)
+
+            if (presets.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.persona_gallery_presets_title),
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.persona_gallery_presets_hint),
+                    style = DsType.caption11,
+                    color = DsTheme.colors.labelTertiary,
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    presets.forEach { preset ->
+                        val installed = entries.any { entry -> entry.persona.presetId == preset.id }
+                        PersonaPresetCard(
+                            preset = preset,
+                            installed = installed,
+                            busy = busy,
+                            onInstall = {
+                                busy = true
+                                error = null
+                                notice = null
+                                scope.launch {
+                                    onInstallPreset(preset.id)
+                                        .onSuccess { entry ->
+                                            notice = presetInstalledText
+                                            selectedId = entry.id
+                                            selectedStoryId = null
+                                        }
+                                        .onFailure { error = it.message ?: presetInstallFailedText }
+                                    busy = false
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
             DsButton(
                 text = stringResource(R.string.persona_gallery_import_file),
                 onClick = { importDocument.launch(arrayOf("application/json", "text/plain")) },
@@ -1053,6 +1101,54 @@ private fun GalleryOverviewHeader(count: Int) {
 }
 
 @Composable
+private fun PersonaPresetCard(
+    preset: PersonaPreset,
+    installed: Boolean,
+    busy: Boolean,
+    onInstall: () -> Unit,
+) {
+    DsCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PersonaAvatar(preset.persona.name)
+            Spacer(Modifier.width(DsSpacing.medium))
+            Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        preset.persona.name,
+                        style = DsType.std14,
+                        color = DsTheme.colors.labelPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    GalleryPill(preset.franchise)
+                }
+                Text(
+                    preset.summary,
+                    style = DsType.caption11,
+                    color = DsTheme.colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        DsButton(
+            text = stringResource(
+                if (installed) R.string.persona_gallery_preset_added
+                else R.string.persona_gallery_preset_add
+            ),
+            onClick = onInstall,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !installed && !busy,
+            variant = if (installed) DsButtonVariant.Ghost else DsButtonVariant.Outline,
+        )
+    }
+}
+
+@Composable
 private fun GalleryPersonaCard(
     entry: PersonaGalleryEntry,
     unsaved: Boolean,
@@ -1253,8 +1349,18 @@ private fun PersonaDetails(persona: PersonaProfile) {
         stringResource(R.string.persona_field_speech_style) to persona.speechStyle,
         stringResource(R.string.persona_field_relationship) to persona.relationship,
         stringResource(R.string.persona_field_world_setting) to persona.worldSetting,
+        stringResource(R.string.persona_field_franchise) to persona.franchise,
+        stringResource(R.string.persona_field_timeline) to persona.timelinePosition,
     ).filter { it.second.isNotBlank() }
     val listSections = listOf(
+        stringResource(R.string.persona_field_motivations) to persona.coreMotivations,
+        stringResource(R.string.persona_field_values) to persona.valuePriorities,
+        stringResource(R.string.persona_field_behavior_patterns) to persona.behaviorPatterns,
+        stringResource(R.string.persona_field_internal_contradictions) to persona.internalContradictions,
+        stringResource(R.string.persona_field_knowledge_boundary) to persona.knowledgeBoundary,
+        stringResource(R.string.persona_field_lore) to persona.loreEntries.map { entry ->
+            entry.title.ifBlank { entry.content.take(80) }
+        },
         stringResource(R.string.persona_field_constraints) to persona.hardConstraints,
         stringResource(R.string.persona_field_dialogues) to persona.exampleDialogues,
         stringResource(R.string.persona_field_banned) to persona.bannedPhrases,
@@ -1404,6 +1510,13 @@ private fun personaFieldLabel(field: String): String = when (field) {
     "speechStyle" -> stringResource(R.string.persona_field_speech_style)
     "relationship" -> stringResource(R.string.persona_field_relationship)
     "worldSetting" -> stringResource(R.string.persona_field_world_setting)
+    "franchise" -> stringResource(R.string.persona_field_franchise)
+    "timelinePosition" -> stringResource(R.string.persona_field_timeline)
+    "coreMotivations" -> stringResource(R.string.persona_field_motivations)
+    "valuePriorities" -> stringResource(R.string.persona_field_values)
+    "behaviorPatterns" -> stringResource(R.string.persona_field_behavior_patterns)
+    "internalContradictions" -> stringResource(R.string.persona_field_internal_contradictions)
+    "knowledgeBoundary" -> stringResource(R.string.persona_field_knowledge_boundary)
     "hardConstraints" -> stringResource(R.string.persona_field_constraints)
     "exampleDialogues" -> stringResource(R.string.persona_field_dialogues)
     "bannedPhrases" -> stringResource(R.string.persona_field_banned)
