@@ -921,7 +921,7 @@
     <string name="tasks_repeat_interval">Repeat interval</string>
     <string name="tasks_repeat_hint">Leave blank for one-time; recurring tasks require at least 15 minutes</string>
     <string name="tasks_create">Create</string>
-    <string name="tasks_create_invalid">Enter a task; recurring intervals must be at least 15 minutes.</string>
+    <string name="tasks_create_invalid">Enter a task and choose a future run time; custom intervals must be at least 1 hour.</string>
     <string name="tools_external_services_hint">Connect HTTP tool servers only when needed</string>
     <string name="tools_capability_group">Capabilities</string>
     <string name="tools_connection_group">Connections</string>
@@ -934,5 +934,19 @@
     <string name="tools_capability_unavailable">Not loaded</string>
     <string name="panel_artifacts_empty">No delivered artifacts yet</string>
     <string name="panel_involved_files_empty">No files involved in this task yet</string>
+
+    <string name="tasks_schedule_label">Schedule</string>
+    <string name="tasks_schedule_once">Once</string>
+    <string name="tasks_schedule_daily">Daily</string>
+    <string name="tasks_schedule_weekly">Weekly</string>
+    <string name="tasks_schedule_custom">Custom</string>
+    <string name="tasks_first_run_value">First run: %1$s</string>
+    <string name="tasks_custom_hours">Repeat interval (hours)</string>
+    <string name="tasks_custom_hours_hint">Custom intervals must be at least 1 hour</string>
+    <string name="tasks_every_hours">Every %1$d hours</string>
+    <string name="tools_capability_group_hint">Shows capabilities currently loaded. Rows with arrows can be managed directly; the rest are invoked by the agent when needed.</string>
+    <string name="tools_capability_agent_available">Used by the agent when needed</string>
+    <string name="tools_capability_automation_hint">View, create, and cancel scheduled tasks</string>
+    <string name="chat_composer_add_attachment">Add attachment</string>
 
 </resources>
