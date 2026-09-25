@@ -50,8 +50,12 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -166,7 +170,7 @@ fun ToolsScreen(
         runCatching { store.refreshPlugins() }
     }
 
-    Surface(Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding()
                 .verticalScroll(rememberScrollState())
@@ -178,7 +182,7 @@ fun ToolsScreen(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.common_back),
                     onClick = onClose,
-                    containerColor = colors.bgLayer1,
+                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                     shadowElevation = 3.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = DsSpacing.medium)) {
@@ -189,7 +193,7 @@ fun ToolsScreen(
                     icon = Icons.Outlined.Refresh,
                     contentDescription = stringResource(R.string.tools_refresh),
                     onClick = viewModel::refresh,
-                    containerColor = colors.bgLayer1,
+                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 )
             }
 
