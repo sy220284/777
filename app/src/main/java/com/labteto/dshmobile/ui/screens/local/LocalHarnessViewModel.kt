@@ -54,11 +54,21 @@ class LocalHarnessViewModel @Inject constructor(
         check(!snapshot.loading && !snapshot.running && snapshot.usageMode == LocalUsageMode.CHAT) {
             "请在聊天空闲时保存人设与故事"
         }
+        val archiveHistory = if (
+            snapshot.galleryStoryId == null &&
+            snapshot.gallerySaveSuppressedThrough > 0L
+        ) {
+            snapshot.messages.filter { message ->
+                message.createdAt > snapshot.gallerySaveSuppressedThrough
+            }
+        } else {
+            snapshot.messages
+        }
         val outcome = withContext(Dispatchers.IO) {
             galleryStore.save(
                 persona = snapshot.chatPersona,
                 sourceSessionId = snapshot.sessionId,
-                history = snapshot.messages,
+                history = archiveHistory,
                 chatState = snapshot.chatState,
                 notes = notes,
                 existingId = existingId ?: snapshot.galleryId,
