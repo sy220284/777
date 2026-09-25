@@ -22,7 +22,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -104,7 +103,7 @@ fun TasksScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
-    val context = LocalContext.current
+    val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by remember { mutableStateOf(false) }
     var prompt by remember { mutableStateOf("") }
     var delayMinutes by remember { mutableStateOf("0") }
@@ -196,7 +195,7 @@ fun TasksScreen(
                                     recurringMinutes = ""
                                     createError = null
                                 } else {
-                                    createError = context.getString(R.string.tasks_create_invalid)
+                                    createError = createInvalidMessage
                                 }
                             },
                             size = DsButtonSize.Small,
