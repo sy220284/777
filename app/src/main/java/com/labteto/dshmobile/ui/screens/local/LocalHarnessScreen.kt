@@ -112,6 +112,7 @@ import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
+import com.labteto.dshmobile.local.chatBranchingEligible
 import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
@@ -1069,6 +1070,8 @@ private fun LocalChat(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
+    val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
+        chatBranchingEligible(state.messages)
     LaunchedEffect(state.sessionId, state.usageMode) {
         showReplySuggestions = false
         editingUserMessage = null
@@ -1361,11 +1364,11 @@ private fun LocalChat(
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
-                            canEdit = state.usageMode == LocalUsageMode.CHAT &&
+                            canEdit = messageBranchingEnabled &&
                                 !state.running &&
                                 !chatMessageHasAttachmentContext(transcriptItem.message),
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
-                            branchInfo = if (state.usageMode == LocalUsageMode.CHAT) {
+                            branchInfo = if (messageBranchingEnabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
                             } else {
                                 null
