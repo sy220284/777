@@ -10,7 +10,7 @@ import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** A snapshot of a character and the actual story, independent of the live session. */
+/** A durable character profile plus its real story history. One character maps to one entry. */
 @Serializable
 data class PersonaGalleryEntry(
     val id: String,
@@ -43,8 +43,192 @@ data class PersonaGalleryEntry(
 
 @Serializable
 private data class GalleryDocument(
-    val version: Int = 1,
+    val version: Int = 2,
     val entries: List<PersonaGalleryEntry> = emptyList(),
+)
+
+internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
+    val name = normalizePersonaText(persona.name)
+    if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
+    return persona.identity.isNotBlank() ||
+        persona.background.isNotBlank() ||
+        persona.personality.isNotBlank() ||
+        persona.speechStyle.isNotBlank() ||
+        persona.relationship.isNotBlank() ||
+        persona.worldSetting.isNotBlank() ||
+        persona.hardConstraints.isNotEmpty() ||
+        persona.corrections.isNotEmpty()
+}
+
+internal fun samePersonaIdentity(left: PersonaProfile, right: PersonaProfile): Boolean {
+    val leftName = normalizePersonaText(left.name)
+    val rightName = normalizePersonaText(right.name)
+    if (leftName.isBlank() || rightName.isBlank()) return false
+    if (leftName in DEFAULT_PERSONA_NAMES || rightName in DEFAULT_PERSONA_NAMES) return false
+    return leftName == rightName
+}
+
+internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
+    base.copy(
+        name = chooseDisplayName(base.name, incoming.name),
+        identity = mergePersonaText(base.identity, incoming.identity, 2_000),
+        background = mergePersonaText(base.background, incoming.background, 4_000),
+        personality = mergePersonaText(base.personality, incoming.personality, 2_000),
+        speechStyle = mergePersonaText(base.speechStyle, incoming.speechStyle, 2_000),
+        relationship = mergePersonaText(base.relationship, incoming.relationship, 2_000),
+        worldSetting = mergePersonaText(base.worldSetting, incoming.worldSetting, 4_000),
+        hardConstraints = mergePersonaLines(base.hardConstraints, incoming.hardConstraints, 20),
+        exampleDialogues = mergePersonaLines(base.exampleDialogues, incoming.exampleDialogues, 12),
+        bannedPhrases = mergePersonaLines(base.bannedPhrases, incoming.bannedPhrases, 30),
+        signaturePhrases = mergePersonaLines(base.signaturePhrases, incoming.signaturePhrases, 20),
+        corrections = mergePersonaLines(base.corrections, incoming.corrections, 20),
+        updatedAt = maxOf(base.updatedAt, incoming.updatedAt),
+    )
+
+internal fun applyPersonaSuggestions(
+    profile: PersonaProfile,
+    suggestions: List<PersonaAppendSuggestion>,
+): PersonaProfile {
+    var result = profile
+    suggestions.forEach { suggestion ->
+        val value = suggestion.value.trim()
+        if (value.isBlank()) return@forEach
+        result = when (suggestion.field) {
+            "identity" -> result.copy(identity = mergePersonaText(result.identity, value, 2_000))
+            "background" -> result.copy(background = mergePersonaText(result.background, value, 4_000))
+            "personality" -> result.copy(personality = mergePersonaText(result.personality, value, 2_000))
+            "speechStyle" -> result.copy(speechStyle = mergePersonaText(result.speechStyle, value, 2_000))
+            "relationship" -> result.copy(relationship = mergePersonaText(result.relationship, value, 2_000))
+            "worldSetting" -> result.copy(worldSetting = mergePersonaText(result.worldSetting, value, 4_000))
+            "hardConstraints" -> result.copy(hardConstraints = mergePersonaLines(result.hardConstraints, listOf(value), 20))
+            "exampleDialogues" -> result.copy(exampleDialogues = mergePersonaLines(result.exampleDialogues, listOf(value), 12))
+            "bannedPhrases" -> result.copy(bannedPhrases = mergePersonaLines(result.bannedPhrases, listOf(value), 30))
+            "signaturePhrases" -> result.copy(signaturePhrases = mergePersonaLines(result.signaturePhrases, listOf(value), 20))
+            "corrections" -> result.copy(corrections = mergePersonaLines(result.corrections, listOf(value), 20))
+            else -> result
+        }
+    }
+    return result
+}
+
+internal fun mergeGalleryEntries(
+    base: PersonaGalleryEntry,
+    incoming: PersonaGalleryEntry,
+): PersonaGalleryEntry {
+    val newer = if (incoming.chatState.updatedAt >= base.chatState.updatedAt) incoming.chatState else base.chatState
+    val older = if (newer === incoming.chatState) base.chatState else incoming.chatState
+    val mergedState = newer.copy(
+        unresolvedThreads = mergePersonaLines(older.unresolvedThreads, newer.unresolvedThreads, 8),
+        dynamics = newer.dynamics.copy(
+            facts = mergeEvidence(older.dynamics.facts, newer.dynamics.facts, 24),
+            hypotheses = mergeEvidence(older.dynamics.hypotheses, newer.dynamics.hypotheses, 16),
+            unknowns = mergePersonaLines(older.dynamics.unknowns, newer.dynamics.unknowns, 12),
+            sharedMoments = mergePersonaLines(older.dynamics.sharedMoments, newer.dynamics.sharedMoments, 30),
+        ),
+    )
+    return base.copy(
+        persona = mergePersonaProfiles(base.persona, incoming.persona).copy(id = base.id),
+        storyNotes = mergePersonaText(base.storyNotes, incoming.storyNotes, 4_000),
+        history = mergeHistory(base.history, incoming.history),
+        chatState = mergedState,
+        sourceSessionId = incoming.sourceSessionId.ifBlank { base.sourceSessionId },
+        updatedAt = maxOf(base.updatedAt, incoming.updatedAt),
+    )
+}
+
+private fun mergeEvidence(
+    base: List<RelationshipEvidence>,
+    incoming: List<RelationshipEvidence>,
+    limit: Int,
+): List<RelationshipEvidence> {
+    val result = mutableListOf<RelationshipEvidence>()
+    val index = linkedMapOf<String, Int>()
+    (base + incoming).forEach { item ->
+        val key = normalizePersonaText(item.text)
+        if (key.isBlank()) return@forEach
+        val previousIndex = index[key]
+        if (previousIndex == null) {
+            index[key] = result.size
+            result += item
+        } else if (item.confidence > result[previousIndex].confidence) {
+            result[previousIndex] = item
+        }
+    }
+    return result.takeLast(limit)
+}
+
+private fun mergeHistory(
+    base: List<LocalHarnessMessage>,
+    incoming: List<LocalHarnessMessage>,
+): List<LocalHarnessMessage> {
+    val seen = linkedSetOf<String>()
+    return (base + incoming)
+        .asSequence()
+        .filter { it.role == "user" || it.role == "assistant" }
+        .filter { message ->
+            val key = message.id.takeIf(String::isNotBlank)
+                ?: "${message.role}|${message.createdAt}|${normalizePersonaText(message.content)}"
+            seen.add(key)
+        }
+        .sortedBy(LocalHarnessMessage::createdAt)
+        .toList()
+}
+
+private fun chooseDisplayName(base: String, incoming: String): String {
+    val current = base.trim()
+    val fresh = incoming.trim()
+    if (current.isBlank()) return fresh
+    if (fresh.isBlank()) return current
+    if (normalizePersonaText(current) in DEFAULT_PERSONA_NAMES &&
+        normalizePersonaText(fresh) !in DEFAULT_PERSONA_NAMES
+    ) return fresh
+    return if (fresh.length > current.length && normalizePersonaText(fresh).contains(normalizePersonaText(current))) {
+        fresh
+    } else current
+}
+
+private fun mergePersonaText(base: String, incoming: String, limit: Int): String {
+    val current = base.trim()
+    val fresh = incoming.trim()
+    if (current.isBlank()) return fresh.take(limit)
+    if (fresh.isBlank()) return current.take(limit)
+
+    val currentKey = normalizePersonaText(current)
+    val freshKey = normalizePersonaText(fresh)
+    if (currentKey == freshKey || currentKey.contains(freshKey)) return current.take(limit)
+    if (freshKey.contains(currentKey)) return fresh.take(limit)
+
+    val existingClauses = splitPersonaClauses(current)
+    val known = existingClauses.mapTo(linkedSetOf(), ::normalizePersonaText)
+    val additions = splitPersonaClauses(fresh).filter { known.add(normalizePersonaText(it)) }
+    if (additions.isEmpty()) return current.take(limit)
+    return (existingClauses + additions).joinToString("；").take(limit)
+}
+
+private fun mergePersonaLines(base: List<String>, incoming: List<String>, limit: Int): List<String> {
+    val seen = linkedSetOf<String>()
+    return (base + incoming)
+        .asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .filter { seen.add(normalizePersonaText(it)) }
+        .map { it.take(240) }
+        .takeLast(limit)
+        .toList()
+}
+
+private fun splitPersonaClauses(text: String): List<String> =
+    text.split(Regex("""[；;。\n]+"""))
+        .map(String::trim)
+        .filter(String::isNotBlank)
+
+private fun normalizePersonaText(text: String): String =
+    text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】—_-]+"""), "")
+
+private val DEFAULT_PERSONA_NAMES = setOf(
+    normalizePersonaText("默认角色"),
+    normalizePersonaText("default"),
+    normalizePersonaText("default角色"),
 )
 
 @Singleton
@@ -67,26 +251,44 @@ class ChatPersonaGalleryStore @Inject constructor(
         existingId: String? = null,
     ): PersonaGalleryEntry {
         val doc = read()
-        val id = existingId?.takeIf { candidate -> doc.entries.any { it.id == candidate } }
-            ?: "gallery-${UUID.randomUUID()}"
-        val entry = PersonaGalleryEntry(
+        val explicit = existingId?.let { id -> doc.entries.firstOrNull { it.id == id } }
+        val matched = explicit ?: doc.entries.firstOrNull { samePersonaIdentity(it.persona, persona) }
+        val id = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val now = System.currentTimeMillis()
+        val incoming = PersonaGalleryEntry(
             id = id,
             persona = persona.copy(id = id),
             storyNotes = notes.trim().take(4_000),
             history = history.filter { it.role == "user" || it.role == "assistant" },
             chatState = chatState,
             sourceSessionId = sourceSessionId,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = now,
         )
-        write(doc.copy(entries = doc.entries.filterNot { it.id == id } + entry))
+        val entry = matched?.let { mergeGalleryEntries(it, incoming).copy(updatedAt = now) } ?: incoming
+        write(doc.copy(version = 2, entries = doc.entries.filterNot { it.id == id } + entry))
         return entry
+    }
+
+    @Synchronized
+    fun applySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): PersonaGalleryEntry? {
+        if (suggestions.isEmpty()) return read().entries.firstOrNull { it.id == id }
+        val doc = read()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return null
+        val now = System.currentTimeMillis()
+        val merged = current.copy(
+            persona = applyPersonaSuggestions(current.persona, suggestions)
+                .copy(id = current.id, updatedAt = now),
+            updatedAt = now,
+        )
+        write(doc.copy(version = 2, entries = doc.entries.map { if (it.id == id) merged else it }))
+        return merged
     }
 
     @Synchronized
     fun updateNotes(id: String, notes: String): Boolean {
         val doc = read()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(entries = doc.entries.map {
+        write(doc.copy(version = 2, entries = doc.entries.map {
             if (it.id == id) it.copy(storyNotes = notes.trim().take(4_000), updatedAt = System.currentTimeMillis()) else it
         }))
         return true
@@ -96,12 +298,16 @@ class ChatPersonaGalleryStore @Inject constructor(
     fun delete(id: String): Boolean {
         val doc = read()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(entries = doc.entries.filterNot { it.id == id }))
+        write(doc.copy(version = 2, entries = doc.entries.filterNot { it.id == id }))
         return true
     }
 
-    private fun read(): GalleryDocument = if (!file.isFile) GalleryDocument() else
-        json.decodeFromString(GalleryDocument.serializer(), file.readText())
+    private fun read(): GalleryDocument {
+        if (!file.isFile) return GalleryDocument()
+        return runCatching {
+            json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        }.getOrDefault(GalleryDocument())
+    }
 
     private fun write(doc: GalleryDocument) {
         file.parentFile?.mkdirs()
