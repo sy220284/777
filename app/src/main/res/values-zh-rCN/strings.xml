@@ -953,4 +953,11 @@
     <string name="persona_gallery_story_count">%1$d 条故事</string>
     <string name="persona_gallery_untitled_story">未命名故事</string>
 
+
+    <string name="persona_gallery_current_synced">当前人物与故事已同步</string>
+    <string name="persona_gallery_unsaved_badge">有新内容</string>
+    <string name="persona_gallery_show_fixed_persona">查看固定人设</string>
+    <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
+    <string name="persona_gallery_rename_story">重命名故事</string>
+
 </resources>
