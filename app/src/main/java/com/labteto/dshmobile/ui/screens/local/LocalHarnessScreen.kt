@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1421,17 +1422,27 @@ private fun LocalChat(
                 color = colors.labelSecondary,
             )
             state.replySuggestions.filter { it.direction.isNotBlank() }.forEach { suggestion ->
-                DsButton(
-                    text = suggestion.label + " · " + suggestion.impact,
+                val selected = state.chatState.narrativeDirection?.guidance == suggestion.direction
+                Surface(
                     onClick = {
                         onSelectChatDirection(suggestion.direction)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
-                    variant = if (state.chatState.narrativeDirection?.guidance == suggestion.direction)
-                        DsButtonVariant.Info else DsButtonVariant.Outline,
-                )
+                    shape = DsShapes.row,
+                    color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                    border = BorderStroke(1.dp, if (selected) colors.labelSecondary else colors.borderL2),
+                ) {
+                    Column(
+                        Modifier.heightIn(min = DsSpacing.touchTarget)
+                            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        Text(suggestion.label, style = DsType.std14Strong, color = colors.labelPrimary)
+                        Text(suggestion.impact, style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
             }
         }
     }
