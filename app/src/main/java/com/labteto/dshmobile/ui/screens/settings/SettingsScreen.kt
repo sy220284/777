@@ -90,8 +90,12 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import java.util.Locale
 
 /**
@@ -164,7 +168,7 @@ fun SettingsScreen(
         SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
             Column(
                 modifier = Modifier
@@ -181,7 +185,7 @@ fun SettingsScreen(
                         onClick = {
                             if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
                         },
-                        containerColor = colors.bgLayer1,
+                        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                         shadowElevation = 3.dp,
                     )
                     Text(
@@ -511,8 +515,8 @@ private fun PluginsSheet(inventory: PluginInventorySnapshot, onDismiss: () -> Un
             placeholder = { Text(stringResource(R.string.plugins_search_hint), style = DsType.std14) },
             singleLine = true,
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.bgLayer2,
-                unfocusedContainerColor = colors.bgLayer2,
+                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                 focusedIndicatorColor = colors.accent,
                 unfocusedIndicatorColor = colors.borderL2,
                 cursorColor = colors.accent,
