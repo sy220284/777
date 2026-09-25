@@ -68,7 +68,7 @@ class ChatPersonaStorageSafetyTest {
 
         galleryFile.writeText("{broken")
         val recovered = galleryStore().list().single()
-        assertEquals(saved.id, recovered.id)
+        assertEquals(saved.entry.id, recovered.id)
         assertEquals("阿青", recovered.persona.name)
         assertTrue(
             temporary.root.listFiles().orEmpty()
