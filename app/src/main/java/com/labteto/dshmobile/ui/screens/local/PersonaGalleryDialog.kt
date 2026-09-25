@@ -745,8 +745,6 @@ private fun DeleteCharacterConfirm(
 private fun StoryDetailSection(
     entry: PersonaGalleryEntry,
     story: PersonaGalleryStory,
-    storyTitle: String,
-    onStoryTitleChange: (String) -> Unit,
     notes: String,
     onNotesChange: (String) -> Unit,
     showHistory: Boolean,
@@ -758,15 +756,6 @@ private fun StoryDetailSection(
     busy: Boolean,
     onDeleteHistoryMessage: (String) -> Unit,
 ) {
-    OutlinedTextField(
-        value = storyTitle,
-        onValueChange = onStoryTitleChange,
-        label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !busy,
-    )
-
     if (story.chatState.updatedAt > 0L) {
         DsCard {
             Text(
@@ -938,6 +927,7 @@ private fun GalleryOverviewHeader(count: Int) {
 @Composable
 private fun GalleryPersonaCard(
     entry: PersonaGalleryEntry,
+    unsaved: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -948,12 +938,10 @@ private fun GalleryPersonaCard(
         else -> waitingText
     }
     DsCard(
-        modifier = Modifier.pointerInput(entry.id) {
-            detectTapGestures(
-                onTap = { onClick() },
-                onLongPress = { onLongClick() },
-            )
-        },
+        modifier = Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick,
+        ),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(entry.persona.name)
@@ -977,6 +965,9 @@ private fun GalleryPersonaCard(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (unsaved) {
+                GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
+            }
             GalleryPill(stringResource(R.string.persona_gallery_story_count, entry.stories.size))
             GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.totalDialogueCount()))
             if (entry.persona.corrections.isNotEmpty()) {
@@ -990,6 +981,7 @@ private fun GalleryPersonaCard(
 private fun GalleryStoryCard(
     story: PersonaGalleryStory,
     selected: Boolean,
+    unsaved: Boolean,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -1022,6 +1014,10 @@ private fun GalleryStoryCard(
                     )
                 }
             }
+            if (unsaved) {
+                GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
+                Spacer(Modifier.width(6.dp))
+            }
             GalleryPill(
                 stringResource(
                     R.string.persona_gallery_dialogue_count,
@@ -1040,9 +1036,10 @@ private fun ArchivedDialogueRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(text) {
-                detectTapGestures(onLongPress = { onLongClick() })
-            },
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onLongClick,
+            ),
         shape = RoundedCornerShape(10.dp),
         color = DsTheme.colors.bgLayer2,
     ) {
