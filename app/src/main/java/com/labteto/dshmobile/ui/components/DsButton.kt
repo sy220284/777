@@ -71,7 +71,7 @@ fun DsButton(
         DsButtonVariant.Info -> colors.buttonInfoFill to colors.onAccent
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
-        DsButtonVariant.Danger -> colors.error to Color.White
+        DsButtonVariant.Danger -> colors.error to colors.onAccent
     }
     val background = when {
         !enabled -> when (variant) {
