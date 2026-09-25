@@ -933,4 +933,24 @@
     <string name="panel_artifacts_empty">当前还没有标记为成果的文件</string>
     <string name="panel_involved_files_empty">当前任务还没有涉及文件</string>
 
+
+    <string name="persona_gallery_unsaved_update_title">人物有新内容未保存</string>
+    <string name="persona_gallery_unsaved_update_subtitle">当前人物的剧情或设定有了新变化</string>
+    <string name="persona_gallery_unsaved_update_hint">进入图集前保存一次，会把最新对白、关系状态和人设变化写回当前故事线，不会另建重复人物卡。</string>
+    <string name="persona_gallery_save_update_enter">保存更新并进入图集</string>
+    <string name="persona_gallery_story_renamed">故事标题已更新</string>
+    <string name="persona_gallery_character_summary">%1$d 条故事线 · %2$d 条对白</string>
+    <string name="persona_gallery_storylines_title">故事线</string>
+    <string name="persona_gallery_storylines_empty">还没有保存过故事。可以只使用这份人物设定开启一条新故事。</string>
+    <string name="persona_gallery_save_current_new_story">把当前会话保存为新故事</string>
+    <string name="persona_gallery_save_story_title">保存故事标题</string>
+    <string name="persona_gallery_story_title_label">故事标题</string>
+    <string name="persona_gallery_delete_story_confirm">删除“%1$s”？</string>
+    <string name="persona_gallery_delete_story_hint">只删除这条故事线及其中的归档对白，人物主档案会保留。</string>
+    <string name="persona_gallery_delete_story">删除这条故事</string>
+    <string name="persona_gallery_continue_story">继续这条故事</string>
+    <string name="persona_gallery_start_fresh_story">只用人物设定开启新故事</string>
+    <string name="persona_gallery_story_count">%1$d 条故事</string>
+    <string name="persona_gallery_untitled_story">未命名故事</string>
+
 </resources>
