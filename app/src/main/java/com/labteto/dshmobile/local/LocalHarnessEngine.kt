@@ -62,6 +62,7 @@ import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -246,6 +247,7 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
     private val chatPersonaStore: ChatPersonaStore,
+    private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
@@ -1026,6 +1028,7 @@ class LocalHarnessEngine @Inject constructor(
                     displayName = saved.name,
                     persona = saved,
                     chatState = previous?.chatState
+                        ?: entry.groupChatState.takeIf { it.updatedAt > 0L }
                         ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
                         ?: ChatCharacterState(),
                 )
@@ -2882,6 +2885,15 @@ class LocalHarnessEngine @Inject constructor(
                     assistantMessage = content,
                     step = CHAT_POST_TURN_MODEL_STEP + 100 + index,
                 )
+                runCatching {
+                    chatPersonaGalleryStore.updateGroupChatState(member.galleryId, nextState)
+                }.onFailure { error ->
+                    eventLog.append("group/state-persist", buildJsonObject {
+                        put("gallery_id", member.galleryId)
+                        put("status", "failed")
+                        put("detail", error.message.orEmpty().take(1_000))
+                    })
+                }
                 currentGroup = currentGroup.copy(
                     members = currentGroup.members.map { existing ->
                         if (existing.galleryId == member.galleryId) {
