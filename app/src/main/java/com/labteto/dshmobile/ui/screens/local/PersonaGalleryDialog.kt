@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,6 +128,7 @@ internal fun PersonaGalleryDialog(
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
     currentGalleryStoryId: String?,
+    currentHasUnsavedChanges: Boolean,
     currentSessionId: String,
     canSave: Boolean,
     onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
@@ -165,6 +165,8 @@ internal fun PersonaGalleryDialog(
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
+    var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     val selectedSuggestionKeys = remember(selectedId, selectedStoryId) { mutableStateListOf<String>() }
 
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
@@ -221,30 +223,45 @@ internal fun PersonaGalleryDialog(
                 )
             }
 
-            DsButton(
-                text = if (currentGalleryId == null) {
-                    stringResource(R.string.persona_gallery_sync_current, currentPersona.name)
-                } else {
-                    stringResource(R.string.persona_gallery_update_current, currentPersona.name)
-                },
-                onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        onSaveCurrent("", currentGalleryId, currentGalleryStoryId, false)
-                            .onSuccess {
-                                selectedId = it.id
-                                selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
-                                notice = mergedNoticeText
-                            }
-                            .onFailure { error = it.message ?: saveFailedText }
-                        busy = false
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy,
-                variant = DsButtonVariant.Outline,
-            )
+            if (currentGalleryId == null || currentHasUnsavedChanges) {
+                DsButton(
+                    text = if (currentGalleryId == null) {
+                        stringResource(R.string.persona_gallery_sync_current, currentPersona.name)
+                    } else {
+                        stringResource(R.string.persona_gallery_update_current, currentPersona.name)
+                    },
+                    onClick = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onSaveCurrent("", currentGalleryId, currentGalleryStoryId, false)
+                                .onSuccess {
+                                    selectedId = it.id
+                                    selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+                                    notice = mergedNoticeText
+                                }
+                                .onFailure { error = it.message ?: saveFailedText }
+                            busy = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSave && !busy,
+                    variant = DsButtonVariant.Outline,
+                )
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DsTheme.colors.accent.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(R.string.persona_gallery_current_synced),
+                        style = DsType.small13,
+                        color = DsTheme.colors.labelSecondary,
+                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    )
+                }
+            }
 
             OutlinedTextField(
                 value = search,
@@ -281,6 +298,7 @@ internal fun PersonaGalleryDialog(
                     filtered.forEach { entry ->
                         GalleryPersonaCard(
                             entry = entry,
+                            unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
                             onClick = {
                                 selectedId = entry.id
                                 selectedStoryId = null
