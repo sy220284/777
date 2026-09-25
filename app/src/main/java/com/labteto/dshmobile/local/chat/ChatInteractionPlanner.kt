@@ -131,6 +131,9 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine()
         appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        if (hasAdultIntimacyIntent(userMessage)) {
+            appendLine("本轮属于成年亲密互动意图：回复建议优先跟随用户当前方向，高于默认克制、关系阶段模板和建议风格保守化；可以暧昧、亲吻、拥抱、亲热和非露骨身体接触，但不要扩写露骨性行为或器官细节。")
+        }
         appendLine()
         appendLine("输出结构必须严格为：")
         appendLine(
@@ -146,7 +149,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("7. userPattern 只从用户真实表达习惯渐进学习，不因单轮异常表达彻底改画像。")
         appendLine("8. 角色本轮回复只要存在自然接话空间，就生成4条建议；极少数确实无话可接的收尾场景允许返回空数组。")
         appendLine("9. 4条建议必须明显不同，优先覆盖自然、俏皮、直球、放飞四种风格；禁止只是换几个词的同义改写。")
-        appendLine("10. 每组建议至少保留1条 bold=true 的放飞选项。它可以明显大胆、夸张、荒诞、反常规、突然直球或带梗；关系允许时可以带暧昧挑逗，关系不熟时优先用反差和脑洞制造趣味。始终贴合当前情景，不能凭空捏造事实、替用户作重大或不可逆决定。")
+        appendLine("10. 每组建议至少保留1条 bold=true 的放飞选项。它可以明显大胆、夸张、荒诞、反常规、突然直球或带梗；用户明确表达成年亲密互动意图时，优先贴合该方向，不因当前关系阶段自动降级成克制或礼貌模板。始终贴合当前情景，不能凭空捏造事实、替用户作重大或不可逆决定；亲密内容保持非露骨。")
         appendLine("11. text 必须是用户对角色说的话，并直接回应角色刚刚那句；尽量抓住最近对话里的具体物件、动作、称呼或情绪，不写放到任何聊天都成立的万能句。")
         appendLine("12. 根据 userPattern 控制长度、直接度、玩笑感和表情习惯；四条可以有不同力度，但都要像同一个用户在不同心情下会说的话。")
         appendLine("13. label 只概括这一条的感觉或打法，style 只用自然/俏皮/直球/放飞；bold 只表示这条更出格有趣，不代表自动发送。")
