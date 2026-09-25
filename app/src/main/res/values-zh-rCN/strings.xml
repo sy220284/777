@@ -1002,4 +1002,15 @@
     <string name="local_execution_notification_background_continues">当前回合已结束，仍有 %1$d 个后台任务继续运行。</string>
     <string name="local_execution_notification_tap">点击返回当前会话</string>
 
+
+    <string name="persona_gallery_import_file">导入文件</string>
+    <string name="persona_gallery_import_qr">扫码导入</string>
+    <string name="persona_gallery_export_file">导出人物</string>
+    <string name="persona_gallery_share_qr">分享二维码</string>
+    <string name="persona_gallery_share_qr_title">人物分享二维码</string>
+    <string name="persona_gallery_share_qr_hint">二维码只包含精简人物设定，不包含故事历史、会话编号和本机数据。</string>
+    <string name="persona_gallery_scan_prompt">扫描神言神语人物二维码</string>
+    <string name="persona_gallery_export_failed">人物导出失败</string>
+    <string name="persona_gallery_import_failed">人物导入失败</string>
+
 </resources>
