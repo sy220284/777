@@ -22,6 +22,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalApprovalImpact
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.agentApprovalPurposeRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
@@ -79,6 +80,109 @@ internal fun NewSessionModeDialog(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
+    }
+}
+
+@Composable
+internal fun ChatPersonaPickerDialog(
+    entries: List<PersonaGalleryEntry>,
+    currentPersona: PersonaProfile,
+    currentGalleryId: String?,
+    canSwitchPersona: Boolean,
+    onSelect: (String) -> Boolean,
+    onCreate: () -> Unit,
+    onEditCurrent: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsDialog(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss) {
+        Text(
+            stringResource(R.string.local_persona_picker_intro),
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    stringResource(R.string.local_persona_picker_current, currentPersona.name),
+                    style = DsType.base16Strong,
+                    color = colors.labelPrimary,
+                )
+                currentPersona.identity.takeIf(String::isNotBlank)?.let {
+                    Text(it, style = DsType.caption11, color = colors.labelSecondary)
+                }
+            }
+        }
+        DsButton(
+            text = stringResource(R.string.local_persona_picker_edit_current),
+            onClick = onEditCurrent,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Outline,
+        )
+
+        if (!canSwitchPersona) {
+            Text(
+                stringResource(R.string.local_persona_picker_switch_requires_new_chat),
+                style = DsType.small13,
+                color = colors.labelTertiary,
+            )
+        } else {
+            DsButton(
+                text = stringResource(R.string.local_persona_picker_new),
+                onClick = onCreate,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (entries.isEmpty()) {
+                Text(
+                    stringResource(R.string.local_persona_picker_empty),
+                    style = DsType.small13,
+                    color = colors.labelTertiary,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.local_persona_picker_saved),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+                entries.forEach { entry ->
+                    val selected = currentGalleryId == entry.id
+                    Surface(
+                        onClick = {
+                            if (onSelect(entry.id)) onDismiss()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(DsSpacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        ) {
+                            Text(
+                                entry.persona.name,
+                                style = DsType.std14,
+                                color = colors.labelPrimary,
+                            )
+                            val subtitle = entry.persona.identity
+                                .ifBlank { entry.persona.worldSetting }
+                                .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
+                            Text(
+                                subtitle,
+                                style = DsType.caption11,
+                                color = colors.labelSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

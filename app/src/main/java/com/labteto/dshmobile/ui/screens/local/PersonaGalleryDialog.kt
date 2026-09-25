@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,17 +13,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PersonSearch
-import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,14 +31,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.galleryMessageArchiveKey
@@ -55,8 +54,9 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun PersonaGallerySavePromptDialog(
     persona: PersonaProfile,
+    isUpdate: Boolean,
     canSave: Boolean,
-    onSaveCurrent: suspend (String, String?) -> Result<PersonaGalleryEntry>,
+    onSaveCurrent: suspend () -> Result<PersonaGalleryEntry>,
     onContinue: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -65,20 +65,42 @@ internal fun PersonaGallerySavePromptDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    DsDialog(title = stringResource(R.string.persona_gallery_new_character_title), onDismiss = onDismiss) {
-        PersonaHero(persona = persona, subtitle = stringResource(R.string.persona_gallery_new_character_subtitle))
+    DsDialog(
+        title = stringResource(
+            if (isUpdate) R.string.persona_gallery_unsaved_update_title
+            else R.string.persona_gallery_new_character_title,
+        ),
+        onDismiss = onDismiss,
+    ) {
+        PersonaHero(
+            persona = persona,
+            subtitle = stringResource(
+                if (isUpdate) R.string.persona_gallery_unsaved_update_subtitle
+                else R.string.persona_gallery_new_character_subtitle,
+            ),
+        )
         Text(
-            stringResource(R.string.persona_gallery_new_character_hint),
+            stringResource(
+                if (isUpdate) R.string.persona_gallery_unsaved_update_hint
+                else R.string.persona_gallery_new_character_hint,
+            ),
             style = DsType.small13,
             color = DsTheme.colors.labelSecondary,
         )
         DsButton(
-            text = if (busy) stringResource(R.string.persona_gallery_saving) else stringResource(R.string.persona_gallery_save_enter),
+            text = if (busy) {
+                stringResource(R.string.persona_gallery_saving)
+            } else {
+                stringResource(
+                    if (isUpdate) R.string.persona_gallery_save_update_enter
+                    else R.string.persona_gallery_save_enter,
+                )
+            },
             onClick = {
                 busy = true
                 error = null
                 scope.launch {
-                    onSaveCurrent("", null)
+                    onSaveCurrent()
                         .onSuccess { onContinue() }
                         .onFailure { error = it.message ?: saveFailedText }
                     busy = false
@@ -105,33 +127,51 @@ internal fun PersonaGalleryDialog(
     entries: List<PersonaGalleryEntry>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
+    currentGalleryStoryId: String?,
+    currentHasUnsavedChanges: Boolean,
     currentSessionId: String,
     canSave: Boolean,
-    onSaveCurrent: suspend (String, String?) -> Result<PersonaGalleryEntry>,
-    onEditNotes: suspend (String, String) -> Result<Unit>,
-    onInspect: suspend (String) -> Result<PersonaInspectionResult>,
+    onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
+    onEditNotes: suspend (String, String, String) -> Result<Unit>,
+    onRenameStory: suspend (String, String, String) -> Result<Unit>,
+    onInspect: suspend (String, String?) -> Result<PersonaInspectionResult>,
     onApplySuggestions: suspend (String, List<PersonaAppendSuggestion>) -> Result<PersonaGalleryEntry>,
     onDelete: suspend (String) -> Result<Unit>,
-    onDeleteHistoryMessage: suspend (String, String) -> Result<Unit>,
-    onStart: (String) -> Unit,
+    onDeleteStory: suspend (String, String) -> Result<Unit>,
+    onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
+    onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
+    var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
+    val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
     var search by remember { mutableStateOf("") }
-    var notes by remember(selectedId, selected?.storyNotes) { mutableStateOf(selected?.storyNotes.orEmpty()) }
+    var notes by remember(selectedId, selectedStoryId, selectedStory?.notes) {
+        mutableStateOf(selectedStory?.notes.orEmpty())
+    }
+    var storyTitle by remember(selectedId, selectedStoryId, selectedStory?.title) {
+        mutableStateOf(selectedStory?.title.orEmpty())
+    }
     var busy by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf(false) }
+    var deletingCharacter by remember { mutableStateOf(false) }
+    var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
-    var visibleHistory by remember(selectedId) { mutableStateOf(8) }
-    var showHistory by remember(selectedId) { mutableStateOf(false) }
-    var pendingHistoryDeleteKey by remember(selectedId) { mutableStateOf<String?>(null) }
+    var visibleHistory by remember(selectedId, selectedStoryId) { mutableStateOf(8) }
+    var showHistory by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var notice by remember(selectedId) { mutableStateOf<String?>(null) }
-    var inspection by remember(selectedId) { mutableStateOf<PersonaInspectionResult?>(null) }
-    var inspecting by remember(selectedId) { mutableStateOf(false) }
-    val selectedSuggestionKeys = remember(selectedId) { mutableStateListOf<String>() }
+    var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
+    var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
+    var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
+    var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    val hasLocalStoryEdits = selectedStory?.let { story ->
+        notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
+    } == true
+    val selectedSuggestionKeys = remember(selectedId, selectedStoryId) { mutableStateListOf<String>() }
+
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
     val inspectFailedText = stringResource(R.string.persona_gallery_inspect_failed)
     val appendFailedText = stringResource(R.string.persona_gallery_append_failed)
@@ -140,10 +180,27 @@ internal fun PersonaGalleryDialog(
     val mergedNoticeText = stringResource(R.string.persona_gallery_merged_notice)
     val appendDoneText = stringResource(R.string.persona_gallery_append_done)
     val storySavedText = stringResource(R.string.persona_gallery_story_saved)
+    val storyRenamedText = stringResource(R.string.persona_gallery_story_renamed)
     val mergeDoneText = stringResource(R.string.persona_gallery_merge_done)
     val archiveDeletedText = stringResource(R.string.persona_gallery_archive_deleted)
+    val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
 
-    DsDialog(title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name, onDismiss = onDismiss) {
+    LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
+        val entry = selected ?: return@LaunchedEffect
+        if (entry.stories.none { it.id == selectedStoryId }) {
+            selectedStoryId = if (currentGalleryId == entry.id) {
+                currentGalleryStoryId?.takeIf { id -> entry.stories.any { it.id == id } }
+                    ?: entry.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+            } else {
+                entry.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+            }
+        }
+    }
+
+    DsDialog(
+        title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
+        onDismiss = onDismiss,
+    ) {
         if (selected == null) {
             GalleryOverviewHeader(entries.size)
             Text(
@@ -151,68 +208,65 @@ internal fun PersonaGalleryDialog(
                 style = DsType.caption11,
                 color = DsTheme.colors.labelTertiary,
             )
+
             entries.firstOrNull { it.id == pendingEntryDeleteId }?.let { pending ->
-                DsCard {
-                    Text(
-                        stringResource(
-                            R.string.persona_gallery_delete_saved_confirm,
-                            pending.persona.name,
-                            pending.history.size,
-                        ),
-                        style = DsType.small13,
-                        color = DsTheme.colors.error,
-                    )
-                    Text(
-                        stringResource(R.string.persona_gallery_delete_saved_hint),
-                        style = DsType.caption11,
-                        color = DsTheme.colors.labelTertiary,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DsButton(
-                            text = stringResource(R.string.persona_gallery_cancel),
-                            onClick = { pendingEntryDeleteId = null },
-                            variant = DsButtonVariant.Ghost,
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        )
-                        DsButton(
-                            text = stringResource(R.string.persona_gallery_confirm_delete),
-                            onClick = {
-                                busy = true
-                                error = null
-                                scope.launch {
-                                    onDelete(pending.id)
-                                        .onSuccess { pendingEntryDeleteId = null }
-                                        .onFailure { error = it.message ?: deleteFailedText }
-                                    busy = false
+                DeleteCharacterConfirm(
+                    entry = pending,
+                    busy = busy,
+                    onCancel = { pendingEntryDeleteId = null },
+                    onConfirm = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onDelete(pending.id)
+                                .onSuccess { pendingEntryDeleteId = null }
+                                .onFailure { error = it.message ?: deleteFailedText }
+                            busy = false
+                        }
+                    },
+                )
+            }
+
+            if (currentGalleryId == null || currentHasUnsavedChanges) {
+                DsButton(
+                    text = if (currentGalleryId == null) {
+                        stringResource(R.string.persona_gallery_sync_current, currentPersona.name)
+                    } else {
+                        stringResource(R.string.persona_gallery_update_current, currentPersona.name)
+                    },
+                    onClick = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onSaveCurrent("", currentGalleryId, currentGalleryStoryId, false)
+                                .onSuccess {
+                                    selectedId = it.id
+                                    selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+                                    notice = mergedNoticeText
                                 }
-                            },
-                            variant = DsButtonVariant.Danger,
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        )
-                    }
+                                .onFailure { error = it.message ?: saveFailedText }
+                            busy = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSave && !busy,
+                    variant = DsButtonVariant.Outline,
+                )
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DsTheme.colors.accent.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(R.string.persona_gallery_current_synced),
+                        style = DsType.small13,
+                        color = DsTheme.colors.labelSecondary,
+                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    )
                 }
             }
-            DsButton(
-                text = if (currentGalleryId == null) stringResource(R.string.persona_gallery_sync_current, currentPersona.name) else stringResource(R.string.persona_gallery_update_current, currentPersona.name),
-                onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        onSaveCurrent("", currentGalleryId)
-                            .onSuccess {
-                                selectedId = it.id
-                                notice = mergedNoticeText
-                            }
-                            .onFailure { error = it.message ?: saveFailedText }
-                        busy = false
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy,
-                variant = DsButtonVariant.Outline,
-            )
+
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
@@ -221,12 +275,15 @@ internal fun PersonaGalleryDialog(
                 modifier = Modifier.fillMaxWidth(),
             )
             val query = search.trim()
-            val filtered = entries.filter {
+            val filtered = entries.filter { entry ->
                 query.isBlank() ||
-                    it.persona.name.contains(query, ignoreCase = true) ||
-                    it.persona.identity.contains(query, ignoreCase = true) ||
-                    it.persona.worldSetting.contains(query, ignoreCase = true) ||
-                    it.storyNotes.contains(query, ignoreCase = true)
+                    entry.persona.name.contains(query, ignoreCase = true) ||
+                    entry.persona.identity.contains(query, ignoreCase = true) ||
+                    entry.persona.worldSetting.contains(query, ignoreCase = true) ||
+                    entry.stories.any { story ->
+                        story.title.contains(query, ignoreCase = true) ||
+                            story.notes.contains(query, ignoreCase = true)
+                    }
             }
             if (filtered.isEmpty()) {
                 DsCard {
@@ -245,8 +302,10 @@ internal fun PersonaGalleryDialog(
                     filtered.forEach { entry ->
                         GalleryPersonaCard(
                             entry = entry,
+                            unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
                             onClick = {
                                 selectedId = entry.id
+                                selectedStoryId = null
                                 error = null
                                 notice = null
                             },
@@ -259,19 +318,14 @@ internal fun PersonaGalleryDialog(
                 }
             }
         } else {
-            val dialogueSummary = stringResource(R.string.persona_gallery_dialogue_count, selected.history.size)
-            val relationSummary = if (selected.chatState.dynamics.sharedMoments.isNotEmpty()) {
-                dialogueSummary + " · " + stringResource(
-                    R.string.persona_gallery_moment_count,
-                    selected.chatState.dynamics.sharedMoments.size,
-                )
-            } else {
-                dialogueSummary
-            }
-            PersonaHero(
-                persona = selected.persona,
-                subtitle = relationSummary,
+            val totalDialogue = selected.totalDialogueCount()
+            val relationSummary = stringResource(
+                R.string.persona_gallery_character_summary,
+                selected.stories.size,
+                totalDialogue,
             )
+            PersonaHero(persona = selected.persona, subtitle = relationSummary)
+
             notice?.let {
                 Surface(
                     color = DsTheme.colors.accent.copy(alpha = 0.10f),
@@ -287,202 +341,76 @@ internal fun PersonaGalleryDialog(
                 }
             }
 
-            PersonaDetails(selected.persona)
-
-            if (selected.chatState.updatedAt > 0L) {
-                DsCard {
-                    Text(stringResource(R.string.persona_gallery_story_relation), style = DsType.std14, color = DsTheme.colors.labelPrimary, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        stringResource(R.string.persona_gallery_current_relation, selected.chatState.relationshipState),
-                        style = DsType.small13,
-                        color = DsTheme.colors.labelSecondary,
-                    )
-                    selected.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
-                        Text(
-                            stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
-                            style = DsType.small13,
-                            color = DsTheme.colors.labelSecondary,
-                        )
-                    }
-                    selected.chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let { threads ->
-                        Text(
-                            stringResource(R.string.persona_gallery_unresolved, threads.joinToString("；")),
-                            style = DsType.small13,
-                            color = DsTheme.colors.labelSecondary,
-                        )
-                    }
-                }
-            }
-
             DsButton(
-                text = if (inspecting) stringResource(R.string.persona_gallery_inspecting) else stringResource(R.string.persona_gallery_inspect),
-                onClick = {
-                    inspecting = true
-                    error = null
-                    notice = null
-                    selectedSuggestionKeys.clear()
-                    scope.launch {
-                        onInspect(selected.id)
-                            .onSuccess { inspection = it }
-                            .onFailure { error = it.message ?: inspectFailedText }
-                        inspecting = false
-                    }
-                },
-                variant = DsButtonVariant.Outline,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy && !inspecting,
-            )
-
-            inspection?.let { result ->
-                PersonaInspectionPanel(
-                    result = result,
-                    selectedKeys = selectedSuggestionKeys,
-                    onToggle = { suggestion ->
-                        val key = suggestionKey(suggestion)
-                        if (key in selectedSuggestionKeys) selectedSuggestionKeys.remove(key)
-                        else selectedSuggestionKeys.add(key)
-                    },
-                )
-                if (result.suggestions.isNotEmpty()) {
-                    val chosen = result.suggestions.filter { suggestionKey(it) in selectedSuggestionKeys }
-                    DsButton(
-                        text = stringResource(R.string.persona_gallery_append_selected, chosen.size),
-                        onClick = {
-                            busy = true
-                            error = null
-                            scope.launch {
-                                onApplySuggestions(selected.id, chosen)
-                                    .onSuccess {
-                                        inspection = null
-                                        selectedSuggestionKeys.clear()
-                                        notice = appendDoneText
-                                    }
-                                    .onFailure { error = it.message ?: appendFailedText }
-                                busy = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = chosen.isNotEmpty() && !busy,
-                    )
-                }
-            }
-
-            DsButton(
-                text = if (showHistory) stringResource(R.string.persona_gallery_history_hide) else stringResource(R.string.persona_gallery_history_show),
-                onClick = { showHistory = !showHistory },
+                text = stringResource(
+                    if (showPersonaDetails) R.string.persona_gallery_hide_fixed_persona
+                    else R.string.persona_gallery_show_fixed_persona,
+                ),
+                onClick = { showPersonaDetails = !showPersonaDetails },
                 variant = DsButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (showHistory) {
+            if (showPersonaDetails) {
+                PersonaDetails(selected.persona)
+            }
+
+            Text(
+                stringResource(R.string.persona_gallery_storylines_title),
+                style = DsType.std14,
+                color = DsTheme.colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (selected.stories.isEmpty()) {
                 DsCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Outlined.History,
-                            contentDescription = null,
-                            tint = DsTheme.colors.labelSecondary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.persona_gallery_archived_dialogue), style = DsType.std14, color = DsTheme.colors.labelPrimary)
-                    }
                     Text(
-                        stringResource(R.string.persona_gallery_history_long_press_hint),
-                        style = DsType.caption11,
-                        color = DsTheme.colors.labelTertiary,
+                        stringResource(R.string.persona_gallery_storylines_empty),
+                        style = DsType.small13,
+                        color = DsTheme.colors.labelSecondary,
                     )
-                    val history = selected.history.filter { it.role == "user" || it.role == "assistant" }
-                    history.takeLast(visibleHistory).forEach { line ->
-                        val lineKey = galleryMessageArchiveKey(line)
-                        ArchivedDialogueRow(
-                            text = "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else selected.persona.name}：${line.content}",
-                            onLongClick = {
-                                pendingHistoryDeleteKey = lineKey
-                                error = null
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    selected.stories.sortedByDescending(PersonaGalleryStory::updatedAt).forEach { story ->
+                        GalleryStoryCard(
+                            story = story,
+                            selected = story.id == selectedStoryId,
+                            unsaved = selected.id == currentGalleryId &&
+                                story.id == currentGalleryStoryId &&
+                                currentHasUnsavedChanges,
+                            onClick = {
+                                if (hasLocalStoryEdits && story.id != selectedStoryId) {
+                                    error = saveEditsBeforeSwitchText
+                                } else {
+                                    selectedStoryId = story.id
+                                    error = null
+                                    notice = null
+                                }
                             },
-                        )
-                    }
-                    val pendingHistory = pendingHistoryDeleteKey?.let { key ->
-                        history.firstOrNull { galleryMessageArchiveKey(it) == key }
-                    }
-                    pendingHistory?.let { line ->
-                        DsCard {
-                            Text(
-                                stringResource(R.string.persona_gallery_delete_dialogue_confirm),
-                                style = DsType.small13,
-                                color = DsTheme.colors.error,
-                            )
-                            Text(
-                                "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else selected.persona.name}：${line.content}",
-                                style = DsType.caption11,
-                                color = DsTheme.colors.labelSecondary,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                stringResource(R.string.persona_gallery_delete_dialogue_hint),
-                                style = DsType.caption11,
-                                color = DsTheme.colors.labelTertiary,
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                DsButton(
-                                    text = stringResource(R.string.persona_gallery_cancel),
-                                    onClick = { pendingHistoryDeleteKey = null },
-                                    variant = DsButtonVariant.Ghost,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !busy,
-                                )
-                                DsButton(
-                                    text = stringResource(R.string.persona_gallery_confirm_delete),
-                                    onClick = {
-                                        val key = galleryMessageArchiveKey(line)
-                                        busy = true
-                                        error = null
-                                        scope.launch {
-                                            onDeleteHistoryMessage(selected.id, key)
-                                                .onSuccess {
-                                                    pendingHistoryDeleteKey = null
-                                                    notice = archiveDeletedText
-                                                }
-                                                .onFailure { error = deleteFailedText }
-                                            busy = false
-                                        }
-                                    },
-                                    variant = DsButtonVariant.Danger,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !busy,
-                                )
-                            }
-                        }
-                    }
-                    if (history.size > visibleHistory) {
-                        DsButton(
-                            text = stringResource(R.string.persona_gallery_older_dialogue),
-                            onClick = { visibleHistory += 12 },
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = DsButtonVariant.Ghost,
                         )
                     }
                 }
             }
 
-            OutlinedTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text(stringResource(R.string.persona_gallery_story_notes)) },
-                placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 8,
-                enabled = !busy,
-            )
-            if (notes != selected.storyNotes) {
+            if (
+                currentGalleryId == selected.id &&
+                currentGalleryStoryId == null &&
+                currentHasUnsavedChanges &&
+                canSave
+            ) {
                 DsButton(
-                    text = stringResource(R.string.persona_gallery_save_story),
+                    text = stringResource(R.string.persona_gallery_save_current_new_story),
                     onClick = {
                         busy = true
+                        error = null
                         scope.launch {
-                            onEditNotes(selected.id, notes)
-                                .onSuccess { notice = storySavedText }
+                            onSaveCurrent("", selected.id, null, true)
+                                .onSuccess {
+                                    selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+                                    notice = mergeDoneText
+                                }
                                 .onFailure { error = it.message ?: saveFailedText }
                             busy = false
                         }
@@ -492,82 +420,287 @@ internal fun PersonaGalleryDialog(
                 )
             }
 
-            if (canSave && (currentSessionId == selected.sourceSessionId || currentGalleryId == selected.id)) {
+            selectedStory?.let { story ->
                 DsButton(
-                    text = stringResource(R.string.persona_gallery_merge_current),
-                    onClick = {
-                        busy = true
-                        error = null
-                        scope.launch {
-                            onSaveCurrent(notes, selected.id)
-                                .onSuccess { notice = mergeDoneText }
-                                .onFailure { error = it.message ?: updateFailedText }
-                            busy = false
-                        }
-                    },
+                    text = stringResource(R.string.persona_gallery_continue_story),
+                    onClick = { onStart(selected.id, story.id, false) },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy,
-                    variant = DsButtonVariant.Outline,
+                    enabled = canSave && !busy && !hasLocalStoryEdits,
                 )
             }
-
             DsButton(
-                text = stringResource(R.string.persona_gallery_start_new),
-                onClick = { onStart(selected.id) },
+                text = stringResource(R.string.persona_gallery_start_fresh_story),
+                onClick = { onStart(selected.id, null, true) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy && notes == selected.storyNotes,
+                enabled = canSave && !busy && !hasLocalStoryEdits,
+                variant = DsButtonVariant.Outline,
             )
 
-            if (deleting) {
-                DsCard {
-                    Text(
-                        stringResource(R.string.persona_gallery_delete_confirm),
-                        style = DsType.small13,
-                        color = DsTheme.colors.error,
+            selectedStory?.let { story ->
+                if (editingStoryTitle) {
+                    OutlinedTextField(
+                        value = storyTitle,
+                        onValueChange = { storyTitle = it },
+                        label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DsButton(
                             text = stringResource(R.string.persona_gallery_cancel),
-                            onClick = { deleting = false },
+                            onClick = {
+                                storyTitle = story.title
+                                editingStoryTitle = false
+                            },
                             variant = DsButtonVariant.Ghost,
                             modifier = Modifier.weight(1f),
+                            enabled = !busy,
                         )
                         DsButton(
-                            text = stringResource(R.string.persona_gallery_confirm_delete),
+                            text = stringResource(R.string.persona_gallery_save_story_title),
                             onClick = {
                                 busy = true
                                 scope.launch {
-                                    onDelete(selected.id)
+                                    onRenameStory(selected.id, story.id, storyTitle)
                                         .onSuccess {
-                                            selectedId = null
-                                            deleting = false
+                                            notice = storyRenamedText
+                                            editingStoryTitle = false
                                         }
-                                        .onFailure { error = it.message ?: deleteFailedText }
+                                        .onFailure { error = it.message ?: updateFailedText }
                                     busy = false
                                 }
                             },
-                            variant = DsButtonVariant.Danger,
-                            enabled = !busy,
                             modifier = Modifier.weight(1f),
+                            enabled = !busy &&
+                                storyTitle.trim().isNotBlank() &&
+                                storyTitle.trim() != story.title,
+                        )
+                    }
+                } else {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_rename_story),
+                        onClick = { editingStoryTitle = true },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                }
+
+                StoryDetailSection(
+                    entry = selected,
+                    story = story,
+                    notes = notes,
+                    onNotesChange = { notes = it },
+                    showHistory = showHistory,
+                    onToggleHistory = { showHistory = !showHistory },
+                    visibleHistory = visibleHistory,
+                    onMoreHistory = { visibleHistory += 12 },
+                    pendingHistoryDeleteKey = pendingHistoryDeleteKey,
+                    onPendingHistoryDelete = { pendingHistoryDeleteKey = it },
+                    busy = busy,
+                    onDeleteHistoryMessage = { messageKey ->
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onDeleteHistoryMessage(selected.id, story.id, messageKey)
+                                .onSuccess {
+                                    pendingHistoryDeleteKey = null
+                                    notice = archiveDeletedText
+                                }
+                                .onFailure { error = deleteFailedText }
+                            busy = false
+                        }
+                    },
+                )
+
+                if (notes != story.notes) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_save_story),
+                        onClick = {
+                            busy = true
+                            scope.launch {
+                                onEditNotes(selected.id, story.id, notes)
+                                    .onSuccess { notice = storySavedText }
+                                    .onFailure { error = it.message ?: saveFailedText }
+                                busy = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                }
+
+                DsButton(
+                    text = if (inspecting) {
+                        stringResource(R.string.persona_gallery_inspecting)
+                    } else {
+                        stringResource(R.string.persona_gallery_inspect)
+                    },
+                    onClick = {
+                        inspecting = true
+                        error = null
+                        notice = null
+                        selectedSuggestionKeys.clear()
+                        scope.launch {
+                            onInspect(selected.id, story.id)
+                                .onSuccess { inspection = it }
+                                .onFailure { error = it.message ?: inspectFailedText }
+                            inspecting = false
+                        }
+                    },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy && !inspecting,
+                )
+
+                inspection?.let { result ->
+                    PersonaInspectionPanel(
+                        result = result,
+                        selectedKeys = selectedSuggestionKeys,
+                        onToggle = { suggestion ->
+                            val key = suggestionKey(suggestion)
+                            if (key in selectedSuggestionKeys) selectedSuggestionKeys.remove(key)
+                            else selectedSuggestionKeys.add(key)
+                        },
+                    )
+                    if (result.suggestions.isNotEmpty()) {
+                        val chosen = result.suggestions.filter { suggestionKey(it) in selectedSuggestionKeys }
+                        DsButton(
+                            text = stringResource(R.string.persona_gallery_append_selected, chosen.size),
+                            onClick = {
+                                busy = true
+                                error = null
+                                scope.launch {
+                                    onApplySuggestions(selected.id, chosen)
+                                        .onSuccess {
+                                            inspection = null
+                                            selectedSuggestionKeys.clear()
+                                            notice = appendDoneText
+                                        }
+                                        .onFailure { error = it.message ?: appendFailedText }
+                                    busy = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = chosen.isNotEmpty() && !busy,
                         )
                     }
                 }
+
+                if (
+                    canSave &&
+                    currentGalleryId == selected.id &&
+                    currentGalleryStoryId == story.id
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_merge_current),
+                        onClick = {
+                            busy = true
+                            error = null
+                            scope.launch {
+                                onSaveCurrent(notes, selected.id, story.id, false)
+                                    .onSuccess { notice = mergeDoneText }
+                                    .onFailure { error = it.message ?: updateFailedText }
+                                busy = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                }
+
+                if (deletingStory) {
+                    DsCard {
+                        Text(
+                            stringResource(R.string.persona_gallery_delete_story_confirm, story.title),
+                            style = DsType.small13,
+                            color = DsTheme.colors.error,
+                        )
+                        Text(
+                            stringResource(R.string.persona_gallery_delete_story_hint),
+                            style = DsType.caption11,
+                            color = DsTheme.colors.labelTertiary,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DsButton(
+                                text = stringResource(R.string.persona_gallery_cancel),
+                                onClick = { deletingStory = false },
+                                variant = DsButtonVariant.Ghost,
+                                modifier = Modifier.weight(1f),
+                            )
+                            DsButton(
+                                text = stringResource(R.string.persona_gallery_confirm_delete),
+                                onClick = {
+                                    busy = true
+                                    scope.launch {
+                                        onDeleteStory(selected.id, story.id)
+                                            .onSuccess {
+                                                selectedStoryId = null
+                                                deletingStory = false
+                                            }
+                                            .onFailure { error = it.message ?: deleteFailedText }
+                                        busy = false
+                                    }
+                                },
+                                variant = DsButtonVariant.Danger,
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy,
+                            )
+                        }
+                    }
+                } else {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_delete_story),
+                        onClick = { deletingStory = true },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                }
+            }
+
+            if (deletingCharacter) {
+                DeleteCharacterConfirm(
+                    entry = selected,
+                    busy = busy,
+                    onCancel = { deletingCharacter = false },
+                    onConfirm = {
+                        busy = true
+                        scope.launch {
+                            onDelete(selected.id)
+                                .onSuccess {
+                                    selectedId = null
+                                    selectedStoryId = null
+                                    deletingCharacter = false
+                                }
+                                .onFailure { error = it.message ?: deleteFailedText }
+                            busy = false
+                        }
+                    },
+                )
             } else {
                 DsButton(
                     text = stringResource(R.string.persona_gallery_delete),
-                    onClick = { deleting = true },
+                    onClick = { deletingCharacter = true },
                     variant = DsButtonVariant.Ghost,
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+
             DsButton(
                 text = stringResource(R.string.persona_gallery_back),
                 onClick = {
-                    selectedId = null
-                    deleting = false
-                    error = null
-                    notice = null
+                    if (hasLocalStoryEdits) {
+                        error = saveEditsBeforeSwitchText
+                    } else {
+                        selectedId = null
+                        selectedStoryId = null
+                        deletingCharacter = false
+                        error = null
+                        notice = null
+                    }
                 },
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
@@ -583,6 +716,194 @@ internal fun PersonaGalleryDialog(
             )
         }
     }
+}
+
+@Composable
+private fun DeleteCharacterConfirm(
+    entry: PersonaGalleryEntry,
+    busy: Boolean,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    DsCard {
+        Text(
+            stringResource(
+                R.string.persona_gallery_delete_saved_confirm,
+                entry.persona.name,
+                entry.totalDialogueCount(),
+            ),
+            style = DsType.small13,
+            color = DsTheme.colors.error,
+        )
+        Text(
+            stringResource(R.string.persona_gallery_delete_saved_hint),
+            style = DsType.caption11,
+            color = DsTheme.colors.labelTertiary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DsButton(
+                text = stringResource(R.string.persona_gallery_cancel),
+                onClick = onCancel,
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_confirm_delete),
+                onClick = onConfirm,
+                variant = DsButtonVariant.Danger,
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoryDetailSection(
+    entry: PersonaGalleryEntry,
+    story: PersonaGalleryStory,
+    notes: String,
+    onNotesChange: (String) -> Unit,
+    showHistory: Boolean,
+    onToggleHistory: () -> Unit,
+    visibleHistory: Int,
+    onMoreHistory: () -> Unit,
+    pendingHistoryDeleteKey: String?,
+    onPendingHistoryDelete: (String?) -> Unit,
+    busy: Boolean,
+    onDeleteHistoryMessage: (String) -> Unit,
+) {
+    if (story.chatState.updatedAt > 0L) {
+        DsCard {
+            Text(
+                stringResource(R.string.persona_gallery_story_relation),
+                style = DsType.std14,
+                color = DsTheme.colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.persona_gallery_current_relation, story.chatState.relationshipState),
+                style = DsType.small13,
+                color = DsTheme.colors.labelSecondary,
+            )
+            story.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
+                Text(
+                    stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelSecondary,
+                )
+            }
+            story.chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let { threads ->
+                Text(
+                    stringResource(R.string.persona_gallery_unresolved, threads.joinToString("；")),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelSecondary,
+                )
+            }
+        }
+    }
+
+    DsButton(
+        text = if (showHistory) {
+            stringResource(R.string.persona_gallery_history_hide)
+        } else {
+            stringResource(R.string.persona_gallery_history_show)
+        },
+        onClick = onToggleHistory,
+        variant = DsButtonVariant.Ghost,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (showHistory) {
+        DsCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.History,
+                    contentDescription = null,
+                    tint = DsTheme.colors.labelSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.persona_gallery_archived_dialogue),
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                )
+            }
+            Text(
+                stringResource(R.string.persona_gallery_history_long_press_hint),
+                style = DsType.caption11,
+                color = DsTheme.colors.labelTertiary,
+            )
+            val history = story.history.filter { it.role == "user" || it.role == "assistant" }
+            history.takeLast(visibleHistory).forEach { line ->
+                val lineKey = galleryMessageArchiveKey(line)
+                ArchivedDialogueRow(
+                    text = "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
+                    onLongClick = { onPendingHistoryDelete(lineKey) },
+                )
+            }
+            val pendingHistory = pendingHistoryDeleteKey?.let { key ->
+                history.firstOrNull { galleryMessageArchiveKey(it) == key }
+            }
+            pendingHistory?.let { line ->
+                DsCard {
+                    Text(
+                        stringResource(R.string.persona_gallery_delete_dialogue_confirm),
+                        style = DsType.small13,
+                        color = DsTheme.colors.error,
+                    )
+                    Text(
+                        "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stringResource(R.string.persona_gallery_delete_dialogue_hint),
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelTertiary,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DsButton(
+                            text = stringResource(R.string.persona_gallery_cancel),
+                            onClick = { onPendingHistoryDelete(null) },
+                            variant = DsButtonVariant.Ghost,
+                            modifier = Modifier.weight(1f),
+                            enabled = !busy,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.persona_gallery_confirm_delete),
+                            onClick = { onDeleteHistoryMessage(galleryMessageArchiveKey(line)) },
+                            variant = DsButtonVariant.Danger,
+                            modifier = Modifier.weight(1f),
+                            enabled = !busy,
+                        )
+                    }
+                }
+            }
+            if (history.size > visibleHistory) {
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_older_dialogue),
+                    onClick = onMoreHistory,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+    }
+
+    OutlinedTextField(
+        value = notes,
+        onValueChange = onNotesChange,
+        label = { Text(stringResource(R.string.persona_gallery_story_notes)) },
+        placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
+        modifier = Modifier.fillMaxWidth(),
+        minLines = 3,
+        maxLines = 8,
+        enabled = !busy,
+    )
 }
 
 @Composable
@@ -624,6 +945,7 @@ private fun GalleryOverviewHeader(count: Int) {
 @Composable
 private fun GalleryPersonaCard(
     entry: PersonaGalleryEntry,
+    unsaved: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -634,12 +956,10 @@ private fun GalleryPersonaCard(
         else -> waitingText
     }
     DsCard(
-        modifier = Modifier.pointerInput(entry.id) {
-            detectTapGestures(
-                onTap = { onClick() },
-                onLongPress = { onLongClick() },
-            )
-        },
+        modifier = Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick,
+        ),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(entry.persona.name)
@@ -663,13 +983,65 @@ private fun GalleryPersonaCard(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.history.size))
-            if (entry.chatState.dynamics.sharedMoments.isNotEmpty()) {
-                GalleryPill(stringResource(R.string.persona_gallery_moments_short, entry.chatState.dynamics.sharedMoments.size))
+            if (unsaved) {
+                GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
             }
+            GalleryPill(stringResource(R.string.persona_gallery_story_count, entry.stories.size))
+            GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.totalDialogueCount()))
             if (entry.persona.corrections.isNotEmpty()) {
                 GalleryPill(stringResource(R.string.persona_gallery_corrections_count, entry.persona.corrections.size))
             }
+        }
+    }
+}
+
+@Composable
+private fun GalleryStoryCard(
+    story: PersonaGalleryStory,
+    selected: Boolean,
+    unsaved: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) DsTheme.colors.accent.copy(alpha = 0.10f) else DsTheme.colors.bgLayer1,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val summary = story.notes.ifBlank { story.chatState.relationshipState }
+                if (summary.isNotBlank()) {
+                    Text(
+                        summary,
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (unsaved) {
+                GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
+                Spacer(Modifier.width(6.dp))
+            }
+            GalleryPill(
+                stringResource(
+                    R.string.persona_gallery_dialogue_count,
+                    story.history.count { it.role == "user" || it.role == "assistant" },
+                ),
+            )
         }
     }
 }
@@ -682,9 +1054,10 @@ private fun ArchivedDialogueRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(text) {
-                detectTapGestures(onLongPress = { onLongClick() })
-            },
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onLongClick,
+            ),
         shape = RoundedCornerShape(10.dp),
         color = DsTheme.colors.bgLayer2,
     ) {

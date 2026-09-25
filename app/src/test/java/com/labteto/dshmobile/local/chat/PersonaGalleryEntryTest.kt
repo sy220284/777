@@ -8,9 +8,8 @@ import org.junit.Test
 class PersonaGalleryEntryTest {
     @Test
     fun carriesSavedEventsAcrossLongStoriesWithoutTreatingThemAsNewInstructions() {
-        val entry = PersonaGalleryEntry(
-            id = "saved",
-            persona = PersonaProfile(name = "小岚"),
+        val story = PersonaGalleryStory(
+            id = "story-1",
             history = (1..30).map { index ->
                 LocalHarnessMessage("$index", "assistant", "日常片段$index", createdAt = index.toLong())
             },
@@ -21,8 +20,13 @@ class PersonaGalleryEntryTest {
                 updatedAt = 1L,
             ),
         )
+        val entry = PersonaGalleryEntry(
+            id = "saved",
+            persona = PersonaProfile(name = "小岚"),
+            stories = listOf(story),
+        )
 
-        val context = entry.storyContext()
+        val context = entry.storyContext("story-1")
         assertTrue(context.contains("彼此信任"))
         assertTrue(context.contains("曾经在雨里一起等车"))
         assertTrue(context.contains("答应过一起去海边"))

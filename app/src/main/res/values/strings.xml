@@ -936,18 +936,56 @@
     <string name="panel_artifacts_empty">No delivered artifacts yet</string>
     <string name="panel_involved_files_empty">No files involved in this task yet</string>
 
-    <string name="tasks_schedule_label">Schedule</string>
-    <string name="tasks_schedule_once">Once</string>
-    <string name="tasks_schedule_daily">Daily</string>
-    <string name="tasks_schedule_weekly">Weekly</string>
-    <string name="tasks_schedule_custom">Custom</string>
-    <string name="tasks_first_run_value">First run: %1$s</string>
-    <string name="tasks_custom_hours">Repeat interval (hours)</string>
-    <string name="tasks_custom_hours_hint">Custom intervals must be at least 1 hour</string>
-    <string name="tasks_every_hours">Every %1$d hours</string>
-    <string name="tools_capability_group_hint">Shows capabilities currently loaded. Rows with arrows can be managed directly; the rest are invoked by the agent when needed.</string>
-    <string name="tools_capability_agent_available">Used by the agent when needed</string>
-    <string name="tools_capability_automation_hint">View, create, and cancel scheduled tasks</string>
-    <string name="chat_composer_add_attachment">Add attachment</string>
 
+    <string name="persona_gallery_unsaved_update_title">Unsaved character progress</string>
+    <string name="persona_gallery_unsaved_update_subtitle">This character has new story or persona changes</string>
+    <string name="persona_gallery_unsaved_update_hint">Save before opening the gallery to keep the latest dialogue, relationship state, and persona updates in the current storyline.</string>
+    <string name="persona_gallery_save_update_enter">Save updates and open gallery</string>
+    <string name="persona_gallery_story_renamed">Story title updated</string>
+    <string name="persona_gallery_character_summary">%1$d storylines · %2$d dialogue lines</string>
+    <string name="persona_gallery_storylines_title">Storylines</string>
+    <string name="persona_gallery_storylines_empty">No saved story yet. You can start a fresh story with this character.</string>
+    <string name="persona_gallery_save_current_new_story">Save current chat as a new storyline</string>
+    <string name="persona_gallery_save_story_title">Save story title</string>
+    <string name="persona_gallery_story_title_label">Story title</string>
+    <string name="persona_gallery_delete_story_confirm">Delete “%1$s”?</string>
+    <string name="persona_gallery_delete_story_hint">Only this storyline and its archived dialogue are removed. The character master profile stays.</string>
+    <string name="persona_gallery_delete_story">Delete this storyline</string>
+    <string name="persona_gallery_continue_story">Continue this storyline</string>
+    <string name="persona_gallery_start_fresh_story">Start a fresh story with this character</string>
+    <string name="persona_gallery_story_count">%1$d stories</string>
+    <string name="persona_gallery_untitled_story">Untitled story</string>
+
+
+    <string name="persona_gallery_current_synced">Current character and storyline are fully synced</string>
+    <string name="persona_gallery_unsaved_badge">New changes</string>
+    <string name="persona_gallery_show_fixed_persona">View fixed persona</string>
+    <string name="persona_gallery_hide_fixed_persona">Hide fixed persona</string>
+    <string name="persona_gallery_rename_story">Rename storyline</string>
+
+    <string name="persona_gallery_save_edits_before_switch">Save or cancel the current story edits before switching.</string>
+
+    <string name="local_persona_picker_title">Choose character</string>
+    <string name="local_persona_picker_intro">A new chat can use any saved character or a brand-new one. Choosing a saved character starts a fresh storyline without importing an old story.</string>
+    <string name="local_persona_picker_current">Current character: %1$s</string>
+    <string name="local_persona_picker_new">Create new character</string>
+    <string name="local_persona_picker_edit_current">Edit current character</string>
+    <string name="local_persona_picker_saved">Saved characters</string>
+    <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
+    <string name="local_persona_picker_saved_hint">Saved character</string>
+    <string name="local_persona_picker_switch_requires_new_chat">This chat already has dialogue. Start a new chat before switching or creating a character so storylines do not mix.</string>
+
+<string name="tasks_schedule_label">Schedule</string>
+<string name="tasks_schedule_once">Once</string>
+<string name="tasks_schedule_daily">Daily</string>
+<string name="tasks_schedule_weekly">Weekly</string>
+<string name="tasks_schedule_custom">Custom</string>
+<string name="tasks_first_run_value">First run: %1$s</string>
+<string name="tasks_custom_hours">Repeat interval (hours)</string>
+<string name="tasks_custom_hours_hint">Custom intervals must be at least 1 hour</string>
+<string name="tasks_every_hours">Every %1$d hours</string>
+<string name="tools_capability_group_hint">Shows capabilities currently loaded. Rows with arrows can be managed directly; the rest are invoked by the agent when needed.</string>
+<string name="tools_capability_agent_available">Used by the agent when needed</string>
+<string name="tools_capability_automation_hint">View, create, and cancel scheduled tasks</string>
+<string name="chat_composer_add_attachment">Add attachment</string>
 </resources>

@@ -934,18 +934,56 @@
     <string name="panel_artifacts_empty">当前还没有标记为成果的文件</string>
     <string name="panel_involved_files_empty">当前任务还没有涉及文件</string>
 
-    <string name="tasks_schedule_label">执行方式</string>
-    <string name="tasks_schedule_once">一次</string>
-    <string name="tasks_schedule_daily">每天</string>
-    <string name="tasks_schedule_weekly">每周</string>
-    <string name="tasks_schedule_custom">自定义</string>
-    <string name="tasks_first_run_value">首次执行：%1$s</string>
-    <string name="tasks_custom_hours">重复间隔（小时）</string>
-    <string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
-    <string name="tasks_every_hours">每 %1$d 小时</string>
-    <string name="tools_capability_group_hint">这里展示当前已加载能力；带箭头的项目可直接管理，其余由智能体按任务需要调用。</string>
-    <string name="tools_capability_agent_available">由智能体按需调用</string>
-    <string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
-    <string name="chat_composer_add_attachment">添加附件</string>
 
+    <string name="persona_gallery_unsaved_update_title">人物有新内容未保存</string>
+    <string name="persona_gallery_unsaved_update_subtitle">当前人物的剧情或设定有了新变化</string>
+    <string name="persona_gallery_unsaved_update_hint">进入图集前保存一次，会把最新对白、关系状态和人设变化写回当前故事线，不会另建重复人物卡。</string>
+    <string name="persona_gallery_save_update_enter">保存更新并进入图集</string>
+    <string name="persona_gallery_story_renamed">故事标题已更新</string>
+    <string name="persona_gallery_character_summary">%1$d 条故事线 · %2$d 条对白</string>
+    <string name="persona_gallery_storylines_title">故事线</string>
+    <string name="persona_gallery_storylines_empty">还没有保存过故事。可以只使用这份人物设定开启一条新故事。</string>
+    <string name="persona_gallery_save_current_new_story">把当前会话保存为新故事</string>
+    <string name="persona_gallery_save_story_title">保存故事标题</string>
+    <string name="persona_gallery_story_title_label">故事标题</string>
+    <string name="persona_gallery_delete_story_confirm">删除“%1$s”？</string>
+    <string name="persona_gallery_delete_story_hint">只删除这条故事线及其中的归档对白，人物主档案会保留。</string>
+    <string name="persona_gallery_delete_story">删除这条故事</string>
+    <string name="persona_gallery_continue_story">继续这条故事</string>
+    <string name="persona_gallery_start_fresh_story">只用人物设定开启新故事</string>
+    <string name="persona_gallery_story_count">%1$d 条故事</string>
+    <string name="persona_gallery_untitled_story">未命名故事</string>
+
+
+    <string name="persona_gallery_current_synced">当前人物与故事已同步</string>
+    <string name="persona_gallery_unsaved_badge">有新内容</string>
+    <string name="persona_gallery_show_fixed_persona">查看固定人设</string>
+    <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
+    <string name="persona_gallery_rename_story">重命名故事</string>
+    <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
+
+
+    <string name="local_persona_picker_title">选择人物</string>
+    <string name="local_persona_picker_intro">新对话可以直接选择已保存的人物，也可以新建人物。选中后会从一条全新的故事开始，不带入旧故事线。</string>
+    <string name="local_persona_picker_current">当前人物：%1$s</string>
+    <string name="local_persona_picker_new">新建人物</string>
+    <string name="local_persona_picker_edit_current">编辑当前人物</string>
+    <string name="local_persona_picker_saved">已创建人物</string>
+    <string name="local_persona_picker_empty">还没有保存过人物。可以先新建一个，聊天后再收入人设图集。</string>
+    <string name="local_persona_picker_saved_hint">已保存人物</string>
+    <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
+
+<string name="tasks_schedule_label">执行方式</string>
+<string name="tasks_schedule_once">一次</string>
+<string name="tasks_schedule_daily">每天</string>
+<string name="tasks_schedule_weekly">每周</string>
+<string name="tasks_schedule_custom">自定义</string>
+<string name="tasks_first_run_value">首次执行：%1$s</string>
+<string name="tasks_custom_hours">重复间隔（小时）</string>
+<string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
+<string name="tasks_every_hours">每 %1$d 小时</string>
+<string name="tools_capability_group_hint">这里展示当前已加载能力；带箭头的项目可直接管理，其余由智能体按任务需要调用。</string>
+<string name="tools_capability_agent_available">由智能体按需调用</string>
+<string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
+<string name="chat_composer_add_attachment">添加附件</string>
 </resources>
