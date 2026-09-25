@@ -12,6 +12,10 @@ import java.security.MessageDigest
  */
 internal class LocalToolOutputStore(
     private val root: File,
+    private val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
+    private val maxFilesPerSession: Int = DEFAULT_MAX_FILES_PER_SESSION,
+    private val maxSessionBytes: Long = DEFAULT_MAX_SESSION_BYTES,
+    private val maxGlobalBytes: Long = DEFAULT_MAX_GLOBAL_BYTES,
 ) {
     init {
         root.mkdirs()
@@ -22,7 +26,7 @@ internal class LocalToolOutputStore(
     @Synchronized
     fun store(sessionId: String, callId: String, content: String): Stored? {
         val bytes = content.toByteArray(Charsets.UTF_8)
-        if (bytes.size > MAX_OUTPUT_BYTES) return null
+        if (bytes.size > maxOutputBytes) return null
 
         val dir = sessionDir(sessionId).apply { mkdirs() }
         val target = File(dir, key(callId) + ".txt")
@@ -33,7 +37,8 @@ internal class LocalToolOutputStore(
             temp.delete()
         }
         target.setLastModified(System.currentTimeMillis())
-        prune(dir)
+        pruneSession(dir)
+        pruneGlobal()
         return Stored(bytes.size)
     }
 
@@ -119,12 +124,39 @@ internal class LocalToolOutputStore(
 
     private fun sessionDir(sessionId: String): File = File(root, key(sessionId))
 
-    private fun prune(dir: File) {
+    private fun pruneSession(dir: File) {
+        var keptBytes = 0L
         dir.listFiles()
             .orEmpty()
-            .filter(File::isFile)
+            .filter { it.isFile && !it.name.startsWith(".") }
             .sortedByDescending(File::lastModified)
-            .drop(MAX_FILES_PER_SESSION)
+            .forEachIndexed { index, file ->
+                val nextBytes = keptBytes + file.length()
+                if (index >= maxFilesPerSession || nextBytes > maxSessionBytes) {
+                    file.delete()
+                } else {
+                    keptBytes = nextBytes
+                }
+            }
+    }
+
+    private fun pruneGlobal() {
+        var keptBytes = 0L
+        root.walkTopDown()
+            .filter { it.isFile && !it.name.startsWith(".") }
+            .sortedByDescending(File::lastModified)
+            .forEach { file ->
+                val nextBytes = keptBytes + file.length()
+                if (nextBytes > maxGlobalBytes) {
+                    file.delete()
+                } else {
+                    keptBytes = nextBytes
+                }
+            }
+        root.listFiles()
+            .orEmpty()
+            .filter(File::isDirectory)
+            .filter { it.listFiles().isNullOrEmpty() }
             .forEach(File::delete)
     }
 
