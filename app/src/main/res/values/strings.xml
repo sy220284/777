@@ -1077,4 +1077,26 @@
 <string name="tools_capability_agent_available">Used by the agent when needed</string>
 <string name="tools_capability_automation_hint">View, create, and cancel scheduled tasks</string>
 <string name="chat_composer_add_attachment">Add attachment</string>
+
+    <string name="tasks_chat_title">Scheduled interactions</string>
+    <string name="tasks_chat_subtitle">Let the current character reach out at a chosen time and continue this relationship and story.</string>
+    <string name="tasks_chat_new">New interaction</string>
+    <string name="tasks_chat_target">Current character: %1$s</string>
+    <string name="tasks_chat_character_fallback">Character</string>
+    <string name="tasks_chat_group_unsupported">Scheduled roleplay interactions currently support single-character chats only.</string>
+    <string name="tasks_chat_prompt_label">Trigger intent</string>
+    <string name="tasks_chat_prompt_hint">For example: Reach out naturally and start a topic based on our recent conversation</string>
+    <string name="tasks_chat_presets">Quick scenes</string>
+    <string name="tasks_chat_preset_morning">Good morning</string>
+    <string name="tasks_chat_preset_night">Good night</string>
+    <string name="tasks_chat_preset_reach_out">Reach out</string>
+    <string name="tasks_chat_preset_story">Story event</string>
+    <string name="tasks_chat_preset_promise">Our promise</string>
+    <string name="tasks_chat_preset_morning_prompt">Reach out naturally in the morning. Based on the current relationship, say good morning or start a fitting topic for the day.</string>
+    <string name="tasks_chat_preset_night_prompt">Reach out naturally at night. Based on the current relationship and recent conversation, say good night or stay and chat for a while.</string>
+    <string name="tasks_chat_preset_reach_out_prompt">Reach out as if something naturally made you think of me. Use the recent conversation and current relationship to start a fresh topic in character.</string>
+    <string name="tasks_chat_preset_story_prompt">Continue the current story with a small in-character event, piece of news, invitation, or situation that fits the world and moves the roleplay forward.</string>
+    <string name="tasks_chat_preset_promise_prompt">Naturally bring up a real promise, plan, or important thing from our existing conversation in the character’s own voice. If no clear promise exists, do not invent one.</string>
+    <string name="tasks_chat_notification_title">%1$s sent you a message</string>
+
 </resources>
