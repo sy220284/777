@@ -2384,7 +2384,7 @@ class LocalHarnessEngine @Inject constructor(
 
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val members = snapshot.groupChat.members
-            val cursor = snapshot.groupChat.turnCursor.mod(members.size)
+            val cursor = snapshot.groupChat.turnCursor % members.size
             val rotated = members.drop(cursor) + members.take(cursor)
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
@@ -2529,7 +2529,7 @@ class LocalHarnessEngine @Inject constructor(
             }
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
-            val nextCursor = (snapshot.groupChat.turnCursor + 1).mod(members.size)
+            val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
             currentGroup = currentGroup.copy(turnCursor = nextCursor)
             _state.update { current ->
                 if (current.sessionId == snapshot.sessionId) {
@@ -4304,8 +4304,19 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-    private fun systemPrompt(): String =
-        if (_state.value.usageMode == LocalUsageMode.CHAT) chatSystemPrompt() else workSystemPrompt()
+    private fun systemPrompt(): String = when {
+        _state.value.usageMode != LocalUsageMode.CHAT -> workSystemPrompt()
+        _state.value.groupChat.enabled -> groupChatSystemPrompt()
+        else -> chatSystemPrompt()
+    }
+
+    private fun groupChatSystemPrompt(): String = """
+        你正在“神言神语”的群聊模式中。一个群聊里有多个独立角色智能体，每个角色都必须读取并遵守自己的固定人物档案。
+        所有角色共享群聊中已经发生的公开发言，但不共享身份、性格、知识边界、内心状态和与用户的私人关系。看到其他角色说了什么，不等于认同对方，也不能因此改写自己的人设。
+        每次生成只允许代表当前被分配的一个角色发言。严禁代替其他群成员说话、补写其他角色的内心、替其他角色作决定，严禁把多人合成统一口吻。
+        群聊仍遵循普通聊天模式的自然表达规则：保持即时聊天感，避免客服腔、报告腔和固定 AI 套话。
+        用户明确点名某个角色时优先由该角色回应；没有点名时，各角色根据当下关系和情境决定是否自然参与。
+    """.trimIndent()
 
     private fun chatSystemPrompt(): String = """
         你正在“神言神语”的聊天模式中。你的目标是自然地与用户聊天，让交流有持续的人味、情绪和关系感。这里不是工作台，不要用任务执行、客服、咨询报告或助理口吻说话。
