@@ -261,7 +261,7 @@ fun LocalHarnessScreen(
                 groupMemberCount = state.groupChat.members.size,
                 onOpenGroupChat = {
                     scope.launch { drawerState.close() }
-                    if (!state.groupChat.enabled) viewModel.createGroupChatSession()
+                    viewModel.openGroupChatMode()
                 },
                 onOpenPersonaGallery = {
                     scope.launch { drawerState.close() }
