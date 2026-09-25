@@ -11,6 +11,7 @@ internal data class LocalSessionControlProjection(
     val todos: List<LocalTodoItem>,
     val goal: LocalGoal?,
     val planMode: Boolean,
+    val chatBranches: LocalChatBranchState,
 )
 
 /**
@@ -39,6 +40,7 @@ internal fun projectSessionControlTail(
     var todos = snapshot.todos
     var goal = snapshot.goal
     var planMode = snapshot.planMode
+    var chatBranches = snapshot.chatBranches
 
     events
         .asSequence()
@@ -64,6 +66,11 @@ internal fun projectSessionControlTail(
                         planMode = active
                     }
                 }
+                "chat/branch-state" -> {
+                    decodeChatBranchStateEvent(event.data)?.let { decoded ->
+                        chatBranches = decoded
+                    }
+                }
             }
         }
 
@@ -72,6 +79,7 @@ internal fun projectSessionControlTail(
         todos = todos,
         goal = goal,
         planMode = planMode,
+        chatBranches = chatBranches,
     )
 }
 
