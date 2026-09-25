@@ -392,6 +392,11 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             current.copy(jobs = projectExecutionJobs(current.usageMode, snapshot))
         }
+        LocalExecutionService.syncJobs(
+            context = context,
+            sessionId = currentSessionId,
+            activeJobs = snapshot.filter { it.status == "running" },
+        )
     }
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
@@ -2085,6 +2090,12 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun runWorkTurn(input: String, memoryInput: String = input) {
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
+        val foregroundSessionId = currentSessionId
+        val keepForeground = _state.value.usageMode == LocalUsageMode.WORK
+        var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
+        if (keepForeground) {
+            LocalExecutionService.holdTurn(context, foregroundSessionId)
+        }
         _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
@@ -2271,6 +2282,9 @@ class LocalHarnessEngine @Inject constructor(
                     }
                     is AgentEvent.StepStarted -> {
                         activeStep = event.step
+                        if (keepForeground) {
+                            LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)
+                        }
                         activeToolCalls = emptyList()
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
@@ -2428,9 +2442,11 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
         } catch (_: CancellationException) {
+            foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
-            _state.update { it.copy(error = error.message ?: "本机 Harness 执行失败") }
+            foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
+            _state.update { it.copy(error = error.message ?: "本机执行失败") }
             // TurnFailed durably records and projects the visible failure message.
         } finally {
             interactions.cancelAll()
@@ -2448,6 +2464,9 @@ class LocalHarnessEngine @Inject constructor(
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) {
                 if (activeJob === completedJob) activeJob = null
+            }
+            if (keepForeground) {
+                LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
             }
             startNextQueuedTurnIfIdle()?.start()
         }
