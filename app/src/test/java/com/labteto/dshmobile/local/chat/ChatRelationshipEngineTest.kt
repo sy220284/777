@@ -48,6 +48,34 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun workAndFictionLanguageDoNotTriggerRelationshipRouting() {
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("他为什么不回邮件"),
+        )
+        assertEquals(
+            RelationshipScenario.GENERAL,
+            engine.classifyScenario("他为什么不回邮件"),
+        )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("小说里他为什么不回消息"),
+        )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("这个角色他为什么突然不回消息"),
+        )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("帮我回客户邮件，告诉他明天给结果"),
+        )
+        assertEquals(
+            ChatRelationshipView.IMMERSIVE,
+            engine.classify("这个客户关系怎么样，为什么最近不推进"),
+        )
+    }
+
+    @Test
     fun scenariosUseDifferentReasoningRoutes() {
         assertEquals(
             RelationshipScenario.CONFLICT_REPAIR,
