@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.Json
 
 class LocalGroupChatTest {
     private val ayaka = LocalGroupChatMember(
@@ -150,5 +151,18 @@ class LocalGroupChatTest {
     fun groupStateDefaultsToSingleAndNeedsExplicitGroupMode() {
         assertTrue(!LocalGroupChatState().enabled)
         assertTrue(LocalGroupChatState(mode = LocalChatMode.GROUP).enabled)
+    }
+
+    @Test
+    fun announcementSurvivesSessionSerializationAndOldGroupStatesStillLoad() {
+        val old = Json.decodeFromString<LocalGroupChatState>("""{"mode":"GROUP"}""")
+        assertEquals("", old.announcement)
+
+        val saved = old.copy(announcement = "众人被同一封邀请函叫到现场。")
+        val restored = Json.decodeFromString<LocalGroupChatState>(
+            Json.encodeToString(LocalGroupChatState.serializer(), saved),
+        )
+        assertEquals(saved.announcement, restored.announcement)
+        assertTrue(restored.enabled)
     }
 }

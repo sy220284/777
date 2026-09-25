@@ -25,6 +25,8 @@ data class LocalGroupChatState(
     val mode: LocalChatMode = LocalChatMode.SINGLE,
     val members: List<LocalGroupChatMember> = emptyList(),
     val turnCursor: Int = 0,
+    /** Public scene premise shared with every group member in this conversation. */
+    val announcement: String = "",
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
 }

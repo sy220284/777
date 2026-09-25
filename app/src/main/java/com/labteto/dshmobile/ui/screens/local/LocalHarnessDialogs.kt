@@ -90,7 +90,6 @@ internal fun ChatPersonaPickerDialog(
     currentGalleryId: String?,
     canSwitchPersona: Boolean,
     onSelect: (String) -> Boolean,
-    onCreate: () -> Unit,
     onEditCurrent: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -134,11 +133,6 @@ internal fun ChatPersonaPickerDialog(
                 color = colors.labelTertiary,
             )
         } else {
-            DsButton(
-                text = stringResource(R.string.local_persona_picker_new),
-                onClick = onCreate,
-                modifier = Modifier.fillMaxWidth(),
-            )
             if (entries.isEmpty()) {
                 Text(
                     stringResource(R.string.local_persona_picker_empty),
@@ -333,9 +327,10 @@ internal fun QuestionDialog(
 @Composable
 internal fun ChatPersonaDialog(
     profile: PersonaProfile,
-    onSave: (PersonaProfile) -> Unit,
+    onSave: suspend (PersonaProfile) -> Result<Unit>,
     onAutoFill: suspend (String) -> Result<PersonaProfile>,
     onDismiss: () -> Unit,
+    creatingNew: Boolean = false,
 ) {
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
@@ -359,6 +354,8 @@ internal fun ChatPersonaDialog(
     }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
+    var saving by remember(profile.id) { mutableStateOf(false) }
+    var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -408,7 +405,7 @@ internal fun ChatPersonaDialog(
                     color = DsTheme.colors.labelPrimary,
                 )
                 Text(
-                    stringResource(R.string.local_persona_ai_hint),
+                    stringResource(if (creatingNew) R.string.local_persona_ai_new_hint else R.string.local_persona_ai_hint),
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                 )
@@ -455,7 +452,7 @@ internal fun ChatPersonaDialog(
                     )
                 } else if (aiSucceeded) {
                     Text(
-                        stringResource(R.string.local_persona_ai_synced),
+                        stringResource(if (creatingNew) R.string.local_persona_ai_new_draft else R.string.local_persona_ai_synced),
                         style = DsType.caption11,
                         color = DsTheme.colors.labelSecondary,
                     )
@@ -495,8 +492,10 @@ internal fun ChatPersonaDialog(
         DsButton(
             text = stringResource(R.string.local_persona_save),
             onClick = {
-                onSave(
-                    runtimeProfile.copy(
+                saving = true
+                saveError = null
+                coroutineScope.launch {
+                    val result = runCatching { onSave(runtimeProfile.copy(
                         name = name,
                         identity = identity,
                         background = background,
@@ -509,13 +508,16 @@ internal fun ChatPersonaDialog(
                         bannedPhrases = lines(banned),
                         signaturePhrases = lines(signature),
                         corrections = lines(corrections),
-                    ),
-                )
-                onDismiss()
+                    )) }.getOrElse { Result.failure(it) }
+                    result.onSuccess { onDismiss() }
+                        .onFailure { saveError = it.message ?: "保存失败" }
+                    saving = false
+                }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = name.isNotBlank() && !aiGenerating,
+            enabled = name.isNotBlank() && !aiGenerating && !saving,
         )
+        saveError?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
     }
 }
 

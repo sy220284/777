@@ -191,6 +191,7 @@ fun LocalHarnessScreen(
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
     var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
+    var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
 
@@ -281,6 +282,10 @@ fun LocalHarnessScreen(
                         showPersonaGallery = true
                     }
                 },
+                onNewPersona = {
+                    scope.launch { drawerState.close() }
+                    showNewPersona = true
+                },
                 onTasks = {
                     scope.launch { drawerState.close() }
                     onOpenTasks()
@@ -346,8 +351,9 @@ fun LocalHarnessScreen(
                 onConfigureChatPersona = viewModel::configureChatPersona,
                 onConfigureGroupMembers = viewModel::configureGroupChatMembers,
                 onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
-                onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
+                onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
+                onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
                 onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
@@ -370,6 +376,16 @@ fun LocalHarnessScreen(
                 showNewSessionMode = false
                 viewModel.createSession(mode)
             },
+        )
+    }
+
+    if (showNewPersona && state.usageMode == LocalUsageMode.CHAT) {
+        ChatPersonaDialog(
+            profile = remember { PersonaProfile(name = "") },
+            onSave = { profile -> viewModel.createGalleryPersona(profile).map { Unit } },
+            onAutoFill = viewModel::autoFillNewPersona,
+            onDismiss = { showNewPersona = false },
+            creatingNew = true,
         )
     }
 
@@ -483,6 +499,7 @@ private fun LocalModeDrawer(
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
+    onNewPersona: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
@@ -595,6 +612,11 @@ private fun LocalModeDrawer(
                         title = stringResource(R.string.persona_gallery_title),
                         trailing = galleryCount.toString(),
                         onClick = onOpenPersonaGallery,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Filled.Add,
+                        title = stringResource(R.string.local_persona_picker_new),
+                        onClick = onNewPersona,
                     )
                     DrawerPrimaryAction(
                         icon = Icons.Outlined.Schedule,
@@ -1104,8 +1126,9 @@ private fun LocalChat(
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
-    onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    onSaveGroupAnnouncement: (String) -> Boolean,
+    onGenerateGroupAnnouncement: suspend (String) -> Result<String>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
@@ -1152,8 +1175,8 @@ private fun LocalChat(
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
+    var showGroupAnnouncement by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
-    var creatingPersona by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
@@ -1400,6 +1423,30 @@ private fun LocalChat(
                     color = colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
+            }
+        }
+
+        if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
+            Surface(
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny)
+                    .clickable { showGroupAnnouncement = true },
+            ) {
+                Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
+                    Text(stringResource(R.string.local_group_announcement_title),
+                        style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(
+                        state.groupChat.announcement.ifBlank {
+                            stringResource(R.string.local_group_announcement_empty)
+                        },
+                        style = DsType.small13,
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 
@@ -1830,6 +1877,16 @@ private fun LocalChat(
             onDismiss = { showGroupMemberPicker = false },
         )
     }
+    if (showGroupAnnouncement && state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
+        GroupAnnouncementSheet(
+            sessionId = state.sessionId,
+            announcement = state.groupChat.announcement,
+            enabled = !state.running,
+            onSave = onSaveGroupAnnouncement,
+            onGenerate = onGenerateGroupAnnouncement,
+            onDismiss = { showGroupAnnouncement = false },
+        )
+    }
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&
@@ -1842,15 +1899,8 @@ private fun LocalChat(
             canSwitchPersona = !state.running &&
                 state.messages.none { it.role == "user" || it.role == "assistant" },
             onSelect = onSelectGalleryPersona,
-            onCreate = {
-                showPersonaPicker = false
-                creatingPersona = true
-                personaEditorDraft = PersonaProfile(name = "")
-                showPersonaEditor = true
-            },
             onEditCurrent = {
                 showPersonaPicker = false
-                creatingPersona = false
                 personaEditorDraft = state.chatPersona
                 showPersonaEditor = true
             },
@@ -1861,19 +1911,14 @@ private fun LocalChat(
         ChatPersonaDialog(
             profile = personaEditorDraft ?: state.chatPersona,
             onSave = { profile ->
-                if (creatingPersona) {
-                    onCreateChatPersona(profile)
-                } else {
-                    onConfigureChatPersona(profile)
-                }
+                onConfigureChatPersona(profile)
                 personaEditorDraft = null
-                creatingPersona = false
+                Result.success(Unit)
             },
             onAutoFill = onAutoFillChatPersona,
             onDismiss = {
                 showPersonaEditor = false
                 personaEditorDraft = null
-                creatingPersona = false
             },
         )
     }

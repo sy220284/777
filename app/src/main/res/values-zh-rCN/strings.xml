@@ -816,6 +816,16 @@
     <string name="local_usage_chat">聊天</string>
     <string name="local_usage_work">工作</string>
     <string name="local_group_chat">群聊模式</string>
+    <string name="local_group_announcement_title">群公告 · 剧情背景</string>
+    <string name="local_group_announcement_empty">设置群聊背景，让每位人物进入群聊时了解眼前的局面。点击编辑。</string>
+    <string name="local_group_announcement_hint">群内所有人物都能看到这段背景。你可以自己写，也可以先生成一段剧情再修改；公告不会改变人物固定设定。</string>
+    <string name="local_group_announcement_content">群公告</string>
+    <string name="local_group_announcement_direction">想要的剧情方向</string>
+    <string name="local_group_announcement_direction_hint">例如：有冲突的修罗场、误会、对峙……</string>
+    <string name="local_group_announcement_drama">修罗场</string>
+    <string name="local_group_announcement_mystery">悬疑对峙</string>
+    <string name="local_group_announcement_generate">生成剧情草稿</string>
+    <string name="local_group_announcement_save">保存公告</string>
     <string name="local_group_chat_title">群聊</string>
     <string name="local_group_chat_member_count">%1$d 位角色</string>
     <string name="local_group_chat_active_speaker">%1$s 正在回复…</string>
@@ -1018,12 +1028,12 @@
 
 
     <string name="local_persona_picker_title">选择人物</string>
-    <string name="local_persona_picker_intro">新对话可以直接选择已保存的人物，也可以新建人物。选中后会从一条全新的故事开始，不带入旧故事线。</string>
+    <string name="local_persona_picker_intro">新对话可以选择人设图集里已保存的人物；新建人物请到侧边栏的人设图集下方。选中后会从一条全新的故事开始。</string>
     <string name="local_persona_picker_current">当前人物：%1$s</string>
     <string name="local_persona_picker_new">新建人物</string>
     <string name="local_persona_picker_edit_current">编辑当前人物</string>
     <string name="local_persona_picker_saved">已创建人物</string>
-    <string name="local_persona_picker_empty">还没有保存过人物。可以先新建一个，聊天后再收入人设图集。</string>
+    <string name="local_persona_picker_empty">还没有保存过人物。到侧边栏点“新建人物”，保存后就能在这里选择。</string>
     <string name="local_persona_picker_saved_hint">已保存人物</string>
 
 
