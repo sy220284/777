@@ -4547,14 +4547,14 @@ class LocalHarnessEngine @Inject constructor(
         return when (call.name) {
             "read", "read_file" -> workspace.read(
                 relativePath = args.string("path"),
-                startByte = args.int("start_byte", 0),
-                maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
+                startLine = args.int("start_line", 1),
+                endLine = args.int("end_line", args.int("start_line", 1) + 399),
             )
             "tool_output_read" -> toolOutputStore.read(
                 sessionId = currentSessionId,
                 callId = args.string("call_id"),
-                startLine = args.int("start_line", 1),
-                endLine = args.int("end_line", args.int("start_line", 1) + 399),
+                startByte = args.int("start_byte", 0),
+                maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
             "file_inspect" -> fileInspector.inspect(args.string("path"))
             "write", "write_file" -> {
