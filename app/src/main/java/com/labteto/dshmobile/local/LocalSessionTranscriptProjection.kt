@@ -53,6 +53,17 @@ internal fun projectSessionTranscriptTail(
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy { event -> event.sequence }
         .forEach { event ->
+            if (event.type == "chat/active-transcript") {
+                val decoded = decodeTranscriptMessages(event.data)
+                if (decoded != null) {
+                    messages.clear()
+                    messages += decoded
+                    knownIds.clear()
+                    knownIds += decoded.map(LocalHarnessMessage::id)
+                }
+                projectedThrough = maxOf(projectedThrough, event.sequence)
+                return@forEach
+            }
             if (event.type == "assistant/message") {
                 val replacedId = (event.data["replaces"] as? JsonPrimitive)?.contentOrNull
                 if (replacedId != null) {

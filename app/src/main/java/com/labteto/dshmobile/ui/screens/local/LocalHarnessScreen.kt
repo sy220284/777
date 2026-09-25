@@ -49,6 +49,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -106,8 +108,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.chatBranchInfo
+import com.labteto.dshmobile.local.chatBranchingEligible
+import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
@@ -285,6 +291,8 @@ fun LocalHarnessScreen(
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
+                onEditAndResend = viewModel::editAndResendUserMessage,
+                onSelectMessageVariant = viewModel::selectChatMessageVariant,
                 onRegenerate = viewModel::regenerateReply,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
@@ -992,6 +1000,8 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
+    onEditAndResend: (String, String) -> Boolean,
+    onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
@@ -1051,16 +1061,27 @@ private fun LocalChat(
     var creatingPersona by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
+    var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
+    var editingUserText by rememberSaveable { mutableStateOf("") }
+    var editingUserError by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
-    LaunchedEffect(state.sessionId, state.usageMode) { showReplySuggestions = false }
+    val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
+        chatBranchingEligible(state.messages)
+    LaunchedEffect(state.sessionId, state.usageMode) {
+        showReplySuggestions = false
+        editingUserMessage = null
+        editingUserText = ""
+        editingUserError = null
+    }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
+    val editUserMessageFailed = stringResource(R.string.local_edit_user_message_failed)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -1341,9 +1362,23 @@ private fun LocalChat(
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> LocalMessageRow(
-                            transcriptItem.message,
+                            message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
+                            canEdit = messageBranchingEnabled &&
+                                !state.running &&
+                                !chatMessageHasAttachmentContext(transcriptItem.message),
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            branchInfo = if (messageBranchingEnabled) {
+                                chatBranchInfo(state.chatBranches, transcriptItem.message.id)
+                            } else {
+                                null
+                            },
+                            onEdit = { message ->
+                                editingUserMessage = message
+                                editingUserText = message.content
+                                editingUserError = null
+                            },
+                            onSelectVariant = onSelectMessageVariant,
                             onRegenerate = onRegenerate,
                         )
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
@@ -1654,6 +1689,67 @@ private fun LocalChat(
             },
         )
     }
+    editingUserMessage?.let { message ->
+        DsBottomSheet(
+            title = stringResource(R.string.local_edit_user_message),
+            onDismiss = {
+                editingUserMessage = null
+                editingUserText = ""
+                editingUserError = null
+            },
+        ) {
+            Text(
+                stringResource(R.string.local_edit_user_message_hint),
+                style = DsType.small13,
+                color = colors.labelSecondary,
+            )
+            OutlinedTextField(
+                value = editingUserText,
+                onValueChange = {
+                    editingUserText = it
+                    editingUserError = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 8,
+            )
+            editingUserError?.let { error ->
+                Text(error, style = DsType.small13, color = colors.error)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = {
+                        editingUserMessage = null
+                        editingUserText = ""
+                        editingUserError = null
+                    },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_edit_user_message_resend),
+                    onClick = {
+                        if (onEditAndResend(message.id, editingUserText)) {
+                            editingUserMessage = null
+                            editingUserText = ""
+                            editingUserError = null
+                        } else {
+                            editingUserError = editUserMessageFailed
+                        }
+                    },
+                    enabled = editingUserText.trim().isNotEmpty() &&
+                        editingUserText.trim() != message.content.trim() &&
+                        !state.running,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+    }
+
     if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
         state.replySuggestions.any { it.text.isNotBlank() }) {
         DsBottomSheet(
@@ -2158,7 +2254,11 @@ private fun localJobStatusLabel(status: String): String = when (status) {
 private fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
+    canEdit: Boolean,
     canRegenerate: Boolean,
+    branchInfo: LocalChatBranchInfo?,
+    onEdit: (LocalHarnessMessage) -> Unit,
+    onSelectVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
 ) {
     val colors = DsTheme.colors
@@ -2166,7 +2266,33 @@ private fun LocalMessageRow(
     val clipboard = LocalClipboardManager.current
 
     when (message.role) {
-        "user" -> UserBubble(message.content)
+        "user" -> Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            UserBubble(message.content)
+            if (chatMode && (canEdit || branchInfo != null)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    MessageVariantControls(
+                        messageId = message.id,
+                        branchInfo = branchInfo,
+                        onSelectVariant = onSelectVariant,
+                    )
+                    if (canEdit) {
+                        DsIconButton(
+                            icon = FeatherIcons.Edit3,
+                            contentDescription = stringResource(R.string.local_edit_user_message),
+                            onClick = { onEdit(message) },
+                            tint = colors.labelTertiary.copy(alpha = 0.78f),
+                        )
+                    }
+                }
+            }
+        }
 
         "system" -> Unit
 
@@ -2194,7 +2320,18 @@ private fun LocalMessageRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 MarkdownText(message.content)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (chatMode) {
+                        MessageVariantControls(
+                            messageId = message.id,
+                            branchInfo = branchInfo,
+                            onSelectVariant = onSelectVariant,
+                        )
+                    }
                     DsIconButton(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.chat_copy_answer),
@@ -2211,6 +2348,35 @@ private fun LocalMessageRow(
             }
         }
     }
+}
+
+@Composable
+private fun MessageVariantControls(
+    messageId: String,
+    branchInfo: LocalChatBranchInfo?,
+    onSelectVariant: (String, Int) -> Boolean,
+) {
+    val info = branchInfo ?: return
+    val colors = DsTheme.colors
+    DsIconButton(
+        icon = Icons.Filled.KeyboardArrowLeft,
+        contentDescription = stringResource(R.string.local_previous_variant),
+        onClick = { onSelectVariant(messageId, info.index - 1) },
+        enabled = info.hasPrevious,
+        tint = colors.labelTertiary.copy(alpha = 0.78f),
+    )
+    Text(
+        text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
+        style = DsType.caption11,
+        color = colors.labelTertiary,
+    )
+    DsIconButton(
+        icon = Icons.Filled.KeyboardArrowRight,
+        contentDescription = stringResource(R.string.local_next_variant),
+        onClick = { onSelectVariant(messageId, info.index + 1) },
+        enabled = info.hasNext,
+        tint = colors.labelTertiary.copy(alpha = 0.78f),
+    )
 }
 
 @Composable

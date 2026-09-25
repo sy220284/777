@@ -84,6 +84,32 @@ class LocalSessionTranscriptProjectionTest {
     }
 
     @Test
+    fun activeTranscriptEventRestoresSelectedConversationBranch() {
+        val oldUser = message("u-old", "user", "原问题", 1L)
+        val oldAnswer = message("a-old", "assistant", "原回答", 2L)
+        val editedUser = message("u-new", "user", "修改后的问题", 3L)
+        val editedAnswer = message("a-new", "assistant", "新回答", 4L)
+        val branchEvent = LocalSessionEventLog.Event(
+            sequence = 11L,
+            type = "chat/active-transcript",
+            createdAt = 5L,
+            data = buildJsonObject {
+                put("reason", "variant-selected")
+                put("transcript", encodeTranscriptMessages(listOf(editedUser, editedAnswer)))
+            },
+        )
+
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = listOf(oldUser, oldAnswer),
+            events = listOf(branchEvent),
+            sequenceExclusive = 10L,
+        )
+
+        assertEquals(listOf("u-new", "a-new"), projected.messages.map { it.id })
+        assertEquals(11L, projected.projectedThroughSequence)
+    }
+
+    @Test
     fun legacyTranscriptUsesDurableBaselineAndNewSessionStartsAtBeginning() {
         val legacy = LocalHarnessSession(id = "legacy", transcriptProjectedThroughSequence = null)
 

@@ -19,6 +19,13 @@
     <string name="local_delete_session">删除会话</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
     <string name="local_regenerate_reply">重新生成回复</string>
+    <string name="local_edit_user_message">修改消息</string>
+    <string name="local_edit_user_message_hint">修改后会从这条消息创建新的对话分支。原消息和原来的后续对话都会保留，可用左右按钮随时切回。</string>
+    <string name="local_edit_user_message_resend">重新发送</string>
+    <string name="local_edit_user_message_failed">当前状态无法重新发送，请确认聊天已停止且消息内容确实有修改。</string>
+    <string name="local_previous_variant">上一版本</string>
+    <string name="local_next_variant">下一版本</string>
+    <string name="local_variant_position">%1$d/%2$d</string>
     <string name="common_back">返回</string>
     <string name="common_edit">编辑</string>
     <string name="common_rename">重命名</string>
