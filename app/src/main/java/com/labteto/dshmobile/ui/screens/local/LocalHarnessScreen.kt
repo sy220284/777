@@ -1419,10 +1419,13 @@ private fun LocalChat(
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
+                            groupMode = state.groupChat.enabled,
                             canEdit = messageBranchingEnabled &&
                                 !state.running &&
                                 !chatMessageHasAttachmentContext(transcriptItem.message),
-                            canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            canRegenerate = !state.groupChat.enabled &&
+                                !state.running &&
+                                state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             branchInfo = if (messageBranchingEnabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
                             } else {
@@ -2309,6 +2312,7 @@ private fun localJobStatusLabel(status: String): String = when (status) {
 private fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
+    groupMode: Boolean,
     canEdit: Boolean,
     canRegenerate: Boolean,
     branchInfo: LocalChatBranchInfo?,
@@ -2374,6 +2378,15 @@ private fun LocalMessageRow(
                 readingModifier,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                if (groupMode) {
+                    message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
+                        Text(
+                            speaker,
+                            style = DsType.small13Strong,
+                            color = colors.accent,
+                        )
+                    }
+                }
                 MarkdownText(message.content)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
