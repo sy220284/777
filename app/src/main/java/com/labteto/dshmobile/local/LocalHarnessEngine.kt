@@ -5152,7 +5152,7 @@ class LocalHarnessEngine @Inject constructor(
         val toolNames = buildJsonArray {
             tools.forEach { element ->
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
-                function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(name) }
+                function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(JsonPrimitive(name)) }
             }
         }
         eventLog.append("request/header", buildJsonObject {
