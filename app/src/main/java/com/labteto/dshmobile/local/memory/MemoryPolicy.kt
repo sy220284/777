@@ -9,6 +9,7 @@ data class MemoryCandidate(
     val scope: MemoryScope,
     val kind: MemoryKind,
     val importance: Int,
+    val subjectKey: String? = null,
 )
 
 @Singleton

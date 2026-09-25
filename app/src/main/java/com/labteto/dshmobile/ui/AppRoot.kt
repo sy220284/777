@@ -62,6 +62,8 @@ fun AppRoot(
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
+        var localNavigationSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+        val effectiveLocalSessionId = requestedLocalSessionId ?: localNavigationSessionId
         // Local Harness is always the product home. Remote control has exactly one transport:
         // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
         // carries the user into the remote session, while Back returns to the local home.
@@ -75,8 +77,8 @@ fun AppRoot(
         LaunchedEffect(requestedSessionId) {
             if (!requestedSessionId.isNullOrBlank()) viewModel.prepareNotificationNavigation()
         }
-        LaunchedEffect(requestedLocalSessionId) {
-            if (!requestedLocalSessionId.isNullOrBlank()) {
+        LaunchedEffect(effectiveLocalSessionId) {
+            if (!effectiveLocalSessionId.isNullOrBlank()) {
                 showSettings = false
                 utilitySurface = null
                 showPair = false
@@ -98,6 +100,15 @@ fun AppRoot(
         when {
             utilitySurface == "tasks" -> TasksScreen(
                 onClose = { utilitySurface = null },
+                onOpenSession = { sessionId ->
+                    utilitySurface = null
+                    showSettings = false
+                    showPair = false
+                    viewModel.disconnectRemote()
+                    relayClaimed = false
+                    surface = "local"
+                    localNavigationSessionId = sessionId
+                },
             )
             utilitySurface == "tools" -> ToolsScreen(
                 onClose = { utilitySurface = null },
@@ -128,8 +139,13 @@ fun AppRoot(
                 },
             )
             surface == "local" -> LocalHarnessScreen(
-                requestedSessionId = requestedLocalSessionId,
-                onSessionRequestConsumed = onLocalSessionRequestConsumed,
+                requestedSessionId = effectiveLocalSessionId,
+                onSessionRequestConsumed = {
+                    if (!requestedLocalSessionId.isNullOrBlank()) {
+                        onLocalSessionRequestConsumed()
+                    }
+                    localNavigationSessionId = null
+                },
                 onOpenRemote = {
                     relayClaimed = false
                     surface = "remote"

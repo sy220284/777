@@ -32,6 +32,8 @@ data class MemoryRecord(
     val projectId: String? = null,
     val lineageId: String? = null,
     val sourceSessionId: String? = null,
+    /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
+    val subjectKey: String? = null,
     val importance: Int = 50,
     val pinned: Boolean = false,
     val active: Boolean = true,
