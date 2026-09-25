@@ -30,7 +30,8 @@ class ChatPersonaStorageSafetyTest {
 
     @Test
     fun corruptedPersonaPrimaryRecoversBackupBeforeNextWrite() {
-        personaStore().upsert(
+        val store = personaStore()
+        store.upsert(
             PersonaProfile(
                 id = "persona-a",
                 name = "阿青",
@@ -40,21 +41,22 @@ class ChatPersonaStorageSafetyTest {
         assertTrue(File(temporary.root, "personas.json.bak").isFile)
 
         personaFile.writeText("{broken")
-        assertEquals("阿青", personaStore().get("persona-a").name)
+        assertEquals("阿青", store.get("persona-a").name)
         assertTrue(
             temporary.root.listFiles().orEmpty()
                 .any { it.name.startsWith("personas.json.corrupt-") },
         )
 
-        personaStore().upsert(PersonaProfile(id = "persona-b", name = "小岚"))
-        val ids = personaStore().list().map { it.id }.toSet()
+        store.upsert(PersonaProfile(id = "persona-b", name = "小岚"))
+        val ids = store.list().map { it.id }.toSet()
         assertTrue("persona-a" in ids)
         assertTrue("persona-b" in ids)
     }
 
     @Test
     fun corruptedGalleryPrimaryRecoversArchivedCharacterBeforeNextWrite() {
-        val saved = galleryStore().save(
+        val store = galleryStore()
+        val saved = store.save(
             persona = PersonaProfile(name = "阿青", identity = "剑客"),
             sourceSessionId = "session-a",
             history = listOf(
@@ -67,7 +69,7 @@ class ChatPersonaStorageSafetyTest {
         assertTrue(File(temporary.root, "persona-gallery.json.bak").isFile)
 
         galleryFile.writeText("{broken")
-        val recovered = galleryStore().list().single()
+        val recovered = store.list().single()
         assertEquals(saved.entry.id, recovered.id)
         assertEquals("阿青", recovered.persona.name)
         assertTrue(
@@ -75,13 +77,13 @@ class ChatPersonaStorageSafetyTest {
                 .any { it.name.startsWith("persona-gallery.json.corrupt-") },
         )
 
-        galleryStore().save(
+        store.save(
             persona = PersonaProfile(name = "小岚", identity = "花店店主"),
             sourceSessionId = "session-b",
             history = emptyList(),
             chatState = ChatCharacterState(),
             notes = "",
         )
-        assertEquals(setOf("阿青", "小岚"), galleryStore().list().map { it.persona.name }.toSet())
+        assertEquals(setOf("阿青", "小岚"), store.list().map { it.persona.name }.toSet())
     }
 }

@@ -20,11 +20,12 @@ class MemoryStoreTest {
     }
 
     @Test fun firstWriteBackupRecoversCorruptedPrimary() {
-        val record = store().remember("remember apples", MemoryScope.GLOBAL)
+        val memoryStore = store()
+        val record = memoryStore.remember("remember apples", MemoryScope.GLOBAL)
         File(temporary.root, "memories.json").writeText("broken")
-        assertEquals(record, all(store()).single())
+        assertEquals(record, all(memoryStore).single())
         assertTrue(temporary.root.listFiles()!!.any { it.name.startsWith("memories.corrupt-") })
-        assertEquals(record, all(store()).single())
+        assertEquals(record, all(memoryStore).single())
     }
 
     @Test fun missingPrimaryRecoversBackupAndCanWriteAgain() {

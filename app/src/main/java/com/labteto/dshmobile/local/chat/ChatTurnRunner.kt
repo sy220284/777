@@ -9,8 +9,14 @@ import javax.inject.Singleton
 
 data class ChatTurnContext(
     val persona: PersonaProfile,
-    val prompt: String,
-)
+    val stablePrompt: String,
+    val dynamicPrompt: String,
+) {
+    val prompt: String
+        get() = listOf(stablePrompt, dynamicPrompt)
+            .filter(String::isNotBlank)
+            .joinToString("\n\n")
+}
 
 @Singleton
 class ChatTurnRunner @Inject constructor(
@@ -42,8 +48,9 @@ class ChatTurnRunner @Inject constructor(
         }.orEmpty()
         return ChatTurnContext(
             persona = persona,
-            prompt = listOf(
-                composePersonaPrompt(persona, state) + storyPrompt,
+            stablePrompt = composeStablePersonaPrompt(persona),
+            dynamicPrompt = listOf(
+                composeDynamicPersonaPrompt(persona, state) + storyPrompt,
                 lorePrompt,
                 relationshipEngine.prompt(userInput, state),
             ).filter(String::isNotBlank).joinToString("\n\n"),
@@ -106,9 +113,8 @@ class ChatTurnRunner @Inject constructor(
         )
     }
 
-    private fun composePersonaPrompt(
+    private fun composeStablePersonaPrompt(
         persona: PersonaProfile,
-        state: ChatCharacterState,
     ): String = buildString {
         appendLine("【角色】${persona.name}")
         if (persona.identity.isNotBlank()) appendLine("身份：${persona.identity}")
@@ -131,14 +137,19 @@ class ChatTurnRunner @Inject constructor(
         section("内在矛盾", persona.internalContradictions)
         section("知识边界", persona.knowledgeBoundary)
         section("硬约束", persona.hardConstraints)
+        section("常用表达", persona.signaturePhrases)
+        section("禁用表达", persona.bannedPhrases)
+        section("对白参考", persona.exampleDialogues)
+    }.trim()
+
+    private fun composeDynamicPersonaPrompt(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+    ): String = buildString {
         if (persona.corrections.isNotEmpty()) {
             appendLine("【用户纠正｜最高优先】")
             persona.corrections.takeLast(12).forEach { appendLine("- $it") }
         }
-        section("常用表达", persona.signaturePhrases)
-        section("禁用表达", persona.bannedPhrases)
-        section("对白参考", persona.exampleDialogues)
-
         appendLine("【当前状态】情绪=${state.mood}｜关系=${state.relationshipState}")
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
         state.currentAgenda.takeIf(String::isNotBlank)?.let { appendLine("行动：$it") }
@@ -152,4 +163,5 @@ class ChatTurnRunner @Inject constructor(
         appendLine("主动=${state.initiative}/100｜分享=${state.shareDesire}/100")
         appendLine("状态保持连续，普通一句话不应让人物或关系突变；始终以角色本人回应，不解释角色卡。")
     }.trim()
+
 }
