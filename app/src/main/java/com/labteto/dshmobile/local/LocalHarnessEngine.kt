@@ -1761,45 +1761,55 @@ class LocalHarnessEngine @Inject constructor(
                     put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
                 })
 
-                // Re-read immediately before commit so a detached automation never overwrites a
-                // foreground turn that completed while the model was generating.
-                val latest = sessionRepository.read(session.id) ?: session
-                val nextMessages = latest.messages + proactiveMessage
-                val nextBranches = if (chatBranchingEligible(nextMessages)) {
-                    syncChatBranchState(
-                        current = latest.chatBranches,
-                        activeMessages = nextMessages,
-                        chatState = latest.chatState,
-                        replySuggestions = latest.replySuggestions,
+                if (ownsVisibleTurn && _state.value.sessionId == session.id) {
+                    // Mirror the foreground turn path: queued user messages may already be visible,
+                    // but are intentionally appended to model history only when their queued turn
+                    // resumes. Keeping the proactive reply in front of that model input avoids
+                    // duplicating queued messages.
+                    appendModelHistory(reply.message)
+                    updateContextMetrics()
+                    applyTranscriptMessages(
+                        listOf(proactiveMessage),
+                        assistantEvent.sequence,
+                        clearStreamingPreview = true,
                     )
-                } else {
-                    latest.chatBranches
-                }
-                val nextSession = latest.copy(
-                    updatedAt = System.currentTimeMillis(),
-                    messages = nextMessages,
-                    chatBranches = nextBranches,
-                    transcriptProjectedThroughSequence = assistantEvent.sequence,
-                )
-                sessionRepository.enqueue(nextSession)
-
-                if (_state.value.sessionId == session.id) {
-                    rebuildChatModelHistoryFromTranscript(nextMessages)
-                    _state.update { current ->
-                        if (current.sessionId == session.id) {
+                    if (pendingInputs.size() == 0 && chatBranchingEligible(_state.value.messages)) {
+                        _state.update { current ->
                             current.copy(
-                                messages = nextMessages,
-                                chatBranches = nextBranches,
-                                chatState = latest.chatState,
-                                replySuggestions = latest.replySuggestions,
-                                streamingAssistant = "",
-                                streamingReasoning = "",
+                                chatBranches = syncChatBranchState(
+                                    current = current.chatBranches,
+                                    activeMessages = current.messages,
+                                    chatState = current.chatState,
+                                    replySuggestions = current.replySuggestions,
+                                ),
                             )
-                        } else {
-                            current
                         }
                     }
                     checkpointModelHistory("chat/proactive-automation")
+                    persist()
+                } else {
+                    // Re-read immediately before commit so a detached automation never overwrites a
+                    // foreground turn that completed while the model was generating.
+                    val latest = sessionRepository.read(session.id) ?: session
+                    val nextMessages = latest.messages + proactiveMessage
+                    val nextBranches = if (chatBranchingEligible(nextMessages)) {
+                        syncChatBranchState(
+                            current = latest.chatBranches,
+                            activeMessages = nextMessages,
+                            chatState = latest.chatState,
+                            replySuggestions = latest.replySuggestions,
+                        )
+                    } else {
+                        latest.chatBranches
+                    }
+                    sessionRepository.enqueue(
+                        latest.copy(
+                            updatedAt = System.currentTimeMillis(),
+                            messages = nextMessages,
+                            chatBranches = nextBranches,
+                            transcriptProjectedThroughSequence = assistantEvent.sequence,
+                        ),
+                    )
                 }
                 boundEventLog.append("turn/end", buildJsonObject {
                     put("reason", "completed")
