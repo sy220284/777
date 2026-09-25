@@ -4017,7 +4017,11 @@ class LocalHarnessEngine @Inject constructor(
                             sideEffect = event.sideEffect,
                             recoveryHint = event.recoveryHint,
                         ).modelVisibleContent()
-                        val transcriptMessage = newTranscriptMessage("tool", event.output, event.call.name)
+                        val transcriptMessage = newTranscriptMessage(
+                            "tool",
+                            boundedContent,
+                            event.call.name,
+                        )
                         val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
