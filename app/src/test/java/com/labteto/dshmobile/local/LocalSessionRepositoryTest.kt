@@ -63,6 +63,8 @@ class LocalSessionRepositoryTest {
             com.labteto.dshmobile.local.chat.PersonaProfile.DEFAULT_PERSONA_ID,
             legacy.personaId,
         )
+        assertEquals("自然", legacy.chatState.mood)
+        assertTrue(legacy.replySuggestions.isEmpty())
     }
 
     @Test fun failedWriteRetriesTheLatestSnapshotAfterStorageRecovers() = runTest {

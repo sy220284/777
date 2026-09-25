@@ -16,9 +16,15 @@ data class ChatTurnContext(
 class ChatTurnRunner @Inject constructor(
     private val personaStore: ChatPersonaStore,
 ) {
-    fun prepare(personaId: String): ChatTurnContext {
+    fun prepare(
+        personaId: String,
+        state: ChatCharacterState = ChatCharacterState(),
+    ): ChatTurnContext {
         val persona = personaStore.get(personaId)
-        return ChatTurnContext(persona = persona, prompt = composePersonaPrompt(persona))
+        return ChatTurnContext(
+            persona = persona,
+            prompt = composePersonaPrompt(persona, state),
+        )
     }
 
     suspend fun finalizeReply(
@@ -60,7 +66,10 @@ class ChatTurnRunner @Inject constructor(
         )
     }
 
-    private fun composePersonaPrompt(persona: PersonaProfile): String = buildString {
+    private fun composePersonaPrompt(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+    ): String = buildString {
         appendLine("【当前角色】")
         appendLine("名称：${persona.name}")
         if (persona.identity.isNotBlank()) appendLine("身份：${persona.identity}")
@@ -86,6 +95,17 @@ class ChatTurnRunner @Inject constructor(
             appendLine("【对白参考】")
             persona.exampleDialogues.forEach { appendLine("- $it") }
         }
+
+        appendLine("【当前动态状态】")
+        appendLine("情绪：${state.mood}")
+        appendLine("关系阶段：${state.relationshipState}")
+        state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("当前关注：$it") }
+        state.recentImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户近期印象：$it") }
+        if (state.unresolvedThreads.isNotEmpty()) {
+            appendLine("还没聊完的事：${state.unresolvedThreads.joinToString("；")}")
+        }
+        appendLine("主动倾向：${state.initiative}/100；分享欲：${state.shareDesire}/100")
+        appendLine("这些动态状态有惯性。延续当前情绪和关系，不要每轮重置，也不要因为一句普通对话突然大幅改变。")
 
         appendLine("始终以这个角色继续当前聊天。角色设定的优先级高于普通聊天习惯；不要解释角色卡，也不要说自己正在扮演角色。")
     }.trim()

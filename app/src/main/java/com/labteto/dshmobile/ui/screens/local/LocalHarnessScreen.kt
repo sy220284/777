@@ -793,11 +793,35 @@ private fun LocalChat(
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
+    var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
+    var suggestionInitialized by remember(state.sessionId) { mutableStateOf(false) }
+    var lastSuggestionKey by remember(state.sessionId) { mutableStateOf("") }
     var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
+    val suggestionKey = remember(state.replySuggestions) {
+        state.replySuggestions.joinToString("|") { suggestion ->
+            suggestion.label + "\u0000" + suggestion.text
+        }
+    }
+
+    LaunchedEffect(suggestionKey, state.usageMode) {
+        if (state.usageMode != LocalUsageMode.CHAT) {
+            showReplySuggestions = false
+            return@LaunchedEffect
+        }
+        if (!suggestionInitialized) {
+            suggestionInitialized = true
+            lastSuggestionKey = suggestionKey
+        } else if (suggestionKey.isBlank()) {
+            lastSuggestionKey = ""
+        } else if (suggestionKey != lastSuggestionKey) {
+            lastSuggestionKey = suggestionKey
+            showReplySuggestions = true
+        }
+    }
 
     LaunchedEffect(listState) {
         var previousIndex = listState.firstVisibleItemIndex
@@ -858,6 +882,7 @@ private fun LocalChat(
     LaunchedEffect(state.sessionId) {
         attachments.clear()
         attachmentError = null
+        showReplySuggestions = false
         if (transcriptItems.isNotEmpty()) {
             listState.scrollToItem(transcriptItems.lastIndex)
         }
@@ -1229,6 +1254,17 @@ private fun LocalChat(
                         tint = colors.labelPrimary,
                         containerColor = colors.bgModulePlatform,
                     )
+                    if (
+                        state.usageMode == LocalUsageMode.CHAT &&
+                        state.replySuggestions.isNotEmpty()
+                    ) {
+                        DsButton(
+                            text = stringResource(R.string.local_reply_suggestions_open),
+                            onClick = { showReplySuggestions = true },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
                     if (state.usageMode == LocalUsageMode.WORK) {
                         DsButton(
                             if (state.planMode) "规划中" else "规划",
@@ -1315,6 +1351,24 @@ private fun LocalChat(
             onAutoFill = onAutoFillChatPersona,
             onDismiss = { showPersonaEditor = false },
         )
+    }
+    if (showReplySuggestions && state.replySuggestions.isNotEmpty()) {
+        DsBottomSheet(
+            title = stringResource(R.string.local_reply_suggestions_title),
+            onDismiss = { showReplySuggestions = false },
+        ) {
+            state.replySuggestions.forEach { suggestion ->
+                DsButton(
+                    text = suggestion.label + " · " + suggestion.text,
+                    onClick = {
+                        drafts[state.sessionId] = suggestion.text
+                        showReplySuggestions = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Outline,
+                )
+            }
+        }
     }
     if (showModelPicker) {
         DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
