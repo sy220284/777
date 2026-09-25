@@ -834,6 +834,12 @@
     <string name="persona_gallery_save_failed">保存失败</string>
     <string name="persona_gallery_skip_save">这次先不保存</string>
     <string name="persona_gallery_title">人设图集</string>
+    <string name="persona_gallery_portrait_add">添加形象图</string>
+    <string name="persona_gallery_portrait_replace">更换形象图</string>
+    <string name="persona_gallery_portrait_remove">移除形象图</string>
+    <string name="persona_gallery_portrait_empty">添加人物形象图后生成立体展示</string>
+    <string name="persona_gallery_portrait_save_failed">人物形象图保存失败</string>
+    <string name="persona_gallery_standee_meta">%1$d 条故事线 · %2$d 条对白</string>
     <string name="persona_gallery_presets_title">作品预置</string>
     <string name="persona_gallery_presets_hint">先加入人物图谱再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
     <string name="persona_gallery_preset_add">加入人物图谱</string>
