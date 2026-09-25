@@ -988,4 +988,19 @@
 
     <string name="local_persona_picker_switch_requires_new_chat">This chat already has dialogue. Start a new chat before switching or creating a character so storylines do not mix.</string>
 
+
+    <string name="notif_channel_local_jobs">On-device tasks</string>
+    <string name="settings_notifications_local_jobs">On-device task completion</string>
+    <string name="settings_notifications_local_jobs_hint">Notify when a Work-mode on-device task finishes, fails, or is cancelled.</string>
+    <string name="local_execution_notification_running">Working</string>
+    <string name="local_execution_notification_step">Working · step %1$d</string>
+    <string name="local_execution_notification_jobs">%1$d background task(s) still running</string>
+    <string name="local_execution_notification_body">神言神语 is running a task on this device</string>
+    <string name="local_execution_background_job">Background task</string>
+    <string name="local_execution_notification_complete">On-device task complete</string>
+    <string name="local_execution_notification_failed">On-device task failed</string>
+    <string name="local_execution_notification_cancelled">On-device task cancelled</string>
+    <string name="local_execution_notification_background_continues">This turn ended; %1$d background task(s) are still running.</string>
+    <string name="local_execution_notification_tap">Tap to return to the conversation</string>
+
 </resources>
