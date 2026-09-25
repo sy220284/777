@@ -280,6 +280,37 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun localPortraitPathPersistsAcrossReloadAndLaterStorySave() {
+        val file = File(temporary.root, "portrait-gallery.json")
+        val store = ChatPersonaGalleryStore(file, Json)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", identity = "剑客"),
+            sourceSessionId = "",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        val withPortrait = store.updatePortraitPath(saved.id, "/app/private/portrait.png")!!
+        assertEquals("/app/private/portrait.png", withPortrait.portraitPath)
+        assertEquals(
+            "/app/private/portrait.png",
+            ChatPersonaGalleryStore(file, Json).list().single().portraitPath,
+        )
+
+        val resaved = store.save(
+            persona = withPortrait.persona,
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "在吗", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "",
+            existingId = saved.id,
+        ).entry
+
+        assertEquals("/app/private/portrait.png", resaved.portraitPath)
+    }
+
+    @Test
     fun structuredRuntimeFieldsSurviveSaveExportAndImport() {
         val source = ChatPersonaGalleryStore(File(temporary.root, "runtime-source.json"), Json)
         val saved = source.save(
