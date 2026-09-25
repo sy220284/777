@@ -510,6 +510,10 @@ class ChatPersonaGalleryStore internal constructor(
 
     private val durableFile = RecoveringChatDocumentFile(file)
 
+    private val backupFile = File(file.parentFile, "${file.name}.bak")
+    private var cachedDocument: GalleryDocument? = null
+    private var cachedStamp: DocumentStamp? = null
+
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
 
@@ -838,11 +842,17 @@ class ChatPersonaGalleryStore internal constructor(
         return normalized
     }
 
-    private fun read(): GalleryDocument =
-        durableFile.read(
+    private fun read(): GalleryDocument {
+        val stamp = documentStamp()
+        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
+        val document = durableFile.read(
             defaultValue = ::GalleryDocument,
             decode = { encoded -> json.decodeFromString(GalleryDocument.serializer(), encoded) },
         )
+        cachedDocument = document
+        cachedStamp = documentStamp()
+        return document
+    }
 
     private fun write(doc: GalleryDocument) {
         val encoded = json.encodeToString(GalleryDocument.serializer(), doc)
@@ -851,5 +861,21 @@ class ChatPersonaGalleryStore internal constructor(
                 json.decodeFromString(GalleryDocument.serializer(), candidate)
             }.isSuccess
         }
+        cachedDocument = doc
+        cachedStamp = documentStamp()
     }
+
+    private fun documentStamp(): DocumentStamp = DocumentStamp(
+        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
+        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
+        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
+        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
+    )
+
+    private data class DocumentStamp(
+        val primaryModified: Long,
+        val primaryLength: Long,
+        val backupModified: Long,
+        val backupLength: Long,
+    )
 }
