@@ -354,6 +354,7 @@ class LocalHarnessEngine @Inject constructor(
             workspacePath = workspace.path,
             sessionId = currentSessionId,
             usage = usageTracker.state.value,
+            chatStyleGuardEnabled = preferences.getBoolean(KEY_CHAT_STYLE_GUARD, true),
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
@@ -693,6 +694,29 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             userProfileStore.write(profile)
+        }
+    }
+
+    /** Toggle only the generic chat-style gate. Persona-specific banned phrases remain enforced. */
+    fun configureChatStyleGuard(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
+        _state.update { it.copy(chatStyleGuardEnabled = enabled) }
+    }
+
+    fun clearChatStyleGuardHits() {
+        _state.update { it.copy(styleGuardHits = emptyList()) }
+    }
+
+    private fun recordStyleGuardHits(violations: List<String>) {
+        if (violations.isEmpty()) return
+        _state.update { state ->
+            state.copy(
+                styleGuardHits = (state.styleGuardHits + violations)
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .takeLast(MAX_STYLE_GUARD_HITS),
+            )
         }
     }
 
@@ -1835,15 +1859,59 @@ class LocalHarnessEngine @Inject constructor(
         val updated = chatPersonaStore.captureExplicitCorrection(snapshot.personaId, text) ?: return
         if (updated.corrections == snapshot.chatPersona.corrections) return
 
+        val correction = updated.corrections.lastOrNull().orEmpty()
+        val notice = ChatPersonaCorrectionNotice(
+            id = System.nanoTime(),
+            personaId = updated.id,
+            correction = correction,
+        )
         _state.update { current ->
-            if (current.personaId == updated.id) current.copy(chatPersona = updated) else current
+            if (current.personaId == updated.id) {
+                current.copy(chatPersona = updated, personaCorrectionNotice = notice)
+            } else {
+                current
+            }
         }
         eventLog.append("chat/persona-correction", buildJsonObject {
             put("persona_id", updated.id)
             put("count", updated.corrections.size)
-            put("latest", updated.corrections.lastOrNull().orEmpty())
+            put("latest", correction)
         })
         persist()
+    }
+
+    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
+        val snapshot = _state.value
+        val notice = snapshot.personaCorrectionNotice
+        if (
+            notice == null ||
+            notice.id != noticeId ||
+            notice.personaId != personaId ||
+            notice.correction != correction
+        ) return
+
+        scope.launch {
+            val updated = chatPersonaStore.removeCorrection(personaId, correction) ?: return@launch
+            _state.update { current ->
+                if (
+                    current.personaId == personaId &&
+                    current.personaCorrectionNotice?.id == noticeId
+                ) {
+                    current.copy(
+                        chatPersona = updated,
+                        personaCorrectionNotice = null,
+                    )
+                } else {
+                    current
+                }
+            }
+            eventLog.append("chat/persona-correction", buildJsonObject {
+                put("persona_id", personaId)
+                put("action", "undo")
+                put("correction", correction)
+            })
+            persist()
+        }
     }
 
     private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
@@ -1909,7 +1977,9 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+                builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
                 onGuardEvent = { action, violations ->
+                    recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
                         put("step", 1)
                         put("action", action)
@@ -3292,7 +3362,9 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+            builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
             onGuardEvent = { action, violations ->
+                recordStyleGuardHits(violations)
                 eventLog.append("chat/style-guard", buildJsonObject {
                     put("step", step)
                     put("action", action)
@@ -4023,6 +4095,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
+        const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
@@ -4049,6 +4122,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
+        const val MAX_STYLE_GUARD_HITS = 20
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
         const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
