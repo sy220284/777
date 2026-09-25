@@ -925,6 +925,127 @@ class LocalHarnessEngine @Inject constructor(
         queueHumanTurn(content, prompt, modelMessage)?.start()
     }
 
+    /**
+     * Edit one user turn and resend from that point.
+     *
+     * Chat mode keeps the old branch in [LocalChatBranchState]. The edited message becomes a sibling
+     * of the original user turn, so switching back later restores the old downstream conversation
+     * instead of destroying it.
+     */
+    fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
+        val content = replacement.trim()
+        val state = _state.value
+        if (
+            content.isEmpty() ||
+            state.usageMode != LocalUsageMode.CHAT ||
+            !state.configured ||
+            state.loading ||
+            sessionTransitioning ||
+            activeJob?.isCompleted == false ||
+            pendingInputs.size() != 0 ||
+            !chatBranchingEligible(state.messages)
+        ) return@synchronized false
+
+        var branches = syncChatBranchState(
+            current = state.chatBranches,
+            activeMessages = state.messages,
+            chatState = state.chatState,
+            replySuggestions = state.replySuggestions,
+        )
+        val original = branches.nodes.firstOrNull { it.message.id == messageId } ?: return@synchronized false
+        if (original.message.role != "user" || state.messages.none { it.id == messageId }) {
+            return@synchronized false
+        }
+        if (original.message.content.trim() == content) return@synchronized false
+
+        val baseState = original.parentId
+            ?.let { parentId -> branches.nodes.firstOrNull { it.message.id == parentId }?.chatStateAfter }
+            ?: ChatCharacterState()
+        val edited = newTranscriptMessage("user", content)
+        branches = upsertChatBranchNode(
+            branches,
+            LocalChatBranchNode(
+                message = edited,
+                parentId = original.parentId,
+                chatStateAfter = baseState,
+            ),
+            select = true,
+        )
+        val activeMessages = activeChatBranchMessages(branches)
+        rebuildChatModelHistoryFromTranscript(activeMessages)
+
+        val userEvent = eventLog.append("user/message", buildJsonObject {
+            put("content", content)
+            put("model_message", buildJsonObject {
+                put("role", "user")
+                put("content", content)
+            })
+            put("edited_from", messageId)
+            put("queued", false)
+            put("transcript", encodeTranscriptMessages(listOf(edited)))
+        })
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
+        _state.update { current ->
+            current.copy(
+                messages = activeMessages,
+                chatState = baseState,
+                replySuggestions = emptyList(),
+                chatBranches = branches,
+                error = null,
+            )
+        }
+        persistChatBranchState("user-edited")
+        checkpointModelHistory("chat/user-edited")
+        persist()
+
+        scope.launch(start = CoroutineStart.LAZY) {
+            captureChatPersonaCorrection(content)
+            hydrateNewChatStateFromRelationshipMemory()
+            runChatTurn(content)
+        }.also { activeJob = it; it.start() }
+        true
+    }
+
+    /** Switch among saved alternatives for one user or assistant turn. */
+    fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean = synchronized(runStateLock) {
+        val state = _state.value
+        if (
+            state.usageMode != LocalUsageMode.CHAT ||
+            state.loading ||
+            sessionTransitioning ||
+            activeJob?.isCompleted == false ||
+            pendingInputs.size() != 0 ||
+            !chatBranchingEligible(state.messages)
+        ) return@synchronized false
+
+        val synced = syncChatBranchState(
+            current = state.chatBranches,
+            activeMessages = state.messages,
+            chatState = state.chatState,
+            replySuggestions = state.replySuggestions,
+        )
+        val selected = selectChatBranchVariant(synced, messageId, targetIndex)
+            ?: return@synchronized false
+        val activeMessages = activeChatBranchMessages(selected)
+        if (activeMessages.isEmpty() || !chatBranchingEligible(activeMessages)) return@synchronized false
+
+        val snapshot = chatBranchLastSnapshot(selected)
+        rebuildChatModelHistoryFromTranscript(activeMessages)
+        _state.update { current ->
+            current.copy(
+                messages = activeMessages,
+                chatState = snapshot?.first ?: current.chatState,
+                replySuggestions = snapshot?.second.orEmpty(),
+                chatBranches = selected,
+                error = null,
+            )
+        }
+        persistChatBranchState("variant-selected")
+        checkpointModelHistory("chat/variant-selected")
+        persist()
+        true
+    }
+
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
     fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
@@ -938,12 +1059,60 @@ class LocalHarnessEngine @Inject constructor(
         if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
             return@synchronized false
         }
+
+        if (state.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(state.messages)) {
+            val branches = syncChatBranchState(
+                current = state.chatBranches,
+                activeMessages = state.messages,
+                chatState = state.chatState,
+                replySuggestions = state.replySuggestions,
+            )
+            val baseState = chatBranchParentState(branches, messageId) ?: state.chatState
+            _state.update {
+                it.copy(
+                    chatState = baseState,
+                    replySuggestions = emptyList(),
+                    chatBranches = branches,
+                )
+            }
+        }
         scope.launch(start = CoroutineStart.LAZY) {
             if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
             else regenerateWorkReply(messageId)
         }
             .also { activeJob = it; it.start() }
         true
+    }
+
+    private fun rebuildChatModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
+        val rebuilt = buildList {
+            add(buildJsonObject {
+                put("role", "system")
+                put("content", chatSystemPrompt())
+            })
+            messages.forEach { message ->
+                if (message.role == "user" || message.role == "assistant") {
+                    add(buildJsonObject {
+                        put("role", message.role)
+                        put("content", message.content)
+                    })
+                }
+            }
+        }
+        resetModelHistory(rebuilt)
+        updateContextMetrics()
+    }
+
+    private fun persistChatBranchState(reason: String) {
+        val state = _state.value
+        eventLog.append("chat/branch-state", JsonObject(
+            encodeChatBranchStateEvent(state.chatBranches) + ("reason" to JsonPrimitive(reason)),
+        ))
+        val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
+            put("reason", reason)
+            put("transcript", encodeTranscriptMessages(state.messages))
+        })
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
     private suspend fun regenerateWorkReply(messageId: String) {
