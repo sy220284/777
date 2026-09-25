@@ -1572,6 +1572,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                 }
                 synchronized(conversationFilesCacheLock) { ids.forEach(conversationFilesCache::remove) }
+                memoryStore.detachSourceSessions(ids)
                 _state.update { it.copy(sessions = sessionSummaries()) }
                 persist()
                 ids.size
