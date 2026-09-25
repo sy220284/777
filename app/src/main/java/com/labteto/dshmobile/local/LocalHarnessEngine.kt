@@ -282,6 +282,9 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val fileInspector = LocalFileInspector(File(workspace.path))
+    private val toolOutputStore = LocalToolOutputStore(
+        File(context.noBackupFilesDir, "local-harness/tool-output"),
+    )
     private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val approvalPreferences = LocalApprovalPreferences(preferences)
@@ -434,6 +437,7 @@ class LocalHarnessEngine @Inject constructor(
         schemasProvider: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
         executeTool: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
         runnerState: StateFlow<LocalHarnessState> = state,
+        toolOutputSessionId: () -> String = { currentSessionId },
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
@@ -444,7 +448,9 @@ class LocalHarnessEngine @Inject constructor(
         eventLog = eventLogProvider,
         schemas = schemasProvider,
         execute = executeTool,
-        pruneToolResult = ::pruneToolResult,
+        spillToolOutput = { callId, output ->
+            toolOutputStore.store(toolOutputSessionId(), callId, output) != null
+        },
         prepareMessages = { messages, mode, _, _ ->
             prepareLocalMultimodalMessages(
                 messages = messages,
@@ -545,6 +551,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             runnerState = MutableStateFlow(boundState),
+            toolOutputSessionId = { sessionId },
         )
     }
 
@@ -595,6 +602,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             runnerState = MutableStateFlow(boundState),
+            toolOutputSessionId = { sessionId },
         )
     }
 
@@ -2529,6 +2537,7 @@ class LocalHarnessEngine @Inject constructor(
                 withContext(Dispatchers.IO) {
                     ids.forEach { id ->
                         sessionRepository.delete(id)
+                        toolOutputStore.deleteSession(id)
                         sessionsRoot.listFiles().orEmpty()
                             .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
                             .forEach(File::delete)
@@ -3943,7 +3952,11 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
-                        val boundedContent = pruneToolResult(event.output)
+                        val boundedContent = retainToolResult(
+                            sessionId = currentSessionId,
+                            callId = event.call.id,
+                            result = event.output,
+                        )
                         val modelOutput = AgentToolResult(
                             content = boundedContent,
                             isError = event.isError,
@@ -4146,6 +4159,17 @@ class LocalHarnessEngine @Inject constructor(
                 "memory_search", "memory_list" -> AgentToolResult(
                     memoryTools.execute(canonical.name, canonical.arguments, allowMutation = false),
                 )
+                "tool_output_read" -> AgentToolResult(
+                    toolOutputStore.read(
+                        sessionId = sessionId,
+                        callId = canonical.arguments.string("call_id"),
+                        startLine = canonical.arguments.int("start_line", 1),
+                        endLine = canonical.arguments.int(
+                            "end_line",
+                            canonical.arguments.int("start_line", 1) + 399,
+                        ),
+                    ),
+                )
                 "web_fetch" -> {
                     val background = canonical.arguments.boolean("run_in_background", false)
                     if (!background) {
@@ -4215,6 +4239,17 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 "memory_search", "memory_list" -> AgentToolResult(
                     memoryTools.execute(normalized.name, normalized.arguments, allowMutation = false),
+                )
+                "tool_output_read" -> AgentToolResult(
+                    toolOutputStore.read(
+                        sessionId = sessionId,
+                        callId = normalized.arguments.string("call_id"),
+                        startLine = normalized.arguments.int("start_line", 1),
+                        endLine = normalized.arguments.int(
+                            "end_line",
+                            normalized.arguments.int("start_line", 1) + 399,
+                        ),
+                    ),
                 )
                 else -> executeAutomationRegistered(
                     original = normalized,
@@ -4485,6 +4520,12 @@ class LocalHarnessEngine @Inject constructor(
         return when (call.name) {
             "read", "read_file" -> workspace.read(
                 relativePath = args.string("path"),
+                startLine = args.int("start_line", 1),
+                endLine = args.int("end_line", args.int("start_line", 1) + 399),
+            )
+            "tool_output_read" -> toolOutputStore.read(
+                sessionId = currentSessionId,
+                callId = args.string("call_id"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
             )
@@ -5309,13 +5350,33 @@ class LocalHarnessEngine @Inject constructor(
         modelHistoryEstimatedTokens = messages.sumOf(::encodedModelMessageTokens)
     }
 
-    private fun pruneToolResult(result: String): String {
+    private fun pruneToolResult(result: String): String =
+        retainToolResult(
+            sessionId = currentSessionId,
+            callId = null,
+            result = result,
+        )
+
+    private fun retainToolResult(
+        sessionId: String,
+        callId: String?,
+        result: String,
+    ): String {
         val budget = currentHistoryBudget()
-        return retainTextForModel(
+        val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,
             maxChars = budget.maxToolResultChars,
-        ).text
+        )
+        if (!retained.truncated) return retained.text
+        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
+        val recovery = when {
+            callId == null -> "请缩小查询范围后继续读取。"
+            stored -> "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
+            else -> "完整结果超过本机私有保留上限；请缩小原查询后重试。"
+        }
+        return retained.text +
+            "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
     private fun compactHistoryIfNeeded(extraTokens: Int = 0) {

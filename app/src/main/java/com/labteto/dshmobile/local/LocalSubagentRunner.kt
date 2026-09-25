@@ -57,7 +57,7 @@ internal class LocalSubagentRunner(
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
-    private val pruneToolResult: (String) -> String,
+    private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
     private val onUsage: (String, DeepSeekTokenUsage) -> Unit = { _, _ -> },
@@ -335,7 +335,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val boundedContent = pruneToolResult(event.output)
+                            val boundedContent = retainSubagentToolResult(event.call.id, event.output)
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
                                 isError = event.isError,
@@ -509,6 +509,24 @@ internal class LocalSubagentRunner(
                 modelClient.complete(key, baseUrl, model, history, tools)
             }
         }
+    }
+
+    private fun retainSubagentToolResult(callId: String, output: String): String {
+        val budget = historyBudget?.invoke() ?: return output
+        val retained = retainTextForModel(
+            value = output,
+            maxTokens = budget.maxToolResultTokens,
+            maxChars = budget.maxToolResultChars,
+        )
+        if (!retained.truncated) return retained.text
+        val stored = spillToolOutput(callId, output)
+        val recovery = if (stored) {
+            "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
+        } else {
+            "完整结果超过本机私有保留上限；请缩小原查询后重试。"
+        }
+        return retained.text +
+            "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
     private fun compactSubagentHistory(history: MutableList<JsonObject>, subagentId: String) {

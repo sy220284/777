@@ -339,6 +339,11 @@ object LocalToolCatalog {
             "start_line" to integer("起始行，默认 1"),
             "end_line" to integer("结束行，默认读取 400 行"),
         ), listOf("path")))
+        add(tool("tool_output_read", "分段读取此前因上下文预算而省略的完整工具结果", properties(
+            "call_id" to string("原工具调用编号"),
+            "start_line" to integer("起始行，默认 1"),
+            "end_line" to integer("结束行，默认读取 400 行，单次最多 2000 行"),
+        ), listOf("call_id")))
         add(tool("write", "创建或完整替换工作区文件；执行前需要用户批准", properties(
             "path" to string("相对工作区的路径"),
             "content" to string("完整文件内容"),
