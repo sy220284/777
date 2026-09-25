@@ -1756,8 +1756,8 @@ class LocalHarnessEngine @Inject constructor(
                 val assistantEvent = boundEventLog.append("assistant/message", buildJsonObject {
                     put("role", "assistant")
                     put("content", content)
-                    put("automation", true)
-                    put("proactive", true)
+                    // Proactive/automation metadata lives inside the transcript message. Keep the
+                    // model-replay envelope schema clean so only role/content return to the model.
                     put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
                 })
 
