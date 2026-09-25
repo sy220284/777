@@ -27,12 +27,24 @@ class AutomationReceiptTest {
     @Test
     fun prunesReceiptsOutsideThirtyDayWindow() {
         val day = 24L * 60L * 60L * 1000L
-        val old = AutomationRunReceipt(0L, day, "completed")
+        val old = AutomationRunReceipt(0L, 0L, "completed")
         val recent = AutomationRunReceipt(31L * day, 31L * day, "failed")
 
         val history = appendAutomationReceipt(listOf(old), recent)
 
         assertEquals(1, history.size)
         assertTrue(history.single().status == "failed")
+    }
+
+    @Test
+    fun keepsReceiptExactlyAtThirtyDayCutoff() {
+        val day = 24L * 60L * 60L * 1000L
+        val atCutoff = AutomationRunReceipt(day, day, "completed")
+        val recent = AutomationRunReceipt(31L * day, 31L * day, "failed")
+
+        val history = appendAutomationReceipt(listOf(atCutoff), recent)
+
+        assertEquals(2, history.size)
+        assertEquals(day, history.first().finishedAt)
     }
 }
