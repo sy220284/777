@@ -1197,7 +1197,8 @@ private fun LocalChat(
                         .background(if (state.usageMode == LocalUsageMode.CHAT) Color.Transparent else headerChipColor)
                         .clickable(enabled = !state.running) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
-                                showPersonaPicker = true
+                                if (state.groupChat.enabled) showGroupMemberPicker = true
+                                else showPersonaPicker = true
                             } else if (state.configured) {
                                 showModelPicker = true
                             } else {
@@ -1211,20 +1212,39 @@ private fun LocalChat(
                     if (state.usageMode == LocalUsageMode.CHAT) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                state.chatPersona.name,
+                                if (state.groupChat.enabled) {
+                                    stringResource(R.string.local_group_chat_title)
+                                } else {
+                                    state.chatPersona.name
+                                },
                                 style = DsType.base16Strong,
                                 color = colors.labelPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                            if (state.groupChat.enabled) {
                                 Text(
-                                    relationship,
+                                    state.groupActiveSpeakerName?.let { speaker ->
+                                        stringResource(R.string.local_group_chat_active_speaker, speaker)
+                                    } ?: stringResource(
+                                        R.string.local_group_chat_member_count,
+                                        state.groupChat.members.size,
+                                    ),
                                     style = DsType.caption11,
                                     color = colors.labelSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            } else {
+                                state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                                    Text(
+                                        relationship,
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                         }
                         Icon(
