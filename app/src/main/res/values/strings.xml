@@ -349,7 +349,7 @@
     <string name="settings_background_image_choose">Choose image</string>
     <string name="settings_background_image_clear">Remove</string>
     <string name="settings_background_adaptive_contrast">Adaptive readability</string>
-    <string name="settings_background_adaptive_contrast_hint">Automatically adjusts the background veil for the current theme so chat text, bubbles and controls stay clear over custom images.</string>
+    <string name="settings_background_adaptive_contrast_hint">Analyzes wallpaper brightness, contrast, saturation and detail density, then adapts top, content and bottom surfaces so chats stay readable after changing backgrounds.</string>
     <string name="settings_readonly_banner">Settings are read-only over the network. Open the harness on its own computer to change them.</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>
