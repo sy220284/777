@@ -7,34 +7,32 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.lazy.LazyListState
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -93,6 +91,7 @@ fun rememberConversationScrollHint(
     return hint to connection
 }
 
+/** Compact arrow-only affordance that adapts to the wallpaper under the composer area. */
 @Composable
 fun ConversationScrollShortcut(
     target: ConversationScrollTarget?,
@@ -100,10 +99,26 @@ fun ConversationScrollShortcut(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val surfaceColor = backgroundState.surfaceColor(
+        base = colors.bgLayer1,
+        region = BackgroundRegion.BOTTOM,
+        minAlpha = 0.80f,
+        maxAlpha = 0.97f,
+    )
+    val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
+        colors.borderL1.copy(alpha = 0.72f)
+    } else {
+        colors.borderL1
+    }
+
     AnimatedContent(
         targetState = target,
         modifier = modifier,
-        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.85f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.85f)) },
+        transitionSpec = {
+            (fadeIn() + scaleIn(initialScale = 0.85f)) togetherWith
+                (fadeOut() + scaleOut(targetScale = 0.85f))
+        },
         label = "conversationScrollShortcut",
     ) { direction ->
         if (direction != null) {
@@ -114,23 +129,21 @@ fun ConversationScrollShortcut(
             Surface(
                 onClick = { onClick(direction) },
                 shape = CircleShape,
-                color = colors.bgLayer1,
-                border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 7.dp,
+                color = surfaceColor,
+                border = BorderStroke(1.dp, borderColor),
+                shadowElevation = 2.dp,
             ) {
-                Row(
-                    modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                Box(
+                    modifier = Modifier.size(40.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         if (direction == ConversationScrollTarget.START) Icons.Filled.ArrowUpward
                         else Icons.Filled.ArrowDownward,
-                        contentDescription = null,
-                        tint = colors.accent,
-                        modifier = Modifier.size(18.dp),
+                        contentDescription = label,
+                        tint = colors.labelPrimary,
+                        modifier = Modifier.size(19.dp),
                     )
-                    Text(label, style = DsType.small13Strong, color = colors.labelPrimary)
                 }
             }
         }
