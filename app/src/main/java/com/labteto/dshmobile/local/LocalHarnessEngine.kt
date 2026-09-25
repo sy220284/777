@@ -5185,12 +5185,14 @@ class LocalHarnessEngine @Inject constructor(
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         if (!failureContextLogged) {
-                            eventLog.append("request/context-full", buildJsonObject {
-                                put("step", step)
-                                put("model", snapshot.model)
-                                put("messages", JsonArray(logMessages))
-                                put("tools", tools)
-                            })
+                            runCatching {
+                                eventLog.append("request/context-full", buildJsonObject {
+                                    put("step", step)
+                                    put("model", snapshot.model)
+                                    put("messages", JsonArray(logMessages))
+                                    put("tools", tools)
+                                })
+                            }
                             failureContextLogged = true
                         }
                         eventLog.append("request/error", buildJsonObject {
