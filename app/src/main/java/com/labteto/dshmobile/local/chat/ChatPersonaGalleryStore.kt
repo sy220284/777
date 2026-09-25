@@ -67,7 +67,7 @@ data class PersonaGalleryEntry(
 
 data class PersonaGallerySaveOutcome(
     val entry: PersonaGalleryEntry,
-    val storyId: String,
+    val storyId: String?,
 )
 
 @Serializable
@@ -470,11 +470,26 @@ class ChatPersonaGalleryStore internal constructor(
             baseEntry.stories.firstOrNull { sourceSessionId in it.sourceSessionIds }
         } else null
         val baseStory = explicitStory ?: sessionStory
-        val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
         val excluded = baseStory?.excludedMessageKeys.orEmpty()
         val incomingHistory = history
             .filter { it.role == "user" || it.role == "assistant" }
             .filterNot { galleryMessageArchiveKey(it) in excluded }
+        val shouldSaveStory = forceNewStory ||
+            baseStory != null ||
+            incomingHistory.isNotEmpty() ||
+            notes.isNotBlank() ||
+            chatState.updatedAt > 0L
+        if (!shouldSaveStory) {
+            val entry = baseEntry.copy(
+                persona = mergePersonaProfiles(baseEntry.persona, persona)
+                    .copy(id = entryId, updatedAt = now),
+                updatedAt = now,
+            )
+            write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+            return PersonaGallerySaveOutcome(entry = entry, storyId = null)
+        }
+
+        val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
