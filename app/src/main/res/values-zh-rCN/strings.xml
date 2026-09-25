@@ -959,6 +959,7 @@
     <string name="persona_gallery_show_fixed_persona">查看固定人设</string>
     <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
     <string name="persona_gallery_rename_story">重命名故事</string>
+    <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
 
 
     <string name="local_persona_picker_title">选择人物</string>
