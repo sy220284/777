@@ -543,7 +543,7 @@
     <string name="chat_view_mode">对话视图</string>
     <string name="chat_view_concise">简洁</string>
     <string name="chat_view_full">完整</string>
-    <string name="tasks_title">定时任务</string>
+    <string name="tasks_title">自动化</string>
     <string name="tasks_subtitle">查看计划任务、周期任务和最近执行结果</string>
     <string name="tasks_refresh">刷新任务</string>
     <string name="tasks_empty_title">暂无后台任务</string>
@@ -557,8 +557,8 @@
     <string name="tasks_next_run">下次执行：%1$s</string>
     <string name="tasks_last_result">最近结果：%1$s</string>
     <string name="tasks_last_status">最近状态：%1$s</string>
-    <string name="tools_title">工具与连接</string>
-    <string name="tools_subtitle">管理外部工具服务和当前可用能力</string>
+    <string name="tools_title">能力中心</string>
+    <string name="tools_subtitle">查看工作模式可用能力，并按需管理外部连接</string>
     <string name="tools_refresh">刷新工具</string>
     <string name="tools_external_services">外部工具服务</string>
     <string name="tools_no_services">暂无已连接服务</string>
@@ -895,5 +895,34 @@
     <string name="persona_gallery_observed_value">对话表现：%1$s</string>
     <string name="persona_gallery_suggestions_title">可追加到固定人设</string>
     <string name="persona_gallery_evidence">依据：%1$s</string>
+
+
+    <string name="local_run_center">运行中心</string>
+    <string name="local_work_history_title">最近任务</string>
+    <string name="local_run_current_goal">当前目标</string>
+    <string name="local_run_plan">计划</string>
+    <string name="local_run_tasks_progress">任务 · %1$d/%2$d</string>
+    <string name="local_run_background">后台任务</string>
+    <string name="local_run_resources">资源</string>
+    <string name="tasks_new">新建自动化</string>
+    <string name="tasks_prompt_label">要执行的任务</string>
+    <string name="tasks_prompt_hint">例如：总结当前项目今天的变化</string>
+    <string name="tasks_delay_minutes">几分钟后执行</string>
+    <string name="tasks_repeat_interval">重复间隔</string>
+    <string name="tasks_repeat_hint">留空为单次，周期任务间隔至少 15 分钟</string>
+    <string name="tasks_create">创建</string>
+    <string name="tasks_create_invalid">请填写任务；周期任务间隔至少 15 分钟。</string>
+    <string name="tools_external_services_hint">需要时再连接 HTTP 工具服务</string>
+    <string name="tools_capability_group">可用能力</string>
+    <string name="tools_connection_group">外部连接</string>
+    <string name="tools_capability_terminal">终端与运行环境</string>
+    <string name="tools_capability_code">代码智能</string>
+    <string name="tools_capability_device">Android 设备控制</string>
+    <string name="tools_capability_vision">视觉理解</string>
+    <string name="tools_capability_automation">自动化与外部触发</string>
+    <string name="tools_capability_available">可用</string>
+    <string name="tools_capability_unavailable">未加载</string>
+    <string name="panel_artifacts_empty">当前还没有标记为成果的文件</string>
+    <string name="panel_involved_files_empty">当前任务还没有涉及文件</string>
 
 </resources>
