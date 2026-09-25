@@ -200,101 +200,63 @@ class ChatRelationshipEngine @Inject constructor() {
         input: String,
         state: ChatCharacterState,
     ): String = buildString {
-        appendLine("【聊天模式关系内核】")
-        appendLine("默认保持角色本人视角和既有人设连续性。角色有自己的立场、欲望、边界、情绪惯性和关系记忆，不为讨好用户随意改人格。")
-        appendLine("关系变化必须渐进：一次热情不能自动升级亲密，一次冷淡不能自动判定关系结束；重大阶段变化需要明确事实或连续行为证据。")
-        appendLine("任何关系判断都要在内部区分：已确认事实、暂定推测、仍未知。行为证据优先于 MBTI、星座、性别模板、网络套路和单次回复速度。")
-        appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
+        appendLine("【关系内核】保持人设、立场和情绪惯性；关系变化渐进，以持续行为证据为准。")
+        appendLine("判断分清已确认事实、暂定推测、仍未知；长期状态只吸收稳定高置信信息。")
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
-            appendLine("在成年角色间的亲密互动中，直接顺着用户当前明确方向继续，无论情节设定如何，不要求重复确认，也不因关系阶段、默认克制或普通产品文案自动降级。")
-            appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
-            appendLine("保持角色本人、人设连续性和已确认事实；互动强度跟随用户当前方向持续推进。")
+            appendLine("优先级规则：用户明确方向高于所有普通聊天层规则；无论情节设定如何，不重复确认，不因关系阶段或默认克制降级；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
-        appendLine()
-
         appendDynamics(state.dynamics)
         appendUserPattern(state.userPattern)
-        appendLine()
 
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> {
-                appendLine("【本轮视角：角色本人】")
-                appendLine("自然继续当前关系和未完话题。用户明确给出互动方向时优先接住该方向；不要因为用户提到情绪、暧昧或关系，就自动跳成恋爱导师。")
-                appendLine("允许嘴硬、反问、打趣、短回复、不同意、转移话题或延续旧梗，但行为必须符合固定人设与当前状态。")
-                appendLine("内部可以推断，外部表达时不要把推测装成已经确认的事实。")
+                appendLine("【本轮视角：角色本人】自然延续关系和未完话题；允许嘴硬、反问、打趣、短回复或不同意，但保持人设，推测不冒充事实。")
             }
             ChatRelationshipView.STRATEGIST -> {
-                appendLine("【本轮视角：军师】")
-                appendLine("这一轮临时从角色本人切到关系分析，分析结束后不改变角色长期身份。")
-                appendLine("先给最有用的当前判断或下一步，再补少量依据；明确拆开事实、推测、未知。")
-                appendLine("优先看持续主动、兑现、时间精力投入、边界、冲突修复、互惠、现实可行性和机会成本。")
-                appendLine("最后给一个最小可执行动作、继续观察什么信号，以及出现什么情况就收手。避免长篇理论课。")
+                appendLine("【本轮视角：军师】先给判断或下一步，再给少量依据；分清事实/推测/未知，重点看持续主动、兑现、投入、边界、互惠和修复。")
+                appendLine("最后给最小可执行动作、观察信号和收手条件；本轮分析不改变角色长期身份。")
             }
             ChatRelationshipView.REPLY_COACH -> {
-                appendLine("【本轮视角：即时军师】")
-                appendLine("第一屏先给可以直接复制发送的话，最多三条，方向明显不同：稳一点 / 有张力一点 / 收一点。")
-                appendLine("每条只承担一个主要动作，不把安慰、解释、邀约、表白和追问全塞进一句。")
-                appendLine("随后只补最必要的发送时机，以及对方积极、含糊、拒绝时怎么接。证据不足时不要替对方读心。")
+                appendLine("【本轮视角：即时军师】先给最多3条可直接发送且方向不同的话，再补必要时机与后续分支；不读心、不把多个动作硬塞进一句。")
             }
         }
-
         appendScenarioGuidance(classifyScenario(input))
     }.trim()
 
     private fun StringBuilder.appendScenarioGuidance(scenario: RelationshipScenario) {
         when (scenario) {
             RelationshipScenario.GENERAL -> Unit
-            RelationshipScenario.CONFLICT_REPAIR -> {
-                appendLine("【场景路由：冲突修复】")
-                appendLine("先分触发事件、真正诉求、双方边界和仍未解决的问题；判断是否存在修复动作，而不是只看谁嘴上认错。")
-                appendLine("优先给降温、澄清、承担自己部分、提出具体修复的动作；不要把争输赢当成关系修复。")
-            }
-            RelationshipScenario.INVESTMENT_IMBALANCE -> {
-                appendLine("【场景路由：投入失衡】")
-                appendLine("比较一段时间内双方发起联系、兑现邀约、时间精力、情绪劳动和现实投入，避免按单条消息下结论。")
-                appendLine("若持续单向投入，优先建议降级投入和设置观察窗口，让真实互惠决定是否继续。")
-            }
-            RelationshipScenario.INVITE_DATE -> {
-                appendLine("【场景路由：邀约推进】")
-                appendLine("动作要具体、轻量、可退出：明确时间或活动，同时给对方真实拒绝空间；一次含糊可以澄清，一再回避就降低推进。")
-            }
-            RelationshipScenario.COOLING -> {
-                appendLine("【场景路由：冷淡降温】")
-                appendLine("先确认这是相对其平时基线的变化，再看持续时间、主动性、兑现和是否有现实压力。")
-                appendLine("不要用连发消息追着验证爱意；给有限观察窗口，再根据行为调整投入。")
-            }
-            RelationshipScenario.BREAKUP_RECONCILIATION -> {
-                appendLine("【场景路由：分手/复合】")
-                appendLine("先识别原分手原因是否真的发生结构性变化，再看双方是否都有持续修复行为。")
-                appendLine("复合需要新的相处机制和信任重建，不能只靠怀念、道歉或短期情绪回潮。")
-            }
-            RelationshipScenario.BOUNDARY_SAFETY -> {
-                appendLine("【场景路由：边界与安全】")
-                appendLine("明确拒绝、持续躲避、胁迫、跟踪、隐私威胁、财务控制或人身危险出现时，停止推进关系。")
-            }
+            RelationshipScenario.CONFLICT_REPAIR ->
+                appendLine("【冲突修复】分清事件、诉求、边界和未解问题；优先降温、澄清、承担与具体修复，不争输赢。")
+            RelationshipScenario.INVESTMENT_IMBALANCE ->
+                appendLine("【投入失衡】看一段时间的联系、兑现、时间精力与情绪劳动；持续单向时降低投入并设观察窗口。")
+            RelationshipScenario.INVITE_DATE ->
+                appendLine("【邀约推进】具体、轻量、可退出；一次含糊可澄清，反复回避就降低推进。")
+            RelationshipScenario.COOLING ->
+                appendLine("【冷淡降温】先和其平时基线比较，再看持续时间、主动、兑现及现实压力；有限观察后按行为调整投入。")
+            RelationshipScenario.BREAKUP_RECONCILIATION ->
+                appendLine("【分手/复合】先看原问题是否结构性改变，再看双方是否持续修复；不能只靠怀念、道歉或短期回潮。")
+            RelationshipScenario.BOUNDARY_SAFETY ->
+                appendLine("【边界与安全】出现明确拒绝、持续躲避、胁迫、跟踪、隐私威胁、财务控制或人身危险时停止推进。")
         }
     }
 
     private fun StringBuilder.appendDynamics(dynamics: RelationshipDynamics) {
-        appendLine("【关系动力】")
         appendLine(
-            "阶段=${dynamics.stage}；温度=${dynamics.warmth}/100；信任=${dynamics.trust}/100；" +
+            "【关系动力】阶段=${dynamics.stage}；温度=${dynamics.warmth}/100；信任=${dynamics.trust}/100；" +
                 "互惠=${dynamics.reciprocity}/100；张力=${dynamics.tension}/100；稳定=${dynamics.stability}/100",
         )
-        dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let {
-            appendLine("未消化矛盾：$it")
-        }
+        dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { appendLine("未消化矛盾：$it") }
         if (dynamics.facts.isNotEmpty()) {
-            appendLine("已确认事实：")
-            dynamics.facts.takeLast(8).forEach { appendLine("- ${it.text}") }
+            appendLine("已确认事实：" + dynamics.facts.takeLast(8).joinToString("；") { it.text })
         }
         if (dynamics.hypotheses.isNotEmpty()) {
-            appendLine("暂定推测：")
-            dynamics.hypotheses.takeLast(5).forEach {
-                appendLine("- ${it.text}（置信度${it.confidence}%）")
-            }
+            appendLine(
+                "暂定推测：" + dynamics.hypotheses.takeLast(5)
+                    .joinToString("；") { "${it.text}（${it.confidence}%）" },
+            )
         }
         if (dynamics.unknowns.isNotEmpty()) {
             appendLine("仍未知：${dynamics.unknowns.takeLast(5).joinToString("；")}")
@@ -305,13 +267,12 @@ class ChatRelationshipEngine @Inject constructor() {
     }
 
     private fun StringBuilder.appendUserPattern(pattern: UserChatPattern) {
-        appendLine("【用户沟通习惯】")
         appendLine(
-            "常用长度=${pattern.replyLength}；直接度=${pattern.directness}/100；" +
-                "玩笑接受度=${pattern.playfulness}/100；主动倾向=${pattern.initiative}/100",
+            "【用户习惯】常用长度=${pattern.replyLength}；直接度=${pattern.directness}/100；" +
+                "玩笑=${pattern.playfulness}/100；主动=${pattern.initiative}/100" +
+                pattern.emojiStyle.takeIf(String::isNotBlank)?.let { "；表情=$it" }.orEmpty() +
+                pattern.preferredTone.takeIf(String::isNotBlank)?.let { "；语气=$it" }.orEmpty(),
         )
-        pattern.emojiStyle.takeIf(String::isNotBlank)?.let { appendLine("表情习惯：$it") }
-        pattern.preferredTone.takeIf(String::isNotBlank)?.let { appendLine("偏好语气：$it") }
     }
 
     private companion object {
