@@ -32,7 +32,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
@@ -117,8 +116,6 @@ private enum class SettingsPage {
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
-    updateStatus: String?,
-    onCheckUpdate: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
@@ -250,20 +247,6 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
                                 onClick = { page = SettingsPage.ADVANCED },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.CloudDownload,
-                                title = stringResource(R.string.settings_update_check),
-                                subtitle = stringResource(R.string.settings_update_check_hint),
-                                onClick = onCheckUpdate,
-                            )
-                        }
-                        updateStatus?.let { status ->
-                            Text(
-                                status,
-                                style = DsType.small13,
-                                color = colors.labelSecondary,
-                                modifier = Modifier.padding(horizontal = DsSpacing.small),
                             )
                         }
                     }
