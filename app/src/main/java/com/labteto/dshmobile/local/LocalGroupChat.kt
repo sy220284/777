@@ -121,15 +121,20 @@ internal fun stripGroupSpeakerPrefix(
         .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
         .distinct()
         .sortedByDescending { it.length }
-        .toList()
 
     names.forEach { name ->
-        val escaped = Regex.escape(name)
-        val prefix = Regex(
-            """^\s*(?:\*\*|__)?(?:[@＠])?(?:【|\[)?$escaped(?:】|\])?(?:\*\*|__)?\s*(?:[:：]\s*|[-—]\s+|\r?\n+)""",
+        val prefixes = sequenceOf(
+            "**$name：**", "**$name:**", "__$name：__", "__$name:__",
+            "【$name】：", "【$name】:", "[$name]：", "[$name]:",
+            "@$name：", "@$name:", "＠$name：", "＠$name:",
+            "$name：", "$name:",
+            "**$name**\r\n", "**$name**\n", "__$name__\r\n", "__$name__\n",
+            "【$name】\r\n", "【$name】\n", "[$name]\r\n", "[$name]\n",
+            "$name\r\n", "$name\n",
+            "$name - ", "$name — ", "$name— ",
         )
-        prefix.find(trimmed)?.let { match ->
-            return trimmed.removeRange(match.range).trimStart()
+        prefixes.firstOrNull(trimmed::startsWith)?.let { prefix ->
+            return trimmed.removePrefix(prefix).trimStart()
         }
     }
     return trimmed
