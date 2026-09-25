@@ -19,7 +19,7 @@
 - 普通子代理和 fork 子代理会继承有界的父级约束上下文，包括用户规则、当前项目相关记忆和会话交接摘要；任务历史仍按子代理模式隔离。
 - 官方 Harness 差分验证模块已进入主线，当前锁定 `0.1.7-rc.2 / 477b4f420...`，日常 CI 不自动同步上游。
 - 用户可见 transcript 已采用独立 sequence 游标：user / assistant / reasoning / progress / tool / system 消息随 canonical Session Event 持久化，快照只承担物化加速；崩溃后按事件尾增量恢复并按稳定消息 id 去重。
-- 长对话压缩已拆为独立的 `LocalHistoryCompactor`：字符预算保护 Android 资源，官方 DeepSeek 路由额外按模型窗口估算 token 压力；主 Agent 每个模型 step 都会重新检查，较早历史生成有界提取式摘要。
+- 长对话压缩已拆为独立的 `LocalHistoryCompactor`：字符预算保护 Android 资源，官方 DeepSeek 路由额外按模型窗口估算 token 压力；主 Agent 每个模型 step 都会重新检查，较早历史生成有界提取式摘要。提供方明确返回上下文超限时，会保留 system 指令、强制缩短较早历史并仅重试一次；普通请求错误不进入该恢复路径。
 - 工具结果使用 Unicode/UTF-8 安全头尾保留；超限完整结果可进入 Session 私有 spill，并通过 `tool_output_read` 分页恢复，不再以“节省上下文”为代价永久丢失可恢复内容。
 - 普通、持久和自动化子 Agent 的可选工具启用集合已经按单次 Agent Run 隔离；子 Agent 的能力发现不会修改父回合工具视图。
 - 自动化任务保存 30 天 / 200 条轻量运行回执，完整结果继续复用原工作会话，避免重复持久化。
