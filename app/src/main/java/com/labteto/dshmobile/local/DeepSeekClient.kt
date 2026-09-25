@@ -223,7 +223,7 @@ class DeepSeekClient @Inject constructor(
                 } ?: DeepSeekTokenUsage(reported = false)
                 LocalModelReply(
                     message = message,
-                    content = content.toString().takeIf(String::isNotBlank),
+                    content = content.toString(),
                     reasoning = reasoning.toString().takeIf(String::isNotBlank),
                     toolCalls = calls,
                     usage = usage,
