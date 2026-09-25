@@ -1,12 +1,18 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import java.io.File
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ChatPersonaGalleryTest {
+    @get:Rule val temporary = TemporaryFolder()
+
     @Test
     fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {
         val story = PersonaGalleryStory(
@@ -244,6 +250,57 @@ class ChatPersonaGalleryTest {
 
         assertEquals("和用户是多年好友；私下会叫用户小名", merged.relationship)
         assertEquals(listOf("少来"), merged.signaturePhrases)
+    }
+
+    @Test
+    fun personaFileShareRoundTripsWithoutStoriesOrForeignIds() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "小岚",
+                identity = "花店店主",
+                personality = "嘴硬心软",
+                bannedPhrases = listOf("客服腔"),
+            ),
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "你好", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "旧故事",
+        ).entry
+
+        val payload = source.exportPersona(saved.id)
+        val importedStore = ChatPersonaGalleryStore(File(temporary.root, "imported.json"), Json)
+        val imported = importedStore.importPersona(payload)
+
+        assertEquals("小岚", imported.persona.name)
+        assertEquals("花店店主", imported.persona.identity)
+        assertEquals(listOf("客服腔"), imported.persona.bannedPhrases)
+        assertTrue(imported.stories.isEmpty())
+        assertFalse(imported.id == saved.id)
+    }
+
+    @Test
+    fun compactPersonaShareStaysQrSizedAndCanImport() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "qr-source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "阿青",
+                identity = "剑客".repeat(600),
+                background = "很长的背景".repeat(600),
+                personality = "克制".repeat(600),
+            ),
+            sourceSessionId = "session-a",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        val payload = source.exportPersona(saved.id, compact = true)
+        assertTrue(payload.length < 2_800)
+        val imported = ChatPersonaGalleryStore(File(temporary.root, "qr-imported.json"), Json)
+            .importPersona(payload)
+        assertEquals("阿青", imported.persona.name)
+        assertTrue(imported.persona.identity.isNotBlank())
     }
 
     @Test
