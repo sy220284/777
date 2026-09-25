@@ -366,6 +366,7 @@ fun LocalHarnessScreen(
     if (showPersonaGallery && state.usageMode == LocalUsageMode.CHAT) {
         PersonaGalleryDialog(
             entries = gallery,
+            presets = viewModel.personaPresets,
             currentPersona = state.chatPersona,
             currentGalleryId = state.galleryId,
             currentGalleryStoryId = state.galleryStoryId,
@@ -382,6 +383,7 @@ fun LocalHarnessScreen(
             onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
             onExport = viewModel::exportGalleryPersona,
             onImport = viewModel::importGalleryPersona,
+            onInstallPreset = viewModel::installPersonaPreset,
             onStart = { id, storyId, freshStory ->
                 if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
             },
