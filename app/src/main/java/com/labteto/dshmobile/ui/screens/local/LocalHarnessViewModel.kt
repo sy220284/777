@@ -94,6 +94,8 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun currentGalleryNeedsUpdate(): Boolean = state.value.galleryId != null
 
+    fun currentGalleryHasUnsavedChanges(): Boolean = hasUnsavedCurrentPersona()
+
     suspend fun inspectGalleryPersona(
         id: String,
         storyId: String?,
