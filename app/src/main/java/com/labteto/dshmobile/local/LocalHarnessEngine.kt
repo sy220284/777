@@ -1939,15 +1939,19 @@ class LocalHarnessEngine @Inject constructor(
         if (!snapshot.autoMemory || text.isBlank()) return
 
         val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-            runCatching {
-                memoryManager.captureChatRelationshipFact(
-                    text = text,
-                    lineageId = snapshot.lineageId,
-                    sourceSessionId = currentSessionId,
-                    subjectLabel = snapshot.chatPersona.name
-                        .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
-                )
-            }.getOrNull()
+            if (snapshot.groupChat.enabled) {
+                null
+            } else {
+                runCatching {
+                    memoryManager.captureChatRelationshipFact(
+                        text = text,
+                        lineageId = snapshot.lineageId,
+                        sourceSessionId = currentSessionId,
+                        subjectLabel = snapshot.chatPersona.name
+                            .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
+                    )
+                }.getOrNull()
+            }
         } else {
             runCatching {
                 memoryManager.captureExplicitUserDirective(
