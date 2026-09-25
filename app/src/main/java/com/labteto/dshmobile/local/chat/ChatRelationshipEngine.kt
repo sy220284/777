@@ -53,13 +53,29 @@ class ChatRelationshipEngine @Inject constructor() {
     internal fun classifyScenario(input: String): RelationshipScenario {
         val text = input.trim().lowercase()
         if (!isRelationshipContext(text)) return RelationshipScenario.GENERAL
+
+        // Ordinary relationship wording is deliberately not enough to inject a specialist route.
+        // One-off words such as “冷淡” or “见面” are common in normal roleplay and previously
+        // caused the hidden prompt to jump into advice mode. A scenario needs either two pieces of
+        // scenario evidence or one piece plus an explicit analysis/strategist request. Safety and
+        // boundary signals stay single-hit because missing those is the worse failure mode.
+        val explicitAnalysis =
+            STRATEGY_COMMANDS.any { text.startsWith(it) } ||
+                "军师" in text ||
+                ANALYSIS_HINTS.any { text.contains(it) }
+
+        fun routed(hints: List<String>): Boolean {
+            val hits = hints.count { text.contains(it) }
+            return hits >= 2 || (hits >= 1 && explicitAnalysis)
+        }
+
         return when {
             BOUNDARY_HINTS.any { text.contains(it) } -> RelationshipScenario.BOUNDARY_SAFETY
-            BREAKUP_HINTS.any { text.contains(it) } -> RelationshipScenario.BREAKUP_RECONCILIATION
-            CONFLICT_HINTS.any { text.contains(it) } -> RelationshipScenario.CONFLICT_REPAIR
-            IMBALANCE_HINTS.any { text.contains(it) } -> RelationshipScenario.INVESTMENT_IMBALANCE
-            COOLING_HINTS.any { text.contains(it) } -> RelationshipScenario.COOLING
-            DATE_HINTS.any { text.contains(it) } -> RelationshipScenario.INVITE_DATE
+            routed(BREAKUP_HINTS) -> RelationshipScenario.BREAKUP_RECONCILIATION
+            routed(CONFLICT_HINTS) -> RelationshipScenario.CONFLICT_REPAIR
+            routed(IMBALANCE_HINTS) -> RelationshipScenario.INVESTMENT_IMBALANCE
+            routed(COOLING_HINTS) -> RelationshipScenario.COOLING
+            routed(DATE_HINTS) -> RelationshipScenario.INVITE_DATE
             else -> RelationshipScenario.GENERAL
         }
     }
@@ -221,7 +237,7 @@ class ChatRelationshipEngine @Inject constructor() {
             "仓库", "提交", "文档", "接口", "任务", "小说", "剧情", "章节", "作者", "台词",
             "角色", "剧本", "设定",
         )
-        val CONFLICT_HINTS = listOf("吵架", "闹矛盾", "生气", "道歉", "冷战", "争执", "冲突", "和好")
+        val CONFLICT_HINTS = listOf("吵架", "闹矛盾", "生气", "道歉", "冷战", "争执", "冲突", "和好", "修复")
         val IMBALANCE_HINTS = listOf("都是我主动", "只有我主动", "付出不对等", "投入失衡", "单方面", "一直是我")
         val DATE_HINTS = listOf("邀约", "约她", "约他", "约出来", "见面", "第一次见", "约会")
         val COOLING_HINTS = listOf("冷淡", "变冷", "回复慢", "不回", "敷衍", "降温", "突然变了")
