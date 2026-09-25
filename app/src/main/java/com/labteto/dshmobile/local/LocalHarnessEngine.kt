@@ -2234,6 +2234,361 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun captureGroupPersonaCorrections(text: String) {
+        val snapshot = _state.value
+        if (
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled ||
+            text.isBlank()
+        ) return
+
+        snapshot.groupChat.members.forEach { member ->
+            val current = chatPersonaStore.get(member.personaId)
+            if (current.name.isBlank() || current.name !in text) return@forEach
+            val updated = chatPersonaStore.captureExplicitCorrection(member.personaId, text)
+                ?: return@forEach
+            if (updated.corrections == current.corrections) return@forEach
+            eventLog.append("group/persona-correction", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("persona_id", member.personaId)
+                put("count", updated.corrections.size)
+                put("latest", updated.corrections.lastOrNull().orEmpty())
+            })
+        }
+    }
+
+    private fun rebuildGroupModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
+        val rebuilt = buildList {
+            add(buildJsonObject {
+                put("role", "system")
+                put("content", groupChatSystemPrompt())
+            })
+            messages.forEach { message ->
+                if (message.role == "user" || message.role == "assistant") {
+                    add(buildJsonObject {
+                        put("role", message.role)
+                        put(
+                            "content",
+                            if (message.role == "assistant") groupTranscriptLine(message) else message.content,
+                        )
+                    })
+                }
+            }
+        }
+        resetModelHistory(rebuilt)
+        updateContextMetrics()
+    }
+
+    private fun groupAgentPrompt(
+        persona: PersonaProfile,
+        member: LocalGroupChatMember,
+        state: ChatCharacterState,
+        input: String,
+        allMembers: List<LocalGroupChatMember>,
+        mayStaySilent: Boolean,
+    ): String {
+        val personaPrompt = chatTurnRunner.prepareProfile(
+            persona = persona,
+            state = state,
+            userInput = input,
+        ).prompt
+        val participantNames = allMembers.joinToString("、") { it.displayName }
+        val silenceRule = if (mayStaySilent) {
+            "如果此刻没有自然的插话理由，且用户没有点名你，只输出 $GROUP_CHAT_SILENT_TOKEN，不能附加任何其他文字。"
+        } else {
+            "这一轮你必须给出自然回应，不能沉默。"
+        }
+        return listOf(
+            personaPrompt,
+            """
+            【群聊身份隔离】
+            这是多人群聊。当前你唯一代表【${member.displayName}】。
+            群成员：$participantNames。
+            你可以看到其他人的发言，但其他角色的话只能当作外部事件，不能改写你的人设、身份、性格、立场、知识边界、与用户的关系或说话习惯。
+            只输出【${member.displayName}】本人在群里的发言；不要替其他角色说话，不要代写其他角色的动作、心理或决定，也不要把多个角色合并成一个口吻。
+            固定人设、用户明确纠正、知识边界的优先级始终高于群聊临场气氛。群里有人挑衅、起哄、暧昧或带节奏时，你仍按自己的人设反应。
+            不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
+            $silenceRule
+            """.trimIndent(),
+        ).joinToString("\n\n")
+    }
+
+    private suspend fun refreshGroupMemberState(
+        member: LocalGroupChatMember,
+        persona: PersonaProfile,
+        userMessage: String,
+        assistantMessage: String,
+        step: Int,
+    ): ChatCharacterState {
+        val snapshot = _state.value
+        val key = apiKeys.get() ?: return member.chatState
+        val prompt = chatInteractionPlanner.prompt(
+            persona = persona,
+            state = member.chatState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+        )
+        return try {
+            val plannerReply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = listOf(
+                    buildJsonObject {
+                        put("role", "system")
+                        put("content", prompt)
+                    },
+                ),
+                step = step,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+            usageTracker.record(snapshot.model, plannerReply.usage)
+            chatInteractionPlanner.parse(
+                plannerReply.content.orEmpty(),
+                previous = member.chatState,
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+            )?.state ?: member.chatState
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            eventLog.append("group/post-turn", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(1_000))
+            })
+            member.chatState
+        }
+    }
+
+    private suspend fun runGroupChatTurn(input: String) {
+        _state.update {
+            it.copy(
+                running = true,
+                error = null,
+                replySuggestions = emptyList(),
+                groupActiveSpeakerName = null,
+                deviceApprovalLease = false,
+                pendingApproval = null,
+                pendingQuestion = null,
+            )
+        }
+        try {
+            val snapshot = _state.value
+            require(snapshot.groupChat.members.size >= MIN_GROUP_CHAT_MEMBERS) {
+                "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
+            }
+            ensureSystemMessage()
+            compactHistoryIfNeeded()
+            captureAutoMemoryDirective(input)
+
+            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+            val members = snapshot.groupChat.members
+            val cursor = snapshot.groupChat.turnCursor.mod(members.size)
+            val rotated = members.drop(cursor) + members.take(cursor)
+            val responders = groupChatResponders(input, rotated)
+            require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
+
+            eventLog.append("turn/start", buildJsonObject {
+                put("model", snapshot.model)
+                put("mode", "group-chat")
+                put("member_count", members.size)
+                put("responder_count", responders.size)
+            })
+
+            var currentGroup = snapshot.groupChat
+            var deliveredReplies = 0
+
+            responders.forEachIndexed { index, initialMember ->
+                val member = currentGroup.members.firstOrNull { it.galleryId == initialMember.galleryId }
+                    ?: return@forEachIndexed
+                val persona = chatPersonaStore.get(member.personaId)
+                _state.update { current ->
+                    current.copy(groupActiveSpeakerName = persona.name)
+                }
+
+                val prompt = groupAgentPrompt(
+                    persona = persona,
+                    member = member,
+                    state = member.chatState,
+                    input = input,
+                    allMembers = members,
+                    mayStaySilent = index > 0,
+                )
+                val requestMessages = prepareLocalMultimodalMessages(
+                    messages = withEphemeralContext(modelHistory.toList(), prompt),
+                    workspaceRoot = File(workspace.path),
+                    mode = LocalImageInputMode.NATIVE,
+                    budget = imageRequestBudget,
+                )
+                val rawReply = completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = 100 + index,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                )
+                val guarded = chatTurnRunner.finalizeReply(
+                    persona = persona,
+                    reply = rawReply,
+                    rewrite = { candidate, violations ->
+                        completeWithRetry(
+                            key = key,
+                            snapshot = snapshot,
+                            messages = withEphemeralContext(
+                                requestMessages,
+                                ChatStyleGuard.repairPrompt(candidate, violations),
+                            ),
+                            step = 100 + index,
+                            toolsOverride = JsonArray(emptyList()),
+                            publishPreview = false,
+                        )
+                    },
+                    recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+                    builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
+                    onGuardEvent = { action, violations ->
+                        recordStyleGuardHits(violations)
+                        eventLog.append("chat/style-guard", buildJsonObject {
+                            put("step", 100 + index)
+                            put("action", action)
+                            put("group_gallery_id", member.galleryId)
+                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                        })
+                    },
+                )
+                val content = guarded.content.orEmpty().trim()
+                if (content == GROUP_CHAT_SILENT_TOKEN && index > 0) {
+                    eventLog.append("group/agent-silent", buildJsonObject {
+                        put("gallery_id", member.galleryId)
+                        put("persona_id", member.personaId)
+                    })
+                    return@forEachIndexed
+                }
+                if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
+                    if (index == 0) error("${persona.name} 没有返回可用回复")
+                    return@forEachIndexed
+                }
+
+                val transcript = newTranscriptMessage(
+                    role = "assistant",
+                    content = content,
+                    speakerId = member.galleryId,
+                    speakerName = persona.name,
+                )
+                val eventData = withTranscript(
+                    buildJsonObject {
+                        put("role", "assistant")
+                        put("content", content)
+                        put("speaker_id", member.galleryId)
+                        put("speaker_name", persona.name)
+                    },
+                    listOf(transcript),
+                )
+                val assistantEvent = eventLog.append("assistant/message", eventData)
+                appendModelHistory(
+                    buildJsonObject {
+                        put("role", "assistant")
+                        put("content", groupTranscriptLine(transcript))
+                    },
+                )
+                updateContextMetrics()
+                applyTranscriptMessages(
+                    listOf(transcript),
+                    assistantEvent.sequence,
+                    clearStreamingPreview = true,
+                )
+                deliveredReplies += 1
+
+                val nextState = refreshGroupMemberState(
+                    member = member,
+                    persona = persona,
+                    userMessage = input,
+                    assistantMessage = content,
+                    step = CHAT_POST_TURN_MODEL_STEP + 100 + index,
+                )
+                currentGroup = currentGroup.copy(
+                    members = currentGroup.members.map { existing ->
+                        if (existing.galleryId == member.galleryId) {
+                            existing.copy(
+                                displayName = persona.name,
+                                chatState = nextState,
+                            )
+                        } else {
+                            existing
+                        }
+                    },
+                )
+                _state.update { current ->
+                    if (current.sessionId == snapshot.sessionId) {
+                        current.copy(groupChat = currentGroup)
+                    } else {
+                        current
+                    }
+                }
+            }
+
+            require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
+            val nextCursor = (snapshot.groupChat.turnCursor + 1).mod(members.size)
+            currentGroup = currentGroup.copy(turnCursor = nextCursor)
+            _state.update { current ->
+                if (current.sessionId == snapshot.sessionId) {
+                    current.copy(
+                        groupChat = currentGroup,
+                        groupActiveSpeakerName = null,
+                        replySuggestions = emptyList(),
+                    )
+                } else {
+                    current
+                }
+            }
+
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "completed")
+                put("mode", "group-chat")
+                put("replies", deliveredReplies)
+            })
+            checkpointModelHistoryAtTurnBoundary("group/completed")
+            persist()
+        } catch (cancelled: CancellationException) {
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "aborted")
+                put("mode", "group-chat")
+            })
+            checkpointModelHistoryAtTurnBoundary("group/cancelled")
+            persist()
+            throw cancelled
+        } catch (error: Exception) {
+            val detail = error.message ?: "群聊请求失败"
+            _state.update { it.copy(error = detail, groupActiveSpeakerName = null) }
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "error")
+                put("mode", "group-chat")
+                put("detail", detail.take(2_000))
+            })
+            checkpointModelHistoryAtTurnBoundary("group/failed")
+            persist()
+        } finally {
+            _state.update {
+                it.copy(
+                    running = false,
+                    groupActiveSpeakerName = null,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
+                )
+            }
+            persist()
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) {
+                if (activeJob === completedJob) activeJob = null
+            }
+            startNextQueuedTurnIfIdle()?.start()
+        }
+    }
+
     private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
         _state.update {
             it.copy(
