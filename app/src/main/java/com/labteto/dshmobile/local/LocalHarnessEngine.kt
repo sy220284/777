@@ -1691,7 +1691,6 @@ class LocalHarnessEngine @Inject constructor(
                         put("content", chatSystemPrompt())
                     })
                     session.messages
-                        .asSequence()
                         .filter { it.role == "user" || it.role == "assistant" }
                         .takeLast(48)
                         .forEach { message ->
