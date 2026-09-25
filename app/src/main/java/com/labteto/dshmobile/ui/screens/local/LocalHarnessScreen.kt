@@ -1077,6 +1077,7 @@ private fun LocalChat(
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
+    val editUserMessageFailed = stringResource(R.string.local_edit_user_message_failed)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -1731,7 +1732,7 @@ private fun LocalChat(
                             editingUserText = ""
                             editingUserError = null
                         } else {
-                            editingUserError = stringResource(R.string.local_edit_user_message_failed)
+                            editingUserError = editUserMessageFailed
                         }
                     },
                     enabled = editingUserText.trim().isNotEmpty() &&
