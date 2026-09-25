@@ -4190,10 +4190,10 @@ class LocalHarnessEngine @Inject constructor(
                     toolOutputStore.read(
                         sessionId = sessionId,
                         callId = canonical.arguments.string("call_id"),
-                        startLine = canonical.arguments.int("start_line", 1),
-                        endLine = canonical.arguments.int(
-                            "end_line",
-                            canonical.arguments.int("start_line", 1) + 399,
+                        startByte = canonical.arguments.int("start_byte", 0),
+                        maxBytes = canonical.arguments.int(
+                            "max_bytes",
+                            LocalToolOutputStore.DEFAULT_READ_BYTES,
                         ),
                     ),
                 )
@@ -4271,10 +4271,10 @@ class LocalHarnessEngine @Inject constructor(
                     toolOutputStore.read(
                         sessionId = sessionId,
                         callId = normalized.arguments.string("call_id"),
-                        startLine = normalized.arguments.int("start_line", 1),
-                        endLine = normalized.arguments.int(
-                            "end_line",
-                            normalized.arguments.int("start_line", 1) + 399,
+                        startByte = normalized.arguments.int("start_byte", 0),
+                        maxBytes = normalized.arguments.int(
+                            "max_bytes",
+                            LocalToolOutputStore.DEFAULT_READ_BYTES,
                         ),
                     ),
                 )
@@ -4547,8 +4547,8 @@ class LocalHarnessEngine @Inject constructor(
         return when (call.name) {
             "read", "read_file" -> workspace.read(
                 relativePath = args.string("path"),
-                startLine = args.int("start_line", 1),
-                endLine = args.int("end_line", args.int("start_line", 1) + 399),
+                startByte = args.int("start_byte", 0),
+                maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
             "tool_output_read" -> toolOutputStore.read(
                 sessionId = currentSessionId,
