@@ -364,6 +364,11 @@ fun SettingsScreen(
                                 settings.notifyNeedsAction,
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notifications_local_jobs),
+                                settings.notifyLocalJobs,
+                                stringResource(R.string.settings_notifications_local_jobs_hint),
+                            ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
                         }
                     }
 
