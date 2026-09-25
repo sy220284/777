@@ -4018,9 +4018,10 @@ class LocalHarnessEngine @Inject constructor(
                             recoveryHint = event.recoveryHint,
                         ).modelVisibleContent()
                         val transcriptMessage = newTranscriptMessage(
-                            "tool",
-                            boundedContent,
-                            event.call.name,
+                            role = "tool",
+                            content = boundedContent,
+                            toolName = event.call.name,
+                            contentAlreadyBounded = true,
                         )
                         val toolEvent = eventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -5729,10 +5730,11 @@ class LocalHarnessEngine @Inject constructor(
         toolName: String? = null,
         speakerId: String? = null,
         speakerName: String? = null,
+        contentAlreadyBounded: Boolean = false,
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
-        content = if (role == "tool") pruneToolResult(content) else content,
+        content = if (role == "tool" && !contentAlreadyBounded) pruneToolResult(content) else content,
         toolName = toolName,
         speakerId = speakerId,
         speakerName = speakerName,
