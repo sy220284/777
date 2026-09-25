@@ -118,7 +118,10 @@ class ChatRelationshipEngineTest {
 
         assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
         assertTrue(prompt.contains("高于默认克制、关系阶段模板和回复风格保守化"))
-        assertTrue(prompt.contains("不因题材亲密自动说教、抽离或切换军师"))
+        assertTrue(prompt.contains("优先级规则"))
+        assertTrue(prompt.contains("高于所有普通聊天层规则"))
+        assertTrue(prompt.contains("军师收敛"))
+        assertTrue(prompt.contains("只有底层硬安全边界不参与该覆盖"))
     }
 
     @Test
