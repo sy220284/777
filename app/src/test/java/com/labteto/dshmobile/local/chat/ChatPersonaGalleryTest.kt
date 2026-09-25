@@ -85,6 +85,58 @@ class ChatPersonaGalleryTest {
         assertEquals(listOf("m1", "m2", "m3"), merged.history.map { it.id })
     }
 
+
+    @Test
+    fun legacyDuplicateCharacterCardsCompactIntoNewestMasterProfile() {
+        val older = PersonaGalleryEntry(
+            id = "gallery-old",
+            persona = PersonaProfile(
+                id = "gallery-old",
+                name = "神里绫华",
+                identity = "社奉行神里家大小姐",
+            ),
+            history = listOf(
+                LocalHarnessMessage("m1", "user", "早上好", createdAt = 1L),
+            ),
+            updatedAt = 10L,
+        )
+        val newer = PersonaGalleryEntry(
+            id = "gallery-new",
+            persona = PersonaProfile(
+                id = "gallery-new",
+                name = "神里绫华",
+                personality = "温柔克制",
+            ),
+            history = listOf(
+                LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L),
+            ),
+            updatedAt = 20L,
+        )
+
+        val compacted = compactDuplicateGalleryEntries(listOf(older, newer))
+
+        assertEquals(1, compacted.size)
+        assertEquals("gallery-new", compacted.single().id)
+        assertEquals("社奉行神里家大小姐", compacted.single().persona.identity)
+        assertEquals("温柔克制", compacted.single().persona.personality)
+        assertEquals(listOf("m1", "m2"), compacted.single().history.map { it.id })
+    }
+
+    @Test
+    fun archivedDialogueCanBeRemovedByStableArchiveKey() {
+        val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
+        val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
+        val entry = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
+            history = listOf(first, second),
+        )
+
+        val updated = removeArchivedGalleryMessage(entry, galleryMessageArchiveKey(first))
+
+        assertEquals(listOf("m2"), updated?.history?.map { it.id })
+    }
+
     @Test
     fun selectedInspectionSuggestionAppendsOnceAndKeepsExistingPersona() {
         val profile = PersonaProfile(
