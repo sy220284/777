@@ -30,6 +30,7 @@ class MemoryStore internal constructor(
         projectId: String? = null,
         lineageId: String? = null,
         sourceSessionId: String? = null,
+        subjectKey: String? = null,
         importance: Int = 50,
         pinned: Boolean = false,
         replaceIds: Set<String> = emptySet(),
@@ -46,6 +47,7 @@ class MemoryStore internal constructor(
                 it.scope == scope &&
                 it.projectId == projectId &&
                 it.lineageId == lineageId &&
+                it.subjectKey == subjectKey &&
                 it.content.equals(clean, ignoreCase = true)
         }
         if (duplicateIndex >= 0) {
@@ -54,6 +56,7 @@ class MemoryStore internal constructor(
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
                 sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
+                subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
             records[duplicateIndex] = refreshed
@@ -81,6 +84,7 @@ class MemoryStore internal constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
+            subjectKey = subjectKey,
             importance = importance.coerceIn(0, 100),
             pinned = pinned,
             createdAt = now,
