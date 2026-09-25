@@ -60,4 +60,57 @@ class LocalToolOutputStoreTest {
 
         assertTrue(store.read("session-a", "call-1").startsWith("未找到"))
     }
+
+    @Test
+    fun boundsSpillBytesPerSession() {
+        val root = File(temporary.root, "tool-output")
+        val store = LocalToolOutputStore(
+            root = root,
+            maxOutputBytes = 32,
+            maxFilesPerSession = 10,
+            maxSessionBytes = 12,
+            maxGlobalBytes = 128,
+        )
+
+        store.store("session-a", "call-1", "12345678")
+        store.store("session-a", "call-2", "abcdefgh")
+
+        val retainedBytes = root.walkTopDown()
+            .filter(File::isFile)
+            .sumOf(File::length)
+        assertTrue(retainedBytes <= 12L)
+    }
+
+    @Test
+    fun boundsSpillBytesAcrossSessions() {
+        val root = File(temporary.root, "tool-output")
+        val store = LocalToolOutputStore(
+            root = root,
+            maxOutputBytes = 32,
+            maxFilesPerSession = 10,
+            maxSessionBytes = 64,
+            maxGlobalBytes = 12,
+        )
+
+        store.store("session-a", "call-1", "12345678")
+        store.store("session-b", "call-2", "abcdefgh")
+
+        val retainedBytes = root.walkTopDown()
+            .filter(File::isFile)
+            .sumOf(File::length)
+        assertTrue(retainedBytes <= 12L)
+    }
+
+    @Test
+    fun refusesSingleSpillAboveItemLimit() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 4,
+            maxFilesPerSession = 10,
+            maxSessionBytes = 64,
+            maxGlobalBytes = 128,
+        )
+
+        assertTrue(store.store("session-a", "call-1", "12345") == null)
+    }
 }
