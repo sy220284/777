@@ -443,7 +443,7 @@ internal fun PersonaGalleryDialog(
                                                     pendingHistoryDeleteKey = null
                                                     notice = archiveDeletedText
                                                 }
-                                                .onFailure { error = it.message ?: deleteFailedText }
+                                                .onFailure { error = deleteFailedText }
                                             busy = false
                                         }
                                     },
