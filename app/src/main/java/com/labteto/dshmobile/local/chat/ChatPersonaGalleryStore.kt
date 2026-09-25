@@ -463,7 +463,7 @@ private fun mergeLoreEntries(
             )
         }
     }
-    return merged.values.takeLast(limit)
+    return merged.values.toList().takeLast(limit)
 }
 
 private fun mergePersonaLines(base: List<String>, incoming: List<String>, limit: Int): List<String> {
