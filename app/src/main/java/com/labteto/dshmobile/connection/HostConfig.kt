@@ -71,6 +71,7 @@ data class AppSettings(
     val notifyTurnComplete: Boolean = true,
     val notifyGoal: Boolean = true,
     val notifyNeedsAction: Boolean = true,
+    val notifyLocalJobs: Boolean = true,
     val themePreference: String = "system", // light | dark | matte_black | system
     val localeOverride: String? = null, // null = system
     /**

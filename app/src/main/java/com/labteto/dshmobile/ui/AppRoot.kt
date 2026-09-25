@@ -40,7 +40,9 @@ import com.labteto.dshmobile.ui.theme.ThemePreference
 fun AppRoot(
     viewModel: AppViewModel = hiltViewModel(),
     requestedSessionId: String? = null,
+    requestedLocalSessionId: String? = null,
     onSessionRequestConsumed: () -> Unit = {},
+    onLocalSessionRequestConsumed: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
@@ -70,6 +72,15 @@ fun AppRoot(
         val selectedRemoteMatches = surface == "remote" && connection.host != null
         LaunchedEffect(requestedSessionId) {
             if (!requestedSessionId.isNullOrBlank()) viewModel.prepareNotificationNavigation()
+        }
+        LaunchedEffect(requestedLocalSessionId) {
+            if (!requestedLocalSessionId.isNullOrBlank()) {
+                showSettings = false
+                utilitySurface = null
+                showPair = false
+                relayClaimed = false
+                surface = "local"
+            }
         }
         LaunchedEffect(requestedSessionId, connection.phase) {
             val target = requestedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
@@ -109,6 +120,8 @@ fun AppRoot(
                 },
             )
             surface == "local" -> LocalHarnessScreen(
+                requestedSessionId = requestedLocalSessionId,
+                onSessionRequestConsumed = onLocalSessionRequestConsumed,
                 onOpenRemote = {
                     relayClaimed = false
                     surface = "remote"

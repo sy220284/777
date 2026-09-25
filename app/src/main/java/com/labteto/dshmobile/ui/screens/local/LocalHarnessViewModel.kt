@@ -200,6 +200,16 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
+    suspend fun exportGalleryPersona(id: String, compact: Boolean = false): Result<String> = runCatching {
+        withContext(Dispatchers.IO) { galleryStore.exportPersona(id, compact) }
+    }
+
+    suspend fun importGalleryPersona(payload: String): Result<PersonaGalleryEntry> = runCatching {
+        withContext(Dispatchers.IO) {
+            galleryStore.importPersona(payload).also { _gallery.value = galleryStore.list() }
+        }
+    }
+
     suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
         withContext(Dispatchers.IO) {
             check(galleryStore.delete(id)) { "图集条目已不存在" }
@@ -271,6 +281,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
     fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
+    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
+        engine.undoChatPersonaCorrection(noticeId, personaId, correction)
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value

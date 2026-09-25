@@ -28,8 +28,12 @@ internal object ChatStyleGuard {
         "让我们一起",
     )
 
-    fun violations(text: String, extraBannedPhrases: List<String> = emptyList()): List<String> =
-        (bannedPhrases + extraBannedPhrases)
+    fun violations(
+        text: String,
+        extraBannedPhrases: List<String> = emptyList(),
+        builtInEnabled: Boolean = true,
+    ): List<String> =
+        ((if (builtInEnabled) bannedPhrases else emptyList()) + extraBannedPhrases)
             .asSequence()
             .map(String::trim)
             .filter(String::isNotBlank)
@@ -45,8 +49,16 @@ internal object ChatStyleGuard {
         append(candidate.take(MAX_CANDIDATE_CHARS))
     }
 
-    fun scrub(text: String, extraBannedPhrases: List<String> = emptyList()): String {
-        val builtIn = bannedPhrases.map(String::trim).filter(String::isNotBlank).distinct()
+    fun scrub(
+        text: String,
+        extraBannedPhrases: List<String> = emptyList(),
+        builtInEnabled: Boolean = true,
+    ): String {
+        val builtIn = if (builtInEnabled) {
+            bannedPhrases.map(String::trim).filter(String::isNotBlank).distinct()
+        } else {
+            emptyList()
+        }
         var result = CHAT_SENTENCE.findAll(text)
             .map { it.value }
             .filterNot { segment ->

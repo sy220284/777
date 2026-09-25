@@ -53,6 +53,7 @@ class MemoryStore internal constructor(
                 kind = kind,
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
+                sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
                 updatedAt = now,
             )
             records[duplicateIndex] = refreshed
@@ -138,6 +139,30 @@ class MemoryStore internal constructor(
         )
         writeDocument(MemoryDocument(records = records))
         return true
+    }
+
+    /**
+     * A deleted conversation must not remain as a dangling provenance pointer. The memory itself
+     * is intentionally preserved because global/project/lineage memories are designed to outlive
+     * one transcript; only the deleted source reference is detached.
+     */
+    @Synchronized
+    fun detachSourceSessions(sessionIds: Set<String>): Int {
+        if (sessionIds.isEmpty()) return 0
+        val records = readDocument().records.toMutableList()
+        val now = System.currentTimeMillis()
+        var changed = 0
+        records.indices.forEach { index ->
+            if (records[index].sourceSessionId in sessionIds) {
+                records[index] = records[index].copy(
+                    sourceSessionId = null,
+                    updatedAt = now,
+                )
+                changed++
+            }
+        }
+        if (changed > 0) writeDocument(MemoryDocument(records = records))
+        return changed
     }
 
     @Synchronized

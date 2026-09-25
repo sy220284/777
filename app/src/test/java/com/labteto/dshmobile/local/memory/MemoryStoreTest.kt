@@ -102,6 +102,42 @@ class MemoryStoreTest {
         assertEquals(listOf(replacement), all(store()))
     }
 
+    @Test fun duplicateRefreshMovesProvenanceToNewestSession() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "old-session",
+        )
+        val refreshed = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "new-session",
+        )
+        assertEquals(first.id, refreshed.id)
+        assertEquals("new-session", all(memoryStore).single().sourceSessionId)
+    }
+
+    @Test fun deletingConversationSourceDetachesProvenanceButKeepsMemory() {
+        val memoryStore = store()
+        val sourced = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "deleted-session",
+        )
+        memoryStore.remember(
+            "另一个事实",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "kept-session",
+        )
+
+        assertEquals(1, memoryStore.detachSourceSessions(setOf("deleted-session")))
+        val remaining = all(store())
+        assertEquals(2, remaining.size)
+        assertNull(remaining.single { it.id == sourced.id }.sourceSessionId)
+        assertEquals("kept-session", remaining.single { it.id != sourced.id }.sourceSessionId)
+    }
+
     @Test fun updateAndForgetPersistAcrossRestart() {
         val original = store().remember("remember apples", MemoryScope.GLOBAL, importance = 50)
         val updated = store().update(

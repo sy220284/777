@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -91,7 +90,6 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -265,6 +263,41 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
+                        SettingsCard(stringResource(R.string.settings_page_chat), Icons.Outlined.Tune) {
+                            ToggleRow(
+                                stringResource(R.string.settings_chat_style_guard),
+                                localHarness.chatStyleGuardEnabled,
+                                stringResource(R.string.settings_chat_style_guard_hint),
+                            ) {
+                                viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
+                            }
+                            Text(
+                                stringResource(R.string.settings_chat_guard_hits_title),
+                                style = DsType.small13,
+                                color = colors.labelSecondary,
+                            )
+                            if (localHarness.styleGuardHits.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.settings_chat_guard_hits_empty),
+                                    style = DsType.caption11,
+                                    color = colors.labelTertiary,
+                                )
+                            } else {
+                                localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
+                                    Text(
+                                        "• " + hit,
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                    )
+                                }
+                                DsButton(
+                                    text = stringResource(R.string.settings_chat_guard_hits_clear),
+                                    onClick = viewModel::clearChatStyleGuardHits,
+                                    variant = DsButtonVariant.Ghost,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
                     }
 
                     SettingsPage.MODELS -> {
@@ -311,6 +344,11 @@ fun SettingsScreen(
                                 settings.notifyNeedsAction,
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notifications_local_jobs),
+                                settings.notifyLocalJobs,
+                                stringResource(R.string.settings_notifications_local_jobs_hint),
+                            ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
                         }
                     }
 

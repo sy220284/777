@@ -973,7 +973,42 @@
     <string name="local_persona_picker_saved">Saved characters</string>
     <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
     <string name="local_persona_picker_saved_hint">Saved character</string>
+
+
+    <string name="settings_page_chat">Chat</string>
+    <string name="settings_chat_subtitle">Role-chat style and output guard</string>
+    <string name="settings_chat_style_guard">Generic phrase guard</string>
+    <string name="settings_chat_style_guard_hint">Blocks common canned assistant phrasing. Character-specific banned phrases remain enforced when this is off.</string>
+    <string name="settings_chat_guard_hits_title">Recent matched phrases</string>
+    <string name="settings_chat_guard_hits_empty">No recent guard matches.</string>
+    <string name="settings_chat_guard_hits_clear">Clear match history</string>
+    <string name="local_mode_intro_chat">Chat mode: everyday conversation, roleplay, and relationship continuity, with persona and chat-style guards.</string>
+    <string name="local_mode_intro_work">Work mode: tasks, files, commands, tools, and subagents, with the full execution chain available here.</string>
+    <string name="local_persona_correction_recorded">Persona correction saved</string>
+    <string name="local_persona_correction_undo">Undo</string>
+
     <string name="local_persona_picker_switch_requires_new_chat">This chat already has dialogue. Start a new chat before switching or creating a character so storylines do not mix.</string>
+
+
+    <string name="notif_channel_local_jobs">On-device tasks</string>
+    <string name="settings_notifications_local_jobs">On-device task completion</string>
+    <string name="settings_notifications_local_jobs_hint">Notify when a Work-mode on-device task finishes, fails, or is cancelled.</string>
+    <string name="local_execution_notification_running">Working</string>
+    <string name="local_execution_notification_step">Working · step %1$d</string>
+    <string name="local_execution_notification_jobs">%1$d background task(s) still running</string>
+    <string name="local_execution_notification_body">神言神语 is running a task on this device</string>
+    <string name="local_execution_background_job">Background task</string>
+    <string name="local_execution_notification_complete">On-device task complete</string>
+    <string name="local_execution_notification_failed">On-device task failed</string>
+    <string name="local_execution_notification_cancelled">On-device task cancelled</string>
+    <string name="local_execution_notification_background_continues">This turn ended; %1$d background task(s) are still running.</string>
+    <string name="local_execution_notification_tap">Tap to return to the conversation</string>
+
+
+    <string name="persona_gallery_import_file">Import file</string>
+    <string name="persona_gallery_export_file">Export character</string>
+    <string name="persona_gallery_export_failed">Could not export character</string>
+    <string name="persona_gallery_import_failed">Could not import character</string>
 
 <string name="tasks_schedule_label">Schedule</string>
 <string name="tasks_schedule_once">Once</string>

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +52,9 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun PersonaGallerySavePromptDialog(
@@ -139,10 +144,13 @@ internal fun PersonaGalleryDialog(
     onDelete: suspend (String) -> Result<Unit>,
     onDeleteStory: suspend (String, String) -> Result<Unit>,
     onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
+    onExport: suspend (String, Boolean) -> Result<String>,
+    onImport: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
@@ -167,6 +175,7 @@ internal fun PersonaGalleryDialog(
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
@@ -184,6 +193,56 @@ internal fun PersonaGalleryDialog(
     val mergeDoneText = stringResource(R.string.persona_gallery_merge_done)
     val archiveDeletedText = stringResource(R.string.persona_gallery_archive_deleted)
     val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
+    val exportFailedText = stringResource(R.string.persona_gallery_export_failed)
+    val importFailedText = stringResource(R.string.persona_gallery_import_failed)
+
+    val exportDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val payload = pendingExportPayload
+        pendingExportPayload = null
+        if (uri != null && payload != null) {
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
+                            it.write(payload)
+                        } ?: error("无法写入目标文件")
+                    }
+                }.onFailure { error = it.message ?: exportFailedText }
+            }
+        }
+    }
+
+    fun importPayload(payload: String) {
+        busy = true
+        error = null
+        scope.launch {
+            onImport(payload)
+                .onSuccess { imported ->
+                    selectedId = imported.id
+                    selectedStoryId = null
+                }
+                .onFailure { error = it.message ?: importFailedText }
+            busy = false
+        }
+    }
+
+    val importDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val payload = runCatching {
+                    withContext(Dispatchers.IO) { readPersonaShareText(context, uri) }
+                }.getOrElse {
+                    error = it.message ?: importFailedText
+                    return@launch
+                }
+                importPayload(payload)
+            }
+        }
+    }
 
     LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
         val entry = selected ?: return@LaunchedEffect
@@ -203,6 +262,13 @@ internal fun PersonaGalleryDialog(
     ) {
         if (selected == null) {
             GalleryOverviewHeader(entries.size)
+            DsButton(
+                text = stringResource(R.string.persona_gallery_import_file),
+                onClick = { importDocument.launch(arrayOf("application/json", "text/plain")) },
+                variant = DsButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
             Text(
                 stringResource(R.string.persona_gallery_long_press_delete_hint),
                 style = DsType.caption11,
@@ -325,6 +391,26 @@ internal fun PersonaGalleryDialog(
                 totalDialogue,
             )
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
+
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_file),
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onExport(selected.id, false)
+                            .onSuccess { payload ->
+                                pendingExportPayload = payload
+                                exportDocument.launch(personaExportFileName(selected.persona.name))
+                            }
+                            .onFailure { error = it.message ?: exportFailedText }
+                        busy = false
+                    }
+                },
+                variant = DsButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
 
             notice?.let {
                 Surface(
@@ -715,6 +801,30 @@ internal fun PersonaGalleryDialog(
                 modifier = Modifier.padding(top = DsSpacing.small),
             )
         }
+    }
+
+}
+
+private fun personaExportFileName(name: String): String {
+    val safe = name.trim()
+        .replace(Regex("""[\\/:*?"<>|]"""), "_")
+        .take(48)
+        .ifBlank { "persona" }
+    return "$safe.persona.json"
+}
+
+private fun readPersonaShareText(context: android.content.Context, uri: android.net.Uri): String {
+    val input = context.contentResolver.openInputStream(uri) ?: error("无法读取人物文件")
+    return input.bufferedReader().use { reader ->
+        val result = StringBuilder()
+        val buffer = CharArray(4_096)
+        while (result.length <= 64_000) {
+            val count = reader.read(buffer)
+            if (count < 0) break
+            result.append(buffer, 0, count)
+        }
+        require(result.length <= 64_000) { "人物文件过大" }
+        result.toString()
     }
 }
 

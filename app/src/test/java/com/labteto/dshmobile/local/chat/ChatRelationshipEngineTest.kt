@@ -76,6 +76,22 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun ordinarySingleScenarioWordDoesNotInjectSpecialistRoute() {
+        assertEquals(
+            RelationshipScenario.GENERAL,
+            engine.classifyScenario("她最近有点冷淡，真烦"),
+        )
+        assertEquals(
+            RelationshipScenario.GENERAL,
+            engine.classifyScenario("今天见面的时候她有点走神"),
+        )
+        assertEquals(
+            RelationshipScenario.BOUNDARY_SAFETY,
+            engine.classifyScenario("她明确说别联系了"),
+        )
+    }
+
+    @Test
     fun scenariosUseDifferentReasoningRoutes() {
         assertEquals(
             RelationshipScenario.CONFLICT_REPAIR,

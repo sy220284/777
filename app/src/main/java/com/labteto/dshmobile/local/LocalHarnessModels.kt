@@ -159,6 +159,12 @@ data class LocalJobInfo(
     val status: String,
 )
 
+data class ChatPersonaCorrectionNotice(
+    val id: Long,
+    val personaId: String,
+    val correction: String,
+)
+
 /** State rendered by the standalone, on-device Harness screen. */
 data class LocalHarnessState(
     val loading: Boolean = true,
@@ -188,6 +194,9 @@ data class LocalHarnessState(
     val userRules: String = "",
     val autoRecall: Boolean = true,
     val autoMemory: Boolean = true,
+    val chatStyleGuardEnabled: Boolean = true,
+    val styleGuardHits: List<String> = emptyList(),
+    val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val plan: List<String> = emptyList(),

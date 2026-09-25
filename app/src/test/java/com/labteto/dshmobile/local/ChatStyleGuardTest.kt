@@ -32,6 +32,25 @@ class ChatStyleGuardTest {
         assertEquals("嗯。你终于回来了。", scrubbed)
     }
 
+    @Test fun disablingGenericGuardStillEnforcesPersonaBan() {
+        val text = "我理解你的感受。亲爱的，回来就好。"
+        assertEquals(
+            listOf("亲爱的"),
+            ChatStyleGuard.violations(
+                text,
+                extraBannedPhrases = listOf("亲爱的"),
+                builtInEnabled = false,
+            ),
+        )
+        val scrubbed = ChatStyleGuard.scrub(
+            text,
+            extraBannedPhrases = listOf("亲爱的"),
+            builtInEnabled = false,
+        )
+        assertTrue("我理解你的感受" in scrubbed)
+        assertFalse("亲爱的" in scrubbed)
+    }
+
     @Test fun naturalChatPassesUntouched() {
         val text = "……你还知道回来？"
         assertTrue(ChatStyleGuard.violations(text).isEmpty())

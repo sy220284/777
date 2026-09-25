@@ -118,6 +118,17 @@ class ChatPersonaStore internal constructor(
         )
     }
 
+    /** Remove exactly one previously captured correction, used by the short undo window. */
+    @Synchronized
+    fun removeCorrection(personaId: String, correction: String): PersonaProfile? {
+        val current = get(personaId)
+        val normalized = normalize(correction)
+        val index = current.corrections.indexOfLast { normalize(it) == normalized }
+        if (index < 0) return null
+        val next = current.corrections.toMutableList().also { it.removeAt(index) }
+        return upsert(current.copy(corrections = next))
+    }
+
     private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.copy(
         id = profile.id.trim().take(80).ifBlank { PersonaProfile.DEFAULT_PERSONA_ID },
         name = profile.name.trim().take(80).ifBlank { "默认角色" },
