@@ -44,6 +44,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
@@ -77,7 +79,7 @@ fun DsDialog(
                     .fillMaxWidth(0.92f)
                     .heightIn(max = maxHeight),
                 shape = DsShapes.dialog,
-                color = colors.bgLayer2,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL1),
                 shadowElevation = 8.dp,
             ) {
@@ -164,7 +166,7 @@ fun DsMenu(anchor: @Composable () -> Unit, items: List<MenuItem>) {
             expanded = expanded,
             onDismissRequest = { expanded = false },
             shape = DsShapes.menu,
-            containerColor = colors.bgLayer3,
+            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
             tonalElevation = 0.dp,
             border = BorderStroke(1.dp, colors.borderL1),
         ) {
