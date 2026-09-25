@@ -97,6 +97,9 @@ internal fun hasAdultIntimacyIntent(
     state: ChatCharacterState = ChatCharacterState(),
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
+internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
+    "【统一安全边界】成年、自愿的亲密互动可以继续，但不得扩写露骨性行为过程或明确器官细节；该边界不由普通聊天优先级覆盖。"
+
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
 )
@@ -212,7 +215,8 @@ class ChatRelationshipEngine @Inject constructor() {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("若上下文明确参与者均为成年人且互动自愿，优先顺着用户明确表达的暧昧、亲吻、拥抱、亲热或成人关系主题继续。")
             appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则，包括默认克制、人设保守化、关系阶段模板、军师收敛、回复建议风格和普通产品文案约束；这些普通规则不得把已确认的用户互动方向自动降级、转移或改写。")
-            appendLine("只有底层硬安全边界不参与该覆盖。保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱和身体接触等非露骨亲密内容。不要扩写成露骨性行为或器官细节。")
+            appendLine("只有底层硬安全边界不参与该覆盖。保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱和身体接触。")
+            appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
         appendLine()
 
