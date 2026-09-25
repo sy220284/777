@@ -2366,9 +2366,9 @@ class LocalHarnessEngine @Inject constructor(
         if (recalled.isEmpty()) return ""
 
         return buildString {
-            appendLine("【已确认的长期关系事实】")
+            appendLine("【长期关系记忆】")
             recalled.forEach { appendLine("- ${it.content}") }
-            append("这些内容来自用户此前明确陈述；若与用户本轮新说法冲突，以更新后的明确事实为准。")
+            append("来自用户既往明确信息；与本轮冲突时以本轮为准。")
         }
     }
 
