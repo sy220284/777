@@ -973,4 +973,17 @@
     <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
     <string name="local_persona_picker_saved_hint">Saved character</string>
 
+
+    <string name="settings_page_chat">Chat</string>
+    <string name="settings_chat_subtitle">Role-chat style and output guard</string>
+    <string name="settings_chat_style_guard">Generic phrase guard</string>
+    <string name="settings_chat_style_guard_hint">Blocks common canned assistant phrasing. Character-specific banned phrases remain enforced when this is off.</string>
+    <string name="settings_chat_guard_hits_title">Recent matched phrases</string>
+    <string name="settings_chat_guard_hits_empty">No recent guard matches.</string>
+    <string name="settings_chat_guard_hits_clear">Clear match history</string>
+    <string name="local_mode_intro_chat">Chat mode: everyday conversation, roleplay, and relationship continuity, with persona and chat-style guards.</string>
+    <string name="local_mode_intro_work">Work mode: tasks, files, commands, tools, and subagents, with the full execution chain available here.</string>
+    <string name="local_persona_correction_recorded">Persona correction saved</string>
+    <string name="local_persona_correction_undo">Undo</string>
+
 </resources>
