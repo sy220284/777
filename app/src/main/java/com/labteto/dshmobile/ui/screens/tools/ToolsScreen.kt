@@ -12,7 +12,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -38,8 +42,10 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.rememberSessionStore
@@ -153,6 +159,7 @@ fun ToolsScreen(
     val colors = DsTheme.colors
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
+    var showExternalConfig by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onClose)
     LaunchedEffect(Unit) {
@@ -186,81 +193,108 @@ fun ToolsScreen(
                 )
             }
 
-            Text(stringResource(R.string.tools_external_services), style = DsType.std14, color = colors.labelTertiary)
+            Text(stringResource(R.string.tools_capability_group), style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
-                if (state.servers.isEmpty()) {
-                    Text(stringResource(R.string.tools_no_services), style = DsType.small13, color = colors.labelTertiary)
-                } else {
-                    state.servers.forEach { server ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        ) {
-                            StateDot(StateDotState.Done)
-                            Column(Modifier.weight(1f)) {
-                                Text(server.id, style = DsType.std14Strong, color = colors.labelPrimary)
-                                Text(
-                                    stringResource(R.string.tools_server_summary, server.transport.uppercase(), server.tools.size),
-                                    style = DsType.caption11,
-                                    color = colors.labelTertiary,
-                                )
-                            }
-                            DsButton(
-                                text = stringResource(R.string.tools_disconnect),
-                                onClick = { viewModel.disconnect(server.id) },
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
-                            )
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = serverId,
-                    onValueChange = { serverId = it.take(24) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.tools_server_name)) },
-                    singleLine = true,
+                DsCategoryRow(
+                    icon = Icons.Outlined.Extension,
+                    title = stringResource(R.string.skills_title),
+                    value = capabilityStateLabel("local-builtin" in state.localPlugins),
                 )
-                OutlinedTextField(
-                    value = endpoint,
-                    onValueChange = { endpoint = it.take(2000) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.tools_endpoint)) },
-                    supportingText = { Text(stringResource(R.string.tools_endpoint_hint)) },
-                    singleLine = true,
+                DsCategoryRow(
+                    icon = FeatherIcons.Terminal,
+                    title = stringResource(R.string.tools_capability_terminal),
+                    value = capabilityStateLabel("android-runtime" in state.localPlugins),
                 )
-                DsButton(
-                    text = stringResource(if (state.loading) R.string.tools_processing else R.string.tools_connect),
-                    onClick = {
-                        viewModel.connectHttp(serverId.trim(), endpoint.trim())
-                        serverId = ""
-                        endpoint = ""
-                    },
-                    enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
-                    variant = DsButtonVariant.Outline,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Outlined.Link,
+                DsCategoryRow(
+                    icon = FeatherIcons.Code,
+                    title = stringResource(R.string.tools_capability_code),
+                    value = capabilityStateLabel("local-language-server" in state.localPlugins),
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.PhoneAndroid,
+                    title = stringResource(R.string.tools_capability_device),
+                    value = capabilityStateLabel("android-device" in state.localPlugins),
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Image,
+                    title = stringResource(R.string.tools_capability_vision),
+                    value = capabilityStateLabel("local-vision" in state.localPlugins),
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.tools_capability_automation),
+                    value = capabilityStateLabel(
+                        "android-automation" in state.localPlugins || "android-webhook" in state.localPlugins,
+                    ),
                 )
             }
 
-            Text(stringResource(R.string.tools_local_capabilities), style = DsType.std14, color = colors.labelTertiary)
+            Text(stringResource(R.string.tools_connection_group), style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
-                Text(
-                    stringResource(R.string.tools_local_loaded, state.localPlugins.size),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
+                DsCategoryRow(
+                    icon = Icons.Outlined.Link,
+                    title = stringResource(R.string.tools_external_services),
+                    subtitle = stringResource(R.string.tools_external_services_hint),
+                    value = state.servers.size.toString(),
+                    onClick = { showExternalConfig = !showExternalConfig },
                 )
-                state.localPlugins.forEach { id ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        StateDot(StateDotState.Done)
-                        Text(localPluginLabel(id), style = DsType.small13, color = colors.labelPrimary)
+
+                if (showExternalConfig) {
+                    if (state.servers.isEmpty()) {
+                        Text(stringResource(R.string.tools_no_services), style = DsType.small13, color = colors.labelTertiary)
+                    } else {
+                        state.servers.forEach { server ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                StateDot(StateDotState.Done)
+                                Column(Modifier.weight(1f)) {
+                                    Text(server.id, style = DsType.std14Strong, color = colors.labelPrimary)
+                                    Text(
+                                        stringResource(R.string.tools_server_summary, server.transport.uppercase(), server.tools.size),
+                                        style = DsType.caption11,
+                                        color = colors.labelTertiary,
+                                    )
+                                }
+                                DsButton(
+                                    text = stringResource(R.string.tools_disconnect),
+                                    onClick = { viewModel.disconnect(server.id) },
+                                    size = DsButtonSize.Small,
+                                    variant = DsButtonVariant.Ghost,
+                                )
+                            }
+                        }
                     }
+
+                    OutlinedTextField(
+                        value = serverId,
+                        onValueChange = { serverId = it.take(24) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.tools_server_name)) },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = endpoint,
+                        onValueChange = { endpoint = it.take(2000) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.tools_endpoint)) },
+                        supportingText = { Text(stringResource(R.string.tools_endpoint_hint)) },
+                        singleLine = true,
+                    )
+                    DsButton(
+                        text = stringResource(if (state.loading) R.string.tools_processing else R.string.tools_connect),
+                        onClick = {
+                            viewModel.connectHttp(serverId.trim(), endpoint.trim())
+                            serverId = ""
+                            endpoint = ""
+                        },
+                        enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
+                        variant = DsButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = Icons.Outlined.Link,
+                    )
                 }
             }
 
@@ -315,17 +349,8 @@ fun ToolsScreen(
 }
 
 @Composable
-private fun localPluginLabel(id: String): String = when (id) {
-    "local-builtin" -> stringResource(R.string.tools_plugin_builtin)
-    "android-runtime" -> stringResource(R.string.tools_plugin_runtime)
-    "mcp-bridge" -> stringResource(R.string.tools_plugin_mcp)
-    "local-language-server" -> stringResource(R.string.tools_plugin_language_server)
-    "android-device" -> stringResource(R.string.tools_plugin_device)
-    "local-vision" -> stringResource(R.string.tools_plugin_vision)
-    "android-automation" -> stringResource(R.string.tools_plugin_automation)
-    "android-webhook" -> stringResource(R.string.tools_plugin_webhook)
-    else -> id
-}
+private fun capabilityStateLabel(available: Boolean): String =
+    stringResource(if (available) R.string.tools_capability_available else R.string.tools_capability_unavailable)
 
 @Composable
 private fun pluginPhaseLabel(phase: PluginFiberPhase?, enabled: Boolean): String = when {

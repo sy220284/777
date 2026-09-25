@@ -97,7 +97,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -136,6 +135,7 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -168,6 +168,7 @@ fun LocalHarnessScreen(
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
     var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
+    var showRunCenter by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -188,7 +189,8 @@ fun LocalHarnessScreen(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
                 usageMode = state.usageMode,
-                usage = state.usage,
+                modeSwitchEnabled = !state.running,
+                onUsageModeChange = viewModel::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
@@ -205,6 +207,10 @@ fun LocalHarnessScreen(
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
                     scope.launch { drawerState.close() }
+                },
+                onOpenRunCenter = {
+                    scope.launch { drawerState.close() }
+                    showRunCenter = true
                 },
                 galleryCount = gallery.size,
                 onOpenPersonaGallery = {
@@ -237,7 +243,6 @@ fun LocalHarnessScreen(
             else -> LocalChat(
                 state = state,
                 onOpenMenu = { scope.launch { drawerState.open() } },
-                onOpenFiles = { filesMode = LocalFilesMode.CONVERSATION },
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
@@ -246,7 +251,7 @@ fun LocalHarnessScreen(
                 onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
-                onUsageModeChange = viewModel::switchUsageMode,
+                onOpenRunCenter = { showRunCenter = true },
                 onConfigureChatPersona = viewModel::configureChatPersona,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
                 onSelectChatDirection = viewModel::selectChatDirection,
@@ -284,6 +289,12 @@ fun LocalHarnessScreen(
             loadPreview = viewModel::previewWorkspaceFile,
             onDismiss = { filesMode = null },
         )
+    }
+
+    if (showRunCenter && state.usageMode == LocalUsageMode.WORK) {
+        Dialog(onDismissRequest = { showRunCenter = false }) {
+            ExecutionStatusCard(state = state)
+        }
     }
 
     if (showPersonaGallerySavePrompt && state.usageMode == LocalUsageMode.CHAT) {
@@ -326,12 +337,14 @@ private fun LocalModeDrawer(
     currentSessionId: String,
     sessions: List<LocalSessionSummary>,
     usageMode: LocalUsageMode,
-    usage: DeepSeekUsageSnapshot,
+    modeSwitchEnabled: Boolean,
+    onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    onOpenRunCenter: () -> Unit,
     galleryCount: Int,
     onOpenPersonaGallery: () -> Unit,
     onTasks: () -> Unit,
@@ -402,6 +415,16 @@ private fun LocalModeDrawer(
                         tint = colors.labelPrimary,
                     )
                 }
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LocalUsageModePill(
+                        selected = usageMode,
+                        enabled = modeSwitchEnabled,
+                        onSelect = onUsageModeChange,
+                    )
+                }
 
                 if (searchOpen) {
                     OutlinedTextField(
@@ -437,44 +460,28 @@ private fun LocalModeDrawer(
                         title = stringResource(R.string.chatlist_workspace_files),
                         onClick = onWorkspaceFiles,
                     )
-                }
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.QrCodeScanner,
-                    title = stringResource(R.string.local_remote_control),
-                    onClick = onRemote,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.Schedule,
-                    title = stringResource(R.string.tasks_title),
-                    onClick = onTasks,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.Extension,
-                    title = stringResource(R.string.tools_title),
-                    onClick = onTools,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.Settings,
-                    title = stringResource(R.string.settings_title),
-                    onClick = onSettings,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.CloudDownload,
-                    title = stringResource(R.string.settings_update_check),
-                    onClick = onCheckUpdate,
-                )
-                updateStatus?.let { status ->
-                    Text(
-                        status,
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 48.dp, end = DsSpacing.small),
+                    DrawerPrimaryAction(
+                        icon = FeatherIcons.CheckSquare,
+                        title = stringResource(R.string.local_run_center),
+                        onClick = onOpenRunCenter,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Schedule,
+                        title = stringResource(R.string.tasks_title),
+                        onClick = onTasks,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Extension,
+                        title = stringResource(R.string.tools_title),
+                        onClick = onTools,
                     )
                 }
-
-                DrawerSectionTitle(stringResource(R.string.chatlist_title))
+                DrawerSectionTitle(
+                    stringResource(
+                        if (usageMode == LocalUsageMode.CHAT) R.string.chatlist_title
+                        else R.string.local_work_history_title,
+                    ),
+                )
             }
 
             LazyColumn(
@@ -515,7 +522,38 @@ private fun LocalModeDrawer(
                     )
                 }
             }
-            LocalUsageFooter(usage)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.QrCodeScanner,
+                    title = stringResource(R.string.local_remote_control),
+                    onClick = onRemote,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.Settings,
+                    title = stringResource(R.string.settings_title),
+                    onClick = onSettings,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.CloudDownload,
+                    title = stringResource(R.string.settings_update_check),
+                    onClick = onCheckUpdate,
+                )
+                updateStatus?.let { status ->
+                    Text(
+                        status,
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = DsSpacing.xxlarge, end = DsSpacing.small),
+                    )
+                }
+            }
         }
     }
 
@@ -891,7 +929,6 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 private fun LocalChat(
     state: LocalHarnessState,
     onOpenMenu: () -> Unit,
-    onOpenFiles: () -> Unit,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
@@ -900,7 +937,7 @@ private fun LocalChat(
     onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
-    onUsageModeChange: (LocalUsageMode) -> Unit,
+    onOpenRunCenter: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onSelectChatDirection: (String?) -> Unit,
@@ -921,8 +958,22 @@ private fun LocalChat(
         state.usageMode == LocalUsageMode.CHAT &&
             backgroundState.hasImage &&
             backgroundState.adaptiveContrast
-    // Let a custom wallpaper continue behind the entire toolbar and composer. Keep contrast
-    // treatment on the individual controls and messages instead of painting two full-width slabs.
+    val adaptiveWorkBackground =
+        state.usageMode == LocalUsageMode.WORK &&
+            backgroundState.hasImage &&
+            backgroundState.adaptiveContrast
+    val rootSurfaceColor = if (adaptiveWorkBackground) {
+        backgroundState.surfaceColor(
+            base = colors.bgBase,
+            region = BackgroundRegion.ALL,
+            minAlpha = 0.90f,
+            maxAlpha = 0.98f,
+        )
+    } else {
+        colors.rootSurface()
+    }
+    // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
+    // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
     val headerChipColor = if (backgroundState.hasImage) Color.Transparent else colors.bgModulePlatform
     val streamingSurfaceColor = if (adaptiveChatBackground) {
@@ -957,7 +1008,6 @@ private fun LocalChat(
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
-    var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
@@ -1025,13 +1075,13 @@ private fun LocalChat(
         }
     }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.rootSurface())) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(rootSurfaceColor)) {
         Column(
             Modifier.fillMaxWidth().background(topSurfaceColor)
-                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
+                .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 DsIconButton(
@@ -1044,8 +1094,8 @@ private fun LocalChat(
                 Row(
                     modifier = Modifier.weight(1f)
                         .heightIn(min = DsSpacing.touchTarget)
-                        .clip(DsShapes.pillFull)
-                        .background(headerChipColor)
+                        .clip(DsShapes.row)
+                        .background(if (state.usageMode == LocalUsageMode.CHAT) Color.Transparent else headerChipColor)
                         .clickable(enabled = !state.running) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
                                 showPersonaEditor = true
@@ -1059,36 +1109,53 @@ private fun LocalChat(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 ) {
-                    Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.labelSecondary,
-                        modifier = Modifier.size(16.dp))
-                    Text(
-                        if (state.usageMode == LocalUsageMode.CHAT) {
-                            state.chatPersona.name
-                        } else if (state.configured) {
-                            state.model
-                        } else {
-                            stringResource(R.string.local_model_setup)
-                        },
-                        style = DsType.small13Strong,
-                        color = colors.labelPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null,
-                        tint = colors.labelSecondary, modifier = Modifier.size(16.dp))
+                    if (state.usageMode == LocalUsageMode.CHAT) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                state.chatPersona.name,
+                                style = DsType.base16Strong,
+                                color = colors.labelPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                                Text(
+                                    relationship,
+                                    style = DsType.caption11,
+                                    color = colors.labelSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    } else {
+                        Icon(
+                            Icons.Outlined.Tune,
+                            contentDescription = null,
+                            tint = colors.labelSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            if (state.configured) state.model else stringResource(R.string.local_model_setup),
+                            style = DsType.small13Strong,
+                            color = colors.labelPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = colors.labelSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
                 if (state.usageMode == LocalUsageMode.WORK) {
                     DsIconButton(
-                        icon = FeatherIcons.FileText,
-                        contentDescription = stringResource(R.string.chat_open_files),
-                        onClick = onOpenFiles,
-                        tint = colors.labelSecondary,
-                    )
-                    DsIconButton(
-                        icon = Icons.Outlined.Terminal,
+                        icon = FeatherIcons.CheckSquare,
                         contentDescription = stringResource(R.string.local_execution_console),
-                        onClick = { showExecutionConsole = true },
+                        onClick = onOpenRunCenter,
                         tint = colors.labelSecondary,
                     )
                 }
@@ -1097,16 +1164,6 @@ private fun LocalChat(
                     contentDescription = stringResource(R.string.chatlist_new_session),
                     onClick = onNewSession,
                     tint = colors.labelSecondary,
-                )
-            }
-            Box(
-                Modifier.fillMaxWidth().padding(top = DsSpacing.tiny),
-                contentAlignment = Alignment.Center,
-            ) {
-                LocalUsageModePill(
-                    selected = state.usageMode,
-                    enabled = !state.running,
-                    onSelect = onUsageModeChange,
                 )
             }
         }
@@ -1598,11 +1655,6 @@ private fun LocalChat(
         }
     }
 
-    if (showExecutionConsole) {
-        Dialog(onDismissRequest = { showExecutionConsole = false }) {
-            ExecutionStatusCard(state = state)
-        }
-    }
 }
 
 @Composable
@@ -1778,33 +1830,92 @@ private fun ExecutionStatusCard(
         state.contextChars,
         state.contextBudgetChars,
     )
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = DsShapes.block,
         color = colors.bgModulePlatform,
     ) {
         Column(
-            Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            Modifier.padding(DsSpacing.comfortable),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            Text(stringResource(R.string.local_execution_console), style = DsType.base16Strong, color = colors.labelPrimary)
-            state.goal?.let { goal ->
-                Text("目标 · ${goal.status}", style = DsType.small13, color = colors.labelSecondary)
-            }
-            if (state.plan.isNotEmpty()) {
-                Text("计划 · ${state.plan.size} 步", style = DsType.small13, color = colors.labelSecondary)
-            }
-            if (state.todos.isNotEmpty()) {
-                Text("任务 · $completed/$total", style = DsType.small13, color = colors.labelSecondary)
-            }
-            Text(resourceSummary, style = DsType.caption11, color = colors.labelTertiary)
-            Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
-            if (state.jobs.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
                 Text(
-                    "后台 · " + state.jobs.joinToString { it.status },
-                    style = DsType.caption11,
-                    color = colors.labelTertiary,
+                    stringResource(R.string.local_run_center),
+                    style = DsType.base16Strong,
+                    color = colors.labelPrimary,
                 )
+            }
+
+            state.goal?.let { goal ->
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(stringResource(R.string.local_run_current_goal), style = DsType.caption11Strong, color = colors.labelTertiary)
+                    Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
+                    Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
+                }
+            }
+
+            if (state.plan.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(stringResource(R.string.local_run_plan), style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.plan.take(5).forEachIndexed { index, step ->
+                        Text(
+                            (index + 1).toString().padStart(2, '0') + "  " + step,
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (state.todos.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(
+                        stringResource(R.string.local_run_tasks_progress, completed, total),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    state.todos.take(5).forEach { todo ->
+                        val marker = when (todo.status) {
+                            "completed" -> "✓"
+                            "in_progress", "running" -> "●"
+                            else -> "○"
+                        }
+                        Text(
+                            marker + "  " + todo.content,
+                            style = DsType.small13,
+                            color = if (todo.status == "completed") colors.labelTertiary else colors.labelSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (state.jobs.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(stringResource(R.string.local_run_background), style = DsType.caption11Strong, color = colors.labelTertiary)
+                    state.jobs.take(4).forEach { job ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Text(job.label, style = DsType.small13, color = colors.labelSecondary, modifier = Modifier.weight(1f))
+                            Text(job.status, style = DsType.caption11, color = colors.labelTertiary)
+                        }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Text(stringResource(R.string.local_run_resources), style = DsType.caption11Strong, color = colors.labelTertiary)
+                Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
+                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
             }
         }
     }
