@@ -57,10 +57,10 @@ internal fun groupChatMentionedMembers(
         if (text == name) return 0
         val escaped = Regex.escape(name)
         val patterns = listOf(
-            Regex("""[@＠]$escaped(?=$|[\\s，,。！？!?；;：:、])"""),
+            Regex("""[@＠]$escaped(?=$|[\s，,。！？!?；;：:、])"""),
             Regex("""$escaped(?=$|[，,。！？!?；;：:、]|你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
-            Regex("""(?:找|问|叫|让|请|喊)$escaped(?=$|[\\s，,。！？!?；;：:、]|来|帮|看|聊|说|回答|告诉)"""),
-            Regex("""$escaped\\s+(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
+            Regex("""(?:找|问|叫|让|请|喊)$escaped(?=$|[\s，,。！？!?；;：:、]|来|帮|看|聊|说|回答|告诉)"""),
+            Regex("""$escaped\s+(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
         )
         return patterns.asSequence()
             .mapNotNull { regex -> regex.find(text)?.range?.first }
