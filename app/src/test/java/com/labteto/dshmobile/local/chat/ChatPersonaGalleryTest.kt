@@ -152,6 +152,31 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun legacyDuplicateCardsWithSameSourceCollapseIntoOneStory() {
+        val message = LocalHarnessMessage("m1", "user", "同一段故事", createdAt = 1L)
+        val older = PersonaGalleryEntry(
+            id = "gallery-old",
+            persona = PersonaProfile(id = "gallery-old", name = "阿青"),
+            history = listOf(message),
+            sourceSessionId = "session-a",
+            updatedAt = 10L,
+        )
+        val newer = PersonaGalleryEntry(
+            id = "gallery-new",
+            persona = PersonaProfile(id = "gallery-new", name = "阿青"),
+            history = listOf(message),
+            sourceSessionId = "session-a",
+            updatedAt = 20L,
+        )
+
+        val compacted = compactLegacyDuplicateGalleryEntries(listOf(older, newer))
+
+        assertEquals(1, compacted.size)
+        assertEquals(1, compacted.single().stories.size)
+        assertEquals(listOf("m1"), compacted.single().stories.single().history.map { it.id })
+    }
+
+    @Test
     fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
         val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
         val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
