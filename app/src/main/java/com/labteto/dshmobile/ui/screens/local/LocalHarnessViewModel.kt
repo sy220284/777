@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaInspectionService
+import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,15 +44,30 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun saveCurrentToGallery(notes: String, existingId: String? = null): Result<PersonaGalleryEntry> = runCatching {
+    suspend fun saveCurrentToGallery(
+        notes: String,
+        existingId: String? = null,
+        existingStoryId: String? = null,
+        forceNewStory: Boolean = false,
+    ): Result<PersonaGalleryEntry> = runCatching {
         val snapshot = state.value
         check(!snapshot.loading && !snapshot.running && snapshot.usageMode == LocalUsageMode.CHAT) {
             "请在聊天空闲时保存人设与故事"
         }
-        withContext(Dispatchers.IO) {
-            galleryStore.save(snapshot.chatPersona, snapshot.sessionId, snapshot.messages, snapshot.chatState, notes, existingId)
-                .also { _gallery.value = galleryStore.list() }
+        val outcome = withContext(Dispatchers.IO) {
+            galleryStore.save(
+                persona = snapshot.chatPersona,
+                sourceSessionId = snapshot.sessionId,
+                history = snapshot.messages,
+                chatState = snapshot.chatState,
+                notes = notes,
+                existingId = existingId ?: snapshot.galleryId,
+                existingStoryId = existingStoryId ?: snapshot.galleryStoryId,
+                forceNewStory = forceNewStory,
+            ).also { _gallery.value = galleryStore.list() }
         }
+        engine.bindChatGallery(outcome.entry.id, outcome.storyId)
+        outcome.entry
     }
 
     fun hasUnsavedCurrentPersona(): Boolean {
@@ -59,10 +75,29 @@ class LocalHarnessViewModel @Inject constructor(
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
         val persona = snapshot.chatPersona
         if (!isMeaningfulGalleryPersona(persona)) return false
+
+        val bound = snapshot.galleryId?.let { id -> gallery.value.firstOrNull { it.id == id } }
+        if (snapshot.galleryId != null) {
+            return bound == null || galleryEntryHasUnsavedChanges(
+                entry = bound,
+                storyId = snapshot.galleryStoryId,
+                persona = persona,
+                history = snapshot.messages,
+                chatState = snapshot.chatState,
+            )
+        }
+
+        val hasDialogue = snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+        if (hasDialogue) return true
         return gallery.value.none { samePersonaIdentity(it.persona, persona) }
     }
 
-    suspend fun inspectGalleryPersona(id: String): Result<PersonaInspectionResult> {
+    fun currentGalleryNeedsUpdate(): Boolean = state.value.galleryId != null
+
+    suspend fun inspectGalleryPersona(
+        id: String,
+        storyId: String?,
+    ): Result<PersonaInspectionResult> {
         val snapshot = state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
             return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
@@ -72,11 +107,16 @@ class LocalHarnessViewModel @Inject constructor(
         }
         val entry = gallery.value.firstOrNull { it.id == id }
             ?: return Result.failure(IllegalStateException("图集条目已不存在"))
-        val dialogue = if (snapshot.galleryId == id) {
-            (entry.history + snapshot.messages)
+        val story = entry.story(storyId)
+        val archived = story?.history.orEmpty()
+        val dialogue = if (
+            snapshot.galleryId == id &&
+            snapshot.galleryStoryId == story?.id
+        ) {
+            (archived + snapshot.messages)
                 .distinctBy { it.id.ifBlank { "${it.role}|${it.createdAt}|${it.content}" } }
         } else {
-            entry.history
+            archived
         }
         return runCatching {
             personaInspectionService.inspect(
@@ -104,9 +144,16 @@ class LocalHarnessViewModel @Inject constructor(
         updated
     }
 
-    suspend fun editGalleryNotes(id: String, notes: String): Result<Unit> = runCatching {
+    suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
         withContext(Dispatchers.IO) {
-            check(galleryStore.updateNotes(id, notes)) { "图集条目已不存在" }
+            check(galleryStore.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
+            _gallery.value = galleryStore.list()
+        }
+    }
+
+    suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) {
+            check(galleryStore.renameStory(id, storyId, title)) { "图集故事已不存在" }
             _gallery.value = galleryStore.list()
         }
     }
@@ -116,23 +163,43 @@ class LocalHarnessViewModel @Inject constructor(
             check(galleryStore.delete(id)) { "图集条目已不存在" }
             _gallery.value = galleryStore.list()
         }
+        engine.clearChatGalleryBinding(expectedGalleryId = id)
+    }
+
+    suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) {
+            check(galleryStore.deleteStory(id, storyId)) { "图集故事已不存在" }
+            _gallery.value = galleryStore.list()
+        }
+        engine.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
     }
 
     suspend fun deleteGalleryHistoryMessage(
         id: String,
+        storyId: String,
         messageKey: String,
     ): Result<Unit> = runCatching {
         withContext(Dispatchers.IO) {
-            check(galleryStore.deleteHistoryMessage(id, messageKey)) { "gallery_archive_missing" }
+            check(galleryStore.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
             _gallery.value = galleryStore.list()
         }
     }
 
-    fun startFromGallery(id: String): Boolean {
+    fun startFromGallery(
+        id: String,
+        storyId: String?,
+        freshStory: Boolean,
+    ): Boolean {
         val snapshot = state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
         val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-        engine.createSession(LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT, entry)
+        engine.createSession(
+            mode = LocalConversationMode.INDEPENDENT,
+            usageMode = LocalUsageMode.CHAT,
+            galleryEntry = entry,
+            galleryStoryId = storyId,
+            freshGalleryStory = freshStory,
+        )
         return true
     }
 
