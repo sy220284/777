@@ -2303,6 +2303,19 @@ class LocalHarnessEngine @Inject constructor(
             persist()
             throw cancelled
         } catch (error: Exception) {
+            if (replacingMessageId != null) {
+                val oldNode = _state.value.chatBranches.nodes.firstOrNull {
+                    it.message.id == replacingMessageId
+                }
+                oldNode?.chatStateAfter?.let { restoredState ->
+                    _state.update { current ->
+                        current.copy(
+                            chatState = restoredState,
+                            replySuggestions = oldNode.replySuggestionsAfter,
+                        )
+                    }
+                }
+            }
             val detail = error.message ?: "聊天请求失败"
             _state.update { it.copy(error = detail) }
             eventLog.append("turn/end", buildJsonObject {
@@ -4106,12 +4119,16 @@ class LocalHarnessEngine @Inject constructor(
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
-            chatBranches = syncChatBranchState(
-                current = projectedControls.chatBranches,
-                activeMessages = projectedTranscript.messages,
-                chatState = stored.chatState,
-                replySuggestions = stored.replySuggestions,
-            ),
+            chatBranches = if (stored.usageMode == LocalUsageMode.CHAT) {
+                syncChatBranchState(
+                    current = projectedControls.chatBranches,
+                    activeMessages = projectedTranscript.messages,
+                    chatState = stored.chatState,
+                    replySuggestions = stored.replySuggestions,
+                )
+            } else {
+                LocalChatBranchState()
+            },
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
