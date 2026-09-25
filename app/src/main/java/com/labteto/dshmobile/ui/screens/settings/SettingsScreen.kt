@@ -105,7 +105,7 @@ import java.util.Locale
  * blanket-labelling the whole screen read-only, as it used to, tells users their own preferences
  * cannot be changed when they plainly can.
  */
-internal enum class SettingsDestination {
+enum class SettingsDestination {
     ROOT,
     GENERAL,
     MODELS,
