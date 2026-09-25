@@ -15,6 +15,7 @@ data class LocalGroupChatMember(
     val galleryId: String,
     val personaId: String,
     val displayName: String,
+    val portraitPath: String = "",
     val persona: PersonaProfile = PersonaProfile(),
     val chatState: ChatCharacterState = ChatCharacterState(),
 )
