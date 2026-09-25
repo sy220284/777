@@ -70,8 +70,11 @@ data class ChatNarrativeDirection(
 @Serializable
 data class ChatReplySuggestion(
     val label: String,
-    // Kept for decoding saved suggestions from older sessions; never used as a reply draft.
+    // Directly sendable user draft. Defaults keep older saved sessions decodable.
     val text: String = "",
+    val style: String = "",
+    val bold: Boolean = false,
+    // Legacy story-direction fields are retained only for session compatibility.
     val direction: String = "",
     val impact: String = "",
 )
@@ -93,7 +96,7 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
     ): String = buildString {
-        appendLine("你负责维护角色聊天的隐藏关系状态、证据账本、用户沟通习惯，并在有真实分歧点时提出后续剧情走向。")
+        appendLine("你负责维护角色聊天的隐藏关系状态、证据账本、用户沟通习惯，并为用户生成下一句可直接编辑发送的回复建议。")
         appendLine("不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。")
         appendLine("角色：${persona.name}")
         if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality}")
@@ -125,14 +128,13 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("已有推测=${state.dynamics.hypotheses.joinToString("；") { it.text }}")
         appendLine("仍未知=${state.dynamics.unknowns.joinToString("；")}")
         appendLine("共同经历=${state.dynamics.sharedMoments.joinToString("；")}")
-        state.narrativeDirection?.let { appendLine("用户当前选择的走向=${it.label}：${it.guidance}") }
         appendLine()
         appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine()
         appendLine("输出结构必须严格为：")
         appendLine(
-            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","activeGoal":"角色眼下真正想达成什么","currentAgenda":"准备如何行动或回应","internalConflict":"当前内在拉扯，没有则空字符串","immediateConcern":"眼下最在意的人或事","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字走向","direction":"角色接下来应如何推动关系或剧情","impact":"这条走向可能带来的变化"}],"turnSignificance":"NONE|MINOR|MAJOR"}""",
+            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","activeGoal":"角色眼下真正想达成什么","currentAgenda":"准备如何行动或回应","internalConflict":"当前内在拉扯，没有则空字符串","immediateConcern":"眼下最在意的人或事","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字短标签","style":"自然/俏皮/直球/放飞","text":"用户可以直接发送的下一句","bold":false}],"turnSignificance":"NONE|MINOR|MAJOR"}""",
         )
         appendLine("要求：")
         appendLine("1. stage 只能取 NEW / FAMILIAR / AMBIGUOUS / DATING / COMMITTED / CONFLICT / COOLING / SEPARATED / REPAIRING。")
@@ -142,12 +144,16 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("5. stage 只有出现明确关系事件或连续强证据时才建议变化；一次回复慢、一个表情、一次冷淡都不足以改阶段。")
         appendLine("6. sharedMoments 只保留双方真实发生且以后值得自然提起的共同经历，禁止虚构。")
         appendLine("7. userPattern 只从用户真实表达习惯渐进学习，不因单轮异常表达彻底改画像。")
-        appendLine("8. 有自然的情节分歧时生成2到3条不同走向；日常闲聊没有分歧时返回空数组。走向必须贴合角色和已有故事。")
-        appendLine("9. direction 是给角色的后续叙事指引，impact 是用户能看懂的可能变化；不要写用户可直接发送的回复，不替用户说话或作重大决定。")
-        appendLine("10. 用户实际发言和明确纠正始终优先于已选走向；不得虚构已发生的事实、强制关系升级或引导操控、羞辱、欺骗和越界。")
-        appendLine("11. turnSignificance 只能是 NONE / MINOR / MAJOR。寒暄、哈哈、收到、重复问候、无信息量回应通常为 NONE；有新的短期情绪/关注变化为 MINOR；承诺、关系事件、重大共同经历、稳定人物事实才可为 MAJOR。")
-        appendLine("12. NONE 时不要为了显得有变化而编造情绪、关系、目标或记忆更新；保持上一状态。")
-        appendLine("13. activeGoal/currentAgenda/internalConflict/immediateConcern 写角色此刻的内在驱动，不要把模型分析口吻暴露给用户，也不要凭空制造阴谋或爱意。")
+        appendLine("8. 角色本轮回复只要存在自然接话空间，就生成4条建议；极少数确实无话可接的收尾场景允许返回空数组。")
+        appendLine("9. 4条建议必须明显不同，优先覆盖自然、俏皮、直球、放飞四种风格；禁止只是换几个词的同义改写。")
+        appendLine("10. 每组建议至少保留1条 bold=true 的放飞选项。它可以明显大胆、夸张、荒诞、反常规、突然直球或带梗；关系允许时可以带暧昧挑逗，关系不熟时优先用反差和脑洞制造趣味。始终贴合当前情景，不能凭空捏造事实、替用户作重大或不可逆决定，也不能靠侮辱、操控或危险行为制造刺激。")
+        appendLine("11. text 必须是用户对角色说的话，并直接回应角色刚刚那句；尽量抓住最近对话里的具体物件、动作、称呼或情绪，不写放到任何聊天都成立的万能句。")
+        appendLine("12. 根据 userPattern 控制长度、直接度、玩笑感和表情习惯；四条可以有不同力度，但都要像同一个用户在不同心情下会说的话。")
+        appendLine("13. label 只概括这一条的感觉或打法，style 只用自然/俏皮/直球/放飞；bold 只表示这条更出格有趣，不代表自动发送。")
+        appendLine("14. 用户实际发言和明确纠正始终优先；不得虚构已发生的事实、强制关系升级或诱导越界。")
+        appendLine("15. turnSignificance 只能是 NONE / MINOR / MAJOR。寒暄、纯表情、重复问候或没有新信息通常为 NONE；短期情绪/关注变化为 MINOR；承诺、关系事件、重大共同经历、稳定人物事实才可为 MAJOR。")
+        appendLine("16. NONE 时人物状态保持原样，不为完整感编造新的情绪、关系、目标或记忆；但只要角色回复仍有自然接话空间，回复建议照常生成。")
+        appendLine("17. activeGoal/currentAgenda/internalConflict/immediateConcern 描述角色此刻的内在驱动，不凭空制造阴谋、爱意或模型分析口吻。")
     }.trim()
 
     fun parse(
@@ -165,33 +171,34 @@ class ChatInteractionPlanner @Inject constructor(
         }.getOrNull() ?: return null
         val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
         val significance = normalizeSignificance(decoded.turnSignificance)
-        if (significance == "NONE") {
-            return ChatPostTurnPlan(
-                state = previous,
-                suggestions = emptyList(),
-                turnSignificance = significance,
-            )
-        }
 
         return decoded.copy(
-            state = sanitizeState(
-                value = decoded.state,
-                previous = previous,
-                userMessage = userMessage,
-                assistantMessage = assistantMessage,
-                rawState = rawState,
-            ),
+            state = if (significance == "NONE") {
+                previous
+            } else {
+                sanitizeState(
+                    value = decoded.state,
+                    previous = previous,
+                    userMessage = userMessage,
+                    assistantMessage = assistantMessage,
+                    rawState = rawState,
+                )
+            },
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
+                    val style = suggestion.style.trim().take(12)
                     ChatReplySuggestion(
                         label = suggestion.label.trim().take(12),
+                        text = suggestion.text.trim().take(320),
+                        style = style,
+                        bold = suggestion.bold || style == "放飞",
                         direction = suggestion.direction.trim().take(200),
                         impact = suggestion.impact.trim().take(120),
                     )
                 }
-                .filter { it.label.isNotBlank() && it.direction.isNotBlank() && it.impact.isNotBlank() }
-                .distinctBy { normalize(it.direction) }
-                .take(3)
+                .filter { it.label.isNotBlank() && it.text.isNotBlank() }
+                .distinctBy { normalize(it.text) }
+                .take(4)
                 .toList(),
             turnSignificance = significance,
         )
@@ -277,7 +284,7 @@ class ChatInteractionPlanner @Inject constructor(
             } else previous.shareDesire,
             dynamics = dynamics,
             userPattern = pattern,
-            narrativeDirection = previous.narrativeDirection,
+            narrativeDirection = null,
             updatedAt = System.currentTimeMillis(),
         )
     }
