@@ -66,7 +66,7 @@ internal class LocalSubagentRunner(
     private val resourceScheduler: HarnessResourceScheduler,
     private val acquireVirtualScreen: suspend (String) -> String? = { null },
     private val releaseVirtualScreen: (String) -> Unit = { },
-    private val historyBudget: (() -> LocalHistoryBudget)? = null,
+    private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
@@ -142,6 +142,7 @@ internal class LocalSubagentRunner(
         val stepLimit = maxSteps.coerceIn(1, 128)
         val snapshot = state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
+        val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
@@ -211,7 +212,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         }
                     }
-                    compactSubagentHistory(history, subagentId)
+                    compactSubagentHistory(history, subagentId, runHistoryBudget)
                     modelStep += 1
                     val durableHistory = history.toList()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
@@ -335,7 +336,11 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val boundedContent = retainSubagentToolResult(event.call.id, event.output)
+                            val boundedContent = retainSubagentToolResult(
+                                event.call.id,
+                                event.output,
+                                runHistoryBudget,
+                            )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
                                 isError = event.isError,
@@ -511,8 +516,12 @@ internal class LocalSubagentRunner(
         }
     }
 
-    private fun retainSubagentToolResult(callId: String, output: String): String {
-        val budget = historyBudget?.invoke() ?: return output
+    private fun retainSubagentToolResult(
+        callId: String,
+        output: String,
+        budget: LocalHistoryBudget?,
+    ): String {
+        budget ?: return output
         val retained = retainTextForModel(
             value = output,
             maxTokens = budget.maxToolResultTokens,
@@ -529,8 +538,12 @@ internal class LocalSubagentRunner(
             "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
-    private fun compactSubagentHistory(history: MutableList<JsonObject>, subagentId: String) {
-        val compaction = historyCompactor.compact(history, historyBudget?.invoke()) ?: return
+    private fun compactSubagentHistory(
+        history: MutableList<JsonObject>,
+        subagentId: String,
+        budget: LocalHistoryBudget?,
+    ) {
+        val compaction = historyCompactor.compact(history, budget) ?: return
         history.clear()
         history += compaction.messages
         eventLog().append("subagent/compaction", buildJsonObject {
