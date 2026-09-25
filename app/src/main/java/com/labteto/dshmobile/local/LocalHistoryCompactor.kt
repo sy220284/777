@@ -15,6 +15,11 @@ internal data class LocalHistoryCompaction(
     val estimatedTokensAfter: Int = 0,
 )
 
+internal enum class LocalHistorySummaryMode {
+    WORK,
+    CHAT,
+}
+
 /**
  * Keeps a recent verbatim tail while turning the older part of model history into a bounded,
  * extractive summary. The summary only quotes facts already present in the model-visible history;
@@ -31,6 +36,7 @@ internal class LocalHistoryCompactor(
         currentChars: Int? = null,
         currentTokens: Int? = null,
         extraTokens: Int = 0,
+        summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
     ): LocalHistoryCompaction? {
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
@@ -63,7 +69,7 @@ internal class LocalHistoryCompactor(
         if (start <= 1 || start >= history.size) return null
 
         val omitted = history.subList(1, start)
-        val summary = buildSummary(omitted, effectiveSummaryChars)
+        val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode)
         val compacted = buildList {
             add(history.first())
             add(buildJsonObject {
@@ -81,27 +87,47 @@ internal class LocalHistoryCompactor(
         )
     }
 
-    private fun buildSummary(messages: List<JsonObject>, summaryLimit: Int): String {
+    private fun buildSummary(
+        messages: List<JsonObject>,
+        summaryLimit: Int,
+        summaryMode: LocalHistorySummaryMode,
+    ): String {
         val user = recentText(messages, "user", maxItems = 8, maxPerItem = 1_200)
         val assistant = recentText(messages, "assistant", maxItems = 6, maxPerItem = 1_200)
         val tools = recentTools(messages, maxItems = 12)
 
         val text = buildString {
-            append("以下是较早会话的提取式压缩摘要，共折叠 ")
-            append(messages.size)
-            append(" 条模型消息。内容只摘自原会话，用于保留任务连续性；当前目标、计划、任务清单与工作区文件仍以实时状态为准。")
-
-            if (user.isNotEmpty()) {
-                append("\n\n用户目标与约束：")
-                user.forEach { append("\n- ").append(it) }
-            }
-            if (assistant.isNotEmpty()) {
-                append("\n\n阶段结论与进展：")
-                assistant.forEach { append("\n- ").append(it) }
-            }
-            if (tools.isNotEmpty()) {
-                append("\n\n已涉及工具：")
-                append(tools.joinToString("、"))
+            when (summaryMode) {
+                LocalHistorySummaryMode.WORK -> {
+                    append("以下是较早会话的提取式压缩摘要，共折叠 ")
+                    append(messages.size)
+                    append(" 条模型消息。内容只摘自原会话，用于保留任务连续性；当前目标、计划、任务清单与工作区文件仍以实时状态为准。")
+                    if (user.isNotEmpty()) {
+                        append("\n\n用户目标与约束：")
+                        user.forEach { append("\n- ").append(it) }
+                    }
+                    if (assistant.isNotEmpty()) {
+                        append("\n\n阶段结论与进展：")
+                        assistant.forEach { append("\n- ").append(it) }
+                    }
+                    if (tools.isNotEmpty()) {
+                        append("\n\n已涉及工具：")
+                        append(tools.joinToString("、"))
+                    }
+                }
+                LocalHistorySummaryMode.CHAT -> {
+                    append("以下是较早聊天的提取式连续性摘要，共折叠 ")
+                    append(messages.size)
+                    append(" 条模型消息。内容只摘自原聊天；当前人物设定、关系状态、长期记忆与群聊成员状态仍以实时状态为准。")
+                    if (user.isNotEmpty()) {
+                        append("\n\n较早用户表达与事件：")
+                        user.forEach { append("\n- ").append(it) }
+                    }
+                    if (assistant.isNotEmpty()) {
+                        append("\n\n较早角色回应与互动：")
+                        assistant.forEach { append("\n- ").append(it) }
+                    }
+                }
             }
         }
         return truncateWithoutSplittingSurrogatePair(text, summaryLimit)
@@ -120,7 +146,7 @@ internal class LocalHistoryCompactor(
         .filter(String::isNotBlank)
         .distinct()
         .take(maxItems)
-        .map { it.take(maxPerItem) }
+        .map { truncateWithoutSplittingSurrogatePair(it, maxPerItem) }
         .toList()
         .asReversed()
 
