@@ -71,6 +71,13 @@ data class PersonaGallerySaveOutcome(
 )
 
 @Serializable
+internal data class PersonaShareEnvelope(
+    val schema: Int = 1,
+    val source: String = "神言神语",
+    val persona: PersonaProfile,
+)
+
+@Serializable
 private data class GalleryDocument(
     val version: Int = 4,
     val entries: List<PersonaGalleryEntry> = emptyList(),
@@ -419,6 +426,8 @@ private fun normalizePersonaText(text: String): String =
         .replace("的", "")
         .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】—_-]+"""), "")
 
+private const val MAX_PERSONA_IMPORT_CHARS = 64_000
+
 private val DEFAULT_PERSONA_NAMES = setOf(
     normalizePersonaText("默认角色"),
     normalizePersonaText("default"),
@@ -437,6 +446,54 @@ class ChatPersonaGalleryStore internal constructor(
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
+
+    @Synchronized
+    fun exportPersona(id: String, compact: Boolean = false): String {
+        val entry = readNormalized().entries.firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        val profile = if (compact) compactSharePersona(entry.persona) else fullSharePersona(entry.persona)
+        return json.encodeToString(
+            PersonaShareEnvelope.serializer(),
+            PersonaShareEnvelope(persona = profile.copy(id = PersonaProfile.DEFAULT_PERSONA_ID)),
+        )
+    }
+
+    @Synchronized
+    fun importPersona(payload: String): PersonaGalleryEntry {
+        val cleanPayload = payload.trim()
+        require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
+            "人物分享数据为空或过大"
+        }
+        val envelope = runCatching {
+            json.decodeFromString(PersonaShareEnvelope.serializer(), cleanPayload)
+        }.getOrElse { error ->
+            throw IllegalArgumentException("人物分享数据格式不正确", error)
+        }
+        require(envelope.schema == 1) { "暂不支持这个人物分享版本" }
+
+        val now = System.currentTimeMillis()
+        val imported = fullSharePersona(envelope.persona).copy(updatedAt = now)
+        require(isMeaningfulGalleryPersona(imported)) { "人物设定内容不足，无法导入" }
+
+        val doc = readNormalized()
+        val matched = doc.entries.filter { samePersonaIdentity(it.persona, imported) }.singleOrNull()
+        val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val entry = if (matched != null) {
+            matched.copy(
+                persona = mergePersonaProfiles(matched.persona, imported)
+                    .copy(id = entryId, updatedAt = now),
+                updatedAt = now,
+            )
+        } else {
+            PersonaGalleryEntry(
+                id = entryId,
+                persona = imported.copy(id = entryId),
+                updatedAt = now,
+            )
+        }
+        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        return entry
+    }
 
     @Synchronized
     fun save(
@@ -597,6 +654,48 @@ class ChatPersonaGalleryStore internal constructor(
         write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
+
+    private fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
+        id = PersonaProfile.DEFAULT_PERSONA_ID,
+        name = profile.name.trim().take(80).ifBlank { "默认角色" },
+        identity = profile.identity.trim().take(2_000),
+        background = profile.background.trim().take(4_000),
+        personality = profile.personality.trim().take(2_000),
+        speechStyle = profile.speechStyle.trim().take(2_000),
+        relationship = profile.relationship.trim().take(2_000),
+        worldSetting = profile.worldSetting.trim().take(4_000),
+        hardConstraints = shareLines(profile.hardConstraints, 20, 240),
+        exampleDialogues = shareLines(profile.exampleDialogues, 12, 240),
+        bannedPhrases = shareLines(profile.bannedPhrases, 30, 240),
+        signaturePhrases = shareLines(profile.signaturePhrases, 20, 240),
+        corrections = shareLines(profile.corrections, 20, 240),
+        updatedAt = 0L,
+    )
+
+    private fun compactSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
+        id = PersonaProfile.DEFAULT_PERSONA_ID,
+        name = profile.name.trim().take(80).ifBlank { "默认角色" },
+        identity = profile.identity.trim().take(160),
+        background = profile.background.trim().take(180),
+        personality = profile.personality.trim().take(160),
+        speechStyle = profile.speechStyle.trim().take(160),
+        relationship = profile.relationship.trim().take(120),
+        worldSetting = profile.worldSetting.trim().take(180),
+        hardConstraints = shareLines(profile.hardConstraints, 4, 60),
+        exampleDialogues = shareLines(profile.exampleDialogues, 2, 80),
+        bannedPhrases = shareLines(profile.bannedPhrases, 6, 30),
+        signaturePhrases = shareLines(profile.signaturePhrases, 4, 40),
+        corrections = emptyList(),
+        updatedAt = 0L,
+    )
+
+    private fun shareLines(values: List<String>, limit: Int, maxChars: Int): List<String> =
+        values.asSequence()
+            .map { it.trim().take(maxChars) }
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(limit)
+            .toList()
 
     private fun readNormalized(): GalleryDocument {
         val raw = read()
