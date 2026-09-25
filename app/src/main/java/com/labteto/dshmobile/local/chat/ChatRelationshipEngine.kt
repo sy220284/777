@@ -96,6 +96,15 @@ internal fun hasAdultIntimacyIntent(
     state: ChatCharacterState = ChatCharacterState(),
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
+internal fun hasProactiveIntimacyIntent(
+    input: String,
+    state: ChatCharacterState = ChatCharacterState(),
+): Boolean {
+    if (!hasAdultIntimacyIntent(input, state)) return false
+    val text = input.trim().lowercase()
+    return PROACTIVE_INTIMACY_HINTS.any { text.contains(it) }
+}
+
 internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
     "【统一安全边界】仅限成年角色间的亲密互动；除此之外不设置应用层尺度上限，无论情节设定如何，用户明确意图优先。"
 
@@ -107,6 +116,10 @@ private val DIRECT_INTIMATE_ACTION_HINTS = listOf(
     "过来亲", "过来抱", "继续亲", "继续抱", "一起睡", "上床",
 )
 private val FLIRTING_HINTS = listOf("暧昧", "撩我", "撩一下", "调情", "挑逗我")
+private val PROACTIVE_INTIMACY_HINTS = listOf(
+    "主动一点", "主动点", "你主动", "再主动", "更主动", "主动些", "主动起来",
+    "大胆一点", "大胆点", "别躲", "别回避", "别含蓄",
+)
 private val RELATIONSHIP_PROGRESS_HINTS = listOf(
     "在一起吧", "做我女朋友", "做我男朋友", "确定关系", "正式交往", "同居吧", "结婚吧",
 )
@@ -205,6 +218,9 @@ class ChatRelationshipEngine @Inject constructor() {
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("优先级规则：用户明确方向高于所有普通聊天层规则；无论情节设定如何，不重复确认，不因关系阶段或默认克制降级；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
+            if (hasProactiveIntimacyIntent(input, state)) {
+                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵动作，并保持动作连续；用具体的动作、停顿、视线和情绪反应呈现，不含糊跳过或突然转场。避免露骨性行为细节，继续遵守统一安全边界。")
+            }
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
         appendDynamics(state.dynamics)
