@@ -37,11 +37,11 @@ class ChatInteractionPlannerTest {
                 }
               },
               "suggestions":[
-                {"label":"暂留悬念","direction":"暂时保留失约原因，让角色先观察用户的态度","impact":"关系多一点试探"},
-                {"label":"说开误会","direction":"让角色主动表达失约引发的感受，给双方澄清机会","impact":"推进双方信任"},
-                {"label":"转向日常","direction":"暂时搁置失约，把关系带回轻松日常","impact":"减轻当前张力"},
-                {"label":"重复","direction":"暂时搁置失约，把关系带回轻松日常","impact":"同一走向不重复"},
-                {"label":"多余","direction":"延后讨论","impact":"超出上限"}
+                {"label":"顺着问","style":"自然","text":"昨天那事你还记着啊？那我现在补个解释。","bold":false},
+                {"label":"轻轻逗","style":"俏皮","text":"哟，还记仇呢？要不要先收点利息。","bold":false},
+                {"label":"直接说","style":"直球","text":"你要真介意，我现在就认真跟你说清楚。","bold":false},
+                {"label":"放飞一下","style":"放飞","text":"行，今日开庭，我申请用一顿饭贿赂主审大人。","bold":true},
+                {"label":"重复","style":"俏皮","text":"哟，还记仇呢？要不要先收点利息。","bold":false}
               ]
             }
         """.trimIndent()
@@ -55,22 +55,24 @@ class ChatInteractionPlannerTest {
         assertEquals(60, plan.state.dynamics.warmth)
         assertEquals(58, plan.state.dynamics.trust)
         assertEquals(2, plan.state.unresolvedThreads.size)
-        assertEquals(3, plan.suggestions.size)
-        assertEquals(plan.suggestions.map { it.direction }.distinct().size, plan.suggestions.size)
-        assertTrue(plan.suggestions.all { it.text.isEmpty() })
+        assertEquals(4, plan.suggestions.size)
+        assertEquals(plan.suggestions.map { it.text }.distinct().size, plan.suggestions.size)
+        assertTrue(plan.suggestions.any { it.bold && it.style == "放飞" })
+        assertTrue(plan.suggestions.all { it.text.isNotBlank() })
         assertTrue(plan.state.updatedAt > 0L)
     }
 
     @Test
-    fun selectedDirectionSurvivesPostTurnAndOldReplyDraftIsIgnored() {
+    fun legacyReplyDraftStillWorksAndLegacyDirectionIsRetired() {
         val previous = ChatCharacterState(
             narrativeDirection = ChatNarrativeDirection("说开误会", "角色给彼此澄清的机会"),
         )
-        val payload = """{"state":{"mood":"自然"},"suggestions":[{"label":"代聊旧选项","text":"替我说一句话"}]}"""
+        val payload = """{"state":{"mood":"自然"},"suggestions":[{"label":"自然接话","text":"那你继续说，我听着。"}]}"""
 
         val plan = planner.parse(payload, previous)!!
-        assertEquals(previous.narrativeDirection, plan.state.narrativeDirection)
-        assertTrue(plan.suggestions.isEmpty())
+        assertTrue(plan.state.narrativeDirection == null)
+        assertEquals(1, plan.suggestions.size)
+        assertEquals("那你继续说，我听着。", plan.suggestions.single().text)
     }
 
     @Test
@@ -321,7 +323,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun noOpTurnPreservesExistingCharacterStateAndDropsSuggestions() {
+    fun noOpTurnPreservesCharacterStateButKeepsReplySuggestions() {
         val previous = ChatCharacterState(
             mood = "开心",
             relationshipState = "熟悉中",
@@ -341,7 +343,7 @@ class ChatInteractionPlannerTest {
                 "initiative":100
               },
               "suggestions":[
-                {"label":"推进","direction":"立刻推进关系","impact":"关系升级"}
+                {"label":"接着聊","style":"自然","text":"你刚才笑什么？说来听听。","bold":false}
               ],
               "turnSignificance":"NONE"
             }
@@ -351,23 +353,17 @@ class ChatInteractionPlannerTest {
             payload,
             previous,
             userMessage = "哈哈",
-            assistantMessage = "嗯。",
+            assistantMessage = "笑什么？",
         )!!
 
         assertEquals("NONE", plan.turnSignificance)
-        assertEquals(previous.mood, plan.state.mood)
-        assertEquals(previous.activeGoal, plan.state.activeGoal)
-        assertEquals(previous.currentAgenda, plan.state.currentAgenda)
-        assertEquals(previous.internalConflict, plan.state.internalConflict)
-        assertEquals(previous.immediateConcern, plan.state.immediateConcern)
-        assertEquals(previous.initiative, plan.state.initiative)
-        assertEquals(previous.dynamics, plan.state.dynamics)
-        assertEquals(previous.updatedAt, plan.state.updatedAt)
-        assertTrue(plan.suggestions.isEmpty())
+        assertEquals(previous, plan.state)
+        assertEquals(1, plan.suggestions.size)
+        assertEquals("你刚才笑什么？说来听听。", plan.suggestions.single().text)
     }
 
     @Test
-    fun meaningfulTurnCarriesCognitiveDriveWithoutResettingOmittedFields() {
+    fun meaningfulTurnCarriesCognitiveDrive() {
         val previous = ChatCharacterState(
             activeGoal = "把误会说清楚",
             currentAgenda = "等合适时机解释",
@@ -383,7 +379,9 @@ class ChatInteractionPlannerTest {
                 "internalConflict":"担心越解释越乱",
                 "immediateConcern":"用户现在的态度"
               },
-              "suggestions":[],
+              "suggestions":[
+                {"label":"认真问","style":"直球","text":"那你现在愿意听我把昨天的事说完吗？","bold":false}
+              ],
               "turnSignificance":"MAJOR"
             }
         """.trimIndent()
@@ -395,6 +393,7 @@ class ChatInteractionPlannerTest {
         assertEquals("先直接问一句", plan.state.currentAgenda)
         assertEquals("担心越解释越乱", plan.state.internalConflict)
         assertEquals("用户现在的态度", plan.state.immediateConcern)
+        assertEquals(1, plan.suggestions.size)
     }
 
     @Test
