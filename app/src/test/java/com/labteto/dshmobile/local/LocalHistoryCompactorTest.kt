@@ -86,6 +86,25 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun chatCompactionUsesContinuityLanguageInsteadOfWorkLanguage() {
+        val history = listOf(
+            message("system", "聊天系统"),
+            message("user", "之前我们约好周末去海边。" + "旧".repeat(240)),
+            message("assistant", "我还记得你说想看日落。" + "旧".repeat(240)),
+            message("user", "继续刚才的话题。" + "新".repeat(120)),
+            message("assistant", "好。" + "新".repeat(120)),
+        )
+        val compaction = LocalHistoryCompactor(maxHistoryChars = 400, tailChars = 260)
+            .compact(history, summaryMode = LocalHistorySummaryMode.CHAT)
+            ?: error("expected chat compaction")
+
+        assertTrue(compaction.summary.contains("较早聊天"))
+        assertTrue(compaction.summary.contains("较早用户表达与事件"))
+        assertTrue(compaction.summary.contains("较早角色回应与互动"))
+        assertFalse(compaction.summary.contains("当前目标、计划"))
+    }
+
+    @Test
     fun retainedToolTextKeepsSupplementaryCharactersWhole() {
         val source = "前".repeat(40) + "😀" + "后".repeat(40)
         val retained = retainTextForModel(source, maxTokens = 12, maxChars = 48)
