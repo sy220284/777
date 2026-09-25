@@ -5519,9 +5519,9 @@ class LocalHarnessEngine @Inject constructor(
 
         val dynamicReserve = minOf(CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
         val stableBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
-        val stable = stableContext.take(stableBudget)
+        val stable = truncateWithoutSplittingSurrogatePair(stableContext, stableBudget)
         val dynamicBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - stable.length).coerceAtLeast(0)
-        val dynamic = dynamicContext.take(dynamicBudget)
+        val dynamic = truncateWithoutSplittingSurrogatePair(dynamicContext, dynamicBudget)
         val result = history.toMutableList()
 
         if (stable.isNotBlank()) {
@@ -5555,7 +5555,7 @@ class LocalHarnessEngine @Inject constructor(
         if (context.isBlank()) return history
         val insertion = buildJsonObject {
             put("role", "system")
-            put("content", context.take(MAX_EPHEMERAL_CONTEXT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
         }
         val result = history.toMutableList()
         val currentUserIndex = result.lastIndex.takeIf { index ->
