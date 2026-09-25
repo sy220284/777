@@ -3093,7 +3093,11 @@ class LocalHarnessEngine @Inject constructor(
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
-                content = guarded.content.orEmpty().trim(),
+                content = stripGroupSpeakerPrefix(
+                    guarded.content.orEmpty(),
+                    member.displayName,
+                    persona.name,
+                ),
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
