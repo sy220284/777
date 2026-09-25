@@ -147,6 +147,7 @@ object DsThemeTokens {
         borderL3 = Color(0x29F3F0E8),
         brandPrimary = Color(0xFFF3F0E8),
         onBrandPrimary = Color(0xFF11110F),
+        onAccent = Color(0xFFF3F0E8),
         labelPrimary = Color(0xFFF3F0E8),
         labelSecondary = Color(0xFFD5D1C9),
         labelTertiary = Color(0xFFAAA69E),
@@ -197,7 +198,7 @@ private fun materialLightScheme(c: DsColors) = lightColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = Color.White,
+    onError = c.onAccent,
 )
 
 private fun materialDarkScheme(c: DsColors) = darkColorScheme(
@@ -215,7 +216,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = Color.White,
+    onError = c.onAccent,
 )
 
 /**
