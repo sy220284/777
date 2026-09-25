@@ -155,6 +155,8 @@ import kotlinx.coroutines.withContext
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
+    requestedSessionId: String? = null,
+    onSessionRequestConsumed: () -> Unit = {},
     onOpenRemote: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTasks: () -> Unit,
@@ -193,6 +195,14 @@ fun LocalHarnessScreen(
             modeIntro = target
         }
         viewModel.switchUsageMode(target)
+    }
+
+    LaunchedEffect(requestedSessionId, state.sessions) {
+        val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
+        if (target == state.sessionId || state.sessions.any { it.id == target }) {
+            if (target != state.sessionId) viewModel.switchSession(target)
+            onSessionRequestConsumed()
+        }
     }
 
     BackHandler(enabled = drawerState.isOpen) {
