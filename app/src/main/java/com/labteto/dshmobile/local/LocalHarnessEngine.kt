@@ -1577,6 +1577,298 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /**
+     * Generate one role-authored message for an existing single-character chat session.
+     *
+     * The scheduled instruction is context, never a fabricated user turn. When the target chat is
+     * visible we temporarily own the normal turn slot so user input queues behind the proactive
+     * message instead of racing it; detached chats are generated without changing the visible UI.
+     */
+    suspend fun runAutomationChat(
+        instruction: String,
+        targetSessionId: String,
+        timeoutMillis: Long = 3 * 60_000L,
+    ): LocalAutomationRunResult {
+        val trigger = instruction.trim()
+        require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
+        withTimeout(15_000L) {
+            while (_state.value.loading) delay(50)
+        }
+        require(_state.value.configured) { "本机 Harness 尚未配置模型" }
+
+        val initialSession = sessionRepository.read(targetSessionId)
+            ?: error("定时互动绑定的聊天已不存在")
+        require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
+        require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
+
+        val automationJob = currentCoroutineContext()[Job]
+        var ownsVisibleTurn = false
+        if (_state.value.sessionId == targetSessionId) {
+            withTimeout(60_000L) {
+                while (!ownsVisibleTurn) {
+                    ownsVisibleTurn = synchronized(runStateLock) {
+                        val busy = sessionTransitioning ||
+                            _state.value.running ||
+                            activeJob?.isCompleted == false
+                        if (!busy) {
+                            activeJob = automationJob
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    if (!ownsVisibleTurn) delay(100)
+                }
+            }
+            _state.update { current ->
+                if (current.sessionId == targetSessionId) {
+                    current.copy(
+                        running = true,
+                        error = null,
+                        streamingAssistant = "",
+                        streamingReasoning = "",
+                    )
+                } else {
+                    current
+                }
+            }
+        }
+
+        try {
+            return withTimeout(timeoutMillis.coerceIn(5_000L, 10 * 60_000L)) {
+                val session = sessionRepository.read(targetSessionId)
+                    ?: error("定时互动绑定的聊天已不存在")
+                require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
+                require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
+
+                val runtime = _state.value
+                val persona = chatPersonaStore.get(session.personaId)
+                val boundState = runtime.copy(
+                    sessionId = session.id,
+                    usageMode = LocalUsageMode.CHAT,
+                    personaId = session.personaId,
+                    galleryId = session.galleryId,
+                    galleryStoryId = session.galleryStoryId,
+                    gallerySaveSuppressedThrough = session.gallerySaveSuppressedThrough,
+                    chatPersona = persona,
+                    chatState = session.chatState,
+                    replySuggestions = session.replySuggestions,
+                    chatBranches = session.chatBranches,
+                    groupChat = session.groupChat,
+                    conversationMode = session.conversationMode,
+                    parentSessionId = session.parentSessionId,
+                    lineageId = session.lineageId.ifBlank { session.id },
+                    projectId = session.projectId,
+                    handoffSummary = session.handoffSummary,
+                    messages = session.messages,
+                    planMode = false,
+                    jobs = emptyList(),
+                    queuedInputCount = 0,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    error = null,
+                )
+                val boundEventLog = eventLogFor(session.id)
+                val chatContext = chatTurnRunner.prepareProfile(
+                    persona = persona,
+                    state = session.chatState,
+                    userInput = trigger,
+                    storyContext = session.handoffSummary,
+                )
+                val relationshipMemory = chatRelationshipMemoryContext(trigger, boundState)
+                val proactiveDirective = """
+                    【定时主动互动】
+                    这是用户提前为当前角色设置的主动互动意图，时间到了。它只是幕后触发条件，不是用户刚发来的消息。
+                    触发意图：$trigger
+                    现在由【${persona.name}】主动给用户发一条新消息，延续当前人物、关系和故事。
+                    结合最近聊天、未完话题、角色当下状态和世界设定，自然决定怎么开口；允许简短、突然、带情绪、带动作感或开启一个小剧情。
+                    不要提“定时任务”“自动化”“触发”“系统提醒”等机制，也不要编造用户刚刚说过触发意图里的文字。
+                    只输出角色此刻真正会发给用户的消息，不加说明、标题、分析或幕后旁白。
+                """.trimIndent()
+                val localHistory = buildList {
+                    add(buildJsonObject {
+                        put("role", "system")
+                        put("content", chatSystemPrompt())
+                    })
+                    session.messages
+                        .filter { it.role == "user" || it.role == "assistant" }
+                        .takeLast(48)
+                        .forEach { message ->
+                            add(buildJsonObject {
+                                put("role", message.role)
+                                put("content", message.content)
+                            })
+                        }
+                }
+                val context = listOf(chatContext.prompt, relationshipMemory, proactiveDirective)
+                    .filter(String::isNotBlank)
+                    .joinToString("\n\n")
+                val requestMessages = withEphemeralContext(localHistory, context)
+                val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+
+                boundEventLog.append("turn/start", buildJsonObject {
+                    put("model", boundState.model)
+                    put("mode", "chat")
+                    put("automation", true)
+                    put("proactive", true)
+                    put("persona_id", persona.id)
+                })
+                val rawReply = completeAutomationChat(
+                    key = key,
+                    snapshot = boundState,
+                    messages = requestMessages,
+                )
+                val reply = chatTurnRunner.finalizeReply(
+                    persona = persona,
+                    reply = rawReply,
+                    rewrite = { candidate, violations ->
+                        completeAutomationChat(
+                            key = key,
+                            snapshot = boundState,
+                            messages = withEphemeralContext(
+                                requestMessages,
+                                ChatStyleGuard.repairPrompt(candidate, violations),
+                            ),
+                        )
+                    },
+                    recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                    builtInGuardEnabled = boundState.chatStyleGuardEnabled,
+                    onGuardEvent = { action, violations ->
+                        recordStyleGuardHits(violations)
+                        boundEventLog.append("chat/style-guard", buildJsonObject {
+                            put("action", action)
+                            put("automation", true)
+                            put("proactive", true)
+                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                        })
+                    },
+                )
+                val content = reply.content.orEmpty().trim()
+                require(content.isNotEmpty()) { "角色没有生成可用的主动消息" }
+
+                val proactiveMessage = LocalHarnessMessage(
+                    id = UUID.randomUUID().toString(),
+                    role = "assistant",
+                    content = content,
+                    createdAt = System.currentTimeMillis(),
+                    proactive = true,
+                )
+                val assistantEvent = boundEventLog.append("assistant/message", buildJsonObject {
+                    put("role", "assistant")
+                    put("content", content)
+                    // Proactive/automation metadata lives inside the transcript message. Keep the
+                    // model-replay envelope schema clean so only role/content return to the model.
+                    put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
+                })
+
+                if (ownsVisibleTurn && _state.value.sessionId == session.id) {
+                    // Mirror the foreground turn path: queued user messages may already be visible,
+                    // but are intentionally appended to model history only when their queued turn
+                    // resumes. Keeping the proactive reply in front of that model input avoids
+                    // duplicating queued messages.
+                    appendModelHistory(reply.message)
+                    updateContextMetrics()
+                    applyTranscriptMessages(
+                        listOf(proactiveMessage),
+                        assistantEvent.sequence,
+                        clearStreamingPreview = true,
+                    )
+                    if (pendingInputs.size() == 0 && chatBranchingEligible(_state.value.messages)) {
+                        _state.update { current ->
+                            current.copy(
+                                chatBranches = syncChatBranchState(
+                                    current = current.chatBranches,
+                                    activeMessages = current.messages,
+                                    chatState = current.chatState,
+                                    replySuggestions = current.replySuggestions,
+                                ),
+                            )
+                        }
+                    }
+                    checkpointModelHistory("chat/proactive-automation")
+                    persist()
+                } else {
+                    // Re-read immediately before commit so a detached automation never overwrites a
+                    // foreground turn that completed while the model was generating.
+                    val latest = sessionRepository.read(session.id) ?: session
+                    val nextMessages = latest.messages + proactiveMessage
+                    val nextBranches = if (chatBranchingEligible(nextMessages)) {
+                        syncChatBranchState(
+                            current = latest.chatBranches,
+                            activeMessages = nextMessages,
+                            chatState = latest.chatState,
+                            replySuggestions = latest.replySuggestions,
+                        )
+                    } else {
+                        latest.chatBranches
+                    }
+                    sessionRepository.enqueue(
+                        latest.copy(
+                            updatedAt = System.currentTimeMillis(),
+                            messages = nextMessages,
+                            chatBranches = nextBranches,
+                            transcriptProjectedThroughSequence = assistantEvent.sequence,
+                        ),
+                    )
+                }
+                boundEventLog.append("turn/end", buildJsonObject {
+                    put("reason", "completed")
+                    put("steps", 1)
+                    put("mode", "chat")
+                    put("automation", true)
+                    put("proactive", true)
+                })
+                LocalAutomationRunResult(sessionId = session.id, output = content)
+            }
+        } finally {
+            if (ownsVisibleTurn) {
+                _state.update { current ->
+                    if (current.sessionId == targetSessionId) {
+                        current.copy(
+                            running = false,
+                            pendingApproval = null,
+                            pendingQuestion = null,
+                            deviceApprovalLease = false,
+                            streamingAssistant = "",
+                            streamingReasoning = "",
+                        )
+                    } else {
+                        current
+                    }
+                }
+                synchronized(runStateLock) {
+                    if (activeJob === automationJob) activeJob = null
+                }
+                startNextQueuedTurnIfIdle()?.start()
+            }
+        }
+    }
+
+    private suspend fun completeAutomationChat(
+        key: String,
+        snapshot: LocalHarnessState,
+        messages: List<JsonObject>,
+    ): LocalModelReply {
+        val executor = AgentRequestExecutor(
+            maxAttempts = snapshot.modelAttempts.coerceIn(1, 3),
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+        )
+        return executor.execute {
+            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                modelClient.completeStreaming(
+                    apiKey = key,
+                    baseUrl = snapshot.baseUrl,
+                    model = snapshot.model,
+                    messages = messages,
+                    tools = JsonArray(emptyList()),
+                    onDelta = { },
+                )
+            }
+        }
+    }
+
     private fun resolveAutomationWorkSession(
         preferredSessionId: String?,
         prompt: String,

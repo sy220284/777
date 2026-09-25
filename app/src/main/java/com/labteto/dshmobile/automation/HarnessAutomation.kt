@@ -43,6 +43,12 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 @Serializable
+enum class AutomationMode {
+    WORK,
+    CHAT,
+}
+
+@Serializable
 data class AutomationTask(
     val id: String,
     val prompt: String,
@@ -50,6 +56,10 @@ data class AutomationTask(
     val nextRunAt: Long,
     val recurringMinutes: Long? = null,
     val notify: Boolean = true,
+    /** Existing tasks decode as WORK; chat interactions explicitly bind to a durable chat session. */
+    val mode: AutomationMode = AutomationMode.WORK,
+    val targetSessionId: String? = null,
+    val actorName: String? = null,
     /** Dedicated Work-mode session that owns this task's run history and artifacts. */
     val workSessionId: String? = null,
     val status: String = "scheduled",
@@ -144,6 +154,9 @@ class HarnessAutomationScheduler @Inject constructor(
         prompt: String,
         triggerAtMillis: Long,
         notify: Boolean,
+        mode: AutomationMode = AutomationMode.WORK,
+        targetSessionId: String? = null,
+        actorName: String? = null,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -156,6 +169,9 @@ class HarnessAutomationScheduler @Inject constructor(
                 createdAt = now,
                 nextRunAt = runAt,
                 notify = notify,
+                mode = mode,
+                targetSessionId = targetSessionId,
+                actorName = actorName,
             ),
         )
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
@@ -172,6 +188,9 @@ class HarnessAutomationScheduler @Inject constructor(
         intervalMinutes: Long,
         firstRunAtMillis: Long = System.currentTimeMillis(),
         notify: Boolean,
+        mode: AutomationMode = AutomationMode.WORK,
+        targetSessionId: String? = null,
+        actorName: String? = null,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -186,6 +205,9 @@ class HarnessAutomationScheduler @Inject constructor(
                 nextRunAt = firstRun,
                 recurringMinutes = intervalMinutes,
                 notify = notify,
+                mode = mode,
+                targetSessionId = targetSessionId,
+                actorName = actorName,
             ),
         )
         val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
@@ -247,15 +269,23 @@ class HarnessAutomationWorker(
         store.update(id) { it.copy(status = "running", lastRunAt = started, lastError = null) }
 
         return try {
-            val run = entry.localHarnessEngine().runAutomationWork(
-                text = task.prompt,
-                preferredSessionId = task.workSessionId,
-            )
+            val run = when (task.mode) {
+                AutomationMode.WORK -> entry.localHarnessEngine().runAutomationWork(
+                    text = task.prompt,
+                    preferredSessionId = task.workSessionId,
+                )
+                AutomationMode.CHAT -> entry.localHarnessEngine().runAutomationChat(
+                    instruction = task.prompt,
+                    targetSessionId = requireNotNull(task.targetSessionId) {
+                        "角色定时互动缺少目标会话"
+                    },
+                )
+            }
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
             store.update(id) {
                 it.copy(
-                    workSessionId = run.sessionId,
+                    workSessionId = if (it.mode == AutomationMode.WORK) run.sessionId else it.workSessionId,
                     status = if (it.recurringMinutes == null) "completed" else "scheduled",
                     nextRunAt = next,
                     lastResult = run.output.take(20_000),
@@ -267,6 +297,7 @@ class HarnessAutomationWorker(
                 task = task,
                 titleRes = R.string.tasks_notification_complete,
                 sessionId = run.sessionId,
+                resultText = run.output,
             )
             Result.success()
         } catch (cancelled: CancellationException) {
@@ -330,15 +361,34 @@ class HarnessAutomationWorker(
         task: AutomationTask,
         titleRes: Int,
         sessionId: String?,
+        resultText: String? = null,
     ) {
         if (!task.notify) return
         val enabled = runCatching { entry.hostsStore().settingsOnce().notifyLocalJobs }
             .getOrDefault(true)
         if (!enabled) return
+        val chatSuccess = task.mode == AutomationMode.CHAT &&
+            titleRes == R.string.tasks_notification_complete
+        val title = if (chatSuccess) {
+            applicationContext.getString(
+                R.string.tasks_chat_notification_title,
+                task.actorName?.takeIf(String::isNotBlank)
+                    ?: applicationContext.getString(R.string.tasks_chat_character_fallback),
+            )
+        } else {
+            applicationContext.getString(titleRes)
+        }
+        val text = if (chatSuccess) {
+            resultText?.replace("\n", " ")?.trim()?.take(180)
+                ?.takeIf(String::isNotBlank)
+                ?: applicationContext.getString(R.string.tasks_notification_open_result)
+        } else {
+            applicationContext.getString(R.string.tasks_notification_open_result)
+        }
         entry.notifications().postLocalSession(
             id = AUTOMATION_NOTIFICATION_BASE + (task.id.hashCode() and Int.MAX_VALUE) % 10_000,
-            title = applicationContext.getString(titleRes),
-            text = applicationContext.getString(R.string.tasks_notification_open_result),
+            title = title,
+            text = text,
             sessionId = sessionId,
         )
     }

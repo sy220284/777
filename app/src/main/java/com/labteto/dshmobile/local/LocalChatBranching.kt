@@ -45,9 +45,11 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
         }) return false
     val dialogue = messages.filter { it.role == "user" || it.role == "assistant" }
     if (dialogue.isEmpty()) return true
-    if (dialogue.first().role != "user") return false
-    if (dialogue.any(::chatMessageHasAttachmentContext)) return false
-    return dialogue.zipWithNext().all { (left, right) -> left.role != right.role }
+    val turnDialogue = dialogue.filterNot { it.role == "assistant" && it.proactive }
+    if (turnDialogue.isEmpty()) return true
+    if (turnDialogue.first().role != "user") return false
+    if (turnDialogue.any(::chatMessageHasAttachmentContext)) return false
+    return turnDialogue.zipWithNext().all { (left, right) -> left.role != right.role }
 }
 
 internal fun chatMessageHasAttachmentContext(message: LocalHarnessMessage): Boolean =

@@ -596,6 +596,11 @@ private fun LocalModeDrawer(
                         trailing = galleryCount.toString(),
                         onClick = onOpenPersonaGallery,
                     )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Schedule,
+                        title = stringResource(R.string.tasks_chat_title),
+                        onClick = onTasks,
+                    )
                 } else {
                     DrawerPrimaryAction(
                         icon = FeatherIcons.FileText,
@@ -671,11 +676,13 @@ private fun LocalModeDrawer(
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.QrCodeScanner,
-                    title = stringResource(R.string.local_remote_control),
-                    onClick = onRemote,
-                )
+                if (usageMode == LocalUsageMode.WORK) {
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.QrCodeScanner,
+                        title = stringResource(R.string.local_remote_control),
+                        onClick = onRemote,
+                    )
+                }
                 DrawerPrimaryAction(
                     icon = Icons.Outlined.Settings,
                     title = stringResource(R.string.settings_title),
@@ -1529,6 +1536,7 @@ private fun LocalChat(
                                 !chatMessageHasAttachmentContext(transcriptItem.message),
                             canRegenerate = !state.groupChat.enabled &&
                                 !state.running &&
+                                !transcriptItem.message.proactive &&
                                 state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             branchInfo = if (messageBranchingEnabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)

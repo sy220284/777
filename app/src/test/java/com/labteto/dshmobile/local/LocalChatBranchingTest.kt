@@ -89,6 +89,29 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun proactiveAssistantMessageDoesNotBreakNormalTurnBranching() {
+        val user = message("u1", "user", "晚点找我", 1)
+        val reply = message("a1", "assistant", "好。", 2)
+        val proactive = LocalHarnessMessage(
+            id = "a2",
+            role = "assistant",
+            content = "你不是说晚点找你么，我来了。",
+            createdAt = 3,
+            proactive = true,
+        )
+
+        assertTrue(chatBranchingEligible(listOf(user, reply, proactive)))
+
+        val branches = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, reply, proactive),
+            chatState = ChatCharacterState(mood = "主动"),
+            replySuggestions = emptyList(),
+        )
+        assertEquals(listOf("u1", "a1", "a2"), activeChatBranchMessages(branches).map { it.id })
+    }
+
+    @Test
     fun branchStateRoundTripsThroughEventPayload() {
         val user = message("u1", "user", "你好", 1)
         val state = upsertChatBranchNode(

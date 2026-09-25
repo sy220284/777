@@ -1075,4 +1075,26 @@
 <string name="tools_capability_agent_available">由智能体按需调用</string>
 <string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
 <string name="chat_composer_add_attachment">添加附件</string>
+
+    <string name="tasks_chat_title">定时互动</string>
+    <string name="tasks_chat_subtitle">让当前角色在约定时间主动来找你，继续这段关系和当前故事。</string>
+    <string name="tasks_chat_new">新建定时互动</string>
+    <string name="tasks_chat_target">当前角色：%1$s</string>
+    <string name="tasks_chat_character_fallback">当前角色</string>
+    <string name="tasks_chat_group_unsupported">定时角色互动当前只支持单人聊天，群聊暂不自动决定由谁先开口。</string>
+    <string name="tasks_chat_prompt_label">触发意图</string>
+    <string name="tasks_chat_prompt_hint">例如：结合最近聊天，自然地主动来找我，开启一个新话题</string>
+    <string name="tasks_chat_presets">快捷场景</string>
+    <string name="tasks_chat_preset_morning">早安</string>
+    <string name="tasks_chat_preset_night">晚安</string>
+    <string name="tasks_chat_preset_reach_out">主动找我</string>
+    <string name="tasks_chat_preset_story">剧情事件</string>
+    <string name="tasks_chat_preset_promise">提起约定</string>
+    <string name="tasks_chat_preset_morning_prompt">早上自然来找我，按当前关系说一句符合人设的早安，或者顺势开启今天的话题。</string>
+    <string name="tasks_chat_preset_night_prompt">晚上自然来找我，结合当前关系和最近聊天说晚安，或者留下来陪我聊几句。</string>
+    <string name="tasks_chat_preset_reach_out_prompt">像真实关系里突然想起我一样主动来找我，结合最近聊天和当前关系，自然开启一个符合人设的新话题。</string>
+    <string name="tasks_chat_preset_story_prompt">从当前故事线继续，让角色主动带来一个符合世界设定和人设的小事件、消息、邀约或状况，推动剧情往前走。</string>
+    <string name="tasks_chat_preset_promise_prompt">以角色自己的口吻，自然提起现有聊天里真实存在的约定、计划或重要事项；如果上下文没有明确约定，不要编造。</string>
+    <string name="tasks_chat_notification_title">%1$s 发来一条消息</string>
+
 </resources>
