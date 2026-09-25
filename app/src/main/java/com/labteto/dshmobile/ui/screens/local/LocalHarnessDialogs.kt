@@ -86,6 +86,7 @@ internal fun ChatPersonaPickerDialog(
     entries: List<PersonaGalleryEntry>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
+    canSwitchPersona: Boolean,
     onSelect: (String) -> Boolean,
     onCreate: () -> Unit,
     onEditCurrent: () -> Unit,
@@ -118,56 +119,64 @@ internal fun ChatPersonaPickerDialog(
             }
         }
         DsButton(
-            text = stringResource(R.string.local_persona_picker_new),
-            onClick = onCreate,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        DsButton(
             text = stringResource(R.string.local_persona_picker_edit_current),
             onClick = onEditCurrent,
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
         )
 
-        if (entries.isEmpty()) {
+        if (!canSwitchPersona) {
             Text(
-                stringResource(R.string.local_persona_picker_empty),
+                stringResource(R.string.local_persona_picker_switch_requires_new_chat),
                 style = DsType.small13,
                 color = colors.labelTertiary,
             )
         } else {
-            Text(
-                stringResource(R.string.local_persona_picker_saved),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
+            DsButton(
+                text = stringResource(R.string.local_persona_picker_new),
+                onClick = onCreate,
+                modifier = Modifier.fillMaxWidth(),
             )
-            entries.forEach { entry ->
-                val selected = currentGalleryId == entry.id
-                Surface(
-                    onClick = {
-                        if (onSelect(entry.id)) onDismiss()
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (selected) colors.bgLayer2 else colors.bgLayer1,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(DsSpacing.medium),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            if (entries.isEmpty()) {
+                Text(
+                    stringResource(R.string.local_persona_picker_empty),
+                    style = DsType.small13,
+                    color = colors.labelTertiary,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.local_persona_picker_saved),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+                entries.forEach { entry ->
+                    val selected = currentGalleryId == entry.id
+                    Surface(
+                        onClick = {
+                            if (onSelect(entry.id)) onDismiss()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            entry.persona.name,
-                            style = DsType.std14,
-                            color = colors.labelPrimary,
-                        )
-                        val subtitle = entry.persona.identity
-                            .ifBlank { entry.persona.worldSetting }
-                            .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
-                        Text(
-                            subtitle,
-                            style = DsType.caption11,
-                            color = colors.labelSecondary,
-                        )
+                        Column(
+                            modifier = Modifier.padding(DsSpacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        ) {
+                            Text(
+                                entry.persona.name,
+                                style = DsType.std14,
+                                color = colors.labelPrimary,
+                            )
+                            val subtitle = entry.persona.identity
+                                .ifBlank { entry.persona.worldSetting }
+                                .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
+                            Text(
+                                subtitle,
+                                style = DsType.caption11,
+                                color = colors.labelSecondary,
+                            )
+                        }
                     }
                 }
             }
