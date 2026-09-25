@@ -1360,7 +1360,9 @@ private fun LocalChat(
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
-                            canEdit = state.usageMode == LocalUsageMode.CHAT && !state.running,
+                            canEdit = state.usageMode == LocalUsageMode.CHAT &&
+                                !state.running &&
+                                "本次附件已导入本机工作区：" !in transcriptItem.message.content,
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             branchInfo = if (state.usageMode == LocalUsageMode.CHAT) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
