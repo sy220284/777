@@ -903,6 +903,66 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    fun createGroupChatSession() {
+        createSession(
+            mode = LocalConversationMode.INDEPENDENT,
+            usageMode = LocalUsageMode.CHAT,
+            chatMode = LocalChatMode.GROUP,
+        )
+    }
+
+    fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
+        val snapshot = _state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled
+        ) return false
+
+        val selected = entries
+            .distinctBy(PersonaGalleryEntry::id)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+        scope.launch {
+            val members = selected.map { entry ->
+                val saved = chatPersonaStore.upsert(entry.persona.copy(id = entry.id))
+                val previous = snapshot.groupChat.members.firstOrNull { it.galleryId == entry.id }
+                LocalGroupChatMember(
+                    galleryId = entry.id,
+                    personaId = saved.id,
+                    displayName = saved.name,
+                    chatState = previous?.chatState ?: ChatCharacterState(),
+                )
+            }
+            _state.update { current ->
+                if (
+                    current.sessionId != snapshot.sessionId ||
+                    current.usageMode != LocalUsageMode.CHAT ||
+                    !current.groupChat.enabled
+                ) {
+                    current
+                } else {
+                    current.copy(
+                        groupChat = current.groupChat.copy(members = members),
+                        replySuggestions = emptyList(),
+                        chatBranches = LocalChatBranchState(),
+                        error = null,
+                    )
+                }
+            }
+            if (_state.value.sessionId == snapshot.sessionId) {
+                rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+                checkpointModelHistory("group/members-updated")
+                eventLog.append("group/members", buildJsonObject {
+                    put("count", members.size)
+                    put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
+                })
+                persist()
+            }
+        }
+        return true
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
