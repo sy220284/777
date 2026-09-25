@@ -1074,6 +1074,7 @@ private fun LocalChat(
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var creatingPersona by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
@@ -1088,9 +1089,26 @@ private fun LocalChat(
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled &&
         chatBranchingEligible(state.messages)
+    LaunchedEffect(
+        state.sessionId,
+        state.usageMode,
+        state.groupChat.enabled,
+        state.groupChat.members.size,
+    ) {
+        if (
+            state.usageMode == LocalUsageMode.CHAT &&
+            state.groupChat.enabled &&
+            state.groupChat.members.size < 2
+        ) {
+            showGroupMemberPicker = true
+        }
+    }
     LaunchedEffect(state.sessionId, state.usageMode) {
         showReplySuggestions = false
+        showPersonaPicker = false
+        if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
         editingUserText = ""
         editingUserError = null
