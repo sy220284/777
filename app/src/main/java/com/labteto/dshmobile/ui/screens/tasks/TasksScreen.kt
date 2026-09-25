@@ -32,6 +32,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
+import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.LocalHarnessEngine
@@ -98,7 +99,8 @@ class TasksViewModel @Inject constructor(
         mode: AutomationMode,
     ): Boolean {
         if (prompt.isBlank() || firstRunAt <= System.currentTimeMillis()) return false
-        if (recurringMinutes != null && recurringMinutes < 60L) return false
+        val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
+        if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
         val snapshot = engine.state.value
         if (mode == AutomationMode.CHAT) {
             if (
@@ -559,8 +561,14 @@ private fun TaskCard(
                 variant = DsButtonVariant.Ghost,
             )
         }
+        val terminalOneShot = task.recurringMinutes == null &&
+            task.status in setOf("completed", "failed", "blocked")
         Text(
-            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt)),
+            if (terminalOneShot && task.lastRunAt != null) {
+                stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+            } else {
+                stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+            },
             style = DsType.caption11,
             color = colors.labelTertiary,
             modifier = Modifier.padding(start = DsSpacing.xlarge),
@@ -582,6 +590,27 @@ private fun TaskCard(
                 maxLines = 2,
             )
         }
+        if (task.runReceipts.isNotEmpty()) {
+            Text(
+                stringResource(R.string.tasks_run_history, task.runReceipts.size),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                modifier = Modifier.padding(start = DsSpacing.xlarge),
+            )
+            task.runReceipts.takeLast(3).asReversed().forEach { receipt ->
+                Text(
+                    stringResource(
+                        R.string.tasks_run_history_item,
+                        formatTime(receipt.finishedAt),
+                        receiptStatusLabel(receipt),
+                    ),
+                    style = DsType.caption11,
+                    color = if (receipt.status == "failed") colors.error else colors.labelSecondary,
+                    modifier = Modifier.padding(start = DsSpacing.xlarge),
+                    maxLines = 2,
+                )
+            }
+        }
         (task.targetSessionId ?: task.workSessionId)?.takeIf(String::isNotBlank)?.let { sessionId ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -596,6 +625,18 @@ private fun TaskCard(
             }
         }
     }
+}
+
+@Composable
+private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
+    val state = when (receipt.status) {
+        "completed" -> stringResource(R.string.tasks_run_completed)
+        "blocked" -> stringResource(R.string.tasks_run_blocked)
+        "failed" -> stringResource(R.string.tasks_run_failed)
+        else -> receipt.status
+    }
+    val detail = receipt.errorPreview ?: receipt.resultPreview
+    return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
 private fun taskStatus(status: String): StateDotState = when (status) {
