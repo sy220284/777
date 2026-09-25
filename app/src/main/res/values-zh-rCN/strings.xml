@@ -558,6 +558,12 @@
     <string name="tasks_next_run">下次执行：%1$s</string>
     <string name="tasks_last_result">最近结果：%1$s</string>
     <string name="tasks_last_status">最近状态：%1$s</string>
+    <string name="tasks_open_result">查看结果</string>
+    <string name="tasks_notification_complete">自动化任务已完成</string>
+    <string name="tasks_notification_blocked">自动化任务需要处理</string>
+    <string name="tasks_notification_failed">自动化任务执行失败</string>
+    <string name="tasks_notification_open_result">点击进入对应工作会话查看结果。</string>
+    <string name="local_run_open_results">本次文件与成果</string>
     <string name="tools_title">能力中心</string>
     <string name="tools_subtitle">查看工作模式可用能力，并按需管理外部连接</string>
     <string name="tools_refresh">刷新工具</string>
