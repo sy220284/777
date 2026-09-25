@@ -305,10 +305,12 @@ class LocalHarnessViewModel @Inject constructor(
     }
 
     suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
+        val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
         withContext(Dispatchers.IO) {
             check(galleryStore.delete(id)) { "图集条目已不存在" }
             _gallery.value = galleryStore.list()
         }
+        deleteManagedPortrait(portraitPath)
         engine.clearChatGalleryBinding(expectedGalleryId = id)
     }
 
