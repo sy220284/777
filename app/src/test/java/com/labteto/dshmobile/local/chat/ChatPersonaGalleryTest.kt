@@ -9,10 +9,10 @@ import org.junit.Test
 class ChatPersonaGalleryTest {
     @Test
     fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {
-        val entry = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(name = "阿青"),
-            storyNotes = "雪夜在桥边重逢",
+        val story = PersonaGalleryStory(
+            id = "story-1",
+            title = "雪夜",
+            notes = "雪夜在桥边重逢",
             history = (1..30).map { index ->
                 LocalHarnessMessage(
                     "$index",
@@ -22,12 +22,17 @@ class ChatPersonaGalleryTest {
                 )
             },
         )
+        val entry = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(name = "阿青"),
+            stories = listOf(story),
+        )
 
-        val context = entry.storyContext()
+        val context = entry.storyContext("story-1")
         assertTrue(context.contains("雪夜在桥边重逢"))
         assertTrue(context.contains("对白30"))
         assertFalse(context.contains("对白1\n"))
-        assertEquals(30, entry.history.size)
+        assertEquals(30, story.history.size)
     }
 
     @Test
@@ -59,19 +64,25 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
-    fun repeatedSaveDoesNotDuplicateArchivedMessages() {
-        val base = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青", identity = "剑客"),
+    fun sameNameDifferentWorldSettingsStaySeparate() {
+        val teyvat = PersonaProfile(name = "神里绫华", worldSetting = "提瓦特稻妻")
+        val modern = PersonaProfile(name = "神里绫华", worldSetting = "现代东京校园")
+
+        assertFalse(samePersonaIdentity(teyvat, modern))
+    }
+
+    @Test
+    fun repeatedSaveDoesNotDuplicateArchivedMessagesInsideOneStory() {
+        val base = PersonaGalleryStory(
+            id = "story-1",
             history = listOf(
                 LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
                 LocalHarnessMessage("m2", "assistant", "嗯。", createdAt = 2L),
             ),
             updatedAt = 2L,
         )
-        val incoming = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青", identity = "剑客"),
+        val incoming = PersonaGalleryStory(
+            id = "story-1",
             history = listOf(
                 LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
                 LocalHarnessMessage("m2", "assistant", "嗯。", createdAt = 2L),
@@ -80,36 +91,33 @@ class ChatPersonaGalleryTest {
             updatedAt = 3L,
         )
 
-        val merged = mergeGalleryEntries(base, incoming)
+        val merged = mergeGalleryStories(base, incoming)
 
         assertEquals(listOf("m1", "m2", "m3"), merged.history.map { it.id })
     }
 
-
     @Test
     fun legacySameDialogueWithDifferentIdsIsStillDeduplicated() {
-        val base = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
+        val base = PersonaGalleryStory(
+            id = "story-1",
             history = listOf(
                 LocalHarnessMessage("old-id", "user", "同一句对白", createdAt = 10L),
             ),
         )
-        val incoming = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
+        val incoming = PersonaGalleryStory(
+            id = "story-1",
             history = listOf(
                 LocalHarnessMessage("new-id", "user", "同一句对白", createdAt = 10L),
             ),
         )
 
-        val merged = mergeGalleryEntries(base, incoming)
+        val merged = mergeGalleryStories(base, incoming)
 
         assertEquals(1, merged.history.size)
     }
 
     @Test
-    fun legacyDuplicateCharacterCardsCompactIntoNewestMasterProfile() {
+    fun legacyDuplicateCharacterCardsCompactButKeepStoriesSeparate() {
         val older = PersonaGalleryEntry(
             id = "gallery-old",
             persona = PersonaProfile(
@@ -117,9 +125,8 @@ class ChatPersonaGalleryTest {
                 name = "神里绫华",
                 identity = "社奉行神里家大小姐",
             ),
-            history = listOf(
-                LocalHarnessMessage("m1", "user", "早上好", createdAt = 1L),
-            ),
+            history = listOf(LocalHarnessMessage("m1", "user", "早上好", createdAt = 1L)),
+            sourceSessionId = "session-old",
             updatedAt = 10L,
         )
         val newer = PersonaGalleryEntry(
@@ -129,34 +136,65 @@ class ChatPersonaGalleryTest {
                 name = "神里绫华",
                 personality = "温柔克制",
             ),
-            history = listOf(
-                LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L),
-            ),
+            history = listOf(LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L)),
+            sourceSessionId = "session-new",
             updatedAt = 20L,
         )
 
-        val compacted = compactDuplicateGalleryEntries(listOf(older, newer))
+        val compacted = compactLegacyDuplicateGalleryEntries(listOf(older, newer))
 
         assertEquals(1, compacted.size)
         assertEquals("gallery-new", compacted.single().id)
         assertEquals("社奉行神里家大小姐", compacted.single().persona.identity)
         assertEquals("温柔克制", compacted.single().persona.personality)
-        assertEquals(listOf("m1", "m2"), compacted.single().history.map { it.id })
+        assertEquals(2, compacted.single().stories.size)
+        assertEquals(setOf("session-old", "session-new"), compacted.single().stories.flatMap { it.sourceSessionIds }.toSet())
     }
 
     @Test
-    fun archivedDialogueCanBeRemovedByStableArchiveKey() {
+    fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
         val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
         val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
-        val entry = PersonaGalleryEntry(
-            id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
-            history = listOf(first, second),
+        val story = PersonaGalleryStory(id = "story-1", history = listOf(first, second))
+
+        val deleted = removeArchivedGalleryMessage(story, galleryMessageArchiveKey(first))!!
+        val resaved = mergeGalleryStories(
+            deleted,
+            PersonaGalleryStory(id = "story-1", history = listOf(first, second)),
         )
 
-        val updated = removeArchivedGalleryMessage(entry, galleryMessageArchiveKey(first))
+        assertEquals(listOf("m2"), resaved.history.map { it.id })
+        assertTrue(galleryMessageArchiveKey(first) in resaved.excludedMessageKeys)
+    }
 
-        assertEquals(listOf("m2"), updated?.history?.map { it.id })
+    @Test
+    fun savedStoryBecomesDirtyWhenNewDialogueArrives() {
+        val saved = LocalHarnessMessage("m1", "user", "早上好", createdAt = 1L)
+        val fresh = LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L)
+        val entry = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(id = "gallery-1", name = "阿青", identity = "剑客"),
+            stories = listOf(PersonaGalleryStory(id = "story-1", history = listOf(saved))),
+        )
+
+        assertFalse(
+            galleryEntryHasUnsavedChanges(
+                entry,
+                "story-1",
+                entry.persona,
+                listOf(saved),
+                ChatCharacterState(),
+            ),
+        )
+        assertTrue(
+            galleryEntryHasUnsavedChanges(
+                entry,
+                "story-1",
+                entry.persona,
+                listOf(saved, fresh),
+                ChatCharacterState(),
+            ),
+        )
     }
 
     @Test
