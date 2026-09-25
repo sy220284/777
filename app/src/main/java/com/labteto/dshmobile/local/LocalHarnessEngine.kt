@@ -416,10 +416,11 @@ class LocalHarnessEngine @Inject constructor(
         contextSnapshotProvider: (String) -> String,
         schemasProvider: (Boolean, Boolean) -> JsonArray,
         executeTool: suspend (LocalToolCall, Boolean) -> AgentToolResult,
+        runnerState: StateFlow<LocalHarnessState> = state,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
-        state = state,
+        state = runnerState,
         jobs = jobs,
         historySnapshot = { modelHistory.toList() },
         contextSnapshot = contextSnapshotProvider,
@@ -511,6 +512,7 @@ class LocalHarnessEngine @Inject constructor(
                     enabledOptionalTools = localEnabledOptionalTools,
                 )
             },
+            runnerState = MutableStateFlow(boundState),
         )
     }
 
@@ -564,6 +566,7 @@ class LocalHarnessEngine @Inject constructor(
                     onApprovalBlocked = onApprovalBlocked,
                 )
             },
+            runnerState = MutableStateFlow(boundState),
         )
     }
 
