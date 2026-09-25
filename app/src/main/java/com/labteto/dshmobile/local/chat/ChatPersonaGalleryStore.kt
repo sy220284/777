@@ -459,7 +459,7 @@ private fun mergeLoreEntries(
                 secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
                 priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
                 alwaysOn = existing.alwaysOn || entry.alwaysOn,
-                spoilerLevel = minOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
+                spoilerLevel = maxOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
             )
         }
     }
