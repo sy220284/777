@@ -704,8 +704,8 @@ class LocalHarnessEngine @Inject constructor(
                 it == PersonaProfile.DEFAULT_PERSONA_ID
             } ?: "persona-${UUID.randomUUID()}"
             val saved = chatPersonaStore.upsert(profile.copy(id = personaId))
-            val sameBoundCharacter = snapshot.chatPersona.name.trim()
-                .equals(saved.name.trim(), ignoreCase = true)
+            val sameBoundCharacter =
+                com.labteto.dshmobile.local.chat.samePersonaIdentity(snapshot.chatPersona, saved)
             _state.update { state ->
                 if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = saved.id,
