@@ -200,6 +200,25 @@ class LocalSessionTranscriptProjectionTest {
     }
 
     @Test
+    fun transcriptRoundTripPreservesProactiveRoleMetadata() {
+        val proactive = LocalHarnessMessage(
+            id = "auto-a1",
+            role = "assistant",
+            content = "突然想起来一件事。",
+            createdAt = 90L,
+            proactive = true,
+        )
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = emptyList(),
+            events = listOf(event(0L, encodeTranscriptMessages(listOf(proactive)))),
+            sequenceExclusive = -1L,
+        )
+
+        assertEquals(listOf(proactive), projected.messages)
+        assertEquals(true, projected.messages.single().proactive)
+    }
+
+    @Test
     fun transcriptRoundTripPreservesToolMetadata() {
         val tool = message("tool-1", "tool", "输出", 99L, toolName = "read")
         val projected = projectSessionTranscriptTail(
