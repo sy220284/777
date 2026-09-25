@@ -280,6 +280,98 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun structuredRuntimeFieldsSurviveSaveExportAndImport() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "runtime-source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "神里绫华",
+                franchise = "原神",
+                timelinePosition = "无剧透阶段",
+                coreMotivations = listOf("兼顾责任与真诚关系"),
+                valuePriorities = listOf("重要之人的安全", "家族责任"),
+                behaviorPatterns = listOf("先观察再表达"),
+                internalContradictions = listOf("责任与普通生活的拉扯"),
+                knowledgeBoundary = listOf("不知道未经历的后续剧情"),
+                loreEntries = listOf(
+                    PersonaLoreEntry(
+                        id = "thoma",
+                        title = "托马",
+                        content = "托马是神里家重要伙伴。",
+                        keywords = listOf("托马"),
+                        priority = 80,
+                    ),
+                ),
+                presetId = "genshin-kamisato-ayaka",
+            ),
+            sourceSessionId = "",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        assertTrue(saved.stories.isEmpty())
+        val payload = source.exportPersona(saved.id)
+        val imported = ChatPersonaGalleryStore(File(temporary.root, "runtime-imported.json"), Json)
+            .importPersona(payload)
+
+        assertEquals("原神", imported.persona.franchise)
+        assertEquals("无剧透阶段", imported.persona.timelinePosition)
+        assertEquals(listOf("兼顾责任与真诚关系"), imported.persona.coreMotivations)
+        assertEquals(listOf("先观察再表达"), imported.persona.behaviorPatterns)
+        assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
+        assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
+        assertEquals("thoma", imported.persona.loreEntries.single().id)
+        assertEquals(listOf("托马"), imported.persona.loreEntries.single().keywords)
+    }
+
+    @Test
+    fun structuredPersonaMergeKeepsDistinctLoreWithoutDuplicatingEntries() {
+        val base = PersonaProfile(
+            name = "卡芙卡",
+            franchise = "崩坏：星穹铁道",
+            coreMotivations = listOf("保持选择权"),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "hunters",
+                    title = "星核猎手",
+                    content = "长期合作组织。",
+                    keywords = listOf("星核猎手"),
+                    priority = 70,
+                ),
+            ),
+        )
+        val incoming = PersonaProfile(
+            name = "卡芙卡",
+            franchise = "崩坏：星穹铁道",
+            coreMotivations = listOf("推动长期计划"),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "hunters",
+                    title = "星核猎手",
+                    content = "长期合作组织，与她的行动密切相关。",
+                    keywords = listOf("星核猎手", "银狼"),
+                    priority = 90,
+                ),
+                PersonaLoreEntry(
+                    id = "script",
+                    title = "剧本",
+                    content = "计划细节按剧情边界透露。",
+                    keywords = listOf("剧本"),
+                ),
+            ),
+        )
+
+        val merged = mergePersonaProfiles(base, incoming)
+
+        assertEquals(2, merged.coreMotivations.size)
+        assertEquals(2, merged.loreEntries.size)
+        val hunters = merged.loreEntries.first { it.id == "hunters" }
+        assertEquals(90, hunters.priority)
+        assertTrue("银狼" in hunters.keywords)
+        assertTrue(hunters.content.contains("密切相关"))
+    }
+
+    @Test
     fun compactPersonaShareStaysQrSizedAndCanImport() {
         val source = ChatPersonaGalleryStore(File(temporary.root, "qr-source.json"), Json)
         val saved = source.save(
