@@ -560,6 +560,12 @@
     <string name="tasks_next_run">Next run: %1$s</string>
     <string name="tasks_last_result">Latest result: %1$s</string>
     <string name="tasks_last_status">Latest status: %1$s</string>
+    <string name="tasks_open_result">Open result</string>
+    <string name="tasks_notification_complete">Automation completed</string>
+    <string name="tasks_notification_blocked">Automation needs attention</string>
+    <string name="tasks_notification_failed">Automation failed</string>
+    <string name="tasks_notification_open_result">Tap to open the Work session and results.</string>
+    <string name="local_run_open_results">Files &amp; results</string>
     <string name="tools_title">Capability center</string>
     <string name="tools_subtitle">See what the work mode can do and manage external connections</string>
     <string name="tools_refresh">Refresh tools</string>
