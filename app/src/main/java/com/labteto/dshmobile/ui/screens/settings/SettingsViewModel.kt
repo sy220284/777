@@ -141,6 +141,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { hostsStore.setSetting(transform) }
     }
 
+    fun configureChatStyleGuard(enabled: Boolean) {
+        localHarness.configureChatStyleGuard(enabled)
+    }
+
+    fun clearChatStyleGuardHits() {
+        localHarness.clearChatStyleGuardHits()
+    }
+
     /**
      * Copy a picked image into app storage and remember it as the app background.
      *
