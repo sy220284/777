@@ -70,11 +70,14 @@ import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.rememberHostsStore
 import com.labteto.dshmobile.ui.rememberSessionStore
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -194,7 +197,7 @@ fun ChatListDrawer(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.sidebar)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.ALL, colors.sidebar))
             .safeDrawingPadding()
             .padding(horizontal = DsSpacing.medium),
     ) {
@@ -210,7 +213,7 @@ fun ChatListDrawer(
                 contentDescription = stringResource(R.string.chatlist_new_session),
                 onClick = { newSessionOpen = true },
                 tint = colors.labelPrimary,
-                containerColor = colors.bgLayer1,
+                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 2.dp,
             )
         }
@@ -231,8 +234,8 @@ fun ChatListDrawer(
             singleLine = true,
             shape = DsShapes.pillFull,
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.bgLayer1,
-                unfocusedContainerColor = colors.bgLayer1,
+                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
+                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
                 focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 cursorColor = colors.accent,
