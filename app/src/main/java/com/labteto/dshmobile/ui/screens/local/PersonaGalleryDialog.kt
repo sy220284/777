@@ -337,7 +337,18 @@ internal fun PersonaGalleryDialog(
                 }
             }
 
-            PersonaDetails(selected.persona)
+            DsButton(
+                text = stringResource(
+                    if (showPersonaDetails) R.string.persona_gallery_hide_fixed_persona
+                    else R.string.persona_gallery_show_fixed_persona,
+                ),
+                onClick = { showPersonaDetails = !showPersonaDetails },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPersonaDetails) {
+                PersonaDetails(selected.persona)
+            }
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
@@ -362,6 +373,9 @@ internal fun PersonaGalleryDialog(
                         GalleryStoryCard(
                             story = story,
                             selected = story.id == selectedStoryId,
+                            unsaved = selected.id == currentGalleryId &&
+                                story.id == currentGalleryStoryId &&
+                                currentHasUnsavedChanges,
                             onClick = {
                                 selectedStoryId = story.id
                                 error = null
