@@ -983,4 +983,8 @@
     <string name="local_persona_correction_recorded">已记入人设纠正</string>
     <string name="local_persona_correction_undo">撤销</string>
 
+    <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
+
+    <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
+
 </resources>
