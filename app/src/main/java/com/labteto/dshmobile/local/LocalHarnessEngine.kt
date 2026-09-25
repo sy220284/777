@@ -1915,7 +1915,16 @@ class LocalHarnessEngine @Inject constructor(
                 goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
                 plan = state.plan,
                 todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
-                messages = state.messages.map { message -> HandoffMessage(message.role, message.content) },
+                messages = state.messages.map { message ->
+                    HandoffMessage(
+                        message.role,
+                        if (state.groupChat.enabled && message.role == "assistant") {
+                            groupTranscriptLine(message)
+                        } else {
+                            message.content
+                        },
+                    )
+                },
             ),
         )
 
@@ -2413,11 +2422,13 @@ class LocalHarnessEngine @Inject constructor(
         input: String,
         allMembers: List<LocalGroupChatMember>,
         mayStaySilent: Boolean,
+        handoffSummary: String?,
     ): String {
         val personaPrompt = chatTurnRunner.prepareProfile(
             persona = persona,
             state = state,
             userInput = input,
+            storyContext = handoffSummary,
         ).prompt
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = if (mayStaySilent) {
@@ -2543,6 +2554,7 @@ class LocalHarnessEngine @Inject constructor(
                     input = input,
                     allMembers = members,
                     mayStaySilent = index > 0,
+                    handoffSummary = snapshot.handoffSummary,
                 )
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = withEphemeralContext(modelHistory.toList(), prompt),
