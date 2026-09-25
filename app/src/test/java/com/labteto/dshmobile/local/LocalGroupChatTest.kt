@@ -93,6 +93,16 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun askingAboutCharacterDoesNotAddressThatCharacter() {
+        val responders = groupChatResponders(
+            input = "关于卡芙卡怎么看？",
+            members = listOf(ayaka, kafka, zhao),
+        )
+
+        assertEquals(listOf("ayaka"), responders.map { it.galleryId })
+    }
+
+    @Test
     fun strongerDirectAddressWinsOverReferencedNameWithComma() {
         val responders = groupChatResponders(
             input = "我刚提到卡芙卡，神里绫华你怎么看？",
