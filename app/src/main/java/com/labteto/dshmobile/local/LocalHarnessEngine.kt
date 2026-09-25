@@ -473,13 +473,14 @@ class LocalHarnessEngine @Inject constructor(
         resourceScheduler = resourceScheduler,
         acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
-        historyBudget = {
+        historyBudget = { baseUrl, model ->
             val runnerSnapshot = runnerState.value
             localHistoryBudgetFor(
                 memoryClassMb = memoryClassMb,
                 pressure = resourceScheduler.snapshot().pressure,
                 usageMode = runnerSnapshot.usageMode,
-                model = runnerSnapshot.model,
+                model = model,
+                baseUrl = baseUrl,
             )
         },
     )
