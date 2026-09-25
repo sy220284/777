@@ -940,6 +940,7 @@ class LocalHarnessEngine @Inject constructor(
         val selected = entries
             .distinctBy(PersonaGalleryEntry::id)
             .take(MAX_GROUP_CHAT_MEMBERS)
+        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
         scope.launch {
             val members = selected.map { entry ->
                 val saved = chatPersonaStore.upsert(entry.persona.copy(id = entry.id))
