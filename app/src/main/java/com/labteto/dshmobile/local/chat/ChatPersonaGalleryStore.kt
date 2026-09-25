@@ -115,8 +115,9 @@ internal fun mergeGalleryEntries(
     base: PersonaGalleryEntry,
     incoming: PersonaGalleryEntry,
 ): PersonaGalleryEntry {
-    val newer = if (incoming.chatState.updatedAt >= base.chatState.updatedAt) incoming.chatState else base.chatState
-    val older = if (newer === incoming.chatState) base.chatState else incoming.chatState
+    val incomingIsNewer = incoming.chatState.updatedAt >= base.chatState.updatedAt
+    val newer = if (incomingIsNewer) incoming.chatState else base.chatState
+    val older = if (incomingIsNewer) base.chatState else incoming.chatState
     val mergedState = newer.copy(
         unresolvedThreads = mergePersonaLines(older.unresolvedThreads, newer.unresolvedThreads, 8),
         dynamics = newer.dynamics.copy(
@@ -213,8 +214,8 @@ private fun mergePersonaLines(base: List<String>, incoming: List<String>, limit:
         .filter(String::isNotBlank)
         .filter { seen.add(normalizePersonaText(it)) }
         .map { it.take(240) }
-        .takeLast(limit)
         .toList()
+        .takeLast(limit)
 }
 
 private fun splitPersonaClauses(text: String): List<String> =
