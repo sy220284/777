@@ -2717,6 +2717,8 @@ class LocalHarnessEngine @Inject constructor(
             it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
                 member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
         } ?: chatPersonaStore.get(member.personaId)
+        val startedAtNanos = System.nanoTime()
+        val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
 
         return try {
             val prompt = groupAgentPrompt(
@@ -2741,6 +2743,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = 100 + index,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                maxAttemptsOverride = interactiveAttempts,
             )
             val guarded = chatTurnRunner.finalizeReply(
                 persona = persona,
@@ -2756,6 +2759,7 @@ class LocalHarnessEngine @Inject constructor(
                         step = 100 + index,
                         toolsOverride = JsonArray(emptyList()),
                         publishPreview = false,
+                        maxAttemptsOverride = interactiveAttempts,
                     )
                 },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
@@ -2770,6 +2774,12 @@ class LocalHarnessEngine @Inject constructor(
                     })
                 },
             )
+            eventLog.append("group/agent-latency", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("index", index)
+                put("status", "success")
+                put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
+            })
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
@@ -2778,6 +2788,12 @@ class LocalHarnessEngine @Inject constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            eventLog.append("group/agent-latency", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("index", index)
+                put("status", "failed")
+                put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
+            })
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
