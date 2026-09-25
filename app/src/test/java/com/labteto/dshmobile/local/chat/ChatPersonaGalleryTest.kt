@@ -351,6 +351,7 @@ class ChatPersonaGalleryTest {
                     content = "长期合作组织，与她的行动密切相关。",
                     keywords = listOf("星核猎手", "银狼"),
                     priority = 90,
+                    spoilerLevel = 2,
                 ),
                 PersonaLoreEntry(
                     id = "script",
@@ -367,6 +368,7 @@ class ChatPersonaGalleryTest {
         assertEquals(2, merged.loreEntries.size)
         val hunters = merged.loreEntries.first { it.id == "hunters" }
         assertEquals(90, hunters.priority)
+        assertEquals(2, hunters.spoilerLevel)
         assertTrue("银狼" in hunters.keywords)
         assertTrue(hunters.content.contains("密切相关"))
     }
