@@ -983,6 +983,35 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
+    fun removeGroupChatMemberByGalleryId(galleryId: String) {
+        val snapshot = _state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled ||
+            snapshot.groupChat.members.none { it.galleryId == galleryId }
+        ) return
+
+        _state.update { current ->
+            if (current.sessionId != snapshot.sessionId) current else current.copy(
+                groupChat = current.groupChat.copy(
+                    members = current.groupChat.members.filterNot { it.galleryId == galleryId },
+                    turnCursor = 0,
+                ),
+                groupActiveSpeakerName = null,
+            )
+        }
+        rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+        checkpointModelHistory("group/member-deleted")
+        eventLog.append("group/members", buildJsonObject {
+            put("action", "member-deleted")
+            put("gallery_id", galleryId)
+            put("count", _state.value.groupChat.members.size)
+        })
+        persist()
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
