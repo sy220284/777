@@ -1091,6 +1091,7 @@ private fun LocalChat(
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
         !state.groupChat.enabled &&
         chatBranchingEligible(state.messages)
+    val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     LaunchedEffect(
         state.sessionId,
         state.usageMode,
@@ -1674,7 +1675,7 @@ private fun LocalChat(
                                     keyboardController?.hide()
                                 }
                             },
-                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                            enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
                         )
                     }
                 }
@@ -1700,7 +1701,7 @@ private fun LocalChat(
                                 keyboardController?.hide()
                             },
                             size = DsButtonSize.Small,
-                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                            enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
                         )
                     }
                 }
