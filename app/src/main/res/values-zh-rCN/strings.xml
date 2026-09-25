@@ -827,11 +827,10 @@
     <string name="chat_scroll_start">回到开头</string>
     <string name="chat_scroll_latest">回到最新</string>
 
-    <string name="local_reply_suggestions_title">故事走向</string>
-    <string name="local_reply_suggestions_open">选择走向</string>
-    <string name="local_story_direction_hint">选择希望角色如何推动后续故事，不会代替你发送消息；随时可以取消。</string>
-    <string name="local_story_direction_selected">当前走向：%1$s</string>
-    <string name="local_story_direction_clear">取消</string>
+    <string name="local_reply_suggestions_title">回复建议</string>
+    <string name="local_reply_suggestions_open">回复建议</string>
+    <string name="local_reply_suggestions_hint">点一下会填进输入框，你可以继续改，不会自动发送。每组会给不同风格，并保留一条更大胆、夸张或脑洞一点的选项。</string>
+    <string name="local_reply_suggestions_bold">放飞</string>
 
     <string name="persona_gallery_new_character_title">发现新角色</string>
     <string name="persona_gallery_new_character_subtitle">这次聊天里的人物还没有收入图集</string>

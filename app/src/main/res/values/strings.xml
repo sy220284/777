@@ -829,11 +829,10 @@
     <string name="chat_scroll_start">First message</string>
     <string name="chat_scroll_latest">Latest message</string>
 
-    <string name="local_reply_suggestions_title">Story directions</string>
-    <string name="local_reply_suggestions_open">Choose direction</string>
-    <string name="local_story_direction_hint">Choose how the story develops. This will guide the character’s next replies without sending a message for you.</string>
-    <string name="local_story_direction_selected">Direction: %1$s</string>
-    <string name="local_story_direction_clear">Clear</string>
+    <string name="local_reply_suggestions_title">Reply suggestions</string>
+    <string name="local_reply_suggestions_open">Reply ideas</string>
+    <string name="local_reply_suggestions_hint">Tap one to put it in the composer. You can edit it before sending. Each set mixes tones and keeps one bolder, more playful option.</string>
+    <string name="local_reply_suggestions_bold">Wild card</string>
 
     <string name="persona_gallery_new_character_title">New character found</string>
     <string name="persona_gallery_new_character_subtitle">This character is not in your gallery yet</string>
