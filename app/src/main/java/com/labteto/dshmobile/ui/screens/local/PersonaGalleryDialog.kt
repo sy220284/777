@@ -1,21 +1,35 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.graphics.BitmapFactory
+import java.io.File
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.Checkbox
@@ -28,10 +42,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -50,6 +72,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -129,7 +152,7 @@ internal fun PersonaGallerySavePromptDialog(
 }
 
 @Composable
-internal fun PersonaGalleryDialog(
+internal fun PersonaGalleryScreen(
     entries: List<PersonaGalleryEntry>,
     presets: List<PersonaPreset>,
     currentPersona: PersonaProfile,
@@ -149,6 +172,8 @@ internal fun PersonaGalleryDialog(
     onExport: suspend (String, Boolean) -> Result<String>,
     onImport: suspend (String) -> Result<PersonaGalleryEntry>,
     onInstallPreset: suspend (String) -> Result<PersonaGalleryEntry>,
+    onSetPortrait: suspend (String, android.net.Uri) -> Result<PersonaGalleryEntry>,
+    onRemovePortrait: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -179,6 +204,7 @@ internal fun PersonaGalleryDialog(
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportPayload by remember { mutableStateOf<String?>(null) }
+    var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
@@ -249,6 +275,22 @@ internal fun PersonaGalleryDialog(
         }
     }
 
+    val portraitPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val targetId = portraitTargetId
+        portraitTargetId = null
+        if (uri != null && targetId != null) {
+            busy = true
+            error = null
+            scope.launch {
+                onSetPortrait(targetId, uri)
+                    .onFailure { error = it.message ?: "人物形象图保存失败" }
+                busy = false
+            }
+        }
+    }
+
     LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
         val entry = selected ?: return@LaunchedEffect
         if (entry.stories.none { it.id == selectedStoryId }) {
@@ -261,11 +303,44 @@ internal fun PersonaGalleryDialog(
         }
     }
 
-    DsDialog(
-        title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
-        onDismiss = onDismiss,
-    ) {
+    fun navigateBack() {
         if (selected == null) {
+            onDismiss()
+        } else if (hasLocalStoryEdits) {
+            error = saveEditsBeforeSwitchText
+        } else {
+            selectedId = null
+            selectedStoryId = null
+            deletingCharacter = false
+            error = null
+            notice = null
+        }
+    }
+
+    BackHandler(onBack = ::navigateBack)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = DsTheme.colors.bgBase,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding(),
+        ) {
+            PersonaGalleryTopBar(
+                title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
+                onBack = ::navigateBack,
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                if (selected == null) {
             GalleryOverviewHeader(entries.size)
 
             if (presets.isNotEmpty()) {
@@ -841,16 +916,52 @@ internal fun PersonaGalleryDialog(
             )
         }
 
-        error?.let {
+                error?.let {
+                    Text(
+                        it,
+                        style = DsType.small13,
+                        color = DsTheme.colors.error,
+                        modifier = Modifier.padding(top = DsSpacing.small),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonaGalleryTopBar(
+    title: String,
+    onBack: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        color = colors.bgBase,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsIconButton(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = stringResource(R.string.common_back),
+                onClick = onBack,
+            )
             Text(
-                it,
-                style = DsType.small13,
-                color = DsTheme.colors.error,
-                modifier = Modifier.padding(top = DsSpacing.small),
+                text = title,
+                style = DsType.large20,
+                color = colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
     }
-
 }
 
 private fun personaExportFileName(name: String): String {
