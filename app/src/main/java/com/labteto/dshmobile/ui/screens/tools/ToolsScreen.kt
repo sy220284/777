@@ -349,7 +349,6 @@ fun ToolsScreen(
 }
 
 @Composable
-@Composable
 private fun capabilityStateLabel(available: Boolean): String =
     stringResource(if (available) R.string.tools_capability_available else R.string.tools_capability_unavailable)
 
