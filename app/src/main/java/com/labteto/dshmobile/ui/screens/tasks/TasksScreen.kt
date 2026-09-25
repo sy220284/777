@@ -31,8 +31,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
+import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -66,7 +69,9 @@ data class TasksUiState(
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val scheduler: HarnessAutomationScheduler,
+    private val engine: LocalHarnessEngine,
 ) : ViewModel() {
+    val harnessState = engine.state
     private val _state = MutableStateFlow(TasksUiState())
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
 
@@ -86,15 +91,49 @@ class TasksViewModel @Inject constructor(
         )
     }
 
-    fun createAt(prompt: String, firstRunAt: Long, recurringMinutes: Long?): Boolean {
+    fun createAt(
+        prompt: String,
+        firstRunAt: Long,
+        recurringMinutes: Long?,
+        mode: AutomationMode,
+    ): Boolean {
         if (prompt.isBlank() || firstRunAt <= System.currentTimeMillis()) return false
         if (recurringMinutes != null && recurringMinutes < 60L) return false
+        val snapshot = engine.state.value
+        if (mode == AutomationMode.CHAT) {
+            if (
+                snapshot.usageMode != LocalUsageMode.CHAT ||
+                snapshot.groupChat.enabled ||
+                snapshot.sessionId.isBlank()
+            ) return false
+        }
         return runCatching {
             val id = "ui-" + System.currentTimeMillis()
+            val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
+            val actorName = snapshot.chatPersona.name.takeIf {
+                mode == AutomationMode.CHAT && it.isNotBlank()
+            }
             if (recurringMinutes == null) {
-                scheduler.scheduleOnce(id, prompt.trim(), firstRunAt, notify = true)
+                scheduler.scheduleOnce(
+                    id = id,
+                    prompt = prompt.trim(),
+                    triggerAtMillis = firstRunAt,
+                    notify = true,
+                    mode = mode,
+                    targetSessionId = targetSessionId,
+                    actorName = actorName,
+                )
             } else {
-                scheduler.schedulePeriodic(id, prompt.trim(), recurringMinutes, firstRunAt, notify = true)
+                scheduler.schedulePeriodic(
+                    id = id,
+                    prompt = prompt.trim(),
+                    intervalMinutes = recurringMinutes,
+                    firstRunAtMillis = firstRunAt,
+                    notify = true,
+                    mode = mode,
+                    targetSessionId = targetSessionId,
+                    actorName = actorName,
+                )
             }
             refresh()
         }.isSuccess
@@ -108,7 +147,15 @@ fun TasksScreen(
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val harnessState by viewModel.harnessState.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
+    val taskMode = if (harnessState.usageMode == LocalUsageMode.CHAT) {
+        AutomationMode.CHAT
+    } else {
+        AutomationMode.WORK
+    }
+    val chatMode = taskMode == AutomationMode.CHAT
+    val visibleTasks = state.tasks.filter { it.mode == taskMode }
     val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by remember { mutableStateOf(false) }
@@ -126,12 +173,18 @@ fun TasksScreen(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
         ) {
             DsTopBar(
-                title = stringResource(R.string.tasks_title),
-                subtitle = stringResource(R.string.tasks_subtitle),
+                title = stringResource(
+                    if (chatMode) R.string.tasks_chat_title else R.string.tasks_title,
+                ),
+                subtitle = stringResource(
+                    if (chatMode) R.string.tasks_chat_subtitle else R.string.tasks_subtitle,
+                ),
                 onBack = onClose,
                 backContentDescription = stringResource(R.string.common_back),
                 actionIcon = Icons.Filled.Add,
-                actionContentDescription = stringResource(R.string.tasks_new),
+                actionContentDescription = stringResource(
+                    if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
+                ),
                 onAction = {
                     showCreate = !showCreate
                     createError = null
@@ -140,12 +193,54 @@ fun TasksScreen(
 
             if (showCreate) {
                 DsGroupCard {
-                    Text(stringResource(R.string.tasks_new), style = DsType.base16Strong, color = colors.labelPrimary)
+                    Text(
+                        stringResource(if (chatMode) R.string.tasks_chat_new else R.string.tasks_new),
+                        style = DsType.base16Strong,
+                        color = colors.labelPrimary,
+                    )
+                    if (chatMode) {
+                        Text(
+                            stringResource(
+                                R.string.tasks_chat_target,
+                                harnessState.chatPersona.name.ifBlank {
+                                    stringResource(R.string.tasks_chat_character_fallback)
+                                },
+                            ),
+                            style = DsType.small13Strong,
+                            color = colors.labelSecondary,
+                        )
+                        if (harnessState.groupChat.enabled) {
+                            Text(
+                                stringResource(R.string.tasks_chat_group_unsupported),
+                                style = DsType.small13,
+                                color = colors.error,
+                            )
+                        } else {
+                            ChatInteractionPresets(onSelect = { selected ->
+                                prompt = selected
+                                createError = null
+                            })
+                        }
+                    }
                     OutlinedTextField(
                         value = prompt,
                         onValueChange = { prompt = it },
-                        label = { Text(stringResource(R.string.tasks_prompt_label)) },
-                        placeholder = { Text(stringResource(R.string.tasks_prompt_hint)) },
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (chatMode) R.string.tasks_chat_prompt_label
+                                    else R.string.tasks_prompt_label,
+                                ),
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                stringResource(
+                                    if (chatMode) R.string.tasks_chat_prompt_hint
+                                    else R.string.tasks_prompt_hint,
+                                ),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         maxLines = 5,
@@ -224,8 +319,11 @@ fun TasksScreen(
                                     AutomationCadence.WEEKLY -> 7L * 24L * 60L
                                     AutomationCadence.CUSTOM -> customHours.toLongOrNull()?.times(60L)
                                 }
-                                val ok = (cadence != AutomationCadence.CUSTOM || recurring != null) &&
-                                    viewModel.createAt(prompt, firstRunAt, recurring)
+                                val ok = !(
+                                    chatMode && harnessState.groupChat.enabled
+                                ) &&
+                                    (cadence != AutomationCadence.CUSTOM || recurring != null) &&
+                                    viewModel.createAt(prompt, firstRunAt, recurring, taskMode)
                                 if (ok) {
                                     showCreate = false
                                     prompt = ""
@@ -243,7 +341,7 @@ fun TasksScreen(
                 }
             }
 
-            if (state.tasks.isEmpty() && !showCreate) {
+            if (visibleTasks.isEmpty() && !showCreate) {
                 EmptyHero(
                     headline = stringResource(R.string.tasks_empty_title),
                     subtitle = stringResource(R.string.tasks_empty_subtitle),
@@ -253,7 +351,7 @@ fun TasksScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                    items(state.tasks, key = AutomationTask::id) { task ->
+                    items(visibleTasks, key = AutomationTask::id) { task ->
                         TaskCard(
                             task = task,
                             onCancel = { viewModel.cancel(task.id) },
@@ -277,6 +375,46 @@ fun TasksScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ChatInteractionPresets(
+    onSelect: (String) -> Unit,
+) {
+    val morning = stringResource(R.string.tasks_chat_preset_morning_prompt)
+    val night = stringResource(R.string.tasks_chat_preset_night_prompt)
+    val reachOut = stringResource(R.string.tasks_chat_preset_reach_out_prompt)
+    val story = stringResource(R.string.tasks_chat_preset_story_prompt)
+    val promise = stringResource(R.string.tasks_chat_preset_promise_prompt)
+
+    Text(
+        stringResource(R.string.tasks_chat_presets),
+        style = DsType.small13Strong,
+        color = DsTheme.colors.labelSecondary,
+    )
+    CadenceRow(
+        first = AutomationCadence.ONCE,
+        firstLabel = stringResource(R.string.tasks_chat_preset_morning),
+        second = AutomationCadence.DAILY,
+        secondLabel = stringResource(R.string.tasks_chat_preset_night),
+        selected = AutomationCadence.CUSTOM,
+        onSelect = { choice -> onSelect(if (choice == AutomationCadence.ONCE) morning else night) },
+    )
+    CadenceRow(
+        first = AutomationCadence.ONCE,
+        firstLabel = stringResource(R.string.tasks_chat_preset_reach_out),
+        second = AutomationCadence.DAILY,
+        secondLabel = stringResource(R.string.tasks_chat_preset_story),
+        selected = AutomationCadence.CUSTOM,
+        onSelect = { choice -> onSelect(if (choice == AutomationCadence.ONCE) reachOut else story) },
+    )
+    DsButton(
+        text = stringResource(R.string.tasks_chat_preset_promise),
+        onClick = { onSelect(promise) },
+        variant = DsButtonVariant.Ghost,
+        size = DsButtonSize.Small,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -376,8 +514,17 @@ private fun TaskCard(
             StateDot(taskStatus(task.status))
             Column(Modifier.weight(1f)) {
                 Text(
-                    task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
-                        .ifBlank { stringResource(R.string.tasks_background_task) },
+                    if (task.mode == AutomationMode.CHAT) {
+                        buildString {
+                            append(task.actorName?.takeIf(String::isNotBlank)
+                                ?: stringResource(R.string.tasks_chat_character_fallback))
+                            append(" · ")
+                            append(task.prompt.lineSequence().firstOrNull()?.trim()?.take(42).orEmpty())
+                        }
+                    } else {
+                        task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
+                            .ifBlank { stringResource(R.string.tasks_background_task) }
+                    },
                     style = DsType.std14Strong,
                     color = colors.labelPrimary,
                 )
@@ -413,7 +560,7 @@ private fun TaskCard(
                 maxLines = 2,
             )
         }
-        task.workSessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
+        (task.targetSessionId ?: task.workSessionId)?.takeIf(String::isNotBlank)?.let { sessionId ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
