@@ -960,4 +960,14 @@
     <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
     <string name="persona_gallery_rename_story">重命名故事</string>
 
+
+    <string name="local_persona_picker_title">选择人物</string>
+    <string name="local_persona_picker_intro">新对话可以直接选择已保存的人物，也可以新建人物。选中后会从一条全新的故事开始，不带入旧故事线。</string>
+    <string name="local_persona_picker_current">当前人物：%1$s</string>
+    <string name="local_persona_picker_new">新建人物</string>
+    <string name="local_persona_picker_edit_current">编辑当前人物</string>
+    <string name="local_persona_picker_saved">已创建人物</string>
+    <string name="local_persona_picker_empty">还没有保存过人物。可以先新建一个，聊天后再收入人设图集。</string>
+    <string name="local_persona_picker_saved_hint">已保存人物</string>
+
 </resources>
