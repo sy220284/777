@@ -110,6 +110,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalChatBranchInfo
+import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
@@ -587,6 +588,7 @@ private fun LocalModeDrawer(
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
                     LocalSessionDrawerRow(
                         title = session.title,
+                        groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
                         selected = session.id in selectedIds,
                         selectionOpen = selectionOpen,
@@ -750,6 +752,7 @@ private fun DrawerSectionTitle(title: String) {
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalSessionDrawerRow(
     title: String,
+    groupChat: Boolean,
     current: Boolean,
     selected: Boolean,
     selectionOpen: Boolean,
@@ -798,6 +801,14 @@ private fun LocalSessionDrawerRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (groupChat) {
+            Spacer(Modifier.width(DsSpacing.small))
+            Text(
+                stringResource(R.string.local_group_chat_title),
+                style = DsType.caption11,
+                color = colors.accent,
+            )
+        }
         if (current) {
             Spacer(Modifier.width(DsSpacing.small))
             Text("当前", style = DsType.caption11, color = colors.accent)
