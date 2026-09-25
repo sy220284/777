@@ -226,6 +226,7 @@ internal fun PersonaGalleryScreen(
     val importFailedText = stringResource(R.string.persona_gallery_import_failed)
     val presetInstallFailedText = stringResource(R.string.persona_gallery_preset_install_failed)
     val presetInstalledText = stringResource(R.string.persona_gallery_preset_installed)
+    val portraitSaveFailedText = stringResource(R.string.persona_gallery_portrait_save_failed)
 
     val exportDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -285,7 +286,7 @@ internal fun PersonaGalleryScreen(
             error = null
             scope.launch {
                 onSetPortrait(targetId, uri)
-                    .onFailure { error = it.message ?: "人物形象图保存失败" }
+                    .onFailure { error = it.message ?: portraitSaveFailedText }
                 busy = false
             }
         }
@@ -486,23 +487,36 @@ internal fun PersonaGalleryScreen(
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
-                    filtered.forEach { entry ->
-                        GalleryPersonaCard(
-                            entry = entry,
-                            unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
-                            onClick = {
-                                selectedId = entry.id
-                                selectedStoryId = null
-                                error = null
-                                notice = null
-                            },
-                            onLongClick = {
-                                pendingEntryDeleteId = entry.id
-                                error = null
-                            },
-                        )
+                    filtered.chunked(2).forEach { rowEntries ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        ) {
+                            rowEntries.forEach { entry ->
+                                GalleryPersonaCard(
+                                    entry = entry,
+                                    unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
+                                    modifier = Modifier.weight(1f),
+                                    onChoosePortrait = {
+                                        portraitTargetId = entry.id
+                                        portraitPicker.launch(arrayOf("image/*"))
+                                    },
+                                    onClick = {
+                                        selectedId = entry.id
+                                        selectedStoryId = null
+                                        error = null
+                                        notice = null
+                                    },
+                                    onLongClick = {
+                                        pendingEntryDeleteId = entry.id
+                                        error = null
+                                    },
+                                )
+                            }
+                            if (rowEntries.size == 1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -513,6 +527,47 @@ internal fun PersonaGalleryScreen(
                 selected.stories.size,
                 totalDialogue,
             )
+            SpatialPortraitStandee(
+                entry = selected,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(380.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(
+                        if (selected.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
+                        else R.string.persona_gallery_portrait_replace,
+                    ),
+                    onClick = {
+                        portraitTargetId = selected.id
+                        portraitPicker.launch(arrayOf("image/*"))
+                    },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+                if (selected.portraitPath.isNotBlank()) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_portrait_remove),
+                        onClick = {
+                            busy = true
+                            error = null
+                            scope.launch {
+                                onRemovePortrait(selected.id)
+                                    .onFailure { error = it.message ?: portraitSaveFailedText }
+                                busy = false
+                            }
+                        },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.weight(1f),
+                        enabled = !busy,
+                    )
+                }
+            }
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
 
             DsButton(
@@ -1263,6 +1318,8 @@ private fun PersonaPresetCard(
 private fun GalleryPersonaCard(
     entry: PersonaGalleryEntry,
     unsaved: Boolean,
+    modifier: Modifier = Modifier,
+    onChoosePortrait: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -1272,44 +1329,184 @@ private fun GalleryPersonaCard(
         entry.persona.personality.isNotBlank() -> entry.persona.personality
         else -> waitingText
     }
-    DsCard(
-        modifier = Modifier.combinedClickable(
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = DsTheme.colors.bgLayer1,
+        shadowElevation = 4.dp,
+        modifier = modifier.combinedClickable(
             onClick = onClick,
             onLongClick = onLongClick,
         ),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PersonaAvatar(entry.persona.name)
-            Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    entry.persona.name,
-                    style = DsType.std14,
-                    color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        Column(
+            modifier = Modifier.padding(DsSpacing.small),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Box(Modifier.fillMaxWidth()) {
+                SpatialPortraitStandee(
+                    entry = entry,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(230.dp),
                 )
-                Text(
-                    subtitle,
-                    style = DsType.small13,
-                    color = DsTheme.colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                DsIconButton(
+                    icon = Icons.Outlined.Image,
+                    contentDescription = stringResource(
+                        if (entry.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
+                        else R.string.persona_gallery_portrait_replace,
+                    ),
+                    onClick = onChoosePortrait,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    containerColor = DsTheme.colors.bgLayer2.copy(alpha = 0.88f),
                 )
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                entry.persona.name,
+                style = DsType.std14,
+                color = DsTheme.colors.labelPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                subtitle,
+                style = DsType.caption11,
+                color = DsTheme.colors.labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(
+                    R.string.persona_gallery_standee_meta,
+                    entry.stories.size,
+                    entry.totalDialogueCount(),
+                ),
+                style = DsType.caption11,
+                color = DsTheme.colors.labelTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (unsaved) {
                 GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
             }
-            GalleryPill(stringResource(R.string.persona_gallery_story_count, entry.stories.size))
-            GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.totalDialogueCount()))
-            if (entry.persona.corrections.isNotEmpty()) {
-                GalleryPill(stringResource(R.string.persona_gallery_corrections_count, entry.persona.corrections.size))
-            }
         }
     }
+}
+
+@Composable
+private fun SpatialPortraitStandee(
+    entry: PersonaGalleryEntry,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    var rotationX by remember(entry.id) { mutableStateOf(0f) }
+    var rotationY by remember(entry.id) { mutableStateOf(0f) }
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = entry.portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            decodeGalleryPortrait(entry.portraitPath)
+        }
+    }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pointerInput(entry.id, entry.portraitPath) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            rotationX = 0f
+                            rotationY = 0f
+                        },
+                        onDragCancel = {
+                            rotationX = 0f
+                            rotationY = 0f
+                        },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        rotationY = (rotationY + dragAmount.x / 28f).coerceIn(-11f, 11f)
+                        rotationX = (rotationX - dragAmount.y / 36f).coerceIn(-7f, 7f)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = colors.accent.copy(alpha = 0.07f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .shadow(12.dp, RoundedCornerShape(28.dp))
+                    .graphicsLayer {
+                        this.rotationX = rotationX
+                        this.rotationY = rotationY
+                        cameraDistance = 24f * density
+                    },
+            ) {
+                if (portrait != null) {
+                    Image(
+                        bitmap = portrait!!,
+                        contentDescription = entry.persona.name,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(22.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(colors.accent.copy(alpha = 0.04f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            PersonaAvatar(entry.persona.name, large = true)
+                            Spacer(Modifier.size(DsSpacing.small))
+                            Text(
+                                stringResource(R.string.persona_gallery_portrait_empty),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = colors.labelTertiary.copy(alpha = 0.16f),
+            modifier = Modifier
+                .fillMaxWidth(0.56f)
+                .height(10.dp)
+                .graphicsLayer {
+                    rotationX = 65f
+                    cameraDistance = 18f * density
+                },
+        ) {}
+    }
+}
+
+private fun decodeGalleryPortrait(path: String): ImageBitmap? {
+    if (path.isBlank()) return null
+    val file = File(path)
+    if (!file.isFile) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    while (longest / sample > 1_600) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeFile(file.absolutePath, options)?.asImageBitmap()
 }
 
 @Composable
