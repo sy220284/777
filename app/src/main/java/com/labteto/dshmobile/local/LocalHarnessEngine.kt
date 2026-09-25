@@ -723,6 +723,70 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /**
+     * Pick a saved character for the current empty chat without creating a throwaway session.
+     * Existing transcripts are deliberately left untouched by refusing the switch once dialogue
+     * exists; callers can start a fresh chat instead.
+     */
+    fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) {
+        val snapshot = _state.value
+        if (
+            snapshot.running ||
+            snapshot.loading ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+        ) return
+
+        scope.launch {
+            val personaId = profile.id.takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID }
+                ?: "persona-${UUID.randomUUID()}"
+            val saved = chatPersonaStore.upsert(profile.copy(id = personaId))
+            _state.update { state ->
+                if (state.sessionId != snapshot.sessionId) state else state.copy(
+                    personaId = saved.id,
+                    galleryId = galleryId,
+                    galleryStoryId = null,
+                    gallerySaveSuppressedThrough = 0L,
+                    chatPersona = saved,
+                    chatState = ChatCharacterState(),
+                    replySuggestions = emptyList(),
+                    handoffSummary = null,
+                )
+            }
+            if (_state.value.sessionId == snapshot.sessionId) persist()
+        }
+    }
+
+    /** Create a brand-new character for the current empty chat. */
+    fun createChatPersona(profile: PersonaProfile) {
+        val snapshot = _state.value
+        if (
+            snapshot.running ||
+            snapshot.loading ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+        ) return
+
+        scope.launch {
+            val saved = chatPersonaStore.upsert(
+                profile.copy(id = "persona-${UUID.randomUUID()}"),
+            )
+            _state.update { state ->
+                if (state.sessionId != snapshot.sessionId) state else state.copy(
+                    personaId = saved.id,
+                    galleryId = null,
+                    galleryStoryId = null,
+                    gallerySaveSuppressedThrough = 0L,
+                    chatPersona = saved,
+                    chatState = ChatCharacterState(),
+                    replySuggestions = emptyList(),
+                    handoffSummary = null,
+                )
+            }
+            if (_state.value.sessionId == snapshot.sessionId) persist()
+        }
+    }
+
     fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
