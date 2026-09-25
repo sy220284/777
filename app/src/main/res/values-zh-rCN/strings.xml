@@ -290,6 +290,7 @@
     <string name="settings_appearance">外观</string>
     <string name="settings_appearance_light">浅色</string>
     <string name="settings_appearance_dark">深色</string>
+    <string name="settings_appearance_matte_black">磨砂黑</string>
     <string name="settings_appearance_system">跟随系统</string>
     <string name="settings_background_image">背景图</string>
     <string name="settings_background_image_none">使用纯色主题背景</string>
@@ -919,7 +920,7 @@
     <string name="tasks_repeat_interval">重复间隔</string>
     <string name="tasks_repeat_hint">留空为单次，周期任务间隔至少 15 分钟</string>
     <string name="tasks_create">创建</string>
-    <string name="tasks_create_invalid">请填写任务；周期任务间隔至少 15 分钟。</string>
+    <string name="tasks_create_invalid">请填写任务并选择未来的执行时间；自定义周期至少 1 小时。</string>
     <string name="tools_external_services_hint">需要时再连接 HTTP 工具服务</string>
     <string name="tools_capability_group">可用能力</string>
     <string name="tools_connection_group">外部连接</string>
@@ -959,6 +960,7 @@
     <string name="persona_gallery_show_fixed_persona">查看固定人设</string>
     <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
     <string name="persona_gallery_rename_story">重命名故事</string>
+    <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
 
 
     <string name="local_persona_picker_title">选择人物</string>
@@ -983,8 +985,6 @@
     <string name="local_persona_correction_recorded">已记入人设纠正</string>
     <string name="local_persona_correction_undo">撤销</string>
 
-    <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
-
     <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
 
 
@@ -1004,16 +1004,10 @@
 
 
     <string name="persona_gallery_import_file">导入文件</string>
-    <string name="persona_gallery_import_qr">扫码导入</string>
     <string name="persona_gallery_export_file">导出人物</string>
-    <string name="persona_gallery_share_qr">分享二维码</string>
-    <string name="persona_gallery_share_qr_title">人物分享二维码</string>
-    <string name="persona_gallery_share_qr_hint">二维码只包含精简人物设定，不包含故事历史、会话编号和本机数据。</string>
-    <string name="persona_gallery_scan_prompt">扫描神言神语人物二维码</string>
     <string name="persona_gallery_export_failed">人物导出失败</string>
     <string name="persona_gallery_import_failed">人物导入失败</string>
 
-<string name="settings_appearance_matte_black">磨砂黑</string>
 <string name="tasks_schedule_label">执行方式</string>
 <string name="tasks_schedule_once">一次</string>
 <string name="tasks_schedule_daily">每天</string>

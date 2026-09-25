@@ -111,7 +111,6 @@ private enum class SettingsPage {
     MODELS,
     PRICING,
     MEMORY,
-    CHAT,
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
@@ -163,7 +162,6 @@ fun SettingsScreen(
         SettingsPage.MODELS -> stringResource(R.string.settings_page_models)
         SettingsPage.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
-        SettingsPage.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
@@ -208,12 +206,6 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
                                 onClick = { page = SettingsPage.MEMORY },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_chat),
-                                subtitle = stringResource(R.string.settings_chat_subtitle),
-                                onClick = { page = SettingsPage.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
@@ -271,25 +263,7 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
-                    }
-
-                    SettingsPage.MODELS -> {
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
-                        ModelServicesCard(modelServices, viewModel)
-                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
-                    }
-
-                    SettingsPage.PRICING -> {
-                        DeepSeekPricingCard(deepSeekPricing, viewModel)
-                    }
-
-                    SettingsPage.MEMORY -> {
-                        LocalMemorySettingsCard(localHarness, viewModel, toast.second)
-                        MemoryManagementCard(memories, viewModel, toast.second)
-                    }
-
-                    SettingsPage.CHAT -> {
-                        SettingsCard(stringResource(R.string.settings_chat_style_guard), Icons.Outlined.Tune) {
+                        SettingsCard(stringResource(R.string.settings_page_chat), Icons.Outlined.Tune) {
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
                                 localHarness.chatStyleGuardEnabled,
@@ -324,6 +298,21 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+
+                    SettingsPage.MODELS -> {
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        ModelServicesCard(modelServices, viewModel)
+                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
+                    }
+
+                    SettingsPage.PRICING -> {
+                        DeepSeekPricingCard(deepSeekPricing, viewModel)
+                    }
+
+                    SettingsPage.MEMORY -> {
+                        LocalMemorySettingsCard(localHarness, viewModel, toast.second)
+                        MemoryManagementCard(memories, viewModel, toast.second)
                     }
 
                     SettingsPage.PERMISSIONS -> {

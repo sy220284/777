@@ -342,6 +342,7 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_light">Light</string>
     <string name="settings_appearance_dark">Dark</string>
+    <string name="settings_appearance_matte_black">Matte black</string>
     <string name="settings_appearance_system">System</string>
     <string name="settings_background_image">Background image</string>
     <string name="settings_background_image_none">Using the plain theme colour</string>
@@ -921,7 +922,7 @@
     <string name="tasks_repeat_interval">Repeat interval</string>
     <string name="tasks_repeat_hint">Leave blank for one-time; recurring tasks require at least 15 minutes</string>
     <string name="tasks_create">Create</string>
-    <string name="tasks_create_invalid">Enter a task; recurring intervals must be at least 15 minutes.</string>
+    <string name="tasks_create_invalid">Enter a task and choose a future run time; custom intervals must be at least 1 hour.</string>
     <string name="tools_external_services_hint">Connect HTTP tool servers only when needed</string>
     <string name="tools_capability_group">Capabilities</string>
     <string name="tools_connection_group">Connections</string>
@@ -1005,16 +1006,10 @@
 
 
     <string name="persona_gallery_import_file">Import file</string>
-    <string name="persona_gallery_import_qr">Scan QR</string>
     <string name="persona_gallery_export_file">Export character</string>
-    <string name="persona_gallery_share_qr">Share QR</string>
-    <string name="persona_gallery_share_qr_title">Character share QR</string>
-    <string name="persona_gallery_share_qr_hint">The QR contains a compact character profile only. Story history, conversation IDs, and device data are excluded.</string>
-    <string name="persona_gallery_scan_prompt">Scan a 神言神语 character QR code</string>
     <string name="persona_gallery_export_failed">Could not export character</string>
     <string name="persona_gallery_import_failed">Could not import character</string>
 
-<string name="settings_appearance_matte_black">Matte black</string>
 <string name="tasks_schedule_label">Schedule</string>
 <string name="tasks_schedule_once">Once</string>
 <string name="tasks_schedule_daily">Daily</string>
