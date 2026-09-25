@@ -935,4 +935,24 @@
     <string name="panel_artifacts_empty">No delivered artifacts yet</string>
     <string name="panel_involved_files_empty">No files involved in this task yet</string>
 
+
+    <string name="persona_gallery_unsaved_update_title">Unsaved character progress</string>
+    <string name="persona_gallery_unsaved_update_subtitle">This character has new story or persona changes</string>
+    <string name="persona_gallery_unsaved_update_hint">Save before opening the gallery to keep the latest dialogue, relationship state, and persona updates in the current storyline.</string>
+    <string name="persona_gallery_save_update_enter">Save updates and open gallery</string>
+    <string name="persona_gallery_story_renamed">Story title updated</string>
+    <string name="persona_gallery_character_summary">%1$d storylines · %2$d dialogue lines</string>
+    <string name="persona_gallery_storylines_title">Storylines</string>
+    <string name="persona_gallery_storylines_empty">No saved story yet. You can start a fresh story with this character.</string>
+    <string name="persona_gallery_save_current_new_story">Save current chat as a new storyline</string>
+    <string name="persona_gallery_save_story_title">Save story title</string>
+    <string name="persona_gallery_story_title_label">Story title</string>
+    <string name="persona_gallery_delete_story_confirm">Delete “%1$s”?</string>
+    <string name="persona_gallery_delete_story_hint">Only this storyline and its archived dialogue are removed. The character master profile stays.</string>
+    <string name="persona_gallery_delete_story">Delete this storyline</string>
+    <string name="persona_gallery_continue_story">Continue this storyline</string>
+    <string name="persona_gallery_start_fresh_story">Start a fresh story with this character</string>
+    <string name="persona_gallery_story_count">%1$d stories</string>
+    <string name="persona_gallery_untitled_story">Untitled story</string>
+
 </resources>
