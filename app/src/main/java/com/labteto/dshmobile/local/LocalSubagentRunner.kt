@@ -170,9 +170,9 @@ internal class LocalSubagentRunner(
                 put(
                     "content",
                     if (allowMutation) {
-                        "你是安卓本机 Harness 的子代理。完成指定子任务，可使用工作区、命令、网页和技能；修改与命令仍需用户批准。"
+                        "你是本机子代理。完成指定子任务；可使用工作区、命令、网页和技能，修改或执行命令按权限审批。"
                     } else {
-                        "你是安卓本机 Harness 的只读子代理。完成指定子任务，可读取和搜索工作区、读取技能、获取网页与解析 JSON；禁止修改用户文件和执行命令。"
+                        "你是本机只读子代理。完成指定子任务；可读取和搜索工作区、技能与网页，禁止修改文件或执行命令。"
                     },
                 )
             }
@@ -181,7 +181,7 @@ internal class LocalSubagentRunner(
                     put("role", "system")
                     put(
                         "content",
-                        "【父级约束上下文】\n$inherited\n以上约束继承自父任务；若与本子任务的明确新要求冲突，以本子任务要求为准。",
+                        "【父任务约束】\n$inherited\n遵守以上约束；若本子任务有明确更新，以本子任务为准。",
                     )
                 }
                 val index = if (
@@ -194,7 +194,7 @@ internal class LocalSubagentRunner(
                     put("role", "system")
                     put(
                         "content",
-                        "【独立虚拟屏】本子任务已分配虚拟屏 id=$id。需要操作 Android 界面时只使用 android_vscreen_* 工具，并始终传入该 id；不要操作主屏。运行时会在子任务结束时自动释放此虚拟屏。",
+                        "【独立虚拟屏】已分配 id=$id。操作界面时只用 android_vscreen_* 并传入该 id；不要操作主屏。",
                     )
                 }
             }
