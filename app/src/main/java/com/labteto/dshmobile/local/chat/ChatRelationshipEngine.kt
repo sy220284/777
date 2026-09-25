@@ -19,6 +19,22 @@ internal enum class RelationshipScenario {
     BOUNDARY_SAFETY,
 }
 
+internal fun hasAdultIntimacyIntent(input: String): Boolean {
+    val text = input.trim().lowercase()
+    if (text.isBlank()) return false
+    if (MINOR_CONTEXT_HINTS.any { text.contains(it) }) return false
+    return ADULT_INTIMACY_HINTS.any { text.contains(it) }
+}
+
+private val ADULT_INTIMACY_HINTS = listOf(
+    "暧昧", "亲吻", "亲亲", "接吻", "拥抱", "抱我", "抱住", "搂住", "亲热", "亲密",
+    "情侣", "恋人", "同居", "成人关系", "性关系", "上床", "做爱", "性爱", "性行为", "器官",
+)
+
+private val MINOR_CONTEXT_HINTS = listOf(
+    "未成年", "未满18", "未满十八", "儿童", "小学生", "初中生", "高中生", "萝莉", "正太",
+)
+
 /**
  * Relationship cognition core for Chat mode.
  *
@@ -102,6 +118,11 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("关系变化必须渐进：一次热情不能自动升级亲密，一次冷淡不能自动判定关系结束；重大阶段变化需要明确事实或连续行为证据。")
         appendLine("任何关系判断都要在内部区分：已确认事实、暂定推测、仍未知。行为证据优先于 MBTI、星座、性别模板、网络套路和单次回复速度。")
         appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
+        if (hasAdultIntimacyIntent(input)) {
+            appendLine("【本轮意图优先：成年亲密互动】")
+            appendLine("若上下文明确参与者均为成年人且互动自愿，优先顺着用户明确表达的暧昧、亲吻、拥抱、亲热或成人关系主题继续；这一意图高于默认克制、关系阶段模板和回复风格保守化，不因题材亲密自动说教、抽离或切换军师。")
+            appendLine("保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱和身体接触等非露骨亲密内容。不要扩写成露骨性行为或器官细节。")
+        }
         appendLine()
 
         appendDynamics(state.dynamics)
@@ -111,7 +132,7 @@ class ChatRelationshipEngine @Inject constructor() {
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> {
                 appendLine("【本轮视角：角色本人】")
-                appendLine("自然继续当前关系和未完话题。不要因为用户提到情绪、暧昧或关系，就自动跳成恋爱导师。")
+                appendLine("自然继续当前关系和未完话题。用户明确给出互动方向时优先接住该方向；不要因为用户提到情绪、暧昧或关系，就自动跳成恋爱导师。")
                 appendLine("允许嘴硬、反问、打趣、短回复、不同意、转移话题或延续旧梗，但行为必须符合固定人设与当前状态。")
                 appendLine("内部可以推断，外部表达时不要把推测装成已经确认的事实。")
             }
