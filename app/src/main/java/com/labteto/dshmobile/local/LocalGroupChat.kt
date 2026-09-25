@@ -33,27 +33,56 @@ internal const val MIN_GROUP_CHAT_MEMBERS = 2
 internal const val GROUP_CHAT_SILENT_TOKEN = "__GROUP_CHAT_SILENT__"
 internal const val MAX_GROUP_CHAT_RESPONDERS_PER_TURN = 3
 
+internal fun groupChatMentionedMembers(
+    input: String,
+    members: List<LocalGroupChatMember>,
+): List<LocalGroupChatMember> {
+    val text = input.trim()
+    if (text.isBlank() || members.isEmpty()) return emptyList()
+
+    fun positionOfAny(name: String, patterns: List<String>): Int =
+        patterns.asSequence()
+            .map { pattern -> text.indexOf(pattern) }
+            .filter { it >= 0 }
+            .minOrNull()
+            ?: -1
+
+    val direct = members.mapNotNull { member ->
+        val name = member.displayName.trim()
+        if (name.isBlank()) return@mapNotNull null
+        val index = positionOfAny(
+            name,
+            listOf(
+                "@$name", "＠$name",
+                "$name你", "$name，", "$name,", "$name：", "$name:", "$name、",
+            ),
+        )
+        index.takeIf { it >= 0 }?.let { it to member }
+    }.sortedBy { it.first }
+
+    val selected = if (direct.isNotEmpty()) {
+        direct
+    } else {
+        members.mapNotNull { member ->
+            val name = member.displayName.trim()
+            val index = name.takeIf(String::isNotBlank)?.let(text::indexOf) ?: -1
+            index.takeIf { it >= 0 }?.let { it to member }
+        }.sortedBy { it.first }
+    }
+
+    return selected.map { it.second }
+        .distinctBy(LocalGroupChatMember::galleryId)
+        .take(MAX_GROUP_CHAT_MEMBERS)
+}
+
 internal fun groupChatResponders(
     input: String,
     members: List<LocalGroupChatMember>,
 ): List<LocalGroupChatMember> {
     if (members.isEmpty()) return emptyList()
-    val normalizedInput = input.trim()
-    val explicitlyMentioned = members.filter { member ->
-        val name = member.displayName.trim()
-        name.isNotBlank() && (
-            "@$name" in normalizedInput ||
-                "＠$name" in normalizedInput ||
-                normalizedInput.startsWith("$name，") ||
-                normalizedInput.startsWith("$name,") ||
-                normalizedInput.startsWith("$name：") ||
-                normalizedInput.startsWith("$name:")
-            )
-    }
+    val explicitlyMentioned = groupChatMentionedMembers(input, members)
     return if (explicitlyMentioned.isNotEmpty()) {
         explicitlyMentioned
-            .distinctBy(LocalGroupChatMember::galleryId)
-            .take(MAX_GROUP_CHAT_MEMBERS)
     } else {
         members
             .distinctBy(LocalGroupChatMember::galleryId)
