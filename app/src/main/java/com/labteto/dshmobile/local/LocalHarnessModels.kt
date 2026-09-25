@@ -104,6 +104,13 @@ data class LocalConversationFiles(
     val isEmpty: Boolean get() = artifacts.isEmpty() && involved.isEmpty()
 }
 
+/** Result of one detached Work-mode automation run. */
+data class LocalAutomationRunResult(
+    val sessionId: String,
+    val output: String,
+)
+
+
 /** Lightweight local preview; binary files remain visible without forcing them through UTF-8. */
 data class LocalWorkspaceFilePreview(
     val file: LocalWorkspaceFile,
