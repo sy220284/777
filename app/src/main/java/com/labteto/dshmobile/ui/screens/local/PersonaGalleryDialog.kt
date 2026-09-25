@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
@@ -58,23 +60,24 @@ internal fun PersonaGallerySavePromptDialog(
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    DsDialog(title = "发现新角色", onDismiss = onDismiss) {
-        PersonaHero(persona = persona, subtitle = "这次聊天里的人物还没有收入图集")
+    DsDialog(title = stringResource(R.string.persona_gallery_new_character_title), onDismiss = onDismiss) {
+        PersonaHero(persona = persona, subtitle = stringResource(R.string.persona_gallery_new_character_subtitle))
         Text(
-            "保存后会建立这名人物的唯一主档案。以后再次保存同一人物，只会补充新增设定、关系和故事记录，不会重复生成多张卡。",
+            stringResource(R.string.persona_gallery_new_character_hint),
             style = DsType.small13,
             color = DsTheme.colors.labelSecondary,
         )
         DsButton(
-            text = if (busy) "正在保存…" else "保存并进入人设图集",
+            text = if (busy) stringResource(R.string.persona_gallery_saving) else stringResource(R.string.persona_gallery_save_enter),
             onClick = {
                 busy = true
                 error = null
                 scope.launch {
                     onSaveCurrent("", null)
                         .onSuccess { onContinue() }
-                        .onFailure { error = it.message ?: "保存失败" }
+                        .onFailure { error = it.message ?: saveFailedText }
                     busy = false
                 }
             },
@@ -82,7 +85,7 @@ internal fun PersonaGallerySavePromptDialog(
             modifier = Modifier.fillMaxWidth(),
         )
         DsButton(
-            text = "这次先不保存",
+            text = stringResource(R.string.persona_gallery_skip_save),
             onClick = onContinue,
             variant = DsButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
@@ -123,12 +126,17 @@ internal fun PersonaGalleryDialog(
     var inspection by remember(selectedId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId) { mutableStateOf(false) }
     val selectedSuggestionKeys = remember(selectedId) { mutableStateListOf<String>() }
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
+    val inspectFailedText = stringResource(R.string.persona_gallery_inspect_failed)
+    val appendFailedText = stringResource(R.string.persona_gallery_append_failed)
+    val updateFailedText = stringResource(R.string.persona_gallery_update_failed)
+    val deleteFailedText = stringResource(R.string.persona_gallery_delete_failed)
 
-    DsDialog(title = if (selected == null) "人设图集" else selected.persona.name, onDismiss = onDismiss) {
+    DsDialog(title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name, onDismiss = onDismiss) {
         if (selected == null) {
             GalleryOverviewHeader(entries.size)
             DsButton(
-                text = if (currentGalleryId == null) "同步当前人物 · ${currentPersona.name}" else "更新当前人物 · ${currentPersona.name}",
+                text = if (currentGalleryId == null) stringResource(R.string.persona_gallery_sync_current, currentPersona.name) else stringResource(R.string.persona_gallery_update_current, currentPersona.name),
                 onClick = {
                     busy = true
                     error = null
@@ -136,9 +144,9 @@ internal fun PersonaGalleryDialog(
                         onSaveCurrent("", currentGalleryId)
                             .onSuccess {
                                 selectedId = it.id
-                                notice = "人物资料已合并到同一张主卡"
+                                notice = stringResource(R.string.persona_gallery_merged_notice)
                             }
-                            .onFailure { error = it.message ?: "保存失败" }
+                            .onFailure { error = it.message ?: saveFailedText }
                         busy = false
                     }
                 },
@@ -149,7 +157,7 @@ internal fun PersonaGalleryDialog(
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
-                label = { Text("搜索人物、身份或剧情") },
+                label = { Text(stringResource(R.string.persona_gallery_search)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -164,8 +172,8 @@ internal fun PersonaGalleryDialog(
             if (filtered.isEmpty()) {
                 DsCard {
                     Text(
-                        if (entries.isEmpty()) "图集还空着。进入图集时发现新角色，会先提示你保存。"
-                        else "没有找到匹配的人物",
+                        if (entries.isEmpty()) stringResource(R.string.persona_gallery_empty)
+                        else stringResource(R.string.persona_gallery_no_match),
                         style = DsType.small13,
                         color = DsTheme.colors.labelSecondary,
                     )
@@ -191,9 +199,9 @@ internal fun PersonaGalleryDialog(
             PersonaHero(
                 persona = selected.persona,
                 subtitle = buildString {
-                    append("${selected.history.size} 条对白")
+                    append(stringResource(R.string.persona_gallery_dialogue_count, selected.history.size))
                     if (selected.chatState.dynamics.sharedMoments.isNotEmpty()) {
-                        append(" · ${selected.chatState.dynamics.sharedMoments.size} 段共同经历")
+                        append(" · ").append(stringResource(R.string.persona_gallery_moment_count, selected.chatState.dynamics.sharedMoments.size))
                     }
                 },
             )
@@ -216,22 +224,22 @@ internal fun PersonaGalleryDialog(
 
             if (selected.chatState.updatedAt > 0L) {
                 DsCard {
-                    Text("故事与关系", style = DsType.std14, color = DsTheme.colors.labelPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.persona_gallery_story_relation), style = DsType.std14, color = DsTheme.colors.labelPrimary, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "当前关系：${selected.chatState.relationshipState}",
+                        stringResource(R.string.persona_gallery_current_relation, selected.chatState.relationshipState),
                         style = DsType.small13,
                         color = DsTheme.colors.labelSecondary,
                     )
                     selected.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
                         Text(
-                            "共同经历：${moments.joinToString("；")}",
+                            stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
                             style = DsType.small13,
                             color = DsTheme.colors.labelSecondary,
                         )
                     }
                     selected.chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let { threads ->
                         Text(
-                            "未完线索：${threads.joinToString("；")}",
+                            stringResource(R.string.persona_gallery_unresolved, threads.joinToString("；")),
                             style = DsType.small13,
                             color = DsTheme.colors.labelSecondary,
                         )
@@ -240,7 +248,7 @@ internal fun PersonaGalleryDialog(
             }
 
             DsButton(
-                text = if (inspecting) "正在检查人物…" else "人物检查",
+                text = if (inspecting) stringResource(R.string.persona_gallery_inspecting) else stringResource(R.string.persona_gallery_inspect),
                 onClick = {
                     inspecting = true
                     error = null
@@ -249,7 +257,7 @@ internal fun PersonaGalleryDialog(
                     scope.launch {
                         onInspect(selected.id)
                             .onSuccess { inspection = it }
-                            .onFailure { error = it.message ?: "人物检查失败" }
+                            .onFailure { error = it.message ?: inspectFailedText }
                         inspecting = false
                     }
                 },
@@ -271,7 +279,7 @@ internal fun PersonaGalleryDialog(
                 if (result.suggestions.isNotEmpty()) {
                     val chosen = result.suggestions.filter { suggestionKey(it) in selectedSuggestionKeys }
                     DsButton(
-                        text = "追加选中内容（${chosen.size}）",
+                        text = stringResource(R.string.persona_gallery_append_selected, chosen.size),
                         onClick = {
                             busy = true
                             error = null
@@ -280,9 +288,9 @@ internal fun PersonaGalleryDialog(
                                     .onSuccess {
                                         inspection = null
                                         selectedSuggestionKeys.clear()
-                                        notice = "已追加到固定人设，重复内容已自动忽略"
+                                        notice = stringResource(R.string.persona_gallery_append_done)
                                     }
-                                    .onFailure { error = it.message ?: "追加失败" }
+                                    .onFailure { error = it.message ?: appendFailedText }
                                 busy = false
                             }
                         },
@@ -293,7 +301,7 @@ internal fun PersonaGalleryDialog(
             }
 
             DsButton(
-                text = if (showHistory) "收起故事历史" else "查看故事历史",
+                text = if (showHistory) stringResource(R.string.persona_gallery_history_hide) else stringResource(R.string.persona_gallery_history_show),
                 onClick = { showHistory = !showHistory },
                 variant = DsButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
@@ -308,19 +316,19 @@ internal fun PersonaGalleryDialog(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("已归档对白", style = DsType.std14, color = DsTheme.colors.labelPrimary)
+                        Text(stringResource(R.string.persona_gallery_archived_dialogue), style = DsType.std14, color = DsTheme.colors.labelPrimary)
                     }
                     val history = selected.history.filter { it.role == "user" || it.role == "assistant" }
                     history.takeLast(visibleHistory).forEach { line ->
                         Text(
-                            "${if (line.role == "user") "用户" else selected.persona.name}：${line.content}",
+                            "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else selected.persona.name}：${line.content}",
                             style = DsType.small13,
                             color = DsTheme.colors.labelSecondary,
                         )
                     }
                     if (history.size > visibleHistory) {
                         DsButton(
-                            text = "再看较早的对白",
+                            text = stringResource(R.string.persona_gallery_older_dialogue),
                             onClick = { visibleHistory += 12 },
                             modifier = Modifier.fillMaxWidth(),
                             variant = DsButtonVariant.Ghost,
@@ -332,8 +340,8 @@ internal fun PersonaGalleryDialog(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("剧情提要") },
-                placeholder = { Text("关键事件、关系变化、未完成的约定……") },
+                label = { Text(stringResource(R.string.persona_gallery_story_notes)) },
+                placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 maxLines = 8,
@@ -341,13 +349,13 @@ internal fun PersonaGalleryDialog(
             )
             if (notes != selected.storyNotes) {
                 DsButton(
-                    text = "保存剧情提要",
+                    text = stringResource(R.string.persona_gallery_save_story),
                     onClick = {
                         busy = true
                         scope.launch {
                             onEditNotes(selected.id, notes)
-                                .onSuccess { notice = "剧情提要已保存" }
-                                .onFailure { error = it.message ?: "保存失败" }
+                                .onSuccess { notice = stringResource(R.string.persona_gallery_story_saved) }
+                                .onFailure { error = it.message ?: saveFailedText }
                             busy = false
                         }
                     },
@@ -358,14 +366,14 @@ internal fun PersonaGalleryDialog(
 
             if (canSave && (currentSessionId == selected.sourceSessionId || currentGalleryId == selected.id)) {
                 DsButton(
-                    text = "把当前会话新增内容并入这张人物卡",
+                    text = stringResource(R.string.persona_gallery_merge_current),
                     onClick = {
                         busy = true
                         error = null
                         scope.launch {
                             onSaveCurrent(notes, selected.id)
-                                .onSuccess { notice = "已合并新增内容，没有重复生成角色卡" }
-                                .onFailure { error = it.message ?: "更新失败" }
+                                .onSuccess { notice = stringResource(R.string.persona_gallery_merge_done) }
+                                .onFailure { error = it.message ?: updateFailedText }
                             busy = false
                         }
                     },
@@ -376,7 +384,7 @@ internal fun PersonaGalleryDialog(
             }
 
             DsButton(
-                text = "用这个人物开启新会话",
+                text = stringResource(R.string.persona_gallery_start_new),
                 onClick = { onStart(selected.id) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canSave && !busy && notes == selected.storyNotes,
@@ -385,19 +393,19 @@ internal fun PersonaGalleryDialog(
             if (deleting) {
                 DsCard {
                     Text(
-                        "删除这张人物卡？已开启的会话不会被删除。",
+                        stringResource(R.string.persona_gallery_delete_confirm),
                         style = DsType.small13,
                         color = DsTheme.colors.error,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DsButton(
-                            text = "取消",
+                            text = stringResource(R.string.persona_gallery_cancel),
                             onClick = { deleting = false },
                             variant = DsButtonVariant.Ghost,
                             modifier = Modifier.weight(1f),
                         )
                         DsButton(
-                            text = "确认删除",
+                            text = stringResource(R.string.persona_gallery_confirm_delete),
                             onClick = {
                                 busy = true
                                 scope.launch {
@@ -406,7 +414,7 @@ internal fun PersonaGalleryDialog(
                                             selectedId = null
                                             deleting = false
                                         }
-                                        .onFailure { error = it.message ?: "删除失败" }
+                                        .onFailure { error = it.message ?: deleteFailedText }
                                     busy = false
                                 }
                             },
@@ -418,7 +426,7 @@ internal fun PersonaGalleryDialog(
                 }
             } else {
                 DsButton(
-                    text = "删除人物卡",
+                    text = stringResource(R.string.persona_gallery_delete),
                     onClick = { deleting = true },
                     variant = DsButtonVariant.Ghost,
                     enabled = !busy,
@@ -426,7 +434,7 @@ internal fun PersonaGalleryDialog(
                 )
             }
             DsButton(
-                text = "返回图集",
+                text = stringResource(R.string.persona_gallery_back),
                 onClick = {
                     selectedId = null
                     deleting = false
@@ -470,13 +478,13 @@ private fun GalleryOverviewHeader(count: Int) {
             Spacer(Modifier.width(DsSpacing.medium))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "人物主档案",
+                    stringResource(R.string.persona_gallery_master),
                     style = DsType.large20,
                     color = DsTheme.colors.labelPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "已保存 $count 人 · 同一人物持续增量完善",
+                    stringResource(R.string.persona_gallery_count, count),
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                 )
@@ -501,7 +509,7 @@ private fun GalleryPersonaCard(entry: PersonaGalleryEntry, onClick: () -> Unit) 
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    entry.persona.identity.ifBlank { entry.persona.personality.ifBlank { "等待补充人物设定" } },
+                    entry.persona.identity.ifBlank { entry.persona.personality.ifBlank { stringResource(R.string.persona_gallery_waiting) } },
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                     maxLines = 2,
@@ -510,12 +518,12 @@ private fun GalleryPersonaCard(entry: PersonaGalleryEntry, onClick: () -> Unit) 
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            GalleryPill("${entry.history.size} 条对白")
+            GalleryPill(stringResource(R.string.persona_gallery_dialogue_count, entry.history.size))
             if (entry.chatState.dynamics.sharedMoments.isNotEmpty()) {
-                GalleryPill("${entry.chatState.dynamics.sharedMoments.size} 段经历")
+                GalleryPill(stringResource(R.string.persona_gallery_moments_short, entry.chatState.dynamics.sharedMoments.size))
             }
             if (entry.persona.corrections.isNotEmpty()) {
-                GalleryPill("${entry.persona.corrections.size} 条纠正")
+                GalleryPill(stringResource(R.string.persona_gallery_corrections_count, entry.persona.corrections.size))
             }
         }
     }
@@ -559,7 +567,7 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                name.trim().firstOrNull()?.toString().orEmpty().ifBlank { "人" },
+                name.trim().firstOrNull()?.toString().orEmpty().ifBlank { stringResource(R.string.persona_gallery_avatar_fallback) },
                 style = if (large) DsType.large20 else DsType.std14,
                 color = DsTheme.colors.accent,
                 fontWeight = FontWeight.SemiBold,
@@ -586,25 +594,25 @@ private fun GalleryPill(text: String) {
 @Composable
 private fun PersonaDetails(persona: PersonaProfile) {
     val scalarSections = listOf(
-        "人物身份" to persona.identity,
-        "背景经历" to persona.background,
-        "核心性格" to persona.personality,
-        "说话方式" to persona.speechStyle,
-        "与你的关系" to persona.relationship,
-        "世界设定" to persona.worldSetting,
+        stringResource(R.string.persona_field_identity) to persona.identity,
+        stringResource(R.string.persona_field_background) to persona.background,
+        stringResource(R.string.persona_field_personality) to persona.personality,
+        stringResource(R.string.persona_field_speech_style) to persona.speechStyle,
+        stringResource(R.string.persona_field_relationship) to persona.relationship,
+        stringResource(R.string.persona_field_world_setting) to persona.worldSetting,
     ).filter { it.second.isNotBlank() }
     val listSections = listOf(
-        "硬性设定" to persona.hardConstraints,
-        "对白参考" to persona.exampleDialogues,
-        "禁用表达" to persona.bannedPhrases,
-        "常用表达" to persona.signaturePhrases,
-        "已学习纠正" to persona.corrections,
+        stringResource(R.string.persona_field_constraints) to persona.hardConstraints,
+        stringResource(R.string.persona_field_dialogues) to persona.exampleDialogues,
+        stringResource(R.string.persona_field_banned) to persona.bannedPhrases,
+        stringResource(R.string.persona_field_signature) to persona.signaturePhrases,
+        stringResource(R.string.persona_field_corrections) to persona.corrections,
     ).filter { it.second.isNotEmpty() }
 
     if (scalarSections.isEmpty() && listSections.isEmpty()) return
     DsCard {
         Text(
-            "固定人设",
+            stringResource(R.string.persona_gallery_fixed_persona),
             style = DsType.std14,
             color = DsTheme.colors.labelPrimary,
             fontWeight = FontWeight.SemiBold,
@@ -643,7 +651,7 @@ private fun PersonaInspectionPanel(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "这轮没有发现明确冲突，也没有新的稳定设定可追加。",
+                    stringResource(R.string.persona_gallery_inspection_clean),
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                 )
@@ -654,7 +662,7 @@ private fun PersonaInspectionPanel(
 
     if (result.conflicts.isNotEmpty()) {
         Text(
-            "发现 ${result.conflicts.size} 处可能冲突",
+            stringResource(R.string.persona_gallery_conflict_count, result.conflicts.size),
             style = DsType.std14,
             color = DsTheme.colors.labelPrimary,
             fontWeight = FontWeight.SemiBold,
@@ -668,13 +676,13 @@ private fun PersonaInspectionPanel(
                 )
                 if (conflict.fixedValue.isNotBlank()) {
                     Text(
-                        "固定人设：${conflict.fixedValue}",
+                        stringResource(R.string.persona_gallery_fixed_value, conflict.fixedValue),
                         style = DsType.small13,
                         color = DsTheme.colors.labelSecondary,
                     )
                 }
                 Text(
-                    "对话表现：${conflict.observedValue}",
+                    stringResource(R.string.persona_gallery_observed_value, conflict.observedValue),
                     style = DsType.small13,
                     color = DsTheme.colors.labelPrimary,
                 )
@@ -691,7 +699,7 @@ private fun PersonaInspectionPanel(
 
     if (result.suggestions.isNotEmpty()) {
         Text(
-            "可追加到固定人设",
+            stringResource(R.string.persona_gallery_suggestions_title),
             style = DsType.std14,
             color = DsTheme.colors.labelPrimary,
             fontWeight = FontWeight.SemiBold,
@@ -720,7 +728,7 @@ private fun PersonaInspectionPanel(
                         )
                         if (suggestion.evidence.isNotBlank()) {
                             Text(
-                                "依据：${suggestion.evidence}",
+                                stringResource(R.string.persona_gallery_evidence, suggestion.evidence),
                                 style = DsType.caption11,
                                 color = DsTheme.colors.labelTertiary,
                             )
@@ -735,17 +743,18 @@ private fun PersonaInspectionPanel(
 private fun suggestionKey(suggestion: PersonaAppendSuggestion): String =
     "${suggestion.field}|${suggestion.value.trim()}"
 
+@Composable
 private fun personaFieldLabel(field: String): String = when (field) {
-    "identity" -> "人物身份"
-    "background" -> "背景经历"
-    "personality" -> "核心性格"
-    "speechStyle" -> "说话方式"
-    "relationship" -> "与你的关系"
-    "worldSetting" -> "世界设定"
-    "hardConstraints" -> "硬性设定"
-    "exampleDialogues" -> "对白参考"
-    "bannedPhrases" -> "禁用表达"
-    "signaturePhrases" -> "常用表达"
-    "corrections" -> "人设纠正"
+    "identity" -> stringResource(R.string.persona_field_identity)
+    "background" -> stringResource(R.string.persona_field_background)
+    "personality" -> stringResource(R.string.persona_field_personality)
+    "speechStyle" -> stringResource(R.string.persona_field_speech_style)
+    "relationship" -> stringResource(R.string.persona_field_relationship)
+    "worldSetting" -> stringResource(R.string.persona_field_world_setting)
+    "hardConstraints" -> stringResource(R.string.persona_field_constraints)
+    "exampleDialogues" -> stringResource(R.string.persona_field_dialogues)
+    "bannedPhrases" -> stringResource(R.string.persona_field_banned)
+    "signaturePhrases" -> stringResource(R.string.persona_field_signature)
+    "corrections" -> stringResource(R.string.persona_field_corrections)
     else -> field
 }
