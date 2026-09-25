@@ -60,6 +60,9 @@ internal fun LocalWorkspaceFilesDialog(
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
     var directory by remember(mode, sessionId) { mutableStateOf("") }
+    var section by remember(mode, sessionId) {
+        mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
+    }
     val scope = rememberCoroutineScope()
     val readFilesFailed = stringResource(R.string.local_files_read_failed)
     val previewFailed = stringResource(R.string.local_files_preview_failed)
@@ -70,7 +73,10 @@ internal fun LocalWorkspaceFilesDialog(
         preview = null
         try {
             when (mode) {
-                LocalFilesMode.WORKSPACE -> workspace = loadWorkspace()
+                LocalFilesMode.WORKSPACE -> {
+                    workspace = loadWorkspace()
+                    conversation = loadConversation(sessionId)
+                }
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
         } catch (cancelled: CancellationException) {
@@ -108,7 +114,12 @@ internal fun LocalWorkspaceFilesDialog(
                     Text(
                         when {
                             preview != null -> preview?.file?.path.orEmpty()
-                            mode == LocalFilesMode.WORKSPACE -> workspacePath + if (directory.isEmpty()) "" else "/$directory"
+                            mode == LocalFilesMode.WORKSPACE && section == 0 ->
+                                workspacePath + if (directory.isEmpty()) "" else "/$directory"
+                            mode == LocalFilesMode.WORKSPACE && section == 1 ->
+                                stringResource(R.string.panel_involved_files)
+                            mode == LocalFilesMode.WORKSPACE && section == 2 ->
+                                stringResource(R.string.panel_artifacts)
                             else -> stringResource(R.string.local_files_conversation_title)
                         },
                         style = MaterialTheme.typography.titleMedium,
@@ -121,6 +132,23 @@ internal fun LocalWorkspaceFilesDialog(
                         enabled = !loading && preview == null,
                     ) {
                         Text(stringResource(R.string.local_files_refresh))
+                    }
+                }
+
+                if (preview == null && mode == LocalFilesMode.WORKSPACE) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        TextButton(onClick = { section = 0; directory = "" }, enabled = section != 0) {
+                            Text(stringResource(R.string.chatlist_workspace_files))
+                        }
+                        TextButton(onClick = { section = 1; directory = "" }, enabled = section != 1) {
+                            Text(stringResource(R.string.panel_involved_files))
+                        }
+                        TextButton(onClick = { section = 2; directory = "" }, enabled = section != 2) {
+                            Text(stringResource(R.string.panel_artifacts))
+                        }
                     }
                 }
 
@@ -143,7 +171,13 @@ internal fun LocalWorkspaceFilesDialog(
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
                     mode == LocalFilesMode.WORKSPACE -> {
-                        LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
+                        val files = when (section) {
+                            1 -> conversation.involved
+                            2 -> conversation.artifacts
+                            else -> null
+                        }
+                        if (files == null) {
+                            LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
                                 previewLoading = true
                                 error = null
                                 try {
@@ -156,6 +190,29 @@ internal fun LocalWorkspaceFilesDialog(
                                 } finally {
                                     previewLoading = false
                                 }
+                            }
+                        } else if (files.isEmpty()) {
+                            LocalFilesEmpty(
+                                stringResource(
+                                    if (section == 2) R.string.panel_artifacts_empty
+                                    else R.string.panel_involved_files_empty,
+                                ),
+                            )
+                        } else {
+                            LocalFlatFileList(files) { file ->
+                                previewLoading = true
+                                error = null
+                                try {
+                                    preview = loadPreview(file.path)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (failure: Exception) {
+                                    error = failure.message ?: previewFailed
+                                    preview = null
+                                } finally {
+                                    previewLoading = false
+                                }
+                            }
                         }
                     }
                     conversation.isEmpty -> LocalFilesEmpty(stringResource(R.string.panel_conversation_files_empty))
@@ -228,6 +285,19 @@ private fun ConversationLocalFileList(
             items(files.involved, key = { "involved:" + it.path }) { file ->
                 LocalFileRow(file) { scope.launch { onOpen(file) } }
             }
+        }
+    }
+}
+
+@Composable
+private fun LocalFlatFileList(
+    files: List<LocalWorkspaceFile>,
+    onOpen: suspend (LocalWorkspaceFile) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    LazyColumn(Modifier.fillMaxSize()) {
+        items(files, key = LocalWorkspaceFile::path) { file ->
+            LocalFileRow(file) { scope.launch { onOpen(file) } }
         }
     }
 }
