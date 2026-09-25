@@ -21,6 +21,7 @@ data class LocalGroupChatMember(
 data class LocalGroupChatState(
     val mode: LocalChatMode = LocalChatMode.SINGLE,
     val members: List<LocalGroupChatMember> = emptyList(),
+    val turnCursor: Int = 0,
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
 }
