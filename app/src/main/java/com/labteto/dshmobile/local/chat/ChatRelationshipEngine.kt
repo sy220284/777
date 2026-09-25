@@ -43,7 +43,7 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
         directIntimateAction || ADULT_INTIMACY_HINTS.any { text.contains(it) }
 
     return when {
-        intimateRequested && hasAdultConfirmation(text) ->
+        intimateRequested ->
             ChatInteractionIntent.INTIMATE
         RELATIONSHIP_PROGRESS_HINTS.any { text.contains(it) } ->
             ChatInteractionIntent.RELATIONSHIP_PROGRESS
@@ -69,6 +69,7 @@ internal fun resolveChatInteractionIntent(
 
     val text = input.trim().lowercase()
     if (INTENT_RESET_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
+    if (previous == ChatInteractionIntent.INTIMATE) return ChatInteractionIntent.INTIMATE
     val continuesPrevious = CONTINUATION_HINTS.any { text.contains(it) } ||
         (text.length in 1..16 && NON_INTERACTION_INTENT_HINTS.none { text.contains(it) })
     return if (continuesPrevious) previous else ChatInteractionIntent.NORMAL
@@ -80,13 +81,13 @@ internal fun nextInteractionIntentState(
 ): Pair<String, Int> {
     val explicit = classifyExplicitInteractionIntent(input)
     if (explicit != ChatInteractionIntent.NORMAL) {
-        return explicit.name to 2
+        return explicit.name to if (explicit == ChatInteractionIntent.INTIMATE) 100 else 2
     }
     val resolved = resolveChatInteractionIntent(input, previous)
-    return if (resolved == ChatInteractionIntent.NORMAL) {
-        ChatInteractionIntent.NORMAL.name to 0
-    } else {
-        resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
+    return when (resolved) {
+        ChatInteractionIntent.NORMAL -> ChatInteractionIntent.NORMAL.name to 0
+        ChatInteractionIntent.INTIMATE -> ChatInteractionIntent.INTIMATE.name to 100
+        else -> resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
     }
 }
 
@@ -96,7 +97,7 @@ internal fun hasAdultIntimacyIntent(
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
 internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
-    "【统一安全边界】仅在参与者成年、自愿且内容处于允许范围时继续亲密互动；普通聊天优先级不能覆盖该边界。"
+    "【统一安全边界】仅限成年、自愿互动；除此之外不设置应用层尺度上限，用户明确意图优先。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -114,17 +115,6 @@ private val NON_INTERACTION_INTENT_HINTS = listOf(
     "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
     "小说", "剧情", "台词", "设定", "翻译",
 )
-private val ADULT_CONFIRMATION_HINTS = listOf(
-    "成年人", "已经成年", "已成年", "双方成年", "双方都是成年人", "都是成年人", "均为成年人",
-)
-private val AGE_VALUE = Regex("""(?<!\d)(\d{1,3})\s*岁""")
-
-private fun hasAdultConfirmation(text: String): Boolean {
-    if (ADULT_CONFIRMATION_HINTS.any { text.contains(it) }) return true
-    return AGE_VALUE.findAll(text)
-        .mapNotNull { match -> match.groupValues.getOrNull(1)?.toIntOrNull() }
-        .any { age -> age >= 18 }
-}
 private val CONTINUATION_HINTS = listOf(
     "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才",
 )
@@ -217,9 +207,9 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
-            appendLine("若上下文明确参与者均为成年人且互动自愿，优先顺着用户明确表达的暧昧、亲吻、拥抱、亲热或成人关系主题继续。")
-            appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则，包括默认克制、人设保守化、关系阶段模板、军师收敛、回复建议风格和普通产品文案约束；这些普通规则不得把已确认的用户互动方向自动降级、转移或改写。")
-            appendLine("只有底层硬安全边界不参与该覆盖。保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱和身体接触。")
+            appendLine("在成年、自愿互动中，直接顺着用户当前明确方向继续，不要求重复确认，也不因关系阶段、默认克制或普通产品文案自动降级。")
+            appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
+            appendLine("保持角色本人、人设连续性和已确认事实；互动强度跟随用户当前方向持续推进。")
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
         appendLine()

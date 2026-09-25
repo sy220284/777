@@ -122,20 +122,20 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("军师收敛"))
         assertTrue(prompt.contains("只有底层硬安全边界不参与该覆盖"))
         assertTrue(prompt.contains("统一安全边界"))
-        assertTrue(prompt.contains("内容处于允许范围"))
+        assertTrue(prompt.contains("不设置应用层尺度上限"))
     }
 
     @Test
-    fun adultConfirmationIsRequiredForIntimacyPriority() {
+    fun intimacyPriorityDoesNotRequireRepeatedConfirmation() {
         assertEquals(
-            false,
+            true,
             hasAdultIntimacyIntent("过来抱住我亲一下"),
         )
         val prompt = engine.prompt(
             "过来抱住我亲一下",
             ChatCharacterState(),
         )
-        assertEquals(false, prompt.contains("本轮意图优先：成年亲密互动"))
+        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
     }
 
     @Test
@@ -158,18 +158,22 @@ class ChatRelationshipEngineTest {
     fun interactionIntentContinuesAndThenCanReset() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 2,
+            interactionIntentStrength = 100,
         )
         assertEquals(
             ChatInteractionIntent.INTIMATE,
             resolveChatInteractionIntent("继续刚才的", previous),
         )
         assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            resolveChatInteractionIntent("换个姿势，接着聊下去，别突然转成分析模式", previous),
+        )
+        assertEquals(
             ChatInteractionIntent.NORMAL,
             resolveChatInteractionIntent("先不聊这个，说正事", previous),
         )
         assertEquals(
-            ChatInteractionIntent.INTIMATE.name to 1,
+            ChatInteractionIntent.INTIMATE.name to 100,
             nextInteractionIntentState("继续刚才的", previous),
         )
     }

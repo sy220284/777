@@ -134,7 +134,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         if (hasAdultIntimacyIntent(userMessage, state)) {
-            appendLine("本轮属于成年亲密互动意图：回复建议必须跟随用户当前方向，其优先级高于所有普通聊天层规则，包括默认克制、人设保守化、关系阶段模板、军师收敛、建议风格和普通产品文案约束；普通规则不得自动降级、转移或改写用户已确认的互动方向。只有底层硬安全边界不参与该覆盖。可以自然延续暧昧、亲吻、拥抱、亲热和身体接触。")
+            appendLine("本轮属于成年、自愿的亲密互动意图：回复建议直接跟随用户当前方向并保持连续，不要求重复确认；普通聊天层规则不得将已确认方向降级、转移、淡化或改写。")
         }
         appendLine()
         appendLine("输出结构必须严格为：")
