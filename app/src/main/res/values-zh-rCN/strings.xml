@@ -970,4 +970,17 @@
     <string name="local_persona_picker_empty">还没有保存过人物。可以先新建一个，聊天后再收入人设图集。</string>
     <string name="local_persona_picker_saved_hint">已保存人物</string>
 
+
+    <string name="settings_page_chat">聊天</string>
+    <string name="settings_chat_subtitle">角色聊天风格与输出门禁</string>
+    <string name="settings_chat_style_guard">通用套话门禁</string>
+    <string name="settings_chat_style_guard_hint">拦截常见客服腔和机械套话。关闭后人物自己设置的禁用表达仍然生效。</string>
+    <string name="settings_chat_guard_hits_title">最近命中的表达</string>
+    <string name="settings_chat_guard_hits_empty">最近没有命中门禁规则。</string>
+    <string name="settings_chat_guard_hits_clear">清空命中记录</string>
+    <string name="local_mode_intro_chat">聊天模式：用于日常聊天、角色扮演和连续关系记忆；会启用人设与聊天风格门禁。</string>
+    <string name="local_mode_intro_work">工作模式：用于任务执行、文件、命令、工具和子代理；完整执行链只在这里展开。</string>
+    <string name="local_persona_correction_recorded">已记入人设纠正</string>
+    <string name="local_persona_correction_undo">撤销</string>
+
 </resources>
