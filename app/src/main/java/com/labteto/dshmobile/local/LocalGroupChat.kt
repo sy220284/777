@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -14,6 +15,7 @@ data class LocalGroupChatMember(
     val galleryId: String,
     val personaId: String,
     val displayName: String,
+    val persona: PersonaProfile = PersonaProfile(),
     val chatState: ChatCharacterState = ChatCharacterState(),
 )
 
