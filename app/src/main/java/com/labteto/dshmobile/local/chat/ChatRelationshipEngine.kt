@@ -19,20 +19,110 @@ internal enum class RelationshipScenario {
     BOUNDARY_SAFETY,
 }
 
-internal fun hasAdultIntimacyIntent(input: String): Boolean {
-    val text = input.trim().lowercase()
-    if (text.isBlank()) return false
-    if (MINOR_CONTEXT_HINTS.any { text.contains(it) }) return false
-    return ADULT_INTIMACY_HINTS.any { text.contains(it) }
+internal enum class ChatInteractionIntent {
+    NORMAL,
+    FLIRTING,
+    INTIMATE,
+    RELATIONSHIP_PROGRESS,
+    STRATEGIST,
 }
 
-private val ADULT_INTIMACY_HINTS = listOf(
-    "暧昧", "亲吻", "亲亲", "接吻", "拥抱", "抱我", "抱住", "搂住", "亲热", "亲密",
-    "情侣", "恋人", "同居", "成人关系", "性关系", "上床", "做爱", "性爱", "性行为", "器官",
-)
+internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
+    val text = input.trim().lowercase()
+    if (text.isBlank()) return ChatInteractionIntent.NORMAL
 
-private val MINOR_CONTEXT_HINTS = listOf(
-    "未成年", "未满18", "未满十八", "儿童", "小学生", "初中生", "高中生", "萝莉", "正太",
+    if (HARD_MINOR_CONTEXT_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
+    val hasSoftMinorContext = SOFT_MINOR_CONTEXT_HINTS.any { text.contains(it) }
+    val softMinorNegated = NEGATED_MINOR_CONTEXT_HINTS.any { text.contains(it) }
+    if (hasSoftMinorContext && !softMinorNegated) return ChatInteractionIntent.NORMAL
+
+    if (STRATEGIST_INTENT_HINTS.any { text.contains(it) }) {
+        return ChatInteractionIntent.STRATEGIST
+    }
+
+    val nonInteractionContext = NON_INTERACTION_INTENT_HINTS.any { text.contains(it) }
+    val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
+    if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
+
+    return when {
+        directIntimateAction || ADULT_INTIMACY_HINTS.any { text.contains(it) } ->
+            ChatInteractionIntent.INTIMATE
+        RELATIONSHIP_PROGRESS_HINTS.any { text.contains(it) } ->
+            ChatInteractionIntent.RELATIONSHIP_PROGRESS
+        FLIRTING_HINTS.any { text.contains(it) } ->
+            ChatInteractionIntent.FLIRTING
+        else -> ChatInteractionIntent.NORMAL
+    }
+}
+
+internal fun resolveChatInteractionIntent(
+    input: String,
+    state: ChatCharacterState,
+): ChatInteractionIntent {
+    val explicit = classifyExplicitInteractionIntent(input)
+    if (explicit != ChatInteractionIntent.NORMAL) return explicit
+
+    val previous = runCatching {
+        ChatInteractionIntent.valueOf(state.interactionIntent)
+    }.getOrDefault(ChatInteractionIntent.NORMAL)
+    if (previous == ChatInteractionIntent.NORMAL || state.interactionIntentStrength <= 0) {
+        return ChatInteractionIntent.NORMAL
+    }
+
+    val text = input.trim().lowercase()
+    if (INTENT_RESET_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
+    val continuesPrevious = CONTINUATION_HINTS.any { text.contains(it) } ||
+        (text.length in 1..16 && NON_INTERACTION_INTENT_HINTS.none { text.contains(it) })
+    return if (continuesPrevious) previous else ChatInteractionIntent.NORMAL
+}
+
+internal fun nextInteractionIntentState(
+    input: String,
+    previous: ChatCharacterState,
+): Pair<String, Int> {
+    val explicit = classifyExplicitInteractionIntent(input)
+    if (explicit != ChatInteractionIntent.NORMAL) {
+        return explicit.name to 2
+    }
+    val resolved = resolveChatInteractionIntent(input, previous)
+    return if (resolved == ChatInteractionIntent.NORMAL) {
+        ChatInteractionIntent.NORMAL.name to 0
+    } else {
+        resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
+    }
+}
+
+internal fun hasAdultIntimacyIntent(
+    input: String,
+    state: ChatCharacterState = ChatCharacterState(),
+): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
+
+private val ADULT_INTIMACY_HINTS = listOf(
+    "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
+)
+private val DIRECT_INTIMATE_ACTION_HINTS = listOf(
+    "亲我", "亲一下", "亲一口", "抱我", "抱住我", "搂住我", "吻我", "吻一下",
+    "过来亲", "过来抱", "继续亲", "继续抱", "一起睡", "上床",
+)
+private val FLIRTING_HINTS = listOf("暧昧", "撩我", "撩一下", "调情", "挑逗我")
+private val RELATIONSHIP_PROGRESS_HINTS = listOf(
+    "在一起吧", "做我女朋友", "做我男朋友", "确定关系", "正式交往", "同居吧", "结婚吧",
+)
+private val STRATEGIST_INTENT_HINTS = listOf("帮我分析", "分析一下", "军师", "怎么判断", "什么意思")
+private val NON_INTERACTION_INTENT_HINTS = listOf(
+    "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
+    "小说", "剧情", "台词", "设定", "翻译",
+)
+private val HARD_MINOR_CONTEXT_HINTS = listOf("儿童", "小学生", "初中生", "高中生", "萝莉", "正太")
+private val SOFT_MINOR_CONTEXT_HINTS = listOf("未成年", "未满18", "未满十八")
+private val NEGATED_MINOR_CONTEXT_HINTS = listOf(
+    "不是未成年", "已经成年", "已成年", "都是成年人", "均为成年人", "双方都是成年人",
+)
+private val CONTINUATION_HINTS = listOf(
+    "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才",
+)
+private val INTENT_RESET_HINTS = listOf(
+    "换个话题", "先不聊这个", "不聊这个", "说正事", "算了", "停一下", "到此为止",
 )
 
 /**
@@ -118,7 +208,7 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("关系变化必须渐进：一次热情不能自动升级亲密，一次冷淡不能自动判定关系结束；重大阶段变化需要明确事实或连续行为证据。")
         appendLine("任何关系判断都要在内部区分：已确认事实、暂定推测、仍未知。行为证据优先于 MBTI、星座、性别模板、网络套路和单次回复速度。")
         appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
-        if (hasAdultIntimacyIntent(input)) {
+        if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("若上下文明确参与者均为成年人且互动自愿，优先顺着用户明确表达的暧昧、亲吻、拥抱、亲热或成人关系主题继续；这一意图高于默认克制、关系阶段模板和回复风格保守化，不因题材亲密自动说教、抽离或切换军师。")
             appendLine("保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱和身体接触等非露骨亲密内容。不要扩写成露骨性行为或器官细节。")
