@@ -913,6 +913,13 @@
     <string name="local_run_tasks_progress">任务 · %1$d/%2$d</string>
     <string name="local_run_background">后台任务</string>
     <string name="local_run_resources">资源</string>
+    <string name="local_run_job_view">查看</string>
+    <string name="local_run_job_hide">收起</string>
+    <string name="local_run_job_output">任务输出</string>
+    <string name="local_run_job_output_empty">暂时没有输出</string>
+    <string name="local_run_job_refresh">刷新</string>
+    <string name="local_run_job_stop">停止</string>
+    <string name="local_run_job_interrupted">已中断</string>
     <string name="tasks_new">新建自动化</string>
     <string name="tasks_prompt_label">要执行的任务</string>
     <string name="tasks_prompt_hint">例如：总结当前项目今天的变化</string>

@@ -335,7 +335,11 @@ fun LocalHarnessScreen(
 
     if (showRunCenter && state.usageMode == LocalUsageMode.WORK) {
         Dialog(onDismissRequest = { showRunCenter = false }) {
-            ExecutionStatusCard(state = state)
+            ExecutionStatusCard(
+                state = state,
+                onJobOutput = viewModel::backgroundJobOutput,
+                onStopJob = viewModel::stopBackgroundJob,
+            )
         }
     }
 
@@ -1944,9 +1948,13 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
 @Composable
 private fun ExecutionStatusCard(
     state: LocalHarnessState,
+    onJobOutput: (String) -> String,
+    onStopJob: (String) -> String,
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
+    var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
     val resourceSummary = stringResource(
@@ -2036,12 +2044,93 @@ private fun ExecutionStatusCard(
             }
 
             if (state.jobs.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     Text(stringResource(R.string.local_run_background), style = DsType.caption11Strong, color = colors.labelTertiary)
                     state.jobs.take(4).forEach { job ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                            Text(job.label, style = DsType.small13, color = colors.labelSecondary, modifier = Modifier.weight(1f))
-                            Text(job.status, style = DsType.caption11, color = colors.labelTertiary)
+                        val expanded = expandedJobId == job.id
+                        Surface(
+                            shape = DsShapes.row,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                ) {
+                                    Text(
+                                        job.label,
+                                        style = DsType.small13,
+                                        color = colors.labelSecondary,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        localJobStatusLabel(job.status),
+                                        style = DsType.caption11,
+                                        color = colors.labelTertiary,
+                                    )
+                                    DsButton(
+                                        text = stringResource(
+                                            if (expanded) R.string.local_run_job_hide
+                                            else R.string.local_run_job_view,
+                                        ),
+                                        onClick = {
+                                            if (expanded) {
+                                                expandedJobId = null
+                                                expandedJobOutput = ""
+                                            } else {
+                                                expandedJobId = job.id
+                                                expandedJobOutput = onJobOutput(job.id)
+                                            }
+                                        },
+                                        variant = DsButtonVariant.Ghost,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
+                                if (expanded) {
+                                    Text(
+                                        stringResource(R.string.local_run_job_output),
+                                        style = DsType.caption11Strong,
+                                        color = colors.labelTertiary,
+                                    )
+                                    Text(
+                                        expandedJobOutput.ifBlank {
+                                            stringResource(R.string.local_run_job_output_empty)
+                                        },
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                        maxLines = 12,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                    ) {
+                                        DsButton(
+                                            text = stringResource(R.string.local_run_job_refresh),
+                                            onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                            variant = DsButtonVariant.Ghost,
+                                            size = DsButtonSize.Small,
+                                        )
+                                        if (job.status == "running") {
+                                            DsButton(
+                                                text = stringResource(R.string.local_run_job_stop),
+                                                onClick = {
+                                                    onStopJob(job.id)
+                                                    expandedJobOutput = onJobOutput(job.id)
+                                                },
+                                                variant = DsButtonVariant.Danger,
+                                                size = DsButtonSize.Small,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2054,6 +2143,16 @@ private fun ExecutionStatusCard(
             }
         }
     }
+}
+
+@Composable
+private fun localJobStatusLabel(status: String): String = when (status) {
+    "running" -> stringResource(R.string.jobs_running)
+    "completed" -> stringResource(R.string.jobs_completed)
+    "killed", "cancelled" -> stringResource(R.string.jobs_killed)
+    "failed" -> stringResource(R.string.jobs_failed)
+    "interrupted" -> stringResource(R.string.local_run_job_interrupted)
+    else -> status
 }
 
 @Composable
