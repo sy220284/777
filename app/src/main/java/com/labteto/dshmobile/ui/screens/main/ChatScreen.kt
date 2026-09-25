@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +55,9 @@ import com.labteto.dshmobile.data.QuestionOutcome
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.ApprovalPanel
 import com.labteto.dshmobile.ui.components.ConnectionBanner
+import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
+import com.labteto.dshmobile.ui.components.ConversationScrollTarget
+import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.PlanReviewPanel
 import com.labteto.dshmobile.ui.components.planReviewOf
@@ -136,7 +143,9 @@ fun ChatScreen(
 
     // Hoisted above the tab swap so each view keeps its own scroll position across switches.
     val chatListState = rememberLazyListState()
+    val (scrollHint, scrollConnection) = rememberConversationScrollHint(chatListState, reverseLayout = true)
     val trajectoryListState = rememberLazyListState()
+    LaunchedEffect(currentSessionId, tab) { scrollHint.hide() }
 
     val commandFailed = stringResource(R.string.err_command_failed)
     val unknownCommand = stringResource(R.string.err_command_unknown)
@@ -438,35 +447,58 @@ fun ChatScreen(
                 )
             }
 
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = {
-                    val forward = targetState.ordinal > initialState.ordinal
-                    (
-                        slideInHorizontally { width -> if (forward) width / 6 else -width / 6 } +
-                            fadeIn(DsAnimations.fade)
+            Box(
+                Modifier.weight(1f).fillMaxWidth().then(
+                    if (tab == ChatTab.Chat) Modifier.nestedScroll(scrollConnection) else Modifier,
+                ),
+            ) {
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        (
+                            slideInHorizontally { width -> if (forward) width / 6 else -width / 6 } +
+                                fadeIn(DsAnimations.fade)
+                            )
+                            .togetherWith(fadeOut(DsAnimations.fade)) using SizeTransform(clip = false)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "chatTab",
+                ) { current ->
+                    when (current) {
+                        ChatTab.Chat -> ChatTranscript(
+                            conversation = conversation,
+                            loading = conversation == null && currentSessionId != null,
+                            loadingOlder = loadingOlder,
+                            loadOlderFailed = loadOlderFailed,
+                            context = nodeContext,
+                            listState = chatListState,
+                            onLoadOlder = { scope.launch { store.loadOlder() } },
                         )
-                        .togetherWith(fadeOut(DsAnimations.fade)) using SizeTransform(clip = false)
-                },
-                modifier = Modifier.weight(1f),
-                label = "chatTab",
-            ) { current ->
-                when (current) {
-                    ChatTab.Chat -> ChatTranscript(
-                        conversation = conversation,
-                        loading = conversation == null && currentSessionId != null,
-                        loadingOlder = loadingOlder,
-                        loadOlderFailed = loadOlderFailed,
-                        context = nodeContext,
-                        listState = chatListState,
-                        onLoadOlder = { scope.launch { store.loadOlder() } },
-                    )
-                    ChatTab.Trajectory -> TrajectoryTab(
-                        conversation = conversation,
-                        stats = sessionStats,
-                        usage = tokenUsage,
-                        cwd = currentSession?.cwd,
-                        listState = trajectoryListState,
+                        ChatTab.Trajectory -> TrajectoryTab(
+                            conversation = conversation,
+                            stats = sessionStats,
+                            usage = tokenUsage,
+                            cwd = currentSession?.cwd,
+                            listState = trajectoryListState,
+                        )
+                    }
+                }
+                if (tab == ChatTab.Chat) {
+                    ConversationScrollShortcut(
+                        target = scrollHint.target,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 8.dp),
+                        onClick = { target ->
+                            scrollHint.hide()
+                            scope.launch {
+                                chatListState.animateScrollToItem(
+                                    if (target == ConversationScrollTarget.START) {
+                                        (chatListState.layoutInfo.totalItemsCount -
+                                            if (conversation?.hasMore == true) 2 else 1).coerceAtLeast(0)
+                                    } else 0,
+                                )
+                            }
+                        },
                     )
                 }
             }
