@@ -142,6 +142,27 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun proactiveIntimacyKeywordMakesCharacterMoreInitiative() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+        )
+        assertTrue(hasProactiveIntimacyIntent("这次你主动一点，别躲", previous))
+
+        val prompt = engine.prompt("这次你主动一点，别躲", previous)
+
+        assertTrue(prompt.contains("主动亲密意图"))
+        assertTrue(prompt.contains("提高主动性"))
+        assertTrue(prompt.contains("主动靠近、发起或承接亲昵动作"))
+        assertTrue(prompt.contains("不含糊跳过或突然转场"))
+    }
+
+    @Test
+    fun genericRelationshipInitiativeDoesNotTriggerProactiveIntimacy() {
+        assertFalse(hasProactiveIntimacyIntent("一直都是我主动，感觉投入失衡"))
+    }
+
+    @Test
     fun interactionIntentAvoidsKeywordFalsePositives() {
         assertEquals(
             ChatInteractionIntent.NORMAL,
