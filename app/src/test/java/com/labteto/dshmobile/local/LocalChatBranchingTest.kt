@@ -81,6 +81,14 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun consecutiveUserTurnsAreNotEligibleForBranchEditing() {
+        val first = message("u1", "user", "第一条", 1)
+        val queued = message("u2", "user", "排队补充", 2)
+
+        assertTrue(!chatBranchingEligible(listOf(first, queued)))
+    }
+
+    @Test
     fun branchStateRoundTripsThroughEventPayload() {
         val user = message("u1", "user", "你好", 1)
         val state = upsertChatBranchNode(
