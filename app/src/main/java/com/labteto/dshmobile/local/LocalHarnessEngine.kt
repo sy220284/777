@@ -727,7 +727,12 @@ class LocalHarnessEngine @Inject constructor(
 
     fun configureChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
-        if (snapshot.running || snapshot.loading || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (
+            snapshot.running ||
+            snapshot.loading ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return
         scope.launch {
             val personaId = snapshot.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
@@ -766,6 +771,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.running ||
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled ||
             snapshot.messages.any { it.role == "user" || it.role == "assistant" }
         ) return
 
@@ -797,6 +803,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.running ||
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled ||
             snapshot.messages.any { it.role == "user" || it.role == "assistant" }
         ) return
 
@@ -856,7 +863,12 @@ class LocalHarnessEngine @Inject constructor(
     /** A story direction is a user preference for future turns, never a synthetic user message. */
     fun selectChatDirection(direction: String?) {
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return
         val selected = direction?.let { requested ->
             snapshot.replySuggestions.firstOrNull { it.direction == requested }
                 ?.let { com.labteto.dshmobile.local.chat.ChatNarrativeDirection(it.label, it.direction) }
@@ -881,7 +893,12 @@ class LocalHarnessEngine @Inject constructor(
      */
     suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
         val snapshot = _state.value
-        check(!snapshot.running && !snapshot.loading && snapshot.usageMode == LocalUsageMode.CHAT) {
+        check(
+            !snapshot.running &&
+                !snapshot.loading &&
+                snapshot.usageMode == LocalUsageMode.CHAT &&
+                !snapshot.groupChat.enabled
+        ) {
             "当前状态暂时不能同步默认角色"
         }
         return withContext(Dispatchers.IO) {
@@ -2548,14 +2565,14 @@ class LocalHarnessEngine @Inject constructor(
                 put("mode", "group-chat")
                 put("replies", deliveredReplies)
             })
-            checkpointModelHistoryAtTurnBoundary("group/completed")
+            checkpointModelHistory("group/completed")
             persist()
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "aborted")
                 put("mode", "group-chat")
             })
-            checkpointModelHistoryAtTurnBoundary("group/cancelled")
+            checkpointModelHistory("group/cancelled")
             persist()
             throw cancelled
         } catch (error: Exception) {
@@ -2566,7 +2583,7 @@ class LocalHarnessEngine @Inject constructor(
                 put("mode", "group-chat")
                 put("detail", detail.take(2_000))
             })
-            checkpointModelHistoryAtTurnBoundary("group/failed")
+            checkpointModelHistory("group/failed")
             persist()
         } finally {
             _state.update {
@@ -4646,7 +4663,11 @@ class LocalHarnessEngine @Inject constructor(
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
         )
         var wroteHistoryCheckpoint = false
-        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+        if (_state.value.groupChat.enabled) {
+            rebuildGroupModelHistoryFromTranscript(projectedTranscript.messages)
+            checkpointModelHistory("load/group-speaker-rebuild")
+            wroteHistoryCheckpoint = true
+        } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             replaceSystemModelHistory(
                 buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
             )
