@@ -86,6 +86,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -146,6 +147,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -165,11 +167,33 @@ fun LocalHarnessScreen(
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val modeIntroPreferences = remember(context) {
+        context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE)
+    }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
     var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
+    var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
+
+    LaunchedEffect(modeIntro) {
+        if (modeIntro != null) {
+            delay(6_000)
+            modeIntro = null
+        }
+    }
+
+    fun switchUsageMode(target: LocalUsageMode) {
+        if (target == state.usageMode) return
+        val key = "shown_" + target.name.lowercase()
+        if (!modeIntroPreferences.getBoolean(key, false)) {
+            modeIntroPreferences.edit().putBoolean(key, true).apply()
+            modeIntro = target
+        }
+        viewModel.switchUsageMode(target)
+    }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -191,7 +215,7 @@ fun LocalHarnessScreen(
                 sessions = state.sessions,
                 usageMode = state.usageMode,
                 modeSwitchEnabled = !state.running,
-                onUsageModeChange = viewModel::switchUsageMode,
+                onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
@@ -244,6 +268,7 @@ fun LocalHarnessScreen(
             else -> LocalChat(
                 state = state,
                 gallery = gallery,
+                modeIntro = modeIntro,
                 onOpenMenu = { scope.launch { drawerState.open() } },
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
@@ -259,6 +284,7 @@ fun LocalHarnessScreen(
                 onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
                 onSelectChatDirection = viewModel::selectChatDirection,
+                onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -944,6 +970,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 private fun LocalChat(
     state: LocalHarnessState,
     gallery: List<PersonaGalleryEntry>,
+    modeIntro: LocalUsageMode?,
     onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
@@ -959,6 +986,7 @@ private fun LocalChat(
     onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onSelectChatDirection: (String?) -> Unit,
+    onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
     onDeny: (String) -> Unit,
@@ -1192,6 +1220,59 @@ private fun LocalChat(
                     onClick = onNewSession,
                     tint = colors.labelSecondary,
                 )
+            }
+        }
+
+        modeIntro?.let { mode ->
+            Surface(
+                color = colors.bgModulePlatform.copy(alpha = 0.94f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            ) {
+                Text(
+                    stringResource(
+                        if (mode == LocalUsageMode.CHAT) R.string.local_mode_intro_chat
+                        else R.string.local_mode_intro_work,
+                    ),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                )
+            }
+        }
+
+        state.personaCorrectionNotice?.takeIf {
+            state.usageMode == LocalUsageMode.CHAT
+        }?.let { notice ->
+            Surface(
+                color = colors.bgModulePlatform.copy(alpha = 0.94f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Text(
+                        stringResource(R.string.local_persona_correction_recorded),
+                        style = DsType.small13,
+                        color = colors.labelSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsButton(
+                        text = stringResource(R.string.local_persona_correction_undo),
+                        onClick = {
+                            onUndoPersonaCorrection(notice.id, notice.personaId, notice.correction)
+                        },
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
             }
         }
 
