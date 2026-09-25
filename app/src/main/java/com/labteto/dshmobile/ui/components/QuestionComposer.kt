@@ -53,8 +53,11 @@ import com.labteto.dshmobile.core.wire.dto.AskUserQuestionItem
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionOption
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlinx.coroutines.launch
 
 /**
@@ -171,7 +174,7 @@ internal fun QuestionsPanel(
                 .then(if (minimized) Modifier else Modifier.heightIn(max = cap))
                 .animateContentSize(DsAnimations.expand),
             shape = DsShapes.approvalCard,
-            color = colors.composerCard,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.BOTTOM, colors.composerCard),
             border = BorderStroke(1.dp, colors.borderL2),
             shadowElevation = 2.dp,
         ) {
@@ -368,7 +371,7 @@ private fun OptionRow(
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick),
         shape = DsShapes.menu,
-        color = if (selected) colors.accentTertiary else colors.bgModulePlatform,
+        color = if (selected) colors.accentTertiary else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         border = if (selected) BorderStroke(1.dp, colors.accent) else null,
     ) {
         Row(
@@ -495,9 +498,9 @@ private fun CustomAnswerField(
             onNext = { onContinue() },
         ),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = colors.bgLayer1,
-            unfocusedContainerColor = colors.bgLayer1,
-            disabledContainerColor = colors.bgLayer1,
+            focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+            unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+            disabledContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
             focusedIndicatorColor = colors.accent,
             unfocusedIndicatorColor = colors.borderL2,
         ),

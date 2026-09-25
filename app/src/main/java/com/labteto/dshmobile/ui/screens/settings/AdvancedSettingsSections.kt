@@ -48,6 +48,8 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -190,7 +192,7 @@ private fun DynamicSettingEditor(
                     anchor = {
                         Surface(
                             shape = DsShapes.row,
-                            color = colors.bgLayer2,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
@@ -489,7 +491,7 @@ internal fun DeepSeekPricingCard(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = DsShapes.block,
-                color = colors.bgLayer1,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             ) {
                 Column(
                     modifier = Modifier.padding(DsSpacing.medium),

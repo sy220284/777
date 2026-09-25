@@ -81,6 +81,7 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
@@ -90,8 +91,12 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import java.util.Locale
 
 /**
@@ -164,7 +169,7 @@ fun SettingsScreen(
         SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
             Column(
                 modifier = Modifier
@@ -174,25 +179,13 @@ fun SettingsScreen(
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    DsIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.common_back),
-                        onClick = {
-                            if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
-                        },
-                        containerColor = colors.bgLayer1,
-                        shadowElevation = 3.dp,
-                    )
-                    Text(
-                        title,
-                        style = DsType.large20,
-                        color = colors.labelPrimary,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.width(48.dp))
-                }
+                DsTopBar(
+                    title = title,
+                    onBack = {
+                        if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+                    },
+                    backContentDescription = stringResource(R.string.common_back),
+                )
 
                 when (page) {
                     SettingsPage.ROOT -> {
@@ -511,8 +504,8 @@ private fun PluginsSheet(inventory: PluginInventorySnapshot, onDismiss: () -> Un
             placeholder = { Text(stringResource(R.string.plugins_search_hint), style = DsType.std14) },
             singleLine = true,
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.bgLayer2,
-                unfocusedContainerColor = colors.bgLayer2,
+                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                 focusedIndicatorColor = colors.accent,
                 unfocusedIndicatorColor = colors.borderL2,
                 cursorColor = colors.accent,

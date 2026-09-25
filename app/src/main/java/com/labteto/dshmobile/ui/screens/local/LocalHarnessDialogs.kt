@@ -31,6 +31,8 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.launch
 
@@ -101,7 +103,7 @@ internal fun ChatPersonaPickerDialog(
         )
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = colors.bgModulePlatform,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -221,7 +223,7 @@ internal fun ApprovalDialog(
 
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = colors.bgModulePlatform,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -391,7 +393,7 @@ internal fun ChatPersonaDialog(
 
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = DsTheme.colors.bgModulePlatform,
+            color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(

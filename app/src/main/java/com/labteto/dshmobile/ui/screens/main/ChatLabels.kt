@@ -13,6 +13,8 @@ import com.labteto.dshmobile.core.wire.dto.JobStatus
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /** Shared label and status mappings for the chat surface. */
 
@@ -138,8 +140,8 @@ internal fun AgentPresetEntry.displayDescription(): String? =
 
 @Composable
 internal fun dialogTextFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = DsTheme.colors.bgLayer1,
-    unfocusedContainerColor = DsTheme.colors.bgLayer1,
+    focusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+    unfocusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
     focusedIndicatorColor = DsTheme.colors.accent,
     unfocusedIndicatorColor = DsTheme.colors.borderL2,
     cursorColor = DsTheme.colors.accent,

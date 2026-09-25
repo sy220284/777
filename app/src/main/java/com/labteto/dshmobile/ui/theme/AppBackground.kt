@@ -33,6 +33,17 @@ const val APP_BACKGROUND_FILE = "background"
 /** Coarse vertical regions used by foreground surfaces to adapt to the picture below them. */
 enum class BackgroundRegion { ALL, TOP, MIDDLE, BOTTOM }
 
+/** Visual weight for any foreground plate shown over a custom wallpaper. */
+enum class WallpaperSurfaceLevel {
+    PAGE,
+    CHROME,
+    CARD,
+    INPUT,
+    FLOATING,
+    DIALOG,
+    MENU,
+}
+
 /** Lightweight image statistics. Every value is normalized to 0..1. */
 data class BackgroundRegionStats(
     val luminance: Float = 0.5f,
@@ -94,6 +105,44 @@ data class AppBackgroundState(
                 saturationPenalty * 0.08f
             ).coerceIn(minAlpha, maxAlpha)
         return base.copy(alpha = alpha)
+    }
+
+
+    /**
+     * Resolves one shared foreground-surface policy for wallpaper mode.
+     *
+     * Large page/chrome areas stay visually light so the wallpaper is never buried by a white
+     * slab. Smaller interaction surfaces progressively gain opacity to preserve readability.
+     * The same fallback opacities are used when adaptive contrast is disabled, so turning the
+     * adaptive analyzer off does not silently restore opaque cards and dialogs.
+     */
+    fun wallpaperSurface(
+        base: Color,
+        level: WallpaperSurfaceLevel,
+        region: BackgroundRegion = BackgroundRegion.ALL,
+    ): Color {
+        if (!hasImage) return base
+        if (level == WallpaperSurfaceLevel.PAGE) return Color.Transparent
+
+        val (minAlpha, maxAlpha, fallbackAlpha) = when (level) {
+            WallpaperSurfaceLevel.PAGE -> Triple(0f, 0f, 0f)
+            WallpaperSurfaceLevel.CHROME -> Triple(0.10f, 0.30f, 0.16f)
+            WallpaperSurfaceLevel.CARD -> Triple(0.44f, 0.68f, 0.54f)
+            WallpaperSurfaceLevel.INPUT -> Triple(0.46f, 0.70f, 0.56f)
+            WallpaperSurfaceLevel.FLOATING -> Triple(0.58f, 0.78f, 0.66f)
+            WallpaperSurfaceLevel.DIALOG -> Triple(0.70f, 0.86f, 0.78f)
+            WallpaperSurfaceLevel.MENU -> Triple(0.74f, 0.88f, 0.82f)
+        }
+
+        if (!adaptiveContrast || analysis == null) {
+            return base.copy(alpha = fallbackAlpha)
+        }
+        return surfaceColor(
+            base = base,
+            region = region,
+            minAlpha = minAlpha,
+            maxAlpha = maxAlpha,
+        )
     }
 }
 
@@ -286,5 +335,19 @@ internal fun analyzeBackground(bitmap: Bitmap): BackgroundAnalysis {
  * [DsColors.bgBase] otherwise.
  */
 @Composable
-fun DsColors.rootSurface(): Color =
-    if (LocalAppBackground.current != null) Color.Transparent else bgBase
+fun DsColors.wallpaperSurface(
+    level: WallpaperSurfaceLevel,
+    region: BackgroundRegion = BackgroundRegion.ALL,
+    base: Color = when (level) {
+        WallpaperSurfaceLevel.PAGE -> bgBase
+        WallpaperSurfaceLevel.CHROME -> bgBase
+        WallpaperSurfaceLevel.CARD -> bgLayer1
+        WallpaperSurfaceLevel.INPUT -> bgLayer2
+        WallpaperSurfaceLevel.FLOATING -> bgModulePlatform
+        WallpaperSurfaceLevel.DIALOG -> bgLayer2
+        WallpaperSurfaceLevel.MENU -> bgLayer3
+    },
+): Color = LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+
+@Composable
+fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)

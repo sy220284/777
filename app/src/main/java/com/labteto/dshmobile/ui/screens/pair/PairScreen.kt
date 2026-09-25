@@ -44,6 +44,9 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 
 /**
@@ -100,7 +103,7 @@ fun PairScreen(
         if (autoScanOnOpen) scanner.launch(scanOptions)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -256,8 +259,8 @@ private fun PairFailureBlock(failure: PairFailure) {
 
 @Composable
 private fun pairFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = DsTheme.colors.bgLayer1,
-    unfocusedContainerColor = DsTheme.colors.bgLayer1,
+    focusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+    unfocusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
     focusedIndicatorColor = DsTheme.colors.accent,
     unfocusedIndicatorColor = DsTheme.colors.borderL2,
     cursorColor = DsTheme.colors.accent,

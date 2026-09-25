@@ -142,6 +142,8 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import java.util.Locale
 import kotlin.math.roundToInt
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -390,7 +392,7 @@ private fun LocalModeDrawer(
     }
 
     ModalDrawerSheet(
-        drawerContainerColor = colors.sidebar,
+        drawerContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, base = colors.sidebar),
         modifier = Modifier.fillMaxHeight(),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
@@ -581,7 +583,7 @@ private fun LocalModeDrawer(
         ) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = colors.bgModulePlatform,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
                 shadowElevation = 10.dp,
                 modifier = Modifier.pointerInput(Unit) {
                     detectDragGestures { change, drag ->
@@ -818,7 +820,7 @@ private fun formatCny(value: Double): String =
 @Composable
 private fun LoadingScreen() {
     Box(
-        Modifier.fillMaxSize().background(DsTheme.colors.bgBase),
+        Modifier.fillMaxSize().background(DsTheme.colors.rootSurface()),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(color = DsTheme.colors.brandPrimary)
@@ -850,7 +852,7 @@ private fun LocalConfiguration(
                 icon = FeatherIcons.Menu,
                 contentDescription = "菜单",
                 onClick = onOpenMenu,
-                containerColor = colors.bgLayer1,
+                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 3.dp,
             )
             Text(
@@ -972,38 +974,16 @@ private fun LocalChat(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val adaptiveChatBackground =
-        state.usageMode == LocalUsageMode.CHAT &&
-            backgroundState.hasImage &&
-            backgroundState.adaptiveContrast
-    val adaptiveWorkBackground =
-        state.usageMode == LocalUsageMode.WORK &&
-            backgroundState.hasImage &&
-            backgroundState.adaptiveContrast
-    val rootSurfaceColor = if (adaptiveWorkBackground) {
-        backgroundState.surfaceColor(
-            base = colors.bgBase,
-            region = BackgroundRegion.ALL,
-            minAlpha = 0.90f,
-            maxAlpha = 0.98f,
-        )
-    } else {
-        colors.rootSurface()
-    }
+    val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
     val headerChipColor = if (backgroundState.hasImage) Color.Transparent else colors.bgModulePlatform
-    val streamingSurfaceColor = if (adaptiveChatBackground) {
-        backgroundState.surfaceColor(
-            base = colors.bgBase,
-            region = BackgroundRegion.MIDDLE,
-            minAlpha = 0.90f,
-            maxAlpha = 0.97f,
-        )
-    } else {
-        colors.bgModulePlatform
-    }
+    val streamingSurfaceColor = backgroundState.wallpaperSurface(
+        base = colors.bgModulePlatform,
+        level = WallpaperSurfaceLevel.CARD,
+        region = BackgroundRegion.MIDDLE,
+    )
     val composerSurfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
@@ -1461,7 +1441,7 @@ private fun LocalChat(
                         onClick = { showAttachmentPicker = true },
                         enabled = !state.running,
                         tint = colors.labelPrimary,
-                        containerColor = colors.bgModulePlatform,
+                        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.BOTTOM),
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
@@ -1896,7 +1876,7 @@ private fun ExecutionStatusCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgModulePlatform,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             Modifier.padding(DsSpacing.comfortable),
@@ -2002,17 +1982,15 @@ private fun LocalMessageRow(
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
         else -> {
-            val adaptiveReadingLayer =
-                chatMode && backgroundState.hasImage && backgroundState.adaptiveContrast
-            val readingModifier = if (adaptiveReadingLayer) {
+            val readingLayer = chatMode && backgroundState.hasImage
+            val readingModifier = if (readingLayer) {
                 Modifier
                     .fillMaxWidth()
                     .background(
-                        backgroundState.surfaceColor(
+                        backgroundState.wallpaperSurface(
                             base = colors.bgBase,
+                            level = WallpaperSurfaceLevel.CARD,
                             region = BackgroundRegion.MIDDLE,
-                            minAlpha = 0.90f,
-                            maxAlpha = 0.97f,
                         ),
                         RoundedCornerShape(18.dp),
                     )
@@ -2053,7 +2031,7 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = colors.bgModulePlatform,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),

@@ -919,7 +919,7 @@
     <string name="tasks_repeat_interval">重复间隔</string>
     <string name="tasks_repeat_hint">留空为单次，周期任务间隔至少 15 分钟</string>
     <string name="tasks_create">创建</string>
-    <string name="tasks_create_invalid">请填写任务；周期任务间隔至少 15 分钟。</string>
+    <string name="tasks_create_invalid">请填写任务并选择未来的执行时间；自定义周期至少 1 小时。</string>
     <string name="tools_external_services_hint">需要时再连接 HTTP 工具服务</string>
     <string name="tools_capability_group">可用能力</string>
     <string name="tools_connection_group">外部连接</string>
@@ -972,4 +972,17 @@
     <string name="local_persona_picker_saved_hint">已保存人物</string>
     <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
 
+<string name="tasks_schedule_label">执行方式</string>
+<string name="tasks_schedule_once">一次</string>
+<string name="tasks_schedule_daily">每天</string>
+<string name="tasks_schedule_weekly">每周</string>
+<string name="tasks_schedule_custom">自定义</string>
+<string name="tasks_first_run_value">首次执行：%1$s</string>
+<string name="tasks_custom_hours">重复间隔（小时）</string>
+<string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
+<string name="tasks_every_hours">每 %1$d 小时</string>
+<string name="tools_capability_group_hint">这里展示当前已加载能力；带箭头的项目可直接管理，其余由智能体按任务需要调用。</string>
+<string name="tools_capability_agent_available">由智能体按需调用</string>
+<string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
+<string name="chat_composer_add_attachment">添加附件</string>
 </resources>

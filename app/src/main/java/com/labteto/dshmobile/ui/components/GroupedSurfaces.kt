@@ -29,6 +29,8 @@ import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 
 /** Large borderless surface used for mobile setting groups and capability panels. */
@@ -42,7 +44,7 @@ fun DsGroupCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(DsShapes.block)
-            .background(colors.bgLayer1)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
             .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
         content = content,
     )
@@ -130,7 +132,7 @@ fun DsQuickActionTile(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        color = colors.bgModulePlatform,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         shape = DsShapes.block,
     ) {
         Column(

@@ -83,6 +83,8 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -149,7 +151,7 @@ fun DetailsPanel(
 
     Surface(
         modifier = modifier.fillMaxHeight(),
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
         shadowElevation = 8.dp,
     ) {
         Box {
