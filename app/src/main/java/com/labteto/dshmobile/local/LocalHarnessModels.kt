@@ -90,6 +90,7 @@ data class LocalSessionSummary(
     val title: String,
     val updatedAt: Long,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
+    val chatMode: LocalChatMode = LocalChatMode.SINGLE,
     val blank: Boolean = false,
 )
 
