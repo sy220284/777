@@ -782,6 +782,7 @@ class LocalHarnessEngine @Inject constructor(
                     chatPersona = saved,
                     chatState = ChatCharacterState(),
                     replySuggestions = emptyList(),
+                    chatBranches = LocalChatBranchState(),
                     handoffSummary = null,
                 )
             }
@@ -812,6 +813,7 @@ class LocalHarnessEngine @Inject constructor(
                     chatPersona = saved,
                     chatState = ChatCharacterState(),
                     replySuggestions = emptyList(),
+                    chatBranches = LocalChatBranchState(),
                     handoffSummary = null,
                 )
             }
@@ -1451,6 +1453,7 @@ class LocalHarnessEngine @Inject constructor(
                             chatPersona = chatPersona,
                             chatState = chatState,
                             replySuggestions = emptyList(),
+                            chatBranches = LocalChatBranchState(),
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -3866,6 +3869,12 @@ class LocalHarnessEngine @Inject constructor(
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
+            chatBranches = syncChatBranchState(
+                current = projectedControls.chatBranches,
+                activeMessages = projectedTranscript.messages,
+                chatState = stored.chatState,
+                replySuggestions = stored.replySuggestions,
+            ),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -4058,6 +4067,7 @@ class LocalHarnessEngine @Inject constructor(
             personaId = state.personaId,
             chatState = state.chatState,
             replySuggestions = state.replySuggestions,
+            chatBranches = state.chatBranches,
             galleryId = state.galleryId,
             galleryStoryId = state.galleryStoryId,
             gallerySaveSuppressedThrough = state.gallerySaveSuppressedThrough,
