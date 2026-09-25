@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -240,6 +241,7 @@ fun LocalHarnessScreen(
                 onUsageModeChange = viewModel::switchUsageMode,
                 onConfigureChatPersona = viewModel::configureChatPersona,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
+                onSelectChatDirection = viewModel::selectChatDirection,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -804,6 +806,7 @@ private fun LocalChat(
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    onSelectChatDirection: (String?) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
     onDeny: (String) -> Unit,
@@ -825,8 +828,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgBase,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.50f,
-            maxAlpha = 0.86f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.rootSurface()
@@ -835,8 +838,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgModulePlatform,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.58f,
-            maxAlpha = 0.90f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgModulePlatform
@@ -845,8 +848,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgBase,
             region = BackgroundRegion.MIDDLE,
-            minAlpha = 0.58f,
-            maxAlpha = 0.86f,
+            minAlpha = 0.90f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgModulePlatform
@@ -855,8 +858,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.composerCard,
             region = BackgroundRegion.BOTTOM,
-            minAlpha = 0.84f,
-            maxAlpha = 0.97f,
+            minAlpha = 0.92f,
+            maxAlpha = 0.98f,
         )
     } else {
         colors.composerCard
@@ -882,8 +885,6 @@ private fun LocalChat(
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
-    var suggestionInitialized by remember(state.sessionId) { mutableStateOf(false) }
-    var lastSuggestionKey by remember(state.sessionId) { mutableStateOf("") }
     var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -891,27 +892,7 @@ private fun LocalChat(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
-    val suggestionKey = remember(state.replySuggestions) {
-        state.replySuggestions.joinToString("|") { suggestion ->
-            suggestion.label + "\u0000" + suggestion.text
-        }
-    }
-
-    LaunchedEffect(suggestionKey, state.usageMode) {
-        if (state.usageMode != LocalUsageMode.CHAT) {
-            showReplySuggestions = false
-            return@LaunchedEffect
-        }
-        if (!suggestionInitialized) {
-            suggestionInitialized = true
-            lastSuggestionKey = suggestionKey
-        } else if (suggestionKey.isBlank()) {
-            lastSuggestionKey = ""
-        } else if (suggestionKey != lastSuggestionKey) {
-            lastSuggestionKey = suggestionKey
-            showReplySuggestions = true
-        }
-    }
+    LaunchedEffect(state.sessionId, state.usageMode) { showReplySuggestions = false }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
@@ -1248,9 +1229,30 @@ private fun LocalChat(
             shadowElevation = if (adaptiveChatBackground) 2.dp else 1.dp,
         ) {
             Column(
-                Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                if (state.usageMode == LocalUsageMode.CHAT) {
+                    state.chatState.narrativeDirection?.let { selected ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.local_story_direction_selected, selected.label),
+                                style = DsType.small13Strong,
+                                color = colors.labelSecondary,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_story_direction_clear),
+                                onClick = { onSelectChatDirection(null) },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                                enabled = !state.running,
+                            )
+                        }
+                    }
+                }
                 if (attachments.isNotEmpty()) {
                     attachments.forEachIndexed { index, attachment ->
                         ImportedAttachmentRow(
@@ -1308,7 +1310,7 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
-                        state.replySuggestions.isNotEmpty()
+                        state.replySuggestions.any { it.direction.isNotBlank() }
                     ) {
                         DsButton(
                             text = stringResource(R.string.local_reply_suggestions_open),
@@ -1408,21 +1410,39 @@ private fun LocalChat(
             onDismiss = { showPersonaEditor = false },
         )
     }
-    if (showReplySuggestions && state.replySuggestions.isNotEmpty()) {
+    if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
+        state.replySuggestions.any { it.direction.isNotBlank() }) {
         DsBottomSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
         ) {
-            state.replySuggestions.forEach { suggestion ->
-                DsButton(
-                    text = suggestion.label + " · " + suggestion.text,
+            Text(
+                stringResource(R.string.local_story_direction_hint),
+                style = DsType.small13,
+                color = colors.labelSecondary,
+            )
+            state.replySuggestions.filter { it.direction.isNotBlank() }.forEach { suggestion ->
+                val selected = state.chatState.narrativeDirection?.guidance == suggestion.direction
+                Surface(
                     onClick = {
-                        drafts[state.sessionId] = suggestion.text
+                        onSelectChatDirection(suggestion.direction)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Outline,
-                )
+                    enabled = !state.running,
+                    shape = DsShapes.row,
+                    color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                    border = BorderStroke(1.dp, if (selected) colors.labelSecondary else colors.borderL2),
+                ) {
+                    Column(
+                        Modifier.heightIn(min = DsSpacing.touchTarget)
+                            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        Text(suggestion.label, style = DsType.std14Strong, color = colors.labelPrimary)
+                        Text(suggestion.impact, style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
             }
         }
     }
@@ -1526,8 +1546,8 @@ private fun LocalUsageModePill(
         backgroundState.surfaceColor(
             base = colors.bgModulePlatform,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.62f,
-            maxAlpha = 0.92f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgLayer1
@@ -1550,17 +1570,17 @@ private fun LocalUsageModePill(
                 val active = selected == mode
                 Box(
                     modifier = Modifier
-                        .heightIn(min = 34.dp)
+                        .heightIn(min = DsSpacing.touchTarget)
                         .clip(DsShapes.pillFull)
-                        .background(if (active) colors.accent else Color.Transparent)
+                        .background(if (active) colors.labelPrimary else Color.Transparent)
                         .clickable(enabled = enabled) { onSelect(mode) }
-                        .padding(horizontal = 22.dp),
+                        .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         stringResource(labelRes),
                         style = DsType.small13Strong,
-                        color = if (active) colors.onAccent else colors.labelSecondary,
+                        color = if (active) colors.bgBase else colors.labelSecondary,
                     )
                 }
             }
@@ -1764,8 +1784,8 @@ private fun LocalMessageRow(
                         backgroundState.surfaceColor(
                             base = colors.bgBase,
                             region = BackgroundRegion.MIDDLE,
-                            minAlpha = 0.28f,
-                            maxAlpha = 0.70f,
+                            minAlpha = 0.90f,
+                            maxAlpha = 0.97f,
                         ),
                         RoundedCornerShape(18.dp),
                     )

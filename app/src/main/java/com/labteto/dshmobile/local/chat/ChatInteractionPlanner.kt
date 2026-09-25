@@ -53,13 +53,23 @@ data class ChatCharacterState(
     val shareDesire: Int = 50,
     val dynamics: RelationshipDynamics = RelationshipDynamics(),
     val userPattern: UserChatPattern = UserChatPattern(),
+    val narrativeDirection: ChatNarrativeDirection? = null,
     val updatedAt: Long = 0L,
+)
+
+@Serializable
+data class ChatNarrativeDirection(
+    val label: String,
+    val guidance: String,
 )
 
 @Serializable
 data class ChatReplySuggestion(
     val label: String,
-    val text: String,
+    // Kept for decoding saved suggestions from older sessions; never used as a reply draft.
+    val text: String = "",
+    val direction: String = "",
+    val impact: String = "",
 )
 
 @Serializable
@@ -78,7 +88,7 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
     ): String = buildString {
-        appendLine("你负责维护角色聊天的隐藏关系状态、证据账本、用户沟通习惯，并生成用户下一句回复建议。")
+        appendLine("你负责维护角色聊天的隐藏关系状态、证据账本、用户沟通习惯，并在有真实分歧点时提出后续剧情走向。")
         appendLine("不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。")
         appendLine("角色：${persona.name}")
         if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality}")
@@ -104,13 +114,14 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("已有推测=${state.dynamics.hypotheses.joinToString("；") { it.text }}")
         appendLine("仍未知=${state.dynamics.unknowns.joinToString("；")}")
         appendLine("共同经历=${state.dynamics.sharedMoments.joinToString("；")}")
+        state.narrativeDirection?.let { appendLine("用户当前选择的走向=${it.label}：${it.guidance}") }
         appendLine()
         appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine()
         appendLine("输出结构必须严格为：")
         appendLine(
-            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到4字方向","text":"用户可以直接发送的回复"}]}""",
+            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字走向","direction":"角色接下来应如何推动关系或剧情","impact":"这条走向可能带来的变化"}]}""",
         )
         appendLine("要求：")
         appendLine("1. stage 只能取 NEW / FAMILIAR / AMBIGUOUS / DATING / COMMITTED / CONFLICT / COOLING / SEPARATED / REPAIRING。")
@@ -120,8 +131,9 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("5. stage 只有出现明确关系事件或连续强证据时才建议变化；一次回复慢、一个表情、一次冷淡都不足以改阶段。")
         appendLine("6. sharedMoments 只保留双方真实发生且以后值得自然提起的共同经历，禁止虚构。")
         appendLine("7. userPattern 只从用户真实表达习惯渐进学习，不因单轮异常表达彻底改画像。")
-        appendLine("8. suggestions 生成3到4条，方向明显不同，禁止同义改写；必须贴合用户已形成的表达习惯。")
-        appendLine("9. 建议是用户对角色说的话，口语自然，不替用户做重大决定，不使用操控、羞辱、欺骗或绕过边界的策略。")
+        appendLine("8. 有自然的情节分歧时生成2到3条不同走向；日常闲聊没有分歧时返回空数组。走向必须贴合角色和已有故事。")
+        appendLine("9. direction 是给角色的后续叙事指引，impact 是用户能看懂的可能变化；不要写用户可直接发送的回复，不替用户说话或作重大决定。")
+        appendLine("10. 用户实际发言和明确纠正始终优先于已选走向；不得虚构已发生的事实、强制关系升级或引导操控、羞辱、欺骗和越界。")
     }.trim()
 
     fun parse(
@@ -150,13 +162,14 @@ class ChatInteractionPlanner @Inject constructor(
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
                     ChatReplySuggestion(
-                        label = suggestion.label.trim().take(8),
-                        text = suggestion.text.trim().take(240),
+                        label = suggestion.label.trim().take(12),
+                        direction = suggestion.direction.trim().take(200),
+                        impact = suggestion.impact.trim().take(120),
                     )
                 }
-                .filter { it.label.isNotBlank() && it.text.isNotBlank() }
-                .distinctBy { normalize(it.text) }
-                .take(4)
+                .filter { it.label.isNotBlank() && it.direction.isNotBlank() && it.impact.isNotBlank() }
+                .distinctBy { normalize(it.direction) }
+                .take(3)
                 .toList(),
         )
     }
@@ -229,6 +242,7 @@ class ChatInteractionPlanner @Inject constructor(
             } else previous.shareDesire,
             dynamics = dynamics,
             userPattern = pattern,
+            narrativeDirection = previous.narrativeDirection,
             updatedAt = System.currentTimeMillis(),
         )
     }

@@ -43,7 +43,7 @@ class LocalHarnessViewModel @Inject constructor(
             "请在聊天空闲时保存人设与故事"
         }
         withContext(Dispatchers.IO) {
-            galleryStore.save(snapshot.chatPersona, snapshot.sessionId, snapshot.messages, notes, existingId)
+            galleryStore.save(snapshot.chatPersona, snapshot.sessionId, snapshot.messages, snapshot.chatState, notes, existingId)
                 .also { _gallery.value = galleryStore.list() }
         }
     }
@@ -95,6 +95,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
+    fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value

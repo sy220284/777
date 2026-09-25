@@ -17,12 +17,22 @@ data class PersonaGalleryEntry(
     val persona: PersonaProfile,
     val storyNotes: String = "",
     val history: List<LocalHarnessMessage> = emptyList(),
+    val chatState: ChatCharacterState = ChatCharacterState(),
     val sourceSessionId: String = "",
     val updatedAt: Long = 0L,
 ) {
     /** Only a small, clearly labelled excerpt is sent to the model; the archive keeps the full story. */
     fun storyContext(): String = buildString {
         if (storyNotes.isNotBlank()) appendLine("剧情提要：${storyNotes.trim().take(2_500)}")
+        if (chatState.updatedAt > 0L) {
+            appendLine("保存时的关系：${chatState.relationshipState.take(80)}")
+            chatState.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let {
+                appendLine("已发生的共同经历：${it.joinToString("；").take(800)}")
+            }
+            chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let {
+                appendLine("仍待推进的线索：${it.joinToString("；").take(400)}")
+            }
+        }
         val excerpt = history.asReversed().asSequence()
             .filter { it.role == "user" || it.role == "assistant" }
             .map { "${if (it.role == "user") "用户" else persona.name}：${it.content.trim().take(600)}" }
@@ -52,6 +62,7 @@ class ChatPersonaGalleryStore @Inject constructor(
         persona: PersonaProfile,
         sourceSessionId: String,
         history: List<LocalHarnessMessage>,
+        chatState: ChatCharacterState,
         notes: String,
         existingId: String? = null,
     ): PersonaGalleryEntry {
@@ -63,6 +74,7 @@ class ChatPersonaGalleryStore @Inject constructor(
             persona = persona.copy(id = id),
             storyNotes = notes.trim().take(4_000),
             history = history.filter { it.role == "user" || it.role == "assistant" },
+            chatState = chatState,
             sourceSessionId = sourceSessionId,
             updatedAt = System.currentTimeMillis(),
         )

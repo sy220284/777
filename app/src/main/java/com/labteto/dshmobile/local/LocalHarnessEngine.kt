@@ -686,6 +686,27 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    /** A story direction is a user preference for future turns, never a synthetic user message. */
+    fun selectChatDirection(direction: String?) {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        val selected = direction?.let { requested ->
+            snapshot.replySuggestions.firstOrNull { it.direction == requested }
+                ?.let { com.labteto.dshmobile.local.chat.ChatNarrativeDirection(it.label, it.direction) }
+                ?: return
+        }
+        _state.update { current ->
+            if (current.sessionId != snapshot.sessionId) current else current.copy(
+                chatState = current.chatState.copy(narrativeDirection = selected),
+            )
+        }
+        eventLog.append("chat/direction", buildJsonObject {
+            put("label", selected?.label.orEmpty())
+            put("guidance", selected?.guidance.orEmpty())
+        })
+        persist()
+    }
+
     /**
      * Persist AI-generated fields into the real default persona and make the current chat use it.
      * This is suspendable so the UI only reports "synced" after the profile file and session state
@@ -1218,7 +1239,9 @@ class LocalHarnessEngine @Inject constructor(
                         PersonaProfile.DEFAULT_PERSONA_ID
                     }
                     val chatPersona = chatPersonaStore.get(personaId)
-                    val chatState = if (
+                    val chatState = if (galleryEntry != null && usageMode == LocalUsageMode.CHAT) {
+                        galleryEntry.chatState
+                    } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         mode == LocalConversationMode.CONTINUATION &&
                         sourceState.usageMode == LocalUsageMode.CHAT

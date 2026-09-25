@@ -97,6 +97,8 @@ internal fun PersonaGalleryDialog(
                 modifier = Modifier.fillMaxWidth(),
             )
             val filtered = entries.filter { it.persona.name.contains(search, ignoreCase = true) ||
+                it.persona.identity.contains(search, ignoreCase = true) ||
+                it.persona.worldSetting.contains(search, ignoreCase = true) ||
                 it.storyNotes.contains(search, ignoreCase = true) }
             if (filtered.isEmpty()) {
                 Text(if (entries.isEmpty()) "图集还空着，保存一次聊天就有第一张角色卡。" else "没有匹配的角色",
@@ -118,8 +120,16 @@ internal fun PersonaGalleryDialog(
         } else {
             Text(selected.persona.identity.ifBlank { "角色设定" }, style = DsType.small13,
                 color = DsTheme.colors.labelSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Text("已归档 ${selected.history.size} 条对白。新会话继承角色、剧情提要与最近片段；原会话仍在会话列表中。",
+            Text("已归档 ${selected.history.size} 条对白。新会话继承角色、保存时的关系与关键经历、剧情提要及最近片段；原会话仍在会话列表中。",
                 style = DsType.caption11, color = DsTheme.colors.labelSecondary)
+            if (selected.chatState.updatedAt > 0L) {
+                Text("保存时的关系：${selected.chatState.relationshipState}",
+                    style = DsType.small13, color = DsTheme.colors.labelSecondary)
+                selected.chatState.dynamics.sharedMoments.takeLast(3).takeIf { it.isNotEmpty() }?.let { moments ->
+                    Text("共同经历：${moments.joinToString("；")}",
+                        style = DsType.small13, color = DsTheme.colors.labelSecondary)
+                }
+            }
             DsButton(text = if (showHistory) "收起故事历史" else "查看完整故事历史",
                 onClick = { showHistory = !showHistory }, variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth())
