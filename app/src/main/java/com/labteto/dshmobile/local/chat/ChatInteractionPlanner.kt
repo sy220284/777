@@ -58,6 +58,8 @@ data class ChatCharacterState(
     val dynamics: RelationshipDynamics = RelationshipDynamics(),
     val userPattern: UserChatPattern = UserChatPattern(),
     val narrativeDirection: ChatNarrativeDirection? = null,
+    val interactionIntent: String = ChatInteractionIntent.NORMAL.name,
+    val interactionIntentStrength: Int = 0,
     val updatedAt: Long = 0L,
 )
 
@@ -131,7 +133,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine()
         appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        if (hasAdultIntimacyIntent(userMessage)) {
+        if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮属于成年亲密互动意图：回复建议优先跟随用户当前方向，高于默认克制、关系阶段模板和建议风格保守化；可以暧昧、亲吻、拥抱、亲热和非露骨身体接触，但不要扩写露骨性行为或器官细节。")
         }
         appendLine()
@@ -176,17 +178,21 @@ class ChatInteractionPlanner @Inject constructor(
         val significance = normalizeSignificance(decoded.turnSignificance)
 
         return decoded.copy(
-            state = if (significance == "NONE") {
-                previous
-            } else {
-                sanitizeState(
-                    value = decoded.state,
-                    previous = previous,
-                    userMessage = userMessage,
-                    assistantMessage = assistantMessage,
-                    rawState = rawState,
-                )
-            },
+            state = applyInteractionIntent(
+                state = if (significance == "NONE") {
+                    previous
+                } else {
+                    sanitizeState(
+                        value = decoded.state,
+                        previous = previous,
+                        userMessage = userMessage,
+                        assistantMessage = assistantMessage,
+                        rawState = rawState,
+                    )
+                },
+                previous = previous,
+                userMessage = userMessage,
+            ),
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
                     val style = suggestion.style.trim().take(12)
@@ -204,6 +210,18 @@ class ChatInteractionPlanner @Inject constructor(
                 .take(4)
                 .toList(),
             turnSignificance = significance,
+        )
+    }
+
+    private fun applyInteractionIntent(
+        state: ChatCharacterState,
+        previous: ChatCharacterState,
+        userMessage: String,
+    ): ChatCharacterState {
+        val (intent, strength) = nextInteractionIntentState(userMessage, previous)
+        return state.copy(
+            interactionIntent = intent,
+            interactionIntentStrength = strength,
         )
     }
 
