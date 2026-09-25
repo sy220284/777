@@ -36,6 +36,8 @@ class LocalHistoryCompactorTest {
         assertTrue(compaction.summary.contains("阶段结论：先补事件日志"))
         assertTrue(compaction.summary.contains("read"))
         assertEquals("system", compaction.messages.first()["role"].toString().trim('"'))
+        assertEquals("user", compaction.messages[1]["role"].toString().trim('"'))
+        assertTrue(compaction.messages[1]["content"].toString().contains("<compacted-summary>"))
         assertTrue(compaction.messages.any { it["content"].toString().contains("最新请求") })
         assertTrue(compaction.summary.length <= 16_000)
     }
@@ -124,6 +126,34 @@ class LocalHistoryCompactorTest {
         assertTrue(compaction.summary.contains("较早用户表达与事件"))
         assertTrue(compaction.summary.contains("较早角色回应与互动"))
         assertFalse(compaction.summary.contains("当前目标、计划"))
+    }
+
+    @Test
+    fun overflowCompactionPreservesAllSystemMessagesAndShrinksRequest() {
+        val history = listOf(
+            message("system", "固定系统规则"),
+            message("system", "当前角色设定"),
+            message("user", "很早的事情" + "旧".repeat(4_000)),
+            message("assistant", "很早的回应" + "旧".repeat(4_000)),
+            message("system", "当前关系状态"),
+            message("user", "现在继续聊" + "新".repeat(500)),
+            message("assistant", "继续" + "新".repeat(500)),
+        )
+
+        val compaction = LocalHistoryCompactor()
+            .compactForOverflow(history, LocalHistorySummaryMode.CHAT)
+            ?: error("expected overflow compaction")
+
+        val systems = compaction.messages
+            .filter { it["role"].toString().trim('"') == "system" }
+            .map { it["content"].toString() }
+        assertTrue(systems.any { it.contains("固定系统规则") })
+        assertTrue(systems.any { it.contains("当前角色设定") })
+        assertTrue(systems.any { it.contains("当前关系状态") })
+        assertEquals("user", compaction.messages.first { 
+            it["content"].toString().contains("<compacted-summary>")
+        }["role"].toString().trim('"'))
+        assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
     }
 
     @Test
