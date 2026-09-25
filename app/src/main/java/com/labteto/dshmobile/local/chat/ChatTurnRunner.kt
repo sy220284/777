@@ -136,10 +136,6 @@ class ChatTurnRunner @Inject constructor(
         if (state.unresolvedThreads.isNotEmpty()) {
             appendLine("还没聊完的事：${state.unresolvedThreads.joinToString("；")}")
         }
-        state.narrativeDirection?.let { direction ->
-            appendLine("【用户选择的后续走向】${direction.label}：${direction.guidance}")
-            appendLine("在接下来的互动中自然推进这一走向。用户本轮表达、人设、故事事实与边界优先；不要替用户说话，不要预设选择已经发生，也不要提及走向设置。")
-        }
         appendLine("主动倾向：${state.initiative}/100；分享欲：${state.shareDesire}/100")
         appendLine(
             "关系动力：温度${state.dynamics.warmth}/100，信任${state.dynamics.trust}/100，" +
