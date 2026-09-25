@@ -300,8 +300,15 @@ fun LocalHarnessScreen(
     if (showPersonaGallerySavePrompt && state.usageMode == LocalUsageMode.CHAT) {
         PersonaGallerySavePromptDialog(
             persona = state.chatPersona,
+            isUpdate = viewModel.currentGalleryNeedsUpdate(),
             canSave = !state.loading && !state.running,
-            onSaveCurrent = viewModel::saveCurrentToGallery,
+            onSaveCurrent = {
+                viewModel.saveCurrentToGallery(
+                    notes = "",
+                    existingId = state.galleryId,
+                    existingStoryId = state.galleryStoryId,
+                )
+            },
             onContinue = {
                 showPersonaGallerySavePrompt = false
                 showPersonaGallery = true
@@ -315,16 +322,19 @@ fun LocalHarnessScreen(
             entries = gallery,
             currentPersona = state.chatPersona,
             currentGalleryId = state.galleryId,
+            currentGalleryStoryId = state.galleryStoryId,
             currentSessionId = state.sessionId,
             canSave = !state.loading && !state.running,
             onSaveCurrent = viewModel::saveCurrentToGallery,
             onEditNotes = viewModel::editGalleryNotes,
+            onRenameStory = viewModel::renameGalleryStory,
             onInspect = viewModel::inspectGalleryPersona,
             onApplySuggestions = viewModel::applyGallerySuggestions,
             onDelete = viewModel::deleteGalleryEntry,
+            onDeleteStory = viewModel::deleteGalleryStory,
             onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
-            onStart = { id ->
-                if (viewModel.startFromGallery(id)) showPersonaGallery = false
+            onStart = { id, storyId, freshStory ->
+                if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
             },
             onDismiss = { showPersonaGallery = false },
         )
