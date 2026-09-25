@@ -836,6 +836,12 @@
     <string name="persona_gallery_save_failed">Save failed</string>
     <string name="persona_gallery_skip_save">Not now</string>
     <string name="persona_gallery_title">Character gallery</string>
+    <string name="persona_gallery_portrait_add">Add artwork</string>
+    <string name="persona_gallery_portrait_replace">Replace artwork</string>
+    <string name="persona_gallery_portrait_remove">Remove artwork</string>
+    <string name="persona_gallery_portrait_empty">Add character artwork for a spatial standee view</string>
+    <string name="persona_gallery_portrait_save_failed">Could not save character artwork</string>
+    <string name="persona_gallery_standee_meta">%1$d storylines · %2$d dialogue lines</string>
     <string name="persona_gallery_presets_title">Character presets</string>
     <string name="persona_gallery_presets_hint">Add a preset to your gallery before chatting. Presets contain only a spoiler-safe base persona; stories, relationships, and memories continue through the existing character system.</string>
     <string name="persona_gallery_preset_add">Add to gallery</string>
