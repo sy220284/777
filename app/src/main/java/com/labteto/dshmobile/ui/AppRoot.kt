@@ -91,10 +91,6 @@ fun AppRoot(
             )
             showSettings -> SettingsScreen(
                 onClose = { showSettings = false },
-                updateStatus = updateInstallStatus,
-                onCheckUpdate = {
-                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                },
             )
             showPair -> PairScreen(
                 autoScanOnOpen = autoScanPair,
