@@ -1314,7 +1314,7 @@ private fun LocalChat(
         }
 
         state.personaCorrectionNotice?.takeIf {
-            state.usageMode == LocalUsageMode.CHAT
+            state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
         }?.let { notice ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
@@ -1411,6 +1411,27 @@ private fun LocalChat(
                             EmptyLocalHarness { suggestion ->
                                 drafts[state.sessionId] = suggestion
                             }
+                        }
+                    }
+                }
+                if (
+                    transcriptItems.isEmpty() &&
+                    state.usageMode == LocalUsageMode.CHAT &&
+                    state.groupChat.enabled &&
+                    state.groupChat.members.size < 2
+                ) {
+                    item {
+                        DsCard {
+                            Text(
+                                stringResource(R.string.local_group_chat_setup_required),
+                                style = DsType.std14,
+                                color = colors.labelSecondary,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_group_chat_manage_members),
+                                onClick = { showGroupMemberPicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 }
@@ -1612,6 +1633,7 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
+                        !state.groupChat.enabled &&
                         state.replySuggestions.any { it.text.isNotBlank() }
                     ) {
                         DsButton(
@@ -1704,7 +1726,24 @@ private fun LocalChat(
             onDismiss = { onCancelQuestion(question.callId) },
         )
     }
-    if (showPersonaPicker && state.usageMode == LocalUsageMode.CHAT) {
+    if (
+        showGroupMemberPicker &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        state.groupChat.enabled
+    ) {
+        GroupChatMemberPickerSheet(
+            entries = gallery,
+            currentIds = state.groupChat.members.map { it.galleryId },
+            enabled = !state.running,
+            onSave = onConfigureGroupMembers,
+            onDismiss = { showGroupMemberPicker = false },
+        )
+    }
+    if (
+        showPersonaPicker &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled
+    ) {
         ChatPersonaPickerDialog(
             entries = gallery,
             currentPersona = state.chatPersona,
@@ -1808,8 +1847,12 @@ private fun LocalChat(
         }
     }
 
-    if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
-        state.replySuggestions.any { it.text.isNotBlank() }) {
+    if (
+        showReplySuggestions &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled &&
+        state.replySuggestions.any { it.text.isNotBlank() }
+    ) {
         DsBottomSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
