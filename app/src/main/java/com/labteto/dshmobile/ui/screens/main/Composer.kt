@@ -58,6 +58,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -170,6 +172,8 @@ internal fun Composer(
 ) {
     val colors = DsTheme.colors
     val haptics = LocalHapticFeedback.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     // A file that is still uploading has no receipt to cite yet, and one that failed never will;
     // the send affordance waits for the chips rather than sending a message that names neither.
     val attachmentsSettled = attachments.none { it is PendingAttachment.File && it.state !is FileUploadState.Ready }
@@ -177,6 +181,14 @@ internal fun Composer(
     val currentDraft by rememberUpdatedState(draft)
     val currentOnDraftChange by rememberUpdatedState(onDraftChange)
     val currentOnSend by rememberUpdatedState(onSend)
+
+    fun submitDraft() {
+        val text = currentDraft
+        currentOnDraftChange("")
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        currentOnSend(text)
+    }
 
     Surface(
         modifier = modifier
@@ -198,9 +210,7 @@ internal fun Composer(
                 modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
                     if (event.key == Key.Enter && (event.isCtrlPressed || event.isMetaPressed)) {
                         if (event.type == KeyEventType.KeyUp && canSend) {
-                            val text = currentDraft
-                            currentOnDraftChange("")
-                            currentOnSend(text)
+                            submitDraft()
                         }
                         true
                     } else false
@@ -294,10 +304,8 @@ internal fun Composer(
                     tint = if (canSend) Color.White else colors.labelTertiary,
                     enabled = canSend,
                     onClick = {
-                        val text = currentDraft
-                        currentOnDraftChange("")
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        currentOnSend(text)
+                        submitDraft()
                     },
                 )
 

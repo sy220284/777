@@ -75,7 +75,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -84,6 +83,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
@@ -112,6 +114,9 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.AppBrandIcon
+import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
+import com.labteto.dshmobile.ui.components.ConversationScrollTarget
+import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -797,9 +802,11 @@ private fun LocalChat(
     var suggestionInitialized by remember(state.sessionId) { mutableStateOf(false) }
     var lastSuggestionKey by remember(state.sessionId) { mutableStateOf("") }
     var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
-    var scrollShortcut by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+    val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
     val suggestionKey = remember(state.replySuggestions) {
         state.replySuggestions.joinToString("|") { suggestion ->
@@ -821,22 +828,6 @@ private fun LocalChat(
             lastSuggestionKey = suggestionKey
             showReplySuggestions = true
         }
-    }
-
-    LaunchedEffect(listState) {
-        var previousIndex = listState.firstVisibleItemIndex
-        var previousOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                val movingTowardBottom = index > previousIndex || (index == previousIndex && offset > previousOffset)
-                val movingTowardTop = index < previousIndex || (index == previousIndex && offset < previousOffset)
-                if (movingTowardBottom && listState.canScrollBackward) scrollShortcut = "top"
-                if (movingTowardTop && listState.canScrollForward) scrollShortcut = "bottom"
-                if (!listState.canScrollBackward && scrollShortcut == "top") scrollShortcut = null
-                if (!listState.canScrollForward && scrollShortcut == "bottom") scrollShortcut = null
-                previousIndex = index
-                previousOffset = offset
-            }
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
@@ -880,6 +871,7 @@ private fun LocalChat(
     }
 
     LaunchedEffect(state.sessionId) {
+        scrollHint.hide()
         attachments.clear()
         attachmentError = null
         showReplySuggestions = false
@@ -1041,7 +1033,7 @@ private fun LocalChat(
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -1093,33 +1085,20 @@ private fun LocalChat(
                 }
             }
 
-            val shortcut = scrollShortcut
-            if (shortcut == "top" && listState.canScrollBackward) {
-                ScrollShortcut(
-                    text = "↑",
-                    description = "回到顶部",
-                    modifier = Modifier.align(Alignment.BottomEnd)
-                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
-                ) {
+            ConversationScrollShortcut(
+                target = scrollHint.target,
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
+                onClick = { target ->
+                    scrollHint.hide()
                     scope.launch {
-                        listState.animateScrollToItem(0)
-                        scrollShortcut = null
+                        listState.animateScrollToItem(
+                            if (target == ConversationScrollTarget.START) 0
+                            else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0),
+                        )
                     }
-                }
-            } else if (shortcut == "bottom" && listState.canScrollForward) {
-                ScrollShortcut(
-                    text = "↓",
-                    description = "直达底部",
-                    modifier = Modifier.align(Alignment.BottomEnd)
-                        .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
-                ) {
-                    scope.launch {
-                        val target = transcriptItems.lastIndex.coerceAtLeast(0)
-                        listState.animateScrollToItem(target)
-                        scrollShortcut = null
-                    }
-                }
-            }
+                },
+            )
         }
 
         if (state.running && state.streamingAssistant.isNotBlank()) {
@@ -1292,6 +1271,8 @@ private fun LocalChat(
                                     onSend(input, selected)
                                     drafts[state.sessionId] = ""
                                     attachments.clear()
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
                                 }
                             },
                             enabled = input.isNotBlank() || attachments.isNotEmpty(),
@@ -1316,6 +1297,8 @@ private fun LocalChat(
                                 onSend(input, selected)
                                 drafts[state.sessionId] = ""
                                 attachments.clear()
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
                             },
                             size = DsButtonSize.Small,
                             enabled = input.isNotBlank() || attachments.isNotEmpty(),
@@ -1711,28 +1694,6 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
 private fun toolResultFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
         "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
-
-@Composable
-private fun ScrollShortcut(
-    text: String,
-    description: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    Surface(
-        modifier = modifier.size(42.dp)
-            .clickable(onClickLabel = description, onClick = onClick),
-        shape = CircleShape,
-        color = colors.bgLayer2,
-        shadowElevation = 4.dp,
-        tonalElevation = 2.dp,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(text, style = DsType.large20, color = colors.labelPrimary)
-        }
-    }
-}
 
 private const val MAX_LOCAL_IMAGE_SELECTION = 20
 
