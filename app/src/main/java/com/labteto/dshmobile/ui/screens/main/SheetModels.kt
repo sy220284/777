@@ -36,6 +36,8 @@ import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.launch
 
@@ -138,7 +140,7 @@ private fun ModelRow(
         // offers nothing to press: a phone has no hover to discover it with, so the row has to look
         // like a control while it is at rest. `bgModulePlatform` is the one surface that steps off
         // the sheet in both themes — the three `bgLayer` tokens are all pure white in light mode.
-        color = if (selected) colors.accentTertiary else colors.bgModulePlatform,
+        color = if (selected) colors.accentTertiary else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         border = if (selected) BorderStroke(1.dp, colors.accent) else null,
     ) {
         Column {
