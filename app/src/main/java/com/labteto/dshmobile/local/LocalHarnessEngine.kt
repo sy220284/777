@@ -5151,7 +5151,7 @@ class LocalHarnessEngine @Inject constructor(
         val toolNames = buildJsonArray {
             tools.forEach { element ->
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
-                function?.get("name")?.jsonPrimitive?.contentOrNull?.let(::add)
+                function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(name) }
             }
         }
         eventLog.append("request/header", buildJsonObject {
@@ -5385,9 +5385,10 @@ class LocalHarnessEngine @Inject constructor(
     ): List<JsonObject> {
         if (stableContext.isBlank() && dynamicContext.isBlank()) return history
 
-        val stable = stableContext.take(MAX_EPHEMERAL_CONTEXT_CHARS)
-        val separatorCost = if (stable.isNotBlank() && dynamicContext.isNotBlank()) 2 else 0
-        val dynamicBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - stable.length - separatorCost).coerceAtLeast(0)
+        val dynamicReserve = minOf(CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
+        val stableBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
+        val stable = stableContext.take(stableBudget)
+        val dynamicBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - stable.length).coerceAtLeast(0)
         val dynamic = dynamicContext.take(dynamicBudget)
         val result = history.toMutableList()
 
@@ -6006,6 +6007,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
+        const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
