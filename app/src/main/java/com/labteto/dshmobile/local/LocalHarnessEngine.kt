@@ -1878,6 +1878,16 @@ class LocalHarnessEngine @Inject constructor(
             put("latest", correction)
         })
         persist()
+        scope.launch {
+            delay(PERSONA_CORRECTION_UNDO_MILLIS)
+            _state.update { current ->
+                if (current.personaCorrectionNotice?.id == notice.id) {
+                    current.copy(personaCorrectionNotice = null)
+                } else {
+                    current
+                }
+            }
+        }
     }
 
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
@@ -4123,6 +4133,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
+        const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
         const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
