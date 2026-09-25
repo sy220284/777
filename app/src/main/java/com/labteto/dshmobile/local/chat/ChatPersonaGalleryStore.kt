@@ -45,6 +45,8 @@ data class PersonaGalleryStory(
 data class PersonaGalleryEntry(
     val id: String,
     val persona: PersonaProfile,
+    /** App-private character artwork used by the gallery's spatial standee presentation. */
+    val portraitPath: String = "",
     val stories: List<PersonaGalleryStory> = emptyList(),
     // V3 compatibility fields. They are migrated into stories and cleared on the first V4 read.
     val storyNotes: String = "",
@@ -644,6 +646,20 @@ class ChatPersonaGalleryStore internal constructor(
         )
         write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
         return merged
+    }
+
+    @Synchronized
+    fun updatePortraitPath(id: String, portraitPath: String): PersonaGalleryEntry? {
+        val doc = readNormalized()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return null
+        val clean = portraitPath.trim().take(1_024)
+        val now = System.currentTimeMillis()
+        val updated = current.copy(
+            portraitPath = clean,
+            updatedAt = now,
+        )
+        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        return updated
     }
 
     @Synchronized
