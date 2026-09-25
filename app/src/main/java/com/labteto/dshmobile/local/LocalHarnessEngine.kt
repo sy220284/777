@@ -1659,6 +1659,7 @@ class LocalHarnessEngine @Inject constructor(
                     sourceSessionId = currentSessionId,
                     subjectLabel = snapshot.chatPersona.name
                         .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
+                    subjectKey = chatRelationshipSubjectKey(snapshot),
                 )
             }.getOrNull()
         } else {
@@ -1683,6 +1684,30 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun chatRelationshipSubjectKey(snapshot: LocalHarnessState): String? =
+        snapshot.galleryId?.takeIf(String::isNotBlank)?.let { "gallery:$it" }
+            ?: snapshot.personaId
+                .takeIf { it.isNotBlank() && it != PersonaProfile.DEFAULT_PERSONA_ID }
+                ?.let { "persona:$it" }
+
+    private fun relationshipMemoryMatchesSubject(
+        memory: MemoryRecord,
+        snapshot: LocalHarnessState,
+    ): Boolean {
+        if (memory.kind == MemoryKind.RELATIONSHIP_PREFERENCE) return true
+        val currentKey = chatRelationshipSubjectKey(snapshot)
+        if (memory.subjectKey != null) return currentKey != null && memory.subjectKey == currentKey
+        if (memory.scope == MemoryScope.LINEAGE) return memory.lineageId == snapshot.lineageId
+
+        // Legacy global records predate subject keys. Keep only records whose text names the
+        // current character; never feed an unrelated unbound relationship into another persona.
+        val subject = snapshot.chatPersona.name.trim()
+            .takeIf { it.isNotBlank() && it != "默认角色" }
+            ?: return false
+        return memory.content.startsWith("关系状态：我和$subject｜") ||
+            memory.content.startsWith("关系对象：$subject｜")
+    }
+
     private fun chatRelationshipMemoryContext(
         query: String,
         snapshot: LocalHarnessState,
@@ -1699,21 +1724,27 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.chatPersona.relationship,
         ).filter(String::isNotBlank).joinToString(" ")
 
+        // Search a wider pool, then enforce character ownership before applying the final bound.
+        // This prevents unrelated high-scoring relationship memories from crowding out the current
+        // character's own history.
         val globalHits = memoryStore.search(
             query = semanticQuery,
             allowedScopes = setOf(MemoryScope.GLOBAL),
             projectId = null,
             lineageId = null,
             allowedKinds = relationshipKinds,
-            maxItems = 6,
-            maxChars = 2_400,
-        )
+            maxItems = 20,
+            maxChars = 8_000,
+        ).filter { relationshipMemoryMatchesSubject(it, snapshot) }
+            .take(6)
         val lineageRecent = memoryStore.listActive(
             allowedScopes = setOf(MemoryScope.LINEAGE),
             projectId = null,
             lineageId = snapshot.lineageId,
-            limit = 12,
-        ).filter { it.kind in relationshipKinds }
+            limit = 20,
+        ).filter {
+            it.kind in relationshipKinds && relationshipMemoryMatchesSubject(it, snapshot)
+        }
 
         val recalled = (lineageRecent + globalHits)
             .distinctBy { it.id }
@@ -1745,7 +1776,11 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = null,
             limit = 200,
         ).asSequence()
-            .filter { it.kind == MemoryKind.RELATIONSHIP_STATE && it.content.startsWith(prefix) }
+            .filter {
+                it.kind == MemoryKind.RELATIONSHIP_STATE &&
+                    relationshipMemoryMatchesSubject(it, snapshot) &&
+                    it.content.startsWith(prefix)
+            }
             .maxByOrNull { it.updatedAt }
             ?: return
 
@@ -1785,6 +1820,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("chat/relationship-hydrate", buildJsonObject {
             put("subject", subject)
+            put("subject_key", chatRelationshipSubjectKey(snapshot).orEmpty())
             put("state", stored)
             put("stage", stage)
             put("memory_id", latest.id)
