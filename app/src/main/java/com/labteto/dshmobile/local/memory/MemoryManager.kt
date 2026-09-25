@@ -25,6 +25,7 @@ class MemoryManager @Inject constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
+            subjectKey = candidate.subjectKey,
             importance = candidate.importance,
         )
     }
@@ -34,8 +35,18 @@ class MemoryManager @Inject constructor(
         lineageId: String?,
         sourceSessionId: String,
         subjectLabel: String? = null,
+        subjectKey: String? = null,
     ): MemoryRecord? {
-        val candidate = policy.extractChatRelationshipFact(text, subjectLabel) ?: return null
+        val extracted = policy.extractChatRelationshipFact(text, subjectLabel) ?: return null
+        val cleanLabel = subjectLabel?.trim()?.takeIf(String::isNotBlank)
+        val belongsToCharacter = subjectKey != null && cleanLabel != null && (
+            extracted.scope == MemoryScope.LINEAGE ||
+                extracted.content.startsWith("关系状态：我和$cleanLabel｜") ||
+                extracted.content.startsWith("关系对象：$cleanLabel｜")
+            )
+        val candidate = extracted.copy(
+            subjectKey = subjectKey.takeIf { belongsToCharacter },
+        )
         return remember(
             content = candidate.content,
             scope = candidate.scope,
@@ -44,6 +55,7 @@ class MemoryManager @Inject constructor(
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
             importance = candidate.importance,
+            subjectKey = candidate.subjectKey,
         )
     }
 
@@ -74,6 +86,7 @@ class MemoryManager @Inject constructor(
         lineageId: String?,
         sourceSessionId: String,
         importance: Int,
+        subjectKey: String? = null,
     ): MemoryRecord {
         val clean = content.trim()
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
@@ -83,6 +96,7 @@ class MemoryManager @Inject constructor(
             scope = scope,
             kind = kind,
             importance = importance.coerceIn(0, 100),
+            subjectKey = subjectKey,
         )
         val current = store.listActive(
             allowedScopes = setOf(scope),
