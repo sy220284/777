@@ -123,7 +123,7 @@ class LocalHarnessViewModel @Inject constructor(
         messageKey: String,
     ): Result<Unit> = runCatching {
         withContext(Dispatchers.IO) {
-            check(galleryStore.deleteHistoryMessage(id, messageKey)) { "归档对白已不存在" }
+            check(galleryStore.deleteHistoryMessage(id, messageKey)) { "gallery_archive_missing" }
             _gallery.value = galleryStore.list()
         }
     }
