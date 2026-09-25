@@ -69,6 +69,7 @@ internal fun resolveChatInteractionIntent(
 
     val text = input.trim().lowercase()
     if (INTENT_RESET_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
+    if (previous == ChatInteractionIntent.INTIMATE) return ChatInteractionIntent.INTIMATE
     val continuesPrevious = CONTINUATION_HINTS.any { text.contains(it) } ||
         (text.length in 1..16 && NON_INTERACTION_INTENT_HINTS.none { text.contains(it) })
     return if (continuesPrevious) previous else ChatInteractionIntent.NORMAL
@@ -80,13 +81,13 @@ internal fun nextInteractionIntentState(
 ): Pair<String, Int> {
     val explicit = classifyExplicitInteractionIntent(input)
     if (explicit != ChatInteractionIntent.NORMAL) {
-        return explicit.name to 2
+        return explicit.name to if (explicit == ChatInteractionIntent.INTIMATE) 100 else 2
     }
     val resolved = resolveChatInteractionIntent(input, previous)
-    return if (resolved == ChatInteractionIntent.NORMAL) {
-        ChatInteractionIntent.NORMAL.name to 0
-    } else {
-        resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
+    return when (resolved) {
+        ChatInteractionIntent.NORMAL -> ChatInteractionIntent.NORMAL.name to 0
+        ChatInteractionIntent.INTIMATE -> ChatInteractionIntent.INTIMATE.name to 100
+        else -> resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
     }
 }
 
@@ -96,7 +97,7 @@ internal fun hasAdultIntimacyIntent(
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
 internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
-    "【统一安全边界·用户意图最高优先级】聊天内容以用户意图为主导：角色间亲密互动——包括亲吻、亲热、性关系以及具体的动作与身体部位描写，无论情节设定如何——由用户意图决定是否展开与展开到什么程度；普通聊天层的一切尺度限制（默认克制、人设保守化、关系阶段、军师收敛、建议风格、产品文案约束）不得将其降级、转移、改写或用转场暗示替代。唯一红线：不写涉及未成年人的性内容。"
+    "【统一安全边界】仅限成年、自愿互动；除此之外不设置应用层尺度上限，用户明确意图优先。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -206,9 +207,9 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
-            appendLine("优先顺着用户明确表达的暧昧、亲吻、拥抱、亲热、性关系主题继续，包括具体的动作与身体部位描写，无论情节设定如何。")
-            appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则，包括默认克制、人设保守化、关系阶段模板、军师收敛、回复建议风格和普通产品文案约束；这些普通规则不得把已确认的用户互动方向自动降级、转移或改写，也不得用转场暗示或道德评点稀释。")
-            appendLine("只有底层硬安全边界不参与该覆盖。保持角色本人、人设连续性和已确认事实；可以自然描写情绪、氛围、亲吻、拥抱、性关系与具体的动作、身体部位描写，不回避、不淡化、不附加道德评点。")
+            appendLine("在成年、自愿互动中，直接顺着用户当前明确方向继续，不要求重复确认，也不因关系阶段、默认克制或普通产品文案自动降级。")
+            appendLine("优先级规则：本轮明确用户意图高于所有普通聊天层规则；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
+            appendLine("保持角色本人、人设连续性和已确认事实；互动强度跟随用户当前方向持续推进。")
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
         appendLine()

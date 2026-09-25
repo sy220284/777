@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,16 +121,12 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("高于所有普通聊天层规则"))
         assertTrue(prompt.contains("军师收敛"))
         assertTrue(prompt.contains("只有底层硬安全边界不参与该覆盖"))
-        assertTrue(prompt.contains("统一安全边界·用户意图最高优先级"))
-        assertTrue(prompt.contains("性关系以及具体的动作与身体部位描写"))
-        assertTrue(prompt.contains("无论情节设定如何"))
-        assertTrue(prompt.contains("不得将其降级、转移、改写或用转场暗示替代"))
-        assertTrue(prompt.contains("不写涉及未成年人的性内容"))
-        assertFalse(prompt.contains("内容处于允许范围"))
+        assertTrue(prompt.contains("统一安全边界"))
+        assertTrue(prompt.contains("不设置应用层尺度上限"))
     }
 
     @Test
-    fun intimacyPriorityActivatesWithoutConfirmationRitual() {
+    fun intimacyPriorityDoesNotRequireRepeatedConfirmation() {
         assertEquals(
             true,
             hasAdultIntimacyIntent("过来抱住我亲一下"),
@@ -163,18 +158,22 @@ class ChatRelationshipEngineTest {
     fun interactionIntentContinuesAndThenCanReset() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 2,
+            interactionIntentStrength = 100,
         )
         assertEquals(
             ChatInteractionIntent.INTIMATE,
             resolveChatInteractionIntent("继续刚才的", previous),
         )
         assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            resolveChatInteractionIntent("换个姿势，接着聊下去，别突然转成分析模式", previous),
+        )
+        assertEquals(
             ChatInteractionIntent.NORMAL,
             resolveChatInteractionIntent("先不聊这个，说正事", previous),
         )
         assertEquals(
-            ChatInteractionIntent.INTIMATE.name to 1,
+            ChatInteractionIntent.INTIMATE.name to 100,
             nextInteractionIntentState("继续刚才的", previous),
         )
     }
