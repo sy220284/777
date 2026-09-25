@@ -33,6 +33,8 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
             put("content", JsonPrimitive(message.content))
             put("created_at", JsonPrimitive(message.createdAt))
             message.toolName?.let { put("tool_name", JsonPrimitive(it)) }
+            message.speakerId?.let { put("speaker_id", JsonPrimitive(it)) }
+            message.speakerName?.let { put("speaker_name", JsonPrimitive(it)) }
         },
     )
 
@@ -103,21 +105,22 @@ private fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage
         } ?: return null
         val content = contentValue.contentOrNull ?: return null
         val createdAt = createdAtValue.longOrNull ?: return null
-        val toolNameValue = item["tool_name"]
-        val toolName = when (toolNameValue) {
-            null -> null
-            is JsonPrimitive -> {
-                if (!toolNameValue.isString) return null
-                toolNameValue.contentOrNull
-            }
-            else -> return null
+        fun optionalString(key: String): String? {
+            val value = item[key] ?: return null
+            if (value !is JsonPrimitive || !value.isString) return null
+            return value.contentOrNull
         }
+        val toolName = optionalString("tool_name")
+        val speakerId = optionalString("speaker_id")
+        val speakerName = optionalString("speaker_name")
 
         decoded += LocalHarnessMessage(
             id = id,
             role = role,
             content = content,
             toolName = toolName,
+            speakerId = speakerId,
+            speakerName = speakerName,
             createdAt = createdAt,
         )
     }
