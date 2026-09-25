@@ -111,6 +111,7 @@ import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
@@ -242,6 +243,7 @@ fun LocalHarnessScreen(
             state.loading -> LoadingScreen()
             else -> LocalChat(
                 state = state,
+                gallery = gallery,
                 onOpenMenu = { scope.launch { drawerState.open() } },
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
@@ -253,6 +255,8 @@ fun LocalHarnessScreen(
                 onNewSession = { showNewSessionMode = true },
                 onOpenRunCenter = { showRunCenter = true },
                 onConfigureChatPersona = viewModel::configureChatPersona,
+                onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
+                onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
                 onSelectChatDirection = viewModel::selectChatDirection,
                 onPlanModeChange = viewModel::setPlanMode,
@@ -939,6 +943,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalChat(
     state: LocalHarnessState,
+    gallery: List<PersonaGalleryEntry>,
     onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
@@ -950,6 +955,8 @@ private fun LocalChat(
     onNewSession: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onSelectGalleryPersona: (String) -> Boolean,
+    onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onSelectChatDirection: (String?) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -1017,7 +1024,10 @@ private fun LocalChat(
     var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
+    var creatingPersona by rememberSaveable { mutableStateOf(false) }
+    var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -1109,7 +1119,7 @@ private fun LocalChat(
                         .background(if (state.usageMode == LocalUsageMode.CHAT) Color.Transparent else headerChipColor)
                         .clickable(enabled = !state.running) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
-                                showPersonaEditor = true
+                                showPersonaPicker = true
                             } else if (state.configured) {
                                 showModelPicker = true
                             } else {
@@ -1139,6 +1149,12 @@ private fun LocalChat(
                                 )
                             }
                         }
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = colors.labelSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
                     } else {
                         Icon(
                             Icons.Outlined.Tune,
@@ -1541,12 +1557,45 @@ private fun LocalChat(
             onDismiss = { onCancelQuestion(question.callId) },
         )
     }
+    if (showPersonaPicker && state.usageMode == LocalUsageMode.CHAT) {
+        ChatPersonaPickerDialog(
+            entries = gallery,
+            currentPersona = state.chatPersona,
+            currentGalleryId = state.galleryId,
+            onSelect = onSelectGalleryPersona,
+            onCreate = {
+                showPersonaPicker = false
+                creatingPersona = true
+                personaEditorDraft = PersonaProfile(name = "")
+                showPersonaEditor = true
+            },
+            onEditCurrent = {
+                showPersonaPicker = false
+                creatingPersona = false
+                personaEditorDraft = state.chatPersona
+                showPersonaEditor = true
+            },
+            onDismiss = { showPersonaPicker = false },
+        )
+    }
     if (showPersonaEditor) {
         ChatPersonaDialog(
-            profile = state.chatPersona,
-            onSave = onConfigureChatPersona,
+            profile = personaEditorDraft ?: state.chatPersona,
+            onSave = { profile ->
+                if (creatingPersona) {
+                    onCreateChatPersona(profile)
+                } else {
+                    onConfigureChatPersona(profile)
+                }
+                personaEditorDraft = null
+                creatingPersona = false
+            },
             onAutoFill = onAutoFillChatPersona,
-            onDismiss = { showPersonaEditor = false },
+            onDismiss = {
+                showPersonaEditor = false
+                personaEditorDraft = null
+                creatingPersona = false
+            },
         )
     }
     if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
