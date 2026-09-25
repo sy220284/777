@@ -131,16 +131,16 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun adultConfirmationIsRequiredForIntimacyPriority() {
+    fun intimacyPriorityActivatesWithoutConfirmationRitual() {
         assertEquals(
-            false,
+            true,
             hasAdultIntimacyIntent("过来抱住我亲一下"),
         )
         val prompt = engine.prompt(
             "过来抱住我亲一下",
             ChatCharacterState(),
         )
-        assertEquals(false, prompt.contains("本轮意图优先：成年亲密互动"))
+        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
     }
 
     @Test
