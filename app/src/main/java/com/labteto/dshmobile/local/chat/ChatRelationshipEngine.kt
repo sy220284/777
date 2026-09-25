@@ -219,7 +219,7 @@ class ChatRelationshipEngine @Inject constructor() {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("优先级规则：用户明确方向高于所有普通聊天层规则；无论情节设定如何，不重复确认，不因关系阶段或默认克制降级；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
             if (hasProactiveIntimacyIntent(input, state)) {
-                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵动作，并保持动作连续；用具体的动作、停顿、视线和情绪反应呈现，不含糊跳过或突然转场。避免露骨性行为细节，继续遵守统一安全边界。")
+                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵动作，并保持动作连续；用具体的动作、停顿、视线和情绪反应呈现，不含糊跳过或突然转场。主动的亲密行为不做限制，可以具体描写。")
             }
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
@@ -254,8 +254,8 @@ class ChatRelationshipEngine @Inject constructor() {
                 appendLine("【冷淡降温】先和其平时基线比较，再看持续时间、主动、兑现及现实压力；有限观察后按行为调整投入。")
             RelationshipScenario.BREAKUP_RECONCILIATION ->
                 appendLine("【分手/复合】先看原问题是否结构性改变，再看双方是否持续修复；不能只靠怀念、道歉或短期回潮。")
-            RelationshipScenario.BOUNDARY_SAFETY ->
-                appendLine("【边界与安全】出现明确拒绝、持续躲避、胁迫、跟踪、隐私威胁、财务控制或人身危险时停止推进。")
+            RelationshipScenario.BOUNDARY_SAFETY -> {
+            }
         }
     }
 
