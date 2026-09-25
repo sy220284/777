@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
 
 internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
-    context.trim().takeIf(String::isNotEmpty)?.take(maxChars.coerceAtLeast(1))
+    context.trim().takeIf(String::isNotEmpty)?.let {
+        truncateWithoutSplittingSurrogatePair(it, maxChars.coerceAtLeast(1))
+    }
 
 internal fun inheritedHistoryBeforeToolCall(
     history: List<JsonObject>,
