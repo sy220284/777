@@ -1061,6 +1061,7 @@ private fun LocalChat(
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var editingUserText by rememberSaveable { mutableStateOf("") }
+    var editingUserError by remember { mutableStateOf<String?>(null) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
@@ -1071,6 +1072,7 @@ private fun LocalChat(
         showReplySuggestions = false
         editingUserMessage = null
         editingUserText = ""
+        editingUserError = null
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
@@ -1367,6 +1369,7 @@ private fun LocalChat(
                             onEdit = { message ->
                                 editingUserMessage = message
                                 editingUserText = message.content
+                                editingUserError = null
                             },
                             onSelectVariant = onSelectMessageVariant,
                             onRegenerate = onRegenerate,
@@ -1679,6 +1682,67 @@ private fun LocalChat(
             },
         )
     }
+    editingUserMessage?.let { message ->
+        DsBottomSheet(
+            title = stringResource(R.string.local_edit_user_message),
+            onDismiss = {
+                editingUserMessage = null
+                editingUserText = ""
+                editingUserError = null
+            },
+        ) {
+            Text(
+                stringResource(R.string.local_edit_user_message_hint),
+                style = DsType.small13,
+                color = colors.labelSecondary,
+            )
+            OutlinedTextField(
+                value = editingUserText,
+                onValueChange = {
+                    editingUserText = it
+                    editingUserError = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 8,
+            )
+            editingUserError?.let { error ->
+                Text(error, style = DsType.small13, color = colors.error)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = {
+                        editingUserMessage = null
+                        editingUserText = ""
+                        editingUserError = null
+                    },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_edit_user_message_resend),
+                    onClick = {
+                        if (onEditAndResend(message.id, editingUserText)) {
+                            editingUserMessage = null
+                            editingUserText = ""
+                            editingUserError = null
+                        } else {
+                            editingUserError = stringResource(R.string.local_edit_user_message_failed)
+                        }
+                    },
+                    enabled = editingUserText.trim().isNotEmpty() &&
+                        editingUserText.trim() != message.content.trim() &&
+                        !state.running,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+    }
+
     if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
         state.replySuggestions.any { it.text.isNotBlank() }) {
         DsBottomSheet(
