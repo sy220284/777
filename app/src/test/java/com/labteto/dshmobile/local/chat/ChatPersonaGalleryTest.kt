@@ -87,6 +87,28 @@ class ChatPersonaGalleryTest {
 
 
     @Test
+    fun legacySameDialogueWithDifferentIdsIsStillDeduplicated() {
+        val base = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
+            history = listOf(
+                LocalHarnessMessage("old-id", "user", "同一句对白", createdAt = 10L),
+            ),
+        )
+        val incoming = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(id = "gallery-1", name = "阿青"),
+            history = listOf(
+                LocalHarnessMessage("new-id", "user", "同一句对白", createdAt = 10L),
+            ),
+        )
+
+        val merged = mergeGalleryEntries(base, incoming)
+
+        assertEquals(1, merged.history.size)
+    }
+
+    @Test
     fun legacyDuplicateCharacterCardsCompactIntoNewestMasterProfile() {
         val older = PersonaGalleryEntry(
             id = "gallery-old",
