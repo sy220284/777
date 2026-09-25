@@ -73,8 +73,8 @@ internal class LocalHistoryCompactor(
         val compacted = buildList {
             add(history.first())
             add(buildJsonObject {
-                put("role", "system")
-                put("content", summary)
+                put("role", "user")
+                put("content", "<compacted-summary>\n$summary\n</compacted-summary>")
             })
             addAll(history.drop(start))
         }
@@ -89,6 +89,71 @@ internal class LocalHistoryCompactor(
             summary = summary,
             estimatedTokensBefore = estimatedTokensBefore,
             estimatedTokensAfter = estimatedTokensAfter,
+        )
+    }
+
+    fun compactForOverflow(
+        history: List<JsonObject>,
+        summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
+    ): LocalHistoryCompaction? {
+        if (history.size < 3) return null
+
+        val systemMessages = history.filter { it["role"].asText() == "system" }
+        val nonSystemMessages = history.filterNot { it["role"].asText() == "system" }
+        if (nonSystemMessages.size < 2) return null
+
+        val leadingSystem = systemMessages.firstOrNull() ?: buildJsonObject {
+            put("role", "system")
+            put("content", "")
+        }
+        val protectedSystems = systemMessages.drop(1)
+        val working = listOf(leadingSystem) + nonSystemMessages
+        val encodedChars = working.sumOf { it.toString().length }
+        val encodedTokens = working.sumOf { estimateModelTokens(it.toString()) }
+        val protectedTokens = protectedSystems.sumOf { estimateModelTokens(it.toString()) }
+        val aggressiveTailChars = minOf(
+            tailChars,
+            maxOf(1_000, encodedChars / 3),
+        )
+        val aggressiveTailTokens = maxOf(512, encodedTokens / 3)
+        val aggressiveSummaryChars = minOf(
+            maxSummaryChars,
+            maxOf(1_000, encodedChars / 8),
+        )
+        val overflowBudget = LocalHistoryBudget(
+            maxHistoryChars = 0,
+            tailChars = aggressiveTailChars,
+            maxSummaryChars = aggressiveSummaryChars,
+            maxToolResultChars = 1,
+            maxHistoryTokens = null,
+            tailTokens = aggressiveTailTokens,
+            maxToolResultTokens = 1,
+        )
+        val compacted = compact(
+            history = working,
+            budget = overflowBudget,
+            currentChars = encodedChars,
+            currentTokens = encodedTokens,
+            extraTokens = protectedTokens,
+            summaryMode = summaryMode,
+        ) ?: return null
+
+        val rebuilt = buildList {
+            if (systemMessages.isNotEmpty()) {
+                add(systemMessages.first())
+                addAll(protectedSystems)
+                addAll(compacted.messages.drop(1))
+            } else {
+                addAll(compacted.messages.drop(1))
+            }
+        }
+        val before = history.sumOf { estimateModelTokens(it.toString()) }
+        val after = rebuilt.sumOf { estimateModelTokens(it.toString()) }
+        if (after >= before) return null
+        return compacted.copy(
+            messages = rebuilt,
+            estimatedTokensBefore = before,
+            estimatedTokensAfter = after,
         )
     }
 
