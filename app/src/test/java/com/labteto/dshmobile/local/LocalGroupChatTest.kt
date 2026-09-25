@@ -147,6 +147,29 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun duplicateSpeakerPrefixIsRemovedBeforeDisplayAndHistory() {
+        val message = LocalHarnessMessage(
+            id = "a2",
+            role = "assistant",
+            content = "赵二：这事交给我。",
+            createdAt = 2L,
+            speakerId = zhao.galleryId,
+            speakerName = zhao.displayName,
+        )
+
+        assertEquals("这事交给我。", groupMessageVisibleContent(message))
+        assertEquals("赵二：这事交给我。", groupTranscriptLine(message))
+    }
+
+    @Test
+    fun speakerPrefixNormalizerSupportsCommonModelFormats() {
+        assertEquals("过来。", stripGroupSpeakerPrefix("赵二: 过来。", "赵二"))
+        assertEquals("过来。", stripGroupSpeakerPrefix("**赵二：** 过来。", "赵二"))
+        assertEquals("过来。", stripGroupSpeakerPrefix("【赵二】\n过来。", "赵二"))
+        assertEquals("赵二今天心情不错。", stripGroupSpeakerPrefix("赵二今天心情不错。", "赵二"))
+    }
+
+    @Test
     fun groupStateDefaultsToSingleAndNeedsExplicitGroupMode() {
         assertTrue(!LocalGroupChatState().enabled)
         assertTrue(LocalGroupChatState(mode = LocalChatMode.GROUP).enabled)
