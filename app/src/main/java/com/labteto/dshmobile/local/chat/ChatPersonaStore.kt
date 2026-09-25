@@ -106,6 +106,10 @@ class ChatPersonaStore internal constructor(
 
     private val durableFile = RecoveringChatDocumentFile(file)
 
+    private val backupFile = File(file.parentFile, "${file.name}.bak")
+    private var cachedDocument: PersonaDocument? = null
+    private var cachedStamp: DocumentStamp? = null
+
     @Synchronized
     fun list(): List<PersonaProfile> = read().personas.sortedByDescending(PersonaProfile::updatedAt)
 
@@ -205,11 +209,17 @@ class ChatPersonaStore internal constructor(
             .take(limit)
             .toList()
 
-    private fun read(): PersonaDocument =
-        durableFile.read(
+    private fun read(): PersonaDocument {
+        val stamp = documentStamp()
+        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
+        val document = durableFile.read(
             defaultValue = ::PersonaDocument,
             decode = { encoded -> json.decodeFromString(PersonaDocument.serializer(), encoded) },
         )
+        cachedDocument = document
+        cachedStamp = documentStamp()
+        return document
+    }
 
     private fun write(document: PersonaDocument) {
         val encoded = json.encodeToString(PersonaDocument.serializer(), document)
@@ -218,7 +228,23 @@ class ChatPersonaStore internal constructor(
                 json.decodeFromString(PersonaDocument.serializer(), candidate)
             }.isSuccess
         }
+        cachedDocument = document
+        cachedStamp = documentStamp()
     }
+
+    private fun documentStamp(): DocumentStamp = DocumentStamp(
+        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
+        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
+        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
+        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
+    )
+
+    private data class DocumentStamp(
+        val primaryModified: Long,
+        val primaryLength: Long,
+        val backupModified: Long,
+        val backupLength: Long,
+    )
 
     private companion object {
         const val MAX_FIELD_CHARS = 2_000
