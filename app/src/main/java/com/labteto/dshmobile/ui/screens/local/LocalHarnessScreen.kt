@@ -277,6 +277,33 @@ fun LocalHarnessScreen(
     ) {
         when {
             state.loading -> LoadingScreen()
+            showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
+                entries = gallery,
+                presets = viewModel.personaPresets,
+                currentPersona = state.chatPersona,
+                currentGalleryId = state.galleryId,
+                currentGalleryStoryId = state.galleryStoryId,
+                currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
+                currentSessionId = state.sessionId,
+                canSave = !state.loading && !state.running,
+                onSaveCurrent = viewModel::saveCurrentToGallery,
+                onEditNotes = viewModel::editGalleryNotes,
+                onRenameStory = viewModel::renameGalleryStory,
+                onInspect = viewModel::inspectGalleryPersona,
+                onApplySuggestions = viewModel::applyGallerySuggestions,
+                onDelete = viewModel::deleteGalleryEntry,
+                onDeleteStory = viewModel::deleteGalleryStory,
+                onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
+                onExport = viewModel::exportGalleryPersona,
+                onImport = viewModel::importGalleryPersona,
+                onInstallPreset = viewModel::installPersonaPreset,
+                onSetPortrait = viewModel::setGalleryPortrait,
+                onRemovePortrait = viewModel::removeGalleryPortrait,
+                onStart = { id, storyId, freshStory ->
+                    if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
+                },
+                onDismiss = { showPersonaGallery = false },
+            )
             else -> LocalChat(
                 state = state,
                 gallery = gallery,
@@ -359,34 +386,6 @@ fun LocalHarnessScreen(
                 showPersonaGallery = true
             },
             onDismiss = { showPersonaGallerySavePrompt = false },
-        )
-    }
-
-    if (showPersonaGallery && state.usageMode == LocalUsageMode.CHAT) {
-        PersonaGalleryDialog(
-            entries = gallery,
-            presets = viewModel.personaPresets,
-            currentPersona = state.chatPersona,
-            currentGalleryId = state.galleryId,
-            currentGalleryStoryId = state.galleryStoryId,
-            currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
-            currentSessionId = state.sessionId,
-            canSave = !state.loading && !state.running,
-            onSaveCurrent = viewModel::saveCurrentToGallery,
-            onEditNotes = viewModel::editGalleryNotes,
-            onRenameStory = viewModel::renameGalleryStory,
-            onInspect = viewModel::inspectGalleryPersona,
-            onApplySuggestions = viewModel::applyGallerySuggestions,
-            onDelete = viewModel::deleteGalleryEntry,
-            onDeleteStory = viewModel::deleteGalleryStory,
-            onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
-            onExport = viewModel::exportGalleryPersona,
-            onImport = viewModel::importGalleryPersona,
-            onInstallPreset = viewModel::installPersonaPreset,
-            onStart = { id, storyId, freshStory ->
-                if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
-            },
-            onDismiss = { showPersonaGallery = false },
         )
     }
 
