@@ -102,7 +102,6 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("关系变化必须渐进：一次热情不能自动升级亲密，一次冷淡不能自动判定关系结束；重大阶段变化需要明确事实或连续行为证据。")
         appendLine("任何关系判断都要在内部区分：已确认事实、暂定推测、仍未知。行为证据优先于 MBTI、星座、性别模板、网络套路和单次回复速度。")
         appendLine("长期状态只吸收稳定、高置信、以后仍会影响互动的信息；临时情绪、一次性猜测和读心不得升级成长期事实。")
-        appendLine("不使用操控、羞辱、嫉妒刺激、虚假承诺、服从测试、煤气灯、跟踪、胁迫或绕过同意来推进关系。")
         appendLine()
 
         appendDynamics(state.dynamics)
@@ -164,7 +163,6 @@ class ChatRelationshipEngine @Inject constructor() {
             RelationshipScenario.BOUNDARY_SAFETY -> {
                 appendLine("【场景路由：边界与安全】")
                 appendLine("明确拒绝、持续躲避、胁迫、跟踪、隐私威胁、财务控制或人身危险出现时，停止推进关系。")
-                appendLine("优先保护安全、边界、证据和现实支持，不把危险行为包装成占有欲、吃醋或爱得深。")
             }
         }
     }
