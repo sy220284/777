@@ -274,6 +274,10 @@ fun SettingsScreen(
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
                             BackgroundRow(
                                 path = settings.backgroundImagePath,
+                                adaptiveContrast = settings.backgroundAdaptiveContrast,
+                                onAdaptiveContrastChange = { enabled ->
+                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
+                                },
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) },
                                 onClear = { viewModel.clearBackgroundImage() },
                             )
@@ -784,7 +788,13 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
  * picker is one thing to keep working.
  */
 @Composable
-private fun BackgroundRow(path: String?, onPick: (Uri) -> Unit, onClear: () -> Unit) {
+private fun BackgroundRow(
+    path: String?,
+    adaptiveContrast: Boolean,
+    onAdaptiveContrastChange: (Boolean) -> Unit,
+    onPick: (Uri) -> Unit,
+    onClear: () -> Unit,
+) {
     val colors = DsTheme.colors
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onPick(uri)
@@ -817,6 +827,14 @@ private fun BackgroundRow(path: String?, onPick: (Uri) -> Unit, onClear: () -> U
                     onClear()
                 }
             }
+        }
+        if (path != null) {
+            Spacer(Modifier.height(DsSpacing.small))
+            ToggleRow(
+                stringResource(R.string.settings_background_adaptive_contrast),
+                adaptiveContrast,
+                stringResource(R.string.settings_background_adaptive_contrast_hint),
+            ) { onAdaptiveContrastChange(!adaptiveContrast) }
         }
     }
 }

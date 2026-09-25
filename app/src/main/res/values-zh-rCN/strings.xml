@@ -296,6 +296,8 @@
     <string name="settings_background_image_active">正在使用自定义图片</string>
     <string name="settings_background_image_choose">选择图片</string>
     <string name="settings_background_image_clear">移除</string>
+    <string name="settings_background_adaptive_contrast">背景自适应</string>
+    <string name="settings_background_adaptive_contrast_hint">根据当前浅色或深色主题自动调整背景遮罩，让聊天文字、气泡和操作区在自定义背景上保持清晰。</string>
     <string name="settings_readonly_banner">设置通过网络为只读。请在 Harness 所在的电脑上打开它以更改设置。</string>
     <string name="settings_notifications">通知</string>
     <string name="settings_notifications_turn">回合完成时通知</string>
