@@ -35,6 +35,7 @@ class HostsStore @Inject constructor(
         val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
         val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
         val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
+        val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
         val THEME = stringPreferencesKey("theme")
         val LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
@@ -211,6 +212,7 @@ class HostsStore @Inject constructor(
             notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
             notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
+            notifyLocalJobs = prefs[Keys.NOTIFY_LOCAL_JOBS] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
@@ -248,6 +250,7 @@ class HostsStore @Inject constructor(
             prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
             prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
             prefs[Keys.NOTIFY_ACTION] = next.notifyNeedsAction
+            prefs[Keys.NOTIFY_LOCAL_JOBS] = next.notifyLocalJobs
             prefs[Keys.THEME] = next.themePreference
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }
                 ?: prefs.remove(Keys.BACKGROUND_IMAGE)
