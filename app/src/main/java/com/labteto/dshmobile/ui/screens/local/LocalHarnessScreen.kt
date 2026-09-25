@@ -2183,7 +2183,11 @@ private fun localJobStatusLabel(status: String): String = when (status) {
 private fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
+    canEdit: Boolean,
     canRegenerate: Boolean,
+    branchInfo: LocalChatBranchInfo?,
+    onEdit: (LocalHarnessMessage) -> Unit,
+    onSelectVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
 ) {
     val colors = DsTheme.colors
@@ -2191,7 +2195,33 @@ private fun LocalMessageRow(
     val clipboard = LocalClipboardManager.current
 
     when (message.role) {
-        "user" -> UserBubble(message.content)
+        "user" -> Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            UserBubble(message.content)
+            if (chatMode && (canEdit || branchInfo != null)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    MessageVariantControls(
+                        messageId = message.id,
+                        branchInfo = branchInfo,
+                        onSelectVariant = onSelectVariant,
+                    )
+                    if (canEdit) {
+                        DsIconButton(
+                            icon = FeatherIcons.Edit3,
+                            contentDescription = stringResource(R.string.local_edit_user_message),
+                            onClick = { onEdit(message) },
+                            tint = colors.labelTertiary.copy(alpha = 0.78f),
+                        )
+                    }
+                }
+            }
+        }
 
         "system" -> Unit
 
@@ -2219,7 +2249,18 @@ private fun LocalMessageRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 MarkdownText(message.content)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (chatMode) {
+                        MessageVariantControls(
+                            messageId = message.id,
+                            branchInfo = branchInfo,
+                            onSelectVariant = onSelectVariant,
+                        )
+                    }
                     DsIconButton(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.chat_copy_answer),
@@ -2236,6 +2277,35 @@ private fun LocalMessageRow(
             }
         }
     }
+}
+
+@Composable
+private fun MessageVariantControls(
+    messageId: String,
+    branchInfo: LocalChatBranchInfo?,
+    onSelectVariant: (String, Int) -> Boolean,
+) {
+    val info = branchInfo ?: return
+    val colors = DsTheme.colors
+    DsIconButton(
+        icon = Icons.Filled.KeyboardArrowLeft,
+        contentDescription = stringResource(R.string.local_previous_variant),
+        onClick = { onSelectVariant(messageId, info.index - 1) },
+        enabled = info.hasPrevious,
+        tint = colors.labelTertiary.copy(alpha = 0.78f),
+    )
+    Text(
+        text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
+        style = DsType.caption11,
+        color = colors.labelTertiary,
+    )
+    DsIconButton(
+        icon = Icons.Filled.KeyboardArrowRight,
+        contentDescription = stringResource(R.string.local_next_variant),
+        onClick = { onSelectVariant(messageId, info.index + 1) },
+        enabled = info.hasNext,
+        tint = colors.labelTertiary.copy(alpha = 0.78f),
+    )
 }
 
 @Composable
