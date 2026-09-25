@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedSession = mutableStateOf<String?>(null)
+    private val requestedLocalSession = mutableStateOf<String?>(null)
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -35,6 +36,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         requestedSession.value = savedInstanceState?.getString("pending_session")
             ?: notificationSession(intent)
+        requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
+            ?: notificationLocalSession(intent)
         enableEdgeToEdge()
         notifications.ensureChannels()
         notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -62,10 +65,15 @@ class MainActivity : AppCompatActivity() {
         setContent {
             AppRoot(
                 requestedSessionId = requestedSession.value,
+                requestedLocalSessionId = requestedLocalSession.value,
                 onSessionRequestConsumed = {
                     requestedSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_SESSION_ID)
                     intent.data = null
+                },
+                onLocalSessionRequestConsumed = {
+                    requestedLocalSession.value = null
+                    intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
                 },
             )
         }
@@ -79,14 +87,20 @@ class MainActivity : AppCompatActivity() {
             ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
     }
 
+    private fun notificationLocalSession(intent: Intent): String? =
+        intent.getStringExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
+            ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedSession.value = notificationSession(intent)
+        requestedLocalSession.value = notificationLocalSession(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_session", requestedSession.value)
+        outState.putString("pending_local_session", requestedLocalSession.value)
         super.onSaveInstanceState(outState)
     }
 
