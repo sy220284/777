@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -56,6 +57,53 @@ class LocalHistoryCompactorTest {
         ).compact(history) ?: error("expected compaction")
 
         assertTrue(compaction.summary.length <= 2_000)
+    }
+
+    @Test
+    fun compactsOnTokenPressureEvenWhenCharacterBudgetIsStillAvailable() {
+        val history = listOf(
+            message("system", "系统"),
+            message("user", "旧内容" + "汉".repeat(400)),
+            message("assistant", "旧答复" + "字".repeat(400)),
+            message("user", "最近请求" + "新".repeat(120)),
+            message("assistant", "最近答复" + "新".repeat(120)),
+        )
+        val budget = LocalHistoryBudget(
+            maxHistoryChars = 100_000,
+            tailChars = 2_000,
+            maxSummaryChars = 2_000,
+            maxToolResultChars = 10_000,
+            maxHistoryTokens = 500,
+            tailTokens = 250,
+            maxToolResultTokens = 2_000,
+        )
+        val compaction = LocalHistoryCompactor().compact(history, budget = budget)
+            ?: error("expected token-pressure compaction")
+
+        assertTrue(compaction.estimatedTokensBefore > budget.maxHistoryTokens!!)
+        assertTrue(compaction.omittedMessages > 0)
+        assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
+    }
+
+    @Test
+    fun retainedToolTextKeepsSupplementaryCharactersWhole() {
+        val source = "前".repeat(40) + "😀" + "后".repeat(40)
+        val retained = retainTextForModel(source, maxTokens = 12, maxChars = 48)
+
+        assertTrue(retained.truncated)
+        assertFalse(retained.text.anyIndexed { index, ch ->
+            Character.isHighSurrogate(ch) &&
+                (index + 1 >= retained.text.length || !Character.isLowSurrogate(retained.text[index + 1]))
+        })
+        assertFalse(retained.text.anyIndexed { index, ch ->
+            Character.isLowSurrogate(ch) &&
+                (index == 0 || !Character.isHighSurrogate(retained.text[index - 1]))
+        })
+    }
+
+    private fun String.anyIndexed(predicate: (Int, Char) -> Boolean): Boolean {
+        for (index in indices) if (predicate(index, this[index])) return true
+        return false
     }
 
     private fun message(role: String, content: String): JsonObject = buildJsonObject {

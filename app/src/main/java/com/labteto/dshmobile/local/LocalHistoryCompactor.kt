@@ -11,6 +11,8 @@ internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
     val summary: String,
+    val estimatedTokensBefore: Int = 0,
+    val estimatedTokensAfter: Int = 0,
 )
 
 /**
@@ -27,18 +29,31 @@ internal class LocalHistoryCompactor(
         history: List<JsonObject>,
         budget: LocalHistoryBudget? = null,
         currentChars: Int? = null,
+        currentTokens: Int? = null,
+        extraTokens: Int = 0,
     ): LocalHistoryCompaction? {
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
         val effectiveSummaryChars = budget?.maxSummaryChars ?: maxSummaryChars
+        val effectiveMaxHistoryTokens = budget?.maxHistoryTokens
+        val effectiveTailTokens = budget?.tailTokens
         val encodedChars = currentChars ?: history.sumOf { it.toString().length }
-        if (history.size < 3 || encodedChars <= effectiveMaxHistoryChars) return null
+        val encodedTokens = currentTokens ?: history.sumOf { estimateModelTokens(it.toString()) }
+        val charPressure = encodedChars > effectiveMaxHistoryChars
+        val tokenPressure = effectiveMaxHistoryTokens?.let { encodedTokens + extraTokens > it } == true
+        if (history.size < 3 || (!charPressure && !tokenPressure)) return null
 
         var start = 1
         var keptChars = 0
+        var keptTokens = 0
         for (index in history.lastIndex downTo 1) {
-            keptChars += history[index].toString().length
-            if (keptChars > effectiveTailChars) {
+            val encoded = history[index].toString()
+            keptChars += encoded.length
+            keptTokens += estimateModelTokens(encoded)
+            if (
+                keptChars > effectiveTailChars ||
+                (effectiveTailTokens != null && keptTokens > effectiveTailTokens)
+            ) {
                 start = (index until history.size).firstOrNull { candidate ->
                     history[candidate]["role"].asText() == "user"
                 } ?: index
@@ -61,6 +76,8 @@ internal class LocalHistoryCompactor(
             messages = compacted,
             omittedMessages = omitted.size,
             summary = summary,
+            estimatedTokensBefore = encodedTokens + extraTokens,
+            estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens,
         )
     }
 
@@ -87,7 +104,7 @@ internal class LocalHistoryCompactor(
                 append(tools.joinToString("、"))
             }
         }
-        return text.take(summaryLimit)
+        return truncateWithoutSplittingSurrogatePair(text, summaryLimit)
     }
 
     private fun recentText(
