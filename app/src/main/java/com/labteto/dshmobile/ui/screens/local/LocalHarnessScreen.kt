@@ -971,26 +971,10 @@ private fun LocalChat(
     } else {
         colors.rootSurface()
     }
-    val topSurfaceColor = if (adaptiveChatBackground) {
-        backgroundState.surfaceColor(
-            base = colors.bgBase,
-            region = BackgroundRegion.TOP,
-            minAlpha = 0.88f,
-            maxAlpha = 0.97f,
-        )
-    } else {
-        colors.rootSurface()
-    }
-    val headerChipColor = if (adaptiveChatBackground) {
-        backgroundState.surfaceColor(
-            base = colors.bgModulePlatform,
-            region = BackgroundRegion.TOP,
-            minAlpha = 0.88f,
-            maxAlpha = 0.97f,
-        )
-    } else {
-        colors.bgModulePlatform
-    }
+    // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
+    // stable root work surface from rootSurfaceColor above.
+    val topSurfaceColor = colors.rootSurface()
+    val headerChipColor = if (backgroundState.hasImage) Color.Transparent else colors.bgModulePlatform
     val streamingSurfaceColor = if (adaptiveChatBackground) {
         backgroundState.surfaceColor(
             base = colors.bgBase,
@@ -1001,16 +985,7 @@ private fun LocalChat(
     } else {
         colors.bgModulePlatform
     }
-    val composerSurfaceColor = if (adaptiveChatBackground) {
-        backgroundState.surfaceColor(
-            base = colors.composerCard,
-            region = BackgroundRegion.BOTTOM,
-            minAlpha = 0.92f,
-            maxAlpha = 0.98f,
-        )
-    } else {
-        colors.composerCard
-    }
+    val composerSurfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -1251,15 +1226,11 @@ private fun LocalChat(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-                if (transcriptItems.isEmpty()) {
+                if (transcriptItems.isEmpty() && state.usageMode == LocalUsageMode.WORK) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            if (state.usageMode == LocalUsageMode.CHAT) {
-                                EmptyLocalChat(state.chatPersona.name)
-                            } else {
-                                EmptyLocalHarness { suggestion ->
-                                    drafts[state.sessionId] = suggestion
-                                }
+                            EmptyLocalHarness { suggestion ->
+                                drafts[state.sessionId] = suggestion
                             }
                         }
                     }
@@ -1379,7 +1350,7 @@ private fun LocalChat(
                 .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
             shape = DsShapes.composer,
             color = composerSurfaceColor,
-            shadowElevation = if (adaptiveChatBackground) 2.dp else 1.dp,
+            shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
         ) {
             Column(
                 Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -1442,6 +1413,9 @@ private fun LocalChat(
                     },
                     shape = DsShapes.block,
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                         disabledBorderColor = Color.Transparent,
                     ),
@@ -1694,9 +1668,11 @@ private fun LocalUsageModePill(
         backgroundState.surfaceColor(
             base = colors.bgModulePlatform,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.88f,
-            maxAlpha = 0.97f,
+            minAlpha = 0.28f,
+            maxAlpha = 0.48f,
         )
+    } else if (backgroundState.hasImage) {
+        colors.bgModulePlatform.copy(alpha = 0.28f)
     } else {
         colors.bgLayer1
     }
@@ -1783,25 +1759,6 @@ private fun ImportedAttachmentRow(
             }
             DsButton("移除", onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
         }
-    }
-}
-
-@Composable
-private fun EmptyLocalChat(personaName: String) {
-    val colors = DsTheme.colors
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large, vertical = DsSpacing.xlarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-    ) {
-        WhaleMark(Modifier.size(40.dp))
-        Text(personaName, style = DsType.display24, color = colors.labelPrimary)
-        Text(
-            stringResource(R.string.local_chat_empty_hint),
-            style = DsType.std14,
-            color = colors.labelSecondary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
     }
 }
 
