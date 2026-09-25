@@ -958,6 +958,7 @@ class LocalHarnessEngine @Inject constructor(
                     galleryId = entry.id,
                     personaId = saved.id,
                     displayName = saved.name,
+                    persona = saved,
                     chatState = previous?.chatState
                         ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
                         ?: ChatCharacterState(),
@@ -2345,6 +2346,22 @@ class LocalHarnessEngine @Inject constructor(
             val updated = chatPersonaStore.captureExplicitCorrection(member.personaId, text)
                 ?: return@forEach
             if (updated.corrections == current.corrections) return@forEach
+            _state.update { state ->
+                state.copy(
+                    groupChat = state.groupChat.copy(
+                        members = state.groupChat.members.map { existing ->
+                            if (existing.galleryId == member.galleryId) {
+                                existing.copy(
+                                    displayName = updated.name,
+                                    persona = updated,
+                                )
+                            } else {
+                                existing
+                            }
+                        },
+                    ),
+                )
+            }
             eventLog.append("group/persona-correction", buildJsonObject {
                 put("gallery_id", member.galleryId)
                 put("persona_id", member.personaId)
@@ -2499,7 +2516,9 @@ class LocalHarnessEngine @Inject constructor(
             responders.forEachIndexed { index, initialMember ->
                 val member = currentGroup.members.firstOrNull { it.galleryId == initialMember.galleryId }
                     ?: return@forEachIndexed
-                val persona = chatPersonaStore.get(member.personaId)
+                val persona = member.persona.takeUnless {
+                    it.id == PersonaProfile.DEFAULT_PERSONA_ID && member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                } ?: chatPersonaStore.get(member.personaId)
                 _state.update { current ->
                     current.copy(groupActiveSpeakerName = persona.name)
                 }
