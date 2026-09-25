@@ -721,19 +721,27 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            AppearanceChip(
-                stringResource(R.string.settings_appearance_light),
-                settings.themePreference == "light",
-            ) { onSelect("light") }
-            AppearanceChip(
-                stringResource(R.string.settings_appearance_dark),
-                settings.themePreference == "dark",
-            ) { onSelect("dark") }
-            AppearanceChip(
-                stringResource(R.string.settings_appearance_system),
-                settings.themePreference == "system",
-            ) { onSelect("system") }
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                AppearanceChip(
+                    stringResource(R.string.settings_appearance_light),
+                    settings.themePreference == "light",
+                ) { onSelect("light") }
+                AppearanceChip(
+                    stringResource(R.string.settings_appearance_dark),
+                    settings.themePreference == "dark",
+                ) { onSelect("dark") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                AppearanceChip(
+                    stringResource(R.string.settings_appearance_matte_black),
+                    settings.themePreference == "matte_black",
+                ) { onSelect("matte_black") }
+                AppearanceChip(
+                    stringResource(R.string.settings_appearance_system),
+                    settings.themePreference == "system",
+                ) { onSelect("system") }
+            }
         }
     }
 }
