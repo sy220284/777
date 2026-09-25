@@ -730,6 +730,23 @@ class LocalHarnessEngine @Inject constructor(
         if (_state.value.sessionId == snapshot.sessionId) persist()
     }
 
+    fun clearChatGalleryBinding(
+        expectedGalleryId: String,
+        expectedStoryId: String? = null,
+        keepCharacter: Boolean = false,
+    ) {
+        val snapshot = _state.value
+        if (snapshot.usageMode != LocalUsageMode.CHAT || snapshot.galleryId != expectedGalleryId) return
+        if (expectedStoryId != null && snapshot.galleryStoryId != expectedStoryId) return
+        _state.update { state ->
+            if (state.sessionId != snapshot.sessionId) state else state.copy(
+                galleryId = if (keepCharacter) state.galleryId else null,
+                galleryStoryId = null,
+            )
+        }
+        if (_state.value.sessionId == snapshot.sessionId) persist()
+    }
+
     /** A story direction is a user preference for future turns, never a synthetic user message. */
     fun selectChatDirection(direction: String?) {
         val snapshot = _state.value
