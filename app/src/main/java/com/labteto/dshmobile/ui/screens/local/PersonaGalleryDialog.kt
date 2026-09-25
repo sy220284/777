@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,11 +33,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.journeyapps.barcodescanner.BarcodeEncoder
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -46,10 +55,13 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.screens.pair.PortraitCaptureActivity
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun PersonaGallerySavePromptDialog(
@@ -139,10 +151,13 @@ internal fun PersonaGalleryDialog(
     onDelete: suspend (String) -> Result<Unit>,
     onDeleteStory: suspend (String, String) -> Result<Unit>,
     onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
+    onExport: suspend (String, Boolean) -> Result<String>,
+    onImport: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
@@ -167,6 +182,8 @@ internal fun PersonaGalleryDialog(
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
+    var qrPayload by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
@@ -184,6 +201,69 @@ internal fun PersonaGalleryDialog(
     val mergeDoneText = stringResource(R.string.persona_gallery_merge_done)
     val archiveDeletedText = stringResource(R.string.persona_gallery_archive_deleted)
     val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
+    val exportFailedText = stringResource(R.string.persona_gallery_export_failed)
+    val importFailedText = stringResource(R.string.persona_gallery_import_failed)
+
+    val exportDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val payload = pendingExportPayload
+        pendingExportPayload = null
+        if (uri != null && payload != null) {
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
+                            it.write(payload)
+                        } ?: error("无法写入目标文件")
+                    }
+                }.onFailure { error = it.message ?: exportFailedText }
+            }
+        }
+    }
+
+    fun importPayload(payload: String) {
+        busy = true
+        error = null
+        scope.launch {
+            onImport(payload)
+                .onSuccess { imported ->
+                    selectedId = imported.id
+                    selectedStoryId = null
+                }
+                .onFailure { error = it.message ?: importFailedText }
+            busy = false
+        }
+    }
+
+    val importDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val payload = runCatching {
+                    withContext(Dispatchers.IO) { readPersonaShareText(context, uri) }
+                }.getOrElse {
+                    error = it.message ?: importFailedText
+                    return@launch
+                }
+                importPayload(payload)
+            }
+        }
+    }
+
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.takeIf(String::isNotBlank)?.let(::importPayload)
+    }
+    val scanPrompt = stringResource(R.string.persona_gallery_scan_prompt)
+    val scanOptions = remember(scanPrompt) {
+        ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt(scanPrompt)
+            .setBeepEnabled(false)
+            .setCaptureActivity(PortraitCaptureActivity::class.java)
+            .setOrientationLocked(true)
+    }
 
     LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
         val entry = selected ?: return@LaunchedEffect
@@ -203,6 +283,22 @@ internal fun PersonaGalleryDialog(
     ) {
         if (selected == null) {
             GalleryOverviewHeader(entries.size)
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_import_file),
+                    onClick = { importDocument.launch(arrayOf("application/json", "text/plain")) },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_import_qr),
+                    onClick = { scanner.launch(scanOptions) },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+            }
             Text(
                 stringResource(R.string.persona_gallery_long_press_delete_hint),
                 style = DsType.caption11,
@@ -325,6 +421,44 @@ internal fun PersonaGalleryDialog(
                 totalDialogue,
             )
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_export_file),
+                    onClick = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onExport(selected.id, false)
+                                .onSuccess { payload ->
+                                    pendingExportPayload = payload
+                                    exportDocument.launch(personaExportFileName(selected.persona.name))
+                                }
+                                .onFailure { error = it.message ?: exportFailedText }
+                            busy = false
+                        }
+                    },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_share_qr),
+                    onClick = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            onExport(selected.id, true)
+                                .onSuccess { qrPayload = it }
+                                .onFailure { error = it.message ?: exportFailedText }
+                            busy = false
+                        }
+                    },
+                    variant = DsButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                )
+            }
 
             notice?.let {
                 Surface(
@@ -715,6 +849,65 @@ internal fun PersonaGalleryDialog(
                 modifier = Modifier.padding(top = DsSpacing.small),
             )
         }
+    }
+
+    qrPayload?.let { payload ->
+        val bitmap = remember(payload) {
+            runCatching {
+                BarcodeEncoder().encodeBitmap(payload, BarcodeFormat.QR_CODE, 900, 900)
+            }.getOrNull()
+        }
+        DsDialog(
+            title = stringResource(R.string.persona_gallery_share_qr_title),
+            onDismiss = { qrPayload = null },
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = stringResource(R.string.persona_gallery_share_qr_title),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    stringResource(R.string.persona_gallery_export_failed),
+                    style = DsType.small13,
+                    color = DsTheme.colors.error,
+                )
+            }
+            Text(
+                stringResource(R.string.persona_gallery_share_qr_hint),
+                style = DsType.caption11,
+                color = DsTheme.colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.common_close),
+                onClick = { qrPayload = null },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+private fun personaExportFileName(name: String): String {
+    val safe = name.trim()
+        .replace(Regex("""[\\/:*?"<>|]"""), "_")
+        .take(48)
+        .ifBlank { "persona" }
+    return "$safe.persona.json"
+}
+
+private fun readPersonaShareText(context: android.content.Context, uri: android.net.Uri): String {
+    val input = context.contentResolver.openInputStream(uri) ?: error("无法读取人物文件")
+    return input.bufferedReader().use { reader ->
+        val result = StringBuilder()
+        val buffer = CharArray(4_096)
+        while (result.length <= 64_000) {
+            val count = reader.read(buffer)
+            if (count < 0) break
+            result.append(buffer, 0, count)
+        }
+        require(result.length <= 64_000) { "人物文件过大" }
+        result.toString()
     }
 }
 
