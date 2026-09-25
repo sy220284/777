@@ -207,13 +207,27 @@ class DeepSeekClient @Inject constructor(
                         })
                     }
                 }
-                val synthetic = buildJsonObject {
-                    put("choices", buildJsonArray {
-                        add(buildJsonObject { put("message", message) })
-                    })
-                    streamUsage?.let { put("usage", it) }
+                val calls = toolCalls.toSortedMap().values.map { call ->
+                    val raw = call.arguments.toString().ifBlank { "{}" }
+                    LocalToolCall(
+                        id = call.id ?: error("流式工具调用缺少 id"),
+                        name = call.name ?: error("流式工具调用缺少 name"),
+                        arguments = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrElse {
+                            error("工具参数不是合法对象：${it.message}")
+                        },
+                        rawArguments = raw,
+                    )
                 }
-                parse(synthetic.toString())
+                val usage = streamUsage?.let { value ->
+                    parseDeepSeekOpenAiUsage(buildJsonObject { put("usage", value) })
+                } ?: DeepSeekTokenUsage(reported = false)
+                LocalModelReply(
+                    message = message,
+                    content = content.toString(),
+                    reasoning = reasoning.toString().takeIf(String::isNotBlank),
+                    toolCalls = calls,
+                    usage = usage,
+                )
             }
         } catch (error: LocalModelException) {
             throw error
