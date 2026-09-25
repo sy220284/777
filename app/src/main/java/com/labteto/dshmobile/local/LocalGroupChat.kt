@@ -29,6 +29,7 @@ data class LocalGroupChatState(
 internal const val MAX_GROUP_CHAT_MEMBERS = 6
 internal const val MIN_GROUP_CHAT_MEMBERS = 2
 internal const val GROUP_CHAT_SILENT_TOKEN = "__GROUP_CHAT_SILENT__"
+internal const val MAX_GROUP_CHAT_RESPONDERS_PER_TURN = 3
 
 internal fun groupChatResponders(
     input: String,
@@ -47,9 +48,15 @@ internal fun groupChatResponders(
                 normalizedInput.startsWith("$name:")
             )
     }
-    return (if (explicitlyMentioned.isNotEmpty()) explicitlyMentioned else members)
-        .distinctBy(LocalGroupChatMember::galleryId)
-        .take(MAX_GROUP_CHAT_MEMBERS)
+    return if (explicitlyMentioned.isNotEmpty()) {
+        explicitlyMentioned
+            .distinctBy(LocalGroupChatMember::galleryId)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+    } else {
+        members
+            .distinctBy(LocalGroupChatMember::galleryId)
+            .take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
+    }
 }
 
 internal fun groupTranscriptLine(message: LocalHarnessMessage): String = when (message.role) {
