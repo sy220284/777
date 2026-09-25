@@ -65,6 +65,8 @@ import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
+import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -1861,7 +1863,7 @@ class LocalHarnessEngine @Inject constructor(
                     sourceSessionId = currentSessionId,
                     subjectLabel = snapshot.chatPersona.name
                         .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
-                    subjectKey = chatRelationshipSubjectKey(snapshot),
+                    subjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
                 )
             }.getOrNull()
         } else {
@@ -1884,30 +1886,6 @@ class LocalHarnessEngine @Inject constructor(
                 put("source", if (snapshot.usageMode == LocalUsageMode.CHAT) "chat-relationship" else "directive")
             })
         }
-    }
-
-    private fun chatRelationshipSubjectKey(snapshot: LocalHarnessState): String? =
-        snapshot.galleryId?.takeIf(String::isNotBlank)?.let { "gallery:$it" }
-            ?: snapshot.personaId
-                .takeIf { it.isNotBlank() && it != PersonaProfile.DEFAULT_PERSONA_ID }
-                ?.let { "persona:$it" }
-
-    private fun relationshipMemoryMatchesSubject(
-        memory: MemoryRecord,
-        snapshot: LocalHarnessState,
-    ): Boolean {
-        if (memory.kind == MemoryKind.RELATIONSHIP_PREFERENCE) return true
-        val currentKey = chatRelationshipSubjectKey(snapshot)
-        if (memory.subjectKey != null) return currentKey != null && memory.subjectKey == currentKey
-        if (memory.scope == MemoryScope.LINEAGE) return memory.lineageId == snapshot.lineageId
-
-        // Legacy global records predate subject keys. Keep only records whose text names the
-        // current character; never feed an unrelated unbound relationship into another persona.
-        val subject = snapshot.chatPersona.name.trim()
-            .takeIf { it.isNotBlank() && it != "默认角色" }
-            ?: return false
-        return memory.content.startsWith("关系状态：我和$subject｜") ||
-            memory.content.startsWith("关系对象：$subject｜")
     }
 
     private fun chatRelationshipMemoryContext(
@@ -1937,7 +1915,12 @@ class LocalHarnessEngine @Inject constructor(
             allowedKinds = relationshipKinds,
             maxItems = 20,
             maxChars = 8_000,
-        ).filter { relationshipMemoryMatchesSubject(it, snapshot) }
+        ).filter { relationshipMemoryMatchesSubject(
+                memory = it,
+                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
+                currentLineageId = snapshot.lineageId,
+                subjectLabel = snapshot.chatPersona.name,
+            ) }
             .take(6)
         val lineageRecent = memoryStore.listActive(
             allowedScopes = setOf(MemoryScope.LINEAGE),
@@ -1945,7 +1928,12 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = snapshot.lineageId,
             limit = 20,
         ).filter {
-            it.kind in relationshipKinds && relationshipMemoryMatchesSubject(it, snapshot)
+            it.kind in relationshipKinds && relationshipMemoryMatchesSubject(
+                memory = it,
+                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
+                currentLineageId = snapshot.lineageId,
+                subjectLabel = snapshot.chatPersona.name,
+            )
         }
 
         val recalled = (lineageRecent + globalHits)
@@ -1980,7 +1968,12 @@ class LocalHarnessEngine @Inject constructor(
         ).asSequence()
             .filter {
                 it.kind == MemoryKind.RELATIONSHIP_STATE &&
-                    relationshipMemoryMatchesSubject(it, snapshot) &&
+                    relationshipMemoryMatchesSubject(
+                memory = it,
+                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
+                currentLineageId = snapshot.lineageId,
+                subjectLabel = snapshot.chatPersona.name,
+            ) &&
                     it.content.startsWith(prefix)
             }
             .maxByOrNull { it.updatedAt }
@@ -2022,7 +2015,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         eventLog.append("chat/relationship-hydrate", buildJsonObject {
             put("subject", subject)
-            put("subject_key", chatRelationshipSubjectKey(snapshot).orEmpty())
+            put("subject_key", chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId).orEmpty())
             put("state", stored)
             put("stage", stage)
             put("memory_id", latest.id)
