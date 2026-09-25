@@ -987,4 +987,19 @@
 
     <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
 
+
+    <string name="notif_channel_local_jobs">本机任务</string>
+    <string name="settings_notifications_local_jobs">本机任务完成通知</string>
+    <string name="settings_notifications_local_jobs_hint">工作模式的本机任务结束、失败或取消时发送通知。</string>
+    <string name="local_execution_notification_running">正在执行</string>
+    <string name="local_execution_notification_step">正在执行 · 第 %1$d 步</string>
+    <string name="local_execution_notification_jobs">%1$d 个后台任务仍在运行</string>
+    <string name="local_execution_notification_body">神言神语正在本机执行任务</string>
+    <string name="local_execution_background_job">后台任务</string>
+    <string name="local_execution_notification_complete">本机任务已完成</string>
+    <string name="local_execution_notification_failed">本机任务执行失败</string>
+    <string name="local_execution_notification_cancelled">本机任务已取消</string>
+    <string name="local_execution_notification_background_continues">当前回合已结束，仍有 %1$d 个后台任务继续运行。</string>
+    <string name="local_execution_notification_tap">点击返回当前会话</string>
+
 </resources>
