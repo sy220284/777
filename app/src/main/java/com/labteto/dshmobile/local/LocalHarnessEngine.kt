@@ -5321,6 +5321,7 @@ class LocalHarnessEngine @Inject constructor(
             pressure = resourceScheduler.snapshot().pressure,
             usageMode = snapshot.usageMode,
             model = snapshot.model,
+            baseUrl = snapshot.baseUrl,
         )
     }
 
