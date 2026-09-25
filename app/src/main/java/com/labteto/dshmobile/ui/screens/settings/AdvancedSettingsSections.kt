@@ -722,6 +722,9 @@ private fun memoryKindLabel(kind: MemoryKind): String = stringResource(
         MemoryKind.CONSTRAINT -> R.string.advanced_kind_constraint
         MemoryKind.STATE -> R.string.advanced_kind_state
         MemoryKind.SUMMARY -> R.string.advanced_kind_summary
+        MemoryKind.RELATIONSHIP_FACT -> R.string.advanced_kind_fact
+        MemoryKind.RELATIONSHIP_STATE -> R.string.advanced_kind_state
+        MemoryKind.RELATIONSHIP_PREFERENCE -> R.string.advanced_kind_preference
     },
 )
 

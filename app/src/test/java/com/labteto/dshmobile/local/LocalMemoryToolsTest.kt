@@ -24,6 +24,44 @@ class LocalMemoryToolsTest {
         assertFalse(tools.execute("memory_search", buildJsonObject { put("query", "apples") }, false).contains("apples decision"))
     }
 
+    @Test fun workToolsDoNotSurfaceRelationshipMemories() {
+        val store = MemoryStore(temporary.root, Json)
+        val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())
+        var state = LocalHarnessState(
+            usageMode = LocalUsageMode.WORK,
+            lineageId = "lineage",
+        )
+        store.remember(
+            content = "关系对象：林晚｜女朋友",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+        )
+        store.remember(
+            content = "用户喜欢简洁回复",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.PREFERENCE,
+        )
+        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+
+        assertFalse(
+            tools.execute(
+                "memory_search",
+                buildJsonObject { put("query", "林晚女朋友") },
+                false,
+            ).contains("林晚"),
+        )
+        assertFalse(tools.execute("memory_list", buildJsonObject { }, false).contains("林晚"))
+
+        state = state.copy(usageMode = LocalUsageMode.CHAT)
+        assertTrue(
+            tools.execute(
+                "memory_search",
+                buildJsonObject { put("query", "林晚女朋友") },
+                false,
+            ).contains("林晚"),
+        )
+    }
+
     @Test fun listExposesStableIdAndUpdateForgetRespectVisibleScope() {
         val store = MemoryStore(temporary.root, Json)
         val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())

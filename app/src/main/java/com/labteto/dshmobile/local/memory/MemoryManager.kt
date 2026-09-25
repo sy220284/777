@@ -29,6 +29,24 @@ class MemoryManager @Inject constructor(
         )
     }
 
+    fun captureChatRelationshipFact(
+        text: String,
+        lineageId: String?,
+        sourceSessionId: String,
+        subjectLabel: String? = null,
+    ): MemoryRecord? {
+        val candidate = policy.extractChatRelationshipFact(text, subjectLabel) ?: return null
+        return remember(
+            content = candidate.content,
+            scope = candidate.scope,
+            kind = candidate.kind,
+            projectId = null,
+            lineageId = lineageId,
+            sourceSessionId = sourceSessionId,
+            importance = candidate.importance,
+        )
+    }
+
     fun update(
         existing: MemoryRecord,
         content: String? = null,

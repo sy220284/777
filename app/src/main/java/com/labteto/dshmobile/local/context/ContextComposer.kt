@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.context
 import com.labteto.dshmobile.harness.context.AgentContextAssembler
 import com.labteto.dshmobile.harness.context.AgentContextMemory
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -38,6 +39,7 @@ class ContextComposer @Inject constructor(
                 allowedScopes = allowedScopes,
                 projectId = request.projectId,
                 lineageId = request.lineageId,
+                allowedKinds = WORK_MEMORY_KINDS,
                 maxItems = MAX_MEMORY_ITEMS,
                 maxChars = MAX_MEMORY_CHARS,
             )
@@ -63,5 +65,12 @@ class ContextComposer @Inject constructor(
     private companion object {
         const val MAX_MEMORY_ITEMS = 6
         const val MAX_MEMORY_CHARS = 3_500
+        val WORK_MEMORY_KINDS = MemoryKind.values().filterNot {
+            it in setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+                MemoryKind.RELATIONSHIP_PREFERENCE,
+            )
+        }.toSet()
     }
 }

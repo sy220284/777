@@ -122,6 +122,9 @@ private fun applyModelHistoryEvent(
         "assistant/message" -> {
             val message = assistantModelMessageFromEvent(event.data)
             if (message["role"]?.jsonPrimitive?.contentOrNull != "assistant") return false
+            if (event.data["replaces"]?.jsonPrimitive?.contentOrNull != null &&
+                history.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "assistant"
+            ) history.removeAt(history.lastIndex)
             history += message
             true
         }

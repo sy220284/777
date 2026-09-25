@@ -131,6 +131,92 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun namedRelationshipStateIsDurableGlobalState() {
+        val candidate = policy.extractChatRelationshipFact("我和林晚刚在一起了")
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+        assertEquals(MemoryKind.RELATIONSHIP_STATE, candidate.kind)
+        assertEquals("关系状态：我和林晚｜在一起", candidate.content)
+    }
+
+    @Test
+    fun unnamedRelationshipStateStaysInsideConversationLineage() {
+        val candidate = policy.extractChatRelationshipFact("我们刚确定关系了")
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.LINEAGE, candidate.scope)
+        assertEquals(MemoryKind.RELATIONSHIP_STATE, candidate.kind)
+        assertEquals("当前对话关系状态：我们｜确定关系", candidate.content)
+    }
+
+    @Test
+    fun pronounRelationshipStateBindsToKnownPersonaAcrossChats() {
+        val candidate = policy.extractChatRelationshipFact(
+            text = "我们刚在一起了",
+            subjectLabel = "林晚",
+        )
+
+        requireNotNull(candidate)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+        assertEquals(MemoryKind.RELATIONSHIP_STATE, candidate.kind)
+        assertEquals("关系状态：我和林晚｜在一起", candidate.content)
+    }
+
+    @Test
+    fun explicitRelationshipObjectIsRememberedAsFact() {
+        val candidate = policy.extractChatRelationshipFact("林晚是我的女朋友")
+        val explicitRemember = policy.extractChatRelationshipFact("记住林晚是我的女朋友")
+
+        requireNotNull(candidate)
+        requireNotNull(explicitRemember)
+        assertEquals(MemoryScope.GLOBAL, candidate.scope)
+        assertEquals(MemoryKind.RELATIONSHIP_FACT, candidate.kind)
+        assertEquals("关系对象：林晚｜女朋友", candidate.content)
+        assertEquals(candidate.content, explicitRemember.content)
+        assertEquals(MemoryKind.RELATIONSHIP_FACT, explicitRemember.kind)
+    }
+
+    @Test
+    fun stablePartnerPreferenceMayBeRememberedButInferenceMayNot() {
+        val stable = policy.extractChatRelationshipFact("她平时不喜欢别人连着问她问题")
+        val inference = policy.extractChatRelationshipFact("她可能是回避型依恋")
+        val unrelated = policy.extractChatRelationshipFact("这部电影平时喜欢用冷色调")
+
+        requireNotNull(stable)
+        assertEquals(MemoryScope.LINEAGE, stable.scope)
+        assertNull(inference)
+        assertNull(unrelated)
+    }
+
+    @Test
+    fun relationshipQuestionsAreNeverSavedAsFacts() {
+        assertNull(policy.extractChatRelationshipFact("我们是不是在一起了？"))
+        assertNull(policy.extractChatRelationshipFact("她喜欢我吗？"))
+    }
+
+    @Test
+    fun relationshipStateSupersedesSamePersonWithoutDependingOnTextSimilarity() {
+        val old = MemoryRecord(
+            id = "old-state",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            content = "关系状态：我和林晚｜在一起",
+            importance = 86,
+            createdAt = 1L,
+            updatedAt = 1L,
+        )
+        val candidate = MemoryCandidate(
+            content = "关系状态：我和林晚｜确定关系",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            importance = 86,
+        )
+
+        assertSame(old, conflicts.findReplacement(candidate, listOf(old)))
+    }
+
+    @Test
     fun highlySimilarMemorySupersedesOlderRecord() {
         val old = memory("以后代码修改完成后必须复查")
         val candidate = MemoryCandidate(
