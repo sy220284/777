@@ -835,6 +835,12 @@
     <string name="persona_gallery_save_failed">保存失败</string>
     <string name="persona_gallery_skip_save">这次先不保存</string>
     <string name="persona_gallery_title">人设图集</string>
+    <string name="persona_gallery_presets_title">作品预置</string>
+    <string name="persona_gallery_presets_hint">先加入人物图谱再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
+    <string name="persona_gallery_preset_add">加入人物图谱</string>
+    <string name="persona_gallery_preset_added">已在人物图谱</string>
+    <string name="persona_gallery_preset_installed">人物预置已加入图谱</string>
+    <string name="persona_gallery_preset_install_failed">人物预置加入失败</string>
     <string name="persona_gallery_sync_current">同步当前人物 · %1$s</string>
     <string name="persona_gallery_update_current">更新当前人物 · %1$s</string>
     <string name="persona_gallery_merged_notice">人物资料已合并到同一张主卡</string>
@@ -884,6 +890,14 @@
     <string name="persona_field_speech_style">说话方式</string>
     <string name="persona_field_relationship">与你的关系</string>
     <string name="persona_field_world_setting">世界设定</string>
+    <string name="persona_field_franchise">作品来源</string>
+    <string name="persona_field_timeline">当前时间线</string>
+    <string name="persona_field_motivations">核心动机</string>
+    <string name="persona_field_values">价值排序</string>
+    <string name="persona_field_behavior_patterns">稳定行为模式</string>
+    <string name="persona_field_internal_contradictions">人物内在矛盾</string>
+    <string name="persona_field_knowledge_boundary">知识边界</string>
+    <string name="persona_field_lore">世界书</string>
     <string name="persona_field_constraints">硬性设定</string>
     <string name="persona_field_dialogues">对白参考</string>
     <string name="persona_field_banned">禁用表达</string>
