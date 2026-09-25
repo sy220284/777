@@ -820,6 +820,9 @@
     <string name="chat_scroll_start">回到开头</string>
     <string name="chat_scroll_latest">回到最新</string>
 
-    <string name="local_reply_suggestions_title">回复建议</string>
-    <string name="local_reply_suggestions_open">回复建议</string>
+    <string name="local_reply_suggestions_title">故事走向</string>
+    <string name="local_reply_suggestions_open">选择走向</string>
+    <string name="local_story_direction_hint">选择希望角色如何推动后续故事，不会代替你发送消息；随时可以取消。</string>
+    <string name="local_story_direction_selected">当前走向：%1$s</string>
+    <string name="local_story_direction_clear">取消</string>
 </resources>
