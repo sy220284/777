@@ -26,6 +26,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
+import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
 import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
 import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
@@ -59,6 +60,7 @@ fun AppRoot(
         backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
     ) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
+        var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         // Local Harness is always the product home. Remote control has exactly one transport:
         // a paired relay. Opening it lands on relay pairing first; a successful pair connects and
@@ -100,9 +102,15 @@ fun AppRoot(
             utilitySurface == "tools" -> ToolsScreen(
                 onClose = { utilitySurface = null },
                 onOpenTasks = { utilitySurface = "tasks" },
+                onOpenSettings = { destination ->
+                    utilitySurface = null
+                    settingsDestination = destination
+                    showSettings = true
+                },
             )
             showSettings -> SettingsScreen(
                 onClose = { showSettings = false },
+                initialDestination = settingsDestination,
             )
             showPair -> PairScreen(
                 autoScanOnOpen = autoScanPair,
@@ -128,7 +136,10 @@ fun AppRoot(
                     autoScanPair = true
                     showPair = true
                 },
-                onOpenSettings = { showSettings = true },
+                onOpenSettings = {
+                    settingsDestination = SettingsDestination.ROOT
+                    showSettings = true
+                },
                 onOpenTasks = { utilitySurface = "tasks" },
                 onOpenTools = { utilitySurface = "tools" },
                 onCheckUpdate = {
@@ -137,7 +148,10 @@ fun AppRoot(
                 updateStatus = updateInstallStatus,
             )
             showMain && selectedRemoteMatches -> MainScreen(
-                onOpenSettings = { showSettings = true },
+                onOpenSettings = {
+                    settingsDestination = SettingsDestination.ROOT
+                    showSettings = true
+                },
                 onOpenTasks = { utilitySurface = "tasks" },
                 onOpenTools = { utilitySurface = "tools" },
                 onOpenLocalHarness = {
