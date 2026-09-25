@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 private const val CHAT_BRANCH_ROOT = "__chat_root__"
+private const val LOCAL_IMPORTED_ATTACHMENT_MARKER = "本次附件已导入本机工作区："
 
 @Serializable
 data class LocalChatBranchNode(
@@ -45,11 +46,12 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
     val dialogue = messages.filter { it.role == "user" || it.role == "assistant" }
     if (dialogue.isEmpty()) return true
     if (dialogue.first().role != "user") return false
-    if (dialogue.any { message ->
-            message.role == "user" && "本次附件已导入本机工作区：" in message.content
-        }) return false
+    if (dialogue.any(::chatMessageHasAttachmentContext)) return false
     return dialogue.zipWithNext().all { (left, right) -> left.role != right.role }
 }
+
+internal fun chatMessageHasAttachmentContext(message: LocalHarnessMessage): Boolean =
+    message.role == "user" && LOCAL_IMPORTED_ATTACHMENT_MARKER in message.content
 
 internal fun syncChatBranchState(
     current: LocalChatBranchState,
