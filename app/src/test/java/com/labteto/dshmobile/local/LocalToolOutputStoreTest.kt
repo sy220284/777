@@ -104,6 +104,21 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun returnsNullWhenSessionBudgetCannotRetainNewestItem() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 32,
+            maxFilesPerSession = 10,
+            maxSessionBytes = 4,
+            maxGlobalBytes = 128,
+        )
+
+        assertTrue(store.store("session-a", "call-1", "12345678") == null)
+        assertTrue(store.read("session-a", "call-1").startsWith("未找到"))
+        assertTrue(store.store("session-b", "call-2", "abcd") != null)
+    }
+
+    @Test
     fun refusesSingleSpillAboveItemLimit() {
         val store = LocalToolOutputStore(
             root = File(temporary.root, "tool-output"),
