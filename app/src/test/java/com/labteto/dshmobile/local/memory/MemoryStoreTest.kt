@@ -96,6 +96,26 @@ class MemoryStoreTest {
         )
     }
 
+    @Test fun identicalRelationshipTextForDifferentCharactersDoesNotDeduplicate() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "关系状态：我和同名角色｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:one",
+        )
+        val second = memoryStore.remember(
+            "关系状态：我和同名角色｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:two",
+        )
+
+        assertNotEquals(first.id, second.id)
+        assertEquals(setOf("gallery:one", "gallery:two"), all(memoryStore).mapNotNull { it.subjectKey }.toSet())
+        assertEquals(setOf("gallery:one", "gallery:two"), all(store()).mapNotNull { it.subjectKey }.toSet())
+    }
+
     @Test fun replacementDoesNotResurrectSupersededMemoryAfterRestart() {
         val old = store().remember("apples old", MemoryScope.GLOBAL)
         val replacement = store().remember("apples new", MemoryScope.GLOBAL, replaceIds = setOf(old.id))

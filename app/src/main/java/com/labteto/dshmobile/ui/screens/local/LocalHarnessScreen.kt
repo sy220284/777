@@ -387,6 +387,10 @@ fun LocalHarnessScreen(
                 state = state,
                 onJobOutput = viewModel::backgroundJobOutput,
                 onStopJob = viewModel::stopBackgroundJob,
+                onOpenResults = {
+                    showRunCenter = false
+                    filesMode = LocalFilesMode.CONVERSATION
+                },
             )
         }
     }
@@ -2164,6 +2168,7 @@ private fun ExecutionStatusCard(
     state: LocalHarnessState,
     onJobOutput: (String) -> String,
     onStopJob: (String) -> String,
+    onOpenResults: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
@@ -2349,6 +2354,14 @@ private fun ExecutionStatusCard(
                     }
                 }
             }
+
+            DsButton(
+                text = stringResource(R.string.local_run_open_results),
+                onClick = onOpenResults,
+                variant = DsButtonVariant.Outline,
+                size = DsButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                 Text(stringResource(R.string.local_run_resources), style = DsType.caption11Strong, color = colors.labelTertiary)

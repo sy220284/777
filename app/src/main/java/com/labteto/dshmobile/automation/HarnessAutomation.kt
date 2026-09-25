@@ -1,8 +1,9 @@
 package com.labteto.dshmobile.automation
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -19,8 +20,8 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.local.LocalAutomationWorkException
 import com.labteto.dshmobile.local.LocalHarnessBlockedException
-import com.labteto.dshmobile.local.LocalHarnessBusyException
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -49,6 +50,8 @@ data class AutomationTask(
     val nextRunAt: Long,
     val recurringMinutes: Long? = null,
     val notify: Boolean = true,
+    /** Dedicated Work-mode session that owns this task's run history and artifacts. */
+    val workSessionId: String? = null,
     val status: String = "scheduled",
     val lastRunAt: Long? = null,
     val lastResult: String? = null,
@@ -227,6 +230,8 @@ class HarnessAutomationWorker(
     interface WorkerEntryPoint {
         fun localHarnessEngine(): LocalHarnessEngine
         fun automationStore(): AutomationStore
+        fun notifications(): DshNotifications
+        fun hostsStore(): HostsStore
     }
 
     override suspend fun doWork(): Result {
@@ -242,36 +247,63 @@ class HarnessAutomationWorker(
         store.update(id) { it.copy(status = "running", lastRunAt = started, lastError = null) }
 
         return try {
-            val result = entry.localHarnessEngine().runAutomationPrompt(task.prompt)
+            val run = entry.localHarnessEngine().runAutomationWork(
+                text = task.prompt,
+                preferredSessionId = task.workSessionId,
+            )
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
             store.update(id) {
                 it.copy(
+                    workSessionId = run.sessionId,
                     status = if (it.recurringMinutes == null) "completed" else "scheduled",
                     nextRunAt = next,
-                    lastResult = result.take(20_000),
+                    lastResult = run.output.take(20_000),
                     lastError = null,
                 )
             }
-            if (task.notify) notifyResult(id, result)
+            maybeNotify(
+                entry = entry,
+                task = task,
+                titleRes = R.string.tasks_notification_complete,
+                sessionId = run.sessionId,
+            )
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (busy: LocalHarnessBusyException) {
-            store.update(id) {
-                it.copy(
-                    status = "queued",
-                    lastError = "前台或其他后台任务正在运行，等待重试",
-                )
-            }
-            Result.retry()
         } catch (blocked: LocalHarnessBlockedException) {
+            val sessionId = blocked.sessionId ?: task.workSessionId
             store.update(id) {
                 it.copy(
+                    workSessionId = sessionId ?: it.workSessionId,
                     status = "blocked",
                     lastError = (blocked.message ?: "需要人工处理").take(4_000),
                 )
             }
+            maybeNotify(
+                entry = entry,
+                task = task,
+                titleRes = R.string.tasks_notification_blocked,
+                sessionId = sessionId,
+            )
+            Result.success()
+        } catch (error: LocalAutomationWorkException) {
+            store.update(id) {
+                it.copy(
+                    workSessionId = error.sessionId,
+                    status = if (it.recurringMinutes == null) "failed" else "scheduled",
+                    nextRunAt = it.recurringMinutes?.let { minutes ->
+                        System.currentTimeMillis() + minutes * 60_000L
+                    } ?: it.nextRunAt,
+                    lastError = (error.message ?: "后台任务失败").take(4_000),
+                )
+            }
+            maybeNotify(
+                entry = entry,
+                task = task,
+                titleRes = R.string.tasks_notification_failed,
+                sessionId = error.sessionId,
+            )
             Result.success()
         } catch (error: Throwable) {
             store.update(id) {
@@ -283,30 +315,36 @@ class HarnessAutomationWorker(
                     lastError = (error.message ?: error::class.java.simpleName).take(4_000),
                 )
             }
+            maybeNotify(
+                entry = entry,
+                task = task,
+                titleRes = R.string.tasks_notification_failed,
+                sessionId = task.workSessionId,
+            )
             Result.success()
         }
     }
 
-    private fun notifyResult(id: String, result: String) {
-        val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Harness 后台任务",
-            NotificationManager.IMPORTANCE_DEFAULT,
+    private suspend fun maybeNotify(
+        entry: WorkerEntryPoint,
+        task: AutomationTask,
+        titleRes: Int,
+        sessionId: String?,
+    ) {
+        if (!task.notify) return
+        val enabled = runCatching { entry.hostsStore().settingsOnce().notifyLocalJobs }
+            .getOrDefault(true)
+        if (!enabled) return
+        entry.notifications().postLocalSession(
+            id = AUTOMATION_NOTIFICATION_BASE + (task.id.hashCode() and Int.MAX_VALUE) % 10_000,
+            title = applicationContext.getString(titleRes),
+            text = applicationContext.getString(R.string.tasks_notification_open_result),
+            sessionId = sessionId,
         )
-        manager.createNotificationChannel(channel)
-        val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_more)
-            .setContentTitle("后台任务完成：$id")
-            .setContentText(result.replace("\n", " ").take(180))
-            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(result.take(4_000)))
-            .setAutoCancel(true)
-            .build()
-        manager.notify(id.hashCode(), notification)
     }
 
     companion object {
-        private const val CHANNEL_ID = "harness_automation"
+        private const val AUTOMATION_NOTIFICATION_BASE = 34_000
     }
 }
 

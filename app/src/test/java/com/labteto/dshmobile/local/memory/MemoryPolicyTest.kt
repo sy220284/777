@@ -217,6 +217,29 @@ class MemoryPolicyTest {
     }
 
     @Test
+    fun relationshipStateNeverSupersedesAnotherCharacterSlot() {
+        val old = MemoryRecord(
+            id = "old-state",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            content = "关系状态：我和同名角色｜在一起",
+            subjectKey = "gallery:one",
+            importance = 86,
+            createdAt = 1L,
+            updatedAt = 1L,
+        )
+        val candidate = MemoryCandidate(
+            content = "关系状态：我和同名角色｜分手",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            importance = 86,
+            subjectKey = "gallery:two",
+        )
+
+        assertNull(conflicts.findReplacement(candidate, listOf(old)))
+    }
+
+    @Test
     fun highlySimilarMemorySupersedesOlderRecord() {
         val old = memory("以后代码修改完成后必须复查")
         val candidate = MemoryCandidate(
