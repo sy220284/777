@@ -1402,23 +1402,146 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun captureAutoMemoryDirective(text: String) {
         val snapshot = _state.value
         if (!snapshot.autoMemory || text.isBlank()) return
-        runCatching {
-            memoryManager.captureExplicitUserDirective(
-                text = text,
-                mode = snapshot.conversationMode,
-                projectId = snapshot.projectId,
-                lineageId = snapshot.lineageId,
-                sourceSessionId = currentSessionId,
-            )
-        }.onSuccess { remembered ->
-            if (remembered != null) {
-                eventLog.append("memory/auto", buildJsonObject {
-                    put("id", remembered.id)
-                    put("scope", remembered.scope.name.lowercase())
-                    put("kind", remembered.kind.name.lowercase())
-                })
+
+        val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+            runCatching {
+                memoryManager.captureChatRelationshipFact(
+                    text = text,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                    subjectLabel = snapshot.chatPersona.name
+                        .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
+                )
+            }.getOrNull()
+        } else {
+            runCatching {
+                memoryManager.captureExplicitUserDirective(
+                    text = text,
+                    mode = snapshot.conversationMode,
+                    projectId = snapshot.projectId,
+                    lineageId = snapshot.lineageId,
+                    sourceSessionId = currentSessionId,
+                )
+            }.getOrNull()
+        }
+
+        remembered?.let {
+            eventLog.append("memory/auto", buildJsonObject {
+                put("id", it.id)
+                put("scope", it.scope.name.lowercase())
+                put("kind", it.kind.name.lowercase())
+                put("source", if (snapshot.usageMode == LocalUsageMode.CHAT) "chat-relationship" else "directive")
+            })
+        }
+    }
+
+    private fun chatRelationshipMemoryContext(
+        query: String,
+        snapshot: LocalHarnessState,
+    ): String {
+        if (!snapshot.autoRecall) return ""
+        val relationshipKinds = setOf(
+            MemoryKind.RELATIONSHIP_FACT,
+            MemoryKind.RELATIONSHIP_STATE,
+            MemoryKind.RELATIONSHIP_PREFERENCE,
+        )
+        val semanticQuery = listOf(
+            query,
+            snapshot.chatPersona.name,
+            snapshot.chatPersona.relationship,
+        ).filter(String::isNotBlank).joinToString(" ")
+
+        val globalHits = memoryStore.search(
+            query = semanticQuery,
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            allowedKinds = relationshipKinds,
+            maxItems = 6,
+            maxChars = 2_400,
+        )
+        val lineageRecent = memoryStore.listActive(
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = snapshot.lineageId,
+            limit = 12,
+        ).filter { it.kind in relationshipKinds }
+
+        val recalled = (lineageRecent + globalHits)
+            .distinctBy { it.id }
+            .take(8)
+        if (recalled.isEmpty()) return ""
+
+        return buildString {
+            appendLine("【已确认的长期关系事实】")
+            recalled.forEach { appendLine("- ${it.content}") }
+            append("这些内容来自用户此前明确陈述；若与用户本轮新说法冲突，以更新后的明确事实为准。")
+        }
+    }
+
+    private fun hydrateNewChatStateFromRelationshipMemory() {
+        val snapshot = _state.value
+        if (
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.autoRecall ||
+            snapshot.chatState.updatedAt != 0L
+        ) return
+
+        val subject = snapshot.chatPersona.name.trim()
+            .takeIf { it.isNotBlank() && it != "默认角色" }
+            ?: return
+        val prefix = "关系状态：我和$subject｜"
+        val latest = memoryStore.listActive(
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            limit = 200,
+        ).asSequence()
+            .filter { it.kind == MemoryKind.RELATIONSHIP_STATE && it.content.startsWith(prefix) }
+            .maxByOrNull { it.updatedAt }
+            ?: return
+
+        val stored = latest.content.substringAfter("｜", "").trim()
+        val stage = when (stored) {
+            "暧昧" -> "AMBIGUOUS"
+            "在一起", "确定关系", "异地", "订婚", "结婚", "同居" -> "COMMITTED"
+            "冷战" -> "CONFLICT"
+            "分手", "离婚" -> "SEPARATED"
+            "复合" -> "REPAIRING"
+            else -> return
+        }
+        val label = when (stage) {
+            "AMBIGUOUS" -> "暧昧期"
+            "COMMITTED" -> "稳定关系"
+            "CONFLICT" -> "矛盾期"
+            "SEPARATED" -> "已分开"
+            "REPAIRING" -> "修复中"
+            else -> snapshot.chatState.relationshipState
+        }
+        if (
+            snapshot.chatState.dynamics.stage == stage &&
+            snapshot.chatState.relationshipState == label
+        ) return
+
+        _state.update { current ->
+            if (current.sessionId != snapshot.sessionId || current.chatState.updatedAt != 0L) {
+                current
+            } else {
+                current.copy(
+                    chatState = current.chatState.copy(
+                        relationshipState = label,
+                        dynamics = current.chatState.dynamics.copy(stage = stage),
+                    ),
+                )
             }
         }
+        eventLog.append("chat/relationship-hydrate", buildJsonObject {
+            put("subject", subject)
+            put("state", stored)
+            put("stage", stage)
+            put("memory_id", latest.id)
+        })
+        persist()
     }
 
     private suspend fun drainPendingInputsIntoHistory() {
@@ -1482,6 +1605,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            captureChatPersonaCorrection(memoryInput)
+            hydrateNewChatStateFromRelationshipMemory()
+        }
         val directChat = _state.value.usageMode == LocalUsageMode.CHAT &&
             !hasLocalImageRefs(modelHistory.takeLast(1))
         if (directChat) {
@@ -1489,6 +1616,23 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             runWorkTurn(input, memoryInput)
         }
+    }
+
+    private fun captureChatPersonaCorrection(text: String) {
+        val snapshot = _state.value
+        if (snapshot.usageMode != LocalUsageMode.CHAT || text.isBlank()) return
+        val updated = chatPersonaStore.captureExplicitCorrection(snapshot.personaId, text) ?: return
+        if (updated.corrections == snapshot.chatPersona.corrections) return
+
+        _state.update { current ->
+            if (current.personaId == updated.id) current.copy(chatPersona = updated) else current
+        }
+        eventLog.append("chat/persona-correction", buildJsonObject {
+            put("persona_id", updated.id)
+            put("count", updated.corrections.size)
+            put("latest", updated.corrections.lastOrNull().orEmpty())
+        })
+        persist()
     }
 
     private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
@@ -1505,12 +1649,17 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState)
+            captureAutoMemoryDirective(input)
+            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input)
+            val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
+            val chatPrompt = listOf(chatContext.prompt, relationshipMemory)
+                .filter(String::isNotBlank)
+                .joinToString("\n\n")
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withEphemeralContext(
                     if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
-                    chatContext.prompt,
+                    chatPrompt,
                 ),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
@@ -1702,10 +1851,16 @@ class LocalHarnessEngine @Inject constructor(
                     compactHistoryIfNeeded()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        ephemeralContext = chatTurnRunner.prepare(
-                            snapshot.personaId,
-                            snapshot.chatState,
-                        ).prompt
+                        captureAutoMemoryDirective(memoryInput)
+                        val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
+                        ephemeralContext = listOf(
+                            chatTurnRunner.prepare(
+                                snapshot.personaId,
+                                snapshot.chatState,
+                                input,
+                            ).prompt,
+                            relationshipMemory,
+                        ).filter(String::isNotBlank).joinToString("\n\n")
                     } else {
                         ephemeralContext = contextComposer.compose(
                             ContextRequest(
@@ -2871,6 +3026,8 @@ class LocalHarnessEngine @Inject constructor(
         val plan = chatInteractionPlanner.parse(
             plannerReply.content.orEmpty(),
             previous = before.chatState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
         )
         if (plan == null) {
             eventLog.append("chat/post-turn", buildJsonObject {

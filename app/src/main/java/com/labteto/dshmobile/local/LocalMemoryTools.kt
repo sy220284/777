@@ -17,6 +17,7 @@ internal class LocalMemoryTools(
                     allowedScopes = allowedMemoryScopes(state.conversationMode),
                     projectId = state.projectId,
                     lineageId = state.lineageId,
+                    allowedKinds = allowedMemoryKinds(state.usageMode),
                     maxItems = 12,
                     maxChars = 8_000,
                 )
@@ -34,8 +35,8 @@ internal class LocalMemoryTools(
                     allowedScopes = allowedMemoryScopes(state.conversationMode),
                     projectId = state.projectId,
                     lineageId = state.lineageId,
-                    limit = 20,
-                )
+                    limit = 200,
+                ).filter { it.kind in allowedMemoryKinds(state.usageMode) }.take(20)
                 if (records.isEmpty()) {
                     "当前作用域没有长期记忆"
                 } else {
@@ -129,7 +130,7 @@ internal class LocalMemoryTools(
             projectId = current.projectId,
             lineageId = current.lineageId,
             limit = 200,
-        )
+        ).filter { it.kind in allowedMemoryKinds(current.usageMode) }
         val exact = visible.firstOrNull { it.id == rawId }
         if (exact != null) return exact
         val prefixMatches = visible.filter { it.id.startsWith(rawId) }
@@ -140,6 +141,19 @@ internal class LocalMemoryTools(
     private fun JsonObject.optionalString(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
     private fun JsonObject.optionalInt(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
     private fun JsonObject.optionalBoolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
+    private fun allowedMemoryKinds(usageMode: LocalUsageMode): Set<MemoryKind> {
+        val relationshipKinds = setOf(
+            MemoryKind.RELATIONSHIP_FACT,
+            MemoryKind.RELATIONSHIP_STATE,
+            MemoryKind.RELATIONSHIP_PREFERENCE,
+        )
+        return if (usageMode == LocalUsageMode.CHAT) {
+            relationshipKinds
+        } else {
+            MemoryKind.values().filterNot(relationshipKinds::contains).toSet()
+        }
+    }
+
     private fun allowedMemoryScopes(mode: LocalConversationMode): Set<MemoryScope> = when (mode) {
         LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
         LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)

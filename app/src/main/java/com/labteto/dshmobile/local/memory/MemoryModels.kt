@@ -18,6 +18,9 @@ enum class MemoryKind {
     CONSTRAINT,
     STATE,
     SUMMARY,
+    RELATIONSHIP_FACT,
+    RELATIONSHIP_STATE,
+    RELATIONSHIP_PREFERENCE,
 }
 
 @Serializable

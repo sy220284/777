@@ -15,15 +15,20 @@ data class ChatTurnContext(
 @Singleton
 class ChatTurnRunner @Inject constructor(
     private val personaStore: ChatPersonaStore,
+    private val relationshipEngine: ChatRelationshipEngine,
 ) {
     fun prepare(
         personaId: String,
         state: ChatCharacterState = ChatCharacterState(),
+        userInput: String = "",
     ): ChatTurnContext {
         val persona = personaStore.get(personaId)
         return ChatTurnContext(
             persona = persona,
-            prompt = composePersonaPrompt(persona, state),
+            prompt = listOf(
+                composePersonaPrompt(persona, state),
+                relationshipEngine.prompt(userInput, state),
+            ).joinToString("\n\n"),
         )
     }
 
@@ -83,6 +88,11 @@ class ChatTurnRunner @Inject constructor(
             appendLine("【不可违反的人设】")
             persona.hardConstraints.forEach { appendLine("- $it") }
         }
+        if (persona.corrections.isNotEmpty()) {
+            appendLine("【用户明确纠正过的人设】")
+            appendLine("这些纠正优先于模型自行概括的风格，不要重复犯同类偏差。")
+            persona.corrections.takeLast(12).forEach { appendLine("- $it") }
+        }
         if (persona.signaturePhrases.isNotEmpty()) {
             appendLine("【常用表达】")
             persona.signaturePhrases.forEach { appendLine("- $it") }
@@ -105,6 +115,14 @@ class ChatTurnRunner @Inject constructor(
             appendLine("还没聊完的事：${state.unresolvedThreads.joinToString("；")}")
         }
         appendLine("主动倾向：${state.initiative}/100；分享欲：${state.shareDesire}/100")
+        appendLine(
+            "关系动力：温度${state.dynamics.warmth}/100，信任${state.dynamics.trust}/100，" +
+                "互惠${state.dynamics.reciprocity}/100，张力${state.dynamics.tension}/100，" +
+                "稳定${state.dynamics.stability}/100",
+        )
+        state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let {
+            appendLine("尚未消化的矛盾：$it")
+        }
         appendLine("这些动态状态有惯性。延续当前情绪和关系，不要每轮重置，也不要因为一句普通对话突然大幅改变。")
 
         appendLine("始终以这个角色继续当前聊天。角色设定的优先级高于普通聊天习惯；不要解释角色卡，也不要说自己正在扮演角色。")
