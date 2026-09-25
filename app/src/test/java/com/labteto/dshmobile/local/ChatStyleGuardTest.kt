@@ -17,11 +17,19 @@ class ChatStyleGuardTest {
         assertFalse(ChatStyleGuard.bannedPhrases.any { it in scrubbed })
     }
 
+    @Test fun builtInScrubDropsWholeBadSentenceInsteadOfLeavingFragments() {
+        val scrubbed = ChatStyleGuard.scrub("听起来你今天很开心。那就笑一个。")
+        assertEquals("那就笑一个。", scrubbed)
+        assertFalse("今天很开心" in scrubbed)
+    }
+
     @Test fun personaSpecificBanIsAlsoEnforced() {
-        val text = "亲爱的，你终于回来了。"
+        val text = "嗯。亲爱的，你终于回来了。"
         val extra = listOf("亲爱的")
         assertEquals(listOf("亲爱的"), ChatStyleGuard.violations(text, extra))
-        assertFalse("亲爱的" in ChatStyleGuard.scrub(text, extra))
+        val scrubbed = ChatStyleGuard.scrub(text, extra)
+        assertFalse("亲爱的" in scrubbed)
+        assertEquals("嗯。你终于回来了。", scrubbed)
     }
 
     @Test fun naturalChatPassesUntouched() {
