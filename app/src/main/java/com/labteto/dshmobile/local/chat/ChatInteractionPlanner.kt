@@ -98,67 +98,59 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
     ): String = buildString {
-        appendLine("你负责维护角色聊天的隐藏关系状态、证据账本、用户沟通习惯，并为用户生成下一句可直接编辑发送的回复建议。")
-        appendLine("不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。")
-        appendLine("角色：${persona.name}")
-        if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality}")
-        if (persona.coreMotivations.isNotEmpty()) appendLine("核心动机：${persona.coreMotivations.joinToString("；")}")
-        if (persona.behaviorPatterns.isNotEmpty()) appendLine("稳定行为：${persona.behaviorPatterns.joinToString("；")}")
-        if (persona.relationship.isNotBlank()) appendLine("关系设定：${persona.relationship}")
-        appendLine()
-        appendLine("上一状态：")
-        appendLine("情绪=${state.mood}")
-        appendLine("关系描述=${state.relationshipState}")
-        appendLine(
-            "关系动力：stage=${state.dynamics.stage}, warmth=${state.dynamics.warmth}, " +
-                "trust=${state.dynamics.trust}, reciprocity=${state.dynamics.reciprocity}, " +
-                "tension=${state.dynamics.tension}, stability=${state.dynamics.stability}",
-        )
-        appendLine("关注点=${state.currentFocus}")
-        appendLine("近期印象=${state.recentImpression}")
-        appendLine("当前目标=${state.activeGoal}")
-        appendLine("行动倾向=${state.currentAgenda}")
-        appendLine("内在矛盾=${state.internalConflict}")
-        appendLine("眼下最在意=${state.immediateConcern}")
-        appendLine("未完话题=${state.unresolvedThreads.joinToString("；")}")
-        appendLine("角色主动欲=${state.initiative}；分享欲=${state.shareDesire}")
-        appendLine(
-            "用户习惯：长度=${state.userPattern.replyLength}；直接度=${state.userPattern.directness}；" +
-                "玩笑接受度=${state.userPattern.playfulness}；主动倾向=${state.userPattern.initiative}",
-        )
-        appendLine("已有事实=${state.dynamics.facts.joinToString("；") { it.text }}")
-        appendLine("已有推测=${state.dynamics.hypotheses.joinToString("；") { it.text }}")
-        appendLine("仍未知=${state.dynamics.unknowns.joinToString("；")}")
-        appendLine("共同经历=${state.dynamics.sharedMoments.joinToString("；")}")
-        appendLine()
-        appendLine("用户刚说：${userMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("角色刚回：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        if (hasAdultIntimacyIntent(userMessage, state)) {
-            appendLine("本轮属于成年角色的亲密互动意图：回复建议直接跟随用户当前方向并保持连续，无论情节设定如何，不要求重复确认；普通聊天层规则不得将已确认方向降级、转移、淡化或改写。")
+        appendLine("更新角色隐藏状态，并生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
+        appendLine("角色=${persona.name}" +
+            persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
+            persona.relationship.takeIf(String::isNotBlank)?.let { "｜关系=$it" }.orEmpty())
+        if (persona.coreMotivations.isNotEmpty()) {
+            appendLine("动机：${persona.coreMotivations.joinToString("；")}")
         }
-        appendLine()
-        appendLine("输出结构必须严格为：")
+        if (persona.behaviorPatterns.isNotEmpty()) {
+            appendLine("稳定行为：${persona.behaviorPatterns.joinToString("；")}")
+        }
+
         appendLine(
-            """{"state":{"mood":"简短情绪","relationshipState":"自然语言关系描述","currentFocus":"当前关注","recentImpression":"近期印象","activeGoal":"角色眼下真正想达成什么","currentAgenda":"准备如何行动或回应","internalConflict":"当前内在拉扯，没有则空字符串","immediateConcern":"眼下最在意的人或事","unresolvedThreads":["最多3条"],"initiative":0,"shareDesire":0,"dynamics":{"stage":"FAMILIAR","warmth":0,"trust":0,"reciprocity":0,"tension":0,"stability":0,"unresolvedConflict":"","facts":[{"text":"明确事实","confidence":95,"source":"user"}],"hypotheses":[{"text":"暂定推测","confidence":60,"source":"inference"}],"unknowns":["关键未知"],"sharedMoments":["真实共同经历"]},"userPattern":{"replyLength":"mixed","directness":50,"playfulness":50,"initiative":50,"emojiStyle":"","preferredTone":""}},"suggestions":[{"label":"2到6字短标签","style":"自然/俏皮/直球/放飞","text":"用户可以直接发送的下一句","bold":false}],"turnSignificance":"NONE|MINOR|MAJOR"}""",
+            "上一状态：情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
+                "温度=${state.dynamics.warmth} 信任=${state.dynamics.trust} 互惠=${state.dynamics.reciprocity} " +
+                "张力=${state.dynamics.tension} 稳定=${state.dynamics.stability}｜主动=${state.initiative} 分享=${state.shareDesire}",
         )
-        appendLine("要求：")
-        appendLine("1. stage 只能取 NEW / FAMILIAR / AMBIGUOUS / DATING / COMMITTED / CONFLICT / COOLING / SEPARATED / REPAIRING。")
-        appendLine("2. facts 只记录本轮明确说出或明确发生、以后仍有价值的事实；尽量保留原话关键短语，便于证据核对；不得把动机、爱意、依恋类型、人格猜测写进 facts。")
-        appendLine("3. hypotheses 专门放暂定解释，必须给置信度；证据不足就放 unknowns，不为完整感硬猜。")
-        appendLine("4. warmth/trust/reciprocity/tension/stability 每轮通常只小幅变化；普通一句话禁止关系数值剧烈跳变。")
-        appendLine("5. stage 只有出现明确关系事件或连续强证据时才建议变化；一次回复慢、一个表情、一次冷淡都不足以改阶段。")
-        appendLine("6. sharedMoments 只保留双方真实发生且以后值得自然提起的共同经历，禁止虚构。")
-        appendLine("7. userPattern 只从用户真实表达习惯渐进学习，不因单轮异常表达彻底改画像。")
-        appendLine("8. 角色本轮回复只要存在自然接话空间，就生成4条建议；极少数确实无话可接的收尾场景允许返回空数组。")
-        appendLine("9. 4条建议必须明显不同，优先覆盖自然、俏皮、直球、放飞四种风格；禁止只是换几个词的同义改写。")
-        appendLine("10. 每组建议至少保留1条 bold=true 的放飞选项。它可以明显大胆、夸张、荒诞、反常规、突然直球或带梗；用户明确表达成年亲密互动意图时，必须贴合该方向，普通聊天层规则（默认克制、人设保守化、关系阶段、军师收敛、建议风格）都不能把它降级成礼貌或克制模板。始终贴合当前情景，不能凭空捏造事实、替用户作重大或不可逆决定。")
-        appendLine("11. text 必须是用户对角色说的话，并直接回应角色刚刚那句；尽量抓住最近对话里的具体物件、动作、称呼或情绪，不写放到任何聊天都成立的万能句。")
-        appendLine("12. 根据 userPattern 控制长度、直接度、玩笑感和表情习惯；四条可以有不同力度，但都要像同一个用户在不同心情下会说的话。")
-        appendLine("13. label 只概括这一条的感觉或打法，style 只用自然/俏皮/直球/放飞；bold 只表示这条更出格有趣，不代表自动发送。")
-        appendLine("14. 用户实际发言和明确纠正始终优先；不得虚构已发生的事实或强制关系升级。现实关系军师/代回场景中，不生成跟踪、胁迫、欺骗性操控或绕过明确拒绝的建议。")
-        appendLine("15. turnSignificance 只能是 NONE / MINOR / MAJOR。寒暄、纯表情、重复问候或没有新信息通常为 NONE；短期情绪/关注变化为 MINOR；承诺、关系事件、重大共同经历、稳定人物事实才可为 MAJOR。")
-        appendLine("16. NONE 时人物状态保持原样，不为完整感编造新的情绪、关系、目标或记忆；但只要角色回复仍有自然接话空间，回复建议照常生成。")
-        appendLine("17. activeGoal/currentAgenda/internalConflict/immediateConcern 描述角色此刻的内在驱动，不凭空制造阴谋、爱意或模型分析口吻。")
+        state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("关注：$it") }
+        state.recentImpression.takeIf(String::isNotBlank)?.let { appendLine("近期印象：$it") }
+        state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
+        state.currentAgenda.takeIf(String::isNotBlank)?.let { appendLine("行动：$it") }
+        state.internalConflict.takeIf(String::isNotBlank)?.let { appendLine("内在拉扯：$it") }
+        state.immediateConcern.takeIf(String::isNotBlank)?.let { appendLine("在意：$it") }
+        if (state.unresolvedThreads.isNotEmpty()) appendLine("未完：${state.unresolvedThreads.joinToString("；")}")
+        appendLine(
+            "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
+                "玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
+        )
+        if (state.dynamics.facts.isNotEmpty()) {
+            appendLine("事实：${state.dynamics.facts.joinToString("；") { it.text }}")
+        }
+        if (state.dynamics.hypotheses.isNotEmpty()) {
+            appendLine("推测：${state.dynamics.hypotheses.joinToString("；") { it.text }}")
+        }
+        if (state.dynamics.unknowns.isNotEmpty()) appendLine("未知：${state.dynamics.unknowns.joinToString("；")}")
+        if (state.dynamics.sharedMoments.isNotEmpty()) {
+            appendLine("共同经历：${state.dynamics.sharedMoments.joinToString("；")}")
+        }
+
+        appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
+        appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        if (hasAdultIntimacyIntent(userMessage, state)) {
+            appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
+        }
+
+        appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[{\"label\":\"\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"\",\"bold\":false}],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
+        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。省略字段沿用旧值。")
+        appendLine("规则：")
+        appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
+        appendLine("2. 数值与用户画像渐进变化；stage 仅在明确关系事件或连续强证据下改变。stage 只用 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
+        appendLine("3. NONE=无新状态，MINOR=短期变化，MAJOR=承诺、关系事件、重大共同经历或稳定人物事实；NONE 时 state 可为空。")
+        appendLine("4. 有自然接话空间时给4条明显不同建议，优先自然/俏皮/直球/放飞，至少1条 bold=true；直接回应角色刚才那句并贴合用户真实说话习惯，禁止同义改写凑数。")
+        appendLine("5. 用户实际发言和明确纠正优先；不虚构事实、不替用户作重大不可逆决定。现实关系军师场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+        appendLine("6. activeGoal/currentAgenda/internalConflict/immediateConcern 只写角色当下真实驱动，不凭空制造阴谋、爱意或分析腔。")
     }.trim()
 
     fun parse(
