@@ -78,12 +78,17 @@ internal class LocalHistoryCompactor(
             })
             addAll(history.drop(start))
         }
+        val estimatedTokensBefore = encodedTokens + extraTokens
+        val estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens
+        // Compaction is allowed to change durable history only when it actually releases context.
+        // A short older span can be smaller than the extractive summary header itself.
+        if (estimatedTokensAfter >= estimatedTokensBefore) return null
         return LocalHistoryCompaction(
             messages = compacted,
             omittedMessages = omitted.size,
             summary = summary,
-            estimatedTokensBefore = encodedTokens + extraTokens,
-            estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens,
+            estimatedTokensBefore = estimatedTokensBefore,
+            estimatedTokensAfter = estimatedTokensAfter,
         )
     }
 
