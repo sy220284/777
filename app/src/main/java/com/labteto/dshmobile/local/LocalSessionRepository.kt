@@ -156,6 +156,13 @@ internal class LocalSessionRepository(
                                 ?: LocalUsageMode.WORK.name,
                         )
                     }.getOrDefault(LocalUsageMode.WORK),
+                    chatMode = runCatching {
+                        val group = payload["groupChat"] as? JsonObject
+                        LocalChatMode.valueOf(
+                            group?.get("mode")?.jsonPrimitive?.contentOrNull
+                                ?: LocalChatMode.SINGLE.name,
+                        )
+                    }.getOrDefault(LocalChatMode.SINGLE),
                     blank = messages?.none { element ->
                         val message = element as? JsonObject ?: return@none false
                         message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
@@ -169,6 +176,7 @@ internal class LocalSessionRepository(
         title = title,
         updatedAt = updatedAt,
         usageMode = usageMode,
+        chatMode = groupChat.mode,
         blank = messages.none { it.content.isNotBlank() },
     )
 }
