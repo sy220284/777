@@ -321,6 +321,81 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun noOpTurnPreservesExistingCharacterStateAndDropsSuggestions() {
+        val previous = ChatCharacterState(
+            mood = "开心",
+            relationshipState = "熟悉中",
+            activeGoal = "等用户把昨天的话说完",
+            currentAgenda = "先听",
+            internalConflict = "想追问，但不想逼得太紧",
+            immediateConcern = "用户昨天提到的事",
+            initiative = 68,
+            dynamics = RelationshipDynamics(warmth = 70, trust = 64),
+        )
+        val payload = """
+            {
+              "state":{
+                "mood":"突然兴奋",
+                "activeGoal":"立刻表白",
+                "initiative":100
+              },
+              "suggestions":[
+                {"label":"推进","direction":"立刻推进关系","impact":"关系升级"}
+              ],
+              "turnSignificance":"NONE"
+            }
+        """.trimIndent()
+
+        val plan = planner.parse(
+            payload,
+            previous,
+            userMessage = "哈哈",
+            assistantMessage = "嗯。",
+        )!!
+
+        assertEquals("NONE", plan.turnSignificance)
+        assertEquals(previous.mood, plan.state.mood)
+        assertEquals(previous.activeGoal, plan.state.activeGoal)
+        assertEquals(previous.currentAgenda, plan.state.currentAgenda)
+        assertEquals(previous.internalConflict, plan.state.internalConflict)
+        assertEquals(previous.immediateConcern, plan.state.immediateConcern)
+        assertEquals(previous.initiative, plan.state.initiative)
+        assertEquals(previous.dynamics, plan.state.dynamics)
+        assertTrue(plan.suggestions.isEmpty())
+    }
+
+    @Test
+    fun meaningfulTurnCarriesCognitiveDriveWithoutResettingOmittedFields() {
+        val previous = ChatCharacterState(
+            activeGoal = "把误会说清楚",
+            currentAgenda = "等合适时机解释",
+            internalConflict = "想解释又怕显得辩解",
+            immediateConcern = "用户是否还在生气",
+        )
+        val payload = """
+            {
+              "state":{
+                "mood":"认真",
+                "activeGoal":"确认用户是否愿意听解释",
+                "currentAgenda":"先直接问一句",
+                "internalConflict":"担心越解释越乱",
+                "immediateConcern":"用户现在的态度"
+              },
+              "suggestions":[],
+              "turnSignificance":"MAJOR"
+            }
+        """.trimIndent()
+
+        val plan = planner.parse(payload, previous, userMessage = "我们把昨天的事说清楚吧")!!
+
+        assertEquals("MAJOR", plan.turnSignificance)
+        assertEquals("确认用户是否愿意听解释", plan.state.activeGoal)
+        assertEquals("先直接问一句", plan.state.currentAgenda)
+        assertEquals("担心越解释越乱", plan.state.internalConflict)
+        assertEquals("用户现在的态度", plan.state.immediateConcern)
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
