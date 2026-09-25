@@ -3297,7 +3297,6 @@ class LocalHarnessEngine @Inject constructor(
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
             }
             ensureSystemMessage()
-            compactHistoryIfNeeded()
             captureAutoMemoryDirective(input)
 
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
@@ -3306,6 +3305,24 @@ class LocalHarnessEngine @Inject constructor(
             val rotated = members.drop(cursor) + members.take(cursor)
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
+            val groupPromptTokens = responders.maxOfOrNull { member ->
+                val persona = member.persona.takeUnless {
+                    it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
+                        member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                } ?: chatPersonaStore.get(member.personaId)
+                estimateModelTokens(
+                    groupAgentPrompt(
+                        persona = persona,
+                        member = member,
+                        state = member.chatState,
+                        input = input,
+                        allMembers = members,
+                        mayStaySilent = false,
+                        handoffSummary = snapshot.handoffSummary,
+                    ),
+                )
+            } ?: 0
+            compactHistoryIfNeeded(extraTokens = groupPromptTokens)
 
             eventLog.append("turn/start", buildJsonObject {
                 put("model", snapshot.model)
@@ -3504,7 +3521,6 @@ class LocalHarnessEngine @Inject constructor(
         }
         try {
             ensureSystemMessage()
-            compactHistoryIfNeeded()
             val snapshot = _state.value
             val branchEligible = chatBranchingEligible(snapshot.messages)
             val branchParentId = snapshot.messages.lastOrNull { it.role == "user" }?.id
@@ -3524,6 +3540,7 @@ class LocalHarnessEngine @Inject constructor(
             val chatPrompt = listOf(chatContext.prompt, relationshipMemory)
                 .filter(String::isNotBlank)
                 .joinToString("\n\n")
+            compactHistoryIfNeeded(extraTokens = estimateModelTokens(chatPrompt))
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withEphemeralContext(
@@ -5387,6 +5404,11 @@ class LocalHarnessEngine @Inject constructor(
             currentChars = modelHistoryChars,
             currentTokens = modelHistoryEstimatedTokens,
             extraTokens = extraTokens,
+            summaryMode = if (_state.value.usageMode == LocalUsageMode.CHAT) {
+                LocalHistorySummaryMode.CHAT
+            } else {
+                LocalHistorySummaryMode.WORK
+            },
         ) ?: run {
             updateContextMetrics()
             return
