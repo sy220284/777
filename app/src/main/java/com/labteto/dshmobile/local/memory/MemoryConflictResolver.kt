@@ -12,7 +12,8 @@ class MemoryConflictResolver @Inject constructor() {
         val comparable = existing.filter {
             it.active &&
                 it.scope == candidate.scope &&
-                it.kind == candidate.kind
+                it.kind == candidate.kind &&
+                it.subjectKey == candidate.subjectKey
         }
         if (candidate.kind == MemoryKind.RELATIONSHIP_STATE) {
             val slot = relationshipSlot(candidate.content)
