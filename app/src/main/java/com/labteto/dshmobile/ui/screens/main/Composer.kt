@@ -304,7 +304,7 @@ internal fun Composer(
                     description = stringResource(R.string.chat_composer_send),
                     size = 36,
                     background = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-                    tint = if (canSend) Color.White else colors.labelTertiary,
+                    tint = if (canSend) colors.onAccent else colors.labelTertiary,
                     enabled = canSend,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -322,7 +322,7 @@ internal fun Composer(
                         description = stringResource(R.string.chat_composer_stop),
                         size = 36,
                         background = colors.error,
-                        tint = Color.White,
+                        tint = colors.onAccent,
                         enabled = true,
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)

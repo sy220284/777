@@ -71,7 +71,7 @@ data class AppSettings(
     val notifyTurnComplete: Boolean = true,
     val notifyGoal: Boolean = true,
     val notifyNeedsAction: Boolean = true,
-    val themePreference: String = "system", // light | dark | system
+    val themePreference: String = "system", // light | dark | matte_black | system
     val localeOverride: String? = null, // null = system
     /**
      * Absolute path of the copied background image inside app storage, or null for the plain theme

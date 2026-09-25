@@ -63,7 +63,7 @@ class DshApplication : Application() {
          */
         fun nightModeFor(themePreference: String?): Int = when (themePreference) {
             "light" -> AppCompatDelegate.MODE_NIGHT_NO
-            "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+            "dark", "matte_black" -> AppCompatDelegate.MODE_NIGHT_YES
             else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
     }
