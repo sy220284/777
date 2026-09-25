@@ -42,10 +42,15 @@ class ChatTurnRunner @Inject constructor(
         reply: LocalModelReply,
         rewrite: suspend (String, List<String>) -> LocalModelReply,
         recordUsage: (DeepSeekTokenUsage) -> Unit,
+        builtInGuardEnabled: Boolean = true,
         onGuardEvent: (String, List<String>) -> Unit = { _, _ -> },
     ): LocalModelReply {
         val extraBanned = persona.bannedPhrases
-        val firstViolations = ChatStyleGuard.violations(reply.content.orEmpty(), extraBanned)
+        val firstViolations = ChatStyleGuard.violations(
+            reply.content.orEmpty(),
+            extraBanned,
+            builtInEnabled = builtInGuardEnabled,
+        )
         if (firstViolations.isEmpty()) {
             recordUsage(reply.usage)
             return reply
@@ -61,18 +66,30 @@ class ChatTurnRunner @Inject constructor(
             onGuardEvent("rewrite-failed", firstViolations)
             return ChatStyleGuard.withContent(
                 reply,
-                ChatStyleGuard.scrub(reply.content.orEmpty(), extraBanned),
+                ChatStyleGuard.scrub(
+                    reply.content.orEmpty(),
+                    extraBanned,
+                    builtInEnabled = builtInGuardEnabled,
+                ),
             )
         }
 
         recordUsage(repaired.usage)
-        val remaining = ChatStyleGuard.violations(repaired.content.orEmpty(), extraBanned)
+        val remaining = ChatStyleGuard.violations(
+            repaired.content.orEmpty(),
+            extraBanned,
+            builtInEnabled = builtInGuardEnabled,
+        )
         if (remaining.isEmpty()) return repaired
 
         onGuardEvent("scrub", remaining)
         return ChatStyleGuard.withContent(
             repaired,
-            ChatStyleGuard.scrub(repaired.content.orEmpty(), extraBanned),
+            ChatStyleGuard.scrub(
+                repaired.content.orEmpty(),
+                extraBanned,
+                builtInEnabled = builtInGuardEnabled,
+            ),
         )
     }
 
