@@ -40,8 +40,12 @@ import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.DateFormat
 import java.util.Date
@@ -111,7 +115,7 @@ fun TasksScreen(
     var createError by remember { mutableStateOf<String?>(null) }
     BackHandler(onBack = onClose)
 
-    Surface(Modifier.fillMaxSize(), color = colors.bgBase) {
+    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding()
                 .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
@@ -122,7 +126,7 @@ fun TasksScreen(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.common_back),
                     onClick = onClose,
-                    containerColor = colors.bgLayer1,
+                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                     shadowElevation = 3.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = DsSpacing.medium)) {
@@ -133,7 +137,7 @@ fun TasksScreen(
                     icon = Icons.Filled.Add,
                     contentDescription = stringResource(R.string.tasks_new),
                     onClick = { showCreate = !showCreate; createError = null },
-                    containerColor = colors.bgLayer1,
+                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 )
             }
 

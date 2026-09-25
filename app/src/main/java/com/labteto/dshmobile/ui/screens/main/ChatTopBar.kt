@@ -33,10 +33,13 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.skeleton
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /** The two views of a session. The low-frequency switch now lives in the capability sheet. */
 internal enum class ChatTab { Chat, Trajectory }
@@ -61,7 +64,7 @@ internal fun ChatTopBar(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    Column(modifier.fillMaxWidth().background(colors.bgBase)) {
+    Column(modifier.fillMaxWidth().background(colors.wallpaperSurface(WallpaperSurfaceLevel.CHROME, BackgroundRegion.TOP))) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -75,7 +78,7 @@ internal fun ChatTopBar(
                 onClick = onOpenDrawer,
                 tint = colors.labelSecondary,
                 iconSize = 18.dp,
-                containerColor = colors.bgLayer1,
+                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 2.dp,
             )
             Spacer(Modifier.width(DsSpacing.medium))
@@ -94,7 +97,7 @@ internal fun ChatTopBar(
                 onClick = onOpenFiles,
                 tint = colors.labelTertiary,
                 iconSize = 18.dp,
-                containerColor = colors.bgLayer1,
+                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 2.dp,
             )
             if (!detailsOpen) {
@@ -105,7 +108,7 @@ internal fun ChatTopBar(
                     onClick = onOpenDetails,
                     tint = colors.labelTertiary,
                     iconSize = 18.dp,
-                    containerColor = colors.bgLayer1,
+                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                     shadowElevation = 2.dp,
                 )
             }

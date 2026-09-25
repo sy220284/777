@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +39,9 @@ import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -94,7 +98,7 @@ internal fun LocalWorkspaceFilesDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
+        Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = DsSpacing.small),
@@ -329,6 +333,9 @@ private fun LocalFileList(
                     headlineContent = { Text(name) },
                     supportingContent = { Text(stringResource(R.string.panel_folder)) },
                     modifier = Modifier.clickable { onDirectory(path) },
+                    colors = ListItemDefaults.colors(
+                        containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                    ),
                 )
             } else {
                 LocalFileRow(file) { scope.launch { onOpen(file) } }
@@ -343,6 +350,9 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
         headlineContent = { Text(file.path.substringAfterLast('/')) },
         supportingContent = { Text("${file.path} · ${formatBytes(file.bytes)}") },
         modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(
+            containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        ),
     )
 }
 
