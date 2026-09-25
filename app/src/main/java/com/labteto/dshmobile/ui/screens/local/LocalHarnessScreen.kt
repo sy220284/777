@@ -497,77 +497,7 @@ private fun LocalModeDrawer(
             LocalUsageFooter(usage)
         }
     }
-    if (selectionOpen) {
-                                if (session.id in selectedIds) selectedIds.remove(session.id)
-                                else selectedIds.add(session.id)
-                            } else onSwitchSession(session.id)
-                        },
-                        onLongClick = {
-                            if (session.id !in selectedIds) selectedIds.add(session.id)
-                            selectionOpen = true
-                        },
-                        onDelete = { onDeleteSessions(setOf(session.id)) },
-                    )
-                }
-                item(key = "drawer-tools-title") {
-                    DrawerSectionTitle("功能")
-                }
-                item(key = "drawer-tools") {
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            subtitle = stringResource(R.string.local_remote_hint),
-                            onClick = onRemote,
-                        )
-                        if (usageMode == LocalUsageMode.WORK) {
-                            DsCategoryRow(
-                                icon = FeatherIcons.FileText,
-                                title = stringResource(R.string.chatlist_workspace_files),
-                                subtitle = stringResource(R.string.local_files_workspace_subtitle),
-                                onClick = onWorkspaceFiles,
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Schedule,
-                                title = "定时任务",
-                                subtitle = "计划任务、周期任务和执行结果",
-                                onClick = onTasks,
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Extension,
-                                title = "工具与连接",
-                                subtitle = "外部工具服务与当前扩展",
-                                onClick = onTools,
-                            )
-                        }
-                        DsCategoryRow(
-                            icon = Icons.Outlined.Settings,
-                            title = "设置",
-                            subtitle = "模型、个性化、权限与高级选项",
-                            onClick = onSettings,
-                        )
-                        DsCategoryRow(
-                            icon = Icons.Outlined.CloudDownload,
-                            title = stringResource(R.string.settings_update_check),
-                            subtitle = stringResource(R.string.settings_update_check_hint),
-                            onClick = onCheckUpdate,
-                        )
-                    }
-                }
-                if (updateStatus != null) {
-                    item(key = "drawer-update-status") {
-                        Text(
-                            updateStatus,
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                        )
-                    }
-                }
-            }
-            LocalUsageFooter(usage)
-        }
-    }
+
     if (selectionOpen) {
         var position by remember { mutableStateOf(IntOffset(24, 160)) }
         Popup(
@@ -610,7 +540,10 @@ private fun LocalModeDrawer(
                     DsIconButton(
                         icon = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.common_close),
-                        onClick = { selectionOpen = false; selectedIds.clear() },
+                        onClick = {
+                            selectionOpen = false
+                            selectedIds.clear()
+                        },
                         tint = colors.labelSecondary,
                     )
                 }
@@ -661,7 +594,6 @@ private fun DrawerPrimaryAction(
         }
     }
 }
-
 
 @Composable
 private fun DrawerSectionTitle(title: String) {
