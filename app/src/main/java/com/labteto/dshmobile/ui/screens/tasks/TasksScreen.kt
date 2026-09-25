@@ -199,13 +199,10 @@ fun TasksScreen(
                         color = colors.labelPrimary,
                     )
                     if (chatMode) {
+                        val characterName = harnessState.chatPersona.name.takeIf(String::isNotBlank)
+                            ?: stringResource(R.string.tasks_chat_character_fallback)
                         Text(
-                            stringResource(
-                                R.string.tasks_chat_target,
-                                harnessState.chatPersona.name.ifBlank {
-                                    stringResource(R.string.tasks_chat_character_fallback)
-                                },
-                            ),
+                            stringResource(R.string.tasks_chat_target, characterName),
                             style = DsType.small13Strong,
                             color = colors.labelSecondary,
                         )
@@ -392,21 +389,19 @@ private fun ChatInteractionPresets(
         style = DsType.small13Strong,
         color = DsTheme.colors.labelSecondary,
     )
-    CadenceRow(
-        first = AutomationCadence.ONCE,
+    ChatPresetRow(
         firstLabel = stringResource(R.string.tasks_chat_preset_morning),
-        second = AutomationCadence.DAILY,
+        firstPrompt = morning,
         secondLabel = stringResource(R.string.tasks_chat_preset_night),
-        selected = AutomationCadence.CUSTOM,
-        onSelect = { choice -> onSelect(if (choice == AutomationCadence.ONCE) morning else night) },
+        secondPrompt = night,
+        onSelect = onSelect,
     )
-    CadenceRow(
-        first = AutomationCadence.ONCE,
+    ChatPresetRow(
         firstLabel = stringResource(R.string.tasks_chat_preset_reach_out),
-        second = AutomationCadence.DAILY,
+        firstPrompt = reachOut,
         secondLabel = stringResource(R.string.tasks_chat_preset_story),
-        selected = AutomationCadence.CUSTOM,
-        onSelect = { choice -> onSelect(if (choice == AutomationCadence.ONCE) reachOut else story) },
+        secondPrompt = story,
+        onSelect = onSelect,
     )
     DsButton(
         text = stringResource(R.string.tasks_chat_preset_promise),
@@ -415,6 +410,35 @@ private fun ChatInteractionPresets(
         size = DsButtonSize.Small,
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+@Composable
+private fun ChatPresetRow(
+    firstLabel: String,
+    firstPrompt: String,
+    secondLabel: String,
+    secondPrompt: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        DsButton(
+            text = firstLabel,
+            onClick = { onSelect(firstPrompt) },
+            modifier = Modifier.weight(1f),
+            variant = DsButtonVariant.Ghost,
+            size = DsButtonSize.Small,
+        )
+        DsButton(
+            text = secondLabel,
+            onClick = { onSelect(secondPrompt) },
+            modifier = Modifier.weight(1f),
+            variant = DsButtonVariant.Ghost,
+            size = DsButtonSize.Small,
+        )
+    }
 }
 
 @Composable
@@ -488,6 +512,8 @@ private fun TaskCard(
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
+    val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.recurringMinutes) {
         null -> stringResource(R.string.tasks_once)
         24L * 60L -> stringResource(R.string.tasks_schedule_daily)
@@ -515,15 +541,11 @@ private fun TaskCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     if (task.mode == AutomationMode.CHAT) {
-                        buildString {
-                            append(task.actorName?.takeIf(String::isNotBlank)
-                                ?: stringResource(R.string.tasks_chat_character_fallback))
-                            append(" · ")
-                            append(task.prompt.lineSequence().firstOrNull()?.trim()?.take(42).orEmpty())
-                        }
+                        val actor = task.actorName?.takeIf(String::isNotBlank) ?: chatCharacterFallback
+                        "$actor · ${task.prompt.lineSequence().firstOrNull()?.trim()?.take(42).orEmpty()}"
                     } else {
                         task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
-                            .ifBlank { stringResource(R.string.tasks_background_task) }
+                            .ifBlank { backgroundTaskLabel }
                     },
                     style = DsType.std14Strong,
                     color = colors.labelPrimary,
