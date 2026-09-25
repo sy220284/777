@@ -295,7 +295,6 @@ fun LocalHarnessScreen(
                 onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
                 onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
-                onSelectChatDirection = viewModel::selectChatDirection,
                 onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
@@ -1005,7 +1004,6 @@ private fun LocalChat(
     onSelectGalleryPersona: (String) -> Boolean,
     onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
-    onSelectChatDirection: (String?) -> Unit,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
@@ -1463,27 +1461,6 @@ private fun LocalChat(
                 Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                if (state.usageMode == LocalUsageMode.CHAT) {
-                    state.chatState.narrativeDirection?.let { selected ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                stringResource(R.string.local_story_direction_selected, selected.label),
-                                style = DsType.small13Strong,
-                                color = colors.labelSecondary,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            DsButton(
-                                text = stringResource(R.string.local_story_direction_clear),
-                                onClick = { onSelectChatDirection(null) },
-                                variant = DsButtonVariant.Ghost,
-                                size = DsButtonSize.Small,
-                                enabled = !state.running,
-                            )
-                        }
-                    }
-                }
                 if (attachments.isNotEmpty()) {
                     attachments.forEachIndexed { index, attachment ->
                         ImportedAttachmentRow(
@@ -1544,7 +1521,7 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
-                        state.replySuggestions.any { it.direction.isNotBlank() }
+                        state.replySuggestions.any { it.text.isNotBlank() }
                     ) {
                         DsButton(
                             text = stringResource(R.string.local_reply_suggestions_open),
@@ -1680,36 +1657,58 @@ private fun LocalChat(
         )
     }
     if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
-        state.replySuggestions.any { it.direction.isNotBlank() }) {
+        state.replySuggestions.any { it.text.isNotBlank() }) {
         DsBottomSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
         ) {
             Text(
-                stringResource(R.string.local_story_direction_hint),
+                stringResource(R.string.local_reply_suggestions_hint),
                 style = DsType.small13,
                 color = colors.labelSecondary,
             )
-            state.replySuggestions.filter { it.direction.isNotBlank() }.forEach { suggestion ->
-                val selected = state.chatState.narrativeDirection?.guidance == suggestion.direction
+            state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 Surface(
                     onClick = {
-                        onSelectChatDirection(suggestion.direction)
+                        drafts[state.sessionId] = suggestion.text
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    color = if (selected) colors.bgLayer2 else colors.bgLayer1,
-                    border = BorderStroke(1.dp, if (selected) colors.labelSecondary else colors.borderL2),
+                    color = colors.bgLayer1,
+                    border = BorderStroke(1.dp, colors.borderL2),
                 ) {
                     Column(
                         Modifier.heightIn(min = DsSpacing.touchTarget)
                             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                     ) {
-                        Text(suggestion.label, style = DsType.std14Strong, color = colors.labelPrimary)
-                        Text(suggestion.impact, style = DsType.small13, color = colors.labelSecondary)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                suggestion.label,
+                                style = DsType.std14Strong,
+                                color = colors.labelPrimary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (suggestion.style.isNotBlank() || suggestion.bold) {
+                                Text(
+                                    if (suggestion.bold) stringResource(R.string.local_reply_suggestions_bold)
+                                    else suggestion.style,
+                                    style = DsType.caption11,
+                                    color = if (suggestion.bold) colors.warnLabel else colors.labelTertiary,
+                                )
+                            }
+                        }
+                        Text(
+                            suggestion.text,
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                        )
                     }
                 }
             }
