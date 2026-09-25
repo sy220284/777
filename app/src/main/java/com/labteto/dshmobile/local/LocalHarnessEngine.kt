@@ -948,7 +948,9 @@ class LocalHarnessEngine @Inject constructor(
                     galleryId = entry.id,
                     personaId = saved.id,
                     displayName = saved.name,
-                    chatState = previous?.chatState ?: ChatCharacterState(),
+                    chatState = previous?.chatState
+                        ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
+                        ?: ChatCharacterState(),
                 )
             }
             _state.update { current ->
