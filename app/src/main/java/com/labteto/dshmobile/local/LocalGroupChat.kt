@@ -124,11 +124,11 @@ internal fun stripGroupSpeakerPrefix(
 
     names.forEach { name ->
         val prefixes = sequenceOf(
-            "**$name：**", "**$name:**", "__$name：__", "__$name:__",
+            "**$name：**", "**$name:**", "__${name}：__", "__${name}:__",
             "【$name】：", "【$name】:", "[$name]：", "[$name]:",
             "@$name：", "@$name:", "＠$name：", "＠$name:",
             "$name：", "$name:",
-            "**$name**\r\n", "**$name**\n", "__$name__\r\n", "__$name__\n",
+            "**$name**\r\n", "**$name**\n", "__${name}__\r\n", "__${name}__\n",
             "【$name】\r\n", "【$name】\n", "[$name]\r\n", "[$name]\n",
             "$name\r\n", "$name\n",
             "$name - ", "$name — ", "$name— ",
