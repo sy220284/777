@@ -137,6 +137,11 @@ internal fun activeChatBranchMessages(state: LocalChatBranchState): List<LocalHa
     return result
 }
 
+internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
+    state.nodes.groupBy { branchParentKey(it.parentId) }
+        .values
+        .any { siblings -> siblings.groupBy { it.message.role }.values.any { it.size > 1 } }
+
 internal fun chatBranchInfo(
     state: LocalChatBranchState,
     messageId: String,
