@@ -2149,6 +2149,18 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             compactHistoryIfNeeded()
             val snapshot = _state.value
+            val branchEligible = chatBranchingEligible(snapshot.messages)
+            val branchParentId = snapshot.messages.lastOrNull { it.role == "user" }?.id
+            val branchBase = if (branchEligible) {
+                syncChatBranchState(
+                    current = snapshot.chatBranches,
+                    activeMessages = snapshot.messages,
+                    chatState = snapshot.chatState,
+                    replySuggestions = snapshot.replySuggestions,
+                )
+            } else {
+                snapshot.chatBranches
+            }
             captureAutoMemoryDirective(input)
             val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input, snapshot.handoffSummary)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
@@ -2236,12 +2248,42 @@ class LocalHarnessEngine @Inject constructor(
                 assistantEvent.sequence,
                 clearStreamingPreview = true,
             )
+            val assistantTranscript = transcriptMessages.lastOrNull()
+            if (branchEligible && assistantTranscript != null && branchParentId != null) {
+                val branches = upsertChatBranchNode(
+                    branchBase,
+                    LocalChatBranchNode(
+                        message = assistantTranscript,
+                        parentId = branchParentId,
+                        chatStateAfter = snapshot.chatState,
+                    ),
+                    select = true,
+                )
+                _state.update { it.copy(chatBranches = branches) }
+            }
             reply.content?.takeIf(String::isNotBlank)?.let { assistantMessage ->
                 refreshChatPostTurn(
                     userMessage = input,
                     assistantMessage = assistantMessage,
                     persona = chatContext.persona,
                 )
+            }
+            if (branchEligible && assistantTranscript != null) {
+                _state.update { current ->
+                    current.copy(
+                        chatBranches = updateChatBranchNodeSnapshot(
+                            state = current.chatBranches,
+                            messageId = assistantTranscript.id,
+                            chatState = current.chatState,
+                            replySuggestions = current.replySuggestions,
+                        ),
+                    )
+                }
+                if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+                    persistChatBranchState(
+                        if (replacingMessageId != null) "assistant-regenerated" else "assistant-branch-completed",
+                    )
+                }
             }
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "completed")
