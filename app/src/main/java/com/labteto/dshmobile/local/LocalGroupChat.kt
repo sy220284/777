@@ -55,7 +55,7 @@ internal fun groupChatMentionedMembers(
             name,
             listOf(
                 "@$name", "＠$name",
-                "$name你", "$name，", "$name,", "$name：", "$name:", "$name、",
+                "${name}你", "$name，", "$name,", "$name：", "$name:", "$name、",
             ),
         )
         index.takeIf { it >= 0 }?.let { it to member }
