@@ -1843,16 +1843,55 @@ class LocalHarnessEngine @Inject constructor(
     /** Backward-compatible entry point: a plain new session is fully independent. */
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
 
-    /** Move between the two product surfaces while keeping each side's latest session. */
-    fun switchUsageMode(mode: LocalUsageMode) {
+    fun switchChatMode(mode: LocalChatMode) {
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode == mode) return
-        val target = snapshot.sessions.firstOrNull { it.usageMode == mode && !it.blank }
-            ?: snapshot.sessions.firstOrNull { it.usageMode == mode }
+        if (snapshot.loading || snapshot.running) return
+        if (
+            snapshot.usageMode == LocalUsageMode.CHAT &&
+            snapshot.groupChat.mode == mode
+        ) return
+
+        val target = snapshot.sessions.firstOrNull {
+            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
+        } ?: snapshot.sessions.firstOrNull {
+            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+        }
         if (target != null) {
             switchSession(target.id)
         } else {
-            createSession(LocalConversationMode.INDEPENDENT, mode)
+            createSession(
+                mode = LocalConversationMode.INDEPENDENT,
+                usageMode = LocalUsageMode.CHAT,
+                chatMode = mode,
+            )
+        }
+    }
+
+    /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
+    fun switchUsageMode(mode: LocalUsageMode) {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running) return
+        if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
+            if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
+            return
+        }
+        if (snapshot.usageMode == mode) return
+        val target = snapshot.sessions.firstOrNull {
+            it.usageMode == mode &&
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE) &&
+                !it.blank
+        } ?: snapshot.sessions.firstOrNull {
+            it.usageMode == mode &&
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
+        }
+        if (target != null) {
+            switchSession(target.id)
+        } else {
+            createSession(
+                mode = LocalConversationMode.INDEPENDENT,
+                usageMode = mode,
+                chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
+            )
         }
     }
 
