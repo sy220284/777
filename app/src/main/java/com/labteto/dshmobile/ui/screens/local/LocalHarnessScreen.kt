@@ -323,6 +323,7 @@ fun LocalHarnessScreen(
             currentPersona = state.chatPersona,
             currentGalleryId = state.galleryId,
             currentGalleryStoryId = state.galleryStoryId,
+            currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
             currentSessionId = state.sessionId,
             canSave = !state.loading && !state.running,
             onSaveCurrent = viewModel::saveCurrentToGallery,
