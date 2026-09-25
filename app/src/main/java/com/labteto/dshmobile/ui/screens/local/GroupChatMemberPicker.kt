@@ -37,6 +37,7 @@ internal fun GroupChatMemberPickerSheet(
     onDismiss: () -> Unit,
 ) {
     val selected = remember { mutableStateListOf<String>() }
+    val avatarFallback = stringResource(R.string.persona_gallery_avatar_fallback)
     LaunchedEffect(currentIds) {
         selected.clear()
         selected.addAll(currentIds.distinct().take(MAX_GROUP_CHAT_MEMBERS))
@@ -95,9 +96,7 @@ internal fun GroupChatMemberPickerSheet(
                                 color = DsTheme.colors.accent.copy(alpha = 0.12f),
                             ) {
                                 Text(
-                                    entry.persona.name.trim().take(1).ifBlank {
-                                        stringResource(R.string.persona_gallery_avatar_fallback)
-                                    },
+                                    entry.persona.name.trim().take(1).ifBlank { avatarFallback },
                                     style = DsType.std14Strong,
                                     color = DsTheme.colors.accent,
                                     modifier = Modifier.padding(DsSpacing.small),
