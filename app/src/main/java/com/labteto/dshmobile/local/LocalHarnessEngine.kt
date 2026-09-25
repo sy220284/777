@@ -1077,6 +1077,21 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
+    fun setGroupChatAnnouncement(text: String): Boolean {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled) return false
+        val announcement = text.trim().take(2_000)
+        _state.update { current ->
+            if (current.sessionId == snapshot.sessionId && current.groupChat.enabled) {
+                current.copy(groupChat = current.groupChat.copy(announcement = announcement))
+            } else current
+        }
+        if (_state.value.sessionId != snapshot.sessionId) return false
+        persist()
+        return true
+    }
+
     fun removeGroupChatMemberByGalleryId(galleryId: String) {
         val snapshot = _state.value
         if (
@@ -2982,6 +2997,9 @@ class LocalHarnessEngine @Inject constructor(
         }
         return listOf(
             personaPrompt,
+            _state.value.groupChat.announcement.takeIf(String::isNotBlank)?.let { announcement ->
+                "【群公告·公开剧情背景】\n$announcement\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
+            }.orEmpty(),
             """
             【群聊身份隔离】
             这是多人群聊。当前你唯一代表【${member.displayName}】。
@@ -2993,7 +3011,7 @@ class LocalHarnessEngine @Inject constructor(
             不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
             $silenceRule
             """.trimIndent(),
-        ).joinToString("\n\n")
+        ).filter(String::isNotBlank).joinToString("\n\n")
     }
 
     private suspend fun generateGroupReply(

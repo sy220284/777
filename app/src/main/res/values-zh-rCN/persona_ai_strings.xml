@@ -7,6 +7,8 @@
     <string name="local_persona_ai_generating">正在生成人设…</string>
     <string name="local_persona_ai_working_hint">正在结合你的描述和最近聊天，拆成人设字段并同步…</string>
     <string name="local_persona_ai_synced">已生成并同步到默认角色，下面可以继续微调。</string>
+    <string name="local_persona_ai_new_hint">写一句人物描述，让 AI 起草；生成后可继续修改，点保存才会加入人设图集。</string>
+    <string name="local_persona_ai_new_draft">人物草稿已生成，检查后保存到人设图集。</string>
     <string name="local_persona_ai_busy">当前回合还在运行，暂时不能生成人设。</string>
     <string name="local_persona_ai_unconfigured">请先完成模型配置。</string>
     <string name="local_persona_ai_failed">生成人设失败，请再试一次。</string>

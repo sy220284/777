@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
+import com.labteto.dshmobile.local.chat.GroupAnnouncementService
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
@@ -41,6 +42,7 @@ private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 class LocalHarnessViewModel @Inject constructor(
     private val engine: LocalHarnessEngine,
     private val personaAutoFillService: PersonaAutoFillService,
+    private val groupAnnouncementService: GroupAnnouncementService,
     private val personaInspectionService: PersonaInspectionService,
     private val galleryStore: ChatPersonaGalleryStore,
     @ApplicationContext private val appContext: Context,
@@ -147,16 +149,34 @@ class LocalHarnessViewModel @Inject constructor(
         return true
     }
 
-    fun createPersonaForCurrentChat(profile: PersonaProfile): Boolean {
+    suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
+        check(!state.value.loading && !state.value.running) { "请在聊天空闲时新建人物" }
+        require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
+        val entry = withContext(Dispatchers.IO) {
+            galleryStore.save(
+                persona = profile,
+                sourceSessionId = "",
+                history = emptyList(),
+                chatState = ChatCharacterState(),
+                notes = "",
+            ).entry.also { _gallery.value = galleryStore.list() }
+        }
+        // Preserve the old create-and-use flow for an empty one-to-one chat.
+        // In an existing conversation or a group, creating a gallery card must not replace the cast.
+        if (!state.value.groupChat.enabled) selectGalleryPersonaForCurrentChat(entry.id)
+        entry
+    }
+
+    suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runCatching {
         val snapshot = state.value
-        if (
-            snapshot.loading ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
-        ) return false
-        engine.createChatPersona(profile)
-        return true
+        check(!snapshot.loading && !snapshot.running && snapshot.configured) { "请先配置模型并等待当前回复结束" }
+        personaAutoFillService.generate(
+            model = snapshot.model,
+            baseUrl = snapshot.baseUrl,
+            current = PersonaProfile(name = ""),
+            recentMessages = emptyList(),
+            description = description,
+        )
     }
 
     suspend fun inspectGalleryPersona(
@@ -374,6 +394,21 @@ class LocalHarnessViewModel @Inject constructor(
         val entries = ids.distinct().mapNotNull(entriesById::get)
         if (entries.size != ids.distinct().size) return false
         return engine.configureGroupChatMembers(entries)
+    }
+    fun setGroupChatAnnouncement(text: String): Boolean = engine.setGroupChatAnnouncement(text)
+
+    suspend fun generateGroupChatAnnouncement(direction: String): Result<String> = runCatching {
+        val snapshot = state.value
+        check(!snapshot.loading && !snapshot.running && snapshot.groupChat.enabled) { "请在群聊空闲时生成公告" }
+        check(snapshot.configured) { "请先配置聊天模型" }
+        check(snapshot.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
+        groupAnnouncementService.generate(
+            model = snapshot.model,
+            baseUrl = snapshot.baseUrl,
+            members = snapshot.groupChat.members,
+            direction = direction,
+            current = snapshot.groupChat.announcement,
+        )
     }
     fun editAndResendUserMessage(messageId: String, text: String): Boolean =
         engine.editAndResendUserMessage(messageId, text)

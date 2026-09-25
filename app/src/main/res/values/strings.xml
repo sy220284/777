@@ -818,6 +818,16 @@
     <string name="local_usage_chat">Chat</string>
     <string name="local_usage_work">Work</string>
     <string name="local_group_chat">Group chat</string>
+    <string name="local_group_announcement_title">Group notice · story setting</string>
+    <string name="local_group_announcement_empty">Set a shared scene for everyone in the group. Tap to edit.</string>
+    <string name="local_group_announcement_hint">All characters can read this setting. Write it yourself or generate a draft and edit it. Fixed character profiles stay intact.</string>
+    <string name="local_group_announcement_content">Group notice</string>
+    <string name="local_group_announcement_direction">Story direction</string>
+    <string name="local_group_announcement_direction_hint">For example: tangled relationships, a misunderstanding, a confrontation…</string>
+    <string name="local_group_announcement_drama">Relationship drama</string>
+    <string name="local_group_announcement_mystery">Mystery</string>
+    <string name="local_group_announcement_generate">Generate story draft</string>
+    <string name="local_group_announcement_save">Save notice</string>
     <string name="local_group_chat_title">Group chat</string>
     <string name="local_group_chat_member_count">%1$d characters</string>
     <string name="local_group_chat_active_speaker">%1$s is replying…</string>
@@ -1020,12 +1030,12 @@
     <string name="persona_gallery_save_edits_before_switch">Save or cancel the current story edits before switching.</string>
 
     <string name="local_persona_picker_title">Choose character</string>
-    <string name="local_persona_picker_intro">A new chat can use any saved character or a brand-new one. Choosing a saved character starts a fresh storyline without importing an old story.</string>
+    <string name="local_persona_picker_intro">Choose a saved character for a new chat. To create one, use New character below Character gallery in the sidebar. This starts a fresh storyline.</string>
     <string name="local_persona_picker_current">Current character: %1$s</string>
     <string name="local_persona_picker_new">Create new character</string>
     <string name="local_persona_picker_edit_current">Edit current character</string>
     <string name="local_persona_picker_saved">Saved characters</string>
-    <string name="local_persona_picker_empty">No saved characters yet. Create one here, then save it to the character gallery after chatting.</string>
+    <string name="local_persona_picker_empty">No saved characters yet. Create one from the sidebar, then select it here.</string>
     <string name="local_persona_picker_saved_hint">Saved character</string>
 
 

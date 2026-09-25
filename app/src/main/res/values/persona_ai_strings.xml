@@ -7,6 +7,8 @@
     <string name="local_persona_ai_generating">Generating persona…</string>
     <string name="local_persona_ai_working_hint">Reading the description and recent chat, then filling the structured fields…</string>
     <string name="local_persona_ai_synced">Generated fields have been synced to the default persona. You can still edit them below.</string>
+    <string name="local_persona_ai_new_hint">Describe the character to draft a profile. Edit the fields below, then save it to the character gallery.</string>
+    <string name="local_persona_ai_new_draft">Character draft generated. Review it and save to the gallery.</string>
     <string name="local_persona_ai_busy">Persona generation is unavailable while the current turn is running.</string>
     <string name="local_persona_ai_unconfigured">Configure the model first.</string>
     <string name="local_persona_ai_failed">Could not generate the persona. Please try again.</string>
