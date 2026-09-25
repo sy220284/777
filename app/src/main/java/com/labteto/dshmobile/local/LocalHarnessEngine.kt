@@ -5406,9 +5406,10 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "system")
                 put("content", dynamic)
             }
-            val currentUserIndex = result.indexOfLast { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull == "user"
-            }
+            val currentUserIndex = result.lastIndex.takeIf { index ->
+                index >= 0 &&
+                    result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
+            } ?: -1
             result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, dynamicMessage)
         }
         return result
@@ -5424,9 +5425,10 @@ class LocalHarnessEngine @Inject constructor(
             put("content", context.take(MAX_EPHEMERAL_CONTEXT_CHARS))
         }
         val result = history.toMutableList()
-        val currentUserIndex = result.indexOfLast { message ->
-            message["role"]?.jsonPrimitive?.contentOrNull == "user"
-        }
+        val currentUserIndex = result.lastIndex.takeIf { index ->
+            index >= 0 &&
+                result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
+        } ?: -1
         result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, insertion)
         return result
     }
