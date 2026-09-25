@@ -166,6 +166,8 @@ class LocalGroupChatTest {
         assertEquals("过来。", stripGroupSpeakerPrefix("赵二: 过来。", "赵二"))
         assertEquals("过来。", stripGroupSpeakerPrefix("**赵二：** 过来。", "赵二"))
         assertEquals("过来。", stripGroupSpeakerPrefix("【赵二】\n过来。", "赵二"))
+        assertEquals("过来。", stripGroupSpeakerPrefix("【赵二】：过来。", "赵二"))
+        assertEquals("过来。", stripGroupSpeakerPrefix("@赵二：过来。", "赵二"))
         assertEquals("赵二今天心情不错。", stripGroupSpeakerPrefix("赵二今天心情不错。", "赵二"))
     }
 
