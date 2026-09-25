@@ -408,6 +408,22 @@ internal fun PersonaGalleryDialog(
             }
 
             selectedStory?.let { story ->
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_continue_story),
+                    onClick = { onStart(selected.id, story.id, false) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSave && !busy && notes == story.notes && !editingStoryTitle,
+                )
+            }
+            DsButton(
+                text = stringResource(R.string.persona_gallery_start_fresh_story),
+                onClick = { onStart(selected.id, null, true) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canSave && !busy,
+                variant = DsButtonVariant.Outline,
+            )
+
+            selectedStory?.let { story ->
                 if (editingStoryTitle) {
                     OutlinedTextField(
                         value = storyTitle,
@@ -581,13 +597,6 @@ internal fun PersonaGalleryDialog(
                     )
                 }
 
-                DsButton(
-                    text = stringResource(R.string.persona_gallery_continue_story),
-                    onClick = { onStart(selected.id, story.id, false) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy && notes == story.notes && !editingStoryTitle,
-                )
-
                 if (deletingStory) {
                     DsCard {
                         Text(
@@ -637,14 +646,6 @@ internal fun PersonaGalleryDialog(
                     )
                 }
             }
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_start_fresh_story),
-                onClick = { onStart(selected.id, null, true) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy,
-                variant = DsButtonVariant.Outline,
-            )
 
             if (deletingCharacter) {
                 DeleteCharacterConfirm(
