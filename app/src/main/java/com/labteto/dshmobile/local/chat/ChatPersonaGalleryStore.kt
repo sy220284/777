@@ -43,7 +43,7 @@ data class PersonaGalleryEntry(
 
 @Serializable
 private data class GalleryDocument(
-    val version: Int = 2,
+    val version: Int = 3,
     val entries: List<PersonaGalleryEntry> = emptyList(),
 )
 
@@ -137,6 +137,42 @@ internal fun mergeGalleryEntries(
     )
 }
 
+internal fun compactDuplicateGalleryEntries(
+    entries: List<PersonaGalleryEntry>,
+): List<PersonaGalleryEntry> {
+    if (entries.size < 2) return entries
+    val compacted = mutableListOf<PersonaGalleryEntry>()
+    entries.sortedByDescending { it.updatedAt }.forEach { entry ->
+        val duplicateIndex = compacted.indexOfFirst { existing ->
+            samePersonaIdentity(existing.persona, entry.persona)
+        }
+        if (duplicateIndex < 0) {
+            compacted += entry
+        } else {
+            val canonical = compacted[duplicateIndex]
+            compacted[duplicateIndex] = mergeGalleryEntries(canonical, entry).copy(
+                id = canonical.id,
+                persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
+                updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
+            )
+        }
+    }
+    return compacted.sortedByDescending { it.updatedAt }
+}
+
+internal fun galleryMessageArchiveKey(message: LocalHarnessMessage): String =
+    message.id.takeIf(String::isNotBlank)
+        ?: "${message.role}|${message.createdAt}|${normalizePersonaText(message.content)}"
+
+internal fun removeArchivedGalleryMessage(
+    entry: PersonaGalleryEntry,
+    messageKey: String,
+): PersonaGalleryEntry? {
+    val remaining = entry.history.filterNot { galleryMessageArchiveKey(it) == messageKey }
+    if (remaining.size == entry.history.size) return null
+    return entry.copy(history = remaining)
+}
+
 private fun mergeEvidence(
     base: List<RelationshipEvidence>,
     incoming: List<RelationshipEvidence>,
@@ -167,9 +203,7 @@ private fun mergeHistory(
         .asSequence()
         .filter { it.role == "user" || it.role == "assistant" }
         .filter { message ->
-            val key = message.id.takeIf(String::isNotBlank)
-                ?: "${message.role}|${message.createdAt}|${normalizePersonaText(message.content)}"
-            seen.add(key)
+            seen.add(galleryMessageArchiveKey(message))
         }
         .sortedBy(LocalHarnessMessage::createdAt)
         .toList()
@@ -242,7 +276,7 @@ class ChatPersonaGalleryStore @Inject constructor(
     private val file = File(context.filesDir, "local-harness/chat/persona-gallery.json")
 
     @Synchronized
-    fun list(): List<PersonaGalleryEntry> = read().entries.sortedByDescending { it.updatedAt }
+    fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
 
     @Synchronized
     fun save(
@@ -253,7 +287,7 @@ class ChatPersonaGalleryStore @Inject constructor(
         notes: String,
         existingId: String? = null,
     ): PersonaGalleryEntry {
-        val doc = read()
+        val doc = readNormalized()
         val explicit = existingId?.let { id -> doc.entries.firstOrNull { it.id == id } }
         val matched = explicit ?: doc.entries.firstOrNull { samePersonaIdentity(it.persona, persona) }
         val id = matched?.id ?: "gallery-${UUID.randomUUID()}"
@@ -268,14 +302,14 @@ class ChatPersonaGalleryStore @Inject constructor(
             updatedAt = now,
         )
         val entry = matched?.let { mergeGalleryEntries(it, incoming).copy(updatedAt = now) } ?: incoming
-        write(doc.copy(version = 2, entries = doc.entries.filterNot { it.id == id } + entry))
+        write(doc.copy(version = 3, entries = doc.entries.filterNot { it.id == id } + entry))
         return entry
     }
 
     @Synchronized
     fun applySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): PersonaGalleryEntry? {
         if (suggestions.isEmpty()) return read().entries.firstOrNull { it.id == id }
-        val doc = read()
+        val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
         val now = System.currentTimeMillis()
         val merged = current.copy(
@@ -283,15 +317,15 @@ class ChatPersonaGalleryStore @Inject constructor(
                 .copy(id = current.id, updatedAt = now),
             updatedAt = now,
         )
-        write(doc.copy(version = 2, entries = doc.entries.map { if (it.id == id) merged else it }))
+        write(doc.copy(version = 3, entries = doc.entries.map { if (it.id == id) merged else it }))
         return merged
     }
 
     @Synchronized
     fun updateNotes(id: String, notes: String): Boolean {
-        val doc = read()
+        val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(version = 2, entries = doc.entries.map {
+        write(doc.copy(version = 3, entries = doc.entries.map {
             if (it.id == id) it.copy(storyNotes = notes.trim().take(4_000), updatedAt = System.currentTimeMillis()) else it
         }))
         return true
@@ -299,10 +333,34 @@ class ChatPersonaGalleryStore @Inject constructor(
 
     @Synchronized
     fun delete(id: String): Boolean {
-        val doc = read()
+        val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(version = 2, entries = doc.entries.filterNot { it.id == id }))
+        write(doc.copy(version = 3, entries = doc.entries.filterNot { it.id == id }))
         return true
+    }
+
+    @Synchronized
+    fun deleteHistoryMessage(id: String, messageKey: String): Boolean {
+        val doc = readNormalized()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return false
+        val updated = removeArchivedGalleryMessage(current, messageKey)
+            ?.copy(updatedAt = System.currentTimeMillis())
+            ?: return false
+        write(
+            doc.copy(
+                version = 3,
+                entries = doc.entries.map { if (it.id == id) updated else it },
+            ),
+        )
+        return true
+    }
+
+    private fun readNormalized(): GalleryDocument {
+        val raw = read()
+        val compacted = compactDuplicateGalleryEntries(raw.entries)
+        val normalized = raw.copy(version = 3, entries = compacted)
+        if (normalized != raw) write(normalized)
+        return normalized
     }
 
     private fun read(): GalleryDocument {
