@@ -167,6 +167,7 @@ fun LocalHarnessScreen(
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
     var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
+    var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -208,7 +209,11 @@ fun LocalHarnessScreen(
                 galleryCount = gallery.size,
                 onOpenPersonaGallery = {
                     scope.launch { drawerState.close() }
-                    showPersonaGallery = true
+                    if (viewModel.hasUnsavedCurrentPersona()) {
+                        showPersonaGallerySavePrompt = true
+                    } else {
+                        showPersonaGallery = true
+                    }
                 },
                 onTasks = {
                     scope.launch { drawerState.close() }
@@ -281,6 +286,19 @@ fun LocalHarnessScreen(
         )
     }
 
+    if (showPersonaGallerySavePrompt && state.usageMode == LocalUsageMode.CHAT) {
+        PersonaGallerySavePromptDialog(
+            persona = state.chatPersona,
+            canSave = !state.loading && !state.running,
+            onSaveCurrent = viewModel::saveCurrentToGallery,
+            onContinue = {
+                showPersonaGallerySavePrompt = false
+                showPersonaGallery = true
+            },
+            onDismiss = { showPersonaGallerySavePrompt = false },
+        )
+    }
+
     if (showPersonaGallery && state.usageMode == LocalUsageMode.CHAT) {
         PersonaGalleryDialog(
             entries = gallery,
@@ -290,6 +308,8 @@ fun LocalHarnessScreen(
             canSave = !state.loading && !state.running,
             onSaveCurrent = viewModel::saveCurrentToGallery,
             onEditNotes = viewModel::editGalleryNotes,
+            onInspect = viewModel::inspectGalleryPersona,
+            onApplySuggestions = viewModel::applyGallerySuggestions,
             onDelete = viewModel::deleteGalleryEntry,
             onStart = { id ->
                 if (viewModel.startFromGallery(id)) showPersonaGallery = false
