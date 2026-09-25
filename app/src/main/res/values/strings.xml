@@ -986,4 +986,6 @@
     <string name="local_persona_correction_recorded">Persona correction saved</string>
     <string name="local_persona_correction_undo">Undo</string>
 
+    <string name="local_persona_picker_switch_requires_new_chat">This chat already has dialogue. Start a new chat before switching or creating a character so storylines do not mix.</string>
+
 </resources>
