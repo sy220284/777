@@ -408,11 +408,59 @@ internal fun PersonaGalleryDialog(
             }
 
             selectedStory?.let { story ->
+                if (editingStoryTitle) {
+                    OutlinedTextField(
+                        value = storyTitle,
+                        onValueChange = { storyTitle = it },
+                        label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DsButton(
+                            text = stringResource(R.string.persona_gallery_cancel),
+                            onClick = {
+                                storyTitle = story.title
+                                editingStoryTitle = false
+                            },
+                            variant = DsButtonVariant.Ghost,
+                            modifier = Modifier.weight(1f),
+                            enabled = !busy,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.persona_gallery_save_story_title),
+                            onClick = {
+                                busy = true
+                                scope.launch {
+                                    onRenameStory(selected.id, story.id, storyTitle)
+                                        .onSuccess {
+                                            notice = storyRenamedText
+                                            editingStoryTitle = false
+                                        }
+                                        .onFailure { error = it.message ?: updateFailedText }
+                                    busy = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !busy &&
+                                storyTitle.trim().isNotBlank() &&
+                                storyTitle.trim() != story.title,
+                        )
+                    }
+                } else {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_rename_story),
+                        onClick = { editingStoryTitle = true },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    )
+                }
+
                 StoryDetailSection(
                     entry = selected,
                     story = story,
-                    storyTitle = storyTitle,
-                    onStoryTitleChange = { storyTitle = it },
                     notes = notes,
                     onNotesChange = { notes = it },
                     showHistory = showHistory,
@@ -436,24 +484,6 @@ internal fun PersonaGalleryDialog(
                         }
                     },
                 )
-
-                if (storyTitle.trim().isNotBlank() && storyTitle.trim() != story.title) {
-                    DsButton(
-                        text = stringResource(R.string.persona_gallery_save_story_title),
-                        onClick = {
-                            busy = true
-                            scope.launch {
-                                onRenameStory(selected.id, story.id, storyTitle)
-                                    .onSuccess { notice = storyRenamedText }
-                                    .onFailure { error = it.message ?: updateFailedText }
-                                busy = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                        variant = DsButtonVariant.Outline,
-                    )
-                }
 
                 if (notes != story.notes) {
                     DsButton(
@@ -555,7 +585,7 @@ internal fun PersonaGalleryDialog(
                     text = stringResource(R.string.persona_gallery_continue_story),
                     onClick = { onStart(selected.id, story.id, false) },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy && notes == story.notes && storyTitle.trim() == story.title,
+                    enabled = canSave && !busy && notes == story.notes && !editingStoryTitle,
                 )
 
                 if (deletingStory) {
