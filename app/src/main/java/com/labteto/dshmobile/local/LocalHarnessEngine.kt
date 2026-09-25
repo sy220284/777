@@ -122,6 +122,11 @@ class LocalHarnessBlockedException(
     message: String,
     val sessionId: String? = null,
 ) : IllegalStateException(message)
+class LocalAutomationWorkException(
+    message: String,
+    val sessionId: String,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
@@ -1210,7 +1215,7 @@ class LocalHarnessEngine @Inject constructor(
                 finalContent = detail,
                 eventLog = boundEventLog,
             )
-            throw IllegalStateException(detail, timeout)
+            throw LocalAutomationWorkException(detail, sessionId, timeout)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -1222,7 +1227,7 @@ class LocalHarnessEngine @Inject constructor(
                 finalContent = detail,
                 eventLog = boundEventLog,
             )
-            throw error
+            throw LocalAutomationWorkException(detail, sessionId, error)
         }
     }
 
