@@ -10,6 +10,9 @@ import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
@@ -37,6 +40,7 @@ class LocalHarnessViewModel @Inject constructor(
     val state = engine.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
+    val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -208,6 +212,20 @@ class LocalHarnessViewModel @Inject constructor(
         withContext(Dispatchers.IO) {
             galleryStore.importPersona(payload).also { _gallery.value = galleryStore.list() }
         }
+    }
+
+    suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
+        val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
+        val entry = withContext(Dispatchers.IO) {
+            galleryStore.save(
+                persona = preset.persona,
+                sourceSessionId = "",
+                history = emptyList(),
+                chatState = ChatCharacterState(),
+                notes = "",
+            ).entry.also { _gallery.value = galleryStore.list() }
+        }
+        entry
     }
 
     suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
