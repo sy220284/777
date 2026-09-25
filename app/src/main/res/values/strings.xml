@@ -955,4 +955,11 @@
     <string name="persona_gallery_story_count">%1$d stories</string>
     <string name="persona_gallery_untitled_story">Untitled story</string>
 
+
+    <string name="persona_gallery_current_synced">Current character and storyline are fully synced</string>
+    <string name="persona_gallery_unsaved_badge">New changes</string>
+    <string name="persona_gallery_show_fixed_persona">View fixed persona</string>
+    <string name="persona_gallery_hide_fixed_persona">Hide fixed persona</string>
+    <string name="persona_gallery_rename_story">Rename storyline</string>
+
 </resources>
