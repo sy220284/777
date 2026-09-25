@@ -14,6 +14,8 @@ data class LocalHarnessMessage(
     val role: String,
     val content: String,
     val toolName: String? = null,
+    val speakerId: String? = null,
+    val speakerName: String? = null,
     val createdAt: Long,
 )
 
@@ -41,6 +43,7 @@ data class LocalHarnessSession(
     val chatState: ChatCharacterState = ChatCharacterState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
+    val groupChat: LocalGroupChatState = LocalGroupChatState(),
     val galleryId: String? = null,
     val galleryStoryId: String? = null,
     val gallerySaveSuppressedThrough: Long = 0L,
@@ -188,6 +191,8 @@ data class LocalHarnessState(
     val chatState: ChatCharacterState = ChatCharacterState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
+    val groupChat: LocalGroupChatState = LocalGroupChatState(),
+    val groupActiveSpeakerName: String? = null,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
