@@ -344,16 +344,16 @@ object LocalToolCatalog {
             "start_line" to integer("起始行，默认 1"),
             "end_line" to integer("结束行，默认读取 400 行，单次最多 2000 行"),
         ), listOf("call_id")))
-        add(tool("write", "创建或完整替换工作区文件；执行前需要用户批准", properties(
+        add(tool("write", "创建或完整替换工作区文件", properties(
             "path" to string("相对工作区的路径"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
-        add(tool("edit", "唯一字面量替换；修改前必须先读取文件，执行前需要用户批准", properties(
+        add(tool("edit", "唯一字面量替换；修改前必须先读取文件", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
         ), listOf("path", "old_text", "new_text")))
-        add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用，执行前需要用户批准", properties(
+        add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用", properties(
             "patch" to string("完整 unified diff 文本"),
         ), listOf("patch")))
         add(tool("file_inspect", "检查工作区文件元数据；图片返回宽高和可用的常见 EXIF，不解码整张图片", properties(
@@ -371,7 +371,7 @@ object LocalToolCatalog {
             "query" to string("搜索内容"),
             "path" to string("相对路径，默认 ."),
         ), listOf("query")))
-        add(tool("bash", "在应用工作区执行 Android 系统 shell；执行前需要用户批准", properties(
+        add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
             "timeout_seconds" to integer("超时秒数；前台默认 30/最大 120，后台默认 300/最大 900"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
@@ -400,7 +400,7 @@ object LocalToolCatalog {
             },
             "run_in_background" to boolean("是否转为后台抓取任务；后台模式使用更长网络时限，默认 false"),
         ), listOf("url")))
-        add(tool("http_request", "向公网 HTTP/HTTPS API 发起受限请求；支持 GET/HEAD/POST/PUT/PATCH/DELETE，认证类请求头禁止写入工具参数，远端变更操作需要用户批准", properties(
+        add(tool("http_request", "向公网 HTTP/HTTPS API 发起受限请求；支持 GET/HEAD/POST/PUT/PATCH/DELETE，认证类请求头禁止写入工具参数", properties(
             "method" to string("GET、HEAD、POST、PUT、PATCH 或 DELETE"),
             "url" to string("完整公网 HTTP/HTTPS 地址"),
             "headers" to buildJsonObject {
@@ -411,7 +411,7 @@ object LocalToolCatalog {
             "body" to string("可选；请求体，最大 1 MiB"),
             "max_bytes" to integer("最多读取响应字节数，最大 4194304"),
         ), listOf("method", "url")))
-        add(tool("download_file", "把公网 HTTP/HTTPS 文件流式下载到工作区并计算 SHA-256；执行前需要用户批准", properties(
+        add(tool("download_file", "把公网 HTTP/HTTPS 文件流式下载到工作区并计算 SHA-256", properties(
             "url" to string("完整公网 HTTP/HTTPS 地址"),
             "path" to string("工作区相对目标路径"),
             "max_bytes" to integer("最大下载字节数，默认 20971520，最高 104857600"),
