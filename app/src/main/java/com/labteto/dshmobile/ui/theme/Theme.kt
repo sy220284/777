@@ -199,14 +199,9 @@ fun DshTheme(
         // screens draw their own Material surfaces on top of whatever is beneath them.
         AppBackgroundHost(
             path = backgroundPath,
-            adaptiveSurfaceColor = if (backgroundAdaptiveContrast) {
-                // Bright photos need a stronger dark veil for light text than dark photos need a
-                // light veil for dark text. Both values keep the image visible while stabilizing
-                // foreground contrast across detailed or high-key wallpapers.
-                ds.bgBase.copy(alpha = if (dark) 0.64f else 0.56f)
-            } else {
-                Color.Transparent
-            },
+            adaptiveEnabled = backgroundAdaptiveContrast,
+            darkTheme = dark,
+            surfaceBase = ds.bgBase,
         ) {
             MaterialTheme(
                 colorScheme = scheme,

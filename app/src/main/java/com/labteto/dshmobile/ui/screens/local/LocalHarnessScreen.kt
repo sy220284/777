@@ -131,10 +131,12 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.WhaleMark
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import java.util.Locale
 import kotlin.math.roundToInt
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -814,6 +816,51 @@ private fun LocalChat(
     onCancelQuestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val adaptiveChatBackground =
+        state.usageMode == LocalUsageMode.CHAT &&
+            backgroundState.hasImage &&
+            backgroundState.adaptiveContrast
+    val topSurfaceColor = if (adaptiveChatBackground) {
+        backgroundState.surfaceColor(
+            base = colors.bgBase,
+            region = BackgroundRegion.TOP,
+            minAlpha = 0.50f,
+            maxAlpha = 0.86f,
+        )
+    } else {
+        colors.rootSurface()
+    }
+    val headerChipColor = if (adaptiveChatBackground) {
+        backgroundState.surfaceColor(
+            base = colors.bgModulePlatform,
+            region = BackgroundRegion.TOP,
+            minAlpha = 0.58f,
+            maxAlpha = 0.90f,
+        )
+    } else {
+        colors.bgModulePlatform
+    }
+    val streamingSurfaceColor = if (adaptiveChatBackground) {
+        backgroundState.surfaceColor(
+            base = colors.bgBase,
+            region = BackgroundRegion.MIDDLE,
+            minAlpha = 0.58f,
+            maxAlpha = 0.86f,
+        )
+    } else {
+        colors.bgModulePlatform
+    }
+    val composerSurfaceColor = if (adaptiveChatBackground) {
+        backgroundState.surfaceColor(
+            base = colors.composerCard,
+            region = BackgroundRegion.BOTTOM,
+            minAlpha = 0.84f,
+            maxAlpha = 0.97f,
+        )
+    } else {
+        colors.composerCard
+    }
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -927,7 +974,7 @@ private fun LocalChat(
 
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(colors.rootSurface())) {
         Column(
-            Modifier.fillMaxWidth().background(colors.rootSurface())
+            Modifier.fillMaxWidth().background(topSurfaceColor)
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
         ) {
             Row(
@@ -945,7 +992,7 @@ private fun LocalChat(
                     modifier = Modifier.weight(1f)
                         .heightIn(min = DsSpacing.touchTarget)
                         .clip(DsShapes.pillFull)
-                        .background(colors.bgModulePlatform)
+                        .background(headerChipColor)
                         .clickable(enabled = !state.running) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
                                 showPersonaEditor = true
@@ -999,25 +1046,14 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
             }
-            Row(
+            Box(
                 Modifier.fillMaxWidth().padding(top = DsSpacing.tiny),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                contentAlignment = Alignment.Center,
             ) {
-                DsButton(
-                    text = stringResource(R.string.local_usage_chat),
-                    onClick = { onUsageModeChange(LocalUsageMode.CHAT) },
-                    modifier = Modifier.weight(1f),
-                    variant = if (state.usageMode == LocalUsageMode.CHAT) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                LocalUsageModePill(
+                    selected = state.usageMode,
                     enabled = !state.running,
-                )
-                DsButton(
-                    text = stringResource(R.string.local_usage_work),
-                    onClick = { onUsageModeChange(LocalUsageMode.WORK) },
-                    modifier = Modifier.weight(1f),
-                    variant = if (state.usageMode == LocalUsageMode.WORK) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                    enabled = !state.running,
+                    onSelect = onUsageModeChange,
                 )
             }
         }
@@ -1098,6 +1134,7 @@ private fun LocalChat(
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             transcriptItem.message,
+                            chatMode = state.usageMode == LocalUsageMode.CHAT,
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             onRegenerate = onRegenerate,
                         )
@@ -1141,8 +1178,8 @@ private fun LocalChat(
             Surface(
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                shape = RoundedCornerShape(12.dp),
-                color = colors.bgModulePlatform,
+                shape = RoundedCornerShape(18.dp),
+                color = streamingSurfaceColor,
             ) {
                 Column(
                     Modifier.padding(DsSpacing.medium),
@@ -1207,11 +1244,11 @@ private fun LocalChat(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
             shape = DsShapes.composer,
-            color = colors.composerCard,
-            shadowElevation = 1.dp,
+            color = composerSurfaceColor,
+            shadowElevation = if (adaptiveChatBackground) 2.dp else 1.dp,
         ) {
             Column(
-                Modifier.padding(DsSpacing.medium),
+                Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 if (attachments.isNotEmpty()) {
@@ -1478,6 +1515,60 @@ private fun LocalChat(
 }
 
 @Composable
+private fun LocalUsageModePill(
+    selected: LocalUsageMode,
+    enabled: Boolean,
+    onSelect: (LocalUsageMode) -> Unit,
+) {
+    val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val containerColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
+        backgroundState.surfaceColor(
+            base = colors.bgModulePlatform,
+            region = BackgroundRegion.TOP,
+            minAlpha = 0.62f,
+            maxAlpha = 0.92f,
+        )
+    } else {
+        colors.bgLayer1
+    }
+    Surface(
+        shape = DsShapes.pillFull,
+        color = containerColor,
+        tonalElevation = 0.dp,
+        shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
+    ) {
+        Row(
+            Modifier.padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            listOf(
+                LocalUsageMode.CHAT to R.string.local_usage_chat,
+                LocalUsageMode.WORK to R.string.local_usage_work,
+            ).forEach { (mode, labelRes) ->
+                val active = selected == mode
+                Box(
+                    modifier = Modifier
+                        .heightIn(min = 34.dp)
+                        .clip(DsShapes.pillFull)
+                        .background(if (active) colors.accent else Color.Transparent)
+                        .clickable(enabled = enabled) { onSelect(mode) }
+                        .padding(horizontal = 22.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(labelRes),
+                        style = DsType.small13Strong,
+                        color = if (active) colors.onAccent else colors.labelSecondary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
     workspacePath: String,
@@ -1648,10 +1739,12 @@ private fun ExecutionStatusCard(
 @Composable
 private fun LocalMessageRow(
     message: LocalHarnessMessage,
+    chatMode: Boolean,
     canRegenerate: Boolean,
     onRegenerate: (String) -> Boolean,
 ) {
     val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
 
     when (message.role) {
@@ -1661,24 +1754,44 @@ private fun LocalMessageRow(
 
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
-        else -> Column(
-            Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            MarkdownText(message.content)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                DsIconButton(
-                    icon = Icons.Outlined.ContentCopy,
-                    contentDescription = stringResource(R.string.chat_copy_answer),
-                    onClick = { clipboard.setText(AnnotatedString(message.content)) },
-                    tint = colors.labelTertiary,
-                )
-                if (canRegenerate) DsIconButton(
-                    icon = Icons.Outlined.Refresh,
-                    contentDescription = stringResource(R.string.local_regenerate_reply),
-                    onClick = { onRegenerate(message.id) },
-                    tint = colors.labelTertiary,
-                )
+        else -> {
+            val adaptiveReadingLayer =
+                chatMode && backgroundState.hasImage && backgroundState.adaptiveContrast
+            val readingModifier = if (adaptiveReadingLayer) {
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        backgroundState.surfaceColor(
+                            base = colors.bgBase,
+                            region = BackgroundRegion.MIDDLE,
+                            minAlpha = 0.28f,
+                            maxAlpha = 0.70f,
+                        ),
+                        RoundedCornerShape(18.dp),
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            } else {
+                Modifier.fillMaxWidth()
+            }
+            Column(
+                readingModifier,
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                MarkdownText(message.content)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                    DsIconButton(
+                        icon = Icons.Outlined.ContentCopy,
+                        contentDescription = stringResource(R.string.chat_copy_answer),
+                        onClick = { clipboard.setText(AnnotatedString(message.content)) },
+                        tint = colors.labelTertiary.copy(alpha = 0.78f),
+                    )
+                    if (canRegenerate) DsIconButton(
+                        icon = Icons.Outlined.Refresh,
+                        contentDescription = stringResource(R.string.local_regenerate_reply),
+                        onClick = { onRegenerate(message.id) },
+                        tint = colors.labelTertiary.copy(alpha = 0.78f),
+                    )
+                }
             }
         }
     }

@@ -33,7 +33,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -56,6 +58,18 @@ import java.util.Locale
 @Composable
 fun UserBubble(text: String, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val bubbleColor = backgroundState.surfaceColor(
+        base = colors.userBubble,
+        region = BackgroundRegion.MIDDLE,
+        minAlpha = 0.76f,
+        maxAlpha = 0.96f,
+    )
+    val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
+        colors.borderL3.copy(alpha = 0.78f)
+    } else {
+        colors.borderL3
+    }
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Text(
             text,
@@ -63,8 +77,8 @@ fun UserBubble(text: String, modifier: Modifier = Modifier) {
             color = colors.labelPrimary,
             modifier = Modifier
                 .widthIn(max = minOf(525.dp, maxWidth * 0.82f))
-                .background(colors.userBubble, DsShapes.bubble)
-                .border(1.dp, colors.borderL3, DsShapes.bubble)
+                .background(bubbleColor, DsShapes.bubble)
+                .border(1.dp, borderColor, DsShapes.bubble)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         )
     }
