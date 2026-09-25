@@ -1211,6 +1211,7 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject?,
         queued: Boolean,
     ) {
+        val before = _state.value
         val transcriptMessage = newTranscriptMessage("user", content)
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
@@ -1219,7 +1220,32 @@ class LocalHarnessEngine @Inject constructor(
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
         })
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+        if (before.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(before.messages)) {
+            val synced = syncChatBranchState(
+                current = before.chatBranches,
+                activeMessages = before.messages,
+                chatState = before.chatState,
+                replySuggestions = before.replySuggestions,
+            )
+            val parentId = before.messages.lastOrNull {
+                it.role == "user" || it.role == "assistant"
+            }?.id
+            val branches = upsertChatBranchNode(
+                synced,
+                LocalChatBranchNode(
+                    message = transcriptMessage,
+                    parentId = parentId,
+                    chatStateAfter = before.chatState,
+                ),
+                select = true,
+            )
+            _state.update {
+                it.copy(
+                    replySuggestions = emptyList(),
+                    chatBranches = branches,
+                )
+            }
+        } else if (before.usageMode == LocalUsageMode.CHAT) {
             _state.update { it.copy(replySuggestions = emptyList()) }
         }
     }
