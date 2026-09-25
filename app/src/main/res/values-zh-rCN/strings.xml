@@ -815,6 +815,17 @@
 
     <string name="local_usage_chat">聊天</string>
     <string name="local_usage_work">工作</string>
+    <string name="local_group_chat">群聊模式</string>
+    <string name="local_group_chat_title">群聊</string>
+    <string name="local_group_chat_member_count">%1$d 位角色</string>
+    <string name="local_group_chat_active_speaker">%1$s 正在回复…</string>
+    <string name="local_group_chat_members_title">群聊角色</string>
+    <string name="local_group_chat_members_hint">从已创建的人物中选择 %1$d～%2$d 个。每个角色由独立角色智能体读取自己的完整人设与关系状态。</string>
+    <string name="local_group_chat_no_characters">还没有可加入群聊的人物，请先在人设图集创建或保存角色。</string>
+    <string name="local_group_chat_selected_count">已选择 %1$d/%2$d</string>
+    <string name="local_group_chat_apply_members">保存群聊角色</string>
+    <string name="local_group_chat_setup_required">先添加至少两个角色，群聊就可以开始了。</string>
+    <string name="local_group_chat_manage_members">管理群聊角色</string>
     <string name="local_chat_composer_hint">想说什么就说吧…</string>
     <string name="local_chat_empty_hint">想说什么就说。这里按角色聊天来，不走工作流程。</string>
     <string name="local_persona_title">角色人设</string>

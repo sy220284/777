@@ -94,7 +94,12 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun hasUnsavedCurrentPersona(): Boolean {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return false
         val persona = snapshot.chatPersona
         if (!isMeaningfulGalleryPersona(persona)) return false
 
@@ -119,7 +124,8 @@ class LocalHarnessViewModel @Inject constructor(
         return gallery.value.none { samePersonaIdentity(it.persona, persona) }
     }
 
-    fun currentGalleryNeedsUpdate(): Boolean = state.value.galleryId != null
+    fun currentGalleryNeedsUpdate(): Boolean =
+        !state.value.groupChat.enabled && state.value.galleryId != null
 
     fun currentGalleryHasUnsavedChanges(): Boolean = hasUnsavedCurrentPersona()
 
@@ -311,6 +317,7 @@ class LocalHarnessViewModel @Inject constructor(
             _gallery.value = galleryStore.list()
         }
         deleteManagedPortrait(portraitPath)
+        engine.removeGroupChatMemberByGalleryId(id)
         engine.clearChatGalleryBinding(expectedGalleryId = id)
     }
 
@@ -355,6 +362,14 @@ class LocalHarnessViewModel @Inject constructor(
     fun selectModel(model: String) = engine.selectModel(model)
     fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
+    fun createGroupChatSession() = engine.createGroupChatSession()
+    fun openGroupChatMode() = engine.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
+    fun configureGroupChatMembers(ids: List<String>): Boolean {
+        val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
+        val entries = ids.distinct().mapNotNull(entriesById::get)
+        if (entries.size != ids.distinct().size) return false
+        return engine.configureGroupChatMembers(entries)
+    }
     fun editAndResendUserMessage(messageId: String, text: String): Boolean =
         engine.editAndResendUserMessage(messageId, text)
     fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
@@ -388,7 +403,12 @@ class LocalHarnessViewModel @Inject constructor(
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) {
             return Result.failure(IllegalStateException("persona_autofill_busy"))
         }
         if (!snapshot.configured) {

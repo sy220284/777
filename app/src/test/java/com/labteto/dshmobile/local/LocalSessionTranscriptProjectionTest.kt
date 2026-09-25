@@ -179,6 +179,27 @@ class LocalSessionTranscriptProjectionTest {
     }
 
     @Test
+    fun transcriptRoundTripPreservesGroupSpeakerMetadata() {
+        val reply = LocalHarnessMessage(
+            id = "group-a1",
+            role = "assistant",
+            content = "我在。",
+            createdAt = 88L,
+            speakerId = "gallery-ayaka",
+            speakerName = "神里绫华",
+        )
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = emptyList(),
+            events = listOf(event(0L, encodeTranscriptMessages(listOf(reply)))),
+            sequenceExclusive = -1L,
+        )
+
+        assertEquals(listOf(reply), projected.messages)
+        assertEquals("gallery-ayaka", projected.messages.single().speakerId)
+        assertEquals("神里绫华", projected.messages.single().speakerName)
+    }
+
+    @Test
     fun transcriptRoundTripPreservesToolMetadata() {
         val tool = message("tool-1", "tool", "输出", 99L, toolName = "read")
         val projected = projectSessionTranscriptTail(

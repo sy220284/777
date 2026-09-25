@@ -15,6 +15,8 @@ data class LocalHarnessMessage(
     val content: String,
     val toolName: String? = null,
     val createdAt: Long,
+    val speakerId: String? = null,
+    val speakerName: String? = null,
 )
 
 @Serializable
@@ -41,6 +43,7 @@ data class LocalHarnessSession(
     val chatState: ChatCharacterState = ChatCharacterState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
+    val groupChat: LocalGroupChatState = LocalGroupChatState(),
     val galleryId: String? = null,
     val galleryStoryId: String? = null,
     val gallerySaveSuppressedThrough: Long = 0L,
@@ -87,6 +90,7 @@ data class LocalSessionSummary(
     val title: String,
     val updatedAt: Long,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
+    val chatMode: LocalChatMode = LocalChatMode.SINGLE,
     val blank: Boolean = false,
 )
 
@@ -195,6 +199,8 @@ data class LocalHarnessState(
     val chatState: ChatCharacterState = ChatCharacterState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
+    val groupChat: LocalGroupChatState = LocalGroupChatState(),
+    val groupActiveSpeakerName: String? = null,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",

@@ -793,7 +793,12 @@ class LocalHarnessEngine @Inject constructor(
 
     fun configureChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
-        if (snapshot.running || snapshot.loading || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (
+            snapshot.running ||
+            snapshot.loading ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return
         scope.launch {
             val personaId = snapshot.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
@@ -832,6 +837,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.running ||
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled ||
             snapshot.messages.any { it.role == "user" || it.role == "assistant" }
         ) return
 
@@ -863,6 +869,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.running ||
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled ||
             snapshot.messages.any { it.role == "user" || it.role == "assistant" }
         ) return
 
@@ -922,7 +929,12 @@ class LocalHarnessEngine @Inject constructor(
     /** A story direction is a user preference for future turns, never a synthetic user message. */
     fun selectChatDirection(direction: String?) {
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return
         val selected = direction?.let { requested ->
             snapshot.replySuggestions.firstOrNull { it.direction == requested }
                 ?.let { com.labteto.dshmobile.local.chat.ChatNarrativeDirection(it.label, it.direction) }
@@ -947,7 +959,12 @@ class LocalHarnessEngine @Inject constructor(
      */
     suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
         val snapshot = _state.value
-        check(!snapshot.running && !snapshot.loading && snapshot.usageMode == LocalUsageMode.CHAT) {
+        check(
+            !snapshot.running &&
+                !snapshot.loading &&
+                snapshot.usageMode == LocalUsageMode.CHAT &&
+                !snapshot.groupChat.enabled
+        ) {
             "当前状态暂时不能同步默认角色"
         }
         return withContext(Dispatchers.IO) {
@@ -967,6 +984,108 @@ class LocalHarnessEngine @Inject constructor(
             if (_state.value.sessionId == snapshot.sessionId) persist()
             saved
         }
+    }
+
+    fun createGroupChatSession() {
+        createSession(
+            mode = LocalConversationMode.INDEPENDENT,
+            usageMode = LocalUsageMode.CHAT,
+            chatMode = LocalChatMode.GROUP,
+        )
+    }
+
+    fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
+        val snapshot = _state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled
+        ) return false
+
+        val selected = entries
+            .distinctBy(PersonaGalleryEntry::id)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
+        scope.launch {
+            val members = selected.map { entry ->
+                val existingPersona = chatPersonaStore.get(entry.id)
+                val saved = chatPersonaStore.upsert(
+                    entry.persona.copy(
+                        id = entry.id,
+                        corrections = (entry.persona.corrections + existingPersona.corrections)
+                            .map(String::trim)
+                            .filter(String::isNotBlank)
+                            .distinct(),
+                    ),
+                )
+                val previous = snapshot.groupChat.members.firstOrNull { it.galleryId == entry.id }
+                LocalGroupChatMember(
+                    galleryId = entry.id,
+                    personaId = saved.id,
+                    displayName = saved.name,
+                    persona = saved,
+                    chatState = previous?.chatState
+                        ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
+                        ?: ChatCharacterState(),
+                )
+            }
+            _state.update { current ->
+                if (
+                    current.sessionId != snapshot.sessionId ||
+                    current.usageMode != LocalUsageMode.CHAT ||
+                    !current.groupChat.enabled
+                ) {
+                    current
+                } else {
+                    current.copy(
+                        groupChat = current.groupChat.copy(members = members),
+                        replySuggestions = emptyList(),
+                        chatBranches = LocalChatBranchState(),
+                        error = null,
+                    )
+                }
+            }
+            if (_state.value.sessionId == snapshot.sessionId) {
+                rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+                checkpointModelHistory("group/members-updated")
+                eventLog.append("group/members", buildJsonObject {
+                    put("count", members.size)
+                    put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
+                })
+                persist()
+            }
+        }
+        return true
+    }
+
+    fun removeGroupChatMemberByGalleryId(galleryId: String) {
+        val snapshot = _state.value
+        if (
+            snapshot.loading ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled ||
+            snapshot.groupChat.members.none { it.galleryId == galleryId }
+        ) return
+
+        _state.update { current ->
+            if (current.sessionId != snapshot.sessionId) current else current.copy(
+                groupChat = current.groupChat.copy(
+                    members = current.groupChat.members.filterNot { it.galleryId == galleryId },
+                    turnCursor = 0,
+                ),
+                groupActiveSpeakerName = null,
+            )
+        }
+        rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+        checkpointModelHistory("group/member-deleted")
+        eventLog.append("group/members", buildJsonObject {
+            put("action", "member-deleted")
+            put("gallery_id", galleryId)
+            put("count", _state.value.groupChat.members.size)
+        })
+        persist()
     }
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
@@ -1004,6 +1123,7 @@ class LocalHarnessEngine @Inject constructor(
         if (
             content.isEmpty() ||
             state.usageMode != LocalUsageMode.CHAT ||
+            state.groupChat.enabled ||
             !state.configured ||
             state.loading ||
             sessionTransitioning ||
@@ -1077,6 +1197,7 @@ class LocalHarnessEngine @Inject constructor(
         val state = _state.value
         if (
             state.usageMode != LocalUsageMode.CHAT ||
+            state.groupChat.enabled ||
             state.loading ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
@@ -1116,6 +1237,7 @@ class LocalHarnessEngine @Inject constructor(
     fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
         if (!state.configured || state.loading ||
+            state.groupChat.enabled ||
             sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
         ) return@synchronized false
         val last = state.messages.lastOrNull() ?: return@synchronized false
@@ -1286,7 +1408,11 @@ class LocalHarnessEngine @Inject constructor(
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
         })
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
-        if (before.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(before.messages)) {
+        if (
+            before.usageMode == LocalUsageMode.CHAT &&
+            !before.groupChat.enabled &&
+            chatBranchingEligible(before.messages)
+        ) {
             val synced = syncChatBranchState(
                 current = before.chatBranches,
                 activeMessages = before.messages,
@@ -1756,10 +1882,18 @@ class LocalHarnessEngine @Inject constructor(
         galleryEntry: PersonaGalleryEntry? = null,
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
+        chatMode: LocalChatMode? = null,
     ) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
         val sourceState = _state.value
+        val resolvedChatMode = when {
+            usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
+            galleryEntry != null -> LocalChatMode.SINGLE
+            chatMode != null -> chatMode
+            sourceState.usageMode == LocalUsageMode.CHAT -> sourceState.groupChat.mode
+            else -> LocalChatMode.SINGLE
+        }
         _state.update {
             it.copy(
                 loading = true,
@@ -1807,18 +1941,23 @@ class LocalHarnessEngine @Inject constructor(
                     } else {
                         null
                     }
-                    val personaId = if (galleryEntry != null) {
+                    val personaId = if (resolvedChatMode == LocalChatMode.GROUP) {
+                        PersonaProfile.DEFAULT_PERSONA_ID
+                    } else if (galleryEntry != null) {
                         chatPersonaStore.upsert(galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}")).id
                     } else if (
                         usageMode == LocalUsageMode.CHAT &&
-                        sourceState.usageMode == LocalUsageMode.CHAT
+                        sourceState.usageMode == LocalUsageMode.CHAT &&
+                        !sourceState.groupChat.enabled
                     ) {
                         sourceState.personaId
                     } else {
                         PersonaProfile.DEFAULT_PERSONA_ID
                     }
                     val chatPersona = chatPersonaStore.get(personaId)
-                    val chatState = if (
+                    val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
+                        ChatCharacterState()
+                    } else if (
                         galleryEntry != null &&
                         usageMode == LocalUsageMode.CHAT &&
                         !freshGalleryStory
@@ -1840,10 +1979,17 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = currentSessionId,
                             usageMode = usageMode,
                             personaId = personaId,
-                            galleryId = galleryEntry?.id ?: sourceState.galleryId.takeIf {
-                                usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT
+                            galleryId = if (resolvedChatMode == LocalChatMode.GROUP) {
+                                null
+                            } else {
+                                galleryEntry?.id ?: sourceState.galleryId.takeIf {
+                                    usageMode == LocalUsageMode.CHAT &&
+                                        sourceState.usageMode == LocalUsageMode.CHAT &&
+                                        !sourceState.groupChat.enabled
+                                }
                             },
                             galleryStoryId = when {
+                                resolvedChatMode == LocalChatMode.GROUP -> null
                                 galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
                                 galleryEntry != null -> null
                                 usageMode == LocalUsageMode.CHAT &&
@@ -1856,6 +2002,21 @@ class LocalHarnessEngine @Inject constructor(
                             chatState = chatState,
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),
+                            groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
+                                if (
+                                    mode == LocalConversationMode.CONTINUATION &&
+                                    sourceState.usageMode == LocalUsageMode.CHAT &&
+                                    sourceState.groupChat.enabled
+                                ) {
+                                    sourceState.groupChat
+                                } else {
+                                    LocalGroupChatState(mode = LocalChatMode.GROUP)
+                                }
+                            } else {
+                                LocalGroupChatState()
+                            },
+                            groupActiveSpeakerName = null,
+                            personaCorrectionNotice = null,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -1903,16 +2064,55 @@ class LocalHarnessEngine @Inject constructor(
     /** Backward-compatible entry point: a plain new session is fully independent. */
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
 
-    /** Move between the two product surfaces while keeping each side's latest session. */
-    fun switchUsageMode(mode: LocalUsageMode) {
+    fun switchChatMode(mode: LocalChatMode) {
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode == mode) return
-        val target = snapshot.sessions.firstOrNull { it.usageMode == mode && !it.blank }
-            ?: snapshot.sessions.firstOrNull { it.usageMode == mode }
+        if (snapshot.loading || snapshot.running) return
+        if (
+            snapshot.usageMode == LocalUsageMode.CHAT &&
+            snapshot.groupChat.mode == mode
+        ) return
+
+        val target = snapshot.sessions.firstOrNull {
+            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
+        } ?: snapshot.sessions.firstOrNull {
+            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+        }
         if (target != null) {
             switchSession(target.id)
         } else {
-            createSession(LocalConversationMode.INDEPENDENT, mode)
+            createSession(
+                mode = LocalConversationMode.INDEPENDENT,
+                usageMode = LocalUsageMode.CHAT,
+                chatMode = mode,
+            )
+        }
+    }
+
+    /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
+    fun switchUsageMode(mode: LocalUsageMode) {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running) return
+        if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
+            if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
+            return
+        }
+        if (snapshot.usageMode == mode) return
+        val target = snapshot.sessions.firstOrNull {
+            it.usageMode == mode &&
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE) &&
+                !it.blank
+        } ?: snapshot.sessions.firstOrNull {
+            it.usageMode == mode &&
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
+        }
+        if (target != null) {
+            switchSession(target.id)
+        } else {
+            createSession(
+                mode = LocalConversationMode.INDEPENDENT,
+                usageMode = mode,
+                chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
+            )
         }
     }
 
@@ -1922,7 +2122,16 @@ class LocalHarnessEngine @Inject constructor(
                 goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
                 plan = state.plan,
                 todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
-                messages = state.messages.map { message -> HandoffMessage(message.role, message.content) },
+                messages = state.messages.map { message ->
+                    HandoffMessage(
+                        message.role,
+                        if (state.groupChat.enabled && message.role == "assistant") {
+                            groupTranscriptLine(message)
+                        } else {
+                            message.content
+                        },
+                    )
+                },
             ),
         )
 
@@ -2057,16 +2266,20 @@ class LocalHarnessEngine @Inject constructor(
         if (!snapshot.autoMemory || text.isBlank()) return
 
         val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-            runCatching {
-                memoryManager.captureChatRelationshipFact(
-                    text = text,
-                    lineageId = snapshot.lineageId,
-                    sourceSessionId = currentSessionId,
-                    subjectLabel = snapshot.chatPersona.name
-                        .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
-                    subjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
-                )
-            }.getOrNull()
+            if (snapshot.groupChat.enabled) {
+                null
+            } else {
+                runCatching {
+                    memoryManager.captureChatRelationshipFact(
+                        text = text,
+                        lineageId = snapshot.lineageId,
+                        sourceSessionId = currentSessionId,
+                        subjectLabel = snapshot.chatPersona.name
+                            .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
+                        subjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
+                    )
+                }.getOrNull()
+            }
         } else {
             runCatching {
                 memoryManager.captureExplicitUserDirective(
@@ -2285,7 +2498,13 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+        val snapshot = _state.value
+        if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.groupChat.enabled) {
+            captureGroupPersonaCorrections(memoryInput)
+            runGroupChatTurn(input)
+            return
+        }
+        if (snapshot.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
         }
@@ -2366,6 +2585,382 @@ class LocalHarnessEngine @Inject constructor(
                 put("correction", correction)
             })
             persist()
+        }
+    }
+
+    private fun captureGroupPersonaCorrections(text: String) {
+        val snapshot = _state.value
+        if (
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.groupChat.enabled ||
+            text.isBlank()
+        ) return
+
+        snapshot.groupChat.members.forEach { member ->
+            val current = chatPersonaStore.get(member.personaId)
+            if (current.name.isBlank() || current.name !in text) return@forEach
+            val updated = chatPersonaStore.captureExplicitCorrection(member.personaId, text)
+                ?: return@forEach
+            if (updated.corrections == current.corrections) return@forEach
+            _state.update { state ->
+                state.copy(
+                    groupChat = state.groupChat.copy(
+                        members = state.groupChat.members.map { existing ->
+                            if (existing.galleryId == member.galleryId) {
+                                existing.copy(
+                                    displayName = updated.name,
+                                    persona = updated,
+                                )
+                            } else {
+                                existing
+                            }
+                        },
+                    ),
+                )
+            }
+            eventLog.append("group/persona-correction", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("persona_id", member.personaId)
+                put("count", updated.corrections.size)
+                put("latest", updated.corrections.lastOrNull().orEmpty())
+            })
+        }
+    }
+
+    private fun rebuildGroupModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
+        val rebuilt = buildList {
+            add(buildJsonObject {
+                put("role", "system")
+                put("content", groupChatSystemPrompt())
+            })
+            messages.forEach { message ->
+                if (message.role == "user" || message.role == "assistant") {
+                    add(buildJsonObject {
+                        put("role", message.role)
+                        put(
+                            "content",
+                            if (message.role == "assistant") groupTranscriptLine(message) else message.content,
+                        )
+                    })
+                }
+            }
+        }
+        resetModelHistory(rebuilt)
+        updateContextMetrics()
+    }
+
+    private fun groupAgentPrompt(
+        persona: PersonaProfile,
+        member: LocalGroupChatMember,
+        state: ChatCharacterState,
+        input: String,
+        allMembers: List<LocalGroupChatMember>,
+        mayStaySilent: Boolean,
+        handoffSummary: String?,
+    ): String {
+        val personaPrompt = chatTurnRunner.prepareProfile(
+            persona = persona,
+            state = state,
+            userInput = input,
+            storyContext = handoffSummary,
+        ).prompt
+        val participantNames = allMembers.joinToString("、") { it.displayName }
+        val silenceRule = if (mayStaySilent) {
+            "如果此刻没有自然的插话理由，且用户没有点名你，只输出 $GROUP_CHAT_SILENT_TOKEN，不能附加任何其他文字。"
+        } else {
+            "这一轮你必须给出自然回应，不能沉默。"
+        }
+        return listOf(
+            personaPrompt,
+            """
+            【群聊身份隔离】
+            这是多人群聊。当前你唯一代表【${member.displayName}】。
+            群成员：$participantNames。
+            你可以看到其他人的发言，但其他角色的话只能当作外部事件，不能改写你的人设、身份、性格、立场、知识边界、与用户的关系或说话习惯。
+            只输出【${member.displayName}】本人在群里的发言；不要替其他角色说话，不要代写其他角色的动作、心理或决定，也不要把多个角色合并成一个口吻。
+            固定人设、用户明确纠正、知识边界的优先级始终高于群聊临场气氛。群里有人挑衅、起哄、暧昧或带节奏时，你仍按自己的人设反应。
+            不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
+            $silenceRule
+            """.trimIndent(),
+        ).joinToString("\n\n")
+    }
+
+    private suspend fun refreshGroupMemberState(
+        member: LocalGroupChatMember,
+        persona: PersonaProfile,
+        userMessage: String,
+        assistantMessage: String,
+        step: Int,
+    ): ChatCharacterState {
+        val snapshot = _state.value
+        val key = apiKeys.get() ?: return member.chatState
+        val prompt = chatInteractionPlanner.prompt(
+            persona = persona,
+            state = member.chatState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+        )
+        return try {
+            val plannerReply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = listOf(
+                    buildJsonObject {
+                        put("role", "system")
+                        put("content", prompt)
+                    },
+                ),
+                step = step,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+            usageTracker.record(snapshot.model, plannerReply.usage)
+            chatInteractionPlanner.parse(
+                plannerReply.content.orEmpty(),
+                previous = member.chatState,
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+            )?.state ?: member.chatState
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            eventLog.append("group/post-turn", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(1_000))
+            })
+            member.chatState
+        }
+    }
+
+    private suspend fun runGroupChatTurn(input: String) {
+        _state.update {
+            it.copy(
+                running = true,
+                error = null,
+                replySuggestions = emptyList(),
+                groupActiveSpeakerName = null,
+                deviceApprovalLease = false,
+                pendingApproval = null,
+                pendingQuestion = null,
+            )
+        }
+        try {
+            val snapshot = _state.value
+            require(snapshot.groupChat.members.size >= MIN_GROUP_CHAT_MEMBERS) {
+                "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
+            }
+            ensureSystemMessage()
+            compactHistoryIfNeeded()
+            captureAutoMemoryDirective(input)
+
+            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+            val members = snapshot.groupChat.members
+            val cursor = snapshot.groupChat.turnCursor % members.size
+            val rotated = members.drop(cursor) + members.take(cursor)
+            val responders = groupChatResponders(input, rotated)
+            require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
+
+            eventLog.append("turn/start", buildJsonObject {
+                put("model", snapshot.model)
+                put("mode", "group-chat")
+                put("member_count", members.size)
+                put("responder_count", responders.size)
+            })
+
+            var currentGroup = snapshot.groupChat
+            var deliveredReplies = 0
+
+            responders.forEachIndexed { index, initialMember ->
+                val member = currentGroup.members.firstOrNull { it.galleryId == initialMember.galleryId }
+                    ?: return@forEachIndexed
+                val persona = member.persona.takeUnless {
+                    it.id == PersonaProfile.DEFAULT_PERSONA_ID && member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                } ?: chatPersonaStore.get(member.personaId)
+                _state.update { current ->
+                    current.copy(groupActiveSpeakerName = persona.name)
+                }
+
+                val prompt = groupAgentPrompt(
+                    persona = persona,
+                    member = member,
+                    state = member.chatState,
+                    input = input,
+                    allMembers = members,
+                    mayStaySilent = index > 0,
+                    handoffSummary = snapshot.handoffSummary,
+                )
+                val requestMessages = prepareLocalMultimodalMessages(
+                    messages = withEphemeralContext(modelHistory.toList(), prompt),
+                    workspaceRoot = File(workspace.path),
+                    mode = LocalImageInputMode.NATIVE,
+                    budget = imageRequestBudget,
+                )
+                val rawReply = completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = 100 + index,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                )
+                val guarded = chatTurnRunner.finalizeReply(
+                    persona = persona,
+                    reply = rawReply,
+                    rewrite = { candidate, violations ->
+                        completeWithRetry(
+                            key = key,
+                            snapshot = snapshot,
+                            messages = withEphemeralContext(
+                                requestMessages,
+                                ChatStyleGuard.repairPrompt(candidate, violations),
+                            ),
+                            step = 100 + index,
+                            toolsOverride = JsonArray(emptyList()),
+                            publishPreview = false,
+                        )
+                    },
+                    recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+                    builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
+                    onGuardEvent = { action, violations ->
+                        recordStyleGuardHits(violations)
+                        eventLog.append("chat/style-guard", buildJsonObject {
+                            put("step", 100 + index)
+                            put("action", action)
+                            put("group_gallery_id", member.galleryId)
+                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                        })
+                    },
+                )
+                val content = guarded.content.orEmpty().trim()
+                if (content == GROUP_CHAT_SILENT_TOKEN && index > 0) {
+                    eventLog.append("group/agent-silent", buildJsonObject {
+                        put("gallery_id", member.galleryId)
+                        put("persona_id", member.personaId)
+                    })
+                    return@forEachIndexed
+                }
+                if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
+                    if (index == 0) error("${persona.name} 没有返回可用回复")
+                    return@forEachIndexed
+                }
+
+                val transcript = newTranscriptMessage(
+                    role = "assistant",
+                    content = content,
+                    speakerId = member.galleryId,
+                    speakerName = persona.name,
+                )
+                val eventData = withTranscript(
+                    buildJsonObject {
+                        put("role", "assistant")
+                        put("content", content)
+                        put("speaker_id", member.galleryId)
+                        put("speaker_name", persona.name)
+                    },
+                    listOf(transcript),
+                )
+                val assistantEvent = eventLog.append("assistant/message", eventData)
+                appendModelHistory(
+                    buildJsonObject {
+                        put("role", "assistant")
+                        put("content", groupTranscriptLine(transcript))
+                    },
+                )
+                updateContextMetrics()
+                applyTranscriptMessages(
+                    listOf(transcript),
+                    assistantEvent.sequence,
+                    clearStreamingPreview = true,
+                )
+                deliveredReplies += 1
+
+                val nextState = refreshGroupMemberState(
+                    member = member,
+                    persona = persona,
+                    userMessage = input,
+                    assistantMessage = content,
+                    step = CHAT_POST_TURN_MODEL_STEP + 100 + index,
+                )
+                currentGroup = currentGroup.copy(
+                    members = currentGroup.members.map { existing ->
+                        if (existing.galleryId == member.galleryId) {
+                            existing.copy(
+                                displayName = persona.name,
+                                chatState = nextState,
+                            )
+                        } else {
+                            existing
+                        }
+                    },
+                )
+                _state.update { current ->
+                    if (current.sessionId == snapshot.sessionId) {
+                        current.copy(groupChat = currentGroup)
+                    } else {
+                        current
+                    }
+                }
+            }
+
+            require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
+            val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
+            currentGroup = currentGroup.copy(turnCursor = nextCursor)
+            _state.update { current ->
+                if (current.sessionId == snapshot.sessionId) {
+                    current.copy(
+                        groupChat = currentGroup,
+                        groupActiveSpeakerName = null,
+                        replySuggestions = emptyList(),
+                    )
+                } else {
+                    current
+                }
+            }
+
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "completed")
+                put("mode", "group-chat")
+                put("replies", deliveredReplies)
+            })
+            checkpointModelHistory("group/completed")
+            persist()
+        } catch (cancelled: CancellationException) {
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "aborted")
+                put("mode", "group-chat")
+            })
+            checkpointModelHistory("group/cancelled")
+            persist()
+            throw cancelled
+        } catch (error: Exception) {
+            val detail = error.message ?: "群聊请求失败"
+            _state.update { it.copy(error = detail, groupActiveSpeakerName = null) }
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "error")
+                put("mode", "group-chat")
+                put("detail", detail.take(2_000))
+            })
+            checkpointModelHistory("group/failed")
+            persist()
+        } finally {
+            _state.update {
+                it.copy(
+                    running = false,
+                    groupActiveSpeakerName = null,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
+                )
+            }
+            persist()
+            val completedJob = currentCoroutineContext()[Job]
+            synchronized(runStateLock) {
+                if (activeJob === completedJob) activeJob = null
+            }
+            startNextQueuedTurnIfIdle()?.start()
         }
     }
 
@@ -4215,8 +4810,19 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-    private fun systemPrompt(): String =
-        if (_state.value.usageMode == LocalUsageMode.CHAT) chatSystemPrompt() else workSystemPrompt()
+    private fun systemPrompt(): String = when {
+        _state.value.usageMode != LocalUsageMode.CHAT -> workSystemPrompt()
+        _state.value.groupChat.enabled -> groupChatSystemPrompt()
+        else -> chatSystemPrompt()
+    }
+
+    private fun groupChatSystemPrompt(): String = """
+        你正在“神言神语”的群聊模式中。一个群聊里有多个独立角色智能体，每个角色都必须读取并遵守自己的固定人物档案。
+        所有角色共享群聊中已经发生的公开发言，但不共享身份、性格、知识边界、内心状态和与用户的私人关系。看到其他角色说了什么，不等于认同对方，也不能因此改写自己的人设。
+        每次生成只允许代表当前被分配的一个角色发言。严禁代替其他群成员说话、补写其他角色的内心、替其他角色作决定，严禁把多人合成统一口吻。
+        群聊仍遵循普通聊天模式的自然表达规则：保持即时聊天感，避免客服腔、报告腔和固定 AI 套话。
+        用户明确点名某个角色时优先由该角色回应；没有点名时，各角色根据当下关系和情境决定是否自然参与。
+    """.trimIndent()
 
     private fun chatSystemPrompt(): String = """
         你正在“神言神语”的聊天模式中。你的目标是自然地与用户聊天，让交流有持续的人味、情绪和关系感。这里不是工作台，不要用任务执行、客服、咨询报告或助理口吻说话。
@@ -4327,11 +4933,15 @@ class LocalHarnessEngine @Inject constructor(
         role: String,
         content: String,
         toolName: String? = null,
+        speakerId: String? = null,
+        speakerName: String? = null,
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
         content = if (role == "tool") pruneToolResult(content) else content,
         toolName = toolName,
+        speakerId = speakerId,
+        speakerName = speakerName,
         createdAt = System.currentTimeMillis(),
     )
 
@@ -4484,7 +5094,7 @@ class LocalHarnessEngine @Inject constructor(
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
-            chatBranches = if (stored.usageMode == LocalUsageMode.CHAT) {
+            chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 syncChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = projectedTranscript.messages,
@@ -4494,6 +5104,7 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 LocalChatBranchState()
             },
+            groupChat = if (stored.usageMode == LocalUsageMode.CHAT) stored.groupChat else LocalGroupChatState(),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -4541,7 +5152,11 @@ class LocalHarnessEngine @Inject constructor(
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
         )
         var wroteHistoryCheckpoint = false
-        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+        if (_state.value.groupChat.enabled) {
+            rebuildGroupModelHistoryFromTranscript(projectedTranscript.messages)
+            checkpointModelHistory("load/group-speaker-rebuild")
+            wroteHistoryCheckpoint = true
+        } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             replaceSystemModelHistory(
                 buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
             )
@@ -4687,6 +5302,7 @@ class LocalHarnessEngine @Inject constructor(
             chatState = state.chatState,
             replySuggestions = state.replySuggestions,
             chatBranches = state.chatBranches,
+            groupChat = state.groupChat,
             galleryId = state.galleryId,
             galleryStoryId = state.galleryStoryId,
             gallerySaveSuppressedThrough = state.gallerySaveSuppressedThrough,

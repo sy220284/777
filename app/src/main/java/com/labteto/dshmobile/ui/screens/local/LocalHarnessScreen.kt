@@ -57,6 +57,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
@@ -109,6 +110,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalChatBranchInfo
+import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
@@ -196,11 +198,17 @@ fun LocalHarnessScreen(
     }
 
     fun switchUsageMode(target: LocalUsageMode) {
-        if (target == state.usageMode) return
-        val key = "shown_" + target.name.lowercase()
-        if (!modeIntroPreferences.getBoolean(key, false)) {
-            modeIntroPreferences.edit().putBoolean(key, true).apply()
-            modeIntro = target
+        val returningFromGroupToSingle =
+            target == LocalUsageMode.CHAT &&
+                state.usageMode == LocalUsageMode.CHAT &&
+                state.groupChat.enabled
+        if (target == state.usageMode && !returningFromGroupToSingle) return
+        if (target != state.usageMode) {
+            val key = "shown_" + target.name.lowercase()
+            if (!modeIntroPreferences.getBoolean(key, false)) {
+                modeIntroPreferences.edit().putBoolean(key, true).apply()
+                modeIntro = target
+            }
         }
         viewModel.switchUsageMode(target)
     }
@@ -256,6 +264,11 @@ fun LocalHarnessScreen(
                     showRunCenter = true
                 },
                 galleryCount = gallery.size,
+                groupMemberCount = state.groupChat.members.size,
+                onOpenGroupChat = {
+                    scope.launch { drawerState.close() }
+                    viewModel.openGroupChatMode()
+                },
                 onOpenPersonaGallery = {
                     scope.launch { drawerState.close() }
                     if (viewModel.hasUnsavedCurrentPersona()) {
@@ -327,6 +340,7 @@ fun LocalHarnessScreen(
                 onNewSession = { showNewSessionMode = true },
                 onOpenRunCenter = { showRunCenter = true },
                 onConfigureChatPersona = viewModel::configureChatPersona,
+                onConfigureGroupMembers = viewModel::configureGroupChatMembers,
                 onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
                 onCreateChatPersona = viewModel::createPersonaForCurrentChat,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
@@ -417,6 +431,8 @@ private fun LocalModeDrawer(
     onWorkspaceFiles: () -> Unit,
     onOpenRunCenter: () -> Unit,
     galleryCount: Int,
+    groupMemberCount: Int,
+    onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
@@ -520,8 +536,14 @@ private fun LocalModeDrawer(
 
                 if (usageMode == LocalUsageMode.CHAT) {
                     DrawerPrimaryAction(
+                        icon = Icons.Outlined.PersonSearch,
+                        title = stringResource(R.string.local_group_chat),
+                        trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
+                        onClick = onOpenGroupChat,
+                    )
+                    DrawerPrimaryAction(
                         icon = Icons.Outlined.Image,
-                        title = "人设图集",
+                        title = stringResource(R.string.persona_gallery_title),
                         trailing = galleryCount.toString(),
                         onClick = onOpenPersonaGallery,
                     )
@@ -576,6 +598,7 @@ private fun LocalModeDrawer(
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
                     LocalSessionDrawerRow(
                         title = session.title,
+                        groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
                         selected = session.id in selectedIds,
                         selectionOpen = selectionOpen,
@@ -739,6 +762,7 @@ private fun DrawerSectionTitle(title: String) {
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalSessionDrawerRow(
     title: String,
+    groupChat: Boolean,
     current: Boolean,
     selected: Boolean,
     selectionOpen: Boolean,
@@ -787,6 +811,14 @@ private fun LocalSessionDrawerRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (groupChat) {
+            Spacer(Modifier.width(DsSpacing.small))
+            Text(
+                stringResource(R.string.local_group_chat_title),
+                style = DsType.caption11,
+                color = colors.accent,
+            )
+        }
         if (current) {
             Spacer(Modifier.width(DsSpacing.small))
             Text("当前", style = DsType.caption11, color = colors.accent)
@@ -1014,6 +1046,7 @@ private fun LocalChat(
     onNewSession: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
     onCreateChatPersona: (PersonaProfile) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
@@ -1062,6 +1095,7 @@ private fun LocalChat(
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var creatingPersona by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
@@ -1076,9 +1110,27 @@ private fun LocalChat(
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled &&
         chatBranchingEligible(state.messages)
+    val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
+    LaunchedEffect(
+        state.sessionId,
+        state.usageMode,
+        state.groupChat.enabled,
+        state.groupChat.members.size,
+    ) {
+        if (
+            state.usageMode == LocalUsageMode.CHAT &&
+            state.groupChat.enabled &&
+            state.groupChat.members.size < 2
+        ) {
+            showGroupMemberPicker = true
+        }
+    }
     LaunchedEffect(state.sessionId, state.usageMode) {
         showReplySuggestions = false
+        showPersonaPicker = false
+        if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
         editingUserText = ""
         editingUserError = null
@@ -1167,7 +1219,8 @@ private fun LocalChat(
                         .background(if (state.usageMode == LocalUsageMode.CHAT) Color.Transparent else headerChipColor)
                         .clickable(enabled = !state.running) {
                             if (state.usageMode == LocalUsageMode.CHAT) {
-                                showPersonaPicker = true
+                                if (state.groupChat.enabled) showGroupMemberPicker = true
+                                else showPersonaPicker = true
                             } else if (state.configured) {
                                 showModelPicker = true
                             } else {
@@ -1181,20 +1234,39 @@ private fun LocalChat(
                     if (state.usageMode == LocalUsageMode.CHAT) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                state.chatPersona.name,
+                                if (state.groupChat.enabled) {
+                                    stringResource(R.string.local_group_chat_title)
+                                } else {
+                                    state.chatPersona.name
+                                },
                                 style = DsType.base16Strong,
                                 color = colors.labelPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                            if (state.groupChat.enabled) {
                                 Text(
-                                    relationship,
+                                    state.groupActiveSpeakerName?.let { speaker ->
+                                        stringResource(R.string.local_group_chat_active_speaker, speaker)
+                                    } ?: stringResource(
+                                        R.string.local_group_chat_member_count,
+                                        state.groupChat.members.size,
+                                    ),
                                     style = DsType.caption11,
                                     color = colors.labelSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            } else {
+                                state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                                    Text(
+                                        relationship,
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                         }
                         Icon(
@@ -1264,7 +1336,7 @@ private fun LocalChat(
         }
 
         state.personaCorrectionNotice?.takeIf {
-            state.usageMode == LocalUsageMode.CHAT
+            state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
         }?.let { notice ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
@@ -1364,15 +1436,39 @@ private fun LocalChat(
                         }
                     }
                 }
+                if (
+                    transcriptItems.isEmpty() &&
+                    state.usageMode == LocalUsageMode.CHAT &&
+                    state.groupChat.enabled &&
+                    state.groupChat.members.size < 2
+                ) {
+                    item {
+                        DsCard {
+                            Text(
+                                stringResource(R.string.local_group_chat_setup_required),
+                                style = DsType.std14,
+                                color = colors.labelSecondary,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_group_chat_manage_members),
+                                onClick = { showGroupMemberPicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
+                            groupMode = state.groupChat.enabled,
                             canEdit = messageBranchingEnabled &&
                                 !state.running &&
                                 !chatMessageHasAttachmentContext(transcriptItem.message),
-                            canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            canRegenerate = !state.groupChat.enabled &&
+                                !state.running &&
+                                state.messages.lastOrNull()?.id == transcriptItem.message.id,
                             branchInfo = if (messageBranchingEnabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
                             } else {
@@ -1559,6 +1655,7 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
+                        !state.groupChat.enabled &&
                         state.replySuggestions.any { it.text.isNotBlank() }
                     ) {
                         DsButton(
@@ -1599,7 +1696,7 @@ private fun LocalChat(
                                     keyboardController?.hide()
                                 }
                             },
-                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                            enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
                         )
                     }
                 }
@@ -1625,7 +1722,7 @@ private fun LocalChat(
                                 keyboardController?.hide()
                             },
                             size = DsButtonSize.Small,
-                            enabled = input.isNotBlank() || attachments.isNotEmpty(),
+                            enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
                         )
                     }
                 }
@@ -1651,7 +1748,24 @@ private fun LocalChat(
             onDismiss = { onCancelQuestion(question.callId) },
         )
     }
-    if (showPersonaPicker && state.usageMode == LocalUsageMode.CHAT) {
+    if (
+        showGroupMemberPicker &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        state.groupChat.enabled
+    ) {
+        GroupChatMemberPickerSheet(
+            entries = gallery,
+            currentIds = state.groupChat.members.map { it.galleryId },
+            enabled = !state.running,
+            onSave = onConfigureGroupMembers,
+            onDismiss = { showGroupMemberPicker = false },
+        )
+    }
+    if (
+        showPersonaPicker &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled
+    ) {
         ChatPersonaPickerDialog(
             entries = gallery,
             currentPersona = state.chatPersona,
@@ -1755,8 +1869,12 @@ private fun LocalChat(
         }
     }
 
-    if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
-        state.replySuggestions.any { it.text.isNotBlank() }) {
+    if (
+        showReplySuggestions &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled &&
+        state.replySuggestions.any { it.text.isNotBlank() }
+    ) {
         DsBottomSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
@@ -2268,6 +2386,7 @@ private fun localJobStatusLabel(status: String): String = when (status) {
 private fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
+    groupMode: Boolean,
     canEdit: Boolean,
     canRegenerate: Boolean,
     branchInfo: LocalChatBranchInfo?,
@@ -2333,6 +2452,15 @@ private fun LocalMessageRow(
                 readingModifier,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                if (groupMode) {
+                    message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
+                        Text(
+                            speaker,
+                            style = DsType.small13Strong,
+                            color = colors.accent,
+                        )
+                    }
+                }
                 MarkdownText(message.content)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
