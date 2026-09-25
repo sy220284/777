@@ -38,9 +38,15 @@ internal fun GroupChatMemberPickerSheet(
 ) {
     val selected = remember { mutableStateListOf<String>() }
     val avatarFallback = stringResource(R.string.persona_gallery_avatar_fallback)
-    LaunchedEffect(currentIds) {
+    val availableIds = entries.mapTo(hashSetOf(), PersonaGalleryEntry::id)
+    LaunchedEffect(currentIds, entries) {
         selected.clear()
-        selected.addAll(currentIds.distinct().take(MAX_GROUP_CHAT_MEMBERS))
+        selected.addAll(
+            currentIds
+                .filter(availableIds::contains)
+                .distinct()
+                .take(MAX_GROUP_CHAT_MEMBERS),
+        )
     }
 
     DsBottomSheet(
