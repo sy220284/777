@@ -43,13 +43,13 @@ internal class LocalToolOutputStore(
         target.setLastModified(System.currentTimeMillis())
 
         val removedFromSession = pruneSession(dir, target)
-        var globalBytes = if (cachedBefore == null) {
+        var globalBytes = if (cachedBefore == null || !target.isFile) {
             measureGlobalBytes()
         } else {
             (
                 cachedBefore -
                     previousBytes +
-                    (target.takeIf(File::isFile)?.length() ?: 0L) -
+                    target.length() -
                     removedFromSession
             ).coerceAtLeast(0L)
         }
