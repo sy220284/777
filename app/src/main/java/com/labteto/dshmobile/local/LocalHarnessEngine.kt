@@ -1032,6 +1032,7 @@ class LocalHarnessEngine @Inject constructor(
                     galleryId = entry.id,
                     personaId = saved.id,
                     displayName = saved.name,
+                    portraitPath = entry.portraitPath,
                     persona = saved,
                     chatState = previous?.chatState
                         ?: entry.groupChatState.takeIf { it.updatedAt > 0L }
