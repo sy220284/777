@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -123,6 +124,8 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("只有底层硬安全边界不参与该覆盖"))
         assertTrue(prompt.contains("统一安全边界"))
         assertTrue(prompt.contains("不设置应用层尺度上限"))
+        assertTrue(prompt.contains("无论情节设定如何"))
+        assertFalse(prompt.contains("自愿"))
     }
 
     @Test
