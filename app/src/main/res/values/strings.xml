@@ -915,6 +915,13 @@
     <string name="local_run_tasks_progress">Tasks · %1$d/%2$d</string>
     <string name="local_run_background">Background tasks</string>
     <string name="local_run_resources">Resources</string>
+    <string name="local_run_job_view">View</string>
+    <string name="local_run_job_hide">Hide</string>
+    <string name="local_run_job_output">Task output</string>
+    <string name="local_run_job_output_empty">No output yet</string>
+    <string name="local_run_job_refresh">Refresh</string>
+    <string name="local_run_job_stop">Stop</string>
+    <string name="local_run_job_interrupted">Interrupted</string>
     <string name="tasks_new">New automation</string>
     <string name="tasks_prompt_label">Task to run</string>
     <string name="tasks_prompt_hint">For example: summarize today’s project changes</string>

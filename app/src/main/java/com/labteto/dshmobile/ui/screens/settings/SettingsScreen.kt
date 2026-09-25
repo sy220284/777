@@ -105,7 +105,7 @@ import java.util.Locale
  * blanket-labelling the whole screen read-only, as it used to, tells users their own preferences
  * cannot be changed when they plainly can.
  */
-private enum class SettingsPage {
+enum class SettingsDestination {
     ROOT,
     GENERAL,
     MODELS,
@@ -119,6 +119,7 @@ private enum class SettingsPage {
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    initialDestination: SettingsDestination = SettingsDestination.ROOT,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
@@ -133,20 +134,23 @@ fun SettingsScreen(
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
-    var page by rememberSaveable { mutableStateOf(SettingsPage.ROOT) }
+    var page by rememberSaveable { mutableStateOf(initialDestination) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
-        if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+        if (page == SettingsDestination.ROOT) onClose() else page = SettingsDestination.ROOT
+    }
+    LaunchedEffect(initialDestination) {
+        page = initialDestination
     }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
     }
     LaunchedEffect(page) {
-        if (page == SettingsPage.MEMORY) viewModel.refreshMemories()
+        if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
     }
     LaunchedEffect(showEnvironment) {
         environmentInfo = if (showEnvironment) {
@@ -157,14 +161,14 @@ fun SettingsScreen(
     }
 
     val title = when (page) {
-        SettingsPage.ROOT -> stringResource(R.string.settings_title)
-        SettingsPage.GENERAL -> stringResource(R.string.settings_page_general)
-        SettingsPage.MODELS -> stringResource(R.string.settings_page_models)
-        SettingsPage.PRICING -> stringResource(R.string.settings_page_pricing)
-        SettingsPage.MEMORY -> stringResource(R.string.settings_page_memory)
-        SettingsPage.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
-        SettingsPage.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
-        SettingsPage.ADVANCED -> stringResource(R.string.settings_page_advanced)
+        SettingsDestination.ROOT -> stringResource(R.string.settings_title)
+        SettingsDestination.GENERAL -> stringResource(R.string.settings_page_general)
+        SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
+        SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
+        SettingsDestination.MEMORY -> stringResource(R.string.settings_page_memory)
+        SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
+        SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
+        SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -180,38 +184,38 @@ fun SettingsScreen(
                 DsTopBar(
                     title = title,
                     onBack = {
-                        if (page == SettingsPage.ROOT) onClose() else page = SettingsPage.ROOT
+                        if (page == SettingsDestination.ROOT) onClose() else page = SettingsDestination.ROOT
                     },
                     backContentDescription = stringResource(R.string.common_back),
                 )
 
                 when (page) {
-                    SettingsPage.ROOT -> {
+                    SettingsDestination.ROOT -> {
                         Text(stringResource(R.string.settings_group_experience), style = DsType.std14, color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Cloud,
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
-                                onClick = { page = SettingsPage.MODELS },
+                                onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
-                                onClick = { page = SettingsPage.PRICING },
+                                onClick = { page = SettingsDestination.PRICING },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
-                                onClick = { page = SettingsPage.MEMORY },
+                                onClick = { page = SettingsDestination.MEMORY },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
                                 title = stringResource(R.string.settings_page_general),
                                 subtitle = stringResource(R.string.settings_general_subtitle),
-                                onClick = { page = SettingsPage.GENERAL },
+                                onClick = { page = SettingsDestination.GENERAL },
                             )
                         }
 
@@ -221,13 +225,13 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.PhoneAndroid,
                                 title = stringResource(R.string.settings_page_permissions),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
-                                onClick = { page = SettingsPage.PERMISSIONS },
+                                onClick = { page = SettingsDestination.PERMISSIONS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
-                                onClick = { page = SettingsPage.NOTIFICATIONS },
+                                onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
 
@@ -237,12 +241,12 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
-                                onClick = { page = SettingsPage.ADVANCED },
+                                onClick = { page = SettingsDestination.ADVANCED },
                             )
                         }
                     }
 
-                    SettingsPage.GENERAL -> {
+                    SettingsDestination.GENERAL -> {
                         SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                             LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
@@ -300,22 +304,22 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsPage.MODELS -> {
+                    SettingsDestination.MODELS -> {
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                         LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
                     }
 
-                    SettingsPage.PRICING -> {
+                    SettingsDestination.PRICING -> {
                         DeepSeekPricingCard(deepSeekPricing, viewModel)
                     }
 
-                    SettingsPage.MEMORY -> {
+                    SettingsDestination.MEMORY -> {
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
                         MemoryManagementCard(memories, viewModel, toast.second)
                     }
 
-                    SettingsPage.PERMISSIONS -> {
+                    SettingsDestination.PERMISSIONS -> {
                         SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
                             ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
                             ToggleRow(
@@ -327,7 +331,7 @@ fun SettingsScreen(
                         DeviceCapabilitiesCard(deviceCapabilities, viewModel)
                     }
 
-                    SettingsPage.NOTIFICATIONS -> {
+                    SettingsDestination.NOTIFICATIONS -> {
                         SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_turn),
@@ -352,7 +356,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsPage.ADVANCED -> {
+                    SettingsDestination.ADVANCED -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {

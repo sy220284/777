@@ -50,6 +50,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.rememberSessionStore
+import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -157,6 +158,7 @@ class ToolsViewModel @Inject constructor(
 fun ToolsScreen(
     onClose: () -> Unit,
     onOpenTasks: () -> Unit = {},
+    onOpenSettings: (SettingsDestination) -> Unit = {},
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -205,24 +207,28 @@ fun ToolsScreen(
                     title = stringResource(R.string.tools_capability_terminal),
                     subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("android-runtime" in state.localPlugins),
+                    onClick = { onOpenSettings(SettingsDestination.ADVANCED) },
                 )
                 DsCategoryRow(
                     icon = FeatherIcons.Code,
                     title = stringResource(R.string.tools_capability_code),
                     subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("local-language-server" in state.localPlugins),
+                    onClick = { onOpenSettings(SettingsDestination.ADVANCED) },
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.PhoneAndroid,
                     title = stringResource(R.string.tools_capability_device),
                     subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("android-device" in state.localPlugins),
+                    onClick = { onOpenSettings(SettingsDestination.PERMISSIONS) },
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Image,
                     title = stringResource(R.string.tools_capability_vision),
                     subtitle = stringResource(R.string.tools_capability_agent_available),
                     value = capabilityStateLabel("local-vision" in state.localPlugins),
+                    onClick = { onOpenSettings(SettingsDestination.MODELS) },
                 )
                 DsCategoryRow(
                     icon = Icons.Outlined.Schedule,

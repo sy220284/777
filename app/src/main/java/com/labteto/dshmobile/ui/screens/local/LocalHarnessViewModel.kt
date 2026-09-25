@@ -265,6 +265,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceFiles() = engine.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = engine.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = engine.previewWorkspaceFileForUi(path)
+    fun backgroundJobOutput(jobId: String): String = engine.backgroundJobOutputForUi(jobId)
+    fun stopBackgroundJob(jobId: String): String = engine.stopBackgroundJobForUi(jobId)
     fun approve(callId: String) = engine.answerApproval(callId, true)
     fun deny(callId: String) = engine.answerApproval(callId, false)
     fun enableAutoApproval() = engine.enableAutoApproval()

@@ -1244,6 +1244,10 @@ class LocalHarnessEngine @Inject constructor(
 
     fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
+    fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId)
+
+    fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
+
     /** Resolve the current write or shell approval. */
     fun answerApproval(callId: String, approved: Boolean) {
         interactions.answerApproval(callId, approved)
