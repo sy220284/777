@@ -970,5 +970,6 @@
     <string name="local_persona_picker_saved">已创建人物</string>
     <string name="local_persona_picker_empty">还没有保存过人物。可以先新建一个，聊天后再收入人设图集。</string>
     <string name="local_persona_picker_saved_hint">已保存人物</string>
+    <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
 
 </resources>
