@@ -63,8 +63,8 @@ class LocalHistoryCompactorTest {
     fun compactsOnTokenPressureEvenWhenCharacterBudgetIsStillAvailable() {
         val history = listOf(
             message("system", "系统"),
-            message("user", "旧内容" + "汉".repeat(400)),
-            message("assistant", "旧答复" + "字".repeat(400)),
+            message("user", "旧内容" + "汉".repeat(2_000)),
+            message("assistant", "旧答复" + "字".repeat(2_000)),
             message("user", "最近请求" + "新".repeat(120)),
             message("assistant", "最近答复" + "新".repeat(120)),
         )
@@ -73,8 +73,8 @@ class LocalHistoryCompactorTest {
             tailChars = 2_000,
             maxSummaryChars = 2_000,
             maxToolResultChars = 10_000,
-            maxHistoryTokens = 500,
-            tailTokens = 250,
+            maxHistoryTokens = 1_500,
+            tailTokens = 300,
             maxToolResultTokens = 2_000,
         )
         val compaction = LocalHistoryCompactor().compact(history, budget = budget)
@@ -83,6 +83,28 @@ class LocalHistoryCompactorTest {
         assertTrue(compaction.estimatedTokensBefore > budget.maxHistoryTokens!!)
         assertTrue(compaction.omittedMessages > 0)
         assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
+    }
+
+    @Test
+    fun refusesCompactionWhenSummaryWouldNotReduceContext() {
+        val history = listOf(
+            message("system", "系统"),
+            message("user", "旧目标" + "旧".repeat(120)),
+            message("assistant", "旧答复" + "旧".repeat(120)),
+            message("user", "最近请求" + "新".repeat(120)),
+            message("assistant", "最近答复" + "新".repeat(120)),
+        )
+        val budget = LocalHistoryBudget(
+            maxHistoryChars = 100_000,
+            tailChars = 2_000,
+            maxSummaryChars = 2_000,
+            maxToolResultChars = 10_000,
+            maxHistoryTokens = 300,
+            tailTokens = 250,
+            maxToolResultTokens = 2_000,
+        )
+
+        assertNull(LocalHistoryCompactor().compact(history, budget = budget))
     }
 
     @Test
