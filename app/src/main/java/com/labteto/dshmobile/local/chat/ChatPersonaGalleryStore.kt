@@ -224,7 +224,9 @@ private fun splitPersonaClauses(text: String): List<String> =
         .filter(String::isNotBlank)
 
 private fun normalizePersonaText(text: String): String =
-    text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】—_-]+"""), "")
+    text.lowercase()
+        .replace("的", "")
+        .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】—_-]+"""), "")
 
 private val DEFAULT_PERSONA_NAMES = setOf(
     normalizePersonaText("默认角色"),
