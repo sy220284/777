@@ -37,9 +37,9 @@ internal class LocalToolOutputStore(
             temp.delete()
         }
         target.setLastModified(System.currentTimeMillis())
-        pruneSession(dir)
-        pruneGlobal()
-        return Stored(bytes.size)
+        pruneSession(dir, target)
+        pruneGlobal(target)
+        return if (target.isFile) Stored(bytes.size) else null
     }
 
     @Synchronized
@@ -124,12 +124,15 @@ internal class LocalToolOutputStore(
 
     private fun sessionDir(sessionId: String): File = File(root, key(sessionId))
 
-    private fun pruneSession(dir: File) {
+    private fun pruneSession(dir: File, protectedFile: File) {
         var keptBytes = 0L
         dir.listFiles()
             .orEmpty()
             .filter { it.isFile && !it.name.startsWith(".") }
-            .sortedByDescending(File::lastModified)
+            .sortedWith(
+                compareByDescending<File> { if (it == protectedFile) 1 else 0 }
+                    .thenByDescending(File::lastModified),
+            )
             .forEachIndexed { index, file ->
                 val nextBytes = keptBytes + file.length()
                 if (index >= maxFilesPerSession || nextBytes > maxSessionBytes) {
@@ -140,11 +143,14 @@ internal class LocalToolOutputStore(
             }
     }
 
-    private fun pruneGlobal() {
+    private fun pruneGlobal(protectedFile: File) {
         var keptBytes = 0L
         root.walkTopDown()
             .filter { it.isFile && !it.name.startsWith(".") }
-            .sortedByDescending(File::lastModified)
+            .sortedWith(
+                compareByDescending<File> { if (it == protectedFile) 1 else 0 }
+                    .thenByDescending(File::lastModified),
+            )
             .forEach { file ->
                 val nextBytes = keptBytes + file.length()
                 if (nextBytes > maxGlobalBytes) {
