@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -37,6 +39,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationFiles
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -100,60 +104,59 @@ internal fun LocalWorkspaceFilesDialog(
     ) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    TextButton(onClick = {
+                val headerTitle = when {
+                    preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
+                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.panel_workspace)
+                    else -> stringResource(R.string.local_files_conversation_title)
+                }
+                val headerSubtitle = when {
+                    preview != null -> preview?.file?.path
+                    mode == LocalFilesMode.WORKSPACE && section == 0 ->
+                        workspacePath + if (directory.isEmpty()) "" else "/$directory"
+                    else -> null
+                }
+                DsTopBar(
+                    title = headerTitle,
+                    subtitle = headerSubtitle,
+                    onBack = {
                         when {
                             preview != null -> preview = null
                             mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
                                 directory = directory.substringBeforeLast('/', "")
                             else -> onDismiss()
                         }
-                    }) {
-                        Text(stringResource(if (preview != null || directory.isNotEmpty()) R.string.local_files_back_to_files else R.string.local_files_back))
-                    }
-                    Text(
-                        when {
-                            preview != null -> preview?.file?.path.orEmpty()
-                            mode == LocalFilesMode.WORKSPACE && section == 0 ->
-                                workspacePath + if (directory.isEmpty()) "" else "/$directory"
-                            mode == LocalFilesMode.WORKSPACE && section == 1 ->
-                                stringResource(R.string.panel_involved_files)
-                            mode == LocalFilesMode.WORKSPACE && section == 2 ->
-                                stringResource(R.string.panel_artifacts)
-                            else -> stringResource(R.string.local_files_conversation_title)
+                    },
+                    backContentDescription = stringResource(
+                        if (preview != null || directory.isNotEmpty()) {
+                            R.string.local_files_back_to_files
+                        } else {
+                            R.string.local_files_back
                         },
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.small),
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                    TextButton(
-                        onClick = { scope.launch { reload() } },
-                        enabled = !loading && preview == null,
-                    ) {
-                        Text(stringResource(R.string.local_files_refresh))
-                    }
-                }
+                    ),
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                    actionIcon = Icons.Outlined.Refresh,
+                    actionContentDescription = stringResource(R.string.local_files_refresh),
+                    actionEnabled = !loading && preview == null,
+                    onAction = { scope.launch { reload() } },
+                )
 
                 if (preview == null && mode == LocalFilesMode.WORKSPACE) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        TextButton(onClick = { section = 0; directory = "" }, enabled = section != 0) {
-                            Text(stringResource(R.string.chatlist_workspace_files))
-                        }
-                        TextButton(onClick = { section = 1; directory = "" }, enabled = section != 1) {
-                            Text(stringResource(R.string.panel_involved_files))
-                        }
-                        TextButton(onClick = { section = 2; directory = "" }, enabled = section != 2) {
-                            Text(stringResource(R.string.panel_artifacts))
-                        }
-                    }
+                    DsSegmentedTabs(
+                        labels = listOf(
+                            stringResource(R.string.chatlist_workspace_files),
+                            stringResource(R.string.panel_involved_files),
+                            stringResource(R.string.panel_artifacts),
+                        ),
+                        selectedIndex = section,
+                        onSelect = { selected ->
+                            section = selected
+                            directory = ""
+                        },
+                        modifier = Modifier.padding(
+                            horizontal = DsSpacing.medium,
+                            vertical = DsSpacing.small,
+                        ),
+                    )
                 }
 
                 when {
