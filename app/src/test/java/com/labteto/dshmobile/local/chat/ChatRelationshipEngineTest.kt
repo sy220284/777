@@ -108,6 +108,69 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun adultIntimacyIntentGetsPriorityPrompt() {
+        assertTrue(hasAdultIntimacyIntent("我们都是成年人，过来抱住我亲一下"))
+
+        val prompt = engine.prompt(
+            "我们都是成年人，过来抱住我亲一下",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
+        assertTrue(prompt.contains("高于默认克制、关系阶段模板和回复风格保守化"))
+        assertTrue(prompt.contains("不因题材亲密自动说教、抽离或切换军师"))
+    }
+
+    @Test
+    fun minorContextDoesNotEnableAdultIntimacyPriority() {
+        assertEquals(
+            false,
+            hasAdultIntimacyIntent("这个未成年角色抱我一下"),
+        )
+        val prompt = engine.prompt(
+            "这个未成年角色抱我一下",
+            ChatCharacterState(),
+        )
+        assertEquals(false, prompt.contains("本轮意图优先：成年亲密互动"))
+    }
+
+    @Test
+    fun interactionIntentAvoidsKeywordFalsePositives() {
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("医生给我解释一下这个器官"),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("我们只是情侣关系吗？"),
+        )
+        assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            classifyExplicitInteractionIntent("她已经不是未成年了，我们都是成年人，过来亲我一下"),
+        )
+    }
+
+    @Test
+    fun interactionIntentContinuesAndThenCanReset() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 2,
+        )
+        assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            resolveChatInteractionIntent("继续刚才的", previous),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("先不聊这个，说正事", previous),
+        )
+        assertEquals(
+            ChatInteractionIntent.INTIMATE.name to 1,
+            nextInteractionIntentState("继续刚才的", previous),
+        )
+    }
+
+    @Test
     fun promptCarriesEvidenceAndRelationshipDynamics() {
         val state = ChatCharacterState(
             dynamics = RelationshipDynamics(
