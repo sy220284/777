@@ -236,16 +236,37 @@ internal fun compactLegacyDuplicateGalleryEntries(
             val canonical = compacted[duplicateIndex]
             compacted[duplicateIndex] = canonical.copy(
                 persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
-                stories = canonical.stories + entry.stories.map { story ->
-                    if (canonical.stories.any { it.id == story.id }) {
-                        story.copy(id = "story-${UUID.randomUUID()}")
-                    } else story
-                },
+                stories = mergeLegacyStoryLists(canonical.stories, entry.stories),
                 updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
             )
         }
     }
     return compacted.sortedByDescending { it.updatedAt }
+}
+
+private fun mergeLegacyStoryLists(
+    base: List<PersonaGalleryStory>,
+    incoming: List<PersonaGalleryStory>,
+): List<PersonaGalleryStory> {
+    val result = base.toMutableList()
+    incoming.forEach { candidate ->
+        val matchIndex = result.indexOfFirst { existing ->
+            val sharedSession = existing.sourceSessionIds.any { it in candidate.sourceSessionIds }
+            val existingKeys = existing.history.mapTo(linkedSetOf(), ::galleryMessageArchiveKey)
+            val candidateKeys = candidate.history.mapTo(linkedSetOf(), ::galleryMessageArchiveKey)
+            val sameArchive = existingKeys.isNotEmpty() && existingKeys == candidateKeys
+            sharedSession || sameArchive
+        }
+        if (matchIndex >= 0) {
+            result[matchIndex] = mergeGalleryStories(result[matchIndex], candidate)
+        } else {
+            result += candidate.copy(
+                id = candidate.id.takeUnless { id -> result.any { it.id == id } }
+                    ?: "story-${UUID.randomUUID()}",
+            )
+        }
+    }
+    return result.sortedByDescending(PersonaGalleryStory::updatedAt)
 }
 
 internal fun galleryMessageArchiveKey(message: LocalHarnessMessage): String =
