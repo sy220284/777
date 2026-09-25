@@ -394,7 +394,12 @@ internal fun PersonaGalleryDialog(
                 }
             }
 
-            if (currentGalleryId == selected.id && currentGalleryStoryId == null && canSave) {
+            if (
+                currentGalleryId == selected.id &&
+                currentGalleryStoryId == null &&
+                currentHasUnsavedChanges &&
+                canSave
+            ) {
                 DsButton(
                     text = stringResource(R.string.persona_gallery_save_current_new_story),
                     onClick = {
