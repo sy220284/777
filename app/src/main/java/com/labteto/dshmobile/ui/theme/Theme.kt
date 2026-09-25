@@ -101,6 +101,35 @@ object DsThemeTokens {
         markdownTag = DsLight.markdownTag, overlayMask = DsLight.overlayMask,
     )
 
+    val dark = DsColors(
+        bgBase = DsDark.bgBase, bgLayer1 = DsDark.bgLayer1, bgLayer2 = DsDark.bgLayer2,
+        bgLayer3 = DsDark.bgLayer3, bgModulePlatform = DsDark.bgModulePlatform,
+        borderL1 = DsDark.borderL1, borderL2 = DsDark.borderL2, borderL3 = DsDark.borderL3,
+        brandPrimary = DsDark.brandPrimary, onBrandPrimary = DsDark.onBrandPrimary,
+        labelPrimary = DsDark.labelPrimary, labelSecondary = DsDark.labelSecondary,
+        labelTertiary = DsDark.labelTertiary, labelCaption = DsDark.labelCaption,
+        labelDimmed = DsDark.labelDimmed,
+        accent = DsDark.accent, onAccent = DsDark.onAccent,
+        accentTertiary = DsDark.accentTertiary, accentHover = DsDark.accentHover,
+        hover = DsDark.hover, hoverSolid = DsDark.hoverSolid, hoverAccent = DsDark.hoverAccent,
+        active = DsDark.active, dangerHover = DsDark.dangerHover,
+        buttonPrimaryHover = DsDark.buttonPrimaryHover, buttonPrimaryDimmed = DsDark.buttonPrimaryDimmed,
+        buttonInfoFill = DsDark.buttonInfoFill, buttonInfoHover = DsDark.buttonInfoHover,
+        error = DsDark.error, errorSecondary = DsDark.errorSecondary, errorTertiary = DsDark.errorTertiary,
+        success = DsDark.success, successSecondary = DsDark.successSecondary,
+        successTertiary = DsDark.successTertiary,
+        warnLabel = DsDark.warnLabel, warn = DsDark.warn, warnSecondary = DsDark.warnSecondary,
+        warnTertiary = DsDark.warnTertiary,
+        toastBg = DsDark.toastBg, tooltipBg = DsDark.tooltipBg,
+        userBubble = DsDark.userBubble, userBubbleHighlight = DsDark.userBubbleHighlight,
+        composerCard = DsDark.composerCard,
+        sidebar = DsDark.sidebar, sidebarNavActive = DsDark.sidebarNavActive,
+        sidebarNavAccent = DsDark.sidebarNavAccent, sidebarNavHover = DsDark.sidebarNavHover,
+        tipSurface = DsDark.tipSurface,
+        codeBlockBg = DsDark.codeBlockBg, codeBlockBanner = DsDark.codeBlockBanner,
+        inlineCode = DsDark.inlineCode, citation = DsDark.citation,
+        markdownTag = DsDark.markdownTag, overlayMask = DsDark.overlayMask,
+    )
     /**
      * A warmer, low-glare dark palette for the optional matte-black appearance.
      *
@@ -143,35 +172,6 @@ object DsThemeTokens {
         markdownTag = Color(0xFF242421),
     )
 
-    val dark = DsColors(
-        bgBase = DsDark.bgBase, bgLayer1 = DsDark.bgLayer1, bgLayer2 = DsDark.bgLayer2,
-        bgLayer3 = DsDark.bgLayer3, bgModulePlatform = DsDark.bgModulePlatform,
-        borderL1 = DsDark.borderL1, borderL2 = DsDark.borderL2, borderL3 = DsDark.borderL3,
-        brandPrimary = DsDark.brandPrimary, onBrandPrimary = DsDark.onBrandPrimary,
-        labelPrimary = DsDark.labelPrimary, labelSecondary = DsDark.labelSecondary,
-        labelTertiary = DsDark.labelTertiary, labelCaption = DsDark.labelCaption,
-        labelDimmed = DsDark.labelDimmed,
-        accent = DsDark.accent, onAccent = DsDark.onAccent,
-        accentTertiary = DsDark.accentTertiary, accentHover = DsDark.accentHover,
-        hover = DsDark.hover, hoverSolid = DsDark.hoverSolid, hoverAccent = DsDark.hoverAccent,
-        active = DsDark.active, dangerHover = DsDark.dangerHover,
-        buttonPrimaryHover = DsDark.buttonPrimaryHover, buttonPrimaryDimmed = DsDark.buttonPrimaryDimmed,
-        buttonInfoFill = DsDark.buttonInfoFill, buttonInfoHover = DsDark.buttonInfoHover,
-        error = DsDark.error, errorSecondary = DsDark.errorSecondary, errorTertiary = DsDark.errorTertiary,
-        success = DsDark.success, successSecondary = DsDark.successSecondary,
-        successTertiary = DsDark.successTertiary,
-        warnLabel = DsDark.warnLabel, warn = DsDark.warn, warnSecondary = DsDark.warnSecondary,
-        warnTertiary = DsDark.warnTertiary,
-        toastBg = DsDark.toastBg, tooltipBg = DsDark.tooltipBg,
-        userBubble = DsDark.userBubble, userBubbleHighlight = DsDark.userBubbleHighlight,
-        composerCard = DsDark.composerCard,
-        sidebar = DsDark.sidebar, sidebarNavActive = DsDark.sidebarNavActive,
-        sidebarNavAccent = DsDark.sidebarNavAccent, sidebarNavHover = DsDark.sidebarNavHover,
-        tipSurface = DsDark.tipSurface,
-        codeBlockBg = DsDark.codeBlockBg, codeBlockBanner = DsDark.codeBlockBanner,
-        inlineCode = DsDark.inlineCode, citation = DsDark.citation,
-        markdownTag = DsDark.markdownTag, overlayMask = DsDark.overlayMask,
-    )
 }
 
 /** The full DeepSeek palette as a CompositionLocal. */
