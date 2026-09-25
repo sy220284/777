@@ -331,6 +331,7 @@ class ChatInteractionPlannerTest {
             immediateConcern = "用户昨天提到的事",
             initiative = 68,
             dynamics = RelationshipDynamics(warmth = 70, trust = 64),
+            updatedAt = 1234L,
         )
         val payload = """
             {
@@ -361,6 +362,7 @@ class ChatInteractionPlannerTest {
         assertEquals(previous.immediateConcern, plan.state.immediateConcern)
         assertEquals(previous.initiative, plan.state.initiative)
         assertEquals(previous.dynamics, plan.state.dynamics)
+        assertEquals(previous.updatedAt, plan.state.updatedAt)
         assertTrue(plan.suggestions.isEmpty())
     }
 
