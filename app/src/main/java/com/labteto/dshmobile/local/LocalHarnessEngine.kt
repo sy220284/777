@@ -118,7 +118,10 @@ import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
 class LocalHarnessBusyException(message: String) : IllegalStateException(message)
-class LocalHarnessBlockedException(message: String) : IllegalStateException(message)
+class LocalHarnessBlockedException(
+    message: String,
+    val sessionId: String? = null,
+) : IllegalStateException(message)
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
@@ -499,6 +502,59 @@ class LocalHarnessEngine @Inject constructor(
                     sessionId = sessionId,
                     memoryTools = boundMemoryTools,
                     enabledOptionalTools = localEnabledOptionalTools,
+                )
+            },
+        )
+    }
+
+
+    /**
+     * Detached work runner for scheduled/webhook work.
+     *
+     * It owns a Work-mode session log but never swaps the UI's current session. Interactive
+     * approvals are deliberately unavailable: safe-global approvals may proceed, everything else
+     * is marked blocked so a background task cannot surface a work prompt inside Chat mode.
+     */
+    private fun automationSubagentRunner(
+        sessionId: String,
+        boundState: LocalHarnessState,
+        onApprovalBlocked: (String) -> Unit,
+    ): LocalSubagentRunner {
+        val boundEventLog = eventLogFor(sessionId)
+        val localEnabledOptionalTools = linkedSetOf<String>()
+        val boundMemoryTools = LocalMemoryTools(
+            memoryStore,
+            memoryManager,
+            state = { boundState },
+            sessionId = { sessionId },
+        )
+        return newSubagentRunner(
+            eventLogProvider = { boundEventLog },
+            contextSnapshotProvider = { query ->
+                contextComposer.compose(
+                    ContextRequest(
+                        query = query,
+                        mode = boundState.conversationMode,
+                        projectId = boundState.projectId,
+                        lineageId = boundState.lineageId,
+                        handoffSummary = boundState.handoffSummary,
+                    ),
+                )
+            },
+            schemasProvider = { allowMutation, allowVirtualScreen ->
+                val enabled = synchronized(localEnabledOptionalTools) {
+                    localEnabledOptionalTools.toSet()
+                }
+                subagentToolSchemas(allowMutation, allowVirtualScreen, enabled)
+            },
+            executeTool = { call, allowMutation ->
+                executeAutomationSubagentTool(
+                    call = call,
+                    allowMutation = allowMutation,
+                    sessionId = sessionId,
+                    memoryTools = boundMemoryTools,
+                    enabledOptionalTools = localEnabledOptionalTools,
+                    onApprovalBlocked = onApprovalBlocked,
                 )
             },
         )
@@ -1068,54 +1124,195 @@ class LocalHarnessEngine @Inject constructor(
     suspend fun runAutomationPrompt(
         text: String,
         timeoutMillis: Long = 5 * 60_000L,
-    ): String {
+    ): String = runAutomationWork(
+        text = text,
+        preferredSessionId = null,
+        timeoutMillis = timeoutMillis,
+    ).output
+
+    /**
+     * Execute automation in its own durable Work session without changing the visible Chat/Work
+     * surface. Recurring tasks can pass [preferredSessionId] so all runs remain in one work history.
+     */
+    suspend fun runAutomationWork(
+        text: String,
+        preferredSessionId: String? = null,
+        timeoutMillis: Long = 5 * 60_000L,
+    ): LocalAutomationRunResult {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
         withTimeout(15_000L) {
             while (_state.value.loading) delay(50)
         }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
-            throw LocalHarnessBusyException("当前处于聊天模式，工作型后台任务等待工作模式后重试")
-        }
-        if (isRunBusy()) throw LocalHarnessBusyException("本机 Harness 正在执行其他任务或切换会话")
 
-        val beforeCount = _state.value.messages.size
-        val job = queueTurn(prompt) ?: error("后台任务未能启动")
-        job.start()
-        com.labteto.dshmobile.automation.owningAutomationRun(job) {
-        try {
-            withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
-                while (!job.isCompleted) {
-                    val snapshot = _state.value
-                    if (snapshot.pendingApproval != null) {
-                        stop()
-                        job.join()
-                        throw LocalHarnessBlockedException("后台任务需要人工审批，已安全停止")
-                    }
-                    if (snapshot.pendingQuestion != null) {
-                        stop()
-                        job.join()
-                        throw LocalHarnessBlockedException("后台任务需要人工回答，已安全停止")
-                    }
-                    delay(100)
-                }
-                job.join()
+        val session = resolveAutomationWorkSession(preferredSessionId, prompt)
+        val sessionId = session.id
+        val boundState = automationBoundState(session)
+        val boundEventLog = eventLogFor(sessionId)
+        val userMessage = LocalHarnessMessage(
+            id = UUID.randomUUID().toString(),
+            role = "user",
+            content = prompt,
+            createdAt = System.currentTimeMillis(),
+        )
+        boundEventLog.append("user/message", buildJsonObject {
+            put("content", prompt)
+            put("automation", true)
+            put("transcript", encodeTranscriptMessages(listOf(userMessage)))
+        })
+
+        var blockedReason: String? = null
+        val runner = automationSubagentRunner(
+            sessionId = sessionId,
+            boundState = boundState,
+            onApprovalBlocked = { reason -> if (blockedReason == null) blockedReason = reason },
+        )
+
+        return try {
+            val result = withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
+                runner.runResult(
+                    task = prompt,
+                    inheritHistory = false,
+                    allowMutation = true,
+                    maxSteps = boundState.subagentMaxSteps,
+                )
             }
+            val output = result.requireCompletedOutput().ifBlank { "后台任务已完成" }
+
+            blockedReason?.let { reason ->
+                persistAutomationTranscript(
+                    session = session,
+                    messages = listOf(userMessage),
+                    finalRole = "system",
+                    finalContent = reason,
+                    eventLog = boundEventLog,
+                )
+                throw LocalHarnessBlockedException(reason, sessionId)
+            }
+
+            persistAutomationTranscript(
+                session = session,
+                messages = listOf(userMessage),
+                finalRole = "assistant",
+                finalContent = output,
+                eventLog = boundEventLog,
+            )
+            LocalAutomationRunResult(sessionId = sessionId, output = output)
+        } catch (blocked: LocalHarnessBlockedException) {
+            throw blocked
         } catch (timeout: TimeoutCancellationException) {
-            stop()
-            job.cancelAndJoin()
-            throw IllegalStateException("后台任务执行超时，已停止本轮任务", timeout)
+            val detail = "后台任务执行超时，已停止本轮任务"
+            persistAutomationTranscript(
+                session = session,
+                messages = listOf(userMessage),
+                finalRole = "system",
+                finalContent = detail,
+                eventLog = boundEventLog,
+            )
+            throw IllegalStateException(detail, timeout)
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (error: Exception) {
+            val detail = "后台任务失败：" + (error.message ?: error::class.java.simpleName)
+            persistAutomationTranscript(
+                session = session,
+                messages = listOf(userMessage),
+                finalRole = "system",
+                finalContent = detail,
+                eventLog = boundEventLog,
+            )
+            throw error
         }
-        }
+    }
 
-        val newMessages = _state.value.messages.drop(beforeCount)
-        _state.value.error?.let { error("后台任务失败：$it") }
-        return newMessages.lastOrNull { it.role == "assistant" }?.content
-            ?: newMessages.lastOrNull { it.role == "system" }?.content
-            ?: "后台任务已完成"
+    private fun resolveAutomationWorkSession(
+        preferredSessionId: String?,
+        prompt: String,
+    ): LocalHarnessSession {
+        preferredSessionId
+            ?.takeIf(String::isNotBlank)
+            ?.let(sessionRepository::read)
+            ?.takeIf { it.usageMode == LocalUsageMode.WORK }
+            ?.let { return it }
+
+        val now = System.currentTimeMillis()
+        val id = UUID.randomUUID().toString()
+        val session = LocalHarnessSession(
+            id = id,
+            title = prompt.lineSequence().firstOrNull()?.trim()?.take(36)
+                ?.takeIf(String::isNotBlank)
+                ?: "自动化任务",
+            updatedAt = now,
+            usageMode = LocalUsageMode.WORK,
+            conversationMode = LocalConversationMode.PROJECT,
+            lineageId = id,
+            projectId = LOCAL_PROJECT_ID,
+        )
+        sessionRepository.enqueue(session)
+        return session
+    }
+
+    private fun automationBoundState(session: LocalHarnessSession): LocalHarnessState {
+        val runtime = _state.value
+        return runtime.copy(
+            sessionId = session.id,
+            usageMode = LocalUsageMode.WORK,
+            personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+            galleryId = null,
+            galleryStoryId = null,
+            chatPersona = PersonaProfile(),
+            chatState = ChatCharacterState(),
+            replySuggestions = emptyList(),
+            conversationMode = session.conversationMode,
+            parentSessionId = session.parentSessionId,
+            lineageId = session.lineageId.ifBlank { session.id },
+            projectId = session.projectId ?: LOCAL_PROJECT_ID,
+            handoffSummary = session.handoffSummary,
+            messages = session.messages,
+            plan = session.plan,
+            todos = session.todos,
+            goal = session.goal,
+            planMode = false,
+            jobs = emptyList(),
+            queuedInputCount = 0,
+            running = false,
+            pendingApproval = null,
+            pendingQuestion = null,
+            error = null,
+        )
+    }
+
+    private fun persistAutomationTranscript(
+        session: LocalHarnessSession,
+        messages: List<LocalHarnessMessage>,
+        finalRole: String,
+        finalContent: String,
+        eventLog: LocalSessionEventLog,
+    ) {
+        val finalMessage = LocalHarnessMessage(
+            id = UUID.randomUUID().toString(),
+            role = finalRole,
+            content = finalContent.take(MAX_EVENT_CHARS),
+            createdAt = System.currentTimeMillis(),
+        )
+        val event = eventLog.append(
+            if (finalRole == "assistant") "assistant/message" else "system/message",
+            buildJsonObject {
+                put("automation", true)
+                put("content", finalMessage.content)
+                put("transcript", encodeTranscriptMessages(listOf(finalMessage)))
+            },
+        )
+        val latest = sessionRepository.read(session.id) ?: session
+        sessionRepository.enqueue(
+            latest.copy(
+                title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
+                updatedAt = System.currentTimeMillis(),
+                messages = latest.messages + messages + finalMessage,
+                transcriptProjectedThroughSequence = event.sequence,
+            ),
+        )
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
@@ -2601,6 +2798,137 @@ class LocalHarnessEngine @Inject constructor(
             toolFailureResult(canonical, error.code, error.message ?: "模型请求失败")
         } catch (error: Exception) {
             toolFailureResult(canonical, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
+        }
+    }
+
+    private suspend fun executeAutomationSubagentTool(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+        memoryTools: LocalMemoryTools,
+        enabledOptionalTools: MutableSet<String>,
+        onApprovalBlocked: (String) -> Unit,
+    ): AgentToolResult {
+        val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+        val normalized = if (
+            canonical.name in setOf("bash", "run_shell", "web_fetch") &&
+            canonical.arguments["run_in_background"]?.jsonPrimitive?.booleanOrNull == true
+        ) {
+            canonical.copy(
+                arguments = JsonObject(
+                    canonical.arguments + ("run_in_background" to JsonPrimitive(false)),
+                ),
+            )
+        } else {
+            canonical
+        }
+        val log = eventLogFor(sessionId)
+        log.append("tool/call", buildJsonObject {
+            put("id", normalized.id)
+            put("name", normalized.name)
+            put("arguments", normalized.arguments)
+            put("automation", true)
+        })
+        val result = try {
+            when (normalized.name) {
+                "capability_search" -> AgentToolResult(
+                    searchCapabilities(normalized.arguments.string("query"), enabledOptionalTools),
+                )
+                "memory_search", "memory_list" -> AgentToolResult(
+                    memoryTools.execute(normalized.name, normalized.arguments, allowMutation = false),
+                )
+                else -> executeAutomationRegistered(
+                    original = normalized,
+                    allowMutation = allowMutation,
+                    sessionId = sessionId,
+                    onApprovalBlocked = onApprovalBlocked,
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            toolFailureResult(
+                normalized,
+                "AUTOMATION_TOOL_ERROR",
+                error.message ?: error::class.java.simpleName,
+            )
+        }
+        log.append("tool/result", buildJsonObject {
+            put("id", normalized.id)
+            put("name", normalized.name)
+            put("content", result.content.take(MAX_EVENT_CHARS))
+            put("is_error", result.isError)
+            put("automation", true)
+        })
+        return result
+    }
+
+    private suspend fun executeAutomationRegistered(
+        original: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+        onApprovalBlocked: (String) -> Unit,
+    ): AgentToolResult {
+        val call = original.copy(name = LocalToolPolicy.canonical(original.name))
+        val registered = toolRegistry.get(call.name)
+            ?: return AgentToolResult(
+                content = "未知工具：${call.name}",
+                isError = true,
+                errorCode = "UNKNOWN_TOOL",
+                recoveryHint = "先使用 capability_search 或检查工具名称。",
+            )
+
+        val result = toolRegistry.execute(
+            name = call.name,
+            input = call.arguments,
+            rawArguments = call.rawArguments,
+            context = ToolContext(
+                sessionId = sessionId,
+                allowMutation = allowMutation,
+                attributes = mapOf("call_id" to call.id),
+                approval = { tool ->
+                    if (
+                        approvalPreferences.isSafeAutoApprovalEnabled() &&
+                        canAutoApprove(tool, call.arguments)
+                    ) {
+                        eventLogFor(sessionId).append("approval/auto", buildJsonObject {
+                            put("tool", call.name)
+                            put("access", tool.access.name.lowercase())
+                            put("mode", "automation-safe-global")
+                        })
+                        true
+                    } else {
+                        val reason = "后台任务需要人工审批：${tool.name}"
+                        onApprovalBlocked(reason)
+                        eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
+                            put("tool", call.name)
+                            put("access", tool.access.name.lowercase())
+                            put("mode", "automation-noninteractive")
+                        })
+                        false
+                    }
+                },
+            ),
+        )
+        return if (result.isError) {
+            AgentToolResult(
+                content = result.content,
+                isError = true,
+                errorCode = "TOOL_REPORTED_ERROR",
+                sideEffect = if (
+                    registered.access in setOf(
+                        ToolAccess.WORKSPACE_WRITE,
+                        ToolAccess.SESSION_WRITE,
+                        ToolAccess.PROCESS,
+                        ToolAccess.AGENT_CONTROL,
+                        ToolAccess.DEVICE,
+                        ToolAccess.PRIVILEGED,
+                    )
+                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
+                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。",
+            )
+        } else {
+            AgentToolResult(result.content)
         }
     }
 
