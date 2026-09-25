@@ -65,19 +65,30 @@ class CharacterLoreEngine @Inject constructor() {
     }
 
     private fun score(entry: PersonaLoreEntry, normalizedQuery: String, queryTerms: Set<String>): Int {
-        var score = entry.priority.coerceIn(0, 100) / 10
-        if (entry.alwaysOn) score += 1000
+        if (entry.alwaysOn) return 1_000 + entry.priority.coerceIn(0, 100)
+        var matched = false
+        var score = 0
         entry.keywords.forEach { keyword ->
             val normalized = normalize(keyword)
-            if (normalized.isNotBlank() && normalizedQuery.contains(normalized)) score += 80
+            if (normalized.isNotBlank() && normalizedQuery.contains(normalized)) {
+                matched = true
+                score += 80
+            }
         }
         entry.secondaryKeywords.forEach { keyword ->
             val normalized = normalize(keyword)
-            if (normalized.isNotBlank() && normalizedQuery.contains(normalized)) score += 35
+            if (normalized.isNotBlank() && normalizedQuery.contains(normalized)) {
+                matched = true
+                score += 35
+            }
         }
         val titleTerms = terms(entry.title)
-        score += queryTerms.count(titleTerms::contains) * 18
-        return score
+        val titleOverlap = queryTerms.count(titleTerms::contains)
+        if (titleOverlap > 0) {
+            matched = true
+            score += titleOverlap * 18
+        }
+        return if (matched) score + entry.priority.coerceIn(0, 100) / 10 else 0
     }
 
     private fun terms(text: String): Set<String> {
