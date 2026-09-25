@@ -956,10 +956,6 @@ private fun LocalChat(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val adaptiveChatBackground =
-        state.usageMode == LocalUsageMode.CHAT &&
-            backgroundState.hasImage &&
-            backgroundState.adaptiveContrast
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
