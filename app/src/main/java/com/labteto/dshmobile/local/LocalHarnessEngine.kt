@@ -111,6 +111,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -1735,10 +1736,14 @@ class LocalHarnessEngine @Inject constructor(
                             })
                         }
                 }
-                val context = listOf(chatContext.prompt, relationshipMemory, proactiveDirective)
+                val dynamicContext = listOf(chatContext.dynamicPrompt, relationshipMemory, proactiveDirective)
                     .filter(String::isNotBlank)
                     .joinToString("\n\n")
-                val requestMessages = withEphemeralContext(localHistory, context)
+                val requestMessages = withChatTurnContext(
+                    history = localHistory,
+                    stableContext = chatContext.stablePrompt,
+                    dynamicContext = dynamicContext,
+                )
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
 
                 boundEventLog.append("turn/start", buildJsonObject {
@@ -1760,7 +1765,7 @@ class LocalHarnessEngine @Inject constructor(
                         completeAutomationChat(
                             key = key,
                             snapshot = boundState,
-                            messages = withEphemeralContext(
+                            messages = chatGuardRewriteMessages(
                                 requestMessages,
                                 ChatStyleGuard.repairPrompt(candidate, violations),
                             ),
@@ -3062,7 +3067,7 @@ class LocalHarnessEngine @Inject constructor(
                 handoffSummary = snapshot.handoffSummary,
             )
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withEphemeralContext(baseHistory, prompt),
+                messages = withTailEphemeralContext(baseHistory, prompt),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
@@ -3083,7 +3088,7 @@ class LocalHarnessEngine @Inject constructor(
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
-                        messages = withEphemeralContext(
+                        messages = chatGuardRewriteMessages(
                             requestMessages,
                             ChatStyleGuard.repairPrompt(candidate, violations),
                         ),
@@ -3537,15 +3542,19 @@ class LocalHarnessEngine @Inject constructor(
             captureAutoMemoryDirective(input)
             val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input, snapshot.handoffSummary)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
-            val chatPrompt = listOf(chatContext.prompt, relationshipMemory)
+            val dynamicContext = listOf(chatContext.dynamicPrompt, relationshipMemory)
                 .filter(String::isNotBlank)
                 .joinToString("\n\n")
-            compactHistoryIfNeeded(extraTokens = estimateModelTokens(chatPrompt))
+            compactHistoryIfNeeded(
+                extraTokens = estimateModelTokens(chatContext.stablePrompt) +
+                    estimateModelTokens(dynamicContext),
+            )
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withEphemeralContext(
-                    if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
-                    chatPrompt,
+                messages = withChatTurnContext(
+                    history = if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                    stableContext = chatContext.stablePrompt,
+                    dynamicContext = dynamicContext,
                 ),
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
@@ -3574,7 +3583,7 @@ class LocalHarnessEngine @Inject constructor(
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
-                        messages = withEphemeralContext(
+                        messages = chatGuardRewriteMessages(
                             requestMessages,
                             ChatStyleGuard.repairPrompt(candidate, violations),
                         ),
@@ -5190,7 +5199,7 @@ class LocalHarnessEngine @Inject constructor(
                 completeWithRetry(
                     key = key,
                     snapshot = snapshot,
-                    messages = withEphemeralContext(
+                    messages = chatGuardRewriteMessages(
                         messages,
                         ChatStyleGuard.repairPrompt(candidate, violations),
                     ),
@@ -5223,21 +5232,32 @@ class LocalHarnessEngine @Inject constructor(
     ): LocalModelReply {
         val tools = toolsOverride ?: modelToolSchemas()
         val logMessages = redactModelImages(messages)
+        val contextChars = logMessages.sumOf { it.toString().length }
+        val toolNames = buildJsonArray {
+            tools.forEach { element ->
+                val function = (element as? JsonObject)?.get("function") as? JsonObject
+                function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(JsonPrimitive(name)) }
+            }
+        }
         eventLog.append("request/header", buildJsonObject {
             put("model", snapshot.model)
             put("base_url", snapshot.baseUrl)
             put("step", step)
             put("message_count", logMessages.size)
-            put("context_chars", logMessages.sumOf { it.toString().length })
-            put("tools", tools)
+            put("context_chars", contextChars)
+            put("tool_count", tools.size)
+            put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
         })
         eventLog.append("request/context", buildJsonObject {
             put("step", step)
             put("model", snapshot.model)
-            put("messages", JsonArray(logMessages))
-            put("tools", tools)
+            put("message_count", logMessages.size)
+            put("context_chars", contextChars)
+            put("tool_count", tools.size)
+            put("tool_names", toolNames)
         })
+        var failureContextLogged = false
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -5249,6 +5269,17 @@ class LocalHarnessEngine @Inject constructor(
                         _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
                     }
                     is AgentRequestEvent.AttemptFailed -> {
+                        if (!failureContextLogged) {
+                            runCatching {
+                                eventLog.append("request/context-full", buildJsonObject {
+                                    put("step", step)
+                                    put("model", snapshot.model)
+                                    put("messages", JsonArray(logMessages))
+                                    put("tools", tools)
+                                })
+                            }
+                            failureContextLogged = true
+                        }
                         eventLog.append("request/error", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
@@ -5477,6 +5508,81 @@ class LocalHarnessEngine @Inject constructor(
         结果用清晰中文，完成后复核关键结果。
         ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
     """.trimIndent()
+
+    private fun withChatTurnContext(
+        history: List<JsonObject>,
+        stableContext: String,
+        dynamicContext: String,
+    ): List<JsonObject> {
+        if (stableContext.isBlank() && dynamicContext.isBlank()) return history
+
+        val dynamicReserve = minOf(CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
+        val stableBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
+        val stable = stableContext.take(stableBudget)
+        val dynamicBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - stable.length).coerceAtLeast(0)
+        val dynamic = dynamicContext.take(dynamicBudget)
+        val result = history.toMutableList()
+
+        if (stable.isNotBlank()) {
+            val stableMessage = buildJsonObject {
+                put("role", "system")
+                put("content", stable)
+            }
+            val stableIndex = if (
+                result.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+            ) 1 else 0
+            result.add(stableIndex, stableMessage)
+        }
+        if (dynamic.isNotBlank()) {
+            val dynamicMessage = buildJsonObject {
+                put("role", "system")
+                put("content", dynamic)
+            }
+            val currentUserIndex = result.lastIndex.takeIf { index ->
+                index >= 0 &&
+                    result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
+            } ?: -1
+            result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, dynamicMessage)
+        }
+        return result
+    }
+
+    private fun withTailEphemeralContext(
+        history: List<JsonObject>,
+        context: String,
+    ): List<JsonObject> {
+        if (context.isBlank()) return history
+        val insertion = buildJsonObject {
+            put("role", "system")
+            put("content", context.take(MAX_EPHEMERAL_CONTEXT_CHARS))
+        }
+        val result = history.toMutableList()
+        val currentUserIndex = result.lastIndex.takeIf { index ->
+            index >= 0 &&
+                result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
+        } ?: -1
+        result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, insertion)
+        return result
+    }
+
+    private fun chatGuardRewriteMessages(
+        messages: List<JsonObject>,
+        repairPrompt: String,
+    ): List<JsonObject> {
+        if (messages.isEmpty()) return withTailEphemeralContext(emptyList(), repairPrompt)
+        val selected = mutableListOf<JsonObject>()
+        selected += messages.first()
+        if (
+            messages.size > 1 &&
+            messages[1]["role"]?.jsonPrimitive?.contentOrNull == "system"
+        ) {
+            selected += messages[1]
+        }
+        messages.takeLast(CHAT_GUARD_REWRITE_TAIL_MESSAGES).forEach { message ->
+            if (message !in selected) selected += message
+        }
+        return withTailEphemeralContext(selected, repairPrompt)
+    }
 
     private fun withEphemeralContext(
         history: List<JsonObject>,
@@ -6030,6 +6136,8 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_HANDOFF_CHARS = 3_500
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
+        const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
+        const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
