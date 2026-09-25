@@ -317,6 +317,7 @@ class LocalHarnessViewModel @Inject constructor(
             _gallery.value = galleryStore.list()
         }
         deleteManagedPortrait(portraitPath)
+        engine.removeGroupChatMemberByGalleryId(id)
         engine.clearChatGalleryBinding(expectedGalleryId = id)
     }
 
