@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Tune
@@ -81,6 +83,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -240,6 +244,7 @@ fun LocalHarnessScreen(
                 onUsageModeChange = viewModel::switchUsageMode,
                 onConfigureChatPersona = viewModel::configureChatPersona,
                 onAutoFillChatPersona = viewModel::autoFillChatPersona,
+                onSelectChatDirection = viewModel::selectChatDirection,
                 onPlanModeChange = viewModel::setPlanMode,
                 onApprove = viewModel::approve,
                 onDeny = viewModel::deny,
@@ -316,8 +321,10 @@ private fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<String>() }
+    val searchFocusRequester = remember { FocusRequester() }
     val visibleSessions = remember(sessions, usageMode) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
             .sortedByDescending(LocalSessionSummary::updatedAt)
@@ -328,63 +335,142 @@ private fun LocalModeDrawer(
             it.title.contains(query, ignoreCase = true)
         }
     }
+
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) searchFocusRequester.requestFocus()
+    }
+
     ModalDrawerSheet(
         drawerContainerColor = colors.sidebar,
         modifier = Modifier.fillMaxHeight(),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
-            LazyColumn(
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.large),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                item(key = "drawer-header") {
-                    Row(
-                        modifier = Modifier.padding(bottom = DsSpacing.medium),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        AppBrandIcon(Modifier.size(44.dp))
-                        Spacer(Modifier.size(DsSpacing.medium))
-                        Text(stringResource(R.string.app_name), style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
-                        DsIconButton(
-                            icon = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.chatlist_new_session),
-                            onClick = onNewSession,
-                            tint = colors.labelPrimary,
-                        )
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppBrandIcon(Modifier.size(44.dp))
+                    Spacer(Modifier.size(DsSpacing.medium))
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = DsType.large20,
+                        color = colors.labelPrimary,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    DsIconButton(
+                        icon = Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.chatlist_search_hint),
+                        onClick = {
+                            searchOpen = !searchOpen
+                            if (!searchOpen) historyQuery = ""
+                        },
+                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
+                    )
+                    DsIconButton(
+                        icon = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.chatlist_new_session),
+                        onClick = onNewSession,
+                        tint = colors.labelPrimary,
+                    )
                 }
-                item(key = "drawer-search") {
+
+                if (searchOpen) {
                     OutlinedTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.medium),
-                        placeholder = { Text("搜索会话") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(searchFocusRequester)
+                            .padding(bottom = DsSpacing.small),
+                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = colors.labelTertiary,
+                            )
+                        },
                         singleLine = true,
                         shape = DsShapes.block,
                     )
                 }
-                item(key = "drawer-sessions-title") {
-                    DrawerSectionTitle("会话")
-                }
+
                 if (usageMode == LocalUsageMode.CHAT) {
-                    item(key = "drawer-persona-gallery") {
-                        DsCategoryRow(
-                            icon = Icons.Outlined.Image,
-                            title = "人设图集",
-                            subtitle = "保存角色和故事 · 已收录 $galleryCount 个",
-                            onClick = onOpenPersonaGallery,
-                        )
-                    }
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Image,
+                        title = "人设图集",
+                        trailing = galleryCount.toString(),
+                        onClick = onOpenPersonaGallery,
+                    )
+                } else {
+                    DrawerPrimaryAction(
+                        icon = FeatherIcons.FileText,
+                        title = stringResource(R.string.chatlist_workspace_files),
+                        onClick = onWorkspaceFiles,
+                    )
                 }
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.QrCodeScanner,
+                    title = stringResource(R.string.local_remote_control),
+                    onClick = onRemote,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.tasks_title),
+                    onClick = onTasks,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.Extension,
+                    title = stringResource(R.string.tools_title),
+                    onClick = onTools,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.Settings,
+                    title = stringResource(R.string.settings_title),
+                    onClick = onSettings,
+                )
+                DrawerPrimaryAction(
+                    icon = Icons.Outlined.CloudDownload,
+                    title = stringResource(R.string.settings_update_check),
+                    onClick = onCheckUpdate,
+                )
+                updateStatus?.let { status ->
+                    Text(
+                        status,
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 48.dp, end = DsSpacing.small),
+                    )
+                }
+
+                DrawerSectionTitle(stringResource(R.string.chatlist_title))
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium),
+                contentPadding = PaddingValues(bottom = DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 if (visibleSessions.isNotEmpty() && filteredSessions.isEmpty()) {
                     item(key = "drawer-no-sessions") {
                         Text(
-                            "没有匹配的会话",
+                            stringResource(R.string.chatlist_search_empty),
                             style = DsType.small13,
                             color = colors.labelTertiary,
-                            modifier = Modifier.padding(horizontal = DsSpacing.small),
+                            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
                         )
                     }
                 }
@@ -407,65 +493,11 @@ private fun LocalModeDrawer(
                         onDelete = { onDeleteSessions(setOf(session.id)) },
                     )
                 }
-                item(key = "drawer-tools-title") {
-                    DrawerSectionTitle("功能")
-                }
-                item(key = "drawer-tools") {
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            subtitle = stringResource(R.string.local_remote_hint),
-                            onClick = onRemote,
-                        )
-                        if (usageMode == LocalUsageMode.WORK) {
-                            DsCategoryRow(
-                                icon = FeatherIcons.FileText,
-                                title = stringResource(R.string.chatlist_workspace_files),
-                                subtitle = stringResource(R.string.local_files_workspace_subtitle),
-                                onClick = onWorkspaceFiles,
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Schedule,
-                                title = "定时任务",
-                                subtitle = "计划任务、周期任务和执行结果",
-                                onClick = onTasks,
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Extension,
-                                title = "工具与连接",
-                                subtitle = "外部工具服务与当前扩展",
-                                onClick = onTools,
-                            )
-                        }
-                        DsCategoryRow(
-                            icon = Icons.Outlined.Settings,
-                            title = "设置",
-                            subtitle = "模型、个性化、权限与高级选项",
-                            onClick = onSettings,
-                        )
-                        DsCategoryRow(
-                            icon = Icons.Outlined.CloudDownload,
-                            title = stringResource(R.string.settings_update_check),
-                            subtitle = stringResource(R.string.settings_update_check_hint),
-                            onClick = onCheckUpdate,
-                        )
-                    }
-                }
-                if (updateStatus != null) {
-                    item(key = "drawer-update-status") {
-                        Text(
-                            updateStatus,
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                        )
-                    }
-                }
             }
             LocalUsageFooter(usage)
         }
     }
+
     if (selectionOpen) {
         var position by remember { mutableStateOf(IntOffset(24, 160)) }
         Popup(
@@ -508,11 +540,57 @@ private fun LocalModeDrawer(
                     DsIconButton(
                         icon = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.common_close),
-                        onClick = { selectionOpen = false; selectedIds.clear() },
+                        onClick = {
+                            selectionOpen = false
+                            selectedIds.clear()
+                        },
                         tint = colors.labelSecondary,
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DrawerPrimaryAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit,
+    trailing: String? = null,
+) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
+            .clip(DsShapes.row)
+            .clickable(onClick = onClick)
+            .padding(horizontal = DsSpacing.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colors.labelSecondary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(DsSpacing.medium))
+        Text(
+            title,
+            style = DsType.base16,
+            color = colors.labelPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        trailing?.let {
+            Text(
+                it,
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                modifier = Modifier.padding(start = DsSpacing.small),
+            )
         }
     }
 }
@@ -804,6 +882,7 @@ private fun LocalChat(
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    onSelectChatDirection: (String?) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
     onDeny: (String) -> Unit,
@@ -825,8 +904,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgBase,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.50f,
-            maxAlpha = 0.86f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.rootSurface()
@@ -835,8 +914,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgModulePlatform,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.58f,
-            maxAlpha = 0.90f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgModulePlatform
@@ -845,8 +924,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.bgBase,
             region = BackgroundRegion.MIDDLE,
-            minAlpha = 0.58f,
-            maxAlpha = 0.86f,
+            minAlpha = 0.90f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgModulePlatform
@@ -855,8 +934,8 @@ private fun LocalChat(
         backgroundState.surfaceColor(
             base = colors.composerCard,
             region = BackgroundRegion.BOTTOM,
-            minAlpha = 0.84f,
-            maxAlpha = 0.97f,
+            minAlpha = 0.92f,
+            maxAlpha = 0.98f,
         )
     } else {
         colors.composerCard
@@ -882,8 +961,6 @@ private fun LocalChat(
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
-    var suggestionInitialized by remember(state.sessionId) { mutableStateOf(false) }
-    var lastSuggestionKey by remember(state.sessionId) { mutableStateOf("") }
     var showExecutionConsole by rememberSaveable { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
@@ -891,27 +968,7 @@ private fun LocalChat(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
-    val suggestionKey = remember(state.replySuggestions) {
-        state.replySuggestions.joinToString("|") { suggestion ->
-            suggestion.label + "\u0000" + suggestion.text
-        }
-    }
-
-    LaunchedEffect(suggestionKey, state.usageMode) {
-        if (state.usageMode != LocalUsageMode.CHAT) {
-            showReplySuggestions = false
-            return@LaunchedEffect
-        }
-        if (!suggestionInitialized) {
-            suggestionInitialized = true
-            lastSuggestionKey = suggestionKey
-        } else if (suggestionKey.isBlank()) {
-            lastSuggestionKey = ""
-        } else if (suggestionKey != lastSuggestionKey) {
-            lastSuggestionKey = suggestionKey
-            showReplySuggestions = true
-        }
-    }
+    LaunchedEffect(state.sessionId, state.usageMode) { showReplySuggestions = false }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
@@ -1248,9 +1305,30 @@ private fun LocalChat(
             shadowElevation = if (adaptiveChatBackground) 2.dp else 1.dp,
         ) {
             Column(
-                Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                if (state.usageMode == LocalUsageMode.CHAT) {
+                    state.chatState.narrativeDirection?.let { selected ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.local_story_direction_selected, selected.label),
+                                style = DsType.small13Strong,
+                                color = colors.labelSecondary,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_story_direction_clear),
+                                onClick = { onSelectChatDirection(null) },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                                enabled = !state.running,
+                            )
+                        }
+                    }
+                }
                 if (attachments.isNotEmpty()) {
                     attachments.forEachIndexed { index, attachment ->
                         ImportedAttachmentRow(
@@ -1308,7 +1386,7 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
-                        state.replySuggestions.isNotEmpty()
+                        state.replySuggestions.any { it.direction.isNotBlank() }
                     ) {
                         DsButton(
                             text = stringResource(R.string.local_reply_suggestions_open),
@@ -1408,21 +1486,39 @@ private fun LocalChat(
             onDismiss = { showPersonaEditor = false },
         )
     }
-    if (showReplySuggestions && state.replySuggestions.isNotEmpty()) {
+    if (showReplySuggestions && state.usageMode == LocalUsageMode.CHAT &&
+        state.replySuggestions.any { it.direction.isNotBlank() }) {
         DsBottomSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
         ) {
-            state.replySuggestions.forEach { suggestion ->
-                DsButton(
-                    text = suggestion.label + " · " + suggestion.text,
+            Text(
+                stringResource(R.string.local_story_direction_hint),
+                style = DsType.small13,
+                color = colors.labelSecondary,
+            )
+            state.replySuggestions.filter { it.direction.isNotBlank() }.forEach { suggestion ->
+                val selected = state.chatState.narrativeDirection?.guidance == suggestion.direction
+                Surface(
                     onClick = {
-                        drafts[state.sessionId] = suggestion.text
+                        onSelectChatDirection(suggestion.direction)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Outline,
-                )
+                    enabled = !state.running,
+                    shape = DsShapes.row,
+                    color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                    border = BorderStroke(1.dp, if (selected) colors.labelSecondary else colors.borderL2),
+                ) {
+                    Column(
+                        Modifier.heightIn(min = DsSpacing.touchTarget)
+                            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        Text(suggestion.label, style = DsType.std14Strong, color = colors.labelPrimary)
+                        Text(suggestion.impact, style = DsType.small13, color = colors.labelSecondary)
+                    }
+                }
             }
         }
     }
@@ -1526,8 +1622,8 @@ private fun LocalUsageModePill(
         backgroundState.surfaceColor(
             base = colors.bgModulePlatform,
             region = BackgroundRegion.TOP,
-            minAlpha = 0.62f,
-            maxAlpha = 0.92f,
+            minAlpha = 0.88f,
+            maxAlpha = 0.97f,
         )
     } else {
         colors.bgLayer1
@@ -1550,17 +1646,17 @@ private fun LocalUsageModePill(
                 val active = selected == mode
                 Box(
                     modifier = Modifier
-                        .heightIn(min = 34.dp)
+                        .heightIn(min = DsSpacing.touchTarget)
                         .clip(DsShapes.pillFull)
-                        .background(if (active) colors.accent else Color.Transparent)
+                        .background(if (active) colors.labelPrimary else Color.Transparent)
                         .clickable(enabled = enabled) { onSelect(mode) }
-                        .padding(horizontal = 22.dp),
+                        .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         stringResource(labelRes),
                         style = DsType.small13Strong,
-                        color = if (active) colors.onAccent else colors.labelSecondary,
+                        color = if (active) colors.bgBase else colors.labelSecondary,
                     )
                 }
             }
@@ -1764,8 +1860,8 @@ private fun LocalMessageRow(
                         backgroundState.surfaceColor(
                             base = colors.bgBase,
                             region = BackgroundRegion.MIDDLE,
-                            minAlpha = 0.28f,
-                            maxAlpha = 0.70f,
+                            minAlpha = 0.90f,
+                            maxAlpha = 0.97f,
                         ),
                         RoundedCornerShape(18.dp),
                     )
