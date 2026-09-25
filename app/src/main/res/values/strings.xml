@@ -545,7 +545,7 @@
     <string name="chat_view_mode">Conversation view</string>
     <string name="chat_view_concise">Concise</string>
     <string name="chat_view_full">Full</string>
-    <string name="tasks_title">Scheduled tasks</string>
+    <string name="tasks_title">Automation</string>
     <string name="tasks_subtitle">Scheduled, recurring, and recent background work</string>
     <string name="tasks_refresh">Refresh tasks</string>
     <string name="tasks_empty_title">No background tasks</string>
@@ -559,8 +559,8 @@
     <string name="tasks_next_run">Next run: %1$s</string>
     <string name="tasks_last_result">Latest result: %1$s</string>
     <string name="tasks_last_status">Latest status: %1$s</string>
-    <string name="tools_title">Tools &amp; connections</string>
-    <string name="tools_subtitle">Manage external tool services and available capabilities</string>
+    <string name="tools_title">Capability center</string>
+    <string name="tools_subtitle">See what the work mode can do and manage external connections</string>
     <string name="tools_refresh">Refresh tools</string>
     <string name="tools_external_services">External tool services</string>
     <string name="tools_no_services">No connected services</string>
@@ -897,5 +897,34 @@
     <string name="persona_gallery_observed_value">Observed in dialogue: %1$s</string>
     <string name="persona_gallery_suggestions_title">Can be added to the fixed persona</string>
     <string name="persona_gallery_evidence">Evidence: %1$s</string>
+
+
+    <string name="local_run_center">Run center</string>
+    <string name="local_work_history_title">Recent tasks</string>
+    <string name="local_run_current_goal">Current goal</string>
+    <string name="local_run_plan">Plan</string>
+    <string name="local_run_tasks_progress">Tasks · %1$d/%2$d</string>
+    <string name="local_run_background">Background tasks</string>
+    <string name="local_run_resources">Resources</string>
+    <string name="tasks_new">New automation</string>
+    <string name="tasks_prompt_label">Task to run</string>
+    <string name="tasks_prompt_hint">For example: summarize today’s project changes</string>
+    <string name="tasks_delay_minutes">Run in (minutes)</string>
+    <string name="tasks_repeat_interval">Repeat interval</string>
+    <string name="tasks_repeat_hint">Leave blank for one-time; recurring tasks require at least 15 minutes</string>
+    <string name="tasks_create">Create</string>
+    <string name="tasks_create_invalid">Enter a task; recurring intervals must be at least 15 minutes.</string>
+    <string name="tools_external_services_hint">Connect HTTP tool servers only when needed</string>
+    <string name="tools_capability_group">Capabilities</string>
+    <string name="tools_connection_group">Connections</string>
+    <string name="tools_capability_terminal">Terminal &amp; runtime</string>
+    <string name="tools_capability_code">Code intelligence</string>
+    <string name="tools_capability_device">Android device control</string>
+    <string name="tools_capability_vision">Vision</string>
+    <string name="tools_capability_automation">Automation &amp; triggers</string>
+    <string name="tools_capability_available">Available</string>
+    <string name="tools_capability_unavailable">Not loaded</string>
+    <string name="panel_artifacts_empty">No delivered artifacts yet</string>
+    <string name="panel_involved_files_empty">No files involved in this task yet</string>
 
 </resources>
