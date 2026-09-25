@@ -58,7 +58,7 @@ class CharacterLoreEngine @Inject constructor() {
             appendLine("【本轮相关世界信息】")
             appendLine("只把下面内容当作角色已知的背景资料；没有激活的条目不要自行补成已知事实。")
             active.forEach { entry ->
-                if (entry.title.isNotBlank()) appendLine("【\${entry.title}】")
+                if (entry.title.isNotBlank()) appendLine("【${entry.title}】")
                 appendLine(entry.content)
             }
         }.trim()
