@@ -120,6 +120,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.chatBranchingEligible
 import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
+import com.labteto.dshmobile.local.groupMessageVisibleContent
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
@@ -2522,7 +2523,8 @@ private fun LocalMessageRow(
                         )
                     }
                 }
-                MarkdownText(message.content)
+                val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
+                MarkdownText(visibleContent)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -2538,7 +2540,7 @@ private fun LocalMessageRow(
                     DsIconButton(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.chat_copy_answer),
-                        onClick = { clipboard.setText(AnnotatedString(message.content)) },
+                        onClick = { clipboard.setText(AnnotatedString(visibleContent)) },
                         tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
                     if (canRegenerate) DsIconButton(
