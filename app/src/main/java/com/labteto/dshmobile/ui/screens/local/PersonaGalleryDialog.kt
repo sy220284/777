@@ -167,6 +167,9 @@ internal fun PersonaGalleryDialog(
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    val hasLocalStoryEdits = selectedStory?.let { story ->
+        notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
+    } == true
     val selectedSuggestionKeys = remember(selectedId, selectedStoryId) { mutableStateListOf<String>() }
 
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
@@ -180,6 +183,7 @@ internal fun PersonaGalleryDialog(
     val storyRenamedText = stringResource(R.string.persona_gallery_story_renamed)
     val mergeDoneText = stringResource(R.string.persona_gallery_merge_done)
     val archiveDeletedText = stringResource(R.string.persona_gallery_archive_deleted)
+    val saveEditsBeforeSwitchText = stringResource(R.string.persona_gallery_save_edits_before_switch)
 
     LaunchedEffect(selectedId, selected?.stories, currentGalleryId, currentGalleryStoryId) {
         val entry = selected ?: return@LaunchedEffect
@@ -377,9 +381,13 @@ internal fun PersonaGalleryDialog(
                                 story.id == currentGalleryStoryId &&
                                 currentHasUnsavedChanges,
                             onClick = {
-                                selectedStoryId = story.id
-                                error = null
-                                notice = null
+                                if (hasLocalStoryEdits && story.id != selectedStoryId) {
+                                    error = saveEditsBeforeSwitchText
+                                } else {
+                                    selectedStoryId = story.id
+                                    error = null
+                                    notice = null
+                                }
                             },
                         )
                     }
@@ -412,14 +420,14 @@ internal fun PersonaGalleryDialog(
                     text = stringResource(R.string.persona_gallery_continue_story),
                     onClick = { onStart(selected.id, story.id, false) },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy && notes == story.notes && !editingStoryTitle,
+                    enabled = canSave && !busy && !hasLocalStoryEdits,
                 )
             }
             DsButton(
                 text = stringResource(R.string.persona_gallery_start_fresh_story),
                 onClick = { onStart(selected.id, null, true) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy,
+                enabled = canSave && !busy && !hasLocalStoryEdits,
                 variant = DsButtonVariant.Outline,
             )
 
@@ -679,11 +687,15 @@ internal fun PersonaGalleryDialog(
             DsButton(
                 text = stringResource(R.string.persona_gallery_back),
                 onClick = {
-                    selectedId = null
-                    selectedStoryId = null
-                    deletingCharacter = false
-                    error = null
-                    notice = null
+                    if (hasLocalStoryEdits) {
+                        error = saveEditsBeforeSwitchText
+                    } else {
+                        selectedId = null
+                        selectedStoryId = null
+                        deletingCharacter = false
+                        error = null
+                        notice = null
+                    }
                 },
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
