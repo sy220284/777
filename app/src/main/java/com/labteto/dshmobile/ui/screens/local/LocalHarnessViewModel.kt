@@ -363,6 +363,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
     fun createGroupChatSession() = engine.createGroupChatSession()
+    fun openGroupChatMode() = engine.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
     fun configureGroupChatMembers(ids: List<String>): Boolean {
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
         val entries = ids.distinct().mapNotNull(entriesById::get)
