@@ -200,7 +200,7 @@ private fun migrateLegacyEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry 
     val migratedStory = if (hasLegacyStory) {
         PersonaGalleryStory(
             id = "story-${UUID.randomUUID()}",
-            title = "主线故事",
+            title = defaultStoryTitle(entry.history),
             notes = entry.storyNotes,
             history = entry.history.filter { it.role == "user" || it.role == "assistant" },
             chatState = entry.chatState,
@@ -317,6 +317,15 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.signaturePhrases.joinToString("\u0000"),
     persona.corrections.joinToString("\u0000"),
 ).joinToString("\u0001") { normalizePersonaText(it) }
+
+private fun defaultStoryTitle(history: List<LocalHarnessMessage>): String =
+    history.firstOrNull { it.role == "user" && it.content.isNotBlank() }
+        ?.content
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.trim()
+        ?.take(28)
+        .orEmpty()
 
 private fun mergeEvidence(
     base: List<RelationshipEvidence>,
@@ -469,7 +478,7 @@ class ChatPersonaGalleryStore internal constructor(
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
-                ?: "故事 ${baseEntry.stories.size + 1}",
+                ?: defaultStoryTitle(incomingHistory),
             notes = notes.trim().take(4_000),
             history = incomingHistory,
             chatState = chatState,
