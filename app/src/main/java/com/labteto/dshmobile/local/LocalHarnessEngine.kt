@@ -998,6 +998,7 @@ class LocalHarnessEngine @Inject constructor(
         if (
             content.isEmpty() ||
             state.usageMode != LocalUsageMode.CHAT ||
+            state.groupChat.enabled ||
             !state.configured ||
             state.loading ||
             sessionTransitioning ||
@@ -1071,6 +1072,7 @@ class LocalHarnessEngine @Inject constructor(
         val state = _state.value
         if (
             state.usageMode != LocalUsageMode.CHAT ||
+            state.groupChat.enabled ||
             state.loading ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
@@ -1110,6 +1112,7 @@ class LocalHarnessEngine @Inject constructor(
     fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
         if (!state.configured || state.loading ||
+            state.groupChat.enabled ||
             sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
         ) return@synchronized false
         val last = state.messages.lastOrNull() ?: return@synchronized false
@@ -1280,7 +1283,11 @@ class LocalHarnessEngine @Inject constructor(
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
         })
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
-        if (before.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(before.messages)) {
+        if (
+            before.usageMode == LocalUsageMode.CHAT &&
+            !before.groupChat.enabled &&
+            chatBranchingEligible(before.messages)
+        ) {
             val synced = syncChatBranchState(
                 current = before.chatBranches,
                 activeMessages = before.messages,
@@ -2133,7 +2140,13 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runTurn(input: String, memoryInput: String = input) {
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+        val snapshot = _state.value
+        if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.groupChat.enabled) {
+            captureGroupPersonaCorrections(memoryInput)
+            runGroupChatTurn(input)
+            return
+        }
+        if (snapshot.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
         }
@@ -4044,11 +4057,15 @@ class LocalHarnessEngine @Inject constructor(
         role: String,
         content: String,
         toolName: String? = null,
+        speakerId: String? = null,
+        speakerName: String? = null,
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
         content = if (role == "tool") pruneToolResult(content) else content,
         toolName = toolName,
+        speakerId = speakerId,
+        speakerName = speakerName,
         createdAt = System.currentTimeMillis(),
     )
 
