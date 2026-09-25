@@ -56,17 +56,17 @@ class LocalGroupChatTest {
     }
 
     @Test
-    fun ordinaryMessageKeepsAllCharactersEligibleInGivenPriorityOrder() {
+    fun ordinaryMessageUsesOneRotatedPrimarySpeaker() {
         val responders = groupChatResponders(
-            input = "你们今天怎么都这么安静",
+            input = "今天怎么这么安静",
             members = listOf(zhao, ayaka, kafka),
         )
 
-        assertEquals(listOf("zhao", "ayaka", "kafka"), responders.map { it.galleryId })
+        assertEquals(listOf("zhao"), responders.map { it.galleryId })
     }
 
     @Test
-    fun ordinaryTurnCapsNaturalRespondersToAvoidEveryoneTalkingAtOnce() {
+    fun collectiveMessageAllowsTwoNaturalRespondersWithoutQueueingEveryone() {
         val extra = LocalGroupChatMember(
             galleryId = "extra",
             personaId = "extra",
@@ -79,7 +79,37 @@ class LocalGroupChatTest {
         )
 
         assertEquals(MAX_GROUP_CHAT_RESPONDERS_PER_TURN, responders.size)
-        assertEquals(listOf("ayaka", "kafka", "zhao"), responders.map { it.galleryId })
+        assertEquals(listOf("ayaka", "kafka"), responders.map { it.galleryId })
+    }
+
+    @Test
+    fun referentialNameMentionDoesNotForceThatCharacterToReply() {
+        val responders = groupChatResponders(
+            input = "刚才卡芙卡说得那句挺有意思",
+            members = listOf(ayaka, kafka, zhao),
+        )
+
+        assertEquals(listOf("ayaka"), responders.map { it.galleryId })
+    }
+
+    @Test
+    fun naturalFindPhraseRoutesOnlyToRequestedCharacter() {
+        val responders = groupChatResponders(
+            input = "我想找卡芙卡聊聊",
+            members = listOf(ayaka, kafka, zhao),
+        )
+
+        assertEquals(listOf("kafka"), responders.map { it.galleryId })
+    }
+
+    @Test
+    fun characterNameAloneRoutesOnlyToThatCharacter() {
+        val responders = groupChatResponders(
+            input = "赵二",
+            members = listOf(ayaka, kafka, zhao),
+        )
+
+        assertEquals(listOf("zhao"), responders.map { it.galleryId })
     }
 
     @Test
