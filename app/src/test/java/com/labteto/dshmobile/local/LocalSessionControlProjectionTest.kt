@@ -54,6 +54,35 @@ class LocalSessionControlProjectionTest {
     }
 
     @Test
+    fun replaysLatestChatBranchState() {
+        val user = LocalHarnessMessage("u1", "user", "原消息", createdAt = 1L)
+        val oldState = LocalChatBranchState()
+        val newState = upsertChatBranchNode(
+            oldState,
+            LocalChatBranchNode(message = user),
+            select = true,
+        )
+        val snapshot = LocalHarnessSession(
+            id = "branch",
+            chatBranches = oldState,
+            controlProjectedThroughSequence = 3L,
+        )
+        val branchEvent = event(
+            4L,
+            "chat/branch-state",
+            encodeChatBranchStateEvent(newState),
+        )
+
+        val projected = projectSessionControlTail(
+            snapshot = snapshot,
+            events = listOf(branchEvent),
+            sequenceExclusive = 3L,
+        )
+
+        assertEquals(newState, projected.chatBranches)
+    }
+
+    @Test
     fun legacyPersistedSnapshotStartsFromCurrentTailInsteadOfReplayingIncompleteHistory() {
         val legacy = LocalHarnessSession(id = "legacy", planMode = false, controlProjectedThroughSequence = null)
 
