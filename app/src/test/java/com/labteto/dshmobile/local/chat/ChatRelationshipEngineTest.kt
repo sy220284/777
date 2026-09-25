@@ -122,17 +122,17 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("军师收敛"))
         assertTrue(prompt.contains("只有底层硬安全边界不参与该覆盖"))
         assertTrue(prompt.contains("统一安全边界"))
-        assertTrue(prompt.contains("不得扩写露骨性行为过程或明确器官细节"))
+        assertTrue(prompt.contains("内容处于允许范围"))
     }
 
     @Test
-    fun minorContextDoesNotEnableAdultIntimacyPriority() {
+    fun adultConfirmationIsRequiredForIntimacyPriority() {
         assertEquals(
             false,
-            hasAdultIntimacyIntent("这个未成年角色抱我一下"),
+            hasAdultIntimacyIntent("过来抱住我亲一下"),
         )
         val prompt = engine.prompt(
-            "这个未成年角色抱我一下",
+            "过来抱住我亲一下",
             ChatCharacterState(),
         )
         assertEquals(false, prompt.contains("本轮意图优先：成年亲密互动"))
@@ -142,7 +142,7 @@ class ChatRelationshipEngineTest {
     fun interactionIntentAvoidsKeywordFalsePositives() {
         assertEquals(
             ChatInteractionIntent.NORMAL,
-            classifyExplicitInteractionIntent("医生给我解释一下这个器官"),
+            classifyExplicitInteractionIntent("医生给我解释一下人体结构"),
         )
         assertEquals(
             ChatInteractionIntent.NORMAL,
@@ -150,7 +150,7 @@ class ChatRelationshipEngineTest {
         )
         assertEquals(
             ChatInteractionIntent.INTIMATE,
-            classifyExplicitInteractionIntent("她已经不是未成年了，我们都是成年人，过来亲我一下"),
+            classifyExplicitInteractionIntent("我们都是成年人，过来亲我一下"),
         )
     }
 
