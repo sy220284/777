@@ -704,14 +704,30 @@ class LocalHarnessEngine @Inject constructor(
                 it == PersonaProfile.DEFAULT_PERSONA_ID
             } ?: "persona-${UUID.randomUUID()}"
             val saved = chatPersonaStore.upsert(profile.copy(id = personaId))
+            val sameBoundCharacter = snapshot.chatPersona.name.trim()
+                .equals(saved.name.trim(), ignoreCase = true)
             _state.update { state ->
                 if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = saved.id,
+                    galleryId = state.galleryId.takeIf { sameBoundCharacter },
+                    galleryStoryId = state.galleryStoryId.takeIf { sameBoundCharacter },
                     chatPersona = saved,
                 )
             }
             if (_state.value.sessionId == snapshot.sessionId) persist()
         }
+    }
+
+    fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        _state.update { state ->
+            if (state.sessionId != snapshot.sessionId) state else state.copy(
+                galleryId = galleryId,
+                galleryStoryId = galleryStoryId,
+            )
+        }
+        if (_state.value.sessionId == snapshot.sessionId) persist()
     }
 
     /** A story direction is a user preference for future turns, never a synthetic user message. */
@@ -753,6 +769,7 @@ class LocalHarnessEngine @Inject constructor(
                 if (state.sessionId != snapshot.sessionId) state else state.copy(
                     personaId = PersonaProfile.DEFAULT_PERSONA_ID,
                     galleryId = null,
+                    galleryStoryId = null,
                     chatPersona = saved,
                 )
             }
@@ -1206,6 +1223,8 @@ class LocalHarnessEngine @Inject constructor(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         galleryEntry: PersonaGalleryEntry? = null,
+        galleryStoryId: String? = null,
+        freshGalleryStory: Boolean = false,
     ) {
         if (!beginSessionTransition()) return
         val sourceId = currentSessionId
@@ -1242,8 +1261,9 @@ class LocalHarnessEngine @Inject constructor(
                         LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
-                    val handoff = if (galleryEntry != null) {
-                        galleryEntry.storyContext()
+                    val selectedGalleryStory = galleryEntry?.story(galleryStoryId)
+                    val handoff = if (galleryEntry != null && !freshGalleryStory) {
+                        selectedGalleryStory?.context(galleryEntry.persona.name).orEmpty()
                     } else if (mode == LocalConversationMode.CONTINUATION) {
                         if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
                             listOfNotNull(
@@ -1267,8 +1287,12 @@ class LocalHarnessEngine @Inject constructor(
                         PersonaProfile.DEFAULT_PERSONA_ID
                     }
                     val chatPersona = chatPersonaStore.get(personaId)
-                    val chatState = if (galleryEntry != null && usageMode == LocalUsageMode.CHAT) {
-                        galleryEntry.chatState
+                    val chatState = if (
+                        galleryEntry != null &&
+                        usageMode == LocalUsageMode.CHAT &&
+                        !freshGalleryStory
+                    ) {
+                        selectedGalleryStory?.chatState ?: ChatCharacterState()
                     } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         mode == LocalConversationMode.CONTINUATION &&
@@ -1287,6 +1311,14 @@ class LocalHarnessEngine @Inject constructor(
                             personaId = personaId,
                             galleryId = galleryEntry?.id ?: sourceState.galleryId.takeIf {
                                 usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT
+                            },
+                            galleryStoryId = when {
+                                galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
+                                galleryEntry != null -> null
+                                usageMode == LocalUsageMode.CHAT &&
+                                    sourceState.usageMode == LocalUsageMode.CHAT &&
+                                    mode == LocalConversationMode.CONTINUATION -> sourceState.galleryStoryId
+                                else -> null
                             },
                             chatPersona = chatPersona,
                             chatState = chatState,
@@ -3628,6 +3660,7 @@ class LocalHarnessEngine @Inject constructor(
             usageMode = stored.usageMode,
             personaId = stored.personaId,
             galleryId = stored.galleryId,
+            galleryStoryId = stored.galleryStoryId,
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
@@ -3824,6 +3857,7 @@ class LocalHarnessEngine @Inject constructor(
             chatState = state.chatState,
             replySuggestions = state.replySuggestions,
             galleryId = state.galleryId,
+            galleryStoryId = state.galleryStoryId,
             conversationMode = state.conversationMode,
             parentSessionId = state.parentSessionId,
             lineageId = state.lineageId,
