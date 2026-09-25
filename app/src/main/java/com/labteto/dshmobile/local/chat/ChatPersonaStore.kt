@@ -9,6 +9,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
+data class PersonaLoreEntry(
+    val id: String = "",
+    val title: String = "",
+    val content: String = "",
+    val keywords: List<String> = emptyList(),
+    val secondaryKeywords: List<String> = emptyList(),
+    val priority: Int = 50,
+    val alwaysOn: Boolean = false,
+    val spoilerLevel: Int = 0,
+)
+
+@Serializable
 data class PersonaProfile(
     val id: String = DEFAULT_PERSONA_ID,
     val name: String = "默认角色",
@@ -18,6 +30,15 @@ data class PersonaProfile(
     val speechStyle: String = "",
     val relationship: String = "",
     val worldSetting: String = "",
+    val franchise: String = "",
+    val timelinePosition: String = "",
+    val coreMotivations: List<String> = emptyList(),
+    val valuePriorities: List<String> = emptyList(),
+    val behaviorPatterns: List<String> = emptyList(),
+    val internalContradictions: List<String> = emptyList(),
+    val knowledgeBoundary: List<String> = emptyList(),
+    val loreEntries: List<PersonaLoreEntry> = emptyList(),
+    val presetId: String = "",
     val hardConstraints: List<String> = emptyList(),
     val exampleDialogues: List<String> = emptyList(),
     val bannedPhrases: List<String> = emptyList(),
@@ -138,12 +159,39 @@ class ChatPersonaStore internal constructor(
         speechStyle = profile.speechStyle.trim().take(MAX_FIELD_CHARS),
         relationship = profile.relationship.trim().take(MAX_FIELD_CHARS),
         worldSetting = profile.worldSetting.trim().take(MAX_LONG_FIELD_CHARS),
+        franchise = profile.franchise.trim().take(120),
+        timelinePosition = profile.timelinePosition.trim().take(MAX_FIELD_CHARS),
+        coreMotivations = cleanLines(profile.coreMotivations, 12),
+        valuePriorities = cleanLines(profile.valuePriorities, 12),
+        behaviorPatterns = cleanLines(profile.behaviorPatterns, 20),
+        internalContradictions = cleanLines(profile.internalContradictions, 12),
+        knowledgeBoundary = cleanLines(profile.knowledgeBoundary, 20),
+        loreEntries = cleanLoreEntries(profile.loreEntries),
+        presetId = profile.presetId.trim().take(120),
         hardConstraints = cleanLines(profile.hardConstraints, 20),
         exampleDialogues = cleanLines(profile.exampleDialogues, 12),
         bannedPhrases = cleanLines(profile.bannedPhrases, 30),
         signaturePhrases = cleanLines(profile.signaturePhrases, 20),
         corrections = cleanLines(profile.corrections, MAX_CORRECTIONS),
     )
+
+    private fun cleanLoreEntries(values: List<PersonaLoreEntry>): List<PersonaLoreEntry> =
+        values.asSequence()
+            .mapIndexed { index, entry ->
+                entry.copy(
+                    id = entry.id.trim().take(80).ifBlank { "lore-$index" },
+                    title = entry.title.trim().take(120),
+                    content = entry.content.trim().take(MAX_LONG_FIELD_CHARS),
+                    keywords = cleanLines(entry.keywords, 16),
+                    secondaryKeywords = cleanLines(entry.secondaryKeywords, 16),
+                    priority = entry.priority.coerceIn(0, 100),
+                    spoilerLevel = entry.spoilerLevel.coerceIn(0, 3),
+                )
+            }
+            .filter { it.content.isNotBlank() }
+            .distinctBy { entry -> normalize(entry.id.ifBlank { entry.title + entry.content.take(80) }) }
+            .take(MAX_LORE_ENTRIES)
+            .toList()
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
@@ -176,5 +224,6 @@ class ChatPersonaStore internal constructor(
         const val MAX_FIELD_CHARS = 2_000
         const val MAX_LONG_FIELD_CHARS = 4_000
         const val MAX_CORRECTIONS = 20
+        const val MAX_LORE_ENTRIES = 80
     }
 }
