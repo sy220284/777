@@ -63,8 +63,13 @@ class LocalHarnessViewModel @Inject constructor(
         forceNewStory: Boolean = false,
     ): Result<PersonaGalleryEntry> = runCatching {
         val snapshot = state.value
-        check(!snapshot.loading && !snapshot.running && snapshot.usageMode == LocalUsageMode.CHAT) {
-            "请在聊天空闲时保存人设与故事"
+        check(
+            !snapshot.loading &&
+                !snapshot.running &&
+                snapshot.usageMode == LocalUsageMode.CHAT &&
+                !snapshot.groupChat.enabled
+        ) {
+            "请在单人聊天空闲时保存人设与故事"
         }
         val archiveHistory = if (
             snapshot.galleryStoryId == null &&

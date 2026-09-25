@@ -80,6 +80,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -100,7 +101,9 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -111,6 +114,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalChatMode
+import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
@@ -415,6 +419,51 @@ fun LocalHarnessScreen(
         )
     }
 
+}
+
+@Composable
+private fun GroupChatMemberAvatar(
+    member: LocalGroupChatMember,
+    active: Boolean,
+) {
+    val colors = DsTheme.colors
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = member.portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            member.portraitPath
+                .takeIf(String::isNotBlank)
+                ?.let { path -> BitmapFactory.decodeFile(path) }
+                ?.asImageBitmap()
+        }
+    }
+
+    Surface(
+        modifier = Modifier.size(24.dp),
+        shape = CircleShape,
+        color = if (active) colors.accent.copy(alpha = 0.16f)
+        else colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
+        border = if (active) BorderStroke(1.dp, colors.accent) else null,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (portrait != null) {
+                Image(
+                    bitmap = portrait!!,
+                    contentDescription = member.displayName,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    member.displayName.trim().take(1).ifBlank { "·" },
+                    style = DsType.caption11,
+                    color = if (active) colors.accent else colors.labelSecondary,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1245,18 +1294,30 @@ private fun LocalChat(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (state.groupChat.enabled) {
-                                Text(
-                                    state.groupActiveSpeakerName?.let { speaker ->
-                                        stringResource(R.string.local_group_chat_active_speaker, speaker)
-                                    } ?: stringResource(
-                                        R.string.local_group_chat_member_count,
-                                        state.groupChat.members.size,
-                                    ),
-                                    style = DsType.caption11,
-                                    color = colors.labelSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    state.groupChat.members.take(6).forEach { member ->
+                                        GroupChatMemberAvatar(
+                                            member = member,
+                                            active = state.groupActiveSpeakerName == member.displayName,
+                                        )
+                                    }
+                                    Text(
+                                        state.groupActiveSpeakerName?.let { speaker ->
+                                            stringResource(R.string.local_group_chat_active_speaker, speaker)
+                                        } ?: stringResource(
+                                            R.string.local_group_chat_member_count,
+                                            state.groupChat.members.size,
+                                        ),
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                             } else {
                                 state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
                                     Text(

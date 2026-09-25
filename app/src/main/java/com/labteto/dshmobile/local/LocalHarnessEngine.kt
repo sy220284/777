@@ -62,6 +62,7 @@ import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -129,6 +130,12 @@ class LocalAutomationWorkException(
     val sessionId: String,
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
+
+private data class GroupReplyForStateUpdate(
+    val member: LocalGroupChatMember,
+    val persona: PersonaProfile,
+    val content: String,
+)
 
 internal fun canAutoApprove(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
@@ -246,6 +253,7 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
     private val chatPersonaStore: ChatPersonaStore,
+    private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
@@ -1024,8 +1032,10 @@ class LocalHarnessEngine @Inject constructor(
                     galleryId = entry.id,
                     personaId = saved.id,
                     displayName = saved.name,
+                    portraitPath = entry.portraitPath,
                     persona = saved,
                     chatState = previous?.chatState
+                        ?: entry.groupChatState.takeIf { it.updatedAt > 0L }
                         ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
                         ?: ChatCharacterState(),
                 )
@@ -2733,6 +2743,110 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private suspend fun refreshGroupMemberStates(
+        replies: List<GroupReplyForStateUpdate>,
+        userMessage: String,
+    ): Map<String, ChatCharacterState> {
+        if (replies.isEmpty()) return emptyMap()
+        if (replies.size == 1) {
+            val reply = replies.single()
+            return mapOf(
+                reply.member.galleryId to refreshGroupMemberState(
+                    member = reply.member,
+                    persona = reply.persona,
+                    userMessage = userMessage,
+                    assistantMessage = reply.content,
+                    step = CHAT_POST_TURN_MODEL_STEP + 100,
+                ),
+            )
+        }
+
+        val snapshot = _state.value
+        val key = apiKeys.get() ?: return replies.associate { it.member.galleryId to it.member.chatState }
+        val prompt = buildString {
+            appendLine("你要一次整理多个群聊角色各自的隐藏状态。每个角色的私有状态完全隔离，禁止把甲角色的判断、关系或经历写进乙角色。")
+            appendLine("最终只输出一个 JSON 对象，格式为：")
+            appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
+            appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
+            replies.forEach { reply ->
+                val memberPrompt = chatInteractionPlanner.prompt(
+                    persona = reply.persona,
+                    state = reply.member.chatState,
+                    userMessage = userMessage,
+                    assistantMessage = reply.content,
+                ).replace(
+                    "不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。",
+                    "不要继续扮演角色，不要解释过程。",
+                )
+                appendLine()
+                appendLine("===== 人物 ${reply.member.galleryId} / ${reply.persona.name} =====")
+                appendLine(memberPrompt)
+            }
+        }
+
+        return try {
+            val plannerReply = completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = listOf(
+                    buildJsonObject {
+                        put("role", "system")
+                        put("content", prompt)
+                    },
+                ),
+                step = CHAT_POST_TURN_MODEL_STEP + 100,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+            )
+            usageTracker.record(snapshot.model, plannerReply.usage)
+            val root = json.parseToJsonElement(plannerReply.content.orEmpty()).jsonObject
+            val plans = root["plans"]?.jsonArray.orEmpty()
+            val result = linkedMapOf<String, ChatCharacterState>()
+            plans.forEach { element ->
+                val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
+                val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val source = replies.firstOrNull { it.member.galleryId == galleryId } ?: return@forEach
+                val plan = item["plan"] ?: return@forEach
+                val parsed = chatInteractionPlanner.parse(
+                    text = plan.toString(),
+                    previous = source.member.chatState,
+                    userMessage = userMessage,
+                    assistantMessage = source.content,
+                ) ?: return@forEach
+                result[galleryId] = parsed.state
+            }
+            replies.forEachIndexed { index, reply ->
+                if (reply.member.galleryId !in result) {
+                    result[reply.member.galleryId] = refreshGroupMemberState(
+                        member = reply.member,
+                        persona = reply.persona,
+                        userMessage = userMessage,
+                        assistantMessage = reply.content,
+                        step = CHAT_POST_TURN_MODEL_STEP + 200 + index,
+                    )
+                }
+            }
+            result
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            eventLog.append("group/post-turn-batch", buildJsonObject {
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(1_000))
+                put("count", replies.size)
+            })
+            replies.mapIndexed { index, reply ->
+                reply.member.galleryId to refreshGroupMemberState(
+                    member = reply.member,
+                    persona = reply.persona,
+                    userMessage = userMessage,
+                    assistantMessage = reply.content,
+                    step = CHAT_POST_TURN_MODEL_STEP + 300 + index,
+                )
+            }.toMap()
+        }
+    }
+
     private suspend fun runGroupChatTurn(input: String) {
         _state.update {
             it.copy(
@@ -2770,6 +2884,7 @@ class LocalHarnessEngine @Inject constructor(
 
             var currentGroup = snapshot.groupChat
             var deliveredReplies = 0
+            val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
 
             responders.forEachIndexed { index, initialMember ->
                 val member = currentGroup.members.firstOrNull { it.galleryId == initialMember.galleryId }
@@ -2874,36 +2989,42 @@ class LocalHarnessEngine @Inject constructor(
                     clearStreamingPreview = true,
                 )
                 deliveredReplies += 1
-
-                val nextState = refreshGroupMemberState(
+                repliesForStateUpdate += GroupReplyForStateUpdate(
                     member = member,
                     persona = persona,
-                    userMessage = input,
-                    assistantMessage = content,
-                    step = CHAT_POST_TURN_MODEL_STEP + 100 + index,
+                    content = content,
                 )
-                currentGroup = currentGroup.copy(
-                    members = currentGroup.members.map { existing ->
-                        if (existing.galleryId == member.galleryId) {
-                            existing.copy(
-                                displayName = persona.name,
-                                chatState = nextState,
-                            )
-                        } else {
-                            existing
-                        }
-                    },
-                )
-                _state.update { current ->
-                    if (current.sessionId == snapshot.sessionId) {
-                        current.copy(groupChat = currentGroup)
-                    } else {
-                        current
-                    }
-                }
             }
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
+
+            val refreshedStates = refreshGroupMemberStates(
+                replies = repliesForStateUpdate,
+                userMessage = input,
+            )
+            currentGroup = currentGroup.copy(
+                members = currentGroup.members.map { existing ->
+                    val nextState = refreshedStates[existing.galleryId] ?: return@map existing
+                    val source = repliesForStateUpdate.firstOrNull { it.member.galleryId == existing.galleryId }
+                    existing.copy(
+                        displayName = source?.persona?.name ?: existing.displayName,
+                        chatState = nextState,
+                    )
+                },
+            )
+            repliesForStateUpdate.forEach { reply ->
+                val nextState = refreshedStates[reply.member.galleryId] ?: return@forEach
+                runCatching {
+                    chatPersonaGalleryStore.updateGroupChatState(reply.member.galleryId, nextState)
+                }.onFailure { error ->
+                    eventLog.append("group/state-persist", buildJsonObject {
+                        put("gallery_id", reply.member.galleryId)
+                        put("status", "failed")
+                        put("detail", error.message.orEmpty().take(1_000))
+                    })
+                }
+            }
+
             val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
             currentGroup = currentGroup.copy(turnCursor = nextCursor)
             _state.update { current ->

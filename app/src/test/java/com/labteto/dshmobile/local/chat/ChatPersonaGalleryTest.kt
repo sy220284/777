@@ -311,6 +311,37 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun groupChatStatePersistsSeparatelyFromSingleChatStories() {
+        val file = File(temporary.root, "group-state-gallery.json")
+        val store = ChatPersonaGalleryStore(file, Json)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", identity = "剑客"),
+            sourceSessionId = "single-session",
+            history = listOf(LocalHarnessMessage("m1", "user", "单聊故事", createdAt = 1L)),
+            chatState = ChatCharacterState(
+                relationshipState = "单聊熟悉中",
+                updatedAt = 10L,
+            ),
+            notes = "",
+        ).entry
+
+        val groupState = ChatCharacterState(
+            relationshipState = "群聊里已经很熟",
+            initiative = 72,
+            updatedAt = 20L,
+        )
+        val updated = store.updateGroupChatState(saved.id, groupState)!!
+
+        assertEquals("群聊里已经很熟", updated.groupChatState.relationshipState)
+        assertEquals(72, updated.groupChatState.initiative)
+        assertEquals("单聊熟悉中", updated.stories.single().chatState.relationshipState)
+
+        val reloaded = ChatPersonaGalleryStore(file, Json).list().single()
+        assertEquals("群聊里已经很熟", reloaded.groupChatState.relationshipState)
+        assertEquals("单聊熟悉中", reloaded.stories.single().chatState.relationshipState)
+    }
+
+    @Test
     fun structuredRuntimeFieldsSurviveSaveExportAndImport() {
         val source = ChatPersonaGalleryStore(File(temporary.root, "runtime-source.json"), Json)
         val saved = source.save(

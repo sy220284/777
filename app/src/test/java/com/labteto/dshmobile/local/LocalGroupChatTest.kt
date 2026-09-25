@@ -36,6 +36,26 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun naturalInSentenceAddressPrefersTheActuallyAddressedCharacter() {
+        val responders = groupChatResponders(
+            input = "卡芙卡说得有道理，神里绫华你怎么看？",
+            members = listOf(ayaka, kafka, zhao),
+        )
+
+        assertEquals(listOf("ayaka"), responders.map { it.galleryId })
+    }
+
+    @Test
+    fun multipleNaturalAddressesKeepMentionOrder() {
+        val responders = groupChatResponders(
+            input = "神里绫华、卡芙卡，你们两个都说说。",
+            members = listOf(kafka, ayaka, zhao),
+        )
+
+        assertEquals(listOf("ayaka", "kafka"), responders.map { it.galleryId })
+    }
+
+    @Test
     fun ordinaryMessageKeepsAllCharactersEligibleInGivenPriorityOrder() {
         val responders = groupChatResponders(
             input = "你们今天怎么都这么安静",

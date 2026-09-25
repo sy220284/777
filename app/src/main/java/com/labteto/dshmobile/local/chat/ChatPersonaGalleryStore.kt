@@ -47,6 +47,7 @@ data class PersonaGalleryEntry(
     val persona: PersonaProfile,
     /** App-private character artwork used by the gallery's spatial standee presentation. */
     val portraitPath: String = "",
+    val groupChatState: ChatCharacterState = ChatCharacterState(),
     val stories: List<PersonaGalleryStory> = emptyList(),
     // V3 compatibility fields. They are migrated into stories and cleared on the first V4 read.
     val storyNotes: String = "",
@@ -265,6 +266,7 @@ internal fun compactLegacyDuplicateGalleryEntries(
             val canonical = compacted[duplicateIndex]
             compacted[duplicateIndex] = canonical.copy(
                 persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
+                groupChatState = mergeChatState(canonical.groupChatState, entry.groupChatState),
                 stories = mergeLegacyStoryLists(canonical.stories, entry.stories),
                 updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
             )
@@ -657,6 +659,20 @@ class ChatPersonaGalleryStore internal constructor(
         val updated = current.copy(
             portraitPath = clean,
             updatedAt = now,
+        )
+        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        return updated
+    }
+
+    @Synchronized
+    fun updateGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
+        val doc = readNormalized()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return null
+        val mergedState = mergeChatState(current.groupChatState, chatState)
+        val now = maxOf(System.currentTimeMillis(), mergedState.updatedAt)
+        val updated = current.copy(
+            groupChatState = mergedState,
+            updatedAt = maxOf(current.updatedAt, now),
         )
         write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
