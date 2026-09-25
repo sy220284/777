@@ -66,16 +66,16 @@ internal fun groupChatMentionedMembers(
         val escaped = Regex.escape(name)
         val strongPatterns = listOf(
             Regex("""[@＠]$escaped(?=$|[\s，,。！？!?；;：:、])"""),
-            Regex("""$escaped(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
+            Regex("""(?:^|[\s，,。！？!?；;：:、])$escaped(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
             Regex("""(?:找|问|叫|让|请|喊)$escaped(?=$|[\s，,。！？!?；;：:、]|来|帮|看|聊|说|回答|告诉)"""),
-            Regex("""$escaped\s+(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
+            Regex("""(?:^|[\s，,。！？!?；;：:、])$escaped\s+(?=你|在吗|呢|来|帮|看|觉得|怎么|能|可以|要|想|陪|给|告诉|回答|说说)"""),
         )
         strongPatterns.asSequence()
             .mapNotNull { regex -> regex.find(text)?.range?.first }
             .minOrNull()
             ?.let { return AddressMatch(strength = 3, index = it, member = member) }
 
-        val punctuationIndex = Regex("""$escaped(?=$|[，,。！？!?；;：:、])""")
+        val punctuationIndex = Regex("""(?:^|[\s，,。！？!?；;：:、])$escaped(?=$|[，,。！？!?；;：:、])""")
             .find(text)
             ?.range
             ?.first
