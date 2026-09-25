@@ -741,6 +741,9 @@ class LocalHarnessEngine @Inject constructor(
                         state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis()
                     },
                     chatPersona = saved,
+                    chatState = if (sameBoundCharacter) state.chatState else ChatCharacterState(),
+                    replySuggestions = if (sameBoundCharacter) state.replySuggestions else emptyList(),
+                    handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
                 )
             }
             if (_state.value.sessionId == snapshot.sessionId) persist()
