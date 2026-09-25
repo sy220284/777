@@ -108,6 +108,33 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun adultIntimacyIntentGetsPriorityPrompt() {
+        assertTrue(hasAdultIntimacyIntent("我们都是成年人，过来抱住我亲一下"))
+
+        val prompt = engine.prompt(
+            "我们都是成年人，过来抱住我亲一下",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
+        assertTrue(prompt.contains("高于默认克制、关系阶段模板和回复风格保守化"))
+        assertTrue(prompt.contains("不因题材亲密自动说教、抽离或切换军师"))
+    }
+
+    @Test
+    fun minorContextDoesNotEnableAdultIntimacyPriority() {
+        assertEquals(
+            false,
+            hasAdultIntimacyIntent("这个未成年角色抱我一下"),
+        )
+        val prompt = engine.prompt(
+            "这个未成年角色抱我一下",
+            ChatCharacterState(),
+        )
+        assertEquals(false, prompt.contains("本轮意图优先：成年亲密互动"))
+    }
+
+    @Test
     fun promptCarriesEvidenceAndRelationshipDynamics() {
         val state = ChatCharacterState(
             dynamics = RelationshipDynamics(
