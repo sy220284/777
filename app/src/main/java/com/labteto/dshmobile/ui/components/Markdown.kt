@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,7 +51,7 @@ val LocalFileOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
 /**
  * Block-level Markdown renderer: fenced code blocks, #-#### headings, bullet and
  * ordered lists, blockquotes, and paragraphs with inline **bold**, *italic*,
- * `code` chips and [links](https://example.com). Tables render as plain text.
+ * `code` chips and [links](https://example.com). Pipe tables render as scrollable grids.
  */
 @Composable
 fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boolean = true) {
@@ -76,9 +77,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boo
                 is MdBlock.MdList -> MdListBlock(block)
                 is MdBlock.Blockquote -> MdBlockquote(block)
                 is MdBlock.Code -> CodeBlock(block.lang, block.code, allowCopy = allowCodeCopy)
-                is MdBlock.Table -> block.rows.forEach { row ->
-                    InlineMarkdown(row, DsType.mdSmall.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
-                }
+                is MdBlock.Table -> MarkdownTable(block)
             }
         }
     }
@@ -89,16 +88,22 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boo
 private val HEADING_REGEX = Regex("^(#{1,4})\\s+(.*)$")
 private val ORDERED_REGEX = Regex("^\\d+\\.\\s+")
 
-private sealed interface MdBlock {
+internal enum class TableAlignment { START, CENTER, END }
+
+internal sealed interface MdBlock {
     data class Paragraph(val lines: List<String>) : MdBlock
     data class Heading(val level: Int, val text: String) : MdBlock
     data class MdList(val items: List<String>, val ordered: Boolean) : MdBlock
     data class Blockquote(val lines: List<String>) : MdBlock
     data class Code(val lang: String?, val code: String) : MdBlock
-    data class Table(val rows: List<String>) : MdBlock
+    data class Table(
+        val header: List<String>,
+        val rows: List<List<String>>,
+        val alignments: List<TableAlignment>,
+    ) : MdBlock
 }
 
-private fun parseMarkdown(markdown: String): List<MdBlock> {
+internal fun parseMarkdown(markdown: String): List<MdBlock> {
     val blocks = mutableListOf<MdBlock>()
     val lines = markdown.replace("\r\n", "\n").split("\n")
     var i = 0
@@ -150,13 +155,17 @@ private fun parseMarkdown(markdown: String): List<MdBlock> {
                 }
                 blocks += MdBlock.Blockquote(quote)
             }
-            trimmed.startsWith("|") -> {
-                val rows = mutableListOf<String>()
+            isMarkdownTableStart(lines, i) -> {
+                val header = splitTableRow(lines[i])
+                val alignments = parseTableAlignments(lines[i + 1], header.size)
+                val rows = mutableListOf<List<String>>()
+                i += 2
                 while (i < lines.size && lines[i].trimStart().startsWith("|")) {
-                    if (!isTableSeparator(lines[i])) rows += lines[i]
+                    val cells = splitTableRow(lines[i])
+                    rows += List(header.size) { column -> cells.getOrElse(column) { "" } }
                     i++
                 }
-                blocks += MdBlock.Table(rows)
+                blocks += MdBlock.Table(header, rows, alignments)
             }
             line.isBlank() -> i++
             else -> {
@@ -184,9 +193,62 @@ private fun isSpecialLine(line: String): Boolean {
         trimmed.startsWith("|")
 }
 
-/** Table separator rows (only pipes, dashes, colons and spaces) are dropped. */
-private fun isTableSeparator(line: String): Boolean =
-    line.replace(Regex("[|:\\-\\s]"), "").isEmpty()
+private fun isMarkdownTableStart(lines: List<String>, index: Int): Boolean =
+    index + 1 < lines.size &&
+        lines[index].trimStart().startsWith("|") &&
+        isTableSeparator(lines[index + 1])
+
+/** A separator cell is at least three dashes with optional leading/trailing alignment colons. */
+internal fun isTableSeparator(line: String): Boolean {
+    if (!line.trimStart().startsWith("|")) return false
+    val cells = splitTableRow(line)
+    return cells.isNotEmpty() && cells.all { it.trim().matches(Regex("^:?-{3,}:?$")) }
+}
+
+internal fun parseTableAlignments(line: String, columns: Int): List<TableAlignment> {
+    val cells = splitTableRow(line)
+    return List(columns) { index ->
+        val cell = cells.getOrElse(index) { "" }.trim()
+        when {
+            cell.startsWith(":") && cell.endsWith(":") -> TableAlignment.CENTER
+            cell.endsWith(":") -> TableAlignment.END
+            else -> TableAlignment.START
+        }
+    }
+}
+
+/**
+ * Split one pipe row while respecting escaped pipes and pipes inside inline code.
+ * Outer pipes are syntax and are not returned as empty cells.
+ */
+internal fun splitTableRow(line: String): List<String> {
+    val source = line.trim().removePrefix("|").removeSuffix("|")
+    val cells = mutableListOf<String>()
+    val current = StringBuilder()
+    var escaped = false
+    var inCode = false
+    source.forEach { char ->
+        when {
+            escaped -> {
+                current.append(char)
+                escaped = false
+            }
+            char == '\\' -> escaped = true
+            char == '`' -> {
+                inCode = !inCode
+                current.append(char)
+            }
+            char == '|' && !inCode -> {
+                cells += current.toString().trim()
+                current.clear()
+            }
+            else -> current.append(char)
+        }
+    }
+    if (escaped) current.append('\\')
+    cells += current.toString().trim()
+    return cells
+}
 
 // ---- Inline rendering ------------------------------------------------------
 
@@ -348,6 +410,68 @@ private fun MdBlockquote(block: MdBlock.Blockquote) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             block.lines.forEach { line ->
                 InlineMarkdown(line, DsType.mdSmall.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarkdownTable(block: MdBlock.Table) {
+    val colors = DsTheme.colors
+    val allRows = listOf(block.header) + block.rows
+    val widths = remember(block) {
+        block.header.indices.map { column ->
+            val maxUnits = allRows.maxOfOrNull { row ->
+                row.getOrElse(column) { "" }.sumOf { char -> if (char.code > 0x7f) 2 else 1 }
+            } ?: 0
+            (maxUnits * 7 + 28).coerceIn(96, 240).dp
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .clip(DsShapes.block)
+            .border(1.dp, colors.borderL1, DsShapes.block),
+    ) {
+        fun textAlign(column: Int): TextAlign = when (block.alignments.getOrElse(column) { TableAlignment.START }) {
+            TableAlignment.START -> TextAlign.Start
+            TableAlignment.CENTER -> TextAlign.Center
+            TableAlignment.END -> TextAlign.End
+        }
+
+        Row(Modifier.background(colors.bgLayer1)) {
+            block.header.forEachIndexed { column, cell ->
+                InlineMarkdown(
+                    cell,
+                    DsType.mdSmall.copy(
+                        color = colors.labelPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = textAlign(column),
+                    ),
+                    Modifier
+                        .width(widths[column])
+                        .border(0.5.dp, colors.borderL1)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
+        }
+        block.rows.forEach { row ->
+            Row {
+                block.header.indices.forEach { column ->
+                    InlineMarkdown(
+                        row.getOrElse(column) { "" },
+                        DsType.mdSmall.copy(
+                            color = colors.labelPrimary,
+                            textAlign = textAlign(column),
+                        ),
+                        Modifier
+                            .width(widths[column])
+                            .border(0.5.dp, colors.borderL1)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
             }
         }
     }
