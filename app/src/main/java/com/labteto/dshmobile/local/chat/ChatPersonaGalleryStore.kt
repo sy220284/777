@@ -198,12 +198,15 @@ private fun mergeHistory(
     base: List<LocalHarnessMessage>,
     incoming: List<LocalHarnessMessage>,
 ): List<LocalHarnessMessage> {
-    val seen = linkedSetOf<String>()
+    val seenIds = linkedSetOf<String>()
+    val seenContent = linkedSetOf<String>()
     return (base + incoming)
         .asSequence()
         .filter { it.role == "user" || it.role == "assistant" }
         .filter { message ->
-            seen.add(galleryMessageArchiveKey(message))
+            val idUnique = message.id.isBlank() || seenIds.add(message.id)
+            val contentKey = "${message.role}|${message.createdAt}|${normalizePersonaText(message.content)}"
+            idUnique && seenContent.add(contentKey)
         }
         .sortedBy(LocalHarnessMessage::createdAt)
         .toList()
@@ -308,7 +311,7 @@ class ChatPersonaGalleryStore @Inject constructor(
 
     @Synchronized
     fun applySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): PersonaGalleryEntry? {
-        if (suggestions.isEmpty()) return read().entries.firstOrNull { it.id == id }
+        if (suggestions.isEmpty()) return readNormalized().entries.firstOrNull { it.id == id }
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
         val now = System.currentTimeMillis()
