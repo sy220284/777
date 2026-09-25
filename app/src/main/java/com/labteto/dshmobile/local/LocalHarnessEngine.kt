@@ -5230,6 +5230,7 @@ class LocalHarnessEngine @Inject constructor(
         toolsOverride: JsonArray? = null,
         publishPreview: Boolean = true,
         maxAttemptsOverride: Int? = null,
+        allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
         val tools = toolsOverride ?: modelToolSchemas()
         val logMessages = redactModelImages(messages)
@@ -5318,8 +5319,9 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
         )
-        return executor.execute {
-            // The request executor retries this block. A new buffer prevents text from a failed
+        return try {
+            executor.execute {
+                // The request executor retries this block. A new buffer prevents text from a failed
             // attempt being prepended to the next attempt's visible answer.
             val streamPreview = LocalStreamPreview(
                 maxChars = MAX_STREAM_PREVIEW_CHARS,
@@ -5340,9 +5342,36 @@ class LocalHarnessEngine @Inject constructor(
                     tools = tools,
                     onDelta = { delta -> streamPreview.append(delta.content) },
                 )
-                streamPreview.flush()
-                reply
+                    streamPreview.flush()
+                    reply
+                }
             }
+        } catch (error: Throwable) {
+            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+            val summaryMode = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                LocalHistorySummaryMode.CHAT
+            } else {
+                LocalHistorySummaryMode.WORK
+            }
+            val compacted = historyCompactor.compactForOverflow(messages, summaryMode)
+                ?: throw error
+            eventLog.append("request/context-overflow-recovery", buildJsonObject {
+                put("step", step)
+                put("model", snapshot.model)
+                put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                put("omitted_messages", compacted.omittedMessages)
+            })
+            completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = compacted.messages,
+                step = step,
+                toolsOverride = tools,
+                publishPreview = publishPreview,
+                maxAttemptsOverride = maxAttemptsOverride,
+                allowContextOverflowRecovery = false,
+            )
         }
     }
 
