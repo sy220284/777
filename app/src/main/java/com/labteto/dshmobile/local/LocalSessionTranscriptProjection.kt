@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
@@ -35,6 +36,7 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
             message.toolName?.let { put("tool_name", JsonPrimitive(it)) }
             message.speakerId?.let { put("speaker_id", JsonPrimitive(it)) }
             message.speakerName?.let { put("speaker_name", JsonPrimitive(it)) }
+            if (message.proactive) put("proactive", JsonPrimitive(true))
         },
     )
 
@@ -113,6 +115,7 @@ private fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage
         val toolName = optionalString("tool_name")
         val speakerId = optionalString("speaker_id")
         val speakerName = optionalString("speaker_name")
+        val proactive = (item["proactive"] as? JsonPrimitive)?.booleanOrNull ?: false
 
         decoded += LocalHarnessMessage(
             id = id,
@@ -122,6 +125,7 @@ private fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage
             speakerId = speakerId,
             speakerName = speakerName,
             createdAt = createdAt,
+            proactive = proactive,
         )
     }
     return decoded
