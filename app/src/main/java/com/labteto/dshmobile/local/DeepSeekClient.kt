@@ -345,6 +345,29 @@ class LocalModelException(
     cause: Throwable? = null,
 ) : Exception(message, cause)
 
+internal fun contextWindowExceeded(error: Throwable): Boolean {
+    val modelError = error as? LocalModelException ?: return false
+    if (modelError.code !in setOf("MODEL_HTTP_400", "MODEL_HTTP_413", "MODEL_HTTP_422")) {
+        return false
+    }
+    val detail = modelError.message.orEmpty().lowercase()
+    return listOf(
+        "context_length_exceeded",
+        "context length",
+        "context window",
+        "maximum context",
+        "max context",
+        "too many tokens",
+        "prompt is too long",
+        "input is too long",
+        "token limit",
+        "上下文长度",
+        "上下文窗口",
+        "输入过长",
+        "token 数量超过",
+    ).any(detail::contains)
+}
+
 /** Model-facing tools mirroring the official Harness capability families on Android. */
 object LocalToolCatalog {
     val specs: JsonArray = buildJsonArray {
