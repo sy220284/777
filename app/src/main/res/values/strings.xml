@@ -819,6 +819,8 @@
     <string name="local_persona_banned">Character-specific banned phrases (one per line)</string>
     <string name="local_persona_signature">Characteristic phrases (one per line)</string>\n    <string name="local_persona_corrections">Learned persona corrections (one per line; editable)</string>
     <string name="local_persona_save">Save persona</string>
+    <string name="chat_scroll_start">First message</string>
+    <string name="chat_scroll_latest">Latest message</string>
 
     <string name="local_reply_suggestions_title">Reply ideas</string>
     <string name="local_reply_suggestions_open">Reply ideas</string>
