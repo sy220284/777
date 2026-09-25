@@ -261,6 +261,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
     fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
+    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
+        engine.undoChatPersonaCorrection(noticeId, personaId, correction)
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value
