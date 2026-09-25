@@ -49,6 +49,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -106,8 +108,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionSummary
@@ -285,6 +289,8 @@ fun LocalHarnessScreen(
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
+                onEditAndResend = viewModel::editAndResendUserMessage,
+                onSelectMessageVariant = viewModel::selectChatMessageVariant,
                 onRegenerate = viewModel::regenerateReply,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
@@ -992,6 +998,8 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
+    onEditAndResend: (String, String) -> Boolean,
+    onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
@@ -1051,13 +1059,19 @@ private fun LocalChat(
     var creatingPersona by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
+    var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
+    var editingUserText by rememberSaveable { mutableStateOf("") }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
-    LaunchedEffect(state.sessionId, state.usageMode) { showReplySuggestions = false }
+    LaunchedEffect(state.sessionId, state.usageMode) {
+        showReplySuggestions = false
+        editingUserMessage = null
+        editingUserText = ""
+    }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
@@ -1341,9 +1355,20 @@ private fun LocalChat(
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> LocalMessageRow(
-                            transcriptItem.message,
+                            message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
+                            canEdit = state.usageMode == LocalUsageMode.CHAT && !state.running,
                             canRegenerate = !state.running && state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            branchInfo = if (state.usageMode == LocalUsageMode.CHAT) {
+                                chatBranchInfo(state.chatBranches, transcriptItem.message.id)
+                            } else {
+                                null
+                            },
+                            onEdit = { message ->
+                                editingUserMessage = message
+                                editingUserText = message.content
+                            },
+                            onSelectVariant = onSelectMessageVariant,
                             onRegenerate = onRegenerate,
                         )
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
