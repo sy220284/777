@@ -322,6 +322,7 @@ fun LocalHarnessScreen(
             onInspect = viewModel::inspectGalleryPersona,
             onApplySuggestions = viewModel::applyGallerySuggestions,
             onDelete = viewModel::deleteGalleryEntry,
+            onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
             onStart = { id ->
                 if (viewModel.startFromGallery(id)) showPersonaGallery = false
             },
