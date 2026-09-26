@@ -353,39 +353,86 @@ fun TasksScreen(
                         selected = cadence,
                         onSelect = { cadence = it },
                     )
-                    CadenceRow(
-                        first = AutomationCadence.WEEKLY,
-                        firstLabel = stringResource(R.string.tasks_schedule_weekly),
-                        second = AutomationCadence.CUSTOM,
-                        secondLabel = stringResource(R.string.tasks_schedule_custom),
-                        selected = cadence,
-                        onSelect = { cadence = it },
-                    )
+                    if (chatMode) {
+                        CadenceRow(
+                            first = AutomationCadence.WEEKLY,
+                            firstLabel = stringResource(R.string.tasks_schedule_weekly),
+                            second = AutomationCadence.SILENCE,
+                            secondLabel = stringResource(R.string.tasks_schedule_silence),
+                            selected = cadence,
+                            onSelect = { cadence = it },
+                        )
+                        DsButton(
+                            text = stringResource(R.string.tasks_schedule_custom),
+                            onClick = { cadence = AutomationCadence.CUSTOM },
+                            variant = if (cadence == AutomationCadence.CUSTOM) {
+                                DsButtonVariant.Info
+                            } else {
+                                DsButtonVariant.Ghost
+                            },
+                            size = DsButtonSize.Small,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        CadenceRow(
+                            first = AutomationCadence.WEEKLY,
+                            firstLabel = stringResource(R.string.tasks_schedule_weekly),
+                            second = AutomationCadence.CUSTOM,
+                            secondLabel = stringResource(R.string.tasks_schedule_custom),
+                            selected = cadence,
+                            onSelect = { cadence = it },
+                        )
+                    }
 
-                    DsButton(
-                        text = stringResource(
-                            R.string.tasks_first_run_value,
-                            DateFormat.getDateTimeInstance(
-                                DateFormat.MEDIUM,
-                                DateFormat.SHORT,
-                            ).format(Date(firstRunAt)),
-                        ),
-                        onClick = {
-                            showSchedulePicker(context, firstRunAt) { picked ->
-                                firstRunAt = picked
-                                createError = null
-                            }
-                        },
-                        variant = DsButtonVariant.Outline,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (cadence != AutomationCadence.SILENCE) {
+                        DsButton(
+                            text = stringResource(
+                                R.string.tasks_first_run_value,
+                                DateFormat.getDateTimeInstance(
+                                    DateFormat.MEDIUM,
+                                    DateFormat.SHORT,
+                                ).format(Date(firstRunAt)),
+                            ),
+                            onClick = {
+                                showSchedulePicker(context, firstRunAt) { picked ->
+                                    firstRunAt = picked
+                                    createError = null
+                                }
+                            },
+                            variant = DsButtonVariant.Outline,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
 
-                    if (cadence == AutomationCadence.CUSTOM) {
+                    if (
+                        cadence == AutomationCadence.CUSTOM ||
+                        cadence == AutomationCadence.SILENCE
+                    ) {
                         OutlinedTextField(
                             value = customHours,
                             onValueChange = { customHours = it.filter(Char::isDigit).take(5) },
-                            label = { Text(stringResource(R.string.tasks_custom_hours)) },
-                            supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (cadence == AutomationCadence.SILENCE) {
+                                            R.string.tasks_chat_silence_hours
+                                        } else {
+                                            R.string.tasks_custom_hours
+                                        },
+                                    ),
+                                )
+                            },
+                            supportingText = {
+                                Text(
+                                    stringResource(
+                                        if (cadence == AutomationCadence.SILENCE) {
+                                            R.string.tasks_chat_silence_hours_hint
+                                        } else {
+                                            R.string.tasks_custom_hours_hint
+                                        },
+                                    ),
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
