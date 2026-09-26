@@ -414,6 +414,8 @@
     <string name="tasks_once">一次性任务</string>
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
     <string name="tasks_cancel">取消</string>
+    <string name="tasks_pause">暂停</string>
+    <string name="tasks_resume">恢复</string>
     <string name="tasks_next_run">下次执行：%1$s</string>
     <string name="tasks_last_run">最近执行：%1$s</string>
     <string name="tasks_run_history">运行记录 · 保留 %1$d 条</string>
@@ -966,6 +968,7 @@
 <string name="tasks_status_running">运行中</string>
 <string name="tasks_status_queued">等待执行</string>
 <string name="tasks_status_scheduled">已排期</string>
+<string name="tasks_status_paused">已暂停</string>
 <string name="tasks_schedule_once">一次</string>
 <string name="tasks_schedule_daily">每天</string>
 <string name="tasks_schedule_weekly">每周</string>
