@@ -152,4 +152,56 @@ class DeepSeekClientTest {
         assertEquals(true, reply.usage.reported)
     }
 
+
+    @Test
+    fun officialDeepSeekStreamingUsesAnthropicMessagesEndpoint() = runBlocking {
+        val body = listOf(
+            "event: message_start",
+            "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}",
+            "",
+            "event: content_block_start",
+            "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}",
+            "",
+            "event: content_block_delta",
+            "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"完成\"}}",
+            "",
+            "event: message_delta",
+            "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":2}}",
+            "",
+            "event: message_stop",
+            "data: {\"type\":\"message_stop\"}",
+        ).joinToString("\n")
+        var requestedUrl = ""
+        var apiKeyHeader = ""
+        var requestBody = ""
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            requestedUrl = chain.request().url.toString()
+            apiKeyHeader = chain.request().header("x-api-key").orEmpty()
+            requestBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body(body.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+
+        val reply = streamingClient.completeStreaming(
+            apiKey = "secret",
+            baseUrl = "https://api.deepseek.com",
+            model = "deepseek-flash",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+        )
+
+        assertEquals("https://api.deepseek.com/anthropic/v1/messages", requestedUrl)
+        assertEquals("secret", apiKeyHeader)
+        assertTrue(requestBody.contains("\"max_tokens\":65536"))
+        assertTrue(requestBody.contains("\"stream\":true"))
+        assertEquals("完成", reply.content)
+        assertEquals(3L, reply.usage.promptTokens)
+        assertEquals(2L, reply.usage.completionTokens)
+    }
+
 }
