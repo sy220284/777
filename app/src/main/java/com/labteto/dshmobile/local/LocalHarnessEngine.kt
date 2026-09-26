@@ -4522,7 +4522,7 @@ class LocalHarnessEngine @Inject constructor(
                 "web_fetch" -> {
                     val background = canonical.arguments.boolean("run_in_background", false)
                     if (!background) {
-                        executeSafely(canonical, allowMutation)
+                        executePersistentRegistered(canonical, allowMutation, sessionId)
                     } else {
                         val input = canonical.arguments.string("url")
                         val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
@@ -4539,7 +4539,7 @@ class LocalHarnessEngine @Inject constructor(
                         )
                     }
                 }
-                else -> executeSafely(canonical, allowMutation)
+                else -> executePersistentRegistered(canonical, allowMutation, sessionId)
             }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
@@ -4552,6 +4552,25 @@ class LocalHarnessEngine @Inject constructor(
             toolFailureResult(canonical, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
         }
     }
+
+    private suspend fun executePersistentRegistered(
+        original: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+    ): AgentToolResult = toolExecutionCoordinator.executeScoped(
+        original = original,
+        sessionId = sessionId,
+        allowMutation = allowMutation,
+        planModeEnabled = false,
+        approval = { call, tool, summary ->
+            if (sessionId == currentSessionId) {
+                approve(call, summary, tool)
+            } else {
+                approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
+            }
+        },
+    )
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,
