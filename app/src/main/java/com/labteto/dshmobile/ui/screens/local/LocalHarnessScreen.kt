@@ -897,7 +897,7 @@ private fun LocalSessionDrawerRow(
             contentDescription = stringResource(R.string.local_delete_session),
             onClick = { swipe = 0f; onDelete() },
             tint = colors.error,
-            modifier = Modifier.align(Alignment.CenterStart),
+            modifier = Modifier.align(Alignment.CenterEnd),
         )
     Row(
         modifier = Modifier
@@ -907,9 +907,9 @@ private fun LocalSessionDrawerRow(
                 detectHorizontalDragGestures(
                     onHorizontalDrag = { change, amount ->
                         change.consume()
-                        swipe = (swipe + amount).coerceIn(0f, reveal)
+                        swipe = (swipe + amount).coerceIn(-reveal, 0f)
                     },
-                    onDragEnd = { swipe = if (swipe > reveal / 2) reveal else 0f },
+                    onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
                 )
             }
             .heightIn(min = DsSpacing.touchTarget)
