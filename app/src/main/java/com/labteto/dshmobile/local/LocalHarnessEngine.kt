@@ -753,12 +753,7 @@ class LocalHarnessEngine @Inject constructor(
                         error = null,
                     )
                 }
-                eventLog.append("session/model-route", buildJsonObject {
-                    put("provider", route.provider)
-                    put("base_url", route.baseUrl)
-                    put("model", route.model)
-                    put("protocol", route.protocol.name.lowercase())
-                })
+                eventLog.append(LOCAL_MODEL_ROUTE_EVENT_TYPE, encodeLocalModelRouteEvent(route))
                 persist()
             }.onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
@@ -777,12 +772,7 @@ class LocalHarnessEngine @Inject constructor(
             if (state.running || selected !in state.configuredModels) state
             else state.copy(model = route.model, modelProtocol = route.protocol)
         }
-        eventLog.append("session/model-route", buildJsonObject {
-            put("provider", route.provider)
-            put("base_url", route.baseUrl)
-            put("model", route.model)
-            put("protocol", route.protocol.name.lowercase())
-        })
+        eventLog.append(LOCAL_MODEL_ROUTE_EVENT_TYPE, encodeLocalModelRouteEvent(route))
         persist()
     }
 
@@ -6167,7 +6157,12 @@ class LocalHarnessEngine @Inject constructor(
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
-        val sessionRoute = resolveSessionModelRoute(stored, baseUrl, model)
+        val sessionRoute = recoverSessionModelRoute(
+            snapshot = stored,
+            latestRouteEvent = eventLog.latest(LOCAL_MODEL_ROUTE_EVENT_TYPE),
+            fallbackBaseUrl = baseUrl,
+            fallbackModel = model,
+        )
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
                 PROJECTION_BASELINE_EVENT,
