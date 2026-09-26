@@ -1001,6 +1001,8 @@
     <string name="tasks_chat_preset_reach_out_prompt">像真实关系里突然想起我一样主动来找我，结合最近聊天和当前关系，自然开启一个符合人设的新话题。</string>
     <string name="tasks_chat_preset_story_prompt">从当前故事线继续，让角色主动带来一个符合世界设定和人设的小事件、消息、邀约或状况，推动剧情往前走。</string>
     <string name="tasks_chat_preset_promise_prompt">以角色自己的口吻，自然提起现有聊天里真实存在的约定、计划或重要事项；如果上下文没有明确约定，不要编造。</string>
+    <string name="tasks_chat_quiet_hours">夜间免打扰</string>
+    <string name="tasks_chat_quiet_hours_hint">设备当地时间 23:00–07:00 暂缓主动消息。</string>
     <string name="tasks_chat_notification_title">%1$s 发来一条消息</string>
 
     <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
