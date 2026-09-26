@@ -5680,6 +5680,7 @@ class LocalHarnessEngine @Inject constructor(
                         model = snapshot.model,
                         messages = messages,
                         tools = tools,
+                        protocol = snapshot.modelProtocol,
                         onDelta = { delta ->
                             val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                             streamPreview.append(visible)
