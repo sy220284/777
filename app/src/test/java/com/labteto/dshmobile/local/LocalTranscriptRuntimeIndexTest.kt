@@ -29,7 +29,7 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals("assistant", index.latestMessageRole)
         assertEquals(4L, index.totalMessageCount)
         assertTrue(index.hasDialogue)
-        assertFalse(index.branchingEligible)
+        assertTrue(index.branchingEligible)
     }
 
     @Test
@@ -55,7 +55,7 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals("新标题不应覆盖", updated.latestUserContent)
         assertEquals(4L, updated.totalMessageCount)
         assertTrue(updated.hasDialogue)
-        assertFalse(updated.branchingEligible)
+        assertTrue(updated.branchingEligible)
     }
 
     @Test
@@ -165,7 +165,7 @@ class LocalTranscriptRuntimeIndexTest {
     }
 
     @Test
-    fun attachmentContextMakesBranchingIneligible() {
+    fun attachmentContextKeepsHistoricalEditingEligible() {
         val index = buildLocalTranscriptRuntimeIndex(
             listOf(
                 message(
