@@ -104,6 +104,16 @@ internal class LocalChatTurnCoordinator(
         assistantMessage = assistantMessage,
     )
 
+    fun applyDeterministicInteractionState(
+        previous: ChatCharacterState,
+        userMessage: String,
+        assistantMessage: String,
+    ): ChatCharacterState = interactionPlanner.applyDeterministicInteractionState(
+        previous = previous,
+        userMessage = userMessage,
+        assistantMessage = assistantMessage,
+    )
+
     fun replySuggestionsPrompt(
         persona: PersonaProfile,
         state: ChatCharacterState,
