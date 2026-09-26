@@ -75,6 +75,9 @@ if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
 if "parse(synthetic.toString())" in deepseek:
     violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
 
+if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
+    violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
+
 if violations:
     print("Local performance invariant guard failed:", file=sys.stderr)
     for violation in violations:
