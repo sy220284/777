@@ -287,6 +287,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 status = "scheduled",
                 nextRunAt = runAt,
                 lastError = null,
+                failureStreak = 0,
             )
         }
 
@@ -506,16 +507,16 @@ class HarnessAutomationWorker(
                     ),
                 )
             }
-            if (autoPaused) {
-                WorkManager.getInstance(applicationContext)
-                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
-            }
             maybeNotify(
                 entry = entry,
                 task = task,
                 titleRes = R.string.tasks_notification_failed,
                 sessionId = error.sessionId,
             )
+            if (autoPaused) {
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
+            }
             Result.success()
         } catch (error: Throwable) {
             val finished = System.currentTimeMillis()
@@ -547,16 +548,16 @@ class HarnessAutomationWorker(
                     ),
                 )
             }
-            if (autoPaused) {
-                WorkManager.getInstance(applicationContext)
-                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
-            }
             maybeNotify(
                 entry = entry,
                 task = task,
                 titleRes = R.string.tasks_notification_failed,
                 sessionId = task.workSessionId,
             )
+            if (autoPaused) {
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
+            }
             Result.success()
         }
     }
