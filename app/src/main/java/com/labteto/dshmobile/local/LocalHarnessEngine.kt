@@ -1985,6 +1985,9 @@ class LocalHarnessEngine @Inject constructor(
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
+            providerRetryDelayMillis = { error, _ ->
+                (error as? LocalModelException)?.retryAfterMillis
+            },
         )
         return try {
             executor.execute {
@@ -5775,6 +5778,9 @@ class LocalHarnessEngine @Inject constructor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            providerRetryDelayMillis = { error, _ ->
+                (error as? LocalModelException)?.retryAfterMillis
             },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
