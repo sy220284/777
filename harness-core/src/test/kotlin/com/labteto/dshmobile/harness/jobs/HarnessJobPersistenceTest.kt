@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,4 +129,42 @@ class HarnessJobPersistenceTest {
 
         assertTrue(manager.output(persistentId).contains("[completed]"))
     }
+
+    @Test
+    fun persistentAgentInboxSurvivesRestartAndIsConsumedExactlyOnce() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val first = HarnessJobManager(scope = this, onChanged = { })
+        val started = first.startPersistent(
+            label = "子代理：research",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{\"session_id\":\"s\"}",
+        ) { _, _ ->
+            gate.await()
+            "done"
+        }
+        val id = started.substringAfterLast('：')
+        runCurrent()
+
+        assertTrue(first.send(id, "继续检查").contains("已发送"))
+        val durable = first.snapshots().single { it.id == id }
+        assertEquals(listOf("继续检查"), durable.inbox)
+
+        first.stopAllAndJoin()
+
+        lateinit var restarted: HarnessJobManager
+        restarted = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(durable.copy(status = "running")),
+        )
+        val resumed = restarted.resumePersistent(id) { jobId, _ ->
+            restarted.drainMessages(jobId).joinToString("|")
+        }
+        assertTrue(resumed.contains("已恢复"))
+        advanceUntilIdle()
+
+        assertTrue(restarted.output(id).contains("继续检查"))
+        assertTrue(restarted.snapshots().single { it.id == id }.inbox.isEmpty())
+    }
+
 }
