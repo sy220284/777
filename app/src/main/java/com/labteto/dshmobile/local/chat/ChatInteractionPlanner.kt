@@ -92,6 +92,11 @@ data class ChatPostTurnPlan(
     val turnSignificance: String = "MINOR",
 )
 
+@Serializable
+data class ChatReplySuggestionPlan(
+    val suggestions: List<ChatReplySuggestion> = emptyList(),
+)
+
 @Singleton
 class ChatInteractionPlanner @Inject constructor(
     private val json: Json,
@@ -102,7 +107,7 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
     ): String = buildString {
-        appendLine("更新角色隐藏状态，并生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
+        appendLine("更新角色隐藏状态。只输出 JSON，不解释；不要生成回复建议。")
         appendLine("角色=${persona.name}" +
             persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
             persona.relationship.takeIf(String::isNotBlank)?.let { "｜关系=$it" }.orEmpty())
@@ -146,16 +151,71 @@ class ChatInteractionPlanner @Inject constructor(
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
         }
 
-        appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[{\"label\":\"\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"\",\"bold\":false}],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
+        appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
         appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
         appendLine("规则：")
         appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
         appendLine("2. 数值与用户画像渐进变化；stage 仅在明确关系事件或连续强证据下改变。stage 只用 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
         appendLine("3. NONE=无新状态，MINOR=短期变化，MAJOR=承诺、关系事件、重大共同经历或稳定人物事实；NONE 时 state 可为空。")
-        appendLine("4. 有自然接话空间时给4条明显不同建议，优先自然/俏皮/直球/放飞，至少1条 bold=true；直接回应角色刚才那句并贴合用户真实说话习惯，禁止同义改写凑数。")
+        appendLine("4. suggestions 固定输出空数组；回复建议只在用户主动点击时另行生成。")
         appendLine("5. 用户实际发言和明确纠正优先；不虚构事实、不替用户作重大不可逆决定。现实关系军师场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
         appendLine("6. activeGoal/currentAgenda/internalConflict/immediateConcern 只写角色当下真实驱动，不凭空制造阴谋、爱意或分析腔。")
     }.trim()
+
+    fun suggestionsPrompt(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+        userMessage: String,
+        assistantMessage: String,
+    ): String = buildString {
+        appendLine("根据最近一轮角色聊天，生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
+        appendLine(
+            "角色=${persona.name}" +
+                persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
+                persona.relationship.takeIf(String::isNotBlank)?.let { "｜关系=$it" }.orEmpty(),
+        )
+        appendLine(
+            "当前关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
+                "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
+                "玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
+        )
+        appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
+        appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        if (hasAdultIntimacyIntent(userMessage, state)) {
+            appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认。")
+        }
+        appendLine(
+            "输出：{\"suggestions\":[{\"label\":\"2到6字短标签\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"用户可直接发送的下一句\",\"bold\":false}]}",
+        )
+        appendLine("规则：")
+        appendLine("1. 必须给4条明显不同的建议，优先覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
+        appendLine("2. text 必须直接回应角色刚才那句，贴合用户真实说话习惯和当前关系，不写万能句。")
+        appendLine("3. 禁止同义改写凑数，不虚构事实，不替用户作重大不可逆决定。")
+        appendLine("4. 现实关系场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+    }.trim()
+
+    fun parseSuggestions(text: String): List<ChatReplySuggestion>? {
+        val body = extractJsonObject(text) ?: return null
+        val decoded = runCatching {
+            json.decodeFromString(ChatReplySuggestionPlan.serializer(), body)
+        }.getOrNull() ?: return null
+        return decoded.suggestions.asSequence()
+            .map { suggestion ->
+                val style = suggestion.style.trim().take(12)
+                ChatReplySuggestion(
+                    label = suggestion.label.trim().take(12),
+                    text = suggestion.text.trim().take(320),
+                    style = style,
+                    bold = suggestion.bold || style == "放飞",
+                    direction = suggestion.direction.trim().take(200),
+                    impact = suggestion.impact.trim().take(120),
+                )
+            }
+            .filter { it.label.isNotBlank() && it.text.isNotBlank() }
+            .distinctBy { normalize(it.text) }
+            .take(4)
+            .toList()
+    }
 
     fun parse(
         text: String,
