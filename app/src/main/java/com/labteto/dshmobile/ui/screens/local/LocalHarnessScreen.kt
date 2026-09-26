@@ -233,8 +233,12 @@ fun LocalHarnessScreen(
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
-    val pendingApprovalCallId = state.pendingApproval?.callId
-    val pendingQuestionCallId = state.pendingQuestion?.callId
+    val pendingApprovalCallId = state.pendingApproval
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.callId
+    val pendingQuestionCallId = state.pendingQuestion
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.callId
     BackHandler(enabled = pendingApprovalCallId != null) {
         pendingApprovalCallId?.let(viewModel::deny)
     }
@@ -1147,8 +1151,11 @@ private fun LocalChat(
     val transcriptMessages = remember(pagedOlderMessages, transcriptWindow.messages) {
         mergeLocalTranscriptHistory(pagedOlderMessages, transcriptWindow.messages)
     }
-    val transcriptItems = remember(transcriptMessages) {
-        buildLocalTranscript(transcriptMessages)
+    val transcriptItems = remember(transcriptMessages, state.usageMode) {
+        buildLocalTranscript(
+            transcriptMessages,
+            includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
+        )
     }
     val hiddenTranscriptCount = (state.messages.size - transcriptMessages.size).coerceAtLeast(0)
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -1747,7 +1754,10 @@ private fun LocalChat(
                             onRemove = { attachments.removeAt(index) },
                         )
                     }
-                    if (attachments.any { it.mediaType.startsWith("image/") }) {
+                    if (
+                        state.usageMode == LocalUsageMode.WORK &&
+                        attachments.any { it.mediaType.startsWith("image/") }
+                    ) {
                         val imageModeLabel = stringResource(
                             when (state.imageInputMode) {
                                 LocalImageInputMode.AUTO -> R.string.advanced_image_mode_auto
@@ -1876,7 +1886,9 @@ private fun LocalChat(
         }
     }
 
-    state.pendingApproval?.let { approval ->
+    state.pendingApproval
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.let { approval ->
         ApprovalDialog(
             approval = approval,
             safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
@@ -1886,7 +1898,9 @@ private fun LocalChat(
             onApproveDeviceTurn = { onApproveDeviceTurn(approval.callId) },
         )
     }
-    state.pendingQuestion?.let { question ->
+    state.pendingQuestion
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.let { question ->
         QuestionDialog(
             question = question.question,
             options = question.options,
@@ -2126,7 +2140,7 @@ private fun LocalChat(
             }
         }
     }
-    if (showImageModePicker) {
+    if (showImageModePicker && state.usageMode == LocalUsageMode.WORK) {
         DsBottomSheet(
             title = stringResource(R.string.advanced_image_input_mode),
             onDismiss = { showImageModePicker = false },
