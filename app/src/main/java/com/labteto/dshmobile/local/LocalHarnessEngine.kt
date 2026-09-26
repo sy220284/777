@@ -4655,6 +4655,10 @@ class LocalHarnessEngine @Inject constructor(
             put("name", normalized.name)
             put("content", truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
             put("is_error", result.isError)
+            result.errorCode?.let { put("error_code", it) }
+            put("retryable", result.retryable)
+            put("side_effect", result.sideEffect.name.lowercase())
+            result.recoveryHint?.let { put("recovery_hint", it) }
             put("automation", true)
         })
         return result
