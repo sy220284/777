@@ -1659,6 +1659,19 @@ class LocalHarnessEngine @Inject constructor(
         timeoutMillis = timeoutMillis,
     ).output
 
+    suspend fun prepareAutomationWorkSession(
+        text: String,
+        preferredSessionId: String? = null,
+    ): String {
+        val prompt = text.trim()
+        require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
+        withTimeout(15_000L) {
+            while (_state.value.loading) delay(50)
+        }
+        require(_state.value.configured) { "本机 Harness 尚未配置模型" }
+        return resolveAutomationWorkSession(preferredSessionId, prompt).id
+    }
+
     /**
      * Execute automation in its own durable Work session without changing the visible Chat/Work
      * surface. Recurring tasks can pass [preferredSessionId] so all runs remain in one work history.
@@ -1667,6 +1680,7 @@ class LocalHarnessEngine @Inject constructor(
         text: String,
         preferredSessionId: String? = null,
         timeoutMillis: Long = 5 * 60_000L,
+        recoverInterrupted: Boolean = false,
     ): LocalAutomationRunResult {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
@@ -1679,17 +1693,55 @@ class LocalHarnessEngine @Inject constructor(
         val sessionId = session.id
         val boundState = automationBoundState(session)
         val boundEventLog = eventLogFor(sessionId)
+
+        if (recoverInterrupted) {
+            val repair = boundEventLog.repairInterruptedTail()
+            agentRunCoordinator.recoveryDecision(
+                sessionId = sessionId,
+                repair = repair,
+                kind = LocalAgentRunKind.AUTOMATION,
+            )?.let { decision ->
+                decision.completedOutput?.let { recovered ->
+                    val output = recovered.ifBlank { "后台任务已完成" }
+                    ensureRecoveredAutomationTranscript(
+                        session = session,
+                        output = output,
+                        eventLog = boundEventLog,
+                    )
+                    return LocalAutomationRunResult(sessionId = sessionId, output = output)
+                }
+                decision.blockedReason?.let { blocked ->
+                    agentRunCoordinator.markRecoveryBlocked(
+                        sessionId = sessionId,
+                        runId = decision.runId,
+                        reason = blocked,
+                        kind = LocalAgentRunKind.AUTOMATION,
+                    )
+                    throw LocalHarnessBlockedException(blocked, sessionId)
+                }
+                if (decision.queuedInput != null) {
+                    agentRunCoordinator.markRecoveryQueued(
+                        sessionId = sessionId,
+                        runId = decision.runId,
+                        kind = LocalAgentRunKind.AUTOMATION,
+                    )
+                }
+            }
+        }
+
         val userMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
             role = "user",
             content = prompt,
             createdAt = System.currentTimeMillis(),
         )
-        boundEventLog.append("user/message", buildJsonObject {
-            put("content", prompt)
-            put("automation", true)
-            put("transcript", encodeTranscriptMessages(listOf(userMessage)))
-        })
+        if (!recoverInterrupted || !hasMatchingAutomationUser(boundEventLog, prompt)) {
+            boundEventLog.append("user/message", buildJsonObject {
+                put("content", prompt)
+                put("automation", true)
+                put("transcript", encodeTranscriptMessages(listOf(userMessage)))
+            })
+        }
 
         var blockedReason: String? = null
         val runner = automationSubagentRunner(
@@ -1766,6 +1818,8 @@ class LocalHarnessEngine @Inject constructor(
         instruction: String,
         targetSessionId: String,
         timeoutMillis: Long = 3 * 60_000L,
+        recoverInterrupted: Boolean = false,
+        recoveryStartedAt: Long? = null,
     ): LocalAutomationRunResult {
         val trigger = instruction.trim()
         require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
@@ -1778,6 +1832,15 @@ class LocalHarnessEngine @Inject constructor(
             ?: error("定时互动绑定的聊天已不存在")
         require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
+
+        if (recoverInterrupted) {
+            recoverAutomationChatOutput(
+                eventLog = eventLogFor(targetSessionId),
+                startedAt = recoveryStartedAt,
+            )?.let { recovered ->
+                return LocalAutomationRunResult(sessionId = targetSessionId, output = recovered)
+            }
+        }
 
         val automationJob = currentCoroutineContext()[Job]
         var ownsVisibleTurn = false
@@ -2129,6 +2192,62 @@ class LocalHarnessEngine @Inject constructor(
             pendingQuestion = null,
             error = null,
         )
+    }
+
+    private fun hasMatchingAutomationUser(
+        eventLog: LocalSessionEventLog,
+        prompt: String,
+    ): Boolean {
+        val latest = eventLog.latest("user/message") ?: return false
+        return latest.data["automation"]?.jsonPrimitive?.booleanOrNull == true &&
+            latest.data["content"]?.jsonPrimitive?.contentOrNull == prompt
+    }
+
+    private fun ensureRecoveredAutomationTranscript(
+        session: LocalHarnessSession,
+        output: String,
+        eventLog: LocalSessionEventLog,
+    ) {
+        val latestAssistant = eventLog.latest("assistant/message")
+        val alreadyPersisted = latestAssistant?.data?.get("automation")
+            ?.jsonPrimitive?.booleanOrNull == true &&
+            latestAssistant.data["content"]?.jsonPrimitive?.contentOrNull == output
+        if (alreadyPersisted) return
+        persistAutomationTranscript(
+            session = session,
+            messages = emptyList(),
+            finalRole = "assistant",
+            finalContent = output,
+            eventLog = eventLog,
+        )
+    }
+
+    private fun recoverAutomationChatOutput(
+        eventLog: LocalSessionEventLog,
+        startedAt: Long?,
+    ): String? {
+        val threshold = startedAt ?: return null
+        var turnStartSequence: Long? = null
+        var recovered: String? = null
+        eventLog.events().forEach { event ->
+            if (
+                event.createdAt >= threshold &&
+                event.type == "turn/start" &&
+                event.data["automation"]?.jsonPrimitive?.booleanOrNull == true &&
+                event.data["proactive"]?.jsonPrimitive?.booleanOrNull == true
+            ) {
+                turnStartSequence = event.sequence
+                recovered = null
+                return@forEach
+            }
+            val startSequence = turnStartSequence ?: return@forEach
+            if (event.sequence <= startSequence || event.type != "assistant/message") return@forEach
+            decodeTranscriptMessages(event.data)
+                .orEmpty()
+                .lastOrNull { message -> message.role == "assistant" && message.proactive }
+                ?.let { message -> recovered = message.content }
+        }
+        return recovered
     }
 
     private fun persistAutomationTranscript(
