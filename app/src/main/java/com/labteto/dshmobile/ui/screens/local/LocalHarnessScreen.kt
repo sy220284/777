@@ -144,6 +144,8 @@ import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
@@ -1204,6 +1206,14 @@ private fun LocalChat(
         !state.groupChat.enabled &&
         state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
+    val currentGalleryEntry = remember(gallery, state.galleryId) {
+        state.galleryId?.let { id -> gallery.firstOrNull { it.id == id } }
+    }
+    val currentGalleryStory = remember(currentGalleryEntry, state.galleryStoryId) {
+        state.galleryStoryId?.let { id ->
+            currentGalleryEntry?.stories?.firstOrNull { it.id == id }
+        }
+    }
     LaunchedEffect(
         state.sessionId,
         state.usageMode,
@@ -1323,6 +1333,12 @@ private fun LocalChat(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 ) {
                     if (state.usageMode == LocalUsageMode.CHAT) {
+                        if (!state.groupChat.enabled) {
+                            LocalPersonaHeaderAvatar(
+                                name = state.chatPersona.name,
+                                portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+                            )
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 if (state.groupChat.enabled) {
@@ -1361,9 +1377,12 @@ private fun LocalChat(
                                     )
                                 }
                             } else {
-                                state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                                val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
+                                val secondary = listOfNotNull(storyTitle, relationship).joinToString(" · ")
+                                if (secondary.isNotBlank()) {
                                     Text(
-                                        relationship,
+                                        secondary,
                                         style = DsType.caption11,
                                         color = colors.labelSecondary,
                                         maxLines = 1,
@@ -1422,6 +1441,13 @@ private fun LocalChat(
             state.usageMode == LocalUsageMode.WORK &&
             (state.running || state.goal != null || state.todos.isNotEmpty())
         ) {
+            WorkSessionStatusStrip(
+                state = state,
+                onClick = onOpenRunCenter,
+            )
+        }
+
+        if (state.usageMode == LocalUsageMode.WORK) {
             WorkSessionStatusStrip(
                 state = state,
                 onClick = onOpenRunCenter,
@@ -2270,6 +2296,127 @@ private fun LocalUsageModePill(
                         style = DsType.small13Strong,
                         color = if (active) colors.bgBase else colors.labelSecondary,
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalPersonaHeaderAvatar(
+    name: String,
+    portraitPath: String,
+) {
+    val colors = DsTheme.colors
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            portraitPath
+                .takeIf(String::isNotBlank)
+                ?.let(BitmapFactory::decodeFile)
+                ?.asImageBitmap()
+        }
+    }
+    Surface(
+        modifier = Modifier.size(34.dp),
+        shape = CircleShape,
+        color = colors.accentTertiary,
+        border = BorderStroke(1.dp, colors.borderL1),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (portrait != null) {
+                Image(
+                    bitmap = portrait!!,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    name.trim().take(1).ifBlank { "·" },
+                    style = DsType.small13Strong,
+                    color = colors.accent,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkSessionStatusStrip(
+    state: LocalHarnessState,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val hasStatus = state.running ||
+        state.goal != null ||
+        state.todos.isNotEmpty() ||
+        state.activeAgents > 0 ||
+        state.jobs.isNotEmpty()
+    if (!hasStatus) return
+
+    val completedTasks = state.todos.count { it.status == "completed" }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsStatusPill(
+                    state = if (state.running) DsStatus.Running else DsStatus.Neutral,
+                    label = stringResource(
+                        if (state.running) R.string.local_execution_notification_running
+                        else R.string.local_run_center,
+                    ),
+                )
+                state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
+                    Text(
+                        goal,
+                        style = DsType.small13Strong,
+                        color = colors.labelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.local_run_center),
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (state.todos.isNotEmpty()) {
+                    DsPill(
+                        text = stringResource(
+                            R.string.local_run_tasks_progress,
+                            completedTasks,
+                            state.todos.size,
+                        ),
+                    )
+                }
+                if (state.activeAgents > 0) {
+                    DsPill(text = stringResource(R.string.subagents_title) + " " + state.activeAgents)
+                }
+                if (state.jobs.isNotEmpty()) {
+                    DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
                 }
             }
         }
