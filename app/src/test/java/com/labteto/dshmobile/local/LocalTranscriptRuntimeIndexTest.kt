@@ -79,7 +79,7 @@ class LocalTranscriptRuntimeIndexTest {
     }
 
     @Test
-    fun proactiveAssistantDoesNotChangeTurnAlternationButCannotStartDialogue() {
+    fun proactiveAssistantDoesNotChangeTurnAlternationAndCanExistBeforeUserTurn() {
         val normal = buildLocalTranscriptRuntimeIndex(
             listOf(
                 message("u1", "user", "稍后找我", 1L),
@@ -93,7 +93,7 @@ class LocalTranscriptRuntimeIndexTest {
 
         assertTrue(normal.branchingEligible)
         assertEquals("assistant", normal.lastTurnDialogueRole)
-        assertFalse(startsProactively.branchingEligible)
+        assertTrue(startsProactively.branchingEligible)
     }
 
     @Test
