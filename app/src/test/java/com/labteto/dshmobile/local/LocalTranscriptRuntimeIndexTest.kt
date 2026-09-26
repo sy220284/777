@@ -113,6 +113,56 @@ class LocalTranscriptRuntimeIndexTest {
     }
 
     @Test
+    fun eventTailAdvancesPersistedIndexWithoutRebuildingFromHotWindow() {
+        val base = LocalTranscriptRuntimeIndex(
+            firstUserTitle = "最早标题",
+            latestCreatedAt = 999L,
+            latestDialogueCreatedAt = 999L,
+            latestDialogueMessageId = "a499",
+            latestUserMessageId = "u499",
+            latestUserContent = "旧问题",
+            latestMessageId = "a499",
+            latestMessageRole = "assistant",
+            totalMessageCount = 1_000L,
+            hasDialogue = true,
+            branchingEligible = true,
+            lastTurnDialogueRole = "assistant",
+        )
+        val events = listOf(
+            LocalSessionEventLog.Event(
+                sequence = 100L,
+                type = "user/message",
+                createdAt = 1_000L,
+                data = kotlinx.serialization.json.buildJsonObject {
+                    put(
+                        "transcript",
+                        encodeTranscriptMessages(listOf(message("u500", "user", "新问题", 1_000L))),
+                    )
+                },
+            ),
+            LocalSessionEventLog.Event(
+                sequence = 101L,
+                type = "assistant/message",
+                createdAt = 1_001L,
+                data = kotlinx.serialization.json.buildJsonObject {
+                    put(
+                        "transcript",
+                        encodeTranscriptMessages(listOf(message("a500", "assistant", "新回答", 1_001L))),
+                    )
+                },
+            ),
+        )
+
+        val updated = projectLocalTranscriptRuntimeIndexTail(base, events, 99L)
+
+        assertEquals(1_002L, updated.totalMessageCount)
+        assertEquals("最早标题", updated.firstUserTitle)
+        assertEquals("a500", updated.latestDialogueMessageId)
+        assertEquals("u500", updated.latestUserMessageId)
+        assertTrue(updated.branchingEligible)
+    }
+
+    @Test
     fun attachmentContextMakesBranchingIneligible() {
         val index = buildLocalTranscriptRuntimeIndex(
             listOf(
