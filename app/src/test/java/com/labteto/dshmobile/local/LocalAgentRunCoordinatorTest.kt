@@ -142,6 +142,32 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun durableTurnEndWinsOverStaleRunningCheckpoint() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 16,
+                input = "完成任务",
+                memoryInput = "完成任务",
+            )
+            log.append(
+                "turn/end",
+                kotlinx.serialization.json.buildJsonObject {
+                    kotlinx.serialization.json.put("reason", "completed")
+                },
+            )
+
+            assertNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+        }
+    }
+
+    @Test
     fun terminalRunNeverProducesRecoveryDecision() {
         withCoordinator { coordinator, _ ->
             val context = coordinator.start(
