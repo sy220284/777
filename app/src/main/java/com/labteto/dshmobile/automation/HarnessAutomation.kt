@@ -492,6 +492,10 @@ class HarnessAutomationScheduler @Inject constructor(
         return store.remove(id)
     }
 
+    internal fun enqueueNextChained(id: String, runAt: Long) {
+        enqueueOneTime(id, runAt)
+    }
+
     private fun enqueueOneTime(id: String, runAt: Long) {
         val now = System.currentTimeMillis()
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
@@ -549,6 +553,7 @@ class HarnessAutomationWorker(
     interface WorkerEntryPoint {
         fun localHarnessEngine(): LocalHarnessEngine
         fun automationStore(): AutomationStore
+        fun automationScheduler(): HarnessAutomationScheduler
         fun notifications(): DshNotifications
         fun hostsStore(): HostsStore
     }
