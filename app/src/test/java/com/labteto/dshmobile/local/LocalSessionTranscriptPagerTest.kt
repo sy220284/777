@@ -142,6 +142,22 @@ class LocalSessionTranscriptPagerTest {
         }
     }
 
+    @Test
+    fun allRebuildsEveryPageInChronologicalOrder() {
+        withLog { log ->
+            repeat(7) { index ->
+                log.append(
+                    if (index % 2 == 0) "user/message" else "assistant/message",
+                    transcript(message("m$index", if (index % 2 == 0) "user" else "assistant", "message-$index")),
+                )
+            }
+
+            val messages = LocalSessionTranscriptPager(log, eventPageSize = 2).all(pageSize = 3)
+
+            assertEquals((0..6).map { "m$it" }, messages.map { it.id })
+        }
+    }
+
     private fun transcript(vararg messages: LocalHarnessMessage) = buildJsonObject {
         put("transcript", encodeTranscriptMessages(messages.toList()))
     }
