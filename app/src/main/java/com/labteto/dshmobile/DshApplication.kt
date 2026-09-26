@@ -11,6 +11,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
@@ -23,17 +24,28 @@ class DshApplication : Application() {
     private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
-        val processStartedAt = System.currentTimeMillis()
         super.onCreate()
         AppCompatDelegate.setDefaultNightMode(nightModeFor(storedThemePreference(this)))
         KeepAliveWorker.schedule(this)
         notificationObserver.start()
 
-        // APKs and delta files are only installer staging artifacts. Keep the current process safe
-        // from races, but remove everything left by an earlier process (including legacy version
-        // directories that older builds accumulated indefinitely).
+        // Legacy update files are removed immediately. A verified APK that has already been handed
+        // to Android's installer is kept only until either this installed build reaches the target
+        // version or the short installer handoff window expires.
         maintenanceScope.launch {
-            UpdateCache.cleanupStale(cacheDir, processStartedAt)
+            val retryAfter = UpdateCache.cleanupStale(
+                cacheDir = cacheDir,
+                currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                nowMillis = System.currentTimeMillis(),
+            )
+            if (retryAfter != null) {
+                delay(retryAfter)
+                UpdateCache.cleanupStale(
+                    cacheDir = cacheDir,
+                    currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                    nowMillis = System.currentTimeMillis(),
+                )
+            }
         }
     }
 
