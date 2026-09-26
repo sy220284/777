@@ -53,4 +53,8 @@ class AgentRunContext(
     val isCancelled: Boolean get() = cancellationReason.get() != null
 
     val cancelReason: String? get() = cancellationReason.get()
+
+    companion object {
+        const val TOOL_CONTEXT_ATTRIBUTE = "agent_run_context"
+    }
 }
