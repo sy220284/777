@@ -70,7 +70,7 @@ class PersonaTransferDocumentsTest {
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (!entry.isDirectory && entry.name.endsWith(".xml")) {
-                    entries[entry.name] = zip.readBytes().toString(StandardCharsets.UTF_8)
+                    entries[entry.name] = String(zip.readBytes(), StandardCharsets.UTF_8)
                 }
             }
         }
