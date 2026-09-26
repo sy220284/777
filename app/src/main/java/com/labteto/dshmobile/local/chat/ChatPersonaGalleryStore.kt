@@ -9,6 +9,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class PersonaGalleryStory(
@@ -123,7 +126,8 @@ internal fun samePersonaIdentity(left: PersonaProfile, right: PersonaProfile): B
     val rightName = normalizePersonaText(right.name)
     if (leftName.isBlank() || rightName.isBlank() || leftName != rightName) return false
     if (leftName in DEFAULT_PERSONA_NAMES || rightName in DEFAULT_PERSONA_NAMES) return false
-    return compatibleIdentityField(left.worldSetting, right.worldSetting)
+    return compatibleIdentityField(left.worldSetting, right.worldSetting) &&
+        compatibleIdentityField(left.franchise, right.franchise)
 }
 
 private fun compatibleIdentityField(left: String, right: String): Boolean {
@@ -536,6 +540,91 @@ class ChatPersonaGalleryStore internal constructor(
             PersonaShareEnvelope.serializer(),
             PersonaShareEnvelope(persona = profile.copy(id = PersonaProfile.DEFAULT_PERSONA_ID)),
         )
+    }
+
+    @Synchronized
+    internal fun exportPersonaDocument(
+        id: String,
+        format: PersonaTransferFormat,
+    ): PersonaTransferDocument {
+        val entry = readNormalized().entries.firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        return PersonaTransferDocuments.encode(json, entry, format)
+    }
+
+    @Synchronized
+    internal fun importPersonaDocument(
+        bytes: ByteArray,
+        fileName: String? = null,
+        mimeType: String? = null,
+    ): PersonaGalleryEntry {
+        val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(
+            bytes = bytes,
+            fileName = fileName,
+            mimeType = mimeType,
+        )
+        val schema = runCatching {
+            json.parseToJsonElement(canonicalJson)
+                .jsonObject["schema"]
+                ?.jsonPrimitive
+                ?.intOrNull
+        }.getOrElse { error ->
+            throw IllegalArgumentException("人物迁移数据格式不正确", error)
+        }
+        return when (schema) {
+            2 -> importArchivedEntry(
+                PersonaTransferDocuments.decodeArchive(json, canonicalJson).entry,
+            )
+            1, null -> importPersona(canonicalJson)
+            else -> throw IllegalArgumentException("暂不支持这个人物迁移版本")
+        }
+    }
+
+    private fun importArchivedEntry(source: PersonaGalleryEntry): PersonaGalleryEntry {
+        val now = System.currentTimeMillis()
+        val importedPersona = fullSharePersona(source.persona).copy(updatedAt = now)
+        require(isMeaningfulGalleryPersona(importedPersona)) { "人物设定内容不足，无法导入" }
+
+        val seenStoryIds = hashSetOf<String>()
+        val importedStories = source.stories.map { raw ->
+            val sourceId = raw.id.trim().take(120)
+            val storyId = sourceId
+                .takeIf { it.isNotBlank() && seenStoryIds.add(it) }
+                ?: "story-${UUID.randomUUID()}".also { seenStoryIds.add(it) }
+            raw.copy(
+                id = storyId,
+                title = raw.title.trim().take(160),
+                notes = raw.notes.trim().take(4_000),
+                history = mergeHistory(emptyList(), raw.history),
+                sourceSessionIds = emptyList(),
+                excludedMessageKeys = emptyList(),
+            )
+        }
+
+        val doc = readNormalized()
+        val matched = doc.entries.filter {
+            samePersonaIdentity(it.persona, importedPersona)
+        }.singleOrNull()
+        val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val entry = if (matched != null) {
+            matched.copy(
+                persona = mergePersonaProfiles(matched.persona, importedPersona)
+                    .copy(id = entryId, updatedAt = now),
+                groupChatState = mergeChatState(matched.groupChatState, source.groupChatState),
+                stories = mergeLegacyStoryLists(matched.stories, importedStories),
+                updatedAt = now,
+            )
+        } else {
+            PersonaGalleryEntry(
+                id = entryId,
+                persona = importedPersona.copy(id = entryId),
+                groupChatState = source.groupChatState,
+                stories = importedStories,
+                updatedAt = now,
+            )
+        }
+        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        return entry
     }
 
     @Synchronized
