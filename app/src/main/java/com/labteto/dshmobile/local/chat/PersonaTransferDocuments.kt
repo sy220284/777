@@ -14,7 +14,7 @@ internal const val PERSONA_WORD_MIME =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 internal const val MAX_PERSONA_TRANSFER_BYTES = 16 * 1024 * 1024
 
-internal enum class PersonaTransferFormat(
+enum class PersonaTransferFormat(
     val extension: String,
     val mimeType: String,
 ) {
@@ -23,7 +23,7 @@ internal enum class PersonaTransferFormat(
     WORD("docx", PERSONA_WORD_MIME),
 }
 
-internal data class PersonaTransferDocument(
+data class PersonaTransferDocument(
     val format: PersonaTransferFormat,
     val bytes: ByteArray,
 )
