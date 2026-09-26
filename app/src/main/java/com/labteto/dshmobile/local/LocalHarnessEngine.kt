@@ -1856,7 +1856,7 @@ class LocalHarnessEngine @Inject constructor(
                     pendingQuestion = null,
                     error = null,
                 )
-                val chatContext = chatTurnRunner.prepareProfile(
+                val chatContext = chatTurnCoordinator.prepareProfile(
                     persona = persona,
                     state = session.chatState,
                     userInput = trigger,
@@ -1908,12 +1908,11 @@ class LocalHarnessEngine @Inject constructor(
                     snapshot = boundState,
                     messages = requestMessages,
                 )
-                val reply = chatTurnRunner.finalizeReply(
+                val reply = chatTurnCoordinator.finalize(
+                    snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
                     recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
-                    guardEnabled = boundState.chatStyleGuardEnabled,
-                    additionalBannedPhrases = boundState.chatStyleGuardCustomPhrases,
                     onGuardEvent = { action, violations ->
                         recordStyleGuardHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
@@ -3242,7 +3241,7 @@ class LocalHarnessEngine @Inject constructor(
         mayStaySilent: Boolean,
         handoffSummary: String?,
     ): String {
-        val personaPrompt = chatTurnRunner.prepareProfile(
+        val personaPrompt = chatTurnCoordinator.prepareProfile(
             persona = persona,
             state = state,
             userInput = input,
@@ -3314,12 +3313,11 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
             )
-            val guarded = chatTurnRunner.finalizeReply(
+            val guarded = chatTurnCoordinator.finalize(
+                snapshot = snapshot,
                 persona = persona,
                 reply = rawReply,
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                guardEnabled = snapshot.chatStyleGuardEnabled,
-                additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
                 onGuardEvent = { action, violations ->
                     recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
@@ -3371,7 +3369,7 @@ class LocalHarnessEngine @Inject constructor(
     ): ChatCharacterState {
         val snapshot = _state.value
         val key = apiKeys.get() ?: return member.chatState
-        val prompt = chatInteractionPlanner.prompt(
+        val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = member.chatState,
             userMessage = userMessage,
@@ -3393,7 +3391,7 @@ class LocalHarnessEngine @Inject constructor(
                 maxAttemptsOverride = 1,
             )
             usageTracker.record(snapshot.model, plannerReply.usage)
-            chatInteractionPlanner.parse(
+            chatTurnCoordinator.parsePostTurn(
                 plannerReply.content.orEmpty(),
                 previous = member.chatState,
                 userMessage = userMessage,
@@ -3437,7 +3435,7 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
             replies.forEach { reply ->
-                val memberPrompt = chatInteractionPlanner.prompt(
+                val memberPrompt = chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
                     state = reply.member.chatState,
                     userMessage = userMessage,
@@ -3476,7 +3474,7 @@ class LocalHarnessEngine @Inject constructor(
                 val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
                 val source = replies.firstOrNull { it.member.galleryId == galleryId } ?: return@forEach
                 val plan = item["plan"] ?: return@forEach
-                val parsed = chatInteractionPlanner.parse(
+                val parsed = chatTurnCoordinator.parsePostTurn(
                     text = plan.toString(),
                     previous = source.member.chatState,
                     userMessage = userMessage,
