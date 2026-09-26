@@ -54,12 +54,9 @@ import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
 import com.labteto.dshmobile.core.wire.dto.SessionCancelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
-import com.labteto.dshmobile.core.wire.dto.SessionControlFrameSerializer
 import com.labteto.dshmobile.core.wire.dto.SessionCreateRequest
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
 import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
-import com.labteto.dshmobile.core.wire.dto.SessionFollowFrameSerializer
-import com.labteto.dshmobile.core.wire.dto.SessionFollowRequest
 import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
@@ -81,7 +78,6 @@ import com.labteto.dshmobile.core.wire.dto.WorkspaceArchiveSessionRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceCreateRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceDeleteRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrame
-import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrameSerializer
 import com.labteto.dshmobile.core.wire.dto.WorkspaceRenameRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceValue
 import com.labteto.dshmobile.core.wire.dto.WorkspaceView
@@ -98,7 +94,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -446,15 +441,32 @@ class SessionStore @Inject constructor(
     private var currentId: String? = null
     private val openSessionState = OpenSessionFoldState()
 
-    /** The open session's live journal. Cancelled and replaced whenever the open session changes. */
-    private var followJob: Job? = null
-    private var childFollowJob: Job? = null
-
-    /** Host-wide live control (queue, jobs, projections). One per connection generation. */
-    private var controlJob: Job? = null
-
-    /** Workspace registry stream. One per connection generation. */
-    private var workspaceJob: Job? = null
+    private val remoteStreams = SessionRemoteStreamCoordinator(
+        scope = scope,
+        streamProvider = { endpoint, args ->
+            connectionManager.generation?.mux?.openStream(endpoint, args)
+        },
+        onControlFrame = ::handleControlFrame,
+        onWorkspaceFrame = ::handleWorkspaceFrame,
+        onFollowFrame = { sessionId, frame ->
+            when (frame) {
+                is SessionFollowFrame.Snapshot -> applyFollowSnapshot(sessionId, frame)
+                is SessionFollowFrame.Entry -> applyFollowEntry(sessionId, frame.record)
+                is SessionFollowFrame.AssistantStream -> applyAssistantFrame(sessionId, frame)
+            }
+        },
+        onFailure = { failure ->
+            when {
+                failure.endpoint == "session/follow" && failure.undecodable ->
+                    log("undecodable session/follow frame")
+                failure.endpoint == "session/follow" -> {
+                    log("session/follow ended for ${failure.sessionId}", failure.error)
+                    setConnectionError(failure.error?.message)
+                }
+                else -> log("${failure.endpoint} ended", failure.error)
+            }
+        },
+    )
 
     private data class ApprovalRequest(
         val sessionId: String,
@@ -527,35 +539,6 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Open the two host-wide streams for this connection generation.
-     *
-     * Both replace things that used to arrive unbidden on the all-session mux, and both open with
-     * a complete baseline — which is the point: a reconnect replaces the mirror wholesale rather
-     * than leaving whatever the old generation last said. They are cancelled and reopened with
-     * the generation, because a stream's items are only meaningful within the socket that carries
-     * them.
-     */
-    private fun startHostStreams() {
-        val mux = connectionManager.generation?.mux ?: return
-        controlJob?.cancel()
-        controlJob = scope.launch {
-            runCatching {
-                mux.openStream("session/control").collect { item ->
-                    decodeOrNull(SessionControlFrameSerializer, item)?.let { handleControlFrame(it) }
-                }
-            }.onFailure { log("session/control ended", it) }
-        }
-        workspaceJob?.cancel()
-        workspaceJob = scope.launch {
-            runCatching {
-                mux.openStream("workspace/follow").collect { item ->
-                    decodeOrNull(WorkspaceFollowFrameSerializer, item)?.let { handleWorkspaceFrame(it) }
-                }
-            }.onFailure { log("workspace/follow ended", it) }
-        }
-    }
-
     /** Decode one stream item, or null when it does not match the expected frame union. */
     private fun <T> decodeOrNull(serializer: kotlinx.serialization.KSerializer<T>, item: JsonElement): T? =
         runCatching { decodeFromJsonElement(serializer, item) }.getOrNull()
@@ -579,7 +562,7 @@ class SessionStore @Inject constructor(
         _contentSearchAvailable.value = true
         // Before the list read: the workspace and control streams each open with their own
         // complete baseline, and the list is what their increments are applied on top of.
-        startHostStreams()
+        remoteStreams.restartHostStreams()
         _hostInfo.value = connectionManager.generation?.description
         coroutineScope {
             // Host-scoped and needed before anything is tapped, but needed by nothing on the way to
@@ -1134,41 +1117,9 @@ class SessionStore @Inject constructor(
      * observation rather than an execution.
      */
     private fun startFollow(sessionId: String) {
-        followJob?.cancel()
         openSessionState.clearFollowCursor()
-        val mux = connectionManager.generation?.mux
-        if (mux == null) {
+        if (!remoteStreams.followSession(sessionId, HISTORY_PAGE_SIZE)) {
             log("cannot follow $sessionId: no connection generation")
-            return
-        }
-        val args = buildJsonObject {
-            put(
-                "request",
-                encodeToJsonElement(
-                    SessionFollowRequest.serializer(),
-                    SessionFollowRequest(
-                        address = SessionAddress.Session(sessionId = sessionId),
-                        maxMessages = HISTORY_PAGE_SIZE,
-                        assistantStream = true,
-                    ),
-                ),
-            )
-        }
-        followJob = scope.launch {
-            runCatching {
-                mux.openStream("session/follow", args).collect { item ->
-                    when (val frame = decodeOrNull(SessionFollowFrameSerializer, item)) {
-                        is SessionFollowFrame.Snapshot -> applyFollowSnapshot(sessionId, frame)
-                        is SessionFollowFrame.Entry -> applyFollowEntry(sessionId, frame.record)
-                        is SessionFollowFrame.AssistantStream -> applyAssistantFrame(sessionId, frame)
-                        null -> log("undecodable session/follow frame")
-                    }
-                }
-            }.onFailure { failure ->
-                if (failure is kotlinx.coroutines.CancellationException) throw failure
-                log("session/follow ended for $sessionId", failure)
-                setConnectionError(failure.message)
-            }
         }
     }
 
@@ -1700,7 +1651,7 @@ class SessionStore @Inject constructor(
 
     suspend fun openSubagentTranscript(childSessionId: String) {
         val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
+        apiOrNull() ?: return
         val entry = _subagents.value.firstOrNull { subagentEntryId(it) == childSessionId }
         val mode = when (entry) {
             is SubagentListEntry.ChildOneShot -> "one-shot"
@@ -1713,47 +1664,52 @@ class SessionStore @Inject constructor(
             log("subagent $childSessionId has no readable transcript mode")
             return
         }
-        childFollowJob?.cancel()
+        remoteStreams.cancelSubagentFollow()
         _subagentConversation.value = null
         val host = activeHostKey ?: return
-        val mux = muxForHost(host) ?: return
-        val request = SessionFollowRequest(
-            address = SessionAddress.Subagent(parentSessionId = sid, childSessionId = childSessionId, mode = mode),
-            maxMessages = HISTORY_PAGE_SIZE, assistantStream = true,
-        )
-        childFollowJob = scope.launch {
-            val events = mutableListOf<SessionEventEnvelope>()
-            val live = AssistantLiveState()
-            var hasMore = false
-            try {
-                mux.openStream("session/follow", buildJsonObject {
-                    put("request", encodeToJsonElement(SessionFollowRequest.serializer(), request))
-                }).collect { item ->
-                    if (activeHostKey != host || currentSessionId.value != sid) return@collect
-                    when (val frame = decodeOrNull(SessionFollowFrameSerializer, item)) {
-                        is SessionFollowFrame.Snapshot -> {
-                            events.clear()
-                            events.addAll(expandRecords(frame.records))
-                            live.seed(frame.assistantStream)
-                            hasMore = frame.hasMore
-                        }
-                        is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
-                            if (events.none { it.seq == event.seq }) events.add(event)
-                            val data = event.data as? JsonObject
-                            live.acceptDurable(event.type, data?.get("turn")?.jsonPrimitive?.intOrNull,
-                                data?.get("step")?.jsonPrimitive?.intOrNull, event.seq, event.surfaceOp)
-                        }
-                        is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
-                        null -> Unit
+        val events = mutableListOf<SessionEventEnvelope>()
+        val live = AssistantLiveState()
+        var hasMore = false
+        val opened = remoteStreams.followSubagent(
+            parentSessionId = sid,
+            childSessionId = childSessionId,
+            mode = mode,
+            maxMessages = HISTORY_PAGE_SIZE,
+        ) { frame ->
+            if (activeHostKey == host && currentSessionId.value == sid) {
+                when (frame) {
+                    is SessionFollowFrame.Snapshot -> {
+                        events.clear()
+                        events.addAll(expandRecords(frame.records))
+                        live.seed(frame.assistantStream)
+                        hasMore = frame.hasMore
                     }
-                    _subagentConversation.value = EventFold(childSessionId).fold(events.sortedBy { it.seq }, live.transientEnvelopes()).copy(hasMore = hasMore)
+                    is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
+                        if (events.none { it.seq == event.seq }) events.add(event)
+                        val data = event.data as? JsonObject
+                        live.acceptDurable(
+                            event.type,
+                            data?.get("turn")?.jsonPrimitive?.intOrNull,
+                            data?.get("step")?.jsonPrimitive?.intOrNull,
+                            event.seq,
+                            event.surfaceOp,
+                        )
+                    }
+                    is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
                 }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { setConnectionError(failure.message) }
+                _subagentConversation.value = EventFold(childSessionId)
+                    .fold(events.sortedBy { it.seq }, live.transientEnvelopes())
+                    .copy(hasMore = hasMore)
+            }
+        }
+        if (!opened) {
+            log("cannot follow subagent $childSessionId: no connection generation")
         }
     }
 
-    fun closeSubagentTranscript() { childFollowJob?.cancel(); childFollowJob = null }
+    fun closeSubagentTranscript() {
+        remoteStreams.cancelSubagentFollow()
+    }
 
     suspend fun createWorkspace(path: String) {
         val api = apiOrNull() ?: return
