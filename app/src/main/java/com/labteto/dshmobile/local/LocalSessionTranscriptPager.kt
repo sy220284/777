@@ -104,7 +104,11 @@ internal class LocalSessionTranscriptPager(
                 }
 
                 val decoded = decodeTranscriptMessages(event.data)
-                val activeTranscript = event.type == "chat/active-transcript" && decoded != null
+                val activeTranscript = (
+                    event.type == "chat/active-transcript" ||
+                        event.type == "session/transcript-projection-baseline" ||
+                        event.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT
+                    ) && decoded != null
                 val nextIndex = collectEventMessages(
                     decoded = decoded,
                     startIndex = decoded?.lastIndex ?: -1,

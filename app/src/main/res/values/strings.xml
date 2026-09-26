@@ -953,8 +953,13 @@
     <string name="local_execution_notification_tap">Tap to return to the conversation</string>
 
 
-    <string name="persona_gallery_import_file">Import file</string>
+    <string name="persona_gallery_import_file">Import character file</string>
     <string name="persona_gallery_export_file">Export character</string>
+    <string name="persona_gallery_export_format_title">Choose export format</string>
+    <string name="persona_gallery_export_format_hint">All formats include the character profile, memory summaries, and archived dialogue. Markdown and Word are readable and can be imported again.</string>
+    <string name="persona_gallery_export_json">JSON data file</string>
+    <string name="persona_gallery_export_markdown">Markdown document (.md)</string>
+    <string name="persona_gallery_export_word">Word document (.docx)</string>
     <string name="persona_gallery_export_failed">Could not export character</string>
     <string name="persona_gallery_import_failed">Could not import character</string>
 

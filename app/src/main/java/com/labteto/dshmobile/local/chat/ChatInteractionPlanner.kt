@@ -60,6 +60,10 @@ data class ChatCharacterState(
     val narrativeDirection: ChatNarrativeDirection? = null,
     val interactionIntent: String = ChatInteractionIntent.NORMAL.name,
     val interactionIntentStrength: Int = 0,
+    /** Per-field age in completed turns. Used to expire short-lived roleplay state. */
+    val transientAges: Map<String, Int> = emptyMap(),
+    /** Open-thread age keyed by normalized thread text. */
+    val unresolvedThreadAges: Map<String, Int> = emptyMap(),
     val updatedAt: Long = 0L,
 )
 
@@ -143,7 +147,7 @@ class ChatInteractionPlanner @Inject constructor(
         }
 
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[{\"label\":\"\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"\",\"bold\":false}],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
-        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。省略字段沿用旧值。")
+        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
         appendLine("规则：")
         appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
         appendLine("2. 数值与用户画像渐进变化；stage 仅在明确关系事件或连续强证据下改变。stage 只用 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
@@ -169,20 +173,25 @@ class ChatInteractionPlanner @Inject constructor(
         val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
         val significance = normalizeSignificance(decoded.turnSignificance)
 
+        val agedPrevious = ageTransientState(previous, userMessage)
         return decoded.copy(
             state = applyInteractionIntent(
                 state = if (significance == "NONE") {
-                    previous
+                    applyExplicitTransientClears(
+                        value = decoded.state,
+                        previous = agedPrevious,
+                        rawState = rawState,
+                    )
                 } else {
                     sanitizeState(
                         value = decoded.state,
-                        previous = previous,
+                        previous = agedPrevious,
                         userMessage = userMessage,
                         assistantMessage = assistantMessage,
                         rawState = rawState,
                     )
                 },
-                previous = previous,
+                previous = agedPrevious,
                 userMessage = userMessage,
             ),
             suggestions = decoded.suggestions.asSequence()
@@ -202,6 +211,57 @@ class ChatInteractionPlanner @Inject constructor(
                 .take(4)
                 .toList(),
             turnSignificance = significance,
+        )
+    }
+
+    private fun applyExplicitTransientClears(
+        value: ChatCharacterState,
+        previous: ChatCharacterState,
+        rawState: JsonObject?,
+    ): ChatCharacterState {
+        if (rawState == null) return previous
+
+        val ages = previous.transientAges.toMutableMap()
+        var changed = false
+
+        fun shouldClear(key: String, value: String): Boolean =
+            rawState.containsKey(key) && value.isBlank()
+
+        val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
+        val clearRecentImpression = shouldClear("recentImpression", value.recentImpression)
+        val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
+        val clearCurrentAgenda = shouldClear("currentAgenda", value.currentAgenda)
+        val clearInternalConflict = shouldClear("internalConflict", value.internalConflict)
+        val clearImmediateConcern = shouldClear("immediateConcern", value.immediateConcern)
+        val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
+
+        listOf(
+            "currentFocus" to clearCurrentFocus,
+            "recentImpression" to clearRecentImpression,
+            "activeGoal" to clearActiveGoal,
+            "currentAgenda" to clearCurrentAgenda,
+            "internalConflict" to clearInternalConflict,
+            "immediateConcern" to clearImmediateConcern,
+        ).forEach { (key, clear) ->
+            if (clear) {
+                ages.remove(key)
+                changed = true
+            }
+        }
+        if (clearThreads) changed = true
+        if (!changed) return previous
+
+        return previous.copy(
+            currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
+            recentImpression = if (clearRecentImpression) "" else previous.recentImpression,
+            activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
+            currentAgenda = if (clearCurrentAgenda) "" else previous.currentAgenda,
+            internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
+            immediateConcern = if (clearImmediateConcern) "" else previous.immediateConcern,
+            unresolvedThreads = if (clearThreads) emptyList() else previous.unresolvedThreads,
+            transientAges = ages,
+            unresolvedThreadAges = if (clearThreads) emptyMap() else previous.unresolvedThreadAges,
+            updatedAt = System.currentTimeMillis(),
         )
     }
 
@@ -257,7 +317,7 @@ class ChatInteractionPlanner @Inject constructor(
                 value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
             else -> previous.relationshipState
         }
-        return value.copy(
+        val merged = value.copy(
             mood = if (rawState?.containsKey("mood") == true) {
                 value.mood.trim().take(80).ifBlank { previous.mood }
             } else previous.mood,
@@ -298,7 +358,97 @@ class ChatInteractionPlanner @Inject constructor(
             dynamics = dynamics,
             userPattern = pattern,
             narrativeDirection = null,
+            transientAges = previous.transientAges,
+            unresolvedThreadAges = previous.unresolvedThreadAges,
             updatedAt = System.currentTimeMillis(),
+        )
+        return resetUpdatedAges(merged, rawState)
+    }
+
+    private fun ageTransientState(
+        previous: ChatCharacterState,
+        userMessage: String,
+    ): ChatCharacterState {
+        val topicReset = TOPIC_RESET_HINTS.any { userMessage.contains(it) }
+        val nextAges = previous.transientAges.toMutableMap()
+
+        fun age(key: String, value: String, ttl: Int, clearOnTopicReset: Boolean = false): String {
+            if (value.isBlank()) {
+                nextAges.remove(key)
+                return ""
+            }
+            if (topicReset && clearOnTopicReset) {
+                nextAges.remove(key)
+                return ""
+            }
+            val next = (nextAges[key] ?: 0) + 1
+            return if (next > ttl) {
+                nextAges.remove(key)
+                ""
+            } else {
+                nextAges[key] = next
+                value
+            }
+        }
+
+        val nextThreadAges = previous.unresolvedThreadAges.toMutableMap()
+        val threads = if (topicReset) {
+            nextThreadAges.clear()
+            emptyList()
+        } else {
+            previous.unresolvedThreads.filter { thread ->
+                val key = normalize(thread)
+                val next = (nextThreadAges[key] ?: 0) + 1
+                if (next > THREAD_TTL) {
+                    nextThreadAges.remove(key)
+                    false
+                } else {
+                    nextThreadAges[key] = next
+                    true
+                }
+            }
+        }
+
+        return previous.copy(
+            currentFocus = age("currentFocus", previous.currentFocus, 3, clearOnTopicReset = true),
+            recentImpression = age("recentImpression", previous.recentImpression, 5),
+            activeGoal = age("activeGoal", previous.activeGoal, 12),
+            currentAgenda = age("currentAgenda", previous.currentAgenda, 3, clearOnTopicReset = true),
+            internalConflict = age("internalConflict", previous.internalConflict, 6),
+            immediateConcern = age("immediateConcern", previous.immediateConcern, 2, clearOnTopicReset = true),
+            unresolvedThreads = threads,
+            transientAges = nextAges,
+            unresolvedThreadAges = nextThreadAges,
+        )
+    }
+
+    private fun resetUpdatedAges(
+        state: ChatCharacterState,
+        rawState: JsonObject?,
+    ): ChatCharacterState {
+        if (rawState == null) return state
+        val ages = state.transientAges.toMutableMap()
+
+        fun reset(key: String, value: String) {
+            if (!rawState.containsKey(key)) return
+            if (value.isBlank()) ages.remove(key) else ages[key] = 0
+        }
+
+        reset("currentFocus", state.currentFocus)
+        reset("recentImpression", state.recentImpression)
+        reset("activeGoal", state.activeGoal)
+        reset("currentAgenda", state.currentAgenda)
+        reset("internalConflict", state.internalConflict)
+        reset("immediateConcern", state.immediateConcern)
+
+        val threadAges = if (rawState.containsKey("unresolvedThreads")) {
+            state.unresolvedThreads.associate { normalize(it) to 0 }
+        } else {
+            state.unresolvedThreadAges
+        }
+        return state.copy(
+            transientAges = ages,
+            unresolvedThreadAges = threadAges,
         )
     }
 
@@ -532,6 +682,10 @@ class ChatInteractionPlanner @Inject constructor(
             "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",
             "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
         )
+        val TOPIC_RESET_HINTS = listOf(
+            "换个话题", "先不聊这个", "不聊这个", "别提这个", "别再提", "说正事", "算了", "到此为止",
+        )
+        const val THREAD_TTL = 6
         val EXPLICIT_STAGE_SIGNAL = Regex(
             """在一起|确定关系|确认关系|正式交往|暧昧|约会中|分手|分开了|复合|冷战|闹矛盾|订婚|结婚|离婚|同居|前任""",
         )

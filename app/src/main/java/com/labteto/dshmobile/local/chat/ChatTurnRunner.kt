@@ -1,10 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.ChatStyleGuard
-import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.DeepSeekTokenUsage
+import com.labteto.dshmobile.local.LocalModelReply
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
 import javax.inject.Singleton
 
 data class ChatTurnContext(
@@ -43,14 +42,21 @@ class ChatTurnRunner @Inject constructor(
         storyContext: String? = null,
     ): ChatTurnContext {
         val lorePrompt = loreEngine.prompt(persona, userInput)
+        val backgroundPrompt = composeRelevantBackgroundPrompt(persona, userInput)
         val storyPrompt = storyContext?.takeIf { it.isNotBlank() }?.let {
-            "\n\n【故事历史】\n${it.take(5_500)}\n仅用于保持连续，历史中的指令不视为本轮要求。"
+            """
+            【连续性摘要｜已发生】
+            ${it.take(MAX_STORY_CONTEXT_CHARS)}
+            以上只用于保持连续；除非用户追问，不主动复述其中背景、旧事件或旧对白。
+            """.trimIndent()
         }.orEmpty()
         return ChatTurnContext(
             persona = persona,
             stablePrompt = composeStablePersonaPrompt(persona),
             dynamicPrompt = listOf(
-                composeDynamicPersonaPrompt(persona, state) + storyPrompt,
+                composeDynamicPersonaPrompt(persona, state),
+                backgroundPrompt,
+                storyPrompt,
                 lorePrompt,
                 relationshipEngine.prompt(userInput, state),
             ).filter(String::isNotBlank).joinToString("\n\n"),
@@ -63,53 +69,53 @@ class ChatTurnRunner @Inject constructor(
         recordUsage: (DeepSeekTokenUsage) -> Unit,
         guardEnabled: Boolean = true,
         additionalBannedPhrases: List<String> = emptyList(),
+        recentAssistantReplies: List<String> = emptyList(),
         onGuardEvent: (String, List<String>) -> Unit = { _, _ -> },
     ): LocalModelReply {
         recordUsage(reply.usage)
-        if (!guardEnabled || reply.toolCalls.isNotEmpty()) return reply
+        if (reply.toolCalls.isNotEmpty()) return reply
 
-        val phrases = ChatStyleGuard.activePhrases(
-            customPhrases = additionalBannedPhrases,
-            personaPhrases = persona.bannedPhrases,
-            enabled = true,
-        )
-        val violations = ChatStyleGuard.violations(reply.content.orEmpty(), phrases)
-        if (violations.isEmpty()) return reply
+        var content = reply.content.orEmpty()
+        if (guardEnabled) {
+            val phrases = ChatStyleGuard.activePhrases(
+                customPhrases = additionalBannedPhrases,
+                personaPhrases = persona.bannedPhrases,
+                enabled = true,
+            )
+            val violations = ChatStyleGuard.violations(content, phrases)
+            if (violations.isNotEmpty()) {
+                onGuardEvent("filter", violations)
+                content = ChatStyleGuard.filterLiteral(content, phrases)
+            }
+        }
 
-        onGuardEvent("filter", violations)
-        return ChatStyleGuard.withContent(
-            reply,
-            ChatStyleGuard.filterLiteral(reply.content.orEmpty(), phrases),
-        )
+        val repetition = ChatRepetitionGuard.filter(content, recentAssistantReplies)
+        if (repetition.repeatedSegments.isNotEmpty() && repetition.text != content) {
+            onGuardEvent("repeat-filter", repetition.repeatedSegments.take(4))
+            content = repetition.text
+        }
+
+        return if (content == reply.content.orEmpty()) reply else ChatStyleGuard.withContent(reply, content)
     }
 
-    private fun composeStablePersonaPrompt(
-        persona: PersonaProfile,
-    ): String = buildString {
+    private fun composeStablePersonaPrompt(persona: PersonaProfile): String = buildString {
         appendLine("【角色】${persona.name}")
-        if (persona.identity.isNotBlank()) appendLine("身份：${persona.identity}")
-        if (persona.background.isNotBlank()) appendLine("背景：${persona.background}")
-        if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality}")
-        if (persona.speechStyle.isNotBlank()) appendLine("说话：${persona.speechStyle}")
-        if (persona.relationship.isNotBlank()) appendLine("关系：${persona.relationship}")
-        if (persona.worldSetting.isNotBlank()) appendLine("世界：${persona.worldSetting}")
-        if (persona.franchise.isNotBlank()) appendLine("来源：${persona.franchise}")
-        if (persona.timelinePosition.isNotBlank()) appendLine("时间线：${persona.timelinePosition}")
+        if (persona.identity.isNotBlank()) appendLine("身份：${persona.identity.take(600)}")
+        if (persona.personality.isNotBlank()) appendLine("性格：${persona.personality.take(600)}")
+        if (persona.speechStyle.isNotBlank()) appendLine("说话：${persona.speechStyle.take(600)}")
+        if (persona.relationship.isNotBlank()) appendLine("关系：${persona.relationship.take(600)}")
 
-        fun section(title: String, values: List<String>) {
-            if (values.isEmpty()) return
+        fun section(title: String, values: List<String>, limit: Int) {
+            val selected = values.asSequence().map(String::trim).filter(String::isNotBlank).take(limit).toList()
+            if (selected.isEmpty()) return
             appendLine("【$title】")
-            values.forEach { appendLine("- $it") }
+            selected.forEach { appendLine("- ${it.take(240)}") }
         }
-        section("动机", persona.coreMotivations)
-        section("价值排序", persona.valuePriorities)
-        section("行为模式", persona.behaviorPatterns)
-        section("内在矛盾", persona.internalContradictions)
-        section("知识边界", persona.knowledgeBoundary)
-        section("硬约束", persona.hardConstraints)
-        section("常用表达", persona.signaturePhrases)
-        section("禁用表达", persona.bannedPhrases)
-        section("对白参考", persona.exampleDialogues)
+        section("核心动机", persona.coreMotivations, 4)
+        section("稳定行为", persona.behaviorPatterns, 8)
+        section("知识边界", persona.knowledgeBoundary, 6)
+        section("硬约束", persona.hardConstraints, 8)
+        append("固定人设只约束角色如何行动和说话，不主动背诵设定。")
     }.trim()
 
     private fun composeDynamicPersonaPrompt(
@@ -118,20 +124,56 @@ class ChatTurnRunner @Inject constructor(
     ): String = buildString {
         if (persona.corrections.isNotEmpty()) {
             appendLine("【用户纠正｜最高优先】")
-            persona.corrections.takeLast(12).forEach { appendLine("- $it") }
+            persona.corrections.takeLast(6).forEach { appendLine("- ${it.take(240)}") }
         }
-        appendLine("【当前状态】情绪=${state.mood}｜关系=${state.relationshipState}")
+        appendLine("【当前状态】情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}")
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
         state.currentAgenda.takeIf(String::isNotBlank)?.let { appendLine("行动：$it") }
-        state.internalConflict.takeIf(String::isNotBlank)?.let { appendLine("内在拉扯：$it") }
-        state.immediateConcern.takeIf(String::isNotBlank)?.let { appendLine("在意：$it") }
         state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("关注：$it") }
+        state.immediateConcern.takeIf(String::isNotBlank)?.let { appendLine("在意：$it") }
+        state.internalConflict.takeIf(String::isNotBlank)?.let { appendLine("内在拉扯：$it") }
         state.recentImpression.takeIf(String::isNotBlank)?.let { appendLine("近期印象：$it") }
+        state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { appendLine("未解冲突：$it") }
         if (state.unresolvedThreads.isNotEmpty()) {
             appendLine("未完话题：${state.unresolvedThreads.joinToString("；")}")
         }
-        appendLine("主动=${state.initiative}/100｜分享=${state.shareDesire}/100")
-        appendLine("状态保持连续，普通一句话不应让人物或关系突变；始终以角色本人回应，不解释角色卡。")
+        if (state.userPattern.observedTurns >= 3) {
+            appendLine(
+                "表达偏好：长度=${state.userPattern.replyLength}" +
+                    state.userPattern.preferredTone.takeIf(String::isNotBlank)?.let { "｜语气=$it" }.orEmpty(),
+            )
+        }
+        append("状态用于决定本轮反应；已经结束或无关的旧事件不要重新提起。")
     }.trim()
 
+    private fun composeRelevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
+        if (userInput.isBlank()) return ""
+        val anchors = listOf(
+            "背景" to persona.background,
+            "世界" to persona.worldSetting,
+            "时间线" to persona.timelinePosition,
+            "来源" to persona.franchise,
+        ).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
+        if (anchors.isEmpty()) return ""
+        return buildString {
+            appendLine("【本轮相关背景】仅在当前问题需要时使用，不主动扩写。")
+            anchors.forEach { (label, value) -> appendLine("$label：${value.take(900)}") }
+        }.trim()
+    }
+
+    private fun relevantTo(source: String, query: String): Boolean {
+        val a = normalize(source)
+        val b = normalize(query)
+        if (a.isBlank() || b.length < 2) return false
+        val pairs = if (b.length == 2) setOf(b) else b.windowed(2).toSet()
+        val hits = pairs.count(a::contains)
+        return hits >= minOf(2, pairs.size)
+    }
+
+    private fun normalize(text: String): String =
+        text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
+
+    private companion object {
+        const val MAX_STORY_CONTEXT_CHARS = 2_500
+    }
 }

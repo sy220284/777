@@ -951,8 +951,13 @@
     <string name="local_execution_notification_tap">点击返回当前会话</string>
 
 
-    <string name="persona_gallery_import_file">导入文件</string>
+    <string name="persona_gallery_import_file">导入人物文件</string>
     <string name="persona_gallery_export_file">导出人物</string>
+    <string name="persona_gallery_export_format_title">选择导出格式</string>
+    <string name="persona_gallery_export_format_hint">三种格式都会包含人物设定、记忆摘要和已归档对话；Markdown 与 Word 可直接阅读，也可重新导入。</string>
+    <string name="persona_gallery_export_json">JSON 数据文件</string>
+    <string name="persona_gallery_export_markdown">Markdown 文档（.md）</string>
+    <string name="persona_gallery_export_word">Word 文档（.docx）</string>
     <string name="persona_gallery_export_failed">人物导出失败</string>
     <string name="persona_gallery_import_failed">人物导入失败</string>
 

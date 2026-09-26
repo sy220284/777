@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -110,6 +112,56 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals("问题", index.latestUserContent)
         assertEquals("a1", index.latestMessageId)
         assertEquals("assistant", index.latestMessageRole)
+    }
+
+    @Test
+    fun eventTailAdvancesPersistedIndexWithoutRebuildingFromHotWindow() {
+        val base = LocalTranscriptRuntimeIndex(
+            firstUserTitle = "最早标题",
+            latestCreatedAt = 999L,
+            latestDialogueCreatedAt = 999L,
+            latestDialogueMessageId = "a499",
+            latestUserMessageId = "u499",
+            latestUserContent = "旧问题",
+            latestMessageId = "a499",
+            latestMessageRole = "assistant",
+            totalMessageCount = 1_000L,
+            hasDialogue = true,
+            branchingEligible = true,
+            lastTurnDialogueRole = "assistant",
+        )
+        val events = listOf(
+            LocalSessionEventLog.Event(
+                sequence = 100L,
+                type = "user/message",
+                createdAt = 1_000L,
+                data = buildJsonObject {
+                    put(
+                        "transcript",
+                        encodeTranscriptMessages(listOf(message("u500", "user", "新问题", 1_000L))),
+                    )
+                },
+            ),
+            LocalSessionEventLog.Event(
+                sequence = 101L,
+                type = "assistant/message",
+                createdAt = 1_001L,
+                data = buildJsonObject {
+                    put(
+                        "transcript",
+                        encodeTranscriptMessages(listOf(message("a500", "assistant", "新回答", 1_001L))),
+                    )
+                },
+            ),
+        )
+
+        val updated = projectLocalTranscriptRuntimeIndexTail(base, events, 99L)
+
+        assertEquals(1_002L, updated.totalMessageCount)
+        assertEquals("最早标题", updated.firstUserTitle)
+        assertEquals("a500", updated.latestDialogueMessageId)
+        assertEquals("u500", updated.latestUserMessageId)
+        assertTrue(updated.branchingEligible)
     }
 
     @Test

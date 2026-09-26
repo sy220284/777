@@ -84,6 +84,27 @@ class LocalSessionTranscriptProjectionTest {
     }
 
     @Test
+    fun boundedProjectionKeepsOnlyNewestRuntimeWindow() {
+        val snapshot = (0 until 4).map { index ->
+            message("s$index", if (index % 2 == 0) "user" else "assistant", "旧$index", index.toLong())
+        }
+        val tail = listOf(
+            event(10L, encodeTranscriptMessages(listOf(message("n1", "user", "新1", 10L)))),
+            event(11L, encodeTranscriptMessages(listOf(message("n2", "assistant", "新2", 11L)))),
+        )
+
+        val projected = projectSessionTranscriptTail(
+            snapshotMessages = snapshot,
+            events = tail,
+            sequenceExclusive = 9L,
+            maxMessages = 3,
+        )
+
+        assertEquals(listOf("s3", "n1", "n2"), projected.messages.map { it.id })
+        assertEquals(11L, projected.projectedThroughSequence)
+    }
+
+    @Test
     fun activeTranscriptEventRestoresSelectedConversationBranch() {
         val oldUser = message("u-old", "user", "原问题", 1L)
         val oldAnswer = message("a-old", "assistant", "原回答", 2L)

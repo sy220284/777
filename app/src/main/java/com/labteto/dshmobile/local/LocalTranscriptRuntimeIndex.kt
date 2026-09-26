@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Small transcript facts that remain valid even after the visible/runtime message list becomes a
@@ -29,6 +31,35 @@ internal fun buildLocalTranscriptRuntimeIndex(
     messages: List<LocalHarnessMessage>,
 ): LocalTranscriptRuntimeIndex =
     appendLocalTranscriptRuntimeIndex(LocalTranscriptRuntimeIndex(), messages)
+
+internal fun projectLocalTranscriptRuntimeIndexTail(
+    snapshot: LocalTranscriptRuntimeIndex,
+    events: List<LocalSessionEventLog.Event>,
+    sequenceExclusive: Long,
+): LocalTranscriptRuntimeIndex {
+    var current = snapshot
+    events.asSequence()
+        .filter { event -> event.sequence > sequenceExclusive }
+        .sortedBy(LocalSessionEventLog.Event::sequence)
+        .forEach { event ->
+            val decoded = decodeTranscriptMessages(event.data) ?: return@forEach
+            if (event.type == "chat/active-transcript") {
+                current = buildLocalTranscriptRuntimeIndex(decoded)
+                return@forEach
+            }
+            if (decoded.isEmpty()) return@forEach
+            val replaced = if (event.type == "assistant/message") {
+                (event.data["replaces"] as? JsonPrimitive)?.contentOrNull
+            } else {
+                null
+            }
+            if (replaced != null && current.totalMessageCount > 0L) {
+                current = current.copy(totalMessageCount = current.totalMessageCount - 1L)
+            }
+            current = appendLocalTranscriptRuntimeIndex(current, decoded)
+        }
+    return current
+}
 
 internal fun appendLocalTranscriptRuntimeIndex(
     current: LocalTranscriptRuntimeIndex,

@@ -7,6 +7,78 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatInteractionPlannerTest {
+
+    @Test
+    fun shortLivedStateExpiresWhenPlannerKeepsReturningNone() {
+        var state = ChatCharacterState(
+            currentFocus = "刚才的争执",
+            immediateConcern = "担心用户生气",
+            unresolvedThreads = listOf("要不要继续争执"),
+        )
+        repeat(4) {
+            state = planner.parse(
+                """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+                previous = state,
+                userMessage = "嗯",
+                assistantMessage = "好",
+            )!!.state
+        }
+
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isNotEmpty())
+    }
+
+    @Test
+    fun topicResetImmediatelyDropsCurrentTopicAndOpenThreads() {
+        val previous = ChatCharacterState(
+            currentFocus = "旧话题",
+            currentAgenda = "继续解释旧事",
+            immediateConcern = "还在纠结",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "换个话题，说正事",
+            assistantMessage = "好",
+        )!!.state
+
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.currentAgenda.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
+    @Test
+    fun noneSignificanceStillHonorsExplicitTransientClears() {
+        val previous = ChatCharacterState(
+            mood = "平静",
+            currentFocus = "旧话题",
+            recentImpression = "还在介意",
+            activeGoal = "继续追问",
+            currentAgenda = "把旧事说完",
+            internalConflict = "想问又不想问",
+            immediateConcern = "怕对方回避",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{"mood":"生气","currentFocus":"","recentImpression":"","activeGoal":"","currentAgenda":"","internalConflict":"","immediateConcern":"","unresolvedThreads":[]},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "没事了",
+            assistantMessage = "好",
+        )!!.state
+
+        assertEquals("平静", state.mood)
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.recentImpression.isBlank())
+        assertTrue(state.activeGoal.isBlank())
+        assertTrue(state.currentAgenda.isBlank())
+        assertTrue(state.internalConflict.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
@@ -323,7 +395,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun noOpTurnPreservesCharacterStateButKeepsReplySuggestions() {
+    fun noOpTurnIgnoresSpuriousStateChangesButStillAgesTransientState() {
         val previous = ChatCharacterState(
             mood = "开心",
             relationshipState = "熟悉中",
@@ -357,7 +429,15 @@ class ChatInteractionPlannerTest {
         )!!
 
         assertEquals("NONE", plan.turnSignificance)
-        assertEquals(previous, plan.state)
+        assertEquals(previous.mood, plan.state.mood)
+        assertEquals(previous.relationshipState, plan.state.relationshipState)
+        assertEquals(previous.activeGoal, plan.state.activeGoal)
+        assertEquals(previous.currentAgenda, plan.state.currentAgenda)
+        assertEquals(previous.internalConflict, plan.state.internalConflict)
+        assertEquals(previous.immediateConcern, plan.state.immediateConcern)
+        assertEquals(previous.initiative, plan.state.initiative)
+        assertEquals(previous.dynamics, plan.state.dynamics)
+        assertTrue(plan.state.transientAges.values.all { it >= 1 })
         assertEquals(1, plan.suggestions.size)
         assertEquals("你刚才笑什么？说来听听。", plan.suggestions.single().text)
     }

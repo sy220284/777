@@ -190,7 +190,9 @@ internal class LocalSessionRepository(
         updatedAt = updatedAt,
         usageMode = usageMode,
         chatMode = groupChat.mode,
-        blank = transcriptIndex.totalMessageCount == 0L && messages.none { it.content.isNotBlank() },
+        blank = transcriptIndex.totalMessageCount == 0L &&
+            transcriptWindow.none { it.content.isNotBlank() } &&
+            messages.none { it.content.isNotBlank() },
         summaryPreview = transcriptIndex.latestUserContent
             ?.replace(Regex("\\s+"), " ")
             ?.trim()

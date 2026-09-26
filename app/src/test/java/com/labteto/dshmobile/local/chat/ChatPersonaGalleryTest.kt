@@ -36,8 +36,10 @@ class ChatPersonaGalleryTest {
 
         val context = entry.storyContext("story-1")
         assertTrue(context.contains("雪夜在桥边重逢"))
-        assertTrue(context.contains("对白30"))
+        assertTrue(context.contains("对白29"))
+        assertFalse(context.contains("对白30"))
         assertFalse(context.contains("对白1\n"))
+        assertTrue(context.contains("角色旧回复已归档"))
         assertEquals(30, story.history.size)
     }
 
@@ -75,6 +77,22 @@ class ChatPersonaGalleryTest {
         val modern = PersonaProfile(name = "神里绫华", worldSetting = "现代东京校园")
 
         assertFalse(samePersonaIdentity(teyvat, modern))
+    }
+
+    @Test
+    fun sameNameSameWorldDifferentFranchisesStaySeparate() {
+        val first = PersonaProfile(
+            name = "阿岚",
+            worldSetting = "现代都市",
+            franchise = "作品甲",
+        )
+        val second = PersonaProfile(
+            name = "阿岚",
+            worldSetting = "现代都市",
+            franchise = "作品乙",
+        )
+
+        assertFalse(samePersonaIdentity(first, second))
     }
 
     @Test

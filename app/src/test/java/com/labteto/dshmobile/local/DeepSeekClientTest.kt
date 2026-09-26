@@ -71,6 +71,7 @@ class DeepSeekClientTest {
             baseUrl = "https://example.com",
             model = "deepseek-chat",
             messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+            temperature = 0.85,
             onDelta = { deltas += it },
         )
 
@@ -85,6 +86,7 @@ class DeepSeekClientTest {
         assertEquals(12L, reply.usage.completionTokens)
         assertTrue(reply.usage.reported)
         assertTrue(requestBody.contains("\"stream_options\":{\"include_usage\":true}"))
+        assertTrue(requestBody.contains("\"temperature\":0.85"))
     }
 
     @Test

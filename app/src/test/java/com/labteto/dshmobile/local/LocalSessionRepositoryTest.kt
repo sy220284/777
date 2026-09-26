@@ -67,6 +67,23 @@ class LocalSessionRepositoryTest {
         assertTrue(legacy.replySuggestions.isEmpty())
     }
 
+    @Test fun boundedTranscriptWindowKeepsSessionSummaryNonBlankWithoutLegacyMessages() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.enqueue(
+            LocalHarnessSession(
+                id = "windowed",
+                title = "windowed",
+                messages = emptyList(),
+                transcriptWindow = listOf(
+                    LocalHarnessMessage("m1", "user", "hello", createdAt = 1L),
+                ),
+            ),
+        )
+        runCurrent()
+
+        assertFalse(repository.summaries().single { it.id == "windowed" }.blank)
+    }
+
     @Test fun failedWriteRetriesTheLatestSnapshotAfterStorageRecovers() = runTest {
         val root = temporary.newFile("blocked-sessions")
         val failures = mutableListOf<Throwable>()

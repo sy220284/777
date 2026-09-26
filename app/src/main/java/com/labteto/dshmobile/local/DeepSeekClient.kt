@@ -45,11 +45,13 @@ class DeepSeekClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
+        temperature: Double? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
+            temperature?.let { put("temperature", it) }
             if (tools.isNotEmpty()) {
                 put("tools", tools)
                 put("tool_choice", "auto")
@@ -102,12 +104,14 @@ class DeepSeekClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
+        temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
+            temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             if (tools.isNotEmpty()) {
                 put("tools", tools)

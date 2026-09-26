@@ -55,10 +55,12 @@ data class LocalHarnessSession(
     val projectId: String? = null,
     val handoffSummary: String? = null,
     /**
-     * Legacy compatibility/runtime acceleration only. New snapshots will progressively stop
-     * materializing complete transcript history here; Session Event remains authoritative.
+     * Legacy compatibility only. New snapshots leave this empty; Session Event is the complete
+     * transcript source of truth.
      */
     val messages: List<LocalHarnessMessage> = emptyList(),
+    /** Bounded startup/runtime cache. This is never allowed to become complete history. */
+    val transcriptWindow: List<LocalHarnessMessage> = emptyList(),
     val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
     /**
      * Legacy compatibility only. New snapshots leave this empty; model-visible history is restored

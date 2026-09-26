@@ -70,6 +70,9 @@ internal class LocalSubagentRunner(
     private val releaseVirtualScreen: (String) -> Unit = { },
     private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
+    private val runCoordinator: LocalAgentRunCoordinator? = null,
+    private val runSessionId: () -> String = { state.value.sessionId },
+    private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
 ) {
     suspend fun run(
         task: String,
@@ -169,6 +172,36 @@ internal class LocalSubagentRunner(
             })
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_API_KEY")
         }
+        val runContext = runCoordinator?.start(
+            sessionId = runSessionId(),
+            usageMode = LocalUsageMode.WORK,
+            model = routeModel,
+            baseUrl = snapshot.baseUrl,
+            planMode = snapshot.planMode,
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            safeAutoApprovalEnabled = snapshot.safeAutoApprovalEnabled,
+            maxSteps = stepLimit,
+            input = task,
+            memoryInput = task,
+            kind = runKind,
+            allowMutation = allowMutation,
+            resourceBudget = LocalAgentRunResourceBudget(
+                maxModelRequests = snapshot.maxModelRequests,
+                maxAgents = snapshot.maxAgents,
+                maxTerminals = snapshot.maxTerminals,
+                maxVirtualDisplays = snapshot.maxVirtualDisplays,
+                maxLanguageServers = snapshot.maxLanguageServers,
+            ),
+            toolNames = schemas(
+                allowMutation,
+                virtualScreenId != null,
+                enabledOptionalTools,
+            ).mapNotNull { element ->
+                val function = (element as? JsonObject)?.get("function") as? JsonObject
+                (function?.get("name") as? JsonPrimitive)?.content
+            },
+            contextChars = history.sumOf { it.toString().length } + task.length,
+        )
 
         try {
             if (!inheritHistory) history += buildJsonObject {
@@ -409,8 +442,12 @@ internal class LocalSubagentRunner(
                         }
                         else -> Unit
                     }
+                    runContext?.let { context ->
+                        runCoordinator?.recordEvent(context, event)
+                    }
                 },
                 maxSteps = stepLimit,
+                idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
 
             val result = loop.run(task)

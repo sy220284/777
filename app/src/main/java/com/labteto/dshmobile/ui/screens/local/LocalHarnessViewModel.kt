@@ -24,6 +24,8 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaInspectionService
+import com.labteto.dshmobile.local.chat.PersonaTransferDocument
+import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
@@ -335,13 +337,21 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun exportGalleryPersona(id: String, compact: Boolean = false): Result<String> = runCatching {
-        withContext(Dispatchers.IO) { galleryStore.exportPersona(id, compact) }
+    internal suspend fun exportGalleryPersona(
+        id: String,
+        format: PersonaTransferFormat,
+    ): Result<PersonaTransferDocument> = runCatching {
+        withContext(Dispatchers.IO) { galleryStore.exportPersonaDocument(id, format) }
     }
 
-    suspend fun importGalleryPersona(payload: String): Result<PersonaGalleryEntry> = runCatching {
+    internal suspend fun importGalleryPersona(
+        bytes: ByteArray,
+        fileName: String?,
+        mimeType: String?,
+    ): Result<PersonaGalleryEntry> = runCatching {
         withContext(Dispatchers.IO) {
-            galleryStore.importPersona(payload).also { _gallery.value = galleryStore.list() }
+            galleryStore.importPersonaDocument(bytes, fileName, mimeType)
+                .also { _gallery.value = galleryStore.list() }
         }
     }
 

@@ -223,12 +223,9 @@ class ChatRelationshipEngine @Inject constructor() {
             }
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }
-        appendDynamics(state.dynamics)
-        appendUserPattern(state.userPattern)
-
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> {
-                appendLine("【本轮视角：角色本人】自然延续关系和未完话题；允许嘴硬、反问、打趣、短回复或不同意，但保持人设，推测不冒充事实。")
+                appendLine("【本轮视角：角色本人】自然承接当前互动；允许嘴硬、反问、打趣、短回复或不同意。已发生内容只作连续性，不主动复述；推测不冒充事实。")
             }
             ChatRelationshipView.STRATEGIST -> {
                 appendLine("【本轮视角：军师】先给判断或下一步，再给少量依据；分清事实/推测/未知，重点看持续主动、兑现、投入、边界、互惠和修复。")
