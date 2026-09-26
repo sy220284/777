@@ -6144,11 +6144,12 @@ class LocalHarnessEngine @Inject constructor(
             }
             usageTracker.record(snapshot.model, reply.usage)
             val summary = sanitizeSemanticCompactionSummary(reply.content.orEmpty())
-                ?: return null.also {
-                    eventLog.append("compaction/model-fallback", buildJsonObject {
-                        put("reason", "invalid-summary-shape")
-                    })
-                }
+            if (summary == null) {
+                eventLog.append("compaction/model-fallback", buildJsonObject {
+                    put("reason", "invalid-summary-shape")
+                })
+                return null
+            }
             historyCompactor.replaceSummary(extractive, summary).also { refined ->
                 if (refined == null) {
                     eventLog.append("compaction/model-fallback", buildJsonObject {
