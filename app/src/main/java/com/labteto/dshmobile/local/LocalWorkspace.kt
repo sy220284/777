@@ -247,20 +247,26 @@ class LocalWorkspace(
         val builder = ProcessBuilder(shellExecutable, "-c", command)
             .directory(canonicalRoot)
             .redirectErrorStream(true)
+        val shellTemp = File(canonicalRoot, ".dsh/tmp").apply { mkdirs() }
         builder.environment().apply {
-            putAll(environmentProvider())
-            val inheritedPath = get("PATH").orEmpty()
+            clear()
+            environmentProvider()
+                .filterKeys { key -> SAFE_ENV_NAME.matches(key) && key !in BLOCKED_SHELL_ENV_KEYS }
+                .filterValues { value -> '\u0000' !in value }
+                .forEach(::put)
             val runtimePath = extraSearchPaths()
                 .filter(File::isDirectory)
                 .joinToString(File.pathSeparator) { it.absolutePath }
-            if (runtimePath.isNotBlank()) {
-                put(
-                    "PATH",
-                    listOf(runtimePath, inheritedPath)
-                        .filter(String::isNotBlank)
-                        .joinToString(File.pathSeparator),
-                )
-            }
+            put(
+                "PATH",
+                (listOf(runtimePath) + SAFE_SYSTEM_PATHS)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .joinToString(File.pathSeparator),
+            )
+            put("HOME", canonicalRoot.absolutePath)
+            put("TMPDIR", shellTemp.absolutePath)
+            put("PWD", canonicalRoot.absolutePath)
         }
         val result = com.labteto.dshmobile.runtime.executeManagedProcess(
             builder = builder,
@@ -414,6 +420,12 @@ class LocalWorkspace(
         const val MAX_LIST_ROWS = 400
         const val MAX_SEARCH_ROWS = 200
         const val MAX_SHELL_CHARS = 65_536
+        val SAFE_ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
+        val BLOCKED_SHELL_ENV_KEYS = setOf(
+            "PATH", "HOME", "PWD", "OLDPWD", "TMPDIR",
+            "LD_PRELOAD", "DYLD_INSERT_LIBRARIES",
+        )
+        val SAFE_SYSTEM_PATHS = listOf("/system/bin", "/system/xbin", "/product/bin", "/vendor/bin")
         const val MAX_SHELL_TIMEOUT_SECONDS = 900
     }
 }
