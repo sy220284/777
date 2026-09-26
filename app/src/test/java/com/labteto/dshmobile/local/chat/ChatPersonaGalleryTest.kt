@@ -80,6 +80,22 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun sameNameSameWorldDifferentFranchisesStaySeparate() {
+        val first = PersonaProfile(
+            name = "阿岚",
+            worldSetting = "现代都市",
+            franchise = "作品甲",
+        )
+        val second = PersonaProfile(
+            name = "阿岚",
+            worldSetting = "现代都市",
+            franchise = "作品乙",
+        )
+
+        assertFalse(samePersonaIdentity(first, second))
+    }
+
+    @Test
     fun repeatedSaveDoesNotDuplicateArchivedMessagesInsideOneStory() {
         val base = PersonaGalleryStory(
             id = "story-1",
