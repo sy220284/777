@@ -759,7 +759,7 @@
     <string name="usage_calculation_title">消耗计算</string>
     <string name="usage_calculation_subtitle">本机 API 用量、费用估算与缓存命中</string>
     <string name="usage_calculation_estimate">累计预估金额</string>
-    <string name="usage_calculation_scope">DeepSeek API · 本机累计 · 聊天、工作及视觉等调用</string>
+    <string name="usage_calculation_scope">本机 API 用量累计 · 聊天、工作及视觉等调用</string>
     <string name="usage_calculation_updated">最近记录：%1$s</string>
     <string name="usage_calculation_no_data">暂无数据</string>
     <string name="usage_calculation_total_tokens">Token 总消耗</string>

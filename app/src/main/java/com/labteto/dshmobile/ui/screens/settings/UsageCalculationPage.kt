@@ -31,7 +31,7 @@ import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 
-/** Device-wide DeepSeek API usage; the tracker already persists and streams these totals. */
+/** Device-wide model API usage; the tracker already persists and streams these totals. */
 @Composable
 internal fun UsageCalculationPage(usage: DeepSeekUsageSnapshot, onOpenPricing: () -> Unit) {
     val colors = DsTheme.colors

@@ -761,7 +761,7 @@
     <string name="usage_calculation_title">Usage calculation</string>
     <string name="usage_calculation_subtitle">Device API usage, cost estimate and cache hit rate</string>
     <string name="usage_calculation_estimate">Cumulative estimated cost</string>
-    <string name="usage_calculation_scope">DeepSeek API · this device · chat, work, vision and more</string>
+    <string name="usage_calculation_scope">Model API usage on this device · chat, work, vision and more</string>
     <string name="usage_calculation_updated">Last recorded: %1$s</string>
     <string name="usage_calculation_no_data">No data</string>
     <string name="usage_calculation_total_tokens">Total tokens</string>
