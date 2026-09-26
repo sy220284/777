@@ -89,6 +89,17 @@ if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TO
 if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
 
+if "if (!runPolicy.toolsEnabled) return JsonArray(emptyList())" not in engine:
+    violations.append("Chat capability policy must project an empty model tool catalog")
+if "toolCalls = if (runPolicy.allowToolExecution)" not in engine:
+    violations.append("Chat model replies must strip unexpected tool calls before AgentLoop execution")
+if "runPolicy.imageFallbackToVisionTool" not in engine:
+    violations.append("Chat native-image failures must not fall back to Work vision tools")
+if "runGroupChatTurn(input)" not in engine or "runAgentTurn(input, memoryInput)" not in engine:
+    violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
+if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
+    violations.append("Chat prompt must not advertise Work tools or execution capabilities")
+
 run_agent = re.search(
     r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
     engine,
