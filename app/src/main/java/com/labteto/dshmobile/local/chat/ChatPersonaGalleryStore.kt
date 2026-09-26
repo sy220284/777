@@ -9,6 +9,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class PersonaGalleryStory(
@@ -560,13 +563,20 @@ class ChatPersonaGalleryStore internal constructor(
             fileName = fileName,
             mimeType = mimeType,
         )
-        val archive = runCatching {
-            PersonaTransferDocuments.decodeArchive(json, canonicalJson)
-        }.getOrNull()
-        return if (archive != null) {
-            importArchivedEntry(archive.entry)
-        } else {
-            importPersona(canonicalJson)
+        val schema = runCatching {
+            json.parseToJsonElement(canonicalJson)
+                .jsonObject["schema"]
+                ?.jsonPrimitive
+                ?.intOrNull
+        }.getOrElse { error ->
+            throw IllegalArgumentException("人物迁移数据格式不正确", error)
+        }
+        return when (schema) {
+            2 -> importArchivedEntry(
+                PersonaTransferDocuments.decodeArchive(json, canonicalJson).entry,
+            )
+            1, null -> importPersona(canonicalJson)
+            else -> throw IllegalArgumentException("暂不支持这个人物迁移版本")
         }
     }
 
