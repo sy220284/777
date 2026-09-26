@@ -2051,50 +2051,18 @@ class LocalHarnessEngine @Inject constructor(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         allowContextOverflowRecovery: Boolean = true,
-    ): LocalModelReply {
-        val executor = AgentRequestExecutor(
-            maxAttempts = snapshot.modelAttempts.coerceIn(1, 3),
-            retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-            },
-        )
-        return try {
-            executor.execute {
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    modelClient.completeStreaming(
-                        apiKey = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = snapshot.model,
-                        messages = messages,
-                        tools = JsonArray(emptyList()),
-                        onDelta = { },
-                    )
-                }
-            }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val compacted = historyCompactor.compactForOverflow(
-                messages,
-                LocalHistorySummaryMode.CHAT,
-            ) ?: throw error
-            eventLogFor(snapshot.sessionId).append(
-                "request/context-overflow-recovery",
-                buildJsonObject {
-                    put("model", snapshot.model)
-                    put("automation", true)
-                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                    put("omitted_messages", compacted.omittedMessages)
-                },
-            )
-            completeAutomationChat(
-                key = key,
-                snapshot = snapshot,
-                messages = compacted.messages,
-                allowContextOverflowRecovery = false,
-            )
-        }
-    }
+    ): LocalModelReply = modelRequestCoordinator.complete(
+        key = key,
+        snapshot = snapshot,
+        messages = messages,
+        step = CHAT_POST_TURN_MODEL_STEP + 200,
+        toolsOverride = JsonArray(emptyList()),
+        publishPreviewEnabled = false,
+        maxAttemptsOverride = snapshot.modelAttempts.coerceIn(1, 3),
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        persistOverflowHistory = false,
+        requestLog = eventLogFor(snapshot.sessionId),
+    )
 
     private fun resolveAutomationWorkSession(
         preferredSessionId: String?,
