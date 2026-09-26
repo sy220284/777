@@ -125,6 +125,7 @@ import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
@@ -2939,38 +2940,99 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
     val toolMessages = messages.filter { it.role == "tool" }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
+            Text(
+                stringResource(R.string.local_work_process),
+                style = DsType.small13Strong,
+                color = colors.labelPrimary,
+            )
             if (toolMessages.isEmpty()) {
-                Text(
-                    stringResource(R.string.agent_operation_generic) + " · " +
-                        stringResource(R.string.agent_operation_status_running),
-                    style = DsType.small13,
-                    color = colors.labelTertiary,
+                WorkProcessOperationRow(
+                    kind = AgentOperationKind.Generic,
+                    toolName = null,
+                    failed = false,
+                    running = true,
+                    count = 1,
                 )
             } else {
-                val grouped = linkedMapOf<com.labteto.dshmobile.ui.AgentOperationKind, MutableList<LocalHarnessMessage>>()
+                val grouped = linkedMapOf<AgentOperationKind, MutableList<LocalHarnessMessage>>()
                 toolMessages.forEach { message ->
                     grouped.getOrPut(agentOperationKind(message.toolName)) { mutableListOf() }.add(message)
                 }
-                grouped.values.forEach { group ->
-                    val failed = group.any { toolResultFailed(it.content) }
-                    val exemplar = group.first()
-                    Text(
-                        stringResource(agentOperationLabelRes(exemplar.toolName)) + " · " +
-                            stringResource(agentOperationStatusRes(running = false, failed = failed)),
-                        style = DsType.small13,
-                        color = if (failed) colors.error else colors.labelTertiary,
+                grouped.forEach { (kind, group) ->
+                    WorkProcessOperationRow(
+                        kind = kind,
+                        toolName = group.first().toolName,
+                        failed = group.any { toolResultFailed(it.content) },
+                        running = false,
+                        count = group.size,
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WorkProcessOperationRow(
+    kind: AgentOperationKind,
+    toolName: String?,
+    failed: Boolean,
+    running: Boolean,
+    count: Int,
+) {
+    val colors = DsTheme.colors
+    val icon = when (kind) {
+        AgentOperationKind.Inspect -> FeatherIcons.FileText
+        AgentOperationKind.Search -> Icons.Outlined.Search
+        AgentOperationKind.Update -> Icons.Outlined.Tune
+        AgentOperationKind.Execute -> Icons.Outlined.Terminal
+        AgentOperationKind.Web -> Icons.Outlined.Extension
+        AgentOperationKind.Device -> Icons.Outlined.QrCodeScanner
+        AgentOperationKind.Image -> Icons.Outlined.Image
+        AgentOperationKind.Background -> Icons.Outlined.Schedule
+        AgentOperationKind.Delegate -> Icons.Outlined.PersonSearch
+        AgentOperationKind.External -> Icons.Outlined.Extension
+        AgentOperationKind.Generic -> Icons.Outlined.Tune
+    }
+    val family = when (kind) {
+        AgentOperationKind.Update -> DsIconFamily.Green
+        AgentOperationKind.Execute -> DsIconFamily.Cyan
+        AgentOperationKind.Search,
+        AgentOperationKind.Web -> DsIconFamily.Accent
+        AgentOperationKind.Device -> DsIconFamily.Amber
+        AgentOperationKind.Delegate -> DsIconFamily.Purple
+        else -> DsIconFamily.Neutral
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        DsIconBox(icon = icon, family = family)
+        Text(
+            stringResource(agentOperationLabelRes(toolName)),
+            style = DsType.std14,
+            color = colors.labelSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        if (count > 1) {
+            DsPill(text = count.toString())
+        }
+        DsStatusPill(
+            state = when {
+                failed -> DsStatus.Failed
+                running -> DsStatus.Running
+                else -> DsStatus.Done
+            },
+            label = stringResource(agentOperationStatusRes(running = running, failed = failed)),
+        )
     }
 }
 
