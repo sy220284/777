@@ -48,6 +48,11 @@ import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.MODEL_HISTORY_SURFACE
+import com.labteto.dshmobile.harness.session.SESSION_SURFACE_EVENT_TYPE
+import com.labteto.dshmobile.harness.session.SessionSurfaceMutation
+import com.labteto.dshmobile.harness.session.SessionSurfaceOperation
+import com.labteto.dshmobile.harness.session.encodeSessionSurfaceMutation
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -6042,6 +6047,7 @@ class LocalHarnessEngine @Inject constructor(
             return
         }
 
+        val sourceCheckpoint = checkpointModelHistory("compaction/source")
         eventLog.append("compaction/start", buildJsonObject {
             put("mode", summaryMode.name.lowercase())
             put("omitted_messages", extractive.omittedMessages)
@@ -6077,7 +6083,18 @@ class LocalHarnessEngine @Inject constructor(
                 put("extra_request_tokens", extraTokens)
             },
         )
-        checkpointModelHistory("session/compaction")
+        val replacementCheckpoint = checkpointModelHistory("session/compaction")
+        eventLog.append(
+            SESSION_SURFACE_EVENT_TYPE,
+            encodeSessionSurfaceMutation(
+                SessionSurfaceMutation(
+                    surface = MODEL_HISTORY_SURFACE,
+                    operation = SessionSurfaceOperation.REPLACE,
+                    sourceEventSeqs = listOf(sourceCheckpoint.sequence),
+                    replacementEventSeq = replacementCheckpoint.sequence,
+                ),
+            ),
+        )
         updateContextMetrics()
         persist()
         eventLog.append("compaction/end", buildJsonObject {
@@ -6725,12 +6742,13 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun checkpointModelHistory(reason: String) {
-        eventLog.append(
+    private fun checkpointModelHistory(reason: String): LocalSessionEventLog.Event {
+        val event = eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             modelHistoryCheckpointCodec.encode(modelHistory.toList(), reason),
         )
         turnsSinceModelHistoryCheckpoint = 0
+        return event
     }
 
     private fun checkpointModelHistoryAtTurnBoundary(reason: String) {
