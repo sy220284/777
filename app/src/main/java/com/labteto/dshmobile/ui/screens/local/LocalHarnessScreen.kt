@@ -1110,7 +1110,25 @@ private fun LocalChat(
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val transcriptItems = remember(state.messages) { buildLocalTranscript(state.messages) }
+    var transcriptWindowSize by rememberSaveable(state.sessionId) {
+        mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
+    }
+    var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
+        mutableStateOf(state.messages.size)
+    }
+    LaunchedEffect(state.messages.size) {
+        val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
+        if (added > 0 && transcriptWindowSize > LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES) {
+            transcriptWindowSize += added
+        }
+        previousTranscriptMessageCount = state.messages.size
+    }
+    val transcriptWindow = remember(state.messages, transcriptWindowSize) {
+        localTranscriptWindow(state.messages, transcriptWindowSize)
+    }
+    val transcriptItems = remember(transcriptWindow.messages) {
+        buildLocalTranscript(transcriptWindow.messages)
+    }
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
         !state.groupChat.enabled &&
         chatBranchingEligible(state.messages)
@@ -1465,6 +1483,23 @@ private fun LocalChat(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
+                if (transcriptWindow.hiddenCount > 0) {
+                    item(key = "local-transcript-load-older") {
+                        DsButton(
+                            text = stringResource(
+                                R.string.local_transcript_load_older,
+                                transcriptWindow.hiddenCount,
+                            ),
+                            onClick = {
+                                transcriptWindowSize = (
+                                    transcriptWindowSize + LOCAL_TRANSCRIPT_PAGE_MESSAGES
+                                ).coerceAtMost(state.messages.size)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                }
                 if (transcriptItems.isEmpty() && state.usageMode == LocalUsageMode.WORK) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
@@ -2645,6 +2680,8 @@ private fun toolResultFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
         "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
 
+private const val LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES = 200
+private const val LOCAL_TRANSCRIPT_PAGE_MESSAGES = 200
 private const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 
