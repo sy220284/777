@@ -121,7 +121,8 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("优先级规则"))
         assertTrue(prompt.contains("高于所有普通聊天层规则"))
         assertTrue(prompt.contains("默认克制"))
-        assertTrue(prompt.contains("普通规则不得将已确认方向淡化、转场、改写或强制收敛"))
+        assertTrue(prompt.contains("人设硬约束"))
+        assertTrue(prompt.contains("淡化、转场、改写、跳过或强制收敛"))
         assertTrue(prompt.contains("统一安全边界"))
         assertTrue(prompt.contains("不做任何应用层尺度或克制限制"))
         assertTrue(prompt.contains("完整、具体描写"))
@@ -153,8 +154,9 @@ class ChatRelationshipEngineTest {
 
         assertTrue(prompt.contains("主动亲密意图"))
         assertTrue(prompt.contains("提高主动性"))
-        assertTrue(prompt.contains("主动靠近、发起或承接亲昵动作"))
-        assertTrue(prompt.contains("不含糊跳过或突然转场"))
+        assertTrue(prompt.contains("主动靠近、发起或承接"))
+        assertTrue(prompt.contains("身体反应"))
+        assertTrue(prompt.contains("含糊跳过或突然转场"))
     }
 
     @Test
