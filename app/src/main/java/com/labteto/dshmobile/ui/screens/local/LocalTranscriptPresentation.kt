@@ -47,6 +47,25 @@ internal fun localTranscriptWindow(
     )
 }
 
+internal fun mergeLocalTranscriptHistory(
+    olderMessages: List<LocalHarnessMessage>,
+    liveMessages: List<LocalHarnessMessage>,
+): List<LocalHarnessMessage> {
+    if (olderMessages.isEmpty()) return liveMessages
+    if (liveMessages.isEmpty()) return olderMessages
+
+    val liveIds = liveMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+    val seen = hashSetOf<String>()
+    return buildList(olderMessages.size + liveMessages.size) {
+        olderMessages.forEach { message ->
+            if (message.id !in liveIds && seen.add(message.id)) add(message)
+        }
+        liveMessages.forEach { message ->
+            if (seen.add(message.id)) add(message)
+        }
+    }
+}
+
 internal fun buildLocalTranscript(messages: List<LocalHarnessMessage>): List<LocalTranscriptItem> {
     if (messages.isEmpty()) return emptyList()
 
