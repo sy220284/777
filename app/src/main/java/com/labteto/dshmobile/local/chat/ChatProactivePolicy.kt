@@ -96,6 +96,7 @@ internal fun isNearDuplicateProactive(
         .filter { it.role == "assistant" && it.proactive }
         .map { normalizeProactiveText(it.content) }
         .filter { it.length >= 8 }
+        .toList()
         .takeLast(MAX_RECENT_PROACTIVE_FOR_CONTEXT)
         .any { previous ->
             if (
