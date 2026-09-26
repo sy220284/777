@@ -42,9 +42,10 @@ class LocalToolPolicyTest {
     }
 
     @Test fun safeAutoApprovalScopeFollowsTheSandboxBoundary() {
-        for (name in listOf("write", "edit", "apply_patch", "download_file", "bash")) {
+        for (name in listOf("write", "edit", "apply_patch", "download_file")) {
             assertEquals(LocalAutoApprovalScope.WORKSPACE, LocalToolPolicy.autoApprovalScope(name))
         }
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("bash"))
         for (name in listOf("read", "file_inspect", "session_trace", "session_event_read")) {
             assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope(name))
         }
@@ -61,34 +62,23 @@ class LocalToolPolicyTest {
         assertFalse(LocalToolPolicy.allowedInPlan("subagent_fork", ToolAccess.AGENT_CONTROL))
     }
 
-    @Test fun shellCommandsAreApprovedUnlessTheyTargetFirmwareOrRewriteHistory() {
-        // Ordinary user-space work needs no prompt: the sandbox, not the prompt, is the guard.
+    @Test fun shellAlwaysRequiresExplicitApprovalWithoutProcessSandbox() {
         for (command in listOf(
-            "ls -la", "git status", "git push", "git push origin main", "git add .",
-            "git commit -m \"x\"", "rm -rf ./build", "npm test",
+            "ls -la",
+            "git status",
+            "npm test",
             "cat /storage/emulated/0/Download/a.txt",
+            "cat /system/build.prop",
+            "git reset --hard",
+            "git push --force",
         )) {
-            assertTrue("应免弹窗: $command", LocalToolPolicy.canAutoApproveCommand(command))
+            assertFalse(
+                "Android 无进程级 workspace-write 沙箱时 shell 不应自动批准: $command",
+                LocalToolPolicy.canAutoApproveCommand(command),
+            )
         }
-
-        // Commands that name firmware keep the prompt as a second line of defence.
-        for (command in listOf(
-            "cat /system/build.prop", "ls /vendor/lib64", "rm /system/bin/x",
-            "cat /proc/sys/kernel/panic", "cat /proc/meminfo", "ls /sys",
-            "cat /sys/class/net/wlan0/address", "cat /dev/null",
-            "ls /data/system", "ls /data/adb",
-        )) {
-            assertFalse("固件路径应弹窗: $command", LocalToolPolicy.canAutoApproveCommand(command))
-        }
-
-        // Irreversible history rewrites stay user-visible.
-        for (command in listOf(
-            "git reset --hard", "git clean -fd", "git clean -fdx", "git filter-branch",
-        )) {
-            assertFalse("危险子命令应弹窗: $command", LocalToolPolicy.canAutoApproveCommand(command))
-        }
-
-        assertFalse("空命令不应放行", LocalToolPolicy.canAutoApproveCommand(""))
+        assertTrue(LocalToolPolicy.shellRiskReason("ls -la").contains("workspace-write"))
+        assertTrue(LocalToolPolicy.shellRiskReason("cat /system/build.prop").contains("系统/内核"))
     }
 
     @Test fun forcePushIsCaughtRegardlessOfArgumentOrder() {
@@ -106,23 +96,5 @@ class LocalToolPolicyTest {
         assertTrue("普通推送不应拦截", LocalToolPolicy.canAutoApproveCommand("git push origin main"))
     }
 
-    /**
-     * Documents a known limit rather than asserting a guarantee.
-     *
-     * Command text admits many equivalent spellings, so the marker check is bypassable by design of
-     * the shell, not by oversight. What actually holds the line is the kernel: firmware is mounted
-     * read-only. These cases are asserted as *currently* uncaught so that a future change tightening
-     * matching will surface here instead of silently diverging from this note.
-     */
-    @Test fun firmwareMarkersAreBestEffortAndSomeSpellingsSlipThrough() {
-        for (command in listOf(
-            "cd / && cat system/build.prop",
-            "cat /sy''stem/build.prop",
-        )) {
-            assertTrue(
-                "已知绕过，实际拦截依赖内核只读挂载: $command",
-                LocalToolPolicy.canAutoApproveCommand(command),
-            )
-        }
-    }
+
 }
