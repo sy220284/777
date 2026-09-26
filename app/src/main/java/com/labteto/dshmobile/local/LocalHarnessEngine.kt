@@ -296,6 +296,13 @@ class LocalHarnessEngine @Inject constructor(
             onError = { error -> _state.update { it.copy(error = error.message ?: "会话写入失败") } },
         )
     }
+    private val sessionCoordinator by lazy {
+        LocalSessionCoordinator(
+            repository = sessionRepository,
+            eventLogFor = ::eventLogFor,
+            runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+        )
+    }
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val enabledOptionalTools = linkedSetOf<String>()
@@ -6240,59 +6247,11 @@ class LocalHarnessEngine @Inject constructor(
             events = eventLog.snapshotAfter(projectionCursor),
             sequenceExclusive = projectionCursor,
         )
-        val legacyTranscriptMigration = if (loaded != null) {
-            migrateLegacyTranscriptSnapshot(
-                session = stored,
-                eventLog = eventLog,
-                windowSize = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
-            )
-        } else {
-            null
-        }
-        val legacyTranscriptBaseline = if (
-            legacyTranscriptMigration == null &&
-            stored.transcriptProjectedThroughSequence == null &&
-            loaded != null
-        ) {
-            eventLog.latest(TRANSCRIPT_PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
-                TRANSCRIPT_PROJECTION_BASELINE_EVENT,
-                buildJsonObject { put("source", "legacy-session-snapshot") },
-            ).sequence
-        } else {
-            null
-        }
-        val transcriptCursor = legacyTranscriptMigration?.projectedThroughSequence
-            ?: transcriptProjectionReplayCursor(
-                snapshot = stored,
-                persistedSnapshotExists = loaded != null,
-                legacyBaselineSequence = legacyTranscriptBaseline,
-            )
-        val transcriptBaseWindow = when {
-            legacyTranscriptMigration != null -> legacyTranscriptMigration.window
-            stored.transcriptWindow.isNotEmpty() -> stored.transcriptWindow
-                .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
-            else -> stored.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
-        }
-        val transcriptTailEvents = eventLog.snapshotAfter(transcriptCursor)
-        val projectedTranscript = projectSessionTranscriptTail(
-            snapshotMessages = transcriptBaseWindow,
-            events = transcriptTailEvents,
-            sequenceExclusive = transcriptCursor,
-            maxMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+        val restoredTranscript = sessionCoordinator.restoreTranscript(
+            stored = stored,
+            persistedSnapshotExists = loaded != null,
         )
-        val transcriptIndexBase = when {
-            legacyTranscriptMigration != null -> legacyTranscriptMigration.index
-            stored.transcriptIndex.totalMessageCount > 0L -> stored.transcriptIndex
-            stored.messages.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.messages)
-            stored.transcriptWindow.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.transcriptWindow)
-            else -> LocalTranscriptRuntimeIndex()
-        }
-        val projectedTranscriptIndex = projectLocalTranscriptRuntimeIndexTail(
-            snapshot = transcriptIndexBase,
-            events = transcriptTailEvents,
-            sequenceExclusive = transcriptCursor,
-        )
-        transcriptProjectionCursor = projectedTranscript.projectedThroughSequence
+        transcriptProjectionCursor = restoredTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
             events = modelHistoryReplayEvents(stored.legacyModelHistory),
             legacyFallback = stored.legacyModelHistory,
@@ -6339,7 +6298,7 @@ class LocalHarnessEngine @Inject constructor(
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
                     current = projectedControls.chatBranches,
-                    activeMessages = projectedTranscript.messages,
+                    activeMessages = restoredTranscript.messages,
                     chatState = stored.chatState,
                     replySuggestions = stored.replySuggestions,
                 )
@@ -6357,8 +6316,8 @@ class LocalHarnessEngine @Inject constructor(
             autoMemory = profile.autoMemory,
             usage = usageTracker.state.value,
             sessions = sessionSummaries(),
-            messages = projectedTranscript.messages,
-            transcriptIndex = projectedTranscriptIndex,
+            messages = restoredTranscript.messages,
+            transcriptIndex = restoredTranscript.index,
             plan = projectedControls.plan,
             todos = projectedControls.todos,
             goal = projectedControls.goal,
@@ -6420,12 +6379,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         if (
             restoredHistory.usedLegacyFallback ||
-            legacyTranscriptMigration != null ||
-            legacyTranscriptBaseline != null ||
-            stored.messages.isNotEmpty() ||
-            stored.transcriptWindow != projectedTranscript.messages ||
-            stored.transcriptIndex != projectedTranscriptIndex ||
-            projectedTranscript.projectedThroughSequence != stored.transcriptProjectedThroughSequence
+            restoredTranscript.needsPersist
         ) {
             // Materialize migrated/replayed projections so later restarts only fold the new tail.
             persist()
@@ -6536,39 +6490,14 @@ class LocalHarnessEngine @Inject constructor(
     private fun persist() {
         // Capture the durable boundary before the in-memory projection. A concurrent state update
         // may then be included in the snapshot with an older cursor, which is safe because replay
-        // can idempotently re-apply its later event. The opposite ordering could advance the cursor
-        // past a control event that the captured state did not yet contain.
-        val projectedThrough = eventLog.latestSequence()
-        val state = _state.value
-        val snapshot = LocalHarnessSession(
-            id = currentSessionId,
-            title = state.transcriptIndex.firstUserTitle ?: "新会话",
-            updatedAt = System.currentTimeMillis(),
-            usageMode = state.usageMode,
-            personaId = state.personaId,
-            chatState = state.chatState,
-            replySuggestions = state.replySuggestions,
-            chatBranches = state.chatBranches,
-            groupChat = state.groupChat,
-            galleryId = state.galleryId,
-            galleryStoryId = state.galleryStoryId,
-            gallerySaveSuppressedThrough = state.gallerySaveSuppressedThrough,
-            conversationMode = state.conversationMode,
-            parentSessionId = state.parentSessionId,
-            lineageId = state.lineageId,
-            projectId = state.projectId,
-            handoffSummary = state.handoffSummary,
-            messages = emptyList(),
-            transcriptWindow = state.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-            transcriptIndex = state.transcriptIndex,
-            plan = state.plan,
-            todos = state.todos,
-            goal = state.goal,
-            planMode = state.planMode,
-            controlProjectedThroughSequence = projectedThrough,
+        // can idempotently re-apply its later event.
+        val snapshot = sessionCoordinator.snapshot(
+            sessionId = currentSessionId,
+            state = _state.value,
+            controlProjectedThroughSequence = eventLog.latestSequence(),
             transcriptProjectedThroughSequence = transcriptProjectionCursor,
         )
-        sessionRepository.enqueue(snapshot)
+        sessionCoordinator.enqueue(snapshot)
     }
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
