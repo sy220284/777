@@ -81,6 +81,24 @@ class LocalSessionEventLog(
     fun latestOf(types: Set<String>): Event? =
         delegate.latestOf(types)?.toLocalEvent()
 
+    fun latestMatching(
+        type: String,
+        pageSize: Int = 96,
+        predicate: (Event) -> Boolean,
+    ): Event? {
+        var before = Long.MAX_VALUE
+        while (true) {
+            val page = pageBefore(before, pageSize.coerceIn(1, 512))
+            if (page.isEmpty()) return null
+            page.asSequence()
+                .filter { it.type == type }
+                .filter(predicate)
+                .maxByOrNull(Event::sequence)
+                ?.let { return it }
+            before = page.minOf(Event::sequence)
+        }
+    }
+
     fun clear() = delegate.clear()
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
