@@ -867,12 +867,14 @@ private fun ManageWorkspacesDialog(
     onPick: (WorkspaceRow) -> Unit,
 ) {
     DsDialog(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
-        workspaces.forEach { workspace ->
-            SheetRow(
-                title = workspace.title.ifBlank { basename(workspace.path) },
-                subtitle = workspace.path,
-                onClick = { onPick(workspace) },
-            )
+        LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+            items(workspaces, key = { it.workspaceId }) { workspace ->
+                SheetRow(
+                    title = workspace.title.ifBlank { basename(workspace.path) },
+                    subtitle = workspace.path,
+                    onClick = { onPick(workspace) },
+                )
+            }
         }
     }
 }
