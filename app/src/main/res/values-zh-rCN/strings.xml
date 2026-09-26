@@ -524,6 +524,16 @@
     <string name="advanced_memory_content">记忆内容</string>
     <string name="advanced_memory_deactivated">记忆已停用</string>
     <string name="advanced_memory_empty">当前作用域还没有长期记忆。</string>
+    <string name="advanced_memory_overview">记忆状态</string>
+    <string name="advanced_auto_recall_on">自动召回已开启</string>
+    <string name="advanced_auto_recall_off">自动召回已关闭</string>
+    <string name="advanced_auto_memory_on">自动记忆已开启</string>
+    <string name="advanced_auto_memory_off">自动记忆已关闭</string>
+    <string name="advanced_memory_active_count">%1$d 条活跃记忆</string>
+    <string name="advanced_memory_search">搜索记忆</string>
+    <string name="advanced_memory_filter_all">全部</string>
+    <string name="advanced_memory_visible_count">显示 %1$d / %2$d</string>
+    <string name="advanced_memory_filter_empty">没有符合当前搜索或筛选条件的记忆。</string>
     <string name="advanced_memory_manage_hint">显示当前对话允许访问的长期记忆。修改和停用会直接影响后续自动召回。</string>
     <string name="advanced_memory_saved">记忆设置已保存</string>
     <string name="advanced_memory_settings">记忆设置</string>

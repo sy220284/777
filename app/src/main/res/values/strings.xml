@@ -526,6 +526,16 @@
     <string name="advanced_memory_content">Memory content</string>
     <string name="advanced_memory_deactivated">Memory deactivated</string>
     <string name="advanced_memory_empty">There is no long-term memory in the current scope.</string>
+    <string name="advanced_memory_overview">Memory status</string>
+    <string name="advanced_auto_recall_on">Auto recall on</string>
+    <string name="advanced_auto_recall_off">Auto recall off</string>
+    <string name="advanced_auto_memory_on">Auto memory on</string>
+    <string name="advanced_auto_memory_off">Auto memory off</string>
+    <string name="advanced_memory_active_count">%1$d active memories</string>
+    <string name="advanced_memory_search">Search memories</string>
+    <string name="advanced_memory_filter_all">All</string>
+    <string name="advanced_memory_visible_count">Showing %1$d of %2$d</string>
+    <string name="advanced_memory_filter_empty">No memories match this search or filter.</string>
     <string name="advanced_memory_manage_hint">Shows long-term memories available to the current conversation. Editing or deactivating one affects future automatic recall.</string>
     <string name="advanced_memory_saved">Memory settings saved</string>
     <string name="advanced_memory_settings">Memory settings</string>

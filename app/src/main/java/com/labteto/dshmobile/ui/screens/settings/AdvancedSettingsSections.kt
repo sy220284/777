@@ -46,6 +46,9 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
 
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
@@ -678,6 +681,53 @@ private fun formatDeepSeekPrice(value: Double): String =
     String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
 @Composable
+internal fun MemoryOverviewCard(
+    local: LocalHarnessState,
+    recordCount: Int,
+) {
+    SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsStatusPill(
+                state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.autoRecall) R.string.advanced_auto_recall_on
+                    else R.string.advanced_auto_recall_off,
+                ),
+            )
+            DsStatusPill(
+                state = if (local.autoMemory) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.autoMemory) R.string.advanced_auto_memory_on
+                    else R.string.advanced_auto_memory_off,
+                ),
+            )
+            DsPill(text = stringResource(R.string.advanced_memory_active_count, recordCount))
+        }
+    }
+}
+
+private enum class MemoryFilter { ALL, RULE, PREFERENCE, FACT }
+
+private fun MemoryKind.matchesFilter(filter: MemoryFilter): Boolean = when (filter) {
+    MemoryFilter.ALL -> true
+    MemoryFilter.RULE -> this == MemoryKind.RULE || this == MemoryKind.CONSTRAINT
+    MemoryFilter.PREFERENCE ->
+        this == MemoryKind.PREFERENCE || this == MemoryKind.RELATIONSHIP_PREFERENCE
+    MemoryFilter.FACT -> this in setOf(
+        MemoryKind.FACT,
+        MemoryKind.DECISION,
+        MemoryKind.STATE,
+        MemoryKind.SUMMARY,
+        MemoryKind.RELATIONSHIP_FACT,
+        MemoryKind.RELATIONSHIP_STATE,
+    )
+}
+
+@Composable
 internal fun LocalMemorySettingsCard(
     local: LocalHarnessState,
     viewModel: SettingsViewModel,
@@ -741,6 +791,15 @@ internal fun MemoryManagementCard(
     val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
     val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
     val colors = DsTheme.colors
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(MemoryFilter.ALL) }
+    val visibleRecords = remember(records, query, filter) {
+        val needle = query.trim()
+        records.filter { record ->
+            record.kind.matchesFilter(filter) &&
+                (needle.isBlank() || record.content.contains(needle, ignoreCase = true))
+        }
+    }
     SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
         if (records.isEmpty()) {
             Text(
@@ -756,8 +815,42 @@ internal fun MemoryManagementCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it.take(200) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(stringResource(R.string.advanced_memory_search)) },
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+            listOf(
+                MemoryFilter.ALL to R.string.advanced_memory_filter_all,
+                MemoryFilter.RULE to R.string.advanced_kind_rule,
+                MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
+                MemoryFilter.FACT to R.string.advanced_kind_fact,
+            ).forEach { (candidate, label) ->
+                DsButton(
+                    text = stringResource(label),
+                    onClick = { filter = candidate },
+                    size = DsButtonSize.Small,
+                    variant = if (filter == candidate) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.advanced_memory_visible_count, visibleRecords.size, records.size),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+        if (visibleRecords.isEmpty()) {
+            Text(
+                stringResource(R.string.advanced_memory_filter_empty),
+                style = DsType.small13,
+                color = colors.labelTertiary,
+            )
+        }
 
-        records.forEach { record ->
+        visibleRecords.forEach { record ->
             var expanded by remember(record.id) { mutableStateOf(false) }
             var content by remember(record.id, record.updatedAt) { mutableStateOf(record.content) }
             var pinned by remember(record.id, record.updatedAt) { mutableStateOf(record.pinned) }

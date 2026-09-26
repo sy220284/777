@@ -458,6 +458,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MEMORY -> {
+                        MemoryOverviewCard(localHarness, memories.size)
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
                         MemoryManagementCard(memories, viewModel, toast.second)
                     }
