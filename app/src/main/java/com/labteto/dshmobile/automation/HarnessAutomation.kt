@@ -30,6 +30,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -81,6 +82,65 @@ internal fun appendAutomationReceipt(
 
 private const val AUTOMATION_HISTORY_DAYS = 30L
 private const val AUTOMATION_HISTORY_RECORDS = 200
+
+internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
+    task.mode == AutomationMode.CHAT &&
+        task.scheduleType in setOf(
+            AutomationScheduleType.INTERVAL,
+            AutomationScheduleType.DAILY,
+            AutomationScheduleType.WEEKLY,
+            AutomationScheduleType.SILENCE,
+        )
+
+internal fun nextAnchoredAutomationRun(
+    task: AutomationTask,
+    afterMillis: Long,
+    suggestedRunAt: Long? = null,
+): Long? {
+    if (task.scheduleType == AutomationScheduleType.SILENCE) {
+        return suggestedRunAt?.takeIf { it > afterMillis }
+            ?: task.silenceMinutes?.let { afterMillis + it * 60_000L }
+    }
+
+    val anchor = task.scheduleAnchorAt ?: task.nextRunAt
+    return when (task.scheduleType) {
+        AutomationScheduleType.DAILY ->
+            nextCalendarAnchoredRun(anchor, afterMillis, Calendar.DAY_OF_YEAR, 1)
+        AutomationScheduleType.WEEKLY ->
+            nextCalendarAnchoredRun(anchor, afterMillis, Calendar.WEEK_OF_YEAR, 1)
+        AutomationScheduleType.INTERVAL -> {
+            val minutes = task.recurringMinutes ?: return null
+            nextIntervalAnchoredRun(anchor, afterMillis, minutes)
+        }
+        else -> task.recurringMinutes?.let { afterMillis + it * 60_000L }
+    }
+}
+
+internal fun nextIntervalAnchoredRun(
+    anchorMillis: Long,
+    afterMillis: Long,
+    intervalMinutes: Long,
+): Long {
+    require(intervalMinutes > 0L) { "intervalMinutes must be positive" }
+    val intervalMillis = intervalMinutes * 60_000L
+    if (anchorMillis > afterMillis) return anchorMillis
+    val elapsed = afterMillis - anchorMillis
+    val steps = elapsed / intervalMillis + 1L
+    return anchorMillis + steps * intervalMillis
+}
+
+private fun nextCalendarAnchoredRun(
+    anchorMillis: Long,
+    afterMillis: Long,
+    field: Int,
+    amount: Int,
+): Long {
+    val calendar = Calendar.getInstance().apply { timeInMillis = anchorMillis }
+    while (calendar.timeInMillis <= afterMillis) {
+        calendar.add(field, amount)
+    }
+    return calendar.timeInMillis
+}
 
 @Serializable
 data class AutomationTask(
