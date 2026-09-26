@@ -19,6 +19,10 @@ import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
+import com.labteto.dshmobile.harness.agent.AgentModelRoute
+import com.labteto.dshmobile.harness.agent.AgentPermissionScope
+import com.labteto.dshmobile.harness.agent.AgentResourceBudget as AgentRunBudget
+import com.labteto.dshmobile.harness.agent.AgentRunContext
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
@@ -738,15 +742,24 @@ class LocalHarnessEngine @Inject constructor(
                     .putString(KEY_BASE_URL, normalizedBaseUrl)
                     .putStringSet(KEY_CONFIGURED_MODELS, configuredModels)
                     .apply()
+                val route = resolveLocalModelRoute(normalizedBaseUrl, normalizedModel)
                 _state.update {
                     it.copy(
                         configured = true,
-                        model = normalizedModel,
-                        baseUrl = normalizedBaseUrl,
+                        model = route.model,
+                        baseUrl = route.baseUrl,
                         configuredModels = configuredModels.sorted(),
+                        modelProtocol = route.protocol,
                         error = null,
                     )
                 }
+                eventLog.append("session/model-route", buildJsonObject {
+                    put("provider", route.provider)
+                    put("base_url", route.baseUrl)
+                    put("model", route.model)
+                    put("protocol", route.protocol.name.lowercase())
+                })
+                persist()
             }.onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
@@ -759,10 +772,18 @@ class LocalHarnessEngine @Inject constructor(
             selected !in current.configuredModels || selected == current.model
         ) return
         preferences.edit().putString(KEY_MODEL, selected).apply()
+        val route = resolveLocalModelRoute(current.baseUrl, selected)
         _state.update { state ->
             if (state.running || selected !in state.configuredModels) state
-            else state.copy(model = selected)
+            else state.copy(model = route.model, modelProtocol = route.protocol)
         }
+        eventLog.append("session/model-route", buildJsonObject {
+            put("provider", route.provider)
+            put("base_url", route.baseUrl)
+            put("model", route.model)
+            put("protocol", route.protocol.name.lowercase())
+        })
+        persist()
     }
 
     /** Choose how user image attachments reach the local model. */
@@ -2033,6 +2054,12 @@ class LocalHarnessEngine @Inject constructor(
             conversationMode = LocalConversationMode.PROJECT,
             lineageId = id,
             projectId = LOCAL_PROJECT_ID,
+            modelRoute = AgentModelRoute(
+                provider = if (_state.value.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible",
+                baseUrl = _state.value.baseUrl,
+                model = _state.value.model,
+                protocol = _state.value.modelProtocol,
+            ),
         )
         sessionRepository.enqueue(session)
         return session
@@ -4273,7 +4300,28 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         try {
-            loop.run(input)
+            val runSnapshot = _state.value
+            val runContext = AgentRunContext(
+                runId = UUID.randomUUID().toString(),
+                sessionId = currentSessionId,
+                lineageId = runSnapshot.lineageId,
+                modelRoute = AgentModelRoute(
+                    provider = if (runSnapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible",
+                    baseUrl = runSnapshot.baseUrl,
+                    model = runSnapshot.model,
+                    protocol = runSnapshot.modelProtocol,
+                ),
+                permissions = AgentPermissionScope(
+                    allowMutation = !runSnapshot.planMode,
+                    approvalScope = "foreground-turn",
+                ),
+                resources = AgentRunBudget(
+                    maxSteps = mainMaxSteps,
+                    maxModelRequests = runSnapshot.maxModelRequests,
+                ),
+                attributes = mapOf("surface" to runSnapshot.usageMode.name.lowercase()),
+            )
+            loop.run(input, context = runContext)
             if (_state.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = _state.value
                 finalChatAssistant?.let { assistantMessage ->
@@ -6115,6 +6163,7 @@ class LocalHarnessEngine @Inject constructor(
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
+        val sessionRoute = resolveSessionModelRoute(stored, baseUrl, model)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
                 PROJECTION_BASELINE_EVENT,
@@ -6175,9 +6224,10 @@ class LocalHarnessEngine @Inject constructor(
         _state.value = LocalHarnessState(
             loading = false,
             configured = apiKeys.get() != null,
-            model = model,
-            baseUrl = baseUrl,
-            configuredModels = configuredModelNames(model),
+            model = sessionRoute.model,
+            baseUrl = sessionRoute.baseUrl,
+            configuredModels = configuredModelNames(sessionRoute.model),
+            modelProtocol = sessionRoute.protocol,
             mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
@@ -6414,6 +6464,12 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = state.lineageId,
             projectId = state.projectId,
             handoffSummary = state.handoffSummary,
+            modelRoute = AgentModelRoute(
+                provider = if (state.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible",
+                baseUrl = state.baseUrl,
+                model = state.model,
+                protocol = state.modelProtocol,
+            ),
             messages = state.messages,
             transcriptIndex = state.transcriptIndex,
             plan = state.plan,
