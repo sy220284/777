@@ -112,6 +112,43 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun durableInboxQueuedMessageStaysHiddenUntilClaimed() {
+        val structured = message("user", "持久补充消息")
+        val queuedInput = com.labteto.dshmobile.harness.agent.QueuedAgentInput(
+            content = "持久补充消息",
+            modelMessage = structured,
+            id = "q1",
+        )
+        val queuedEvent = event(
+            0L,
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "queued",
+                pending = listOf(queuedInput),
+            ),
+        )
+        val claimedEvent = event(
+            1L,
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "claimed",
+                pending = emptyList(),
+                affected = listOf(queuedInput),
+                modelMessages = listOf(structured),
+            ),
+        )
+
+        assertEquals(
+            emptyList<JsonObject>(),
+            restoreLocalModelHistory(listOf(queuedEvent), emptyList(), codec).messages,
+        )
+        assertEquals(
+            listOf(structured),
+            restoreLocalModelHistory(listOf(queuedEvent, claimedEvent), emptyList(), codec).messages,
+        )
+    }
+
+    @Test
     fun legacyFallbackIsUsedWithoutReplayingUnknownOverlap() {
         val fallback = listOf(
             message("system", "旧系统"),
