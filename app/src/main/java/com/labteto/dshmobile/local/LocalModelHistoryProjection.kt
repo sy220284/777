@@ -106,9 +106,14 @@ private fun applyModelHistoryEvent(
                 true
             }
         }
-        "user/queue" -> {
+        "user/queue", LOCAL_AGENT_INBOX_EVENT_TYPE -> {
             val action = event.data["action"]?.jsonPrimitive?.contentOrNull
-            if (action !in setOf("consumed", "resumed")) return false
+            val modelVisible = when (event.type) {
+                "user/queue" -> action in setOf("consumed", "resumed")
+                LOCAL_AGENT_INBOX_EVENT_TYPE -> action in setOf("claimed", "resumed")
+                else -> false
+            }
+            if (!modelVisible) return false
             val messages = event.data["model_messages"] as? JsonArray ?: return false
             var changed = false
             messages.forEach { element ->
