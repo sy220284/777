@@ -4001,18 +4001,29 @@ class LocalHarnessEngine @Inject constructor(
                     step = modelStep + 1,
                     reply = rawReply,
                 )
-                modelStep += 1
-                repliesByStep[modelStep] = reply
-                if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
+                val effectiveReply = if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
                     eventLog.append("chat/tool-call-blocked", buildJsonObject {
                         put("count", reply.toolCalls.size)
                         put("reason", "chat-capability-policy")
                     })
+                    val content = reply.content?.takeIf(String::isNotBlank)
+                        ?: throw IllegalStateException("模型未返回可显示的聊天内容，请重试。")
+                    reply.copy(
+                        message = buildJsonObject {
+                            put("role", "assistant")
+                            put("content", content)
+                        },
+                        toolCalls = emptyList(),
+                    )
+                } else {
+                    reply
                 }
+                modelStep += 1
+                repliesByStep[modelStep] = effectiveReply
                 AgentModelReply(
-                    content = reply.content.orEmpty(),
+                    content = effectiveReply.content.orEmpty(),
                     toolCalls = if (runPolicy.allowToolExecution) {
-                        reply.toolCalls.map { call ->
+                        effectiveReply.toolCalls.map { call ->
                             AgentToolCall(
                                 id = call.id,
                                 name = call.name,
