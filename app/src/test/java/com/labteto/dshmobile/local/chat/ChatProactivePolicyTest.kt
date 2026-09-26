@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -57,6 +58,20 @@ class ChatProactivePolicyTest {
             fallbackReferenceAt = 0L,
         )
         assertTrue(ready.ready)
+    }
+
+    @Test
+    fun quietHoursRetryMovesToNextEndBoundary() {
+        val now = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 2, 23, 30, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val expected = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 3, 7, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        assertEquals(expected, nextQuietHoursEndMillis(now, endHour = 7))
     }
 
     @Test
