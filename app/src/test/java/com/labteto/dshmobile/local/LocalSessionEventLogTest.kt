@@ -81,6 +81,33 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun exposesBoundedReversePagesForInfiniteSessionHistory() {
+        val directory = Files.createTempDirectory("local-event-page-before").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 700)
+            repeat(24) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) },
+                )
+            }
+
+            assertEquals(
+                listOf(20L, 21L, 22L, 23L),
+                log.pageBefore(limit = 4).map(LocalSessionEventLog.Event::sequence),
+            )
+            assertEquals(
+                listOf(7L, 8L, 9L),
+                log.pageBefore(sequenceExclusive = 10L, limit = 3)
+                    .map(LocalSessionEventLog.Event::sequence),
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun exposesLatestTypedEventForRecovery() {
         val directory = Files.createTempDirectory("local-event-latest").toFile()
         val file = directory.resolve("session.events.jsonl")
