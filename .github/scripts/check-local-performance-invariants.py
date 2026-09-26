@@ -11,6 +11,7 @@ EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/s
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
 CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt"
+COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt"
 
 violations: list[str] = []
 
@@ -19,6 +20,7 @@ event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
 context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
+coordinator = COORDINATOR.read_text(encoding="utf-8")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
@@ -97,7 +99,12 @@ if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedCh
     violations.append("Chat branching must materialize full history only on demand and preserve durable branch graphs")
 if "(state.messages + messages).takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)" not in engine:
     violations.append("Runtime transcript must stay bounded to LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES")
-if "messages = emptyList()" not in engine or "transcriptWindow = state.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)" not in engine:
+if "LocalSessionCoordinator(" not in engine or "sessionCoordinator.snapshot(" not in engine:
+    violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
+if (
+    "messages = emptyList()" not in coordinator or
+    "transcriptWindow = state.messages.takeLast(runtimeWindowMessages)" not in coordinator
+):
     violations.append("Session snapshots must persist only a bounded transcriptWindow, never full state.messages")
 if "LocalSessionTranscriptPager(eventLog).all()" not in engine:
     violations.append("Full transcript reads must go through the Session Event pager")
