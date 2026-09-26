@@ -143,6 +143,39 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun durableFinalAssistantEventWinsEvenBeforeAssistantCheckpoint() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 16,
+                input = "给我最终结论",
+                memoryInput = "给我最终结论",
+            )
+            log.append("turn/start", buildJsonObject { put("turn_id", context.runId) })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            log.append(
+                "assistant/message",
+                buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "最终结论")
+                },
+            )
+
+            val repair = SessionRecovery.repairInterruptedTail(log)
+
+            assertTrue(repair.repaired)
+            assertNull(coordinator.recoveryDecision("s1", repair))
+        }
+    }
+
+    @Test
     fun durableFinalAssistantReplyIsNotGeneratedTwiceAfterRestart() {
         withCoordinator { coordinator, log ->
             val context = coordinator.start(
