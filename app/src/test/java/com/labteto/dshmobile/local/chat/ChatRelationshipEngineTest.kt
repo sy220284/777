@@ -156,6 +156,70 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun chineseInnuendoRecognizesStrongAndContextualDoubleMeanings() {
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("今晚别走，留下来陪我"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("想更深入了解一下你"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("你行不行啊，别光说"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("你又开车了吧，车速有点快"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("咱俩找个安静地方深入交流一下"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("懂得都懂，别装正经"),
+        )
+    }
+
+    @Test
+    fun chineseInnuendoAvoidsNeutralContextFalsePositives() {
+        assertFalse(hasChineseSuggestiveFlirtingIntent("这个项目需要深入了解一下"))
+        assertFalse(hasChineseSuggestiveFlirtingIntent("产品需求还要深入了解"))
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("你行不行把这个代码修一下"),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("今晚别走，项目还没做完"),
+        )
+    }
+
+    @Test
+    fun chineseInnuendoAddsContextGuidanceAndKeepsIntimateContinuity() {
+        val prompt = engine.prompt(
+            "你行不行啊，别光说",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("中文暗示与双关"))
+        assertTrue(prompt.contains("结合人物关系、前后文和语气理解言外之意"))
+        assertTrue(prompt.contains("一句话同时有普通含义和暧昧含义"))
+        assertTrue(prompt.contains("不要把双关解释成词典释义"))
+
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+        )
+        assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            resolveChatInteractionIntent("你行不行啊，别光说", previous),
+        )
+    }
+
+    @Test
     fun ordinaryChatKeepsFlirtAbilityWithoutDetailedRepertoire() {
         val prompt = engine.prompt(
             "今天工作有点累，陪我聊会儿",
