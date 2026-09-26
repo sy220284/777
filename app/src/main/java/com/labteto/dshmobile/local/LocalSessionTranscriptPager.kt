@@ -24,6 +24,19 @@ internal class LocalSessionTranscriptPager(
     private val eventLog: LocalSessionEventLog,
     private val eventPageSize: Int = DEFAULT_EVENT_PAGE_SIZE,
 ) {
+    fun all(
+        pageSize: Int = MAX_MESSAGE_PAGE_SIZE,
+    ): List<LocalHarnessMessage> {
+        val pages = mutableListOf<List<LocalHarnessMessage>>()
+        var cursor: LocalTranscriptPageCursor? = null
+        do {
+            val page = page(cursor = cursor, limit = pageSize)
+            if (page.messages.isNotEmpty()) pages += page.messages
+            cursor = page.nextCursor
+        } while (cursor != null)
+        return pages.asReversed().flatten()
+    }
+
     fun page(
         cursor: LocalTranscriptPageCursor? = null,
         limit: Int = DEFAULT_MESSAGE_PAGE_SIZE,
