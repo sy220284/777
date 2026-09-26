@@ -3922,6 +3922,7 @@ class LocalHarnessEngine @Inject constructor(
         var chatStableContext = ""
         var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
+        val runAllowMutation = runPolicy.allowToolExecution && !_state.value.planMode
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
         val startedToolCallIds = linkedSetOf<String>()
@@ -4151,7 +4152,7 @@ class LocalHarnessEngine @Inject constructor(
                         errorCode = "TOOLS_DISABLED",
                     )
                 } else {
-                    executeSafely(call.toLocalToolCall(), allowMutation = true)
+                    executeSafely(call.toLocalToolCall(), allowMutation = runAllowMutation)
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
@@ -4166,7 +4167,7 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     executeToolBatch(
                         calls = calls.map { it.toLocalToolCall() },
-                        allowMutation = true,
+                        allowMutation = runAllowMutation,
                     ).map { (_, result) -> result }
                 }
             },
@@ -4385,7 +4386,7 @@ class LocalHarnessEngine @Inject constructor(
                     protocol = runSnapshot.modelProtocol,
                 ),
                 permissions = AgentPermissionScope(
-                    allowMutation = runPolicy.allowToolExecution && !runSnapshot.planMode,
+                    allowMutation = runAllowMutation,
                     approvalScope = "foreground-turn",
                 ),
                 resources = AgentRunBudget(
@@ -4627,6 +4628,17 @@ class LocalHarnessEngine @Inject constructor(
                 errorCode = "UNKNOWN_TOOL",
                 recoveryHint = "先使用 capability_search 或检查工具名称。",
             )
+        if (
+            LocalToolRouter.isOptional(call.name) &&
+            synchronized(enabledOptionalTools) { call.name !in enabledOptionalTools }
+        ) {
+            return AgentToolResult(
+                content = "当前 Agent Run 尚未启用扩展工具：${call.name}",
+                isError = true,
+                errorCode = "TOOL_NOT_VISIBLE",
+                recoveryHint = "先使用 capability_search 在当前回合显式启用该能力。",
+            )
+        }
 
         val result = toolRegistry.execute(
             name = call.name,
