@@ -66,6 +66,8 @@ if "orderedFilesUnsafe().asReversed()" not in event_log:
     violations.append("SessionEventLog tail/latest paths must keep newest-first segment traversal")
 if "RandomAccessFile(source, \"r\")" not in event_log or "REVERSE_READ_BUFFER_BYTES" not in event_log:
     violations.append("SessionEventLog restart sequence recovery must keep buffered reverse reading")
+if "fun pageBefore(" not in event_log or "forEachEventReverseUnsafe" not in event_log:
+    violations.append("SessionEventLog must keep bounded reverse paging for infinite-session history")
 
 if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")

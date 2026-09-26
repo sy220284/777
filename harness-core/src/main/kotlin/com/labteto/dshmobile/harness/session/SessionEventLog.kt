@@ -77,6 +77,31 @@ class SessionEventLog(
     }
 
     /**
+     * Return one chronological page strictly older than [sequenceExclusive].
+     *
+     * The implementation walks rotated segments newest-first and decodes JSONL rows backwards, so
+     * loading one history page is proportional to the requested page instead of the session age.
+     * Malformed/torn rows are skipped just like restart recovery.
+     */
+    fun pageBefore(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = DEFAULT_PAGE_EVENTS,
+    ): List<SessionEvent> = synchronized(lock) {
+        val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
+        val newestFirst = ArrayList<SessionEvent>(wanted)
+        for (source in orderedFilesUnsafe().asReversed()) {
+            val first = readFirstValidEventUnsafe(source) ?: continue
+            if (first.sequence >= sequenceExclusive) continue
+            val completed = forEachEventReverseUnsafe(source) { event ->
+                if (event.sequence < sequenceExclusive) newestFirst += event
+                newestFirst.size < wanted
+            }
+            if (!completed || newestFirst.size >= wanted) break
+        }
+        newestFirst.asReversed()
+    }
+
+    /**
      * Visit durable events newer than [sequenceExclusive] without materializing the tail.
      *
      * Startup recovery uses this path so a long-lived session cannot temporarily duplicate its
@@ -212,6 +237,16 @@ class SessionEventLog(
         return 0L
     }
 
+    private fun readFirstValidEventUnsafe(source: File): SessionEvent? {
+        if (!source.isFile || source.length() == 0L) return null
+        source.bufferedReader().useLines { lines ->
+            lines.forEach { line ->
+                decodeEventOrNull(line)?.let { return it }
+            }
+        }
+        return null
+    }
+
     private fun readLastValidEventUnsafe(source: File): SessionEvent? {
         if (!source.isFile || source.length() == 0L) return null
         RandomAccessFile(source, "r").use { input ->
@@ -245,6 +280,47 @@ class SessionEventLog(
         val bytes = reversed.toByteArray()
         bytes.reverse()
         return decodeEventOrNull(String(bytes, Charsets.UTF_8).trimEnd('\r'))
+    }
+
+    /**
+     * Visit one segment from newest row to oldest without materializing the segment.
+     *
+     * Returning false from [visitor] stops immediately, allowing callers such as [pageBefore] to
+     * bound both decoding work and temporary allocations to the requested page.
+     */
+    private fun forEachEventReverseUnsafe(
+        source: File,
+        visitor: (SessionEvent) -> Boolean,
+    ): Boolean {
+        if (!source.isFile || source.length() == 0L) return true
+        RandomAccessFile(source, "r").use { input ->
+            var cursor = input.length()
+            val reversed = ByteArrayOutputStream()
+            val buffer = ByteArray(REVERSE_READ_BUFFER_BYTES)
+
+            fun visitBufferedLine(): Boolean {
+                val event = decodeReversedLineUnsafe(reversed)
+                reversed.reset()
+                return event?.let(visitor) ?: true
+            }
+
+            while (cursor > 0L) {
+                val chunkSize = minOf(buffer.size.toLong(), cursor).toInt()
+                val start = cursor - chunkSize
+                input.seek(start)
+                input.readFully(buffer, 0, chunkSize)
+                for (index in chunkSize - 1 downTo 0) {
+                    val value = buffer[index].toInt() and 0xff
+                    if (value == '\n'.code) {
+                        if (reversed.size() > 0 && !visitBufferedLine()) return false
+                    } else {
+                        reversed.write(value)
+                    }
+                }
+                cursor = start
+            }
+            return reversed.size() == 0 || visitBufferedLine()
+        }
     }
 
     private fun readWindowUnsafe(
@@ -369,6 +445,8 @@ class SessionEventLog(
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
         const val MAX_CONTEXT_LINES = 20
+        const val DEFAULT_PAGE_EVENTS = 80
+        const val MAX_PAGE_EVENTS = 200
         const val REVERSE_READ_BUFFER_BYTES = 8 * 1024
     }
 }
