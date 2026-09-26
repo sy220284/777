@@ -72,7 +72,8 @@ unzip -qq "$apk" "lib/$expected_abi/*" "assets/runtime/*/$expected_abi/*" -d "$e
 
 elf_count=0
 while IFS= read -r -d '' library; do
-  if ! head -c 4 "$library" | grep -q \x7fELF'; then
+  elf_magic="$(head -c 4 "$library" | od -An -tx1 | tr -d ' \n')"
+  if [ "$elf_magic" != "7f454c46" ]; then
     continue
   fi
   elf_count=$((elf_count + 1))
