@@ -43,6 +43,7 @@ data class AgentResourceBudget(
     val maxSteps: Int? = null,
     val maxModelRequests: Int? = null,
     val maxParallelTools: Int? = null,
+    val maxDepth: Int = 4,
 )
 
 fun interface AgentCancellation {
@@ -58,6 +59,8 @@ data class AgentRunContext(
     val runId: String,
     val sessionId: String,
     val lineageId: String? = null,
+    val parentRunId: String? = null,
+    val depth: Int = 0,
     val modelRoute: AgentModelRoute,
     val toolView: AgentToolView = AgentToolView.UNRESTRICTED,
     val permissions: AgentPermissionScope = AgentPermissionScope(),
