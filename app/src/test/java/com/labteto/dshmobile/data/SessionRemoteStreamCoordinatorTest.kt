@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.data
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,6 +21,7 @@ class SessionRemoteStreamCoordinatorTest {
         val cancelled = mutableListOf<String>()
         var followIndex = 0
         val coordinator = coordinator(
+            scope = backgroundScope,
             streamProvider = { endpoint, args ->
                 opened += endpoint to args
                 if (endpoint == "session/follow") {
@@ -52,6 +54,7 @@ class SessionRemoteStreamCoordinatorTest {
         val cancelled = mutableListOf<String>()
         val opened = mutableListOf<String>()
         val coordinator = coordinator(
+            scope = backgroundScope,
             streamProvider = { endpoint, _ ->
                 opened += endpoint
                 trackedFlow("$endpoint#${opened.count { it == endpoint }}", cancelled)
@@ -72,9 +75,10 @@ class SessionRemoteStreamCoordinatorTest {
     }
 
     private fun coordinator(
+        scope: CoroutineScope,
         streamProvider: (String, JsonElement) -> Flow<JsonElement>?,
     ) = SessionRemoteStreamCoordinator(
-        scope = backgroundScope,
+        scope = scope,
         streamProvider = streamProvider,
         onControlFrame = {},
         onWorkspaceFrame = {},
