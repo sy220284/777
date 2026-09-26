@@ -8,6 +8,7 @@ import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -158,8 +159,8 @@ class LocalAgentRunCoordinatorTest {
             )
             log.append(
                 "turn/end",
-                kotlinx.serialization.json.buildJsonObject {
-                    kotlinx.serialization.json.put("reason", "completed")
+                buildJsonObject {
+                    put("reason", "completed")
                 },
             )
 
