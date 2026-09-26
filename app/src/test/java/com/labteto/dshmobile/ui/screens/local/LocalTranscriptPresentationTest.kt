@@ -83,6 +83,24 @@ class LocalTranscriptPresentationTest {
         assertEquals("assistant", (items[2] as LocalTranscriptItem.Message).message.role)
     }
 
+    @Test
+    fun transcriptWindowKeepsOnlyNewestMessagesAndReportsHiddenCount() {
+        val messages = (1..500).map { index ->
+            message("m$index", if (index % 2 == 0) "assistant" else "user", "message-$index")
+        }
+
+        val initial = localTranscriptWindow(messages, 200)
+        assertEquals(200, initial.messages.size)
+        assertEquals(300, initial.hiddenCount)
+        assertEquals("m301", initial.messages.first().id)
+        assertEquals("m500", initial.messages.last().id)
+
+        val expanded = localTranscriptWindow(messages, 400)
+        assertEquals(400, expanded.messages.size)
+        assertEquals(100, expanded.hiddenCount)
+        assertEquals("m101", expanded.messages.first().id)
+    }
+
     private fun message(
         id: String,
         role: String,
