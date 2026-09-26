@@ -1006,4 +1006,10 @@
     <string name="local_current_session">当前</string>
     <string name="chatlist_exit_remote_control">退出远程控制</string>
     <string name="local_work_process">工作过程</string>
+    <string name="local_work_composer_hint">问点什么，或直接交给 Harness 执行…</string>
+    <string name="local_group_chat_composer_hint">和大家说点什么…</string>
+    <string name="local_chat_composer_persona_hint">给 %1$s 发消息…</string>
+    <string name="local_plan_button_on">规划中</string>
+    <string name="local_plan_button_off">规划</string>
+    <string name="local_auto_approve_short">自动批准</string>
 </resources>
