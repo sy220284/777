@@ -47,6 +47,8 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
 
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
@@ -381,7 +383,6 @@ internal fun LocalModelSettingsCard(
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
-    var imageMode by remember(local.imageInputMode) { mutableStateOf(local.imageInputMode) }
     var showEditor by remember { mutableStateOf(false) }
 
     val openEditor = {
@@ -392,15 +393,21 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
-        Text(
-            if (local.configured) {
-                stringResource(R.string.advanced_model_configured)
-            } else {
-                stringResource(R.string.advanced_model_unconfigured)
-            },
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
+        // 状态英雄行：配置现状先于一切可编辑项
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DsStatusPill(
+                state = if (local.configured) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.configured) R.string.advanced_model_configured
+                    else R.string.advanced_model_unconfigured,
+                ),
+            )
+            Spacer(Modifier.width(DsSpacing.small))
+            Column {
+                Text(local.model, style = DsType.std14Strong, color = colors.labelPrimary)
+                Text(local.baseUrl, style = DsType.caption11, color = colors.labelTertiary)
+            }
+        }
         if (local.configured && local.configuredModels.isNotEmpty()) {
             Text(
                 stringResource(R.string.local_saved_models, local.configuredModels.joinToString("、")),
@@ -443,23 +450,18 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            listOf(
-                LocalImageInputMode.AUTO to R.string.advanced_image_mode_auto,
-                LocalImageInputMode.NATIVE to R.string.advanced_image_mode_native,
-                LocalImageInputMode.TOOL to R.string.advanced_image_mode_tool,
-            ).forEach { (mode, label) ->
-                DsButton(
-                    text = stringResource(label),
-                    onClick = {
-                        imageMode = mode
-                        viewModel.configureLocalImageInputMode(mode)
-                    },
-                    size = DsButtonSize.Small,
-                    variant = if (imageMode == mode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                )
-            }
-        }
+        DsSegmented(
+            segments = listOf(
+                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.advanced_image_mode_auto)),
+                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.advanced_image_mode_native)),
+                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.advanced_image_mode_tool)),
+            ),
+            selectedKey = local.imageInputMode.name,
+            onSelect = { key ->
+                viewModel.configureLocalImageInputMode(LocalImageInputMode.valueOf(key))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     if (showEditor) {
