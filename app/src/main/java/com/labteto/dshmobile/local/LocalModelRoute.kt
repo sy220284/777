@@ -28,3 +28,14 @@ internal fun resolveSessionModelRoute(
     fallbackBaseUrl: String,
     fallbackModel: String,
 ): AgentModelRoute = session.modelRoute ?: resolveLocalModelRoute(fallbackBaseUrl, fallbackModel)
+
+internal fun usesDeepSeekInHistorySystem(route: AgentModelRoute): Boolean =
+    route.provider == "deepseek" &&
+        route.protocol == AgentModelProtocol.ANTHROPIC_MESSAGES &&
+        deepSeekSupportsInHistorySystem(route.model)
+
+internal fun usesDeepSeekAdditionOnlyTools(route: AgentModelRoute): Boolean =
+    route.provider == "deepseek" &&
+        route.protocol == AgentModelProtocol.ANTHROPIC_MESSAGES &&
+        deepSeekSupportsAdditionOnlyTools(route.model)
+
