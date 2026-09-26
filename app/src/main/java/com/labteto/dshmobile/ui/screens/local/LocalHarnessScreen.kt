@@ -1157,7 +1157,7 @@ private fun LocalChat(
         transcriptHistory.loading
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
         !state.groupChat.enabled &&
-        chatBranchingEligible(state.messages)
+        state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     LaunchedEffect(
         state.sessionId,
