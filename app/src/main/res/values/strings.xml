@@ -253,6 +253,8 @@
     <string name="settings_background_adaptive_contrast">Adaptive readability</string>
     <string name="settings_background_adaptive_contrast_hint">Analyzes wallpaper brightness, contrast, saturation and detail density, then adapts top, content and bottom surfaces so chats stay readable after changing backgrounds.</string>
     <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_group_agent">Agent feedback</string>
+    <string name="settings_notifications_group_jobs">Background tasks</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>
     <string name="settings_notifications_goal">Notify when a goal completes or blocks</string>
     <string name="settings_notifications_action">Notify when your action is needed</string>
@@ -621,6 +623,9 @@
     <string name="pricing_same_thinking">Thinking / non-thinking: same token rates</string>
     <string name="pricing_off_peak_row">Off-peak · cache hit ¥%1$s · miss ¥%2$s · output ¥%3$s / 1M tokens</string>
     <string name="pricing_peak_row">Peak · cache hit ¥%1$s · miss ¥%2$s · output ¥%3$s / 1M tokens</string>
+    <string name="pricing_col_cache_hit">Cache hit</string>
+    <string name="pricing_col_cache_miss">Cache miss</string>
+    <string name="pricing_col_output">Output</string>
     <string name="pricing_holiday_hint">Cost estimates use Beijing-time weekday peak periods. DeepSeek prices Chinese statutory holidays as off-peak; the app does not embed a holiday calendar yet, so holiday estimates may be slightly high.</string>
     <string name="pricing_refresh">Fetch latest official prices</string>
     <string name="pricing_refreshing">Checking official prices…</string>

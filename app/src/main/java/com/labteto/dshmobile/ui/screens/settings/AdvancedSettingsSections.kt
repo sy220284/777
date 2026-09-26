@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Memory
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextAlign
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
@@ -43,6 +45,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
+
 import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
@@ -329,17 +332,34 @@ private fun ModelProviderRow(
                 variant = DsButtonVariant.Outline,
             )
             if (models.isNotEmpty()) {
-                Text(
-                    models.joinToString("\n") { model ->
-                        buildString {
-                            append(model.name ?: model.id)
-                            if (model.name != null && model.name != model.id) append(" · ${model.id}")
-                            model.contextWindow?.let { append(" · $contextWindowLabel $it") }
+                // 发现结果逐行成卡：名称 + id + 上下文窗口，替代 \n 拼接的文本墙
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+                    models.forEach { model ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    model.name ?: model.id,
+                                    style = DsType.small13Strong,
+                                    color = colors.labelPrimary,
+                                )
+                                if (model.name != null && model.name != model.id) {
+                                    Text(
+                                        model.id,
+                                        style = DsType.caption11,
+                                        color = colors.labelTertiary,
+                                    )
+                                }
+                            }
+                            model.contextWindow?.let {
+                                Text(
+                                    "$contextWindowLabel $it",
+                                    style = DsType.caption11,
+                                    color = colors.labelTertiary,
+                                )
+                            }
                         }
-                    },
-                    style = DsType.caption11,
-                    color = colors.labelSecondary,
-                )
+                    }
+                }
             }
         }
     }
@@ -569,25 +589,38 @@ internal fun DeepSeekPricingCard(
                         style = DsType.caption11,
                         color = colors.labelSecondary,
                     )
-                    Text(
-                        stringResource(
-                            R.string.pricing_off_peak_row,
-                            formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
-                            formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
-                            formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
-                        ),
-                        style = DsType.small13,
-                        color = if (currentPeriod == DeepSeekPricePeriod.OFF_PEAK) colors.labelPrimary else colors.labelSecondary,
+                    // 表头：缓存命中 / 缓存未命中 / 输出
+                    Row(Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.weight(1.5f))
+                        Text(
+                            stringResource(R.string.pricing_col_cache_hit),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                        Text(
+                            stringResource(R.string.pricing_col_cache_miss),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                        Text(
+                            stringResource(R.string.pricing_col_output),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                    }
+                    PriceTableRow(
+                        periodLabel = stringResource(R.string.pricing_period_off_peak),
+                        cacheHit = formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
+                        cacheMiss = formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
+                        output = formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
+                        active = currentPeriod == DeepSeekPricePeriod.OFF_PEAK,
                     )
-                    Text(
-                        stringResource(
-                            R.string.pricing_peak_row,
-                            formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
-                            formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
-                            formatDeepSeekPrice(model.peak.outputCnyPerMillion),
-                        ),
-                        style = DsType.small13,
-                        color = if (currentPeriod == DeepSeekPricePeriod.PEAK) colors.labelPrimary else colors.labelSecondary,
+                    PriceTableRow(
+                        periodLabel = stringResource(R.string.pricing_period_peak),
+                        cacheHit = formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
+                        cacheMiss = formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
+                        output = formatDeepSeekPrice(model.peak.outputCnyPerMillion),
+                        active = currentPeriod == DeepSeekPricePeriod.PEAK,
                     )
                 }
             }
@@ -614,6 +647,31 @@ internal fun DeepSeekPricingCard(
             variant = DsButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/** 价格表行：时段标签 + 三列右对齐价格；当前计价时段整行提亮。 */
+@Composable
+private fun PriceTableRow(
+    periodLabel: String,
+    cacheHit: String,
+    cacheMiss: String,
+    output: String,
+    active: Boolean,
+) {
+    val colors = DsTheme.colors
+    val labelColor = if (active) colors.accent else colors.labelSecondary
+    val priceColor = if (active) colors.labelPrimary else colors.labelSecondary
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            periodLabel,
+            style = DsType.small13,
+            color = labelColor,
+            modifier = Modifier.weight(1.5f),
+        )
+        Text(cacheHit, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(cacheMiss, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(output, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }
 
@@ -798,46 +856,93 @@ internal fun LocalAgentSettingsCard(
     report: (String) -> Unit,
 ) {
     val agentSavedMessage = stringResource(R.string.advanced_agent_saved)
-    var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
-    var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
-    var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
+
+    // 步进即保存：不再积攒草稿等“保存”按钮，误触也不可能（有边界钳制）
+    fun clampUpdate(current: Int, delta: Int, min: Int, max: Int, apply: (Int) -> Unit) {
+        val next = (current + delta).coerceIn(min, max)
+        if (next != current) {
+            apply(next)
+            report(agentSavedMessage)
+        }
+    }
 
     SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            OutlinedTextField(
-                value = mainSteps,
-                onValueChange = { mainSteps = it.filter(Char::isDigit).take(3) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_main_steps)) },
-            )
-            OutlinedTextField(
-                value = subagentSteps,
-                onValueChange = { subagentSteps = it.filter(Char::isDigit).take(2) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_subagent_steps)) },
-            )
+        StepperRow(
+            label = stringResource(R.string.advanced_main_steps),
+            hint = stringResource(R.string.advanced_agent_limits_hint),
+            value = local.mainMaxSteps,
+            range = 1..500,
+            onDelta = { delta ->
+                clampUpdate(local.mainMaxSteps, delta, 1, 500) {
+                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts)
+                }
+            },
+        )
+        StepperRow(
+            label = stringResource(R.string.advanced_subagent_steps),
+            hint = null,
+            value = local.subagentMaxSteps,
+            range = 1..99,
+            onDelta = { delta ->
+                clampUpdate(local.subagentMaxSteps, delta, 1, 99) {
+                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts)
+                }
+            },
+        )
+        StepperRow(
+            label = stringResource(R.string.advanced_model_attempts),
+            hint = null,
+            value = local.modelAttempts,
+            range = 1..9,
+            onDelta = { delta ->
+                clampUpdate(local.modelAttempts, delta, 1, 9) {
+                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it)
+                }
+            },
+        )
+    }
+}
+
+/** 数值行：标签 + 说明在左，−/值/＋ 在右。 */
+@Composable
+private fun StepperRow(
+    label: String,
+    hint: String?,
+    value: Int,
+    range: IntRange,
+    onDelta: (Int) -> Unit,
+) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = DsType.small13Strong, color = colors.labelPrimary)
+            hint?.let {
+                Text(it, style = DsType.caption11, color = colors.labelTertiary)
+            }
         }
-        OutlinedTextField(
-            value = attempts,
-            onValueChange = { attempts = it.filter(Char::isDigit).take(1) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_model_attempts)) },
-            supportingText = { Text(stringResource(R.string.advanced_agent_limits_hint)) },
+        DsButton(
+            text = "−",
+            onClick = { onDelta(-1) },
+            enabled = value > range.first,
+            size = DsButtonSize.Small,
+            variant = DsButtonVariant.Ghost,
+        )
+        Text(
+            value.toString(),
+            style = DsType.std14Strong,
+            color = colors.labelPrimary,
+            modifier = Modifier.widthIn(min = 30.dp),
+            textAlign = TextAlign.Center,
         )
         DsButton(
-            text = stringResource(R.string.advanced_save_agent_settings),
-            onClick = {
-                viewModel.configureLocalAgent(
-                    mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
-                    subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
-                    modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
-                )
-                report(agentSavedMessage)
-            },
-            variant = DsButtonVariant.Outline,
+            text = "＋",
+            onClick = { onDelta(1) },
+            enabled = value < range.last,
+            size = DsButtonSize.Small,
+            variant = DsButtonVariant.Ghost,
         )
     }
 }

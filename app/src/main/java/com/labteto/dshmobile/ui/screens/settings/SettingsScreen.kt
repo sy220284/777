@@ -1,10 +1,12 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -47,6 +50,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.layout.wrapContentWidth
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
@@ -454,7 +460,8 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
-                        SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
+                        // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
+                        SettingsCard(stringResource(R.string.settings_notifications_group_agent), Icons.Outlined.Notifications) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_turn),
                                 settings.notifyTurnComplete,
@@ -470,6 +477,8 @@ fun SettingsScreen(
                                 settings.notifyNeedsAction,
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs), Icons.Outlined.Notifications) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
@@ -755,6 +764,12 @@ private fun appearanceLabel(preference: String): String = when (preference) {
 @Composable
 private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = DsTheme.colors
+    val options = listOf(
+        "light" to stringResource(R.string.settings_appearance_light),
+        "dark" to stringResource(R.string.settings_appearance_dark),
+        "matte_black" to stringResource(R.string.settings_appearance_matte_black),
+        "system" to stringResource(R.string.settings_appearance_system),
+    )
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
         Text(
             stringResource(R.string.settings_appearance),
@@ -762,28 +777,84 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_light),
-                    settings.themePreference == "light",
-                ) { onSelect("light") }
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_dark),
-                    settings.themePreference == "dark",
-                ) { onSelect("dark") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_matte_black),
-                    settings.themePreference == "matte_black",
-                ) { onSelect("matte_black") }
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_system),
-                    settings.themePreference == "system",
-                ) { onSelect("system") }
+        // 预览先行：每块内画出主题本身的底色与卡片条，选中块描 accent 边
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            options.take(2).forEach { (key, label) ->
+                ThemePreviewBlock(
+                    label = label,
+                    selected = settings.themePreference == key,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(key) },
+                )
             }
         }
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            options.takeLast(2).forEach { (key, label) ->
+                ThemePreviewBlock(
+                    label = label,
+                    selected = settings.themePreference == key,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(key) },
+                )
+            }
+        }
+    }
+}
+
+/** 单个主题预览块：上半段画该主题的底色与卡片条，下半段是名称。 */
+@Composable
+private fun ThemePreviewBlock(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    // 各主题的示意底色/卡片色（与 Color.kt 语义值一致）
+    val (bg, card) = when (label) {
+        stringResource(R.string.settings_appearance_light) -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
+        stringResource(R.string.settings_appearance_dark) -> Color(0xFF0F1514) to Color(0xFF182120)
+        stringResource(R.string.settings_appearance_matte_black) -> Color(0xFF000000) to Color(0xFF111111)
+        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514) // 跟随系统：左亮右暗拼色
+    }
+    Column(
+        modifier = modifier
+            .clip(DsShapes.cube)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) colors.accent else colors.borderL2,
+                shape = DsShapes.cube,
+            )
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .background(bg),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (label == stringResource(R.string.settings_appearance_system)) {
+                Row(Modifier.fillMaxWidth()) {
+                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFFF7F8F6)))
+                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFF0F1514)))
+                }
+            }
+            // 卡片条示意
+            Box(
+                Modifier
+                    .padding(start = 10.dp)
+                    .size(width = 64.dp, height = 16.dp)
+                    .background(card, RoundedCornerShape(5.dp)),
+            )
+        }
+        Text(
+            label,
+            style = DsType.small13,
+            color = if (selected) colors.accent else colors.labelSecondary,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
     }
 }
 
@@ -831,6 +902,29 @@ private fun BackgroundRow(
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
+        if (path != null) {
+            // 缩略图先行：两段式解码（先边界再按目标高度取样），大图不会撑爆内存
+            val thumbnail = remember(path) {
+                runCatching {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(path, bounds)
+                    var sample = 1
+                    while (bounds.outHeight / (sample * 2) >= 96) sample *= 2
+                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                    BitmapFactory.decodeFile(path, opts)?.asImageBitmap()
+                }.getOrNull()
+            }
+            thumbnail?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(width = 96.dp, height = 56.dp)
+                        .clip(DsShapes.cube),
+                )
+                Spacer(Modifier.height(DsSpacing.small))
+            }
+        }
         Text(
             stringResource(
                 if (path == null) {

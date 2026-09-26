@@ -203,6 +203,8 @@
     <string name="settings_background_adaptive_contrast">背景自适应</string>
     <string name="settings_background_adaptive_contrast_hint">自动分析背景的亮度、对比度、饱和度和细节密度，并按顶部、正文、底部区域调整阅读层、气泡和输入区，换图后也保持清晰。</string>
     <string name="settings_notifications">通知</string>
+    <string name="settings_notifications_group_agent">智能体反馈</string>
+    <string name="settings_notifications_group_jobs">后台任务</string>
     <string name="settings_notifications_turn">回合完成时通知</string>
     <string name="settings_notifications_goal">目标完成或受阻时通知</string>
     <string name="settings_notifications_action">需要你操作时通知</string>
@@ -619,6 +621,9 @@
     <string name="pricing_same_thinking">思考 / 非思考：Token 单价相同</string>
     <string name="pricing_off_peak_row">空闲 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
     <string name="pricing_peak_row">高峰 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
+    <string name="pricing_col_cache_hit">缓存命中</string>
+    <string name="pricing_col_cache_miss">缓存未命中</string>
+    <string name="pricing_col_output">输出</string>
     <string name="pricing_holiday_hint">预估金额按北京时间工作日峰谷计算。DeepSeek 官网将中国法定节假日按空闲价计费；应用暂未内置节假日表，因此节假日预估可能略高。</string>
     <string name="pricing_refresh">联网查询官网最新价格</string>
     <string name="pricing_refreshing">正在查询官网价格…</string>
