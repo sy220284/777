@@ -32,9 +32,6 @@ internal fun buildLocalTranscriptRuntimeIndex(
         if (message.role == "user") {
             latestUserMessageId = message.id
         }
-        if (message.role == "user") {
-            latestUserMessageId = message.id
-        }
         if (message.role == "user" || message.role == "assistant") {
             hasDialogue = true
             latestDialogueMessageId = message.id
