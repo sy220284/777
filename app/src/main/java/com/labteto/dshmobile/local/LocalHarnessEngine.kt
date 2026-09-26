@@ -1882,6 +1882,7 @@ class LocalHarnessEngine @Inject constructor(
                     // but are intentionally appended to model history only when their queued turn
                     // resumes. Keeping the proactive reply in front of that model input avoids
                     // duplicating queued messages.
+                    val beforeProactive = _state.value
                     appendModelHistory(reply.message)
                     updateContextMetrics()
                     applyTranscriptMessages(
@@ -1889,12 +1890,18 @@ class LocalHarnessEngine @Inject constructor(
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
-                    if (pendingInputs.size() == 0 && _state.value.transcriptIndex.branchingEligible) {
+                    if (
+                        pendingInputs.size() == 0 &&
+                        beforeProactive.transcriptIndex.branchingEligible &&
+                        beforeProactive.chatBranches.nodes.isNotEmpty()
+                    ) {
                         _state.update { current ->
                             current.copy(
-                                chatBranches = syncMaterializedChatBranchState(
+                                chatBranches = appendMaterializedChatBranchMessage(
                                     current = current.chatBranches,
-                                    activeMessages = current.messages,
+                                    activeMessages = emptyList(),
+                                    message = proactiveMessage,
+                                    parentId = beforeProactive.transcriptIndex.latestDialogueMessageId,
                                     chatState = current.chatState,
                                     replySuggestions = current.replySuggestions,
                                 ),
@@ -5406,10 +5413,15 @@ class LocalHarnessEngine @Inject constructor(
     ).all()
 
     private fun transcriptIndexForSession(session: LocalHarnessSession): LocalTranscriptRuntimeIndex =
-        if (session.transcriptIndex.totalMessageCount > 0L || session.messages.isEmpty()) {
+        if (
+            session.transcriptIndex.totalMessageCount > 0L ||
+            (session.messages.isEmpty() && session.transcriptWindow.isEmpty())
+        ) {
             session.transcriptIndex
         } else {
-            buildLocalTranscriptRuntimeIndex(session.messages)
+            buildLocalTranscriptRuntimeIndex(
+                session.transcriptWindow.ifEmpty { session.messages },
+            )
         }
 
     private fun cancelChatPostTurn() {
