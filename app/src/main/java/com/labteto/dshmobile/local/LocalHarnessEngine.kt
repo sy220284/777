@@ -341,6 +341,24 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
+    private val modelRequestCoordinator by lazy {
+        LocalModelRequestCoordinator(
+            modelClient = modelClient,
+            resourceScheduler = resourceScheduler,
+            historyCompactor = historyCompactor,
+            toolSchemas = ::modelToolSchemas,
+            defaultEventLog = { eventLog },
+            resetPreview = {
+                _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+            },
+            publishPreview = { preview ->
+                _state.update { it.copy(streamingAssistant = preview) }
+            },
+            persistOverflowCompaction = ::persistForegroundOverflowCompaction,
+            maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
+            streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
+        )
+    }
     private val runtimePlugin by lazy {
         AndroidRuntimePlugin(
             workspaceRoot = File(workspace.path),
@@ -5578,165 +5596,19 @@ class LocalHarnessEngine @Inject constructor(
         persistOverflowHistory: Boolean = false,
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
-    ): LocalModelReply {
-        val tools = toolsOverride ?: modelToolSchemas(localAgentRunPolicy(snapshot.usageMode))
-        val log = requestLog ?: eventLog
-        val logMessages = redactModelImages(messages)
-        val contextChars = logMessages.sumOf { it.toString().length }
-        val toolNames = buildJsonArray {
-            tools.forEach { element ->
-                val function = (element as? JsonObject)?.get("function") as? JsonObject
-                function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(JsonPrimitive(name)) }
-            }
-        }
-        log.append("request/header", buildJsonObject {
-            put("model", snapshot.model)
-            put("base_url", snapshot.baseUrl)
-            put("step", step)
-            put("message_count", logMessages.size)
-            put("context_chars", contextChars)
-            put("tool_count", tools.size)
-            put("tool_names", toolNames)
-            put("plan_mode", snapshot.planMode)
-        })
-        log.append("request/context", buildJsonObject {
-            put("step", step)
-            put("model", snapshot.model)
-            put("message_count", logMessages.size)
-            put("context_chars", contextChars)
-            put("tool_count", tools.size)
-            put("tool_names", toolNames)
-        })
-        var failureContextLogged = false
-        val executor = AgentRequestExecutor(
-            maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
-            retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-            },
-            eventSink = AgentRequestEventSink { event ->
-                when (event) {
-                    is AgentRequestEvent.AttemptStarted -> {
-                        if (publishPreview) {
-                            _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
-                        }
-                    }
-                    is AgentRequestEvent.AttemptFailed -> {
-                        if (!failureContextLogged) {
-                            runCatching {
-                                log.append("request/context-full", buildJsonObject {
-                                    put("step", step)
-                                    put("model", snapshot.model)
-                                    put("messages", JsonArray(logMessages))
-                                    put("tools", tools)
-                                })
-                            }
-                            failureContextLogged = true
-                        }
-                        log.append("request/error", buildJsonObject {
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("retryable", event.retryable)
-                            put("will_retry", event.willRetry)
-                            put("detail", event.reason.take(2_000))
-                        })
-                        log.append("assistant/attempt", buildJsonObject {
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("status", "failed")
-                            put("retryable", event.retryable)
-                            put("will_retry", event.willRetry)
-                            put("detail", event.reason.take(2_000))
-                        })
-                    }
-                    is AgentRequestEvent.RetryScheduled -> {
-                        log.append("llm/retry", buildJsonObject {
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("next_attempt", event.nextAttempt)
-                            put("delay_ms", event.delayMillis)
-                        })
-                    }
-                    is AgentRequestEvent.AttemptCancelled -> {
-                        log.append("assistant/attempt", buildJsonObject {
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("status", "cancelled")
-                            put("will_retry", false)
-                            event.reason?.let { put("detail", it.take(2_000)) }
-                        })
-                    }
-                    is AgentRequestEvent.AttemptSucceeded -> Unit
-                }
-            },
-        )
-        return try {
-            executor.execute {
-                // A fresh filter and preview per attempt prevents failed-attempt text from leaking
-                // into the next visible retry.
-                val streamPreview = LocalStreamPreview(
-                    maxChars = MAX_STREAM_PREVIEW_CHARS,
-                    minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
-                    clockMs = { System.nanoTime() / 1_000_000 },
-                    publish = { preview ->
-                        if (publishPreview) {
-                            _state.update { it.copy(streamingAssistant = preview) }
-                        }
-                    },
-                )
-                val streamFilter = streamFilterPhrases
-                    .takeIf { it.isNotEmpty() }
-                    ?.let(::ChatStreamFilter)
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    val reply = modelClient.completeStreaming(
-                        apiKey = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = snapshot.model,
-                        messages = messages,
-                        tools = tools,
-                        onDelta = { delta ->
-                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                            streamPreview.append(visible)
-                        },
-                    )
-                    streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
-                    streamPreview.flush()
-                    reply
-                }
-            }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val summaryMode = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                LocalHistorySummaryMode.CHAT
-            } else {
-                LocalHistorySummaryMode.WORK
-            }
-            val compacted = historyCompactor.compactForOverflow(messages, summaryMode)
-                ?: throw error
-            if (persistOverflowHistory) {
-                persistForegroundOverflowCompaction(snapshot, summaryMode)
-            }
-            log.append("request/context-overflow-recovery", buildJsonObject {
-                put("step", step)
-                put("model", snapshot.model)
-                put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                put("omitted_messages", compacted.omittedMessages)
-            })
-            completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = compacted.messages,
-                step = step,
-                toolsOverride = tools,
-                publishPreview = publishPreview,
-                maxAttemptsOverride = maxAttemptsOverride,
-                allowContextOverflowRecovery = false,
-                persistOverflowHistory = false,
-                streamFilterPhrases = streamFilterPhrases,
-                requestLog = log,
-            )
-        }
-    }
+    ): LocalModelReply = modelRequestCoordinator.complete(
+        key = key,
+        snapshot = snapshot,
+        messages = messages,
+        step = step,
+        toolsOverride = toolsOverride,
+        publishPreviewEnabled = publishPreview,
+        maxAttemptsOverride = maxAttemptsOverride,
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        persistOverflowHistory = persistOverflowHistory,
+        streamFilterPhrases = streamFilterPhrases,
+        requestLog = requestLog,
+    )
 
     private fun persistForegroundOverflowCompaction(
         snapshot: LocalHarnessState,
