@@ -125,6 +125,21 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun flirtActionRepertoireAddsPoseAndGestureVariety() {
+        val prompt = engine.prompt(
+            "靠近点，陪我聊会儿",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("暧昧动作与姿态变化"))
+        assertTrue(prompt.contains("面对面、并肩、侧身贴近、坐近、倚靠"))
+        assertTrue(prompt.contains("牵手、十指交扣"))
+        assertTrue(prompt.contains("整理衣领或头发"))
+        assertTrue(prompt.contains("压低声音"))
+        assertTrue(prompt.contains("近期已经反复出现的动作优先换一种"))
+    }
+
+    @Test
     fun adultIntimacyIntentGetsPriorityPrompt() {
         assertTrue(hasAdultIntimacyIntent("我们都是成年人，过来抱住我亲一下"))
 
@@ -142,6 +157,8 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("统一安全边界"))
         assertTrue(prompt.contains("不做任何应用层尺度或克制限制"))
         assertTrue(prompt.contains("完整、具体描写"))
+        assertTrue(prompt.contains("亲密姿态连续性"))
+        assertTrue(prompt.contains("避免连续多轮复用同一种姿态或同一个动作模板"))
         assertFalse(prompt.contains("自愿"))
     }
 
