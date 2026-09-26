@@ -1857,7 +1857,7 @@ class LocalHarnessEngine @Inject constructor(
                     pendingQuestion = null,
                     error = null,
                 )
-                val chatContext = chatTurnRunner.prepareProfile(
+                val chatContext = chatTurnCoordinator.prepareProfile(
                     persona = persona,
                     state = session.chatState,
                     userInput = trigger,
@@ -1909,12 +1909,11 @@ class LocalHarnessEngine @Inject constructor(
                     snapshot = boundState,
                     messages = requestMessages,
                 )
-                val reply = chatTurnRunner.finalizeReply(
+                val reply = chatTurnCoordinator.finalize(
+                    snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
                     recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
-                    guardEnabled = boundState.chatStyleGuardEnabled,
-                    additionalBannedPhrases = boundState.chatStyleGuardCustomPhrases,
                     onGuardEvent = { action, violations ->
                         recordStyleGuardHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
@@ -2053,50 +2052,18 @@ class LocalHarnessEngine @Inject constructor(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         allowContextOverflowRecovery: Boolean = true,
-    ): LocalModelReply {
-        val executor = AgentRequestExecutor(
-            maxAttempts = snapshot.modelAttempts.coerceIn(1, 3),
-            retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-            },
-        )
-        return try {
-            executor.execute {
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    modelClient.completeStreaming(
-                        apiKey = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = snapshot.model,
-                        messages = messages,
-                        tools = JsonArray(emptyList()),
-                        onDelta = { },
-                    )
-                }
-            }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val compacted = historyCompactor.compactForOverflow(
-                messages,
-                LocalHistorySummaryMode.CHAT,
-            ) ?: throw error
-            eventLogFor(snapshot.sessionId).append(
-                "request/context-overflow-recovery",
-                buildJsonObject {
-                    put("model", snapshot.model)
-                    put("automation", true)
-                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                    put("omitted_messages", compacted.omittedMessages)
-                },
-            )
-            completeAutomationChat(
-                key = key,
-                snapshot = snapshot,
-                messages = compacted.messages,
-                allowContextOverflowRecovery = false,
-            )
-        }
-    }
+    ): LocalModelReply = modelRequestCoordinator.complete(
+        key = key,
+        snapshot = snapshot,
+        messages = messages,
+        step = CHAT_POST_TURN_MODEL_STEP + 200,
+        toolsOverride = JsonArray(emptyList()),
+        publishPreviewEnabled = false,
+        maxAttemptsOverride = snapshot.modelAttempts.coerceIn(1, 3),
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        persistOverflowHistory = false,
+        requestLog = eventLogFor(snapshot.sessionId),
+    )
 
     private fun resolveAutomationWorkSession(
         preferredSessionId: String?,
@@ -3220,7 +3187,7 @@ class LocalHarnessEngine @Inject constructor(
         mayStaySilent: Boolean,
         handoffSummary: String?,
     ): String {
-        val personaPrompt = chatTurnRunner.prepareProfile(
+        val personaPrompt = chatTurnCoordinator.prepareProfile(
             persona = persona,
             state = state,
             userInput = input,
@@ -3292,12 +3259,11 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
             )
-            val guarded = chatTurnRunner.finalizeReply(
+            val guarded = chatTurnCoordinator.finalize(
+                snapshot = snapshot,
                 persona = persona,
                 reply = rawReply,
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                guardEnabled = snapshot.chatStyleGuardEnabled,
-                additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
                 onGuardEvent = { action, violations ->
                     recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
@@ -3349,7 +3315,7 @@ class LocalHarnessEngine @Inject constructor(
     ): ChatCharacterState {
         val snapshot = _state.value
         val key = apiKeys.get() ?: return member.chatState
-        val prompt = chatInteractionPlanner.prompt(
+        val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = member.chatState,
             userMessage = userMessage,
@@ -3371,7 +3337,7 @@ class LocalHarnessEngine @Inject constructor(
                 maxAttemptsOverride = 1,
             )
             usageTracker.record(snapshot.model, plannerReply.usage)
-            chatInteractionPlanner.parse(
+            chatTurnCoordinator.parsePostTurn(
                 plannerReply.content.orEmpty(),
                 previous = member.chatState,
                 userMessage = userMessage,
@@ -3415,7 +3381,7 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
             replies.forEach { reply ->
-                val memberPrompt = chatInteractionPlanner.prompt(
+                val memberPrompt = chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
                     state = reply.member.chatState,
                     userMessage = userMessage,
@@ -3454,7 +3420,7 @@ class LocalHarnessEngine @Inject constructor(
                 val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
                 val source = replies.firstOrNull { it.member.galleryId == galleryId } ?: return@forEach
                 val plan = item["plan"] ?: return@forEach
-                val parsed = chatInteractionPlanner.parse(
+                val parsed = chatTurnCoordinator.parsePostTurn(
                     text = plan.toString(),
                     previous = source.member.chatState,
                     userMessage = userMessage,
@@ -3747,6 +3713,7 @@ class LocalHarnessEngine @Inject constructor(
                 messages = withChatTurnContext(
                     history = boundedChatRequestHistory(
                         if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                        recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
                     ),
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
@@ -3970,6 +3937,8 @@ class LocalHarnessEngine @Inject constructor(
                 maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                 maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             ),
+            toolNames = toolExecutionCoordinator.visibleToolNames(runPolicy),
+            contextChars = runSnapshot.contextChars,
         )
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
@@ -4064,7 +4033,10 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
-                        history = boundedChatRequestHistory(modelHistory.toList()),
+                        history = boundedChatRequestHistory(
+                            modelHistory.toList(),
+                            recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                        ),
                         stableContext = chatStableContext,
                         dynamicContext = chatDynamicContext,
                     )
@@ -4536,7 +4508,7 @@ class LocalHarnessEngine @Inject constructor(
                 "web_fetch" -> {
                     val background = canonical.arguments.boolean("run_in_background", false)
                     if (!background) {
-                        executeSafely(canonical, allowMutation)
+                        executePersistentRegistered(canonical, allowMutation, sessionId)
                     } else {
                         val input = canonical.arguments.string("url")
                         val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
@@ -4553,7 +4525,7 @@ class LocalHarnessEngine @Inject constructor(
                         )
                     }
                 }
-                else -> executeSafely(canonical, allowMutation)
+                else -> executePersistentRegistered(canonical, allowMutation, sessionId)
             }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
@@ -4566,6 +4538,25 @@ class LocalHarnessEngine @Inject constructor(
             toolFailureResult(canonical, "TOOL_ERROR", error.message ?: error::class.java.simpleName)
         }
     }
+
+    private suspend fun executePersistentRegistered(
+        original: LocalToolCall,
+        allowMutation: Boolean,
+        sessionId: String,
+    ): AgentToolResult = toolExecutionCoordinator.executeScoped(
+        original = original,
+        sessionId = sessionId,
+        allowMutation = allowMutation,
+        planModeEnabled = false,
+        approval = { call, tool, summary ->
+            if (sessionId == currentSessionId) {
+                approve(call, summary, tool)
+            } else {
+                approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
+            }
+        },
+    )
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,
@@ -4650,66 +4641,41 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         onApprovalBlocked: (String) -> Unit,
     ): AgentToolResult {
-        val call = original.copy(name = LocalToolPolicy.canonical(original.name))
-        val registered = toolRegistry.get(call.name)
-            ?: return AgentToolResult(
-                content = "未知工具：${call.name}",
-                isError = true,
-                errorCode = "UNKNOWN_TOOL",
-                recoveryHint = "先使用 capability_search 或检查工具名称。",
-            )
-
-        val result = toolRegistry.execute(
-            name = call.name,
-            input = call.arguments,
-            rawArguments = call.rawArguments,
-            context = ToolContext(
-                sessionId = sessionId,
-                allowMutation = allowMutation,
-                attributes = mapOf("call_id" to call.id),
-                approval = { tool ->
-                    if (
-                        approvalPreferences.isSafeAutoApprovalEnabled() &&
-                        canAutoApprove(tool, call.arguments)
-                    ) {
-                        eventLogFor(sessionId).append("approval/auto", buildJsonObject {
-                            put("tool", call.name)
-                            put("access", tool.access.name.lowercase())
-                            put("mode", "automation-safe-global")
-                        })
-                        true
-                    } else {
-                        val reason = "后台任务需要人工审批：${tool.name}"
-                        onApprovalBlocked(reason)
-                        eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
-                            put("tool", call.name)
-                            put("access", tool.access.name.lowercase())
-                            put("mode", "automation-noninteractive")
-                        })
-                        false
-                    }
-                },
-            ),
+        val result = toolExecutionCoordinator.executeScoped(
+            original = original,
+            sessionId = sessionId,
+            allowMutation = allowMutation,
+            planModeEnabled = false,
+            approval = { call, tool, _ ->
+                if (
+                    approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
+                ) {
+                    eventLogFor(sessionId).append("approval/auto", buildJsonObject {
+                        put("tool", call.name)
+                        put("access", tool.access.name.lowercase())
+                        put("mode", "automation-safe-global")
+                    })
+                    true
+                } else {
+                    val reason = "后台任务需要人工审批：" + tool.name
+                    onApprovalBlocked(reason)
+                    eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
+                        put("tool", call.name)
+                        put("access", tool.access.name.lowercase())
+                        put("mode", "automation-noninteractive")
+                    })
+                    false
+                }
+            },
         )
         return if (result.isError) {
-            AgentToolResult(
-                content = result.content,
-                isError = true,
-                errorCode = "TOOL_REPORTED_ERROR",
-                sideEffect = if (
-                    registered.access in setOf(
-                        ToolAccess.WORKSPACE_WRITE,
-                        ToolAccess.SESSION_WRITE,
-                        ToolAccess.PROCESS,
-                        ToolAccess.AGENT_CONTROL,
-                        ToolAccess.DEVICE,
-                        ToolAccess.PRIVILEGED,
-                    )
-                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
-                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。",
+            result.copy(
+                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。" +
+                    result.recoveryHint?.let { " " + it }.orEmpty(),
             )
         } else {
-            AgentToolResult(result.content)
+            result
         }
     }
 

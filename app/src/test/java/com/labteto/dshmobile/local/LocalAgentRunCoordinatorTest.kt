@@ -8,6 +8,7 @@ import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -142,6 +143,80 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun durableFinalAssistantEventWinsEvenBeforeAssistantCheckpoint() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 16,
+                input = "给我最终结论",
+                memoryInput = "给我最终结论",
+            )
+            log.append("turn/start", buildJsonObject { put("turn_id", context.runId) })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            log.append(
+                "assistant/message",
+                buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "最终结论")
+                },
+            )
+
+            val repair = log.repairInterruptedTail()
+
+            assertTrue(repair.repaired)
+            assertNull(coordinator.recoveryDecision("s1", repair))
+        }
+    }
+
+    @Test
+    fun durableFinalAssistantReplyIsNotGeneratedTwiceAfterRestart() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.CHAT,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.CHAT),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 1,
+                input = "你好",
+                memoryInput = "你好",
+            )
+            log.append("turn/start", buildJsonObject { put("turn_id", context.runId) })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append(
+                "assistant/message",
+                buildJsonObject {
+                    put("step", 1)
+                    put("content", "已经生成的最终回复")
+                },
+            )
+            coordinator.recordEvent(
+                context,
+                AgentEvent.AssistantObserved(
+                    turnId = context.runId,
+                    step = 1,
+                    content = "已经生成的最终回复",
+                    toolCalls = emptyList(),
+                ),
+            )
+
+            val repair = log.repairInterruptedTail()
+
+            assertTrue(repair.repaired)
+            assertNull(coordinator.recoveryDecision("s1", repair))
+        }
+    }
+
+    @Test
     fun durableTurnEndWinsOverStaleRunningCheckpoint() {
         withCoordinator { coordinator, log ->
             val context = coordinator.start(
@@ -158,8 +233,8 @@ class LocalAgentRunCoordinatorTest {
             )
             log.append(
                 "turn/end",
-                kotlinx.serialization.json.buildJsonObject {
-                    kotlinx.serialization.json.put("reason", "completed")
+                buildJsonObject {
+                    put("reason", "completed")
                 },
             )
 

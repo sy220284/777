@@ -41,6 +41,12 @@ internal class LocalToolExecutionCoordinator(
         return LocalToolRouter.visibleSchemas(tools, enabledOptionalSnapshot())
     }
 
+    fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =
+        visibleSchemas(policy).mapNotNull { element ->
+            val function = (element as? JsonObject)?.get("function") as? JsonObject
+            (function?.get("name") as? JsonPrimitive)?.content
+        }
+
     fun searchCapabilities(
         query: String,
         target: MutableSet<String> = enabledOptionalTools,
@@ -68,6 +74,20 @@ internal class LocalToolExecutionCoordinator(
     suspend fun execute(
         original: LocalToolCall,
         allowMutation: Boolean,
+    ): AgentToolResult = executeScoped(
+        original = original,
+        sessionId = currentSessionId(),
+        allowMutation = allowMutation,
+        planModeEnabled = planMode(),
+        approval = requestApproval,
+    )
+
+    suspend fun executeScoped(
+        original: LocalToolCall,
+        sessionId: String,
+        allowMutation: Boolean,
+        planModeEnabled: Boolean,
+        approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = registry.get(call.name)
@@ -78,7 +98,7 @@ internal class LocalToolExecutionCoordinator(
                 recoveryHint = "先使用 capability_search 或检查工具名称。",
             )
 
-        if (planMode() && !LocalToolPolicy.allowedInPlan(call.name, registered.access)) {
+        if (planModeEnabled && !LocalToolPolicy.allowedInPlan(call.name, registered.access)) {
             return AgentToolResult(
                 content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
                 isError = true,
@@ -92,11 +112,11 @@ internal class LocalToolExecutionCoordinator(
             input = call.arguments,
             rawArguments = call.rawArguments,
             context = ToolContext(
-                sessionId = currentSessionId(),
+                sessionId = sessionId,
                 allowMutation = allowMutation,
                 attributes = mapOf("call_id" to call.id),
                 approval = { tool ->
-                    requestApproval(call, tool, approvalSummary(call, tool))
+                    approval(call, tool, approvalSummary(call, tool))
                 },
             ),
         )

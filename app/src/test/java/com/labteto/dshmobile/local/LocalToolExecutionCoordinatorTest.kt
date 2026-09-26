@@ -82,6 +82,44 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun scopedExecutionUsesOwningSessionInsteadOfForegroundSession() = runBlocking {
+        var observedSessionId = ""
+        val registry = ToolRegistry().apply {
+            register(
+                HarnessTool(
+                    name = "session_probe",
+                    schema = buildJsonObject {
+                        put("type", "function")
+                        put("function", buildJsonObject {
+                            put("name", "session_probe")
+                            put("description", "probe")
+                            put("parameters", buildJsonObject { put("type", "object") })
+                        })
+                    },
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    executor = HarnessToolExecutor { context, _, _ ->
+                        observedSessionId = context.sessionId.orEmpty()
+                        ToolResult("ok")
+                    },
+                ),
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        val result = coordinator.executeScoped(
+            original = LocalToolCall("c1", "session_probe", JsonObject(emptyMap()), "{}"),
+            sessionId = "detached-session",
+            allowMutation = false,
+            planModeEnabled = false,
+            approval = { _, _, _ -> true },
+        )
+
+        assertFalse(result.isError)
+        assertEquals("detached-session", observedSessionId)
+    }
+
+    @Test
     fun capabilitySearchEnablesOptionalToolForCurrentTurn() {
         val registry = ToolRegistry().apply {
             register(
