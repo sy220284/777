@@ -59,6 +59,28 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun successfulMutationPreservesPossibleSideEffectForRecovery() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.MUTATION,
+                ) { ToolResult("ok") },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        val result = coordinator.execute(
+            LocalToolCall("c1", "write", JsonObject(emptyMap()), "{}"),
+            allowMutation = true,
+        )
+
+        assertFalse(result.isError)
+        assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
+    }
+
+    @Test
     fun registryErrorsPreservePossibleSideEffect() = runBlocking {
         val registry = ToolRegistry().apply {
             register(
