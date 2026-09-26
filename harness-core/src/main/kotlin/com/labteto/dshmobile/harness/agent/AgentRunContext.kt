@@ -1,12 +1,16 @@
 package com.labteto.dshmobile.harness.agent
 
+import kotlinx.serialization.Serializable
+
 /** Model transport selected for one immutable Agent run. */
+@Serializable
 enum class AgentModelProtocol {
     OPENAI_CHAT,
     ANTHROPIC_MESSAGES,
     RESPONSES,
 }
 
+@Serializable
 data class AgentModelRoute(
     val provider: String,
     val baseUrl: String,
