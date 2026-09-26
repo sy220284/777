@@ -253,6 +253,7 @@
     <string name="settings_background_adaptive_contrast">Adaptive readability</string>
     <string name="settings_background_adaptive_contrast_hint">Analyzes wallpaper brightness, contrast, saturation and detail density, then adapts top, content and bottom surfaces so chats stay readable after changing backgrounds.</string>
     <string name="settings_notifications">Notifications</string>
+    <string name="settings_accent_theme">Accent color</string>
     <string name="settings_notifications_group_agent">Agent feedback</string>
     <string name="settings_notifications_group_jobs">Background tasks</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>

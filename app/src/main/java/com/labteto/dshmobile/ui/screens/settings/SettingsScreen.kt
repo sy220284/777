@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
@@ -83,6 +85,7 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -265,6 +268,7 @@ fun SettingsScreen(
                         SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                             LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
                             BackgroundRow(
                                 path = settings.backgroundImagePath,
                                 adaptiveContrast = settings.backgroundAdaptiveContrast,
@@ -890,6 +894,58 @@ private fun ThemePreviewBlock(
             color = if (selected) colors.accent else colors.labelSecondary,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
         )
+    }
+}
+
+@Composable
+private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
+    val colors = DsTheme.colors
+    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+        Text(
+            stringResource(R.string.settings_accent_theme),
+            style = DsType.std14,
+            color = colors.labelSecondary,
+        )
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        ) {
+            AccentPalettes.ALL.forEach { palette ->
+                val selected = settings.accentTheme == palette.key
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .width(68.dp)
+                        .clip(DsShapes.cube)
+                        .border(
+                            width = if (selected) 1.5.dp else 1.dp,
+                            color = if (selected) palette.lightAccent else colors.borderL2,
+                            shape = DsShapes.cube,
+                        )
+                        .clickable { onSelect(palette.key) }
+                        .padding(8.dp),
+                ) {
+                    // 色卡本体：亮档/暗档/浅衬 三段色条
+                    Row(Modifier.fillMaxWidth().height(24.dp).clip(DsShapes.row)) {
+                        Box(Modifier.weight(1f).fillMaxHeight().background(palette.lightAccent))
+                        Box(Modifier.weight(1f).fillMaxHeight().background(palette.darkAccent))
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .background(palette.lightAccent.copy(alpha = 0.35f)),
+                        )
+                    }
+                    Spacer(Modifier.height(DsSpacing.xsmall))
+                    Text(
+                        palette.cnName,
+                        style = DsType.caption11,
+                        color = if (selected) colors.labelPrimary else colors.labelTertiary,
+                    )
+                }
+            }
+        }
     }
 }
 
