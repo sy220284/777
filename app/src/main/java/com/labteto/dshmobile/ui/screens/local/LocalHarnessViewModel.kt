@@ -409,6 +409,8 @@ class LocalHarnessViewModel @Inject constructor(
             return
         }
 
+        transcriptHistoryCursor = null
+        transcriptHistoryInitializedSessionId = null
         _transcriptHistory.value = LocalTranscriptHistoryState(
             sessionId = sessionId,
             loading = true,
