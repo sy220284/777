@@ -192,6 +192,15 @@ internal class LocalSubagentRunner(
                 maxVirtualDisplays = snapshot.maxVirtualDisplays,
                 maxLanguageServers = snapshot.maxLanguageServers,
             ),
+            toolNames = schemas(
+                allowMutation,
+                virtualScreenId != null,
+                enabledOptionalTools,
+            ).mapNotNull { element ->
+                val function = (element as? JsonObject)?.get("function") as? JsonObject
+                (function?.get("name") as? JsonPrimitive)?.content
+            },
+            contextChars = history.sumOf { it.toString().length } + task.length,
         )
 
         try {
