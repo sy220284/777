@@ -3956,6 +3956,8 @@ class LocalHarnessEngine @Inject constructor(
                 maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                 maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             ),
+            toolNames = toolExecutionCoordinator.visibleToolNames(runPolicy),
+            contextChars = runSnapshot.contextChars,
         )
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
