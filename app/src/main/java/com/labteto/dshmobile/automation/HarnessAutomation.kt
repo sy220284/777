@@ -242,6 +242,10 @@ class HarnessAutomationScheduler @Inject constructor(
 ) : HarnessScheduler {
     private val workManager get() = WorkManager.getInstance(context)
 
+    init {
+        reconcileChainedTasks()
+    }
+
     override suspend fun schedule(id: String, triggerAtMillis: Long, payload: String) {
         scheduleOnce(id, payload, triggerAtMillis, notify = true)
     }
@@ -448,7 +452,19 @@ class HarnessAutomationScheduler @Inject constructor(
                 silenceMinutes
             }
             AutomationScheduleType.ONCE -> null
-            else -> recurringMinutes
+            AutomationScheduleType.DAILY -> {
+                require(recurringMinutes == 24L * 60L) { "每日任务周期必须为 24 小时" }
+                recurringMinutes
+            }
+            AutomationScheduleType.WEEKLY -> {
+                require(recurringMinutes == 7L * 24L * 60L) { "每周任务周期必须为 7 天" }
+                recurringMinutes
+            }
+            AutomationScheduleType.INTERVAL -> {
+                require(recurringMinutes != null) { "自定义周期不能为空" }
+                recurringMinutes
+            }
+            AutomationScheduleType.LEGACY -> recurringMinutes
         }
         if (recurring != null) {
             val minimum = if (current.mode == AutomationMode.CHAT) 60L else 15L
@@ -494,6 +510,14 @@ class HarnessAutomationScheduler @Inject constructor(
 
     internal fun enqueueNextChained(id: String, runAt: Long) {
         enqueueOneTime(id, runAt)
+    }
+
+    private fun reconcileChainedTasks() {
+        store.list()
+            .filter { it.status == "scheduled" && usesChainedChatScheduling(it) }
+            .forEach { task ->
+                enqueueOneTime(task.id, task.nextRunAt.coerceAtLeast(System.currentTimeMillis()))
+            }
     }
 
     private fun enqueueOneTime(id: String, runAt: Long) {
