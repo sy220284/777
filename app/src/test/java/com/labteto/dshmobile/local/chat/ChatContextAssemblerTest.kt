@@ -27,6 +27,17 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun repetitionGuardKeepsExtendedSentenceWithNewInformation() {
+        val result = ChatRepetitionGuard.filter(
+            candidate = "这件事你不用再担心了，因为我已经把门锁好了。我们先去看看门外是谁。",
+            recentAssistantReplies = listOf("这件事你不用再担心了。"),
+        )
+
+        assertTrue(result.text.contains("因为我已经把门锁好了"))
+        assertTrue(result.text.contains("我们先去看看门外是谁"))
+    }
+
+    @Test
     fun repetitionGuardRemovesRepeatedSentenceWhenReplyAlsoHasNewContent() {
         val result = ChatRepetitionGuard.filter(
             candidate = "这件事你不用再担心了。我们先去看看门外是谁。",
