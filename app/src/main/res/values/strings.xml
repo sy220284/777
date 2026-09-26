@@ -931,6 +931,9 @@
     <string name="persona_gallery_import_failed">Could not import character</string>
 
 <string name="tasks_schedule_label">Schedule</string>
+<string name="tasks_status_running">Running</string>
+<string name="tasks_status_queued">Queued</string>
+<string name="tasks_status_scheduled">Scheduled</string>
 <string name="tasks_schedule_once">Once</string>
 <string name="tasks_schedule_daily">Daily</string>
 <string name="tasks_schedule_weekly">Weekly</string>

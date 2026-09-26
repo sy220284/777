@@ -929,6 +929,9 @@
     <string name="persona_gallery_import_failed">人物导入失败</string>
 
 <string name="tasks_schedule_label">执行方式</string>
+<string name="tasks_status_running">运行中</string>
+<string name="tasks_status_queued">等待执行</string>
+<string name="tasks_status_scheduled">已排期</string>
 <string name="tasks_schedule_once">一次</string>
 <string name="tasks_schedule_daily">每天</string>
 <string name="tasks_schedule_weekly">每周</string>

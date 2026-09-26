@@ -668,11 +668,13 @@ private fun taskStatus(status: String): DsStatus = when (status) {
 
 @Composable
 private fun taskStatusLabel(status: String): String = when (status) {
-    "running", "queued" -> stringResource(R.string.chat_running_status)
+    "running" -> stringResource(R.string.tasks_status_running)
+    "queued" -> stringResource(R.string.tasks_status_queued)
+    "scheduled" -> stringResource(R.string.tasks_status_scheduled)
     "completed" -> stringResource(R.string.tasks_run_completed)
     "blocked" -> stringResource(R.string.tasks_run_blocked)
     "failed" -> stringResource(R.string.tasks_run_failed)
-    else -> stringResource(R.string.tasks_schedule_label)
+    else -> stringResource(R.string.tasks_status_scheduled)
 }
 
 private fun formatTime(time: Long): String =
