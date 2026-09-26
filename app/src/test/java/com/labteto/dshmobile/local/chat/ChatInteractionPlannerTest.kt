@@ -496,8 +496,23 @@ class ChatInteractionPlannerTest {
             state = ChatCharacterState(),
             userMessage = "你今天怎么这么开心",
             assistantMessage = "因为你来了啊",
+            recentDialogue = listOf(
+                "user" to "最旧消息不应保留",
+                "assistant" to "最旧回复不应保留",
+                "user" to "刚才先聊旧话题",
+                "assistant" to "旧话题回复",
+                "user" to "算了，换个话题，今晚吃什么？",
+                "assistant" to "那就聊吃的，你想吃辣的还是清淡的？",
+                "user" to "想吃辣的",
+                "assistant" to "那火锅怎么样？",
+            ),
         )
         assertTrue(prompt.contains("必须给4条明显不同的建议"))
+        assertTrue(prompt.contains("最近对话（按时间从旧到新；越靠后优先级越高）"))
+        assertTrue(prompt.contains("算了，换个话题，今晚吃什么？"))
+        assertTrue(prompt.contains("那火锅怎么样？"))
+        assertTrue(!prompt.contains("最旧消息不应保留"))
+        assertTrue(prompt.contains("禁止把已经失效的话题重新带回来"))
         assertTrue(!prompt.contains("\"state\""))
 
         val suggestions = planner.parseSuggestions(

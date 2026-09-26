@@ -1266,11 +1266,6 @@ class LocalHarnessEngine @Inject constructor(
         }
         if (assistantIndex < 0) return false
         val assistantMessage = snapshot.messages[assistantIndex]
-        val userMessage = snapshot.messages
-            .take(assistantIndex)
-            .lastOrNull { message -> message.role == "user" }
-            ?.content
-            .orEmpty()
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = eventLogFor(expectedSessionId)
@@ -1278,8 +1273,8 @@ class LocalHarnessEngine @Inject constructor(
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
             persona = snapshot.chatPersona,
             state = snapshot.chatState,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage.content,
+            messages = snapshot.messages,
+            latestAssistantMessageId = assistantMessage.id,
         )
         val reply = try {
             completeWithRetry(

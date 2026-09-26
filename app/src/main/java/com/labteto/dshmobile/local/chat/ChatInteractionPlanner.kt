@@ -145,8 +145,21 @@ class ChatInteractionPlanner @Inject constructor(
             appendLine("共同经历：${state.dynamics.sharedMoments.joinToString("；")}")
         }
 
-        appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        val dialogue = recentDialogue
+            .filter { (role, content) ->
+                (role == "user" || role == "assistant") && content.isNotBlank()
+            }
+            .takeLast(6)
+        if (dialogue.isNotEmpty()) {
+            appendLine("最近对话（按时间从旧到新；越靠后优先级越高）：")
+            dialogue.forEach { (role, content) ->
+                val speaker = if (role == "user") "用户" else "角色"
+                appendLine("${speaker}：${content.take(MAX_MESSAGE_CHARS)}")
+            }
+        } else {
+            appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
+            appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        }
         if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
         }
@@ -167,8 +180,9 @@ class ChatInteractionPlanner @Inject constructor(
         state: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        recentDialogue: List<Pair<String, String>> = emptyList(),
     ): String = buildString {
-        appendLine("根据最近一轮角色聊天，生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
+        appendLine("根据最近几条角色聊天，生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
         appendLine(
             "角色=${persona.name}" +
                 persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
@@ -179,8 +193,21 @@ class ChatInteractionPlanner @Inject constructor(
                 "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
                 "玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
         )
-        appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        val dialogue = recentDialogue
+            .filter { (role, content) ->
+                (role == "user" || role == "assistant") && content.isNotBlank()
+            }
+            .takeLast(6)
+        if (dialogue.isNotEmpty()) {
+            appendLine("最近对话（按时间从旧到新；越靠后优先级越高）：")
+            dialogue.forEach { (role, content) ->
+                val speaker = if (role == "user") "用户" else "角色"
+                appendLine("${speaker}：${content.take(MAX_MESSAGE_CHARS)}")
+            }
+        } else {
+            appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
+            appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        }
         if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认。")
         }
@@ -189,9 +216,11 @@ class ChatInteractionPlanner @Inject constructor(
         )
         appendLine("规则：")
         appendLine("1. 必须给4条明显不同的建议，优先覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
-        appendLine("2. text 必须直接回应角色刚才那句，贴合用户真实说话习惯和当前关系，不写万能句。")
-        appendLine("3. 禁止同义改写凑数，不虚构事实，不替用户作重大不可逆决定。")
-        appendLine("4. 现实关系场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+        appendLine("2. 以最近对话为主依据，最后1到2轮权重最高；更早内容只用于理解承接，禁止压过后续新信息。")
+        appendLine("3. 如果后续消息已经纠正、结束、拒绝或切换话题，必须以最新状态为准，禁止把已经失效的话题重新带回来。")
+        appendLine("4. text 必须直接回应角色最后一句，贴合用户最近几轮真实说话习惯和当前关系，不写万能句，不照搬更早对话。")
+        appendLine("5. 禁止同义改写凑数，不虚构事实，不替用户作重大不可逆决定。")
+        appendLine("6. 现实关系场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? {
