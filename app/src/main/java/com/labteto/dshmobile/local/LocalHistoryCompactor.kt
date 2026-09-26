@@ -20,6 +20,17 @@ internal enum class LocalHistorySummaryMode {
     CHAT,
 }
 
+internal fun applyOverflowCompaction(
+    history: MutableList<JsonObject>,
+    compactor: LocalHistoryCompactor,
+    summaryMode: LocalHistorySummaryMode,
+): LocalHistoryCompaction? {
+    val compacted = compactor.compactForOverflow(history.toList(), summaryMode) ?: return null
+    history.clear()
+    history += compacted.messages
+    return compacted
+}
+
 /**
  * Keeps a recent verbatim tail while turning the older part of model history into a bounded,
  * extractive summary. The summary only quotes facts already present in the model-visible history;
@@ -98,19 +109,32 @@ internal class LocalHistoryCompactor(
     ): LocalHistoryCompaction? {
         if (history.size < 3) return null
 
-        val systemMessages = history.filter { it["role"].asText() == "system" }
-        val nonSystemMessages = history.filterNot { it["role"].asText() == "system" }
-        if (nonSystemMessages.size < 2) return null
+        // Preserve the leading system prefix exactly. Request-only context such as persona/profile
+        // facts is injected immediately after the base system prompt and must survive emergency
+        // recovery. A later system message (for example the current chat turn's dynamic context)
+        // stays at its original tail boundary instead of being hoisted ahead of retained history.
+        val leadingSystemCount = history.takeWhile { it["role"].asText() == "system" }.size
+        val protectedHead = history.take(leadingSystemCount)
+        val firstBodyIndex = leadingSystemCount
+        if (firstBodyIndex >= history.lastIndex) return null
 
-        val leadingSystem = systemMessages.firstOrNull() ?: buildJsonObject {
+        val latestTailSystemIndex = (history.lastIndex downTo firstBodyIndex)
+            .firstOrNull { history[it]["role"].asText() == "system" }
+        val compactableEndExclusive = latestTailSystemIndex ?: history.size
+        val compactableBody = history.subList(firstBodyIndex, compactableEndExclusive)
+        if (compactableBody.size < 2) return null
+
+        val leadingSystem = protectedHead.firstOrNull() ?: buildJsonObject {
             put("role", "system")
             put("content", "")
         }
-        val protectedSystems = systemMessages.drop(1)
-        val working = listOf(leadingSystem) + nonSystemMessages
+        val protectedSuffix = latestTailSystemIndex?.let { history.subList(it, history.size) }.orEmpty()
+        val protectedTokens =
+            protectedHead.drop(1).sumOf { estimateModelTokens(it.toString()) } +
+                protectedSuffix.sumOf { estimateModelTokens(it.toString()) }
+        val working = listOf(leadingSystem) + compactableBody
         val encodedChars = working.sumOf { it.toString().length }
         val encodedTokens = working.sumOf { estimateModelTokens(it.toString()) }
-        val protectedTokens = protectedSystems.sumOf { estimateModelTokens(it.toString()) }
         val aggressiveTailChars = minOf(
             tailChars,
             maxOf(1_000, encodedChars / 3),
@@ -139,13 +163,9 @@ internal class LocalHistoryCompactor(
         ) ?: return null
 
         val rebuilt = buildList {
-            if (systemMessages.isNotEmpty()) {
-                add(systemMessages.first())
-                addAll(protectedSystems)
-                addAll(compacted.messages.drop(1))
-            } else {
-                addAll(compacted.messages.drop(1))
-            }
+            addAll(protectedHead)
+            addAll(compacted.messages.drop(1))
+            addAll(protectedSuffix)
         }
         val before = history.sumOf { estimateModelTokens(it.toString()) }
         val after = rebuilt.sumOf { estimateModelTokens(it.toString()) }

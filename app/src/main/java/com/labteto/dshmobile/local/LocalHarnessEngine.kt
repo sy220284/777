@@ -1374,6 +1374,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                persistOverflowHistory = true,
             )
             val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
             usageTracker.record(snapshot.model, reply.usage)
@@ -3600,6 +3601,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                persistOverflowHistory = true,
             )
 
             val reply = chatTurnRunner.finalizeReply(
@@ -3616,6 +3618,7 @@ class LocalHarnessEngine @Inject constructor(
                         step = 1,
                         toolsOverride = JsonArray(emptyList()),
                         publishPreview = false,
+                        persistOverflowHistory = true,
                     )
                 },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
@@ -3884,6 +3887,7 @@ class LocalHarnessEngine @Inject constructor(
                         step = modelStep + 1,
                         toolsOverride = tools,
                         publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                        persistOverflowHistory = true,
                     ).also {
                         if (nativeImagesSent) {
                             imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
@@ -3916,6 +3920,7 @@ class LocalHarnessEngine @Inject constructor(
                             step = modelStep + 1,
                             toolsOverride = tools,
                             publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                            persistOverflowHistory = true,
                         )
                     } else {
                         throw error
@@ -5242,6 +5247,7 @@ class LocalHarnessEngine @Inject constructor(
                     step = step,
                     toolsOverride = JsonArray(emptyList()),
                     publishPreview = false,
+                    persistOverflowHistory = true,
                 )
             },
             recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
@@ -5266,6 +5272,7 @@ class LocalHarnessEngine @Inject constructor(
         publishPreview: Boolean = true,
         maxAttemptsOverride: Int? = null,
         allowContextOverflowRecovery: Boolean = true,
+        persistOverflowHistory: Boolean = false,
     ): LocalModelReply {
         val tools = toolsOverride ?: modelToolSchemas()
         val logMessages = redactModelImages(messages)
@@ -5390,6 +5397,9 @@ class LocalHarnessEngine @Inject constructor(
             }
             val compacted = historyCompactor.compactForOverflow(messages, summaryMode)
                 ?: throw error
+            if (persistOverflowHistory) {
+                persistForegroundOverflowCompaction(snapshot, summaryMode)
+            }
             eventLog.append("request/context-overflow-recovery", buildJsonObject {
                 put("step", step)
                 put("model", snapshot.model)
@@ -5406,8 +5416,31 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = publishPreview,
                 maxAttemptsOverride = maxAttemptsOverride,
                 allowContextOverflowRecovery = false,
+                persistOverflowHistory = false,
             )
         }
+    }
+
+    private fun persistForegroundOverflowCompaction(
+        snapshot: LocalHarnessState,
+        summaryMode: LocalHistorySummaryMode,
+    ) {
+        if (snapshot.sessionId != currentSessionId || snapshot.groupChat.enabled) return
+        val compaction = applyOverflowCompaction(
+            history = modelHistory,
+            compactor = historyCompactor,
+            summaryMode = summaryMode,
+        ) ?: return
+        eventLog.append("session/compaction", buildJsonObject {
+            put("trigger", "context-overflow")
+            put("omitted_messages", compaction.omittedMessages)
+            put("summary", compaction.summary)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
+        })
+        checkpointModelHistory("session/context-overflow")
+        updateContextMetrics()
+        persist()
     }
 
     private fun currentHistoryBudget(): LocalHistoryBudget {
