@@ -85,6 +85,14 @@ if "parse(synthetic.toString())" in deepseek:
 if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TOKENS" in context_budget:
     violations.append("Context/tool-result budgets must be shared across Chat and Work product surfaces")
 
+if 'eventLog.append("user/queue"' in engine:
+    violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
+if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
+    violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
+if "startNextQueuedTurnIfIdle()?.start()" not in engine:
+    violations.append("Recovered durable Agent inbox must have a wake path")
+
+
 if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
 
