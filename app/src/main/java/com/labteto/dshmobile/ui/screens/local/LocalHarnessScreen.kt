@@ -140,6 +140,9 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsIconBox
+import com.labteto.dshmobile.ui.components.DsIconFamily
+import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -147,6 +150,7 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.WhaleMark
+import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -609,56 +613,67 @@ private fun LocalModeDrawer(
                     )
                 }
 
-                if (usageMode == LocalUsageMode.CHAT) {
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.PersonSearch,
-                        title = stringResource(R.string.local_group_chat),
-                        trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
-                        onClick = onOpenGroupChat,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Image,
-                        title = stringResource(R.string.persona_gallery_title),
-                        trailing = galleryCount.toString(),
-                        onClick = onOpenPersonaGallery,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Filled.Add,
-                        title = stringResource(R.string.local_persona_picker_new),
-                        onClick = onNewPersona,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(R.string.tasks_chat_title),
-                        onClick = onTasks,
-                    )
-                } else {
-                    DrawerPrimaryAction(
-                        icon = FeatherIcons.FileText,
-                        title = stringResource(R.string.chatlist_workspace_files),
-                        onClick = onWorkspaceFiles,
-                    )
-                    DrawerPrimaryAction(
-                        icon = FeatherIcons.CheckSquare,
-                        title = stringResource(R.string.local_run_center),
-                        onClick = onOpenRunCenter,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(R.string.tasks_title),
-                        onClick = onTasks,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Extension,
-                        title = stringResource(R.string.tools_title),
-                        onClick = onTools,
-                    )
+                DsGroupCard {
+                    if (usageMode == LocalUsageMode.CHAT) {
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.PersonSearch,
+                            title = stringResource(R.string.local_group_chat),
+                            trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
+                            iconFamily = DsIconFamily.Purple,
+                            onClick = onOpenGroupChat,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Image,
+                            title = stringResource(R.string.persona_gallery_title),
+                            trailing = galleryCount.toString(),
+                            iconFamily = DsIconFamily.Purple,
+                            onClick = onOpenPersonaGallery,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Filled.Add,
+                            title = stringResource(R.string.local_persona_picker_new),
+                            iconFamily = DsIconFamily.Green,
+                            onClick = onNewPersona,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(R.string.tasks_chat_title),
+                            iconFamily = DsIconFamily.Amber,
+                            onClick = onTasks,
+                        )
+                    } else {
+                        DrawerPrimaryAction(
+                            icon = FeatherIcons.FileText,
+                            title = stringResource(R.string.chatlist_workspace_files),
+                            iconFamily = DsIconFamily.Cyan,
+                            onClick = onWorkspaceFiles,
+                        )
+                        DrawerPrimaryAction(
+                            icon = FeatherIcons.CheckSquare,
+                            title = stringResource(R.string.local_run_center),
+                            iconFamily = DsIconFamily.Green,
+                            onClick = onOpenRunCenter,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(R.string.tasks_title),
+                            iconFamily = DsIconFamily.Amber,
+                            onClick = onTasks,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Extension,
+                            title = stringResource(R.string.tools_title),
+                            iconFamily = DsIconFamily.Neutral,
+                            onClick = onTools,
+                        )
+                    }
                 }
                 DrawerSectionTitle(
-                    stringResource(
+                    title = stringResource(
                         if (usageMode == LocalUsageMode.CHAT) R.string.chatlist_title
                         else R.string.local_work_history_title,
                     ),
+                    count = filteredSessions.size,
                 )
             }
 
@@ -683,6 +698,7 @@ private fun LocalModeDrawer(
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
                     LocalSessionDrawerRow(
                         title = session.title,
+                        updatedAt = session.updatedAt,
                         groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
                         selected = session.id in selectedIds,
@@ -705,25 +721,30 @@ private fun LocalModeDrawer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                if (usageMode == LocalUsageMode.WORK) {
+                DsGroupCard {
+                    if (usageMode == LocalUsageMode.WORK) {
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            title = stringResource(R.string.local_remote_control),
+                            iconFamily = DsIconFamily.Cyan,
+                            onClick = onRemote,
+                        )
+                    }
                     DrawerPrimaryAction(
-                        icon = Icons.Outlined.QrCodeScanner,
-                        title = stringResource(R.string.local_remote_control),
-                        onClick = onRemote,
+                        icon = Icons.Outlined.Settings,
+                        title = stringResource(R.string.settings_title),
+                        iconFamily = DsIconFamily.Neutral,
+                        onClick = onSettings,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.CloudDownload,
+                        title = stringResource(R.string.settings_update_check),
+                        iconFamily = DsIconFamily.Green,
+                        onClick = onCheckUpdate,
                     )
                 }
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.Settings,
-                    title = stringResource(R.string.settings_title),
-                    onClick = onSettings,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.CloudDownload,
-                    title = stringResource(R.string.settings_update_check),
-                    onClick = onCheckUpdate,
-                )
                 updateStatus?.let { status ->
                     Text(
                         status,
@@ -731,7 +752,7 @@ private fun LocalModeDrawer(
                         color = colors.labelSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = DsSpacing.xxlarge, end = DsSpacing.small),
+                        modifier = Modifier.padding(horizontal = DsSpacing.small),
                     )
                 }
             }
@@ -798,6 +819,7 @@ private fun DrawerPrimaryAction(
     title: String,
     onClick: () -> Unit,
     trailing: String? = null,
+    iconFamily: DsIconFamily = DsIconFamily.Neutral,
 ) {
     val colors = DsTheme.colors
     Row(
@@ -809,13 +831,8 @@ private fun DrawerPrimaryAction(
             .padding(horizontal = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = colors.labelSecondary,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(DsSpacing.medium))
+        DsIconBox(icon = icon, family = iconFamily)
+        Spacer(Modifier.width(DsSpacing.small))
         Text(
             title,
             style = DsType.base16,
@@ -825,10 +842,8 @@ private fun DrawerPrimaryAction(
             modifier = Modifier.weight(1f),
         )
         trailing?.let {
-            Text(
-                it,
-                style = DsType.caption11,
-                color = colors.labelTertiary,
+            DsPill(
+                text = it,
                 modifier = Modifier.padding(start = DsSpacing.small),
             )
         }
@@ -836,19 +851,31 @@ private fun DrawerPrimaryAction(
 }
 
 @Composable
-private fun DrawerSectionTitle(title: String) {
-    Text(
-        title,
-        style = DsType.std14,
-        color = DsTheme.colors.labelTertiary,
-        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
-    )
+private fun DrawerSectionTitle(
+    title: String,
+    count: Int? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = DsType.std14,
+            color = DsTheme.colors.labelTertiary,
+            modifier = Modifier.weight(1f),
+        )
+        count?.let { DsPill(text = it.toString()) }
+    }
 }
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalSessionDrawerRow(
     title: String,
+    updatedAt: Long,
     groupChat: Boolean,
     current: Boolean,
     selected: Boolean,
@@ -890,25 +917,37 @@ private fun LocalSessionDrawerRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selectionOpen) Checkbox(checked = selected, onCheckedChange = { onClick() })
-        Text(
-            title,
-            style = DsType.std14,
-            color = colors.labelPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Column(
             modifier = Modifier.weight(1f),
-        )
-        if (groupChat) {
-            Spacer(Modifier.width(DsSpacing.small))
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
-                stringResource(R.string.local_group_chat_title),
-                style = DsType.caption11,
-                color = colors.accent,
+                title,
+                style = DsType.std14,
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (current) {
-            Spacer(Modifier.width(DsSpacing.small))
-            Text("当前", style = DsType.caption11, color = colors.accent)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                Text(
+                    relativeTime(updatedAt),
+                    style = DsType.caption11,
+                    color = colors.labelCaption,
+                    maxLines = 1,
+                )
+                if (groupChat) {
+                    DsPill(text = stringResource(R.string.local_group_chat_title))
+                }
+                if (current) {
+                    DsPill(
+                        text = stringResource(R.string.local_current_session),
+                        selected = true,
+                    )
+                }
+            }
         }
     }
     }
