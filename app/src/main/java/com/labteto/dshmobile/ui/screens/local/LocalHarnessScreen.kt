@@ -1844,8 +1844,17 @@ private fun LocalChat(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
-                            if (state.usageMode == LocalUsageMode.CHAT) stringResource(R.string.local_chat_composer_hint)
-                            else "问点什么，或直接交给 Harness 执行…",
+                            when {
+                                state.usageMode == LocalUsageMode.WORK ->
+                                    stringResource(R.string.local_work_composer_hint)
+                                state.groupChat.enabled ->
+                                    stringResource(R.string.local_group_chat_composer_hint)
+                                else ->
+                                    stringResource(
+                                        R.string.local_chat_composer_persona_hint,
+                                        state.chatPersona.name,
+                                    )
+                            },
                         )
                     },
                     shape = DsShapes.block,
@@ -1866,7 +1875,7 @@ private fun LocalChat(
                 ) {
                     DsIconButton(
                         icon = Icons.Filled.Add,
-                        contentDescription = "添加附件",
+                        contentDescription = stringResource(R.string.chat_composer_add_attachment),
                         onClick = { showAttachmentPicker = true },
                         enabled = !state.running,
                         tint = colors.labelPrimary,
@@ -1886,14 +1895,17 @@ private fun LocalChat(
                     }
                     if (state.usageMode == LocalUsageMode.WORK) {
                         DsButton(
-                            if (state.planMode) "规划中" else "规划",
+                            stringResource(
+                                if (state.planMode) R.string.local_plan_button_on
+                                else R.string.local_plan_button_off,
+                            ),
                             { onPlanModeChange(!state.planMode) },
                             variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                             enabled = !state.running,
                         )
                         DsButton(
-                            "自动批准",
+                            stringResource(R.string.local_auto_approve_short),
                             if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
                             variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
@@ -1902,7 +1914,7 @@ private fun LocalChat(
                     Spacer(Modifier.weight(1f))
                     if (!state.running) {
                         DsButton(
-                            "发送",
+                            stringResource(R.string.chat_composer_send),
                             onClick = {
                                 if (!state.configured) {
                                     onConfigure()
@@ -1925,7 +1937,7 @@ private fun LocalChat(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.End),
                     ) {
                         DsButton(
-                            "停止",
+                            stringResource(R.string.chat_composer_stop),
                             onStop,
                             variant = DsButtonVariant.Danger,
                             size = DsButtonSize.Small,
