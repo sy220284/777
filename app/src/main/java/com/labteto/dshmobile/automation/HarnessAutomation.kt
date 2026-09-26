@@ -289,21 +289,46 @@ class HarnessAutomationWorker(
             WorkerEntryPoint::class.java,
         )
         val store = entry.automationStore()
-        val task = store.get(id) ?: return Result.success()
-        val started = System.currentTimeMillis()
-        store.update(id) { it.copy(status = "running", lastRunAt = started, lastError = null) }
+        var task = store.get(id) ?: return Result.success()
+        val recovering = task.status == "running" && task.lastRunAt != null
+        val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
+        store.update(id) {
+            it.copy(
+                status = "running",
+                lastRunAt = started,
+                lastError = null,
+            )
+        }
+        task = store.get(id) ?: return Result.success()
 
         return try {
-            val run = when (task.mode) {
-                AutomationMode.WORK -> entry.localHarnessEngine().runAutomationWork(
+            val engine = entry.localHarnessEngine()
+            val workSessionId = if (task.mode == AutomationMode.WORK) {
+                engine.prepareAutomationWorkSession(
                     text = task.prompt,
                     preferredSessionId = task.workSessionId,
+                ).also { sessionId ->
+                    store.update(id) { current ->
+                        current.copy(workSessionId = sessionId)
+                    }
+                    task = store.get(id) ?: task.copy(workSessionId = sessionId)
+                }
+            } else {
+                task.workSessionId
+            }
+            val run = when (task.mode) {
+                AutomationMode.WORK -> engine.runAutomationWork(
+                    text = task.prompt,
+                    preferredSessionId = workSessionId,
+                    recoverInterrupted = recovering,
                 )
-                AutomationMode.CHAT -> entry.localHarnessEngine().runAutomationChat(
+                AutomationMode.CHAT -> engine.runAutomationChat(
                     instruction = task.prompt,
                     targetSessionId = requireNotNull(task.targetSessionId) {
                         "角色定时互动缺少目标会话"
                     },
+                    recoverInterrupted = recovering,
+                    recoveryStartedAt = started,
                 )
             }
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
