@@ -1759,7 +1759,11 @@ class LocalHarnessEngine @Inject constructor(
                 val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
                     .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
                     .messages
-                    .ifEmpty { session.messages.takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES) }
+                    .ifEmpty {
+                        session.transcriptWindow
+                            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+                            .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    }
                 val sessionTranscriptIndex = transcriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
@@ -1903,15 +1907,23 @@ class LocalHarnessEngine @Inject constructor(
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
                     val latest = sessionRepository.read(session.id) ?: session
-                    val nextMessages = latest.messages + proactiveMessage
+                    val latestIndex = transcriptIndexForSession(latest)
                     val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
-                        transcriptIndexForSession(latest),
+                        latestIndex,
                         listOf(proactiveMessage),
                     )
-                    val nextBranches = if (nextTranscriptIndex.branchingEligible) {
-                        syncMaterializedChatBranchState(
+                    val latestWindow = latest.transcriptWindow.ifEmpty {
+                        latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+                    }
+                    val nextBranches = if (
+                        nextTranscriptIndex.branchingEligible &&
+                        latest.chatBranches.nodes.isNotEmpty()
+                    ) {
+                        appendMaterializedChatBranchMessage(
                             current = latest.chatBranches,
-                            activeMessages = nextMessages,
+                            activeMessages = emptyList(),
+                            message = proactiveMessage,
+                            parentId = latestIndex.latestDialogueMessageId,
                             chatState = latest.chatState,
                             replySuggestions = latest.replySuggestions,
                         )
@@ -1921,7 +1933,9 @@ class LocalHarnessEngine @Inject constructor(
                     sessionRepository.enqueue(
                         latest.copy(
                             updatedAt = System.currentTimeMillis(),
-                            messages = nextMessages,
+                            messages = emptyList(),
+                            transcriptWindow = (latestWindow + proactiveMessage)
+                                .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                             transcriptIndex = nextTranscriptIndex,
                             chatBranches = nextBranches,
                             transcriptProjectedThroughSequence = assistantEvent.sequence,
@@ -2043,7 +2057,10 @@ class LocalHarnessEngine @Inject constructor(
         val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
             .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
             .messages
-            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+            .ifEmpty {
+                session.transcriptWindow
+                    .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+            }
         return runtime.copy(
             sessionId = session.id,
             usageMode = LocalUsageMode.WORK,
@@ -2096,11 +2113,16 @@ class LocalHarnessEngine @Inject constructor(
         )
         val latest = sessionRepository.read(session.id) ?: session
         val appendedTranscript = messages + finalMessage
+        val latestWindow = latest.transcriptWindow.ifEmpty {
+            latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+        }
         sessionRepository.enqueue(
             latest.copy(
                 title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
                 updatedAt = System.currentTimeMillis(),
-                messages = latest.messages + appendedTranscript,
+                messages = emptyList(),
+                transcriptWindow = (latestWindow + appendedTranscript)
+                    .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = appendLocalTranscriptRuntimeIndex(
                     transcriptIndexForSession(latest),
                     appendedTranscript,
