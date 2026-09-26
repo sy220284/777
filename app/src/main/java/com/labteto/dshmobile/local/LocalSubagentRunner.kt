@@ -70,6 +70,7 @@ internal class LocalSubagentRunner(
     private val releaseVirtualScreen: (String) -> Unit = { },
     private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
+    private val runInterceptors: () -> List<AgentRunInterceptor> = { emptyList() },
 ) {
     suspend fun run(
         task: String,
@@ -431,6 +432,7 @@ internal class LocalSubagentRunner(
                         else -> Unit
                     }
                 },
+                runInterceptors = runInterceptors(),
                 maxSteps = stepLimit,
             )
 
