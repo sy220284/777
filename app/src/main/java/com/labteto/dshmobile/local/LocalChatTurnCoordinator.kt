@@ -107,14 +107,23 @@ internal class LocalChatTurnCoordinator(
     fun replySuggestionsPrompt(
         persona: PersonaProfile,
         state: ChatCharacterState,
-        userMessage: String,
-        assistantMessage: String,
-    ): String = interactionPlanner.suggestionsPrompt(
-        persona = persona,
-        state = state,
-        userMessage = userMessage,
-        assistantMessage = assistantMessage,
-    )
+        messages: List<LocalHarnessMessage>,
+        latestAssistantMessageId: String,
+    ): String {
+        val recentDialogue = recentReplySuggestionDialogue(
+            messages = messages,
+            latestAssistantMessageId = latestAssistantMessageId,
+        )
+        val userMessage = recentDialogue.lastOrNull { it.first == "user" }?.second.orEmpty()
+        val assistantMessage = recentDialogue.lastOrNull { it.first == "assistant" }?.second.orEmpty()
+        return interactionPlanner.suggestionsPrompt(
+            persona = persona,
+            state = state,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            recentDialogue = recentDialogue,
+        )
+    }
 
     fun parseReplySuggestions(text: String): List<ChatReplySuggestion>? =
         interactionPlanner.parseSuggestions(text)
@@ -141,3 +150,28 @@ internal fun recentRoleReplies(
     .take(limit.coerceAtLeast(1))
     .toList()
     .asReversed()
+
+internal fun recentReplySuggestionDialogue(
+    messages: List<LocalHarnessMessage>,
+    latestAssistantMessageId: String,
+    limit: Int = 6,
+): List<Pair<String, String>> {
+    val latestAssistantIndex = messages.indexOfLast { message ->
+        message.id == latestAssistantMessageId &&
+            message.role == "assistant" &&
+            message.content.isNotBlank()
+    }
+    if (latestAssistantIndex < 0) return emptyList()
+
+    return messages
+        .subList(0, latestAssistantIndex + 1)
+        .asSequence()
+        .filter { message ->
+            (message.role == "user" || message.role == "assistant") &&
+                message.content.isNotBlank()
+        }
+        .map { message -> message.role to message.content.trim() }
+        .toList()
+        .takeLast(limit.coerceAtLeast(2))
+}
+
