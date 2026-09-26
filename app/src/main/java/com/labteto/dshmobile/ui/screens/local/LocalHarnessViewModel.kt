@@ -122,24 +122,33 @@ class LocalHarnessViewModel @Inject constructor(
         val persona = snapshot.chatPersona
         if (!isMeaningfulGalleryPersona(persona)) return false
 
-        val relevantMessages = snapshot.messages.filter { message ->
-            (message.role == "user" || message.role == "assistant") &&
-                message.createdAt > snapshot.gallerySaveSuppressedThrough
-        }
-        if (snapshot.gallerySaveSuppressedThrough > 0L && relevantMessages.isEmpty()) return false
+        val latestDialogueAt = snapshot.transcriptIndex.latestDialogueCreatedAt
+        val suppressedThrough = snapshot.gallerySaveSuppressedThrough
+        val hasDialogueAfterSuppression =
+            snapshot.transcriptIndex.hasDialogue && latestDialogueAt > suppressedThrough
+
+        if (suppressedThrough > 0L && !hasDialogueAfterSuppression) return false
 
         val bound = snapshot.galleryId?.let { id -> gallery.value.firstOrNull { it.id == id } }
         if (snapshot.galleryId != null) {
-            return bound == null || galleryEntryHasUnsavedChanges(
+            if (bound == null) return true
+            val story = bound.story(snapshot.galleryStoryId)
+            val archivedThrough = story?.history
+                ?.asReversed()
+                ?.firstOrNull { message -> message.role == "user" || message.role == "assistant" }
+                ?.createdAt
+                ?: 0L
+            val hasNewDialogue = hasDialogueAfterSuppression && latestDialogueAt > archivedThrough
+            return hasNewDialogue || galleryEntryHasUnsavedChanges(
                 entry = bound,
                 storyId = snapshot.galleryStoryId,
                 persona = persona,
-                history = relevantMessages,
+                history = emptyList(),
                 chatState = snapshot.chatState,
             )
         }
 
-        if (relevantMessages.isNotEmpty()) return true
+        if (hasDialogueAfterSuppression) return true
         return gallery.value.none { samePersonaIdentity(it.persona, persona) }
     }
 
