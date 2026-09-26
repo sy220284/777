@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.AgentModelProtocol
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
 import javax.inject.Inject
@@ -45,7 +46,17 @@ class DeepSeekClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
+        protocol: AgentModelProtocol? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        if (transportProtocolFor(baseUrl, protocol) == AgentModelProtocol.ANTHROPIC_MESSAGES) {
+            return@withContext completeAnthropic(
+                apiKey = apiKey,
+                baseUrl = baseUrl,
+                model = model,
+                messages = messages,
+                tools = tools,
+            )
+        }
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
@@ -102,8 +113,19 @@ class DeepSeekClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
+        protocol: AgentModelProtocol? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        if (transportProtocolFor(baseUrl, protocol) == AgentModelProtocol.ANTHROPIC_MESSAGES) {
+            return@withContext completeAnthropicStreaming(
+                apiKey = apiKey,
+                baseUrl = baseUrl,
+                model = model,
+                messages = messages,
+                tools = tools,
+                onDelta = onDelta,
+            )
+        }
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
@@ -246,6 +268,142 @@ class DeepSeekClient @Inject constructor(
                 cause = error,
             )
         }
+    }
+
+    private suspend fun completeAnthropic(
+        apiKey: String,
+        baseUrl: String,
+        model: String,
+        messages: List<JsonObject>,
+        tools: JsonArray,
+    ): LocalModelReply {
+        val payload = deepSeekAnthropicPayload(
+            model = model,
+            messages = messages,
+            tools = tools,
+            stream = false,
+        )
+        val request = Request.Builder()
+            .url(deepSeekAnthropicEndpoint(baseUrl))
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        return executeAnthropic(request) { body ->
+            parseDeepSeekAnthropicReply(json.parseToJsonElement(body).jsonObject)
+        }
+    }
+
+    private suspend fun completeAnthropicStreaming(
+        apiKey: String,
+        baseUrl: String,
+        model: String,
+        messages: List<JsonObject>,
+        tools: JsonArray,
+        onDelta: (LocalModelDelta) -> Unit,
+    ): LocalModelReply {
+        val payload = deepSeekAnthropicPayload(
+            model = model,
+            messages = messages,
+            tools = tools,
+            stream = true,
+        )
+        val request = Request.Builder()
+            .url(deepSeekAnthropicEndpoint(baseUrl))
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        return try {
+            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+                if (!response.isSuccessful) {
+                    val body = response.readModelBodyBounded()
+                    throw anthropicHttpError(response.code, body)
+                }
+                val accumulator = DeepSeekAnthropicStreamAccumulator(json, onDelta)
+                val responseBody = response.body ?: error("模型响应为空")
+                var totalBytes = 0
+                responseBody.charStream().buffered().use { reader ->
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
+                        if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
+                            throw LocalModelException(
+                                code = "MODEL_RESPONSE_TOO_LARGE",
+                                message = "模型流式响应超过 " + MAX_MODEL_RESPONSE_BYTES + " 字节上限",
+                                retryable = false,
+                            )
+                        }
+                        if (!line.startsWith("data:")) continue
+                        val data = line.removePrefix("data:").trim()
+                        if (data.isBlank() || data == "[DONE]") continue
+                        val root = runCatching { json.parseToJsonElement(data).jsonObject }
+                            .getOrElse { error("Anthropic 流式事件不是合法 JSON：" + it.message) }
+                        accumulator.accept(root)
+                    }
+                }
+                accumulator.result()
+            }
+        } catch (error: LocalModelException) {
+            throw error
+        } catch (error: SocketTimeoutException) {
+            throw LocalModelException(
+                code = "MODEL_TIMEOUT",
+                message = "模型推理超时：" + (error.message ?: "请求未在时限内完成"),
+                retryable = true,
+                cause = error,
+            )
+        } catch (error: java.io.IOException) {
+            throw LocalModelException(
+                code = "MODEL_NETWORK",
+                message = "模型网络请求失败：" + (error.message ?: "网络异常"),
+                retryable = true,
+                cause = error,
+            )
+        }
+    }
+
+    private suspend fun <T> executeAnthropic(
+        request: Request,
+        parse: (String) -> T,
+    ): T = try {
+        runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+            val body = response.readModelBodyBounded()
+            if (!response.isSuccessful) throw anthropicHttpError(response.code, body)
+            parse(body)
+        }
+    } catch (error: LocalModelException) {
+        throw error
+    } catch (error: SocketTimeoutException) {
+        throw LocalModelException(
+            code = "MODEL_TIMEOUT",
+            message = "模型推理超时：" + (error.message ?: "请求未在时限内完成"),
+            retryable = true,
+            cause = error,
+        )
+    } catch (error: java.io.IOException) {
+        throw LocalModelException(
+            code = "MODEL_NETWORK",
+            message = "模型网络请求失败：" + (error.message ?: "网络异常"),
+            retryable = true,
+            cause = error,
+        )
+    }
+
+    private fun anthropicHttpError(code: Int, body: String): LocalModelException {
+        val detail = runCatching {
+            val root = json.parseToJsonElement(body).jsonObject
+            val error = root["error"] as? JsonObject
+            error?.get("message")?.jsonPrimitive?.contentOrNull
+                ?: root["message"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
+        return LocalModelException(
+            code = "MODEL_HTTP_" + code,
+            message = "模型请求失败（HTTP " + code + "）：" + (detail ?: body.take(500)),
+            retryable = code == 408 || code == 429 || code >= 500,
+        )
     }
 
     private data class StreamToolCall(
