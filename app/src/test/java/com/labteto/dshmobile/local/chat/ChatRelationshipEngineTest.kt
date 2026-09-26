@@ -239,9 +239,9 @@ class ChatRelationshipEngineTest {
         val prompt = engine.prompt("帮我分析一下她什么意思", state)
 
         assertTrue(prompt.contains("本轮视角：军师"))
-        assertFalse(prompt.contains("已确认事实"))
-        assertFalse(prompt.contains("暂定推测"))
-        assertFalse(prompt.contains("仍未知"))
+        assertFalse(prompt.contains("对方上周主动约过一次"))
+        assertFalse(prompt.contains("对方可能在观察用户是否稳定"))
+        assertFalse(prompt.contains("她平时是否也会主动约朋友"))
         assertFalse(prompt.contains("温度=68/100"))
         assertFalse(prompt.contains("常用长度=short"))
     }
