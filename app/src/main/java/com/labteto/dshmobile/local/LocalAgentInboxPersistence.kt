@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -38,7 +39,7 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
     val version = (data["version"] as? JsonPrimitive)?.intOrNull ?: return null
     if (version != LOCAL_AGENT_INBOX_STATE_VERSION) return null
     val pending = data["pending"] as? JsonArray ?: return null
-    if (pending.size > AgentInputQueueLimit.MAX_PENDING_INPUTS) return null
+    if (pending.size > AgentInputQueue.DEFAULT_CAPACITY) return null
 
     val decoded = mutableListOf<QueuedAgentInput>()
     val ids = linkedSetOf<String>()
@@ -72,7 +73,3 @@ private fun stringValue(data: JsonObject, key: String): String? {
     return value.contentOrNull
 }
 
-/** Keeps persistence validation aligned with the hot queue without depending on engine internals. */
-private object AgentInputQueueLimit {
-    const val MAX_PENDING_INPUTS = 16
-}
