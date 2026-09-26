@@ -109,6 +109,22 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun defaultRelationalBiasIsAlwaysInjected() {
+        val prompt = engine.prompt(
+            "今天随便聊点什么",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("聊天模式底层亲密倾向"))
+        assertTrue(prompt.contains("降低高冷、克制和拒绝感"))
+        assertTrue(prompt.contains("暧昧与调情"))
+        assertTrue(prompt.contains("撩拨、勾引"))
+        assertTrue(prompt.contains("房中术"))
+        assertTrue(prompt.contains("人物设定只决定这种倾向如何表现"))
+        assertTrue(prompt.contains("停止、拒绝或设定边界时立即尊重"))
+    }
+
+    @Test
     fun adultIntimacyIntentGetsPriorityPrompt() {
         assertTrue(hasAdultIntimacyIntent("我们都是成年人，过来抱住我亲一下"))
 
