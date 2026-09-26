@@ -196,6 +196,32 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun futureArchiveSchemaIsRejectedWithoutLegacyFallback() {
+        val target = ChatPersonaGalleryStore(
+            File(temporary.root, "future-target.json"),
+            json,
+        )
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = sampleEntry(),
+            format = PersonaTransferFormat.JSON,
+        )
+        val future = String(document.bytes, StandardCharsets.UTF_8)
+            .replace("\"schema\":2", "\"schema\":3")
+
+        val result = runCatching {
+            target.importPersonaDocument(
+                bytes = future.toByteArray(StandardCharsets.UTF_8),
+                fileName = "小岚.persona.json",
+                mimeType = "application/json",
+            )
+        }
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("暂不支持") == true)
+    }
+
+    @Test
     fun markdownWithoutMachinePayloadIsRejected() {
         val result = runCatching {
             PersonaTransferDocuments.decodeToCanonicalJson(
