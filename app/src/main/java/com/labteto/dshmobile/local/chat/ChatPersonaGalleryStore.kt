@@ -539,6 +539,88 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
+    fun exportPersonaDocument(
+        id: String,
+        format: PersonaTransferFormat,
+    ): PersonaTransferDocument {
+        val entry = readNormalized().entries.firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        return PersonaTransferDocuments.encode(json, entry, format)
+    }
+
+    @Synchronized
+    fun importPersonaDocument(
+        bytes: ByteArray,
+        fileName: String? = null,
+        mimeType: String? = null,
+    ): PersonaGalleryEntry {
+        val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(
+            bytes = bytes,
+            fileName = fileName,
+            mimeType = mimeType,
+        )
+        val archive = runCatching {
+            PersonaTransferDocuments.decodeArchive(json, canonicalJson)
+        }.getOrNull()
+        return if (archive != null) {
+            importArchivedEntry(archive.entry)
+        } else {
+            importPersona(canonicalJson)
+        }
+    }
+
+    private fun importArchivedEntry(source: PersonaGalleryEntry): PersonaGalleryEntry {
+        val now = System.currentTimeMillis()
+        val importedPersona = fullSharePersona(source.persona).copy(updatedAt = now)
+        require(isMeaningfulGalleryPersona(importedPersona)) { "人物设定内容不足，无法导入" }
+
+        val seenStoryIds = hashSetOf<String>()
+        val importedStories = source.stories.map { raw ->
+            val sourceId = raw.id.trim().take(120)
+            val storyId = sourceId
+                .takeIf { it.isNotBlank() && seenStoryIds.add(it) }
+                ?: "story-${UUID.randomUUID()}".also(seenStoryIds::add)
+            raw.copy(
+                id = storyId,
+                title = raw.title.trim().take(160),
+                notes = raw.notes.trim().take(4_000),
+                history = mergeHistory(emptyList(), raw.history),
+                sourceSessionIds = emptyList(),
+                excludedMessageKeys = raw.excludedMessageKeys
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .takeLast(200),
+            )
+        }
+
+        val doc = readNormalized()
+        val matched = doc.entries.filter {
+            samePersonaIdentity(it.persona, importedPersona)
+        }.singleOrNull()
+        val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val entry = if (matched != null) {
+            matched.copy(
+                persona = mergePersonaProfiles(matched.persona, importedPersona)
+                    .copy(id = entryId, updatedAt = now),
+                groupChatState = mergeChatState(matched.groupChatState, source.groupChatState),
+                stories = mergeLegacyStoryLists(matched.stories, importedStories),
+                updatedAt = now,
+            )
+        } else {
+            PersonaGalleryEntry(
+                id = entryId,
+                persona = importedPersona.copy(id = entryId),
+                groupChatState = source.groupChatState,
+                stories = importedStories,
+                updatedAt = now,
+            )
+        }
+        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        return entry
+    }
+
+    @Synchronized
     fun importPersona(payload: String): PersonaGalleryEntry {
         val cleanPayload = payload.trim()
         require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
