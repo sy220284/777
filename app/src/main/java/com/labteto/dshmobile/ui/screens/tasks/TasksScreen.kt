@@ -230,12 +230,23 @@ fun TasksScreen(
     val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by remember { mutableStateOf(false) }
+    var editingTaskId by remember { mutableStateOf<String?>(null) }
     var prompt by remember { mutableStateOf("") }
     var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
     var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
     var customHours by remember { mutableStateOf("6") }
     var quietHoursEnabled by remember { mutableStateOf(true) }
     var createError by remember { mutableStateOf<String?>(null) }
+    val resetEditor = {
+        showCreate = false
+        editingTaskId = null
+        prompt = ""
+        cadence = AutomationCadence.ONCE
+        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+        customHours = "6"
+        quietHoursEnabled = true
+        createError = null
+    }
     BackHandler(onBack = onClose)
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -258,15 +269,29 @@ fun TasksScreen(
                     if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
                 ),
                 onAction = {
-                    showCreate = !showCreate
-                    createError = null
+                    if (showCreate && editingTaskId == null) {
+                        resetEditor()
+                    } else {
+                        showCreate = true
+                        editingTaskId = null
+                        prompt = ""
+                        cadence = AutomationCadence.ONCE
+                        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+                        customHours = "6"
+                        quietHoursEnabled = true
+                        createError = null
+                    }
                 },
             )
 
             if (showCreate) {
                 DsGroupCard {
                     Text(
-                        stringResource(if (chatMode) R.string.tasks_chat_new else R.string.tasks_new),
+                        stringResource(
+                            if (editingTaskId != null) R.string.tasks_edit
+                            else if (chatMode) R.string.tasks_chat_new
+                            else R.string.tasks_new,
+                        ),
                         style = DsType.base16Strong,
                         color = colors.labelPrimary,
                     )
