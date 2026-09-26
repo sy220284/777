@@ -6231,8 +6231,19 @@ class LocalHarnessEngine @Inject constructor(
             events = eventLog.snapshotAfter(projectionCursor),
             sequenceExclusive = projectionCursor,
         )
+        val legacyTranscriptMigration = if (loaded != null) {
+            migrateLegacyTranscriptSnapshot(
+                session = stored,
+                eventLog = eventLog,
+                windowSize = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+            )
+        } else {
+            null
+        }
         val legacyTranscriptBaseline = if (
-            stored.transcriptProjectedThroughSequence == null && loaded != null
+            legacyTranscriptMigration == null &&
+            stored.transcriptProjectedThroughSequence == null &&
+            loaded != null
         ) {
             eventLog.latest(TRANSCRIPT_PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
                 TRANSCRIPT_PROJECTION_BASELINE_EVENT,
@@ -6241,14 +6252,35 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             null
         }
-        val transcriptCursor = transcriptProjectionReplayCursor(
-            snapshot = stored,
-            persistedSnapshotExists = loaded != null,
-            legacyBaselineSequence = legacyTranscriptBaseline,
-        )
+        val transcriptCursor = legacyTranscriptMigration?.projectedThroughSequence
+            ?: transcriptProjectionReplayCursor(
+                snapshot = stored,
+                persistedSnapshotExists = loaded != null,
+                legacyBaselineSequence = legacyTranscriptBaseline,
+            )
+        val transcriptBaseWindow = when {
+            legacyTranscriptMigration != null -> legacyTranscriptMigration.window
+            stored.transcriptWindow.isNotEmpty() -> stored.transcriptWindow
+                .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+            else -> stored.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+        }
+        val transcriptTailEvents = eventLog.snapshotAfter(transcriptCursor)
         val projectedTranscript = projectSessionTranscriptTail(
-            snapshotMessages = stored.messages,
-            events = eventLog.snapshotAfter(transcriptCursor),
+            snapshotMessages = transcriptBaseWindow,
+            events = transcriptTailEvents,
+            sequenceExclusive = transcriptCursor,
+            maxMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+        )
+        val transcriptIndexBase = when {
+            legacyTranscriptMigration != null -> legacyTranscriptMigration.index
+            stored.transcriptIndex.totalMessageCount > 0L -> stored.transcriptIndex
+            stored.messages.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.messages)
+            stored.transcriptWindow.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.transcriptWindow)
+            else -> LocalTranscriptRuntimeIndex()
+        }
+        val projectedTranscriptIndex = projectLocalTranscriptRuntimeIndexTail(
+            snapshot = transcriptIndexBase,
+            events = transcriptTailEvents,
             sequenceExclusive = transcriptCursor,
         )
         transcriptProjectionCursor = projectedTranscript.projectedThroughSequence
@@ -6317,7 +6349,7 @@ class LocalHarnessEngine @Inject constructor(
             usage = usageTracker.state.value,
             sessions = sessionSummaries(),
             messages = projectedTranscript.messages,
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(projectedTranscript.messages),
+            transcriptIndex = projectedTranscriptIndex,
             plan = projectedControls.plan,
             todos = projectedControls.todos,
             goal = projectedControls.goal,
@@ -6355,8 +6387,10 @@ class LocalHarnessEngine @Inject constructor(
         )
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
-            rebuildGroupModelHistoryFromTranscript(projectedTranscript.messages)
-            checkpointModelHistory("load/group-speaker-rebuild")
+            // Group model history is already restored from its durable checkpoint/event tail.
+            // Rebuilding it from the bounded UI transcript would silently discard older context.
+            refreshGroupModelSystemPrompt()
+            checkpointModelHistory("load/group-system-refresh")
             wroteHistoryCheckpoint = true
         } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             replaceSystemModelHistory(
@@ -6377,8 +6411,11 @@ class LocalHarnessEngine @Inject constructor(
         }
         if (
             restoredHistory.usedLegacyFallback ||
+            legacyTranscriptMigration != null ||
             legacyTranscriptBaseline != null ||
-            projectedTranscript.messages != stored.messages ||
+            stored.messages.isNotEmpty() ||
+            stored.transcriptWindow != projectedTranscript.messages ||
+            stored.transcriptIndex != projectedTranscriptIndex ||
             projectedTranscript.projectedThroughSequence != stored.transcriptProjectedThroughSequence
         ) {
             // Materialize migrated/replayed projections so later restarts only fold the new tail.
