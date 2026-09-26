@@ -56,6 +56,9 @@ import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
@@ -256,8 +259,12 @@ fun ChatListDrawer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
-                SectionHeader("会话")
+                SectionHeader(stringResource(R.string.chatlist_title))
             }
+            DsPill(
+                text = (historySessions.size + if (currentListSession != null) 1 else 0).toString(),
+            )
+            Spacer(Modifier.width(DsSpacing.xsmall))
             SortChip(sortByRecency) { next ->
                 scope.launch { hostsStore.setSessionSort(if (next) SORT_UPDATED else SORT_MANUAL) }
             }
@@ -382,71 +389,61 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            DsButton(
-                text = stringResource(R.string.chatlist_workspace_files),
-                onClick = {
-                    val sessionId = currentSessionId
-                    val hostKey = connection.host?.let { "${it.baseUrl}|${it.id}" }
-                    if (sessionId != null && hostKey != null) {
-                        val key = ComposerKey(hostKey, sessionId)
-                        store.panels.get(key).section = 0
-                        workspacePanelKey = key
-                        onClose()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
-                icon = FeatherIcons.FileText,
-                enabled = currentSessionId != null && connection.host != null,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsButton(
-                    text = "定时任务",
+            DsGroupCard {
+                DsCategoryRow(
+                    icon = FeatherIcons.FileText,
+                    title = stringResource(R.string.chatlist_workspace_files),
+                    iconFamily = DsIconFamily.Cyan,
+                    onClick = if (currentSessionId != null && connection.host != null) {
+                        {
+                            val sessionId = currentSessionId
+                            val hostKey = connection.host?.let { "${it.baseUrl}|${it.id}" }
+                            if (sessionId != null && hostKey != null) {
+                                val key = ComposerKey(hostKey, sessionId)
+                                store.panels.get(key).section = 0
+                                workspacePanelKey = key
+                                onClose()
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                )
+                DsCategoryRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.tasks_title),
+                    iconFamily = DsIconFamily.Amber,
                     onClick = {
                         onClose()
                         onOpenTasks()
                     },
-                    modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Ghost,
-                    icon = Icons.Outlined.Schedule,
                 )
-                DsButton(
-                    text = "工具与连接",
+                DsCategoryRow(
+                    icon = Icons.Outlined.Extension,
+                    title = stringResource(R.string.tools_title),
+                    iconFamily = DsIconFamily.Neutral,
                     onClick = {
                         onClose()
                         onOpenTools()
                     },
-                    modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Ghost,
-                    icon = Icons.Outlined.Extension,
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsButton(
-                    text = "退出远程控制",
+                DsCategoryRow(
+                    icon = Icons.Outlined.PhoneAndroid,
+                    title = stringResource(R.string.chatlist_exit_remote_control),
+                    iconFamily = DsIconFamily.Cyan,
                     onClick = {
                         onClose()
                         onOpenLocalHarness()
                     },
-                    modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Ghost,
-                    icon = Icons.Outlined.PhoneAndroid,
                 )
-                DsButton(
-                    text = stringResource(R.string.settings_title),
+                DsCategoryRow(
+                    icon = Icons.Filled.Settings,
+                    title = stringResource(R.string.settings_title),
+                    iconFamily = DsIconFamily.Neutral,
                     onClick = {
                         onClose()
                         onOpenSettings()
                     },
-                    modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Ghost,
-                    icon = Icons.Filled.Settings,
                 )
             }
         }
