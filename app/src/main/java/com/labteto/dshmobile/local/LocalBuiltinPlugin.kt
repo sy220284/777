@@ -6,7 +6,7 @@ import java.util.UUID
 import kotlinx.serialization.json.*
 
 internal class LocalBuiltinPlugin(
-    private val execute: suspend (LocalToolCall, Boolean) -> String,
+    private val execute: suspend (LocalToolCall, Boolean, ToolContext) -> String,
 ) : HarnessPlugin {
         override val id = "android-local-builtins"
 
@@ -33,6 +33,7 @@ internal class LocalBuiltinPlugin(
                                         rawArguments = rawArguments,
                                     ),
                                     toolContext.allowMutation,
+                                    toolContext,
                                 ),
                             )
                         },
