@@ -1,18 +1,21 @@
 name: Release APK
 
 'on':
-  # 合并到主线后立即检查，定时任务用于补偿 GitHub Actions 的偶发延迟。
+  # 主线 CI 成功后直接发布；低频定时任务只做漏触发补偿。
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
   push:
     tags:
       - 'v*'
-    branches:
-      - main
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
 
 concurrency:
   group: release-${{ github.repository }}
@@ -21,31 +24,87 @@ concurrency:
 jobs:
   check-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       should_release: ${{ steps.detect.outputs.should_release }}
       version: ${{ steps.detect.outputs.version }}
+      release_sha: ${{ steps.detect.outputs.release_sha }}
     steps:
       - uses: actions/checkout@v4
-      - name: Detect unreleased main commit
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Detect tested release candidate
         id: detect
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
 
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+          skip_release() {
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+          }
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
+            RELEASE_SHA="$WORKFLOW_RUN_SHA"
+            echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+            if [ "$WORKFLOW_RUN_CONCLUSION" != "success" ]; then
+              echo "CI 未成功，本次不进入发布：$WORKFLOW_RUN_CONCLUSION"
+              skip_release
+              exit 0
+            fi
+          else
+            RELEASE_SHA="$(git rev-parse HEAD)"
+            echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+          IS_TAG=false
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            IS_TAG=true
+          fi
+
+          if [ "$IS_TAG" = "false" ]; then
+            MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+            if [ "$RELEASE_SHA" != "$MAIN_SHA" ]; then
+              echo "候选提交已经落后于 main：$RELEASE_SHA != $MAIN_SHA"
+              skip_release
+              exit 0
+            fi
+          fi
+
+          if [ "$GITHUB_EVENT_NAME" != "workflow_run" ]; then
+            SUCCESSFUL_CI_COUNT="$(
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&status=success&per_page=100" \
+                --jq '[.workflow_runs[] | select(.name == "CI" and .conclusion == "success")] | length'
+            )"
+            if [ "$SUCCESSFUL_CI_COUNT" -eq 0 ]; then
+              echo "提交尚无成功 CI 记录，跳过发布：$RELEASE_SHA"
+              skip_release
+              exit 0
+            fi
+          fi
+
+          if [ "$IS_TAG" = "true" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
+            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "标签已有 Release：$GITHUB_REF_NAME"
+              skip_release
+              exit 0
+            fi
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          LATEST_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name // empty')"
-          LATEST_TARGET="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.target_commitish // empty')"
-          if [ -n "$LATEST_TARGET" ] && [ "$LATEST_TARGET" = "$GITHUB_SHA" ]; then
-            echo "当前主线提交已经发布：$GITHUB_SHA"
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "version=" >> "$GITHUB_OUTPUT"
+          LATEST_RELEASE="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" 2>/dev/null || printf '{}')"
+          LATEST_TAG="$(printf '%s' "$LATEST_RELEASE" | jq -r '.tag_name // empty')"
+          LATEST_TARGET="$(printf '%s' "$LATEST_RELEASE" | jq -r '.target_commitish // empty')"
+
+          if [ -n "$LATEST_TARGET" ] && [ "$LATEST_TARGET" = "$RELEASE_SHA" ]; then
+            echo "当前主线提交已经发布：$RELEASE_SHA"
+            skip_release
             exit 0
           fi
 
@@ -59,149 +118,22 @@ jobs:
             exit 1
           fi
 
-          echo "检测到主线尚未发布：$GITHUB_SHA -> v$VERSION"
+          echo "检测到已通过 CI 且尚未发布的主线：$RELEASE_SHA -> v$VERSION"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-  quality-gate:
-    needs: check-release
-    if: needs.check-release.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Verify official golden fixture provenance
-        run: |
-          corepack enable
-          bash tools/reference-validation/refresh-official-fixtures.sh
-          git diff --exit-code -- reference-validation/src/test/resources/official
-      - name: Full unit tests
-        run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
-      - name: Official Harness conformance
-        run: ./gradlew :reference-validation:test --stacktrace
-      - name: Lint
-        run: ./gradlew :app:lintDebug --stacktrace
-      - name: Guard hard-coded UI text
-        run: python3 .github/scripts/check-ui-hardcoded-cjk.py
-      - name: Guard Kotlin risk patterns
-        run: python3 .github/scripts/check-kotlin-risk-patterns.py
-      - name: Guard local performance invariants
-        run: python3 .github/scripts/check-local-performance-invariants.py
-      - name: Assemble optimized APK
-        run: ./gradlew :app:assembleOptimized --stacktrace
-      - name: Verify Android 16 APK
-        run: .github/scripts/verify-android16-apk.sh app/build/outputs/apk/optimized/app-optimized.apk
-      - name: Enforce APK size budget
-        run: |
-          BYTES="$(stat -c '%s' app/build/outputs/apk/optimized/app-optimized.apk)"
-          BUDGET=268435456
-          echo "Optimized APK: $BYTES bytes (budget: $BUDGET)"
-          test "$BYTES" -le "$BUDGET"
-
-  android-16-instrumented:
-    needs: check-release
-    if: needs.check-release.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Enable KVM acceleration
-        run: |
-          if [ -e /dev/kvm ]; then
-            sudo chmod 666 /dev/kvm
-            ls -l /dev/kvm
-          else
-            echo "::error::/dev/kvm is unavailable on this runner"
-            exit 1
-          fi
-      - name: Android 16 instrumentation tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          arch: x86_64
-          disable-animations: true
-          script: |
-            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug :app:assembleOptimized --stacktrace
-            adb shell am force-stop com.sy220284.dshmobile.debug || true
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
-            sleep 2
-            adb shell pidof com.sy220284.dshmobile.debug
-
-            # The publishing path must launch a minified/shrunk build, not only debug.
-            adb shell am force-stop com.sy220284.dshmobile.debug || true
-            adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug 15
-
-  android-17-instrumented:
-    needs: check-release
-    if: needs.check-release.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools emulator platforms;android-37.0 build-tools;37.0.0 system-images;android-37.0;google_apis_ps16k;x86_64'
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Enable KVM acceleration
-        run: |
-          if [ -e /dev/kvm ]; then
-            sudo chmod 666 /dev/kvm
-            ls -l /dev/kvm
-          else
-            echo "::error::/dev/kvm is unavailable on this runner"
-            exit 1
-          fi
-      - name: Android 17 instrumentation tests
-        run: |
-          echo no | avdmanager create avd --force -n android17 \
-            --package 'system-images;android-37.0;google_apis_ps16k;x86_64'
-          "$ANDROID_SDK_ROOT/emulator/emulator" -avd android17 \
-            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim &
-          adb wait-for-device
-          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
-          adb shell settings put global window_animation_scale 0
-          adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
-          DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug :app:assembleOptimized --stacktrace
-          adb shell am force-stop com.sy220284.dshmobile.debug || true
-          adb install -r app/build/outputs/apk/debug/app-debug.apk
-          adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
-          sleep 2
-          adb shell pidof com.sy220284.dshmobile.debug
-
-          # Publishing is blocked unless the Android 17 release-like build also cold-starts.
-          adb shell am force-stop com.sy220284.dshmobile.debug || true
-          adb install -r app/build/outputs/apk/optimized/app-optimized.apk
-          bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug 15
-
   release:
-    needs: [check-release, quality-gate, android-16-instrumented, android-17-instrumented]
+    needs: check-release
     if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-release.outputs.release_sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -285,11 +217,7 @@ jobs:
       - name: Derive release version
         id: version
         run: |
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="${{ needs.check-release.outputs.version }}"
-          fi
+          VERSION="${{ needs.check-release.outputs.version }}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
             echo "::error::发布版本格式无效：$VERSION"
             exit 1
@@ -297,9 +225,8 @@ jobs:
           echo "DSH_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      # quality-gate already runs the full unit-test suite. AGP 9 no longer creates
-      # :app:testReleaseUnitTest for this application setup, so do not select a
-      # non-existent release-variant test task here.
+      # CI 已完成单测、Lint、优化包校验与 Android 16/17 仪器测试；
+      # 发布阶段只构建正式签名包，避免同一提交重复消耗运行器。
 
       - name: Build release APK
         env:
@@ -445,11 +372,31 @@ jobs:
             ls -lh
           )
 
+      - name: Recheck main before publish
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.check-release.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$MAIN_SHA" = "$RELEASE_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "构建期间 main 已前进到 $MAIN_SHA，本次旧版本不发布。"
+          fi
+
       - name: Publish GitHub Release
+        if: steps.freshness.outputs.current == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.check-release.outputs.release_sha }}
           name: ${{ steps.version.outputs.tag }}
           files: |
             .release-assets/*
