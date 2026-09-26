@@ -756,7 +756,7 @@
     <string name="advanced_vision_optional">可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。</string>
     <string name="advanced_vision_saved">视觉模型配置已保存</string>
 
-        <string name="usage_calculation_title">消耗计算</string>
+    <string name="usage_calculation_title">消耗计算</string>
     <string name="usage_calculation_subtitle">本机 API 用量、费用估算与缓存命中</string>
     <string name="usage_calculation_estimate">累计预估金额</string>
     <string name="usage_calculation_scope">DeepSeek API · 本机累计 · 聊天、工作及视觉等调用</string>
@@ -774,7 +774,7 @@
     <string name="usage_calculation_partial">部分用量未计入金额</string>
     <string name="usage_calculation_disclaimer">金额按每次请求当时的模型价格估算，仅供参考；不等同于平台账单。</string>
     <string name="usage_calculation_view_prices">查看 API 价格与计价规则</string>
-<string name="settings_page_pricing">API 价格</string>
+    <string name="settings_page_pricing">API 价格</string>
     <string name="settings_pricing_subtitle">模型 Token 价格、计价规则与官网自动更新</string>
     <string name="pricing_deepseek_title">DeepSeek API 价格</string>
     <string name="pricing_current_period">当前计价时段：%1$s</string>
