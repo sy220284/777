@@ -147,6 +147,23 @@ if "chatTurnCoordinator.prepare(" not in engine or "chatTurnCoordinator.finalize
 if "messages = emptyList()" not in coordinator:
     violations.append("LocalSessionCoordinator must keep legacy full transcript out of new snapshots")
 
+for forbidden_direct in (
+    "toolRegistry.execute(",
+    "modelClient.complete(",
+    "modelClient.completeStreaming(",
+    "AgentRequestExecutor(",
+    "chatTurnRunner.",
+    "chatInteractionPlanner.",
+    "sessionRepository.read(",
+    "sessionRepository.enqueue(",
+    "sessionRepository.delete(",
+    "sessionRepository.summaries()",
+):
+    if forbidden_direct in engine:
+        violations.append(
+            f"LocalHarnessEngine bypassed an extracted coordinator: {forbidden_direct}"
+        )
+
 run_agent = re.search(
     r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
     engine,
