@@ -91,6 +91,57 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun childRunCheckpointCannotTriggerForegroundRecovery() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "检查子任务",
+                memoryInput = "检查子任务",
+                kind = LocalAgentRunKind.SUBAGENT,
+                allowMutation = false,
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+
+            assertNotNull(log.latest(LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT))
+            assertNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+        }
+    }
+
+    @Test
+    fun automationRunUsesIndependentCheckpointStream() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = true,
+                maxSteps = 8,
+                input = "后台任务",
+                memoryInput = "后台任务",
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+            coordinator.recordEvent(
+                context,
+                AgentEvent.TurnCompleted(context.runId, 1, "完成"),
+            )
+
+            assertNotNull(log.latest(LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT))
+            assertNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+        }
+    }
+
+    @Test
     fun terminalRunNeverProducesRecoveryDecision() {
         withCoordinator { coordinator, _ ->
             val context = coordinator.start(
