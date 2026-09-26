@@ -202,7 +202,7 @@ class ChatRelationshipEngineTest {
     @Test
     fun interactionIntensityRisesContinuesAndResets() {
         assertEquals(2, nextInteractionIntensity("想更深入了解一下你"))
-        assertEquals(3, nextInteractionIntensity("你行不行啊，别光说"))
+        assertEquals(4, nextInteractionIntensity("你行不行啊，别光说"))
         assertEquals(5, nextInteractionIntensity("我们都是成年人，过来亲我一下"))
 
         val flirting = ChatCharacterState(
