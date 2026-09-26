@@ -90,6 +90,8 @@ class SessionEventLog(
         val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
         val newestFirst = ArrayList<SessionEvent>(wanted)
         for (source in orderedFilesUnsafe().asReversed()) {
+            val first = readFirstValidEventUnsafe(source) ?: continue
+            if (first.sequence >= sequenceExclusive) continue
             val completed = forEachEventReverseUnsafe(source) { event ->
                 if (event.sequence < sequenceExclusive) newestFirst += event
                 newestFirst.size < wanted
@@ -233,6 +235,16 @@ class SessionEventLog(
             return latest.sequence + 1L
         }
         return 0L
+    }
+
+    private fun readFirstValidEventUnsafe(source: File): SessionEvent? {
+        if (!source.isFile || source.length() == 0L) return null
+        source.bufferedReader().useLines { lines ->
+            lines.forEach { line ->
+                decodeEventOrNull(line)?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun readLastValidEventUnsafe(source: File): SessionEvent? {
