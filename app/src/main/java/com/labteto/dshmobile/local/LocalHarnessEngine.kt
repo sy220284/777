@@ -481,6 +481,8 @@ class LocalHarnessEngine @Inject constructor(
         executeTool: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
         runnerState: StateFlow<LocalHarnessState> = state,
         toolOutputSessionId: () -> String = { currentSessionId },
+        runSessionId: () -> String = { currentSessionId },
+        runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
@@ -524,6 +526,9 @@ class LocalHarnessEngine @Inject constructor(
                 baseUrl = baseUrl,
             )
         },
+        runCoordinator = agentRunCoordinator,
+        runSessionId = runSessionId,
+        runKind = runKind,
     )
 
     private val subagents by lazy {
@@ -595,6 +600,8 @@ class LocalHarnessEngine @Inject constructor(
             },
             runnerState = MutableStateFlow(boundState),
             toolOutputSessionId = { sessionId },
+            runSessionId = { sessionId },
+            runKind = LocalAgentRunKind.SUBAGENT,
         )
     }
 
@@ -646,6 +653,8 @@ class LocalHarnessEngine @Inject constructor(
             },
             runnerState = MutableStateFlow(boundState),
             toolOutputSessionId = { sessionId },
+            runSessionId = { sessionId },
+            runKind = LocalAgentRunKind.AUTOMATION,
         )
     }
 
