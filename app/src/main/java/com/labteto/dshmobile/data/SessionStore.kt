@@ -54,12 +54,9 @@ import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
 import com.labteto.dshmobile.core.wire.dto.SessionCancelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
-import com.labteto.dshmobile.core.wire.dto.SessionControlFrameSerializer
 import com.labteto.dshmobile.core.wire.dto.SessionCreateRequest
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
 import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
-import com.labteto.dshmobile.core.wire.dto.SessionFollowFrameSerializer
-import com.labteto.dshmobile.core.wire.dto.SessionFollowRequest
 import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
@@ -81,7 +78,6 @@ import com.labteto.dshmobile.core.wire.dto.WorkspaceArchiveSessionRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceCreateRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceDeleteRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrame
-import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrameSerializer
 import com.labteto.dshmobile.core.wire.dto.WorkspaceRenameRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceValue
 import com.labteto.dshmobile.core.wire.dto.WorkspaceView
