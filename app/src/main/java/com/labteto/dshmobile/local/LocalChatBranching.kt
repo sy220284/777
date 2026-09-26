@@ -131,7 +131,9 @@ internal fun restoreMaterializedChatBranchState(
     if (!hasChatBranchAlternatives(current)) {
         LocalChatBranchState()
     } else {
-        syncChatBranchState(current, activeMessages, chatState, replySuggestions)
+        // Real alternatives are already a durable branch graph. Re-syncing from a bounded hot
+        // transcript would re-parent the first visible node to the synthetic root.
+        current
     }
 
 internal fun appendMaterializedChatBranchMessage(
@@ -143,18 +145,13 @@ internal fun appendMaterializedChatBranchMessage(
     replySuggestions: List<ChatReplySuggestion> = emptyList(),
 ): LocalChatBranchState {
     if (current.nodes.isEmpty()) return current
-    val synced = syncChatBranchState(
-        current = current,
-        activeMessages = activeMessages,
-        chatState = chatState,
-        replySuggestions = replySuggestions,
-    )
     return upsertChatBranchNode(
-        state = synced,
+        state = current,
         node = LocalChatBranchNode(
             message = message,
             parentId = parentId,
             chatStateAfter = chatState,
+            replySuggestionsAfter = replySuggestions,
         ),
         select = true,
     )
