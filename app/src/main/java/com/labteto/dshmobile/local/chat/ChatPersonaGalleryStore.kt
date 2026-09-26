@@ -540,7 +540,7 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
-    fun exportPersonaDocument(
+    internal fun exportPersonaDocument(
         id: String,
         format: PersonaTransferFormat,
     ): PersonaTransferDocument {
@@ -550,7 +550,7 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
-    fun importPersonaDocument(
+    internal fun importPersonaDocument(
         bytes: ByteArray,
         fileName: String? = null,
         mimeType: String? = null,
@@ -587,11 +587,7 @@ class ChatPersonaGalleryStore internal constructor(
                 notes = raw.notes.trim().take(4_000),
                 history = mergeHistory(emptyList(), raw.history),
                 sourceSessionIds = emptyList(),
-                excludedMessageKeys = raw.excludedMessageKeys
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(200),
+                excludedMessageKeys = emptyList(),
             )
         }
 
