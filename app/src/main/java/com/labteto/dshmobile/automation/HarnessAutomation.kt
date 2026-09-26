@@ -353,7 +353,9 @@ class HarnessAutomationScheduler @Inject constructor(
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
         require(silenceMinutes >= 60L) { "聊天沉默触发最短为 1 小时" }
         val now = System.currentTimeMillis()
-        val firstRun = now + silenceMinutes * 60_000L
+        // Run one lightweight transcript check immediately so an already-silent conversation
+        // does not restart its silence clock from task creation.
+        val firstRun = now
         store.upsert(
             AutomationTask(
                 id = id,
@@ -392,6 +394,7 @@ class HarnessAutomationScheduler @Inject constructor(
 
         val now = System.currentTimeMillis()
         val runAt = when {
+            task.scheduleType == AutomationScheduleType.SILENCE -> now
             usesChainedChatScheduling(task) ->
                 nextAnchoredAutomationRun(task, now) ?: now
             else -> task.nextRunAt.coerceAtLeast(now)
@@ -472,7 +475,7 @@ class HarnessAutomationScheduler @Inject constructor(
             require(recurring >= minimum) { "任务周期过短" }
         }
         val nextRun = if (scheduleType == AutomationScheduleType.SILENCE) {
-            now + requireNotNull(silenceMinutes) * 60_000L
+            now
         } else {
             firstRunAtMillis.coerceAtLeast(now)
         }
