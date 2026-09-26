@@ -120,4 +120,43 @@ class ProcessRuntimeTest {
         }
     }
 
+
+    @Test
+    fun environmentOverridesCannotReplaceRuntimePathOrInjectPreload() {
+        val runtime = AndroidProcessRuntime(
+            baseEnvironment = { mapOf("SAFE_BASE" to "base", "LD_LIBRARY_PATH" to "/trusted/lib") },
+        )
+
+        val environment = runtime.processEnvironment(
+            mapOf(
+                "SAFE_USER" to "user",
+                "PATH" to "/attacker",
+                "LD_PRELOAD" to "/attacker/lib.so",
+                "BAD-NAME" to "bad",
+            ),
+        )
+
+        assertEquals("base", environment["SAFE_BASE"])
+        assertEquals("user", environment["SAFE_USER"])
+        assertFalse(environment["PATH"].orEmpty() == "/attacker")
+        assertFalse("LD_PRELOAD" in environment)
+        assertFalse("BAD-NAME" in environment)
+        assertEquals("/trusted/lib", environment["LD_LIBRARY_PATH"])
+    }
+
+    @Test
+    fun childProcessDoesNotInheritUnlistedParentEnvironment() = runTest {
+        val inheritedName = System.getenv().keys.firstOrNull {
+            it !in setOf("PATH") && it.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))
+        } ?: return@runTest
+        val result = AndroidProcessRuntime().execute(
+            ProcessRequest(
+                command = listOf("sh", "-c", "printenv " + inheritedName + " || true"),
+                timeoutMillis = 5_000,
+            ),
+        )
+
+        assertEquals("", result.stdout.trim())
+    }
+
 }
