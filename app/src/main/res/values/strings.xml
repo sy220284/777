@@ -416,6 +416,8 @@
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
     <string name="tasks_cancel">Cancel</string>
+    <string name="tasks_pause">Pause</string>
+    <string name="tasks_resume">Resume</string>
     <string name="tasks_next_run">Next run: %1$s</string>
     <string name="tasks_last_run">Last run: %1$s</string>
     <string name="tasks_run_history">Run history · %1$d retained</string>
@@ -423,6 +425,7 @@
     <string name="tasks_run_completed">Completed</string>
     <string name="tasks_run_blocked">Needs attention</string>
     <string name="tasks_run_failed">Failed</string>
+    <string name="tasks_run_skipped">Skipped</string>
     <string name="tasks_last_result">Latest result: %1$s</string>
     <string name="tasks_last_status">Latest status: %1$s</string>
     <string name="tasks_open_result">Open result</string>
@@ -967,6 +970,7 @@
 <string name="tasks_status_running">Running</string>
 <string name="tasks_status_queued">Queued</string>
 <string name="tasks_status_scheduled">Scheduled</string>
+<string name="tasks_status_paused">Paused</string>
 <string name="tasks_schedule_once">Once</string>
 <string name="tasks_schedule_daily">Daily</string>
 <string name="tasks_schedule_weekly">Weekly</string>
@@ -999,6 +1003,8 @@
     <string name="tasks_chat_preset_reach_out_prompt">Reach out as if something naturally made you think of me. Use the recent conversation and current relationship to start a fresh topic in character.</string>
     <string name="tasks_chat_preset_story_prompt">Continue the current story with a small in-character event, piece of news, invitation, or situation that fits the world and moves the roleplay forward.</string>
     <string name="tasks_chat_preset_promise_prompt">Naturally bring up a real promise, plan, or important thing from our existing conversation in the character’s own voice. If no clear promise exists, do not invent one.</string>
+    <string name="tasks_chat_quiet_hours">Night quiet hours</string>
+    <string name="tasks_chat_quiet_hours_hint">Pause proactive messages from 23:00 to 07:00 in the device time zone.</string>
     <string name="tasks_chat_notification_title">%1$s sent you a message</string>
 
     <string name="local_transcript_load_older">Load earlier messages · %1$d hidden</string>

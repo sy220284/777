@@ -84,6 +84,10 @@ data class AutomationTask(
     val mode: AutomationMode = AutomationMode.WORK,
     val targetSessionId: String? = null,
     val actorName: String? = null,
+    val quietHoursEnabled: Boolean = false,
+    val quietStartHour: Int = 23,
+    val quietEndHour: Int = 7,
+    val failureStreak: Int = 0,
     /** Dedicated Work-mode session that owns this task's run history and artifacts. */
     val workSessionId: String? = null,
     val status: String = "scheduled",
@@ -182,6 +186,9 @@ class HarnessAutomationScheduler @Inject constructor(
         mode: AutomationMode = AutomationMode.WORK,
         targetSessionId: String? = null,
         actorName: String? = null,
+        quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietEndHour: Int = 7,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -197,6 +204,9 @@ class HarnessAutomationScheduler @Inject constructor(
                 mode = mode,
                 targetSessionId = targetSessionId,
                 actorName = actorName,
+                quietHoursEnabled = quietHoursEnabled,
+                quietStartHour = quietStartHour,
+                quietEndHour = quietEndHour,
             ),
         )
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
@@ -216,6 +226,9 @@ class HarnessAutomationScheduler @Inject constructor(
         mode: AutomationMode = AutomationMode.WORK,
         targetSessionId: String? = null,
         actorName: String? = null,
+        quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietEndHour: Int = 7,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -233,6 +246,9 @@ class HarnessAutomationScheduler @Inject constructor(
                 mode = mode,
                 targetSessionId = targetSessionId,
                 actorName = actorName,
+                quietHoursEnabled = quietHoursEnabled,
+                quietStartHour = quietStartHour,
+                quietEndHour = quietEndHour,
             ),
         )
         val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
@@ -252,6 +268,55 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun list(): List<AutomationTask> = store.list()
 
+    fun pauseTask(id: String): Boolean {
+        val task = store.get(id) ?: return false
+        if (task.status == "paused") return true
+        workManager.cancelUniqueWork(workName(id))
+        store.update(id) { it.copy(status = "paused") }
+        return true
+    }
+
+    fun resumeTask(id: String): Boolean {
+        val task = store.get(id) ?: return false
+        if (task.status != "paused") return false
+
+        val now = System.currentTimeMillis()
+        val runAt = task.nextRunAt.coerceAtLeast(now)
+        store.update(id) {
+            it.copy(
+                status = "scheduled",
+                nextRunAt = runAt,
+                lastError = null,
+                failureStreak = 0,
+            )
+        }
+
+        val input = Data.Builder().putString(KEY_TASK_ID, id).build()
+        if (task.recurringMinutes == null) {
+            val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
+                .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+                .setInputData(input)
+                .addTag(WORK_TAG)
+                .build()
+            workManager.enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
+        } else {
+            val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
+                task.recurringMinutes,
+                TimeUnit.MINUTES,
+            )
+                .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+                .setInputData(input)
+                .addTag(WORK_TAG)
+                .build()
+            workManager.enqueueUniquePeriodicWork(
+                workName(id),
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request,
+            )
+        }
+        return true
+    }
+
     fun cancelTask(id: String): Boolean {
         workManager.cancelUniqueWork(workName(id))
         return store.remove(id)
@@ -267,6 +332,14 @@ class HarnessAutomationScheduler @Inject constructor(
         fun workName(id: String) = "harness-automation-$id"
     }
 }
+
+internal fun shouldAutoPauseChatAutomation(
+    task: AutomationTask,
+    nextFailureStreak: Int,
+): Boolean =
+    task.mode == AutomationMode.CHAT &&
+        task.recurringMinutes != null &&
+        nextFailureStreak >= 3
 
 class HarnessAutomationWorker(
     appContext: Context,
@@ -290,6 +363,7 @@ class HarnessAutomationWorker(
         )
         val store = entry.automationStore()
         var task = store.get(id) ?: return Result.success()
+        if (task.status == "paused") return Result.success()
         val recovering = task.status == "running" && task.lastRunAt != null
         val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
         store.update(id) {
@@ -329,40 +403,48 @@ class HarnessAutomationWorker(
                     },
                     recoverInterrupted = recovering,
                     recoveryStartedAt = started,
+                    quietHoursEnabled = task.quietHoursEnabled,
+                    quietStartHour = task.quietStartHour,
+                    quietEndHour = task.quietEndHour,
                 )
             }
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
             val finished = System.currentTimeMillis()
+            val receiptStatus = if (run.delivered) "completed" else "skipped"
+            val resultText = run.skipReason ?: run.output
             store.update(id) {
                 it.copy(
                     workSessionId = if (it.mode == AutomationMode.WORK) run.sessionId else it.workSessionId,
                     status = if (it.recurringMinutes == null) "completed" else "scheduled",
                     nextRunAt = next,
-                    lastResult = truncateWithoutSplittingSurrogatePair(run.output, 20_000),
+                    lastResult = truncateWithoutSplittingSurrogatePair(resultText, 20_000),
                     lastError = null,
+                    failureStreak = 0,
                     runReceipts = appendAutomationReceipt(
                         it.runReceipts,
                         AutomationRunReceipt(
                             startedAt = started,
                             finishedAt = finished,
-                            status = "completed",
+                            status = receiptStatus,
                             sessionId = run.sessionId,
                             resultPreview = truncateWithoutSplittingSurrogatePair(
-                                run.output.replace("\n", " "),
+                                resultText.replace("\n", " "),
                                 320,
                             ),
                         ),
                     ),
                 )
             }
-            maybeNotify(
-                entry = entry,
-                task = task,
-                titleRes = R.string.tasks_notification_complete,
-                sessionId = run.sessionId,
-                resultText = run.output,
-            )
+            if (run.delivered) {
+                maybeNotify(
+                    entry = entry,
+                    task = task,
+                    titleRes = R.string.tasks_notification_complete,
+                    sessionId = run.sessionId,
+                    resultText = run.output,
+                )
+            }
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -397,14 +479,22 @@ class HarnessAutomationWorker(
         } catch (error: LocalAutomationWorkException) {
             val finished = System.currentTimeMillis()
             val detail = error.message ?: "后台任务失败"
+            var autoPaused = false
             store.update(id) {
+                val nextFailureStreak = it.failureStreak + 1
+                autoPaused = shouldAutoPauseChatAutomation(it, nextFailureStreak)
                 it.copy(
                     workSessionId = error.sessionId,
-                    status = if (it.recurringMinutes == null) "failed" else "scheduled",
+                    status = when {
+                        autoPaused -> "paused"
+                        it.recurringMinutes == null -> "failed"
+                        else -> "scheduled"
+                    },
                     nextRunAt = it.recurringMinutes?.let { minutes ->
                         System.currentTimeMillis() + minutes * 60_000L
                     } ?: it.nextRunAt,
                     lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
+                    failureStreak = nextFailureStreak,
                     runReceipts = appendAutomationReceipt(
                         it.runReceipts,
                         AutomationRunReceipt(
@@ -423,17 +513,29 @@ class HarnessAutomationWorker(
                 titleRes = R.string.tasks_notification_failed,
                 sessionId = error.sessionId,
             )
+            if (autoPaused) {
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
+            }
             Result.success()
         } catch (error: Throwable) {
             val finished = System.currentTimeMillis()
             val detail = error.message ?: error::class.java.simpleName
+            var autoPaused = false
             store.update(id) {
+                val nextFailureStreak = it.failureStreak + 1
+                autoPaused = shouldAutoPauseChatAutomation(it, nextFailureStreak)
                 it.copy(
-                    status = if (it.recurringMinutes == null) "failed" else "scheduled",
+                    status = when {
+                        autoPaused -> "paused"
+                        it.recurringMinutes == null -> "failed"
+                        else -> "scheduled"
+                    },
                     nextRunAt = it.recurringMinutes?.let { minutes ->
                         System.currentTimeMillis() + minutes * 60_000L
                     } ?: it.nextRunAt,
                     lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
+                    failureStreak = nextFailureStreak,
                     runReceipts = appendAutomationReceipt(
                         it.runReceipts,
                         AutomationRunReceipt(
@@ -452,6 +554,10 @@ class HarnessAutomationWorker(
                 titleRes = R.string.tasks_notification_failed,
                 sessionId = task.workSessionId,
             )
+            if (autoPaused) {
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
+            }
             Result.success()
         }
     }

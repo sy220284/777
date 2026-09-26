@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -96,11 +97,22 @@ class TasksViewModel @Inject constructor(
         )
     }
 
+    fun pause(id: String) {
+        scheduler.pauseTask(id)
+        refresh()
+    }
+
+    fun resume(id: String) {
+        scheduler.resumeTask(id)
+        refresh()
+    }
+
     fun createAt(
         prompt: String,
         firstRunAt: Long,
         recurringMinutes: Long?,
         mode: AutomationMode,
+        quietHoursEnabled: Boolean = false,
     ): Boolean {
         if (prompt.isBlank() || firstRunAt <= System.currentTimeMillis()) return false
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
@@ -128,6 +140,7 @@ class TasksViewModel @Inject constructor(
                     mode = mode,
                     targetSessionId = targetSessionId,
                     actorName = actorName,
+                    quietHoursEnabled = quietHoursEnabled,
                 )
             } else {
                 scheduler.schedulePeriodic(
@@ -139,6 +152,7 @@ class TasksViewModel @Inject constructor(
                     mode = mode,
                     targetSessionId = targetSessionId,
                     actorName = actorName,
+                    quietHoursEnabled = quietHoursEnabled,
                 )
             }
             refresh()
@@ -169,6 +183,7 @@ fun TasksScreen(
     var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
     var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
     var customHours by remember { mutableStateOf("6") }
+    var quietHoursEnabled by remember { mutableStateOf(true) }
     var createError by remember { mutableStateOf<String?>(null) }
     BackHandler(onBack = onClose)
 
@@ -300,6 +315,31 @@ fun TasksScreen(
                         )
                     }
 
+                    if (chatMode) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.tasks_chat_quiet_hours),
+                                    style = DsType.small13Strong,
+                                    color = colors.labelPrimary,
+                                )
+                                Text(
+                                    stringResource(R.string.tasks_chat_quiet_hours_hint),
+                                    style = DsType.caption11,
+                                    color = colors.labelSecondary,
+                                )
+                            }
+                            Switch(
+                                checked = quietHoursEnabled,
+                                onCheckedChange = { quietHoursEnabled = it },
+                            )
+                        }
+                    }
+
                     createError?.let {
                         Text(it, style = DsType.small13, color = colors.error)
                     }
@@ -326,13 +366,20 @@ fun TasksScreen(
                                     chatMode && harnessState.groupChat.enabled
                                 ) &&
                                     (cadence != AutomationCadence.CUSTOM || recurring != null) &&
-                                    viewModel.createAt(prompt, firstRunAt, recurring, taskMode)
+                                    viewModel.createAt(
+                                        prompt = prompt,
+                                        firstRunAt = firstRunAt,
+                                        recurringMinutes = recurring,
+                                        mode = taskMode,
+                                        quietHoursEnabled = chatMode && quietHoursEnabled,
+                                    )
                                 if (ok) {
                                     showCreate = false
                                     prompt = ""
                                     cadence = AutomationCadence.ONCE
                                     firstRunAt = System.currentTimeMillis() + 60L * 60_000L
                                     customHours = "6"
+                                    quietHoursEnabled = true
                                     createError = null
                                 } else {
                                     createError = createInvalidMessage
@@ -358,6 +405,8 @@ fun TasksScreen(
                         TaskCard(
                             task = task,
                             onCancel = { viewModel.cancel(task.id) },
+                            onPause = { viewModel.pause(task.id) },
+                            onResume = { viewModel.resume(task.id) },
                             onOpenSession = onOpenSession,
                         )
                     }
@@ -515,6 +564,8 @@ private fun showSchedulePicker(
 private fun TaskCard(
     task: AutomationTask,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -584,6 +635,9 @@ private fun TaskCard(
                 label = taskStatusLabel(task.status),
             )
             DsPill(text = scheduleLabel)
+            if (task.mode == AutomationMode.CHAT && task.quietHoursEnabled) {
+                DsPill(text = stringResource(R.string.tasks_chat_quiet_hours))
+            }
         }
 
         task.lastError?.takeIf(String::isNotBlank)?.let {
@@ -627,6 +681,17 @@ private fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
+                if (task.mode == AutomationMode.CHAT && task.recurringMinutes != null) {
+                    DsButton(
+                        text = stringResource(
+                            if (task.status == "paused") R.string.tasks_resume
+                            else R.string.tasks_pause,
+                        ),
+                        onClick = if (task.status == "paused") onResume else onPause,
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
                 DsButton(
                     text = stringResource(R.string.tasks_open_result),
                     onClick = { onOpenSession(sessionId) },
@@ -644,6 +709,7 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
         "completed" -> stringResource(R.string.tasks_run_completed)
         "blocked" -> stringResource(R.string.tasks_run_blocked)
         "failed" -> stringResource(R.string.tasks_run_failed)
+        "skipped" -> stringResource(R.string.tasks_run_skipped)
         else -> receipt.status
     }
     val detail = receipt.errorPreview ?: receipt.resultPreview
@@ -655,6 +721,7 @@ private fun receiptStatus(status: String): DsStatus = when (status) {
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
     "running", "queued" -> DsStatus.Running
+    "skipped" -> DsStatus.Neutral
     else -> DsStatus.Neutral
 }
 
@@ -663,6 +730,7 @@ private fun taskStatus(status: String): DsStatus = when (status) {
     "completed" -> DsStatus.Done
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
+    "paused" -> DsStatus.Neutral
     else -> DsStatus.Neutral
 }
 
@@ -674,6 +742,7 @@ private fun taskStatusLabel(status: String): String = when (status) {
     "completed" -> stringResource(R.string.tasks_run_completed)
     "blocked" -> stringResource(R.string.tasks_run_blocked)
     "failed" -> stringResource(R.string.tasks_run_failed)
+    "paused" -> stringResource(R.string.tasks_status_paused)
     else -> stringResource(R.string.tasks_status_scheduled)
 }
 
