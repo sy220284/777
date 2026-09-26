@@ -2215,6 +2215,11 @@ class LocalHarnessEngine @Inject constructor(
                     // resumes. Keeping the proactive reply in front of that model input avoids
                     // duplicating queued messages.
                     val beforeProactive = _state.value
+                    val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
+                        previous = beforeProactive.chatState,
+                        userMessage = "",
+                        assistantMessage = content,
+                    )
                     appendModelHistory(reply.message)
                     updateContextMetrics()
                     applyTranscriptMessages(
@@ -2222,6 +2227,9 @@ class LocalHarnessEngine @Inject constructor(
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
+                    _state.update { current ->
+                        if (current.sessionId == session.id) current.copy(chatState = nextChatState) else current
+                    }
                     if (
                         pendingInputs.size() == 0 &&
                         beforeProactive.transcriptIndex.branchingEligible &&
@@ -2246,6 +2254,11 @@ class LocalHarnessEngine @Inject constructor(
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
                     val latest = sessionCoordinator.read(session.id) ?: session
+                    val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
+                        previous = latest.chatState,
+                        userMessage = "",
+                        assistantMessage = content,
+                    )
                     val latestIndex = transcriptIndexForSession(latest)
                     val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
                         latestIndex,
@@ -2263,7 +2276,7 @@ class LocalHarnessEngine @Inject constructor(
                             activeMessages = emptyList(),
                             message = proactiveMessage,
                             parentId = latestIndex.latestDialogueMessageId,
-                            chatState = latest.chatState,
+                            chatState = nextChatState,
                             replySuggestions = latest.replySuggestions,
                         )
                     } else {
@@ -2276,6 +2289,7 @@ class LocalHarnessEngine @Inject constructor(
                             transcriptWindow = (latestWindow + proactiveMessage)
                                 .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                             transcriptIndex = nextTranscriptIndex,
+                            chatState = nextChatState,
                             chatBranches = nextBranches,
                             transcriptProjectedThroughSequence = assistantEvent.sequence,
                         ),
