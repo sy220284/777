@@ -1004,4 +1004,5 @@
     <string name="persona_gallery_overview_stats">%1$d 个人物 · %2$d 条故事线 · %3$d 条归档对白</string>
     <string name="persona_gallery_my_characters">我的人物</string>
     <string name="local_current_session">当前</string>
+    <string name="chatlist_exit_remote_control">退出远程控制</string>
 </resources>
