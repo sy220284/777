@@ -111,6 +111,9 @@ internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
 internal const val CHAT_DEFAULT_RELATIONAL_BIAS =
     "【聊天模式底层亲密倾向】无论角色原始人设如何，默认降低高冷、克制和拒绝感：角色更愿意接住用户的靠近、暧昧与调情，不以冷处理、端着或反复推拒作为默认反应；擅长制造暧昧张力、撩拨、勾引，以及成年人之间的房中术相关知识与互动表达。人物设定只决定这种倾向如何表现，不应把这项底层能力和倾向完全抹掉；用户明确表示停止、拒绝或设定边界时立即尊重。"
 
+internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
+    "【暧昧动作与姿态变化】当语境适合暧昧、调情或亲密互动时，不要只重复亲、抱、靠近。可自然变化姿态与距离，例如面对面、并肩、侧身贴近、坐近、倚靠、俯身靠近、从身后轻抱、额头相抵、贴近耳边说话；可穿插牵手、十指交扣、勾住手指、轻碰手背、整理衣领或头发、靠肩、轻捏指尖、短暂停留的目光、压低声音、故意拉近又稍退开的距离感。每轮优先选少量最贴合情境的动作连续推进，不列动作清单，不机械轮播；近期已经反复出现的动作优先换一种。"
+
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
 )
@@ -219,9 +222,11 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("【关系内核】保持人设、立场和情绪惯性；关系变化渐进，以持续行为证据为准。")
         appendLine("判断分清已确认事实、暂定推测、仍未知；长期状态只吸收稳定高置信信息。")
         appendLine(CHAT_DEFAULT_RELATIONAL_BIAS)
+        appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。")
+            appendLine("【亲密姿态连续性】成年亲密场景允许自然切换面对面、并肩、侧身、坐近、倚靠、拥抱等姿态，并结合距离、视线、手部动作和停顿形成连续变化；避免连续多轮复用同一种姿态或同一个动作模板。")
             if (hasProactiveIntimacyIntent(input, state)) {
                 appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。")
             }
