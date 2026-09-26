@@ -505,23 +505,35 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
                         }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = DsShapes.row,
+                            color = colors.warnTertiary,
+                        ) {
+                            Text(
+                                stringResource(R.string.settings_notifications_usage_hint),
+                                style = DsType.caption11,
+                                color = colors.warnLabel,
+                                modifier = Modifier.padding(DsSpacing.medium),
+                            )
+                        }
                     }
 
                     SettingsDestination.ADVANCED -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {
-                            DsButton(
-                                text = stringResource(R.string.settings_network_diagnostic),
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Link,
+                                title = stringResource(R.string.settings_network_diagnostic),
+                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { showDiagnostic = true },
-                                variant = DsButtonVariant.Outline,
-                                modifier = Modifier.fillMaxWidth(),
                             )
-                            DsButton(
-                                text = stringResource(R.string.settings_environment_capabilities),
+                            DsCategoryRow(
+                                icon = Icons.Outlined.PhoneAndroid,
+                                title = stringResource(R.string.settings_environment_capabilities),
+                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { showEnvironment = true },
-                                variant = DsButtonVariant.Ghost,
-                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
