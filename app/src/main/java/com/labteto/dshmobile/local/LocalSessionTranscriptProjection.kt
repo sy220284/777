@@ -47,8 +47,11 @@ internal fun projectSessionTranscriptTail(
     snapshotMessages: List<LocalHarnessMessage>,
     events: List<LocalSessionEventLog.Event>,
     sequenceExclusive: Long,
+    maxMessages: Int? = null,
 ): LocalSessionTranscriptProjection {
-    val messages = snapshotMessages.toMutableList()
+    val messages = snapshotMessages
+        .let { source -> maxMessages?.let(source::takeLast) ?: source }
+        .toMutableList()
     val knownIds = messages.mapTo(linkedSetOf(), LocalHarnessMessage::id)
     var projectedThrough = sequenceExclusive
 
@@ -61,7 +64,7 @@ internal fun projectSessionTranscriptTail(
                 val decoded = decodeTranscriptMessages(event.data)
                 if (decoded != null) {
                     messages.clear()
-                    messages += decoded
+                    messages += maxMessages?.let(decoded::takeLast) ?: decoded
                     knownIds.clear()
                     knownIds += decoded.map(LocalHarnessMessage::id)
                 }
@@ -79,6 +82,11 @@ internal fun projectSessionTranscriptTail(
             if (decoded != null) {
                 decoded.forEach { message ->
                     if (knownIds.add(message.id)) messages += message
+                }
+                maxMessages?.let { limit ->
+                    while (messages.size > limit) {
+                        knownIds.remove(messages.removeAt(0).id)
+                    }
                 }
             }
             projectedThrough = maxOf(projectedThrough, event.sequence)
