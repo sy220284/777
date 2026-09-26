@@ -77,6 +77,7 @@ internal data class LocalAgentRunRecoveryDecision(
     val runId: String,
     val queuedInput: QueuedAgentInput? = null,
     val blockedReason: String? = null,
+    val completedOutput: String? = null,
 )
 
 /**
@@ -170,6 +171,7 @@ internal class LocalAgentRunCoordinator(
                 step = event.step,
                 callId = event.call.id,
                 toolName = event.call.name,
+                sideEffect = event.sideEffect.name.lowercase(),
             )
             // ToolFinished already captures the durable continuation point for tool-using steps.
             // Keeping a generic StepFinished checkpoint would erase whether an AssistantObserved
@@ -180,6 +182,7 @@ internal class LocalAgentRunCoordinator(
                 LocalAgentRunCheckpointStatus.COMPLETED,
                 LocalAgentRunPhase.TURN_FINISHED,
                 step = event.steps,
+                answer = event.answer,
             )
             is AgentEvent.TurnStepLimit -> append(
                 context,
@@ -206,14 +209,41 @@ internal class LocalAgentRunCoordinator(
     fun recoveryDecision(
         sessionId: String,
         repair: SessionRepairResult,
+        kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
     ): LocalAgentRunRecoveryDecision? {
-        val event = eventLogFor(sessionId).latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT) ?: return null
+        val log = eventLogFor(sessionId)
+        val checkpointType = eventType(kind)
+        val event = log.latest(checkpointType) ?: return null
         val data = event.data
         if (data["version"]?.jsonPrimitive?.intOrNull != LOCAL_AGENT_RUN_CHECKPOINT_VERSION) return null
         val status = data["status"]?.jsonPrimitive?.contentOrNull ?: return null
-        if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
-        val log = eventLogFor(sessionId)
+
+        if (status == LocalAgentRunCheckpointStatus.COMPLETED.name.lowercase()) {
+            if (kind == LocalAgentRunKind.FOREGROUND) return null
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                completedOutput = data["answer"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
+        }
+        if (status == LocalAgentRunCheckpointStatus.RECOVERY_BLOCKED.name.lowercase()) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = data["reason"]?.jsonPrimitive?.contentOrNull
+                    ?: "上次执行已被恢复保护阻断，请先检查外部状态后再继续。",
+            )
+        }
+        if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                queuedInput = QueuedAgentInput(
+                    id = "run-recovery:$runId",
+                    content = RECOVERY_CONTINUATION_PROMPT,
+                    memoryInput = RECOVERY_CONTINUATION_PROMPT,
+                ),
+            )
+        }
+        if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val unsafe = repair.toolResults.any { recovered ->
             recovered.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
         }
@@ -221,6 +251,27 @@ internal class LocalAgentRunCoordinator(
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
+            )
+        }
+
+        if (kind != LocalAgentRunKind.FOREGROUND) {
+            val allowMutation = data["allow_mutation"]?.jsonPrimitive?.contentOrNull
+                ?.toBooleanStrictOrNull() ?: true
+            if (allowMutation && hasPossibleReplaySideEffect(log, checkpointType, runId)) {
+                return LocalAgentRunRecoveryDecision(
+                    runId = runId,
+                    blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
+                )
+            }
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                queuedInput = QueuedAgentInput(
+                    id = "run-recovery:$runId",
+                    content = RECOVERY_CONTINUATION_PROMPT,
+                    memoryInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
+                        ?: data["input"]?.jsonPrimitive?.contentOrNull
+                        ?: RECOVERY_CONTINUATION_PROMPT,
+                ),
             )
         }
 
@@ -261,19 +312,30 @@ internal class LocalAgentRunCoordinator(
         return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation)
     }
 
-    fun markRecoveryQueued(sessionId: String, runId: String) {
+    fun markRecoveryQueued(
+        sessionId: String,
+        runId: String,
+        kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+    ) {
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
+            kind = kind,
             status = LocalAgentRunCheckpointStatus.RECOVERY_QUEUED,
             reason = "process_restart",
         )
     }
 
-    fun markRecoveryBlocked(sessionId: String, runId: String, reason: String) {
+    fun markRecoveryBlocked(
+        sessionId: String,
+        runId: String,
+        reason: String,
+        kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+    ) {
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
+            kind = kind,
             status = LocalAgentRunCheckpointStatus.RECOVERY_BLOCKED,
             reason = reason,
         )
@@ -288,6 +350,8 @@ internal class LocalAgentRunCoordinator(
         toolName: String? = null,
         reason: String? = null,
         toolCallCount: Int? = null,
+        sideEffect: String? = null,
+        answer: String? = null,
     ) {
         eventLogFor(context.sessionId).append(
             eventType(context.kind),
@@ -324,9 +388,32 @@ internal class LocalAgentRunCoordinator(
                 callId?.let { put("call_id", it) }
                 toolName?.let { put("tool_name", it) }
                 toolCallCount?.let { put("tool_call_count", it) }
+                sideEffect?.takeIf(String::isNotBlank)?.let { put("side_effect", it) }
+                answer?.let { put("answer", it.take(MAX_RECOVERY_OUTPUT_CHARS)) }
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
+    }
+
+    private fun hasPossibleReplaySideEffect(
+        log: LocalSessionEventLog,
+        checkpointType: String,
+        runId: String,
+    ): Boolean {
+        var startedWithoutFinish = false
+        for (event in log.events()) {
+            if (event.type != checkpointType) continue
+            val data = event.data
+            if (data["run_id"]?.jsonPrimitive?.contentOrNull != runId) continue
+            when (data["phase"]?.jsonPrimitive?.contentOrNull) {
+                LocalAgentRunPhase.TOOL_STARTED.name.lowercase() -> startedWithoutFinish = true
+                LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() -> {
+                    startedWithoutFinish = false
+                    if (data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") return true
+                }
+            }
+        }
+        return startedWithoutFinish
     }
 
     private fun hasDurableFinalAssistant(log: LocalSessionEventLog): Boolean {
@@ -346,11 +433,12 @@ internal class LocalAgentRunCoordinator(
     private fun appendRecoveryState(
         sessionId: String,
         runId: String,
+        kind: LocalAgentRunKind,
         status: LocalAgentRunCheckpointStatus,
         reason: String,
     ) {
         eventLogFor(sessionId).append(
-            LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+            eventType(kind),
             buildJsonObject {
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", runId)
@@ -364,6 +452,7 @@ internal class LocalAgentRunCoordinator(
     }
 
     private companion object {
+        const val MAX_RECOVERY_OUTPUT_CHARS = 20_000
         const val RECOVERY_CONTINUATION_PROMPT =
             "继续执行上次因系统中断而停止的任务。先核对已有结果，再从安全位置继续；不要重复已完成且可能产生副作用的操作。"
     }
