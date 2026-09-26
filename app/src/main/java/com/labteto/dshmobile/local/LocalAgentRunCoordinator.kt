@@ -207,6 +207,14 @@ internal class LocalAgentRunCoordinator(
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
 
+        // A process may die after turn/end is durable but before the terminal run checkpoint is
+        // appended. In that narrow window the stale RUNNING checkpoint must never replay a turn
+        // that already completed.
+        if (!repair.repaired) {
+            val durableTurnEnd = eventLogFor(sessionId).latest("turn/end")
+            if (durableTurnEnd != null && durableTurnEnd.sequence > event.sequence) return null
+        }
+
         val unsafe = repair.toolResults.any { recovered ->
             recovered.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
         }
