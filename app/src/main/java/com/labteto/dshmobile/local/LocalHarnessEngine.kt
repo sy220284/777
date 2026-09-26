@@ -1435,15 +1435,15 @@ class LocalHarnessEngine @Inject constructor(
             select = true,
         )
         val activeMessages = activeChatBranchMessages(branches)
-        if (state.groupChat.enabled) {
-            rebuildGroupModelHistoryFromTranscript(activeMessages)
-        } else {
-            rebuildChatModelHistoryFromTranscript(activeMessages)
-        }
-
         val editedModelMessage = editedUserModelMessage(
             originalMessageId = messageId,
             content = content,
+        )
+        rebuildEditedChatModelHistory(
+            messages = activeMessages,
+            groupMode = state.groupChat.enabled,
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
         )
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
@@ -1582,6 +1582,54 @@ class LocalHarnessEngine @Inject constructor(
                 put("content", content)
             }
         }
+    }
+
+    private fun rebuildEditedChatModelHistory(
+        messages: List<LocalHarnessMessage>,
+        groupMode: Boolean,
+        editedMessageId: String,
+        editedModelMessage: JsonObject,
+    ) {
+        val durableUserMessages = linkedMapOf<String, JsonObject>()
+        eventLog.events()
+            .filter { event -> event.type == "user/message" }
+            .forEach { event ->
+                val structured = event.data["model_message"] as? JsonObject ?: return@forEach
+                decodeTranscriptMessages(event.data)
+                    .orEmpty()
+                    .filter { message -> message.role == "user" }
+                    .forEach { message -> durableUserMessages[message.id] = structured }
+            }
+
+        val rebuilt = buildList {
+            add(buildJsonObject {
+                put("role", "system")
+                put("content", if (groupMode) groupChatSystemPrompt() else chatSystemPrompt())
+            })
+            messages.forEach { message ->
+                when (message.role) {
+                    "user" -> add(
+                        if (message.id == editedMessageId) {
+                            editedModelMessage
+                        } else {
+                            durableUserMessages[message.id] ?: buildJsonObject {
+                                put("role", "user")
+                                put("content", message.content)
+                            }
+                        },
+                    )
+                    "assistant" -> add(buildJsonObject {
+                        put("role", "assistant")
+                        put(
+                            "content",
+                            if (groupMode) groupTranscriptLine(message) else message.content,
+                        )
+                    })
+                }
+            }
+        }
+        resetModelHistory(rebuilt)
+        updateContextMetrics()
     }
 
     private fun transcriptForBranchMaterialization(
