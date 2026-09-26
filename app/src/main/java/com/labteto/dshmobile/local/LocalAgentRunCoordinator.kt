@@ -43,6 +43,14 @@ internal enum class LocalAgentRunPhase {
     TURN_FINISHED,
 }
 
+internal data class LocalAgentRunResourceBudget(
+    val maxModelRequests: Int,
+    val maxAgents: Int,
+    val maxTerminals: Int,
+    val maxVirtualDisplays: Int,
+    val maxLanguageServers: Int,
+)
+
 internal data class LocalAgentRunContext(
     val runId: String,
     val kind: LocalAgentRunKind,
@@ -53,7 +61,9 @@ internal data class LocalAgentRunContext(
     val planMode: Boolean,
     val policy: LocalAgentRunPolicy,
     val safeAutoApprovalEnabled: Boolean,
+    val allowMutation: Boolean,
     val maxSteps: Int,
+    val resourceBudget: LocalAgentRunResourceBudget?,
     val input: String,
     val memoryInput: String,
     val startedAt: Long,
@@ -89,6 +99,8 @@ internal class LocalAgentRunCoordinator(
         input: String,
         memoryInput: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+        allowMutation: Boolean = true,
+        resourceBudget: LocalAgentRunResourceBudget? = null,
     ): LocalAgentRunContext {
         val context = LocalAgentRunContext(
             runId = idFactory(),
@@ -100,7 +112,9 @@ internal class LocalAgentRunCoordinator(
             planMode = planMode,
             policy = policy,
             safeAutoApprovalEnabled = safeAutoApprovalEnabled,
+            allowMutation = allowMutation,
             maxSteps = maxSteps,
+            resourceBudget = resourceBudget,
             input = input.take(MAX_RECOVERY_INPUT_CHARS),
             memoryInput = memoryInput.take(MAX_RECOVERY_INPUT_CHARS),
             startedAt = now(),
@@ -257,7 +271,15 @@ internal class LocalAgentRunCoordinator(
                 put("safe_auto_approval", context.safeAutoApprovalEnabled)
                 put("tools_enabled", context.policy.toolsEnabled)
                 put("allow_tool_execution", context.policy.allowToolExecution)
+                put("allow_mutation", context.allowMutation)
                 put("max_steps", context.maxSteps)
+                context.resourceBudget?.let { budget ->
+                    put("max_model_requests", budget.maxModelRequests)
+                    put("max_agents", budget.maxAgents)
+                    put("max_terminals", budget.maxTerminals)
+                    put("max_virtual_displays", budget.maxVirtualDisplays)
+                    put("max_language_servers", budget.maxLanguageServers)
+                }
                 put("input", context.input)
                 put("memory_input", context.memoryInput)
                 put("started_at", context.startedAt)
