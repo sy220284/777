@@ -5510,7 +5510,7 @@ class LocalHarnessEngine @Inject constructor(
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
     ): LocalModelReply {
-        val tools = toolsOverride ?: modelToolSchemas()
+        val tools = toolsOverride ?: modelToolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val log = requestLog ?: eventLog
         val logMessages = redactModelImages(messages)
         val contextChars = logMessages.sumOf { it.toString().length }
