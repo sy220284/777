@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.github.sisong.HPatch
+import com.labteto.dshmobile.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.EOFException
 import java.io.File
@@ -15,7 +16,11 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -40,6 +45,7 @@ class UpdateInstaller @Inject constructor(
         .retryOnConnectionFailure(true)
         .protocols(listOf(Protocol.HTTP_1_1))
         .build()
+    private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun downloadVerifyAndLaunch(update: AvailableUpdate): UpdateInstallResult =
         withContext(Dispatchers.IO) {
@@ -71,44 +77,74 @@ class UpdateInstaller @Inject constructor(
                 root,
                 apkName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
             )
+            var installerOwnsTarget = false
 
-            val usedDelta = tryDeltaUpdate(update, target, expected)
-            if (!usedDelta) {
-                target.delete()
-                downloadFile(
-                    url = apkUrl,
-                    target = target,
-                    maxBytes = MAX_APK_BYTES,
-                    expectedBytes = update.apkSize,
-                    kind = "APK",
-                    accept = "application/vnd.android.package-archive, application/octet-stream",
-                )
-                val actual = sha256(target)
-                if (!actual.equals(expected, ignoreCase = true)) {
+            try {
+                val usedDelta = tryDeltaUpdate(update, target, expected)
+                if (!usedDelta) {
                     target.delete()
-                    error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
+                    downloadFile(
+                        url = apkUrl,
+                        target = target,
+                        maxBytes = MAX_APK_BYTES,
+                        expectedBytes = update.apkSize,
+                        kind = "APK",
+                        accept = "application/vnd.android.package-archive, application/octet-stream",
+                    )
+                    val actual = sha256(target)
+                    if (!actual.equals(expected, ignoreCase = true)) {
+                        target.delete()
+                        error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
+                    }
+                }
+
+                val targetVersionCode = verifyPackageAndSigner(target)
+
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.files",
+                    target,
+                )
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+                // Protect exactly this verified APK across a possible process restart while Android
+                // reads it. The marker is removed with the APK as soon as the target build is seen,
+                // or after the bounded handoff window if installation was cancelled.
+                UpdateCache.markInstallerHandoff(
+                    root = root,
+                    apk = target,
+                    targetVersionCode = targetVersionCode,
+                    handedAtMillis = System.currentTimeMillis(),
+                )
+                context.startActivity(intent)
+                installerOwnsTarget = true
+
+                maintenanceScope.launch {
+                    delay(UpdateCache.INSTALLER_HANDOFF_GRACE_MS)
+                    UpdateCache.cleanupStale(
+                        cacheDir = context.cacheDir,
+                        currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                        nowMillis = System.currentTimeMillis(),
+                    )
+                }
+
+                UpdateInstallResult(
+                    launchedInstaller = true,
+                    message = if (usedDelta) {
+                        "增量包已合成完整 APK，并通过摘要、包名与签名校验，已交给 Android 系统安装器。"
+                    } else {
+                        "APK 已通过摘要、包名与签名校验，已交给 Android 系统安装器。"
+                    },
+                )
+            } finally {
+                if (!installerOwnsTarget) {
+                    // Download, digest, package/signature verification and installer-launch failures
+                    // are all terminal for this staging attempt; never leave their APK behind.
+                    UpdateCache.discard(root)
                 }
             }
-
-            verifyPackageAndSigner(target)
-
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.files",
-                target,
-            )
-            val intent = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            context.startActivity(intent)
-            UpdateInstallResult(
-                launchedInstaller = true,
-                message = if (usedDelta) {
-                    "增量包已合成完整 APK，并通过摘要、包名与签名校验，已交给 Android 系统安装器。"
-                } else {
-                    "APK 已通过摘要、包名与签名校验，已交给 Android 系统安装器。"
-                },
-            )
         }
 
     private fun tryDeltaUpdate(
@@ -343,7 +379,7 @@ class UpdateInstaller @Inject constructor(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun verifyPackageAndSigner(apk: File) {
+    private fun verifyPackageAndSigner(apk: File): Long {
         val flags = PackageManager.PackageInfoFlags.of(
             PackageManager.GET_SIGNING_CERTIFICATES.toLong(),
         )
@@ -363,6 +399,7 @@ class UpdateInstaller @Inject constructor(
         require(archive.longVersionCode > installed.longVersionCode) {
             "APK 版本号没有高于当前安装版本，拒绝覆盖安装"
         }
+        return archive.longVersionCode
     }
 
     private fun signerDigests(info: android.content.pm.PackageInfo): Set<String> {
