@@ -830,6 +830,7 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             options.takeLast(2).forEach { (key, label) ->
                 ThemePreviewBlock(
+                    themeKey = key,
                     label = label,
                     selected = settings.themePreference == key,
                     modifier = Modifier.weight(1f),
