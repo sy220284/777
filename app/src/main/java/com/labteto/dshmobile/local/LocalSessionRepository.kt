@@ -142,6 +142,11 @@ internal class LocalSessionRepository(
             runCatching {
                 val payload = loaded.document.payload
                 val messages = payload["messages"] as? JsonArray
+                val transcriptIndex = (payload["transcriptIndex"] as? JsonObject)?.let { encoded ->
+                    runCatching {
+                        json.decodeFromJsonElement(LocalTranscriptRuntimeIndex.serializer(), encoded)
+                    }.getOrNull()
+                }
                 LocalSessionSummary(
                     id = payload["id"]?.jsonPrimitive?.contentOrNull
                         ?.takeIf(String::isNotBlank)
@@ -163,10 +168,13 @@ internal class LocalSessionRepository(
                                 ?: LocalChatMode.SINGLE.name,
                         )
                     }.getOrDefault(LocalChatMode.SINGLE),
-                    blank = messages?.none { element ->
-                        val message = element as? JsonObject ?: return@none false
-                        message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
-                    } ?: true,
+                    blank = when {
+                        transcriptIndex != null -> transcriptIndex.totalMessageCount == 0L
+                        else -> messages?.none { element ->
+                            val message = element as? JsonObject ?: return@none false
+                            message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
+                        } ?: true
+                    },
                 )
             }.getOrNull()
         }
@@ -177,6 +185,6 @@ internal class LocalSessionRepository(
         updatedAt = updatedAt,
         usageMode = usageMode,
         chatMode = groupChat.mode,
-        blank = messages.none { it.content.isNotBlank() },
+        blank = transcriptIndex.totalMessageCount == 0L && messages.none { it.content.isNotBlank() },
     )
 }
