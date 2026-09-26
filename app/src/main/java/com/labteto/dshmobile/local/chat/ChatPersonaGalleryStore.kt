@@ -579,7 +579,7 @@ class ChatPersonaGalleryStore internal constructor(
             val sourceId = raw.id.trim().take(120)
             val storyId = sourceId
                 .takeIf { it.isNotBlank() && seenStoryIds.add(it) }
-                ?: "story-${UUID.randomUUID()}".also(seenStoryIds::add)
+                ?: "story-${UUID.randomUUID()}".also { seenStoryIds.add(it) }
             raw.copy(
                 id = storyId,
                 title = raw.title.trim().take(160),
