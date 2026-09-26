@@ -60,6 +60,12 @@ data class ChatCharacterState(
     val narrativeDirection: ChatNarrativeDirection? = null,
     val interactionIntent: String = ChatInteractionIntent.NORMAL.name,
     val interactionIntentStrength: Int = 0,
+    val interactionIntensity: Int = 0,
+    val recentActionTags: List<String> = emptyList(),
+    val recentPoseTags: List<String> = emptyList(),
+    val recentVerbalTags: List<String> = emptyList(),
+    val recentAddressTerms: List<String> = emptyList(),
+    val interactionCooldowns: Map<String, Int> = emptyMap(),
     /** Per-field age in completed turns. Used to expire short-lived roleplay state. */
     val transientAges: Map<String, Int> = emptyMap(),
     /** Open-thread age keyed by normalized thread text. */
@@ -123,6 +129,13 @@ class ChatInteractionPlanner @Inject constructor(
                 "温度=${state.dynamics.warmth} 信任=${state.dynamics.trust} 互惠=${state.dynamics.reciprocity} " +
                 "张力=${state.dynamics.tension} 稳定=${state.dynamics.stability}｜主动=${state.initiative} 分享=${state.shareDesire}",
         )
+        if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
+            appendLine(
+                "互动：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
+                    "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                    "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}",
+            )
+        }
         state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("关注：$it") }
         state.recentImpression.takeIf(String::isNotBlank)?.let { appendLine("近期印象：$it") }
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
@@ -147,12 +160,19 @@ class ChatInteractionPlanner @Inject constructor(
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        if (hasFlirtingOrIntimateIntent(userMessage, state)) {
+            appendLine("本轮处于暧昧/亲密互动：状态更新应保留互动连续性与张力变化，不把接梗、双关或反撩误写成普通闲聊。")
+            if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
+                appendLine("用户本轮含中文暗示或双关：按前后文理解话外音，不把字面歧义当成新的事实。")
+            }
+        }
         if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
         }
 
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
         appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
+        appendLine("interactionIntent、interactionIntensity、recentActionTags、recentPoseTags、recentVerbalTags、recentAddressTerms、interactionCooldowns 由系统根据真实对话维护，不要在 JSON 中输出或猜测。")
         appendLine("规则：")
         appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
         appendLine("2. 数值与用户画像渐进变化；stage 仅在明确关系事件或连续强证据下改变。stage 只用 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
@@ -180,6 +200,14 @@ class ChatInteractionPlanner @Inject constructor(
                 "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
                 "玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
         )
+        if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
+            appendLine(
+                "互动状态：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
+                    "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                    "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
+                    "近期称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
+            )
+        }
         val dialogue = recentDialogue
             .filter { (role, content) ->
                 (role == "user" || role == "assistant") && content.isNotBlank()
@@ -194,6 +222,12 @@ class ChatInteractionPlanner @Inject constructor(
         } else {
             appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
             appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
+        }
+        if (hasFlirtingOrIntimateIntent(userMessage, state)) {
+            appendLine("当前为暧昧/亲密语境：4条建议都要承接当前互动，其中至少2条能自然接梗、反撩或延续双关；避免照搬角色刚用过的动作、称呼和挑逗套路。")
+            if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
+                appendLine("用户这句含中文暗示或双关：优先给能接住言外之意的回复，不做词义解释。")
+            }
         }
         if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认。")
@@ -251,24 +285,29 @@ class ChatInteractionPlanner @Inject constructor(
 
         val agedPrevious = ageTransientState(previous, userMessage)
         return decoded.copy(
-            state = applyInteractionIntent(
-                state = if (significance == "NONE") {
-                    applyExplicitTransientClears(
-                        value = decoded.state,
-                        previous = agedPrevious,
-                        rawState = rawState,
-                    )
-                } else {
-                    sanitizeState(
-                        value = decoded.state,
-                        previous = agedPrevious,
-                        userMessage = userMessage,
-                        assistantMessage = assistantMessage,
-                        rawState = rawState,
-                    )
-                },
+            state = applyInteractionPerformance(
+                state = applyInteractionIntent(
+                    state = if (significance == "NONE") {
+                        applyExplicitTransientClears(
+                            value = decoded.state,
+                            previous = agedPrevious,
+                            rawState = rawState,
+                        )
+                    } else {
+                        sanitizeState(
+                            value = decoded.state,
+                            previous = agedPrevious,
+                            userMessage = userMessage,
+                            assistantMessage = assistantMessage,
+                            rawState = rawState,
+                        )
+                    },
+                    previous = agedPrevious,
+                    userMessage = userMessage,
+                ),
                 previous = agedPrevious,
                 userMessage = userMessage,
+                assistantMessage = assistantMessage,
             ),
             suggestions = decoded.suggestions.asSequence()
                 .map { suggestion ->
@@ -350,7 +389,53 @@ class ChatInteractionPlanner @Inject constructor(
         return state.copy(
             interactionIntent = intent,
             interactionIntentStrength = strength,
+            interactionIntensity = nextInteractionIntensity(userMessage, previous),
         )
+    }
+
+    private fun applyInteractionPerformance(
+        state: ChatCharacterState,
+        previous: ChatCharacterState,
+        userMessage: String,
+        assistantMessage: String,
+    ): ChatCharacterState {
+        val signals = extractInteractionPerformanceSignals(assistantMessage)
+        val cooldowns = previous.interactionCooldowns
+            .mapValues { (_, turns) -> turns - 1 }
+            .filterValues { it > 0 }
+            .toMutableMap()
+
+        fun cool(prefix: String, tags: List<String>, turns: Int) {
+            tags.forEach { tag -> cooldowns["$prefix:$tag"] = turns }
+        }
+
+        cool("动作", signals.actionTags, ACTION_COOLDOWN_TURNS)
+        cool("姿态", signals.poseTags, POSE_COOLDOWN_TURNS)
+        cool("话术", signals.verbalTags, VERBAL_COOLDOWN_TURNS)
+        cool("称呼", signals.addressTerms, ADDRESS_COOLDOWN_TURNS)
+
+        val reset = nextInteractionIntensity(userMessage, previous) == 0
+        return state.copy(
+            recentActionTags = mergeRecentTags(previous.recentActionTags, signals.actionTags, RECENT_ACTION_LIMIT),
+            recentPoseTags = mergeRecentTags(previous.recentPoseTags, signals.poseTags, RECENT_POSE_LIMIT),
+            recentVerbalTags = mergeRecentTags(previous.recentVerbalTags, signals.verbalTags, RECENT_VERBAL_LIMIT),
+            recentAddressTerms = mergeRecentTags(previous.recentAddressTerms, signals.addressTerms, RECENT_ADDRESS_LIMIT),
+            interactionCooldowns = if (reset) emptyMap() else cooldowns.toMap(),
+        )
+    }
+
+    private fun mergeRecentTags(
+        previous: List<String>,
+        incoming: List<String>,
+        limit: Int,
+    ): List<String> {
+        if (incoming.isEmpty()) return previous.takeLast(limit)
+        val merged = previous.toMutableList()
+        incoming.forEach { tag ->
+            merged.remove(tag)
+            merged += tag
+        }
+        return merged.takeLast(limit)
     }
 
     private fun sanitizeState(
@@ -434,6 +519,14 @@ class ChatInteractionPlanner @Inject constructor(
             dynamics = dynamics,
             userPattern = pattern,
             narrativeDirection = null,
+            interactionIntent = previous.interactionIntent,
+            interactionIntentStrength = previous.interactionIntentStrength,
+            interactionIntensity = previous.interactionIntensity,
+            recentActionTags = previous.recentActionTags,
+            recentPoseTags = previous.recentPoseTags,
+            recentVerbalTags = previous.recentVerbalTags,
+            recentAddressTerms = previous.recentAddressTerms,
+            interactionCooldowns = previous.interactionCooldowns,
             transientAges = previous.transientAges,
             unresolvedThreadAges = previous.unresolvedThreadAges,
             updatedAt = System.currentTimeMillis(),
@@ -751,6 +844,14 @@ class ChatInteractionPlanner @Inject constructor(
 
     private companion object {
         const val MAX_MESSAGE_CHARS = 2_000
+        const val ACTION_COOLDOWN_TURNS = 3
+        const val POSE_COOLDOWN_TURNS = 3
+        const val VERBAL_COOLDOWN_TURNS = 3
+        const val ADDRESS_COOLDOWN_TURNS = 2
+        const val RECENT_ACTION_LIMIT = 6
+        const val RECENT_POSE_LIMIT = 4
+        const val RECENT_VERBAL_LIMIT = 6
+        const val RECENT_ADDRESS_LIMIT = 4
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
