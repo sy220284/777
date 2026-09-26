@@ -530,6 +530,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun selectModel(model: String) = engine.selectModel(model)
     fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
+    suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
     fun createGroupChatSession() = engine.createGroupChatSession()
     fun openGroupChatMode() = engine.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
     fun configureGroupChatMembers(ids: List<String>): Boolean {

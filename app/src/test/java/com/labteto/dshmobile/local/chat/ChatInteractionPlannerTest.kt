@@ -477,6 +477,44 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun automaticPostTurnPromptDoesNotRequestReplySuggestions() {
+        val prompt = planner.prompt(
+            persona = PersonaProfile(name = "测试角色"),
+            state = ChatCharacterState(),
+            userMessage = "你好",
+            assistantMessage = "你好呀",
+        )
+
+        assertTrue(prompt.contains("\"suggestions\":[]"))
+        assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
+    }
+
+    @Test
+    fun onDemandReplySuggestionPromptAndParserStayIndependentFromStateUpdate() {
+        val prompt = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试角色"),
+            state = ChatCharacterState(),
+            userMessage = "你今天怎么这么开心",
+            assistantMessage = "因为你来了啊",
+        )
+        assertTrue(prompt.contains("必须给4条明显不同的建议"))
+        assertTrue(!prompt.contains("\"state\""))
+
+        val suggestions = planner.parseSuggestions(
+            """{"suggestions":[
+                {"label":"自然","style":"自然","text":"那我是不是来得正好？","bold":false},
+                {"label":"俏皮","style":"俏皮","text":"哟，这么会说话，奖励你继续。","bold":false},
+                {"label":"直球","style":"直球","text":"那你就多开心一会儿，我陪你。","bold":false},
+                {"label":"放飞","style":"放飞","text":"行，那今天的快乐税我全包了。","bold":true}
+            ]}""",
+        )
+
+        assertNotNull(suggestions)
+        assertEquals(4, suggestions!!.size)
+        assertTrue(suggestions.any { it.bold && it.style == "放飞" })
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))

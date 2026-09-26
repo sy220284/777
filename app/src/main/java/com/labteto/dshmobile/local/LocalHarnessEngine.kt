@@ -1245,6 +1245,122 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
+    /**
+     * Generate reply suggestions only when the user explicitly asks for them.
+     *
+     * Normal chat turns never call this path, so keeping the affordance visible has zero model
+     * cost until it is tapped.
+     */
+    suspend fun generateReplySuggestions(): Boolean {
+        val snapshot = _state.value
+        if (
+            snapshot.loading ||
+            !snapshot.configured ||
+            snapshot.running ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.groupChat.enabled
+        ) return false
+
+        val assistantIndex = snapshot.messages.indexOfLast { message ->
+            message.role == "assistant" && message.content.isNotBlank()
+        }
+        if (assistantIndex < 0) return false
+        val assistantMessage = snapshot.messages[assistantIndex]
+        val userMessage = snapshot.messages
+            .take(assistantIndex)
+            .lastOrNull { message -> message.role == "user" }
+            ?.content
+            .orEmpty()
+        val expectedSessionId = snapshot.sessionId
+        val expectedAssistantMessageId = assistantMessage.id
+        val boundEventLog = eventLogFor(expectedSessionId)
+        val key = apiKeys.get() ?: return false
+        val prompt = chatInteractionPlanner.suggestionsPrompt(
+            persona = snapshot.chatPersona,
+            state = snapshot.chatState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage.content,
+        )
+        val reply = try {
+            completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = listOf(
+                    buildJsonObject {
+                        put("role", "system")
+                        put("content", prompt)
+                    },
+                ),
+                step = CHAT_POST_TURN_MODEL_STEP + 1,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+                requestLog = boundEventLog,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(1_000))
+            })
+            return false
+        }
+        usageTracker.record(snapshot.model, reply.usage)
+        val suggestions = chatInteractionPlanner.parseSuggestions(reply.content.orEmpty())
+        if (suggestions.isNullOrEmpty()) {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                put("status", "parse-failed")
+                put("content", reply.content.orEmpty().take(2_000))
+            })
+            return false
+        }
+
+        var applied = false
+        _state.update { current ->
+            if (
+                current.sessionId != expectedSessionId ||
+                current.usageMode != LocalUsageMode.CHAT ||
+                current.groupChat.enabled ||
+                current.transcriptIndex.latestDialogueMessageId != expectedAssistantMessageId
+            ) {
+                current
+            } else {
+                applied = true
+                current.copy(
+                    replySuggestions = suggestions,
+                    chatBranches = if (current.transcriptIndex.branchingEligible) {
+                        updateChatBranchNodeSnapshot(
+                            state = current.chatBranches,
+                            messageId = expectedAssistantMessageId,
+                            chatState = current.chatState,
+                            replySuggestions = suggestions,
+                        )
+                    } else {
+                        current.chatBranches
+                    },
+                )
+            }
+        }
+        if (!applied) {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                put("status", "stale-discarded")
+                put("assistant_message_id", expectedAssistantMessageId)
+            })
+            return false
+        }
+
+        boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+            put("status", "updated")
+            put("assistant_message_id", expectedAssistantMessageId)
+            put("suggestion_count", suggestions.size)
+        })
+        if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+            persistChatBranchState("chat/reply-suggestions-updated")
+        }
+        persist()
+        return true
+    }
+
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
@@ -5633,13 +5749,12 @@ class LocalHarnessEngine @Inject constructor(
                 applied = true
                 current.copy(
                     chatState = plan.state,
-                    replySuggestions = plan.suggestions,
                     chatBranches = if (current.transcriptIndex.branchingEligible) {
                         updateChatBranchNodeSnapshot(
                             state = current.chatBranches,
                             messageId = expectedAssistantMessageId,
                             chatState = plan.state,
-                            replySuggestions = plan.suggestions,
+                            replySuggestions = current.replySuggestions,
                         )
                     } else {
                         current.chatBranches
@@ -5659,7 +5774,7 @@ class LocalHarnessEngine @Inject constructor(
             put("status", "updated")
             put("mood", plan.state.mood)
             put("relationship_state", plan.state.relationshipState)
-            put("suggestion_count", plan.suggestions.size)
+            put("suggestion_count", 0)
         })
         if (hasChatBranchAlternatives(_state.value.chatBranches)) {
             persistChatBranchState("chat/post-turn-updated")
