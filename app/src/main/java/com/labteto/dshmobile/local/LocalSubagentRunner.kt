@@ -134,7 +134,8 @@ internal class LocalSubagentRunner(
         maxSteps: Int,
         virtualScreenId: String?,
     ): LocalSubagentResult {
-        val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        val subagentId = backgroundJobId
+            ?: ("sa-" + UUID.randomUUID().toString().replace("-", "").take(12))
         val history = if (inheritHistory) {
             inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
         } else {
@@ -151,9 +152,24 @@ internal class LocalSubagentRunner(
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
 
+        fun archive(status: String, detail: String? = null) {
+            eventLog().append("subagent/archive", buildJsonObject {
+                put("agent_id", subagentId)
+                put("parent_session_id", snapshot.sessionId)
+                put("lineage_id", snapshot.lineageId)
+                put("depth", 1)
+                put("durable", backgroundJobId != null)
+                put("status", status)
+                detail?.takeIf(String::isNotBlank)?.let { put("detail", it.take(2_000)) }
+            })
+        }
+
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
             put("background_job_id", backgroundJobId ?: "")
+            put("parent_session_id", snapshot.sessionId)
+            put("lineage_id", snapshot.lineageId)
+            put("depth", 1)
             put("model", routeModel)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
@@ -167,6 +183,7 @@ internal class LocalSubagentRunner(
                 put("status", "failed")
                 put("code", "NO_API_KEY")
             })
+            archive("failed", "NO_API_KEY")
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_API_KEY")
         }
 
@@ -386,6 +403,7 @@ internal class LocalSubagentRunner(
                                 put("status", "completed")
                                 put("steps", event.steps)
                             })
+                            archive("completed")
                         }
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -393,12 +411,14 @@ internal class LocalSubagentRunner(
                                 put("status", "step_limit")
                                 put("steps", event.steps)
                             })
+                            archive("step_limit")
                         }
                         is AgentEvent.TurnCancelled -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("status", "cancelled")
                             })
+                            archive("cancelled")
                         }
                         is AgentEvent.TurnFailed -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -406,6 +426,7 @@ internal class LocalSubagentRunner(
                                 put("status", "failed")
                                 put("detail", event.reason.take(2_000))
                             })
+                            archive("failed", event.reason)
                         }
                         else -> Unit
                     }
@@ -419,6 +440,8 @@ internal class LocalSubagentRunner(
                     runId = subagentId,
                     sessionId = snapshot.sessionId,
                     lineageId = snapshot.lineageId,
+                    parentRunId = parentCallId,
+                    depth = 1,
                     modelRoute = AgentModelRoute(
                         provider = if (snapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible",
                         baseUrl = snapshot.baseUrl,
@@ -429,7 +452,7 @@ internal class LocalSubagentRunner(
                         allowMutation = allowMutation,
                         approvalScope = "subagent",
                     ),
-                    resources = AgentResourceBudget(maxSteps = stepLimit),
+                    resources = AgentResourceBudget(maxSteps = stepLimit, maxDepth = 4),
                     attributes = mapOf(
                         "kind" to "subagent",
                         "background" to (backgroundJobId != null).toString(),
