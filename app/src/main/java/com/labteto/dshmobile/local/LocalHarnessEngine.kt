@@ -22,6 +22,9 @@ import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
+import com.labteto.dshmobile.harness.agent.AgentModelRoute
+import com.labteto.dshmobile.harness.agent.AgentPermissionScope
+import com.labteto.dshmobile.harness.agent.AgentRunContext
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
@@ -298,7 +301,6 @@ class LocalHarnessEngine @Inject constructor(
     }
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
-    private val enabledOptionalTools = linkedSetOf<String>()
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
         dynamicSearchPaths = ::bundledRuntimeSearchPaths,
@@ -3830,8 +3832,19 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
-        synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+        val initialRunState = _state.value
+        val runContext = AgentRunContext(
+            sessionId = currentSessionId,
+            route = AgentModelRoute(
+                model = initialRunState.model,
+                baseUrl = initialRunState.baseUrl,
+            ),
+            permissions = AgentPermissionScope(
+                allowMutation = true,
+                planMode = initialRunState.planMode,
+            ),
+        )
+        if (initialRunState.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
             // answer's background relationship/state refresh before capturing this turn's context.
             cancelChatPostTurn()
@@ -3931,8 +3944,11 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 drainPendingInputsIntoHistory()
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
-                val snapshot = _state.value
-                val tools = modelToolSchemas()
+                val snapshot = _state.value.copy(
+                    model = runContext.route.model,
+                    baseUrl = runContext.route.baseUrl,
+                )
+                val tools = modelToolSchemas(runContext)
                 // Re-check before every model step. Tool results and queued user messages can grow
                 // substantially inside one turn, so checking only at turn start is insufficient.
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
@@ -4036,12 +4052,17 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             tools = AgentToolExecutor { call ->
-                executeSafely(call.toLocalToolCall(), allowMutation = true)
+                executeSafely(
+                    call = call.toLocalToolCall(),
+                    allowMutation = runContext.permissions.allowMutation,
+                    runContext = runContext,
+                )
             },
             toolBatch = AgentToolBatchExecutor { calls ->
                 executeToolBatch(
                     calls = calls.map { it.toLocalToolCall() },
-                    allowMutation = true,
+                    allowMutation = runContext.permissions.allowMutation,
+                    runContext = runContext,
                 ).map { (_, result) -> result }
             },
             isParallelTool = { call -> call.name in PARALLEL_SUBAGENT_TOOLS },
@@ -4049,7 +4070,7 @@ class LocalHarnessEngine @Inject constructor(
                 when (event) {
                     is AgentEvent.TurnStarted -> {
                         eventLog.append("turn/start", buildJsonObject {
-                            put("model", _state.value.model)
+                            put("model", runContext.route.model)
                         })
                     }
                     is AgentEvent.StepStarted -> {
@@ -4295,13 +4316,14 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
+        runContext: AgentRunContext? = null,
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
         if (!parallelSubagents) {
-            return calls.map { call -> call to executeSafely(call, allowMutation) }
+            return calls.map { call -> call to executeSafely(call, allowMutation, runContext) }
         }
         return isolatedParallelMap(calls) { call ->
-            call to executeSafely(call, allowMutation)
+            call to executeSafely(call, allowMutation, runContext)
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
@@ -4314,8 +4336,12 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): AgentToolResult = try {
-        executeRegistered(call, allowMutation)
+    private suspend fun executeSafely(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        runContext: AgentRunContext? = null,
+    ): AgentToolResult = try {
+        executeRegistered(call, allowMutation, runContext)
     } catch (cancelled: CancellationException) {
         if (!currentCoroutineContext().isActive) throw cancelled
         toolFailureResult(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
@@ -4569,7 +4595,11 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
+    private suspend fun executeRegistered(
+        original: LocalToolCall,
+        allowMutation: Boolean,
+        runContext: AgentRunContext? = null,
+    ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         val registered = toolRegistry.get(call.name)
             ?: return AgentToolResult(
@@ -4579,7 +4609,7 @@ class LocalHarnessEngine @Inject constructor(
                 recoveryHint = "先使用 capability_search 或检查工具名称。",
             )
         if (
-            _state.value.planMode &&
+            (runContext?.permissions?.planMode ?: _state.value.planMode) &&
             !LocalToolPolicy.allowedInPlan(call.name, registered.access)
         ) {
             return AgentToolResult(
@@ -4594,9 +4624,12 @@ class LocalHarnessEngine @Inject constructor(
             input = call.arguments,
             rawArguments = call.rawArguments,
             context = ToolContext(
-                sessionId = currentSessionId,
-                allowMutation = allowMutation,
-                attributes = mapOf("call_id" to call.id),
+                sessionId = runContext?.sessionId ?: currentSessionId,
+                allowMutation = allowMutation && (runContext?.permissions?.allowMutation != false),
+                attributes = buildMap {
+                    put("call_id", call.id)
+                    runContext?.let { put(AgentRunContext.TOOL_CONTEXT_ATTRIBUTE, it) }
+                },
                 approval = { tool ->
                     approve(
                         call = call,
@@ -4639,15 +4672,6 @@ class LocalHarnessEngine @Inject constructor(
     private fun subagentToolSchemas(
         allowMutation: Boolean,
         allowVirtualScreen: Boolean,
-    ): JsonArray = subagentToolSchemas(
-        allowMutation = allowMutation,
-        allowVirtualScreen = allowVirtualScreen,
-        enabledOptional = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() },
-    )
-
-    private fun subagentToolSchemas(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
         enabledOptional: Set<String>,
     ): JsonArray {
         val enabled = enabledOptional +
@@ -4664,14 +4688,20 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun modelToolSchemas(): JsonArray {
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
+    private fun modelToolSchemas(runContext: AgentRunContext): JsonArray {
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        return LocalToolRouter.visibleSchemas(tools, enabled)
+        return LocalToolRouter.visibleSchemas(tools, runContext.optionalTools())
     }
 
-    private fun searchCapabilities(query: String): String =
-        searchCapabilities(query, enabledOptionalTools)
+    private fun searchCapabilities(query: String, runContext: AgentRunContext): String {
+        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
+        val matches = LocalToolRouter.search(tools, query)
+        if (matches.isEmpty()) {
+            return "未找到匹配的扩展能力；可换用 Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
+        }
+        runContext.enableOptionalTools(matches.map(HarnessTool::name))
+        return formatCapabilityMatches(matches)
+    }
 
     private fun searchCapabilities(query: String, target: MutableSet<String>): String {
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
@@ -4680,19 +4710,25 @@ class LocalHarnessEngine @Inject constructor(
         synchronized(target) {
             target += matches.map(HarnessTool::name)
         }
-        return buildString {
-            appendLine("已为当前回合启用 ${matches.size} 个扩展工具：")
-            matches.forEach { tool ->
-                append("- ").append(tool.name)
-                LocalToolRouter.description(tool).takeIf(String::isNotBlank)?.let {
-                    append("：").append(it)
-                }
-                appendLine()
-            }
-        }.trimEnd()
+        return formatCapabilityMatches(matches)
     }
 
-    private suspend fun executeBuiltin(call: LocalToolCall, allowMutation: Boolean): String {
+    private fun formatCapabilityMatches(matches: List<HarnessTool>): String = buildString {
+        appendLine("已为当前回合启用 ${matches.size} 个扩展工具：")
+        matches.forEach { tool ->
+            append("- ").append(tool.name)
+            LocalToolRouter.description(tool).takeIf(String::isNotBlank)?.let {
+                append("：").append(it)
+            }
+            appendLine()
+        }
+    }.trimEnd()
+
+    private suspend fun executeBuiltin(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        toolContext: ToolContext,
+    ): String {
         val args = call.arguments
         if (_state.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
@@ -4828,7 +4864,11 @@ class LocalHarnessEngine @Inject constructor(
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfo()
-            "capability_search" -> searchCapabilities(args.string("query"))
+            "capability_search" -> {
+                val runContext = toolContext.attributes[AgentRunContext.TOOL_CONTEXT_ATTRIBUTE] as? AgentRunContext
+                    ?: return "当前工具调用缺少 AgentRunContext，无法修改动态工具视图"
+                searchCapabilities(args.string("query"), runContext)
+            }
             "update_plan" -> updatePlan(args)
             "exit_plan_mode" -> exitPlanMode(call, args.string("plan"))
             "todo_write" -> updateTodos(args)
