@@ -652,41 +652,58 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
     val colors = DsTheme.colors
     val isConnected = connectionState.phase == ConnectionPhase.CONNECTED ||
         connectionState.phase == ConnectionPhase.RECONNECTING
+    val statusText = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> stringResource(R.string.common_connected)
+        ConnectionPhase.RECONNECTING -> stringResource(R.string.common_reconnecting)
+        ConnectionPhase.CONNECTING -> stringResource(R.string.common_loading)
+        ConnectionPhase.DISCONNECTED -> stringResource(R.string.common_offline)
+    }
+    val statusState = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> StateDotState.Done
+        ConnectionPhase.RECONNECTING, ConnectionPhase.CONNECTING -> StateDotState.Running
+        ConnectionPhase.DISCONNECTED -> StateDotState.Idle
+    }
+    val heroColor = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> colors.successTertiary
+        ConnectionPhase.RECONNECTING -> colors.warnTertiary
+        ConnectionPhase.CONNECTING -> colors.accentTertiary
+        ConnectionPhase.DISCONNECTED -> colors.hoverSolid
+    }
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            stringResource(R.string.settings_connection_status),
-            style = DsType.std14,
-            color = colors.labelSecondary,
-            modifier = Modifier.weight(1f),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StateDot(
-                when (connectionState.phase) {
-                    ConnectionPhase.CONNECTED -> StateDotState.Done
-                    ConnectionPhase.RECONNECTING, ConnectionPhase.CONNECTING -> StateDotState.Running
-                    else -> StateDotState.Idle
-                },
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(
-                when (connectionState.phase) {
-                    ConnectionPhase.CONNECTED -> stringResource(R.string.common_connected)
-                    ConnectionPhase.RECONNECTING -> stringResource(R.string.common_reconnecting)
-                    ConnectionPhase.CONNECTING -> stringResource(R.string.common_loading)
-                    else -> stringResource(R.string.common_offline)
-                },
-                style = DsType.small13,
-                color = colors.labelTertiary,
-            )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = heroColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StateDot(statusState)
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(statusText, style = DsType.std14Strong, color = colors.labelPrimary)
+            }
+            connectionState.host?.let { host ->
+                LabelledValue(
+                    stringResource(R.string.settings_connection_host),
+                    host.displayAddress,
+                )
+                LabelledValue(
+                    stringResource(R.string.settings_connection_protocol),
+                    if (host.useTls) "HTTPS" else "HTTP",
+                )
+            }
+            if (connectionState.phase == ConnectionPhase.RECONNECTING && connectionState.attempts > 0) {
+                LabelledValue(
+                    stringResource(R.string.settings_connection_attempts),
+                    connectionState.attempts.toString(),
+                )
+            }
         }
     }
 
     if (isConnected && connectionState.host != null) {
-        LabelledValue(
-            stringResource(R.string.settings_connection_host),
-            connectionState.host.authority,
-        )
         DsButton(
             text = stringResource(R.string.settings_connection_disconnect),
             onClick = onDisconnect,

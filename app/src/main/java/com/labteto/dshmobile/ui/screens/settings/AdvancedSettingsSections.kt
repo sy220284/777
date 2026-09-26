@@ -1139,12 +1139,49 @@ internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
 ) {
+    val overallState = when {
+        state.loading -> DsStatus.Running
+        state.error != null -> DsStatus.Failed
+        state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
+            DsStatus.Done
+        else -> DsStatus.Warning
+    }
+    val overallLabel = stringResource(
+        when {
+            state.loading -> R.string.advanced_device_status_checking
+            state.error != null -> R.string.advanced_device_status_error
+            overallState == DsStatus.Done -> R.string.advanced_device_status_ready
+            else -> R.string.advanced_device_status_needs_setup
+        },
+    )
+
     SettingsCard(stringResource(R.string.advanced_device_capabilities), Icons.Outlined.PhoneAndroid) {
-        CapabilityRow(stringResource(R.string.advanced_shizuku_service), state.shizukuAlive)
-        CapabilityRow(stringResource(R.string.advanced_shizuku_permission), state.shizukuGranted)
-        CapabilityRow(stringResource(R.string.advanced_accessibility), state.accessibility)
-        CapabilityRow(stringResource(R.string.advanced_notification_access), state.notifications)
-        CapabilityRow(stringResource(R.string.advanced_virtual_display), state.virtualDisplay)
+        DsStatusPill(state = overallState, label = overallLabel)
+        CapabilityRow(
+            label = stringResource(R.string.advanced_shizuku_service),
+            enabled = state.shizukuAlive,
+            hint = stringResource(R.string.advanced_shizuku_service_hint),
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_shizuku_permission),
+            enabled = state.shizukuGranted,
+            hint = stringResource(R.string.advanced_shizuku_permission_hint),
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_accessibility),
+            enabled = state.accessibility,
+            hint = stringResource(R.string.advanced_accessibility_hint),
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_notification_access),
+            enabled = state.notifications,
+            hint = stringResource(R.string.advanced_notification_access_hint),
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_virtual_display),
+            enabled = state.virtualDisplay,
+            hint = stringResource(R.string.advanced_virtual_display_hint),
+        )
         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (!state.shizukuGranted) {
                 DsButton(
@@ -1182,12 +1219,40 @@ internal fun DeviceCapabilitiesCard(
 }
 
 @Composable
-private fun CapabilityRow(label: String, enabled: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
-        Spacer(Modifier.width(DsSpacing.small))
-        Text(label, style = DsType.std14, color = DsTheme.colors.labelSecondary, modifier = Modifier.weight(1f))
-        Text(stringResource(if (enabled) R.string.advanced_available else R.string.advanced_not_authorized), style = DsType.caption11, color = DsTheme.colors.labelTertiary)
+private fun CapabilityRow(
+    label: String,
+    enabled: Boolean,
+    hint: String,
+) {
+    val colors = DsTheme.colors
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
+            Spacer(Modifier.width(DsSpacing.small))
+            Text(
+                label,
+                style = DsType.std14,
+                color = colors.labelSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(
+                    if (enabled) R.string.advanced_available
+                    else R.string.advanced_not_authorized,
+                ),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+        }
+        Text(
+            hint,
+            style = DsType.caption11,
+            color = colors.labelCaption,
+            modifier = Modifier.padding(start = 8.dp + DsSpacing.small),
+        )
     }
 }
 

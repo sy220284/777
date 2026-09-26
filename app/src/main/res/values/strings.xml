@@ -263,6 +263,8 @@
     <string name="settings_connection">Connection</string>
     <string name="settings_connection_status">Status</string>
     <string name="settings_connection_host">Connected to</string>
+    <string name="settings_connection_protocol">Protocol</string>
+    <string name="settings_connection_attempts">Reconnect attempts</string>
     <string name="settings_connection_disconnect">Disconnect</string>
     <string name="settings_connection_disconnect_confirm">Disconnect from harness?</string>
     <string name="settings_connection_disconnect_message">You will return to the connection screen.</string>
@@ -509,6 +511,15 @@
     <string name="advanced_deactivate">Deactivate</string>
     <string name="advanced_default_model">Default model</string>
     <string name="advanced_device_capabilities">Device capabilities</string>
+    <string name="advanced_device_status_checking">Checking device capabilities</string>
+    <string name="advanced_device_status_ready">Device capabilities ready</string>
+    <string name="advanced_device_status_needs_setup">Some capabilities need setup</string>
+    <string name="advanced_device_status_error">Capability check failed</string>
+    <string name="advanced_shizuku_service_hint">Checks whether the Shizuku service is running on this device.</string>
+    <string name="advanced_shizuku_permission_hint">Authorizes privileged device operations through Shizuku.</string>
+    <string name="advanced_accessibility_hint">Lets the agent click, type, and navigate ordinary device UI.</string>
+    <string name="advanced_notification_access_hint">Lets the agent read notifications when a task needs that context.</string>
+    <string name="advanced_virtual_display_hint">Allows isolated device work to continue on a virtual display.</string>
     <string name="advanced_discover_models">Discover models</string>
     <string name="advanced_discovering_models">Discovering…</string>
     <string name="advanced_enable_accessibility">Enable accessibility control</string>
