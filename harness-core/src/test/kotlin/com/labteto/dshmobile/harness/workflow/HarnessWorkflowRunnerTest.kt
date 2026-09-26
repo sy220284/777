@@ -69,4 +69,57 @@ class HarnessWorkflowRunnerTest {
             throw CancellationException("stop")
         }
     }
+
+    @Test
+    fun parallelResumeSkipsCompletedBranches() = runTest {
+        val runner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 2)
+        val executed = mutableListOf<Int>()
+        val resume = HarnessWorkflowCheckpoint(
+            mode = HarnessWorkflowMode.PARALLEL,
+            tasks = listOf("a", "b", "c"),
+            results = listOf(HarnessWorkflowTaskResult(0, "a", output = "done-a")),
+        )
+        val checkpoints = mutableListOf<HarnessWorkflowCheckpoint>()
+
+        val results = runner.run(
+            tasks = resume.tasks,
+            mode = HarnessWorkflowMode.PARALLEL,
+            resume = resume,
+            onCheckpoint = { checkpoints += it },
+        ) { index, task, _ ->
+            executed += index
+            "done-" + task
+        }
+
+        assertEquals(listOf(1, 2), executed.sorted())
+        assertEquals(listOf("done-a", "done-b", "done-c"), results.map { it.output })
+        assertTrue(checkpoints.isNotEmpty())
+    }
+
+    @Test
+    fun pipelineResumeContinuesFromLastCompletedStage() = runTest {
+        val runner = HarnessWorkflowRunner()
+        val executed = mutableListOf<Int>()
+        val resume = HarnessWorkflowCheckpoint(
+            mode = HarnessWorkflowMode.PIPELINE,
+            tasks = listOf("a", "b", "c"),
+            results = listOf(
+                HarnessWorkflowTaskResult(0, "a", output = "A"),
+                HarnessWorkflowTaskResult(1, "b", output = "B"),
+            ),
+        )
+
+        val results = runner.run(
+            tasks = resume.tasks,
+            mode = HarnessWorkflowMode.PIPELINE,
+            resume = resume,
+        ) { index, _, previous ->
+            executed += index
+            previous.orEmpty() + "C"
+        }
+
+        assertEquals(listOf(2), executed)
+        assertEquals("BC", results.last().output)
+    }
+
 }
