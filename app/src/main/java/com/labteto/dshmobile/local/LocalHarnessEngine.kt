@@ -3713,7 +3713,7 @@ class LocalHarnessEngine @Inject constructor(
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "completed")
                 put("steps", 1)
-                put("messages", _state.value.messages.size)
+                put("messages", _state.value.transcriptIndex.totalMessageCount)
                 put("mode", "chat")
             })
             if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
@@ -4155,7 +4155,7 @@ class LocalHarnessEngine @Inject constructor(
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "completed")
                             put("steps", event.steps)
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount)
                         })
                         checkpointModelHistoryAtTurnBoundary("turn/completed")
                     }
@@ -4167,7 +4167,7 @@ class LocalHarnessEngine @Inject constructor(
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
                             put("steps", event.steps)
-                            put("messages", _state.value.messages.size + 1)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
@@ -4181,7 +4181,7 @@ class LocalHarnessEngine @Inject constructor(
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "error")
                             put("detail", detail)
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
@@ -4193,7 +4193,7 @@ class LocalHarnessEngine @Inject constructor(
                         val transcriptMessage = newTranscriptMessage("system", "本轮已停止。")
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "aborted")
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
