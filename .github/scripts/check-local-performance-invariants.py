@@ -49,6 +49,7 @@ for forbidden in (
     'checkpointModelHistory("user/queue-consumed")',
     "val directChat =",
     "CHAT_MODE_TOOLS",
+    "postTurnSnapshot.messages.lastOrNull",
 ):
     if forbidden in engine:
         violations.append(f"LocalHarnessEngine.kt reintroduced hot-path pattern: {forbidden}")
@@ -92,9 +93,10 @@ if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not 
 if "startNextQueuedTurnIfIdle()?.start()" not in engine:
     violations.append("Recovered durable Agent inbox must have a wake path")
 
-
 if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
+if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
+    violations.append("Chat branch continuation must only materialize after a real branch already exists")
 
 if violations:
     print("Local performance invariant guard failed:", file=sys.stderr)
