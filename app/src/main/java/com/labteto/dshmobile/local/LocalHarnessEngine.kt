@@ -309,6 +309,15 @@ class LocalHarnessEngine @Inject constructor(
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val enabledOptionalTools = linkedSetOf<String>()
+    private val toolExecutionCoordinator by lazy {
+        LocalToolExecutionCoordinator(
+            registry = toolRegistry,
+            currentSessionId = { currentSessionId },
+            planMode = { _state.value.planMode },
+            enabledOptionalTools = enabledOptionalTools,
+            requestApproval = { call, tool, summary -> approve(call, summary, tool) },
+        )
+    }
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
         dynamicSearchPaths = ::bundledRuntimeSearchPaths,
@@ -3910,7 +3919,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
         val runPolicy = localAgentRunPolicy(_state.value.usageMode)
-        synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
+        toolExecutionCoordinator.clearTurnCapabilities()
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
             // answer's background relationship/state refresh before capturing this turn's context.
@@ -4722,72 +4731,10 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private suspend fun executeRegistered(original: LocalToolCall, allowMutation: Boolean): AgentToolResult {
-        val call = original.copy(name = LocalToolPolicy.canonical(original.name))
-        val registered = toolRegistry.get(call.name)
-            ?: return AgentToolResult(
-                content = "未知工具：${call.name}",
-                isError = true,
-                errorCode = "UNKNOWN_TOOL",
-                recoveryHint = "先使用 capability_search 或检查工具名称。",
-            )
-        if (
-            _state.value.planMode &&
-            !LocalToolPolicy.allowedInPlan(call.name, registered.access)
-        ) {
-            return AgentToolResult(
-                content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
-                isError = true,
-                errorCode = "PLAN_MODE_BLOCKED",
-                recoveryHint = "提交并批准计划后再执行修改类工具。",
-            )
-        }
-        val result = toolRegistry.execute(
-            name = call.name,
-            input = call.arguments,
-            rawArguments = call.rawArguments,
-            context = ToolContext(
-                sessionId = currentSessionId,
-                allowMutation = allowMutation,
-                attributes = mapOf("call_id" to call.id),
-                approval = { tool ->
-                    approve(
-                        call = call,
-                        summary = when (tool.name) {
-                            "write", "edit", "apply_patch", "download_file" ->
-                                "${tool.name}：${call.arguments.optionalString("path").orEmpty()}"
-                            "bash", "pwsh", "shell", "run_shell", "process_exec",
-                            "terminal_open", "terminal_send", "terminal_write" ->
-                                "执行本机操作以完成当前任务"
-                            "lsp_start" -> "启用代码智能分析"
-                            else -> "执行 ${tool.name}（权限级别：${tool.access.name.lowercase()}）"
-                        },
-                        tool = tool,
-                    )
-                },
-            ),
-        )
-        return if (result.isError) {
-            AgentToolResult(
-                content = result.content,
-                isError = true,
-                errorCode = "TOOL_REPORTED_ERROR",
-                sideEffect = if (
-                    registered.access in setOf(
-                        ToolAccess.WORKSPACE_WRITE,
-                        ToolAccess.SESSION_WRITE,
-                        ToolAccess.PROCESS,
-                        ToolAccess.AGENT_CONTROL,
-                        ToolAccess.DEVICE,
-                        ToolAccess.PRIVILEGED,
-                    )
-                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
-                recoveryHint = "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。",
-            )
-        } else {
-            AgentToolResult(result.content)
-        }
-    }
+    private suspend fun executeRegistered(
+        original: LocalToolCall,
+        allowMutation: Boolean,
+    ): AgentToolResult = toolExecutionCoordinator.execute(original, allowMutation)
 
     private fun subagentToolSchemas(
         allowMutation: Boolean,
@@ -4795,7 +4742,7 @@ class LocalHarnessEngine @Inject constructor(
     ): JsonArray = subagentToolSchemas(
         allowMutation = allowMutation,
         allowVirtualScreen = allowVirtualScreen,
-        enabledOptional = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() },
+        enabledOptional = toolExecutionCoordinator.enabledOptionalSnapshot(),
     )
 
     private fun subagentToolSchemas(
@@ -4817,34 +4764,14 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun modelToolSchemas(runPolicy: LocalAgentRunPolicy): JsonArray {
-        if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
-        val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
-        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        return LocalToolRouter.visibleSchemas(tools, enabled)
-    }
+    private fun modelToolSchemas(runPolicy: LocalAgentRunPolicy): JsonArray =
+        toolExecutionCoordinator.visibleSchemas(runPolicy)
 
     private fun searchCapabilities(query: String): String =
-        searchCapabilities(query, enabledOptionalTools)
+        toolExecutionCoordinator.searchCapabilities(query)
 
-    private fun searchCapabilities(query: String, target: MutableSet<String>): String {
-        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        val matches = LocalToolRouter.search(tools, query)
-        if (matches.isEmpty()) return "未找到匹配的扩展能力；可换用 Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
-        synchronized(target) {
-            target += matches.map(HarnessTool::name)
-        }
-        return buildString {
-            appendLine("已为当前回合启用 ${matches.size} 个扩展工具：")
-            matches.forEach { tool ->
-                append("- ").append(tool.name)
-                LocalToolRouter.description(tool).takeIf(String::isNotBlank)?.let {
-                    append("：").append(it)
-                }
-                appendLine()
-            }
-        }.trimEnd()
-    }
+    private fun searchCapabilities(query: String, target: MutableSet<String>): String =
+        toolExecutionCoordinator.searchCapabilities(query, target)
 
     private suspend fun executeBuiltin(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
