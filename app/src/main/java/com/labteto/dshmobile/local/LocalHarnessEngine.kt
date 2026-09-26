@@ -4636,66 +4636,41 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         onApprovalBlocked: (String) -> Unit,
     ): AgentToolResult {
-        val call = original.copy(name = LocalToolPolicy.canonical(original.name))
-        val registered = toolRegistry.get(call.name)
-            ?: return AgentToolResult(
-                content = "未知工具：${call.name}",
-                isError = true,
-                errorCode = "UNKNOWN_TOOL",
-                recoveryHint = "先使用 capability_search 或检查工具名称。",
-            )
-
-        val result = toolRegistry.execute(
-            name = call.name,
-            input = call.arguments,
-            rawArguments = call.rawArguments,
-            context = ToolContext(
-                sessionId = sessionId,
-                allowMutation = allowMutation,
-                attributes = mapOf("call_id" to call.id),
-                approval = { tool ->
-                    if (
-                        approvalPreferences.isSafeAutoApprovalEnabled() &&
-                        canAutoApprove(tool, call.arguments)
-                    ) {
-                        eventLogFor(sessionId).append("approval/auto", buildJsonObject {
-                            put("tool", call.name)
-                            put("access", tool.access.name.lowercase())
-                            put("mode", "automation-safe-global")
-                        })
-                        true
-                    } else {
-                        val reason = "后台任务需要人工审批：${tool.name}"
-                        onApprovalBlocked(reason)
-                        eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
-                            put("tool", call.name)
-                            put("access", tool.access.name.lowercase())
-                            put("mode", "automation-noninteractive")
-                        })
-                        false
-                    }
-                },
-            ),
+        val result = toolExecutionCoordinator.executeScoped(
+            original = original,
+            sessionId = sessionId,
+            allowMutation = allowMutation,
+            planModeEnabled = false,
+            approval = { call, tool, _ ->
+                if (
+                    approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
+                ) {
+                    eventLogFor(sessionId).append("approval/auto", buildJsonObject {
+                        put("tool", call.name)
+                        put("access", tool.access.name.lowercase())
+                        put("mode", "automation-safe-global")
+                    })
+                    true
+                } else {
+                    val reason = "后台任务需要人工审批：" + tool.name
+                    onApprovalBlocked(reason)
+                    eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
+                        put("tool", call.name)
+                        put("access", tool.access.name.lowercase())
+                        put("mode", "automation-noninteractive")
+                    })
+                    false
+                }
+            },
         )
         return if (result.isError) {
-            AgentToolResult(
-                content = result.content,
-                isError = true,
-                errorCode = "TOOL_REPORTED_ERROR",
-                sideEffect = if (
-                    registered.access in setOf(
-                        ToolAccess.WORKSPACE_WRITE,
-                        ToolAccess.SESSION_WRITE,
-                        ToolAccess.PROCESS,
-                        ToolAccess.AGENT_CONTROL,
-                        ToolAccess.DEVICE,
-                        ToolAccess.PRIVILEGED,
-                    )
-                ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
-                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。",
+            result.copy(
+                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。" +
+                    result.recoveryHint?.let { " " + it }.orEmpty(),
             )
         } else {
-            AgentToolResult(result.content)
+            result
         }
     }
 
