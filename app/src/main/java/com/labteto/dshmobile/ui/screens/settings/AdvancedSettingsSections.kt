@@ -425,8 +425,7 @@ internal fun LocalModelSettingsCard(
         )
         DsValueRow(
             label = stringResource(R.string.advanced_model_key),
-            value = if (local.configured) "••••••••" else null,
-            masked = true,
+            value = if (local.configured) "••••" else null,
             configured = local.configured,
             onClick = openEditor,
         )
@@ -871,9 +870,9 @@ internal fun LocalAgentSettingsCard(
             label = stringResource(R.string.advanced_main_steps),
             hint = stringResource(R.string.advanced_agent_limits_hint),
             value = local.mainMaxSteps,
-            range = 1..500,
+            range = 4..128,
             onDelta = { delta ->
-                clampUpdate(local.mainMaxSteps, delta, 1, 500) {
+                clampUpdate(local.mainMaxSteps, delta, 4, 128) {
                     viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts)
                 }
             },
@@ -882,9 +881,9 @@ internal fun LocalAgentSettingsCard(
             label = stringResource(R.string.advanced_subagent_steps),
             hint = null,
             value = local.subagentMaxSteps,
-            range = 1..99,
+            range = 1..128,
             onDelta = { delta ->
-                clampUpdate(local.subagentMaxSteps, delta, 1, 99) {
+                clampUpdate(local.subagentMaxSteps, delta, 1, 128) {
                     viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts)
                 }
             },
@@ -893,9 +892,9 @@ internal fun LocalAgentSettingsCard(
             label = stringResource(R.string.advanced_model_attempts),
             hint = null,
             value = local.modelAttempts,
-            range = 1..9,
+            range = 1..5,
             onDelta = { delta ->
-                clampUpdate(local.modelAttempts, delta, 1, 9) {
+                clampUpdate(local.modelAttempts, delta, 1, 5) {
                     viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it)
                 }
             },

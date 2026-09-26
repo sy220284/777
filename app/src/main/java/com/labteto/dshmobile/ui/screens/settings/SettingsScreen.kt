@@ -45,17 +45,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.ui.layout.wrapContentWidth
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,6 +88,8 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * App settings, grouped into cards.
@@ -781,6 +785,7 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             options.take(2).forEach { (key, label) ->
                 ThemePreviewBlock(
+                    themeKey = key,
                     label = label,
                     selected = settings.themePreference == key,
                     modifier = Modifier.weight(1f),
@@ -805,6 +810,7 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 /** 单个主题预览块：上半段画该主题的底色与卡片条，下半段是名称。 */
 @Composable
 private fun ThemePreviewBlock(
+    themeKey: String,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -812,11 +818,11 @@ private fun ThemePreviewBlock(
 ) {
     val colors = DsTheme.colors
     // 各主题的示意底色/卡片色（与 Color.kt 语义值一致）
-    val (bg, card) = when (label) {
-        stringResource(R.string.settings_appearance_light) -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
-        stringResource(R.string.settings_appearance_dark) -> Color(0xFF0F1514) to Color(0xFF182120)
-        stringResource(R.string.settings_appearance_matte_black) -> Color(0xFF000000) to Color(0xFF111111)
-        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514) // 跟随系统：左亮右暗拼色
+    val (bg, card) = when (themeKey) {
+        "light" -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
+        "dark" -> Color(0xFF0F1514) to Color(0xFF182120)
+        "matte_black" -> Color(0xFF000000) to Color(0xFF111111)
+        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514)
     }
     Column(
         modifier = modifier
@@ -835,7 +841,7 @@ private fun ThemePreviewBlock(
                 .background(bg),
             contentAlignment = Alignment.CenterStart,
         ) {
-            if (label == stringResource(R.string.settings_appearance_system)) {
+            if (themeKey == "system") {
                 Row(Modifier.fillMaxWidth()) {
                     Box(Modifier.weight(1f).height(52.dp).background(Color(0xFFF7F8F6)))
                     Box(Modifier.weight(1f).height(52.dp).background(Color(0xFF0F1514)))
@@ -903,21 +909,25 @@ private fun BackgroundRow(
         )
         Spacer(Modifier.height(DsSpacing.small))
         if (path != null) {
-            // 缩略图先行：两段式解码（先边界再按目标高度取样），大图不会撑爆内存
-            val thumbnail = remember(path) {
-                runCatching {
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(path, bounds)
-                    var sample = 1
-                    while (bounds.outHeight / (sample * 2) >= 96) sample *= 2
-                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-                    BitmapFactory.decodeFile(path, opts)?.asImageBitmap()
-                }.getOrNull()
+            val imagePath = path
+            val thumbnail by produceState<ImageBitmap?>(initialValue = null, key1 = imagePath) {
+                value = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(imagePath, bounds)
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                        var sample = 1
+                        while (bounds.outHeight / (sample * 2) >= 96) sample *= 2
+                        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                        BitmapFactory.decodeFile(imagePath, opts)?.asImageBitmap()
+                    }.getOrNull()
+                }
             }
             thumbnail?.let {
                 Image(
                     bitmap = it,
                     contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(width = 96.dp, height = 56.dp)
                         .clip(DsShapes.cube),
