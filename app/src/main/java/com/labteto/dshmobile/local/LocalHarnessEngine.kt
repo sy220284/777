@@ -1935,6 +1935,9 @@ class LocalHarnessEngine @Inject constructor(
         timeoutMillis: Long = 3 * 60_000L,
         recoverInterrupted: Boolean = false,
         recoveryStartedAt: Long? = null,
+        quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietEndHour: Int = 7,
     ): LocalAutomationRunResult {
         val trigger = instruction.trim()
         require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
@@ -2011,6 +2014,9 @@ class LocalHarnessEngine @Inject constructor(
                 val proactiveDecision = evaluateChatProactivePolicy(
                     messages = recentTranscript,
                     nowMillis = System.currentTimeMillis(),
+                    quietHoursEnabled = quietHoursEnabled,
+                    quietStartHour = quietStartHour,
+                    quietEndHour = quietEndHour,
                 )
                 if (!proactiveDecision.shouldSend) {
                     val reason = proactiveDecision.reason ?: "当前不适合继续主动互动"
