@@ -268,6 +268,9 @@ class AgentLoop(
                     context?.cancellation?.throwIfCancelled()
                     val visible = group.filter { call -> context?.toolView?.allows(call.name) != false }
                     val executed = if (visible.isEmpty()) emptyList() else toolBatch.execute(visible)
+                    require(executed.size == visible.size) {
+                        "工具批次结果数量不匹配：调用 " + visible.size + "，结果 " + executed.size
+                    }
                     val executedById = visible.zip(executed).associate { (call, result) -> call.id to result }
                     val results = group.map { call ->
                         executedById[call.id] ?: AgentToolResult(
