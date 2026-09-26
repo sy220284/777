@@ -97,9 +97,10 @@ internal fun resolveChatInteractionIntent(
     }
 
     if (resetsPrevious) return ChatInteractionIntent.NORMAL
-    if (previous == ChatInteractionIntent.INTIMATE) return ChatInteractionIntent.INTIMATE
-    val continuesPrevious = CONTINUATION_HINTS.any { text.contains(it) } ||
-        (text.length in 1..16 && NON_INTERACTION_INTENT_HINTS.none { text.contains(it) })
+    val continuesPrevious =
+        CONTINUATION_HINTS.any { text.contains(it) } ||
+            text in SHORT_INTERACTION_CONTINUATIONS ||
+            hasChineseSuggestiveFlirtingIntent(text)
     return if (continuesPrevious) previous else ChatInteractionIntent.NORMAL
 }
 
@@ -109,13 +110,22 @@ internal fun nextInteractionIntentState(
 ): Pair<String, Int> {
     val explicit = classifyExplicitInteractionIntent(input)
     if (explicit != ChatInteractionIntent.NORMAL) {
-        return explicit.name to if (explicit == ChatInteractionIntent.INTIMATE) 100 else 2
+        val strength = when (explicit) {
+            ChatInteractionIntent.INTIMATE -> 100
+            ChatInteractionIntent.FLIRTING -> 3
+            else -> 1
+        }
+        return explicit.name to strength
     }
     val resolved = resolveChatInteractionIntent(input, previous)
     return when (resolved) {
         ChatInteractionIntent.NORMAL -> ChatInteractionIntent.NORMAL.name to 0
         ChatInteractionIntent.INTIMATE -> ChatInteractionIntent.INTIMATE.name to 100
-        else -> resolved.name to (previous.interactionIntentStrength - 1).coerceAtLeast(1)
+        else -> {
+            val remaining = previous.interactionIntentStrength - 1
+            if (remaining <= 0) ChatInteractionIntent.NORMAL.name to 0
+            else resolved.name to remaining
+        }
     }
 }
 
@@ -305,7 +315,11 @@ private val NON_INTERACTION_INTENT_HINTS = listOf(
     "小说", "剧情", "台词", "设定", "翻译",
 )
 private val CONTINUATION_HINTS = listOf(
-    "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才",
+    "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才", "换个姿势",
+)
+private val SHORT_INTERACTION_CONTINUATIONS = setOf(
+    "嗯", "嗯嗯", "好", "行", "可以", "来吧", "继续", "接着", "再来", "别停", "就这样",
+    "你猜", "是吗", "哦？", "嗯？", "然后呢",
 )
 private val INTENT_RESET_HINTS = listOf(
     "换个话题", "先不聊这个", "不聊这个", "说正事", "算了", "停一下", "到此为止",
