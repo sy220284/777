@@ -27,6 +27,20 @@ internal enum class ChatInteractionIntent {
     STRATEGIST,
 }
 
+internal fun hasChineseSuggestiveFlirtingIntent(input: String): Boolean {
+    val text = input.trim().lowercase()
+    if (text.isBlank()) return false
+    if (CHINESE_SUGGESTIVE_STRONG_HINTS.any { text.contains(it) }) return true
+    if (CHINESE_INNUENDO_NEUTRAL_CONTEXT_HINTS.any { text.contains(it) }) return false
+
+    val weakHits = CHINESE_SUGGESTIVE_CONTEXT_HINTS.count { text.contains(it) }
+    if (weakHits == 0) return false
+
+    val hasInterpersonalAnchor = CHINESE_INTERPERSONAL_HINTS.any { text.contains(it) }
+    val hasTeasingTone = CHINESE_TEASING_TONE_HINTS.any { text.contains(it) }
+    return weakHits >= 2 || hasInterpersonalAnchor || hasTeasingTone
+}
+
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
@@ -47,7 +61,7 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
             ChatInteractionIntent.INTIMATE
         RELATIONSHIP_PROGRESS_HINTS.any { text.contains(it) } ->
             ChatInteractionIntent.RELATIONSHIP_PROGRESS
-        FLIRTING_HINTS.any { text.contains(it) } ->
+        FLIRTING_HINTS.any { text.contains(it) } || hasChineseSuggestiveFlirtingIntent(text) ->
             ChatInteractionIntent.FLIRTING
         else -> ChatInteractionIntent.NORMAL
     }
@@ -57,18 +71,29 @@ internal fun resolveChatInteractionIntent(
     input: String,
     state: ChatCharacterState,
 ): ChatInteractionIntent {
-    val explicit = classifyExplicitInteractionIntent(input)
-    if (explicit != ChatInteractionIntent.NORMAL) return explicit
-
+    val text = input.trim().lowercase()
     val previous = runCatching {
         ChatInteractionIntent.valueOf(state.interactionIntent)
     }.getOrDefault(ChatInteractionIntent.NORMAL)
+    val explicit = classifyExplicitInteractionIntent(input)
+    val resetsPrevious = INTENT_RESET_HINTS.any { text.contains(it) }
+    if (explicit != ChatInteractionIntent.NORMAL) {
+        if (
+            !resetsPrevious &&
+            previous == ChatInteractionIntent.INTIMATE &&
+            state.interactionIntentStrength > 0 &&
+            explicit == ChatInteractionIntent.FLIRTING
+        ) {
+            return ChatInteractionIntent.INTIMATE
+        }
+        return explicit
+    }
+
     if (previous == ChatInteractionIntent.NORMAL || state.interactionIntentStrength <= 0) {
         return ChatInteractionIntent.NORMAL
     }
 
-    val text = input.trim().lowercase()
-    if (INTENT_RESET_HINTS.any { text.contains(it) }) return ChatInteractionIntent.NORMAL
+    if (resetsPrevious) return ChatInteractionIntent.NORMAL
     if (previous == ChatInteractionIntent.INTIMATE) return ChatInteractionIntent.INTIMATE
     val continuesPrevious = CONTINUATION_HINTS.any { text.contains(it) } ||
         (text.length in 1..16 && NON_INTERACTION_INTENT_HINTS.none { text.contains(it) })
@@ -127,6 +152,9 @@ internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
 internal const val CHAT_FLIRT_VERBAL_REPERTOIRE =
     "【暧昧话语变化】在暧昧、调情或成年亲密语境中，话语要有变化和来回感。可按当下关系选择轻挑逗、反撩接梗、含蓄双关、半句留白、短促直球、带专属感的称呼、贴近当下细节的夸赞、把用户刚说的话反转回来、压低语气的提醒或故意停顿后再补一句。不要连续多轮只用同一种套路，例如反复“你猜”“怕了？”“嘴硬”“还敢不敢”；不要堆情话、连续审问或每句都故作神秘。每轮优先选一到两种表达手段，贴合角色原有说话方式和当前关系强度；近期已经重复的句式、称呼和挑逗结构优先换掉。"
 
+internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
+    "【中文暗示与双关】本轮含有中文语境下的暧昧暗示、双关、反话或话外音。优先结合人物关系、前后文和语气理解言外之意，不要只按字面拆解。可以顺着暗示反撩、接住双关、借用户原词回钩，或保留半句留白；一句话同时有普通含义和暧昧含义时，优先保留这种双层意思。除非用户明确在分析文字，否则不要把双关解释成词典释义。"
+
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
 )
@@ -135,6 +163,26 @@ private val DIRECT_INTIMATE_ACTION_HINTS = listOf(
     "过来亲", "过来抱", "继续亲", "继续抱", "一起睡", "上床",
 )
 private val FLIRTING_HINTS = listOf("暧昧", "撩我", "撩一下", "调情", "挑逗我")
+private val CHINESE_SUGGESTIVE_STRONG_HINTS = listOf(
+    "今晚别走", "留下来陪我", "别装正经", "别装不懂", "懂的都懂", "你想哪去了",
+    "想到哪去了", "别想歪", "我可没说那个", "这话有歧义", "这话怎么听着不对",
+    "你知道我什么意思", "明知故问", "馋你", "想吃你", "吃掉你", "想尝尝你", "让我尝尝",
+    "要不要试试", "试试就知道", "你又开车", "又开车了", "车速有点快", "上高速了",
+)
+private val CHINESE_SUGGESTIVE_CONTEXT_HINTS = listOf(
+    "深入了解", "你行不行", "行不行啊", "敢不敢", "别光说", "有本事就", "留下来",
+    "离我近点", "过来点", "靠近点", "再近一点", "不正经", "嘴硬", "怕了", "怂了",
+)
+private val CHINESE_INTERPERSONAL_HINTS = listOf(
+    "你", "我", "我们", "咱俩", "两个人", "陪我", "对我", "跟我", "靠近我", "过来",
+)
+private val CHINESE_TEASING_TONE_HINTS = listOf(
+    "明知故问", "装不懂", "装正经", "怕了", "怂了", "嘴硬", "敢不敢", "有本事", "别光说",
+)
+private val CHINESE_INNUENDO_NEUTRAL_CONTEXT_HINTS = listOf(
+    "项目", "代码", "文档", "产品", "需求", "业务", "客户", "会议", "工作", "学习", "课程",
+    "考试", "作业", "资料", "知识", "医学", "医生", "小说", "剧情", "台词", "文案", "翻译",
+)
 private val PROACTIVE_INTIMACY_HINTS = listOf(
     "主动一点", "主动点", "你主动", "再主动", "更主动", "主动些", "主动起来",
     "大胆一点", "大胆点", "别躲", "别回避", "别含蓄",
@@ -238,6 +286,9 @@ class ChatRelationshipEngine @Inject constructor() {
         if (hasFlirtingOrIntimateIntent(input, state)) {
             appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
             appendLine(CHAT_FLIRT_VERBAL_REPERTOIRE)
+            if (hasChineseSuggestiveFlirtingIntent(input)) {
+                appendLine(CHAT_CHINESE_INNUENDO_GUIDANCE)
+            }
         }
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
