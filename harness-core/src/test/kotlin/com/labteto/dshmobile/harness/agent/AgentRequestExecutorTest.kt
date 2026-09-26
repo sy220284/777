@@ -43,6 +43,30 @@ class AgentRequestExecutorTest {
     }
 
     @Test
+    fun providerRetryDelayOverridesLocalBackoff() = runTest {
+        val delays = mutableListOf<Long>()
+        var calls = 0
+        val providerError = IOException("rate limited")
+        val executor = AgentRequestExecutor(
+            maxAttempts = 2,
+            retryable = { it === providerError },
+            providerRetryDelayMillis = { error, _ -> if (error === providerError) 9_000L else null },
+            backoffMillis = { 250L },
+            sleeper = { delays += it },
+        )
+
+        val result = executor.execute { attempt ->
+            calls += 1
+            if (attempt == 1) throw providerError
+            "ok"
+        }
+
+        assertEquals("ok", result)
+        assertEquals(2, calls)
+        assertEquals(listOf(9_000L), delays)
+    }
+
+    @Test
     fun nonRetryableFailureStopsImmediately() = runTest {
         val events = mutableListOf<AgentRequestEvent>()
         var calls = 0
