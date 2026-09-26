@@ -732,21 +732,40 @@ private fun TaskCard(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onRunNow: () -> Unit,
+    onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
-    val scheduleLabel = when (task.recurringMinutes) {
-        null -> stringResource(R.string.tasks_once)
-        24L * 60L -> stringResource(R.string.tasks_schedule_daily)
-        7L * 24L * 60L -> stringResource(R.string.tasks_schedule_weekly)
-        else -> {
+    val scheduleLabel = when (task.scheduleType) {
+        AutomationScheduleType.SILENCE -> {
+            val minutes = task.silenceMinutes ?: task.recurringMinutes ?: 60L
+            stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
+        }
+        AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)
+        AutomationScheduleType.WEEKLY -> stringResource(R.string.tasks_schedule_weekly)
+        AutomationScheduleType.INTERVAL -> {
             val minutes = task.recurringMinutes ?: 0L
             if (minutes % 60L == 0L) {
                 stringResource(R.string.tasks_every_hours, minutes / 60L)
             } else {
                 stringResource(R.string.tasks_every_minutes, minutes)
+            }
+        }
+        AutomationScheduleType.ONCE -> stringResource(R.string.tasks_once)
+        AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
+            null -> stringResource(R.string.tasks_once)
+            24L * 60L -> stringResource(R.string.tasks_schedule_daily)
+            7L * 24L * 60L -> stringResource(R.string.tasks_schedule_weekly)
+            else -> {
+                val minutes = task.recurringMinutes ?: 0L
+                if (minutes % 60L == 0L) {
+                    stringResource(R.string.tasks_every_hours, minutes / 60L)
+                } else {
+                    stringResource(R.string.tasks_every_minutes, minutes)
+                }
             }
         }
     }
@@ -842,6 +861,26 @@ private fun TaskCard(
             DsTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
         }
 
+        if (task.mode == AutomationMode.CHAT) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.tasks_try_now),
+                    onClick = onRunNow,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.tasks_edit),
+                    onClick = onEdit,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+
         (task.targetSessionId ?: task.workSessionId)?.takeIf(String::isNotBlank)?.let { sessionId ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -910,6 +949,30 @@ private fun taskStatusLabel(status: String): String = when (status) {
     "failed" -> stringResource(R.string.tasks_run_failed)
     "paused" -> stringResource(R.string.tasks_status_paused)
     else -> stringResource(R.string.tasks_status_scheduled)
+}
+
+private fun cadenceForTask(task: AutomationTask): AutomationCadence =
+    when (task.scheduleType) {
+        AutomationScheduleType.ONCE -> AutomationCadence.ONCE
+        AutomationScheduleType.DAILY -> AutomationCadence.DAILY
+        AutomationScheduleType.WEEKLY -> AutomationCadence.WEEKLY
+        AutomationScheduleType.INTERVAL -> AutomationCadence.CUSTOM
+        AutomationScheduleType.SILENCE -> AutomationCadence.SILENCE
+        AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
+            null -> AutomationCadence.ONCE
+            24L * 60L -> AutomationCadence.DAILY
+            7L * 24L * 60L -> AutomationCadence.WEEKLY
+            else -> AutomationCadence.CUSTOM
+        }
+    }
+
+private fun customHoursForTask(task: AutomationTask): String {
+    val minutes = if (task.scheduleType == AutomationScheduleType.SILENCE) {
+        task.silenceMinutes
+    } else {
+        task.recurringMinutes
+    } ?: return "6"
+    return maxOf(1L, minutes / 60L).toString()
 }
 
 private fun formatTime(time: Long): String =
