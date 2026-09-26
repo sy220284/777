@@ -173,18 +173,24 @@ class AgentLoop(
     suspend fun run(
         input: String,
         history: List<AgentMessage> = emptyList(),
+        context: AgentRunContext? = null,
     ): AgentRunResult {
         val cleanInput = input.trim()
         require(cleanInput.isNotEmpty()) { "用户输入不能为空" }
-        val turnId = idFactory()
+        val turnId = context?.runId?.takeIf(String::isNotBlank) ?: idFactory()
+        val effectiveMaxSteps = context?.resources?.maxSteps
+            ?.coerceIn(1, maxSteps)
+            ?: maxSteps
+        context?.cancellation?.throwIfCancelled()
         val messages = history.toMutableList().apply {
             add(AgentMessage(role = "user", content = cleanInput))
         }
         eventSink.append(AgentEvent.TurnStarted(turnId, cleanInput))
 
         try {
-            repeat(maxSteps) { stepIndex ->
+            repeat(effectiveMaxSteps) { stepIndex ->
                 val step = stepIndex + 1
+                context?.cancellation?.throwIfCancelled()
                 eventSink.append(AgentEvent.StepStarted(turnId, step))
                 val reply = model.complete(messages.toList())
                 requireUniqueCallIds(reply.toolCalls)
@@ -219,7 +225,17 @@ class AgentLoop(
                     val first = reply.toolCalls[callIndex]
                     if (!isParallelTool(first)) {
                         eventSink.append(AgentEvent.ToolStarted(turnId, step, first))
-                        val result = tools.execute(first)
+                        context?.cancellation?.throwIfCancelled()
+                        val result = if (context?.toolView?.allows(first.name) == false) {
+                            AgentToolResult(
+                                content = "当前 Agent Run 不可见工具：" + first.name,
+                                isError = true,
+                                errorCode = "TOOL_NOT_VISIBLE",
+                                recoveryHint = "重新进行能力发现，或在新的 Agent Run 中显式授予该工具。",
+                            )
+                        } else {
+                            tools.execute(first)
+                        }
                         eventSink.append(
                             AgentEvent.ToolFinished(
                                 turnId = turnId,
@@ -249,7 +265,18 @@ class AgentLoop(
                     group.forEach { call ->
                         eventSink.append(AgentEvent.ToolStarted(turnId, step, call))
                     }
-                    val results = toolBatch.execute(group)
+                    context?.cancellation?.throwIfCancelled()
+                    val visible = group.filter { call -> context?.toolView?.allows(call.name) != false }
+                    val executed = if (visible.isEmpty()) emptyList() else toolBatch.execute(visible)
+                    val executedById = visible.zip(executed).associate { (call, result) -> call.id to result }
+                    val results = group.map { call ->
+                        executedById[call.id] ?: AgentToolResult(
+                            content = "当前 Agent Run 不可见工具：" + call.name,
+                            isError = true,
+                            errorCode = "TOOL_NOT_VISIBLE",
+                            recoveryHint = "重新进行能力发现，或在新的 Agent Run 中显式授予该工具。",
+                        )
+                    }
                     require(results.size == group.size) {
                         "工具批次结果数量不匹配：调用 ${group.size}，结果 ${results.size}"
                     }
@@ -279,12 +306,12 @@ class AgentLoop(
                 eventSink.append(AgentEvent.StepFinished(turnId, step))
             }
 
-            eventSink.append(AgentEvent.TurnStepLimit(turnId, maxSteps))
+            eventSink.append(AgentEvent.TurnStepLimit(turnId, effectiveMaxSteps))
             return AgentRunResult(
                 turnId = turnId,
                 answer = messages.lastOrNull { it.role == "assistant" }?.content.orEmpty(),
                 messages = messages.toList(),
-                steps = maxSteps,
+                steps = effectiveMaxSteps,
                 stopReason = AgentStopReason.STEP_LIMIT,
             )
         } catch (cancelled: CancellationException) {
