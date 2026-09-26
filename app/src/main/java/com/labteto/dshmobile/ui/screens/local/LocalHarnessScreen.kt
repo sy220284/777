@@ -1217,7 +1217,6 @@ private fun LocalChat(
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
-        !state.groupChat.enabled &&
         state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val currentGalleryEntry = remember(gallery, state.galleryId) {
@@ -1657,19 +1656,19 @@ private fun LocalChat(
                             groupMode = state.groupChat.enabled,
                             canEdit = messageBranchingEnabled &&
                                 !state.running &&
-                                !chatMessageHasAttachmentContext(transcriptItem.message),
+                                transcriptItem.message.role == "user",
                             canRegenerate = !state.groupChat.enabled &&
                                 !state.running &&
                                 !transcriptItem.message.proactive &&
                                 state.messages.lastOrNull()?.id == transcriptItem.message.id,
-                            branchInfo = if (messageBranchingEnabled) {
+                            branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
                             } else {
                                 null
                             },
                             onEdit = { message ->
                                 editingUserMessage = message
-                                editingUserText = message.content
+                                editingUserText = editableChatUserText(message)
                                 editingUserError = null
                             },
                             onSelectVariant = onSelectMessageVariant,
@@ -2137,8 +2136,11 @@ private fun LocalChat(
                             editingUserError = editUserMessageFailed
                         }
                     },
-                    enabled = editingUserText.trim().isNotEmpty() &&
-                        editingUserText.trim() != message.content.trim() &&
+                    enabled = (
+                        editingUserText.trim().isNotEmpty() ||
+                            chatMessageHasAttachmentContext(message)
+                        ) &&
+                        editingUserText.trim() != editableChatUserText(message).trim() &&
                         !state.running,
                     size = DsButtonSize.Small,
                 )
@@ -2816,7 +2818,7 @@ private fun LocalMessageRow(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
             UserBubble(message.content)
-            if (chatMode && (canEdit || branchInfo != null)) {
+            if (chatMode) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End,
@@ -2826,14 +2828,13 @@ private fun LocalMessageRow(
                         branchInfo = branchInfo,
                         onSelectVariant = onSelectVariant,
                     )
-                    if (canEdit) {
-                        DsIconButton(
-                            icon = FeatherIcons.Edit3,
-                            contentDescription = stringResource(R.string.local_edit_user_message),
-                            onClick = { onEdit(message) },
-                            tint = colors.labelTertiary.copy(alpha = 0.78f),
-                        )
-                    }
+                    DsIconButton(
+                        icon = FeatherIcons.Edit3,
+                        contentDescription = stringResource(R.string.local_edit_user_message),
+                        onClick = { onEdit(message) },
+                        enabled = canEdit,
+                        tint = colors.labelTertiary.copy(alpha = if (canEdit) 0.78f else 0.38f),
+                    )
                 }
             }
         }
