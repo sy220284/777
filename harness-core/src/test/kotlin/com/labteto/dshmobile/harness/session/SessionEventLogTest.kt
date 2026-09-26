@@ -152,6 +152,37 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun pageBeforeReadsOnlyTheRequestedOlderWindowAcrossSegments() {
+        val directory = Files.createTempDirectory("harness-event-page-before").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(30) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) },
+                )
+            }
+            file.appendText("{broken tail\n")
+
+            assertEquals(
+                listOf(27L, 28L, 29L),
+                log.pageBefore(limit = 3).map(SessionEvent::sequence),
+            )
+            assertEquals(
+                listOf(12L, 13L, 14L),
+                log.pageBefore(sequenceExclusive = 15L, limit = 3).map(SessionEvent::sequence),
+            )
+            assertEquals(
+                listOf(0L, 1L),
+                log.pageBefore(sequenceExclusive = 2L, limit = 20).map(SessionEvent::sequence),
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun latestOfReturnsNewestMatchingRelevantType() {
         val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
         val file = directory.resolve("session.events.jsonl")
