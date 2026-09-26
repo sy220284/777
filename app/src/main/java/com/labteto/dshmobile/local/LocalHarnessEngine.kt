@@ -6027,27 +6027,53 @@ class LocalHarnessEngine @Inject constructor(
             "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
-    private fun compactHistoryIfNeeded(extraTokens: Int = 0) {
+    private suspend fun compactHistoryIfNeeded(extraTokens: Int = 0) {
         val budget = currentHistoryBudget()
-        val compaction = historyCompactor.compact(
+        val summaryMode = if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            LocalHistorySummaryMode.CHAT
+        } else {
+            LocalHistorySummaryMode.WORK
+        }
+        val extractive = historyCompactor.compact(
             history = modelHistory,
             budget = budget,
             currentChars = modelHistoryChars,
             currentTokens = modelHistoryEstimatedTokens,
             extraTokens = extraTokens,
-            summaryMode = if (_state.value.usageMode == LocalUsageMode.CHAT) {
-                LocalHistorySummaryMode.CHAT
-            } else {
-                LocalHistorySummaryMode.WORK
-            },
+            summaryMode = summaryMode,
         ) ?: run {
             updateContextMetrics()
             return
         }
+
+        eventLog.append("compaction/start", buildJsonObject {
+            put("mode", summaryMode.name.lowercase())
+            put("omitted_messages", extractive.omittedMessages)
+            put("estimated_tokens_before", extractive.estimatedTokensBefore)
+            put("extractive_tokens_after", extractive.estimatedTokensAfter)
+        })
+
+        val semantic = if (
+            summaryMode == LocalHistorySummaryMode.WORK &&
+            extractive.omittedHistory.size >= MIN_SEMANTIC_COMPACTION_MESSAGES
+        ) {
+            refineWorkCompactionSemantically(extractive)
+        } else {
+            null
+        }
+        val compaction = semantic ?: extractive
+        val backend = if (semantic != null) "model-semantic" else "extractive-local"
+
         resetModelHistory(compaction.messages)
+        eventLog.append("compaction/summary", buildJsonObject {
+            put("backend", backend)
+            put("summary", compaction.summary)
+            put("omitted_messages", compaction.omittedMessages)
+        })
         eventLog.append(
             "session/compaction",
             buildJsonObject {
+                put("backend", backend)
                 put("omitted_messages", compaction.omittedMessages)
                 put("summary", compaction.summary)
                 put("estimated_tokens_before", compaction.estimatedTokensBefore)
@@ -6058,6 +6084,87 @@ class LocalHarnessEngine @Inject constructor(
         checkpointModelHistory("session/compaction")
         updateContextMetrics()
         persist()
+        eventLog.append("compaction/end", buildJsonObject {
+            put("backend", backend)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
+        })
+    }
+
+    private suspend fun refineWorkCompactionSemantically(
+        extractive: LocalHistoryCompaction,
+    ): LocalHistoryCompaction? {
+        val key = apiKeys.get() ?: return null
+        val snapshot = _state.value
+        val request = semanticCompactionRequest(extractive)
+        val executor = AgentRequestExecutor(
+            maxAttempts = snapshot.modelAttempts.coerceIn(1, 2),
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            providerRetryDelayMillis = { error, _ ->
+                (error as? LocalModelException)?.retryAfterMillis
+            },
+            eventSink = AgentRequestEventSink { event ->
+                when (event) {
+                    is AgentRequestEvent.AttemptFailed -> eventLog.append(
+                        "compaction/model-attempt",
+                        buildJsonObject {
+                            put("attempt", event.attempt)
+                            put("status", "failed")
+                            put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
+                            put("detail", event.reason.take(1_000))
+                        },
+                    )
+                    is AgentRequestEvent.RetryScheduled -> eventLog.append(
+                        "compaction/model-retry",
+                        buildJsonObject {
+                            put("attempt", event.attempt)
+                            put("next_attempt", event.nextAttempt)
+                            put("delay_ms", event.delayMillis)
+                        },
+                    )
+                    else -> Unit
+                }
+            },
+        )
+        return try {
+            val reply = executor.execute {
+                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                    modelClient.complete(
+                        apiKey = key,
+                        baseUrl = snapshot.baseUrl,
+                        model = snapshot.model,
+                        messages = request,
+                        tools = JsonArray(emptyList()),
+                        protocol = snapshot.modelProtocol,
+                    )
+                }
+            }
+            usageTracker.record(snapshot.model, reply.usage)
+            val summary = sanitizeSemanticCompactionSummary(reply.content.orEmpty())
+                ?: return null.also {
+                    eventLog.append("compaction/model-fallback", buildJsonObject {
+                        put("reason", "invalid-summary-shape")
+                    })
+                }
+            historyCompactor.replaceSummary(extractive, summary).also { refined ->
+                if (refined == null) {
+                    eventLog.append("compaction/model-fallback", buildJsonObject {
+                        put("reason", "semantic-summary-did-not-reduce-context")
+                    })
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            eventLog.append("compaction/model-fallback", buildJsonObject {
+                put("reason", "model-error")
+                put("detail", (error.message ?: error::class.java.simpleName).take(1_000))
+            })
+            null
+        }
     }
 
     private fun ensureSystemMessage() {
@@ -6771,6 +6878,7 @@ class LocalHarnessEngine @Inject constructor(
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
+        const val MIN_SEMANTIC_COMPACTION_MESSAGES = 6
         const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
         const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         const val LOCAL_PROJECT_ID = "local-workspace"
