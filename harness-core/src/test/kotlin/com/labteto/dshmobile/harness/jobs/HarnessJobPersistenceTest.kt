@@ -167,4 +167,24 @@ class HarnessJobPersistenceTest {
         assertTrue(restarted.snapshots().single { it.id == id }.inbox.isEmpty())
     }
 
+    @Test
+    fun completedPersistentAgentCanBeColdReactivatedByMessage() = runTest {
+        val manager = HarnessJobManager(scope = this, onChanged = { })
+        val started = manager.startPersistent(
+            label = "子代理：research",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{\"session_id\":\"s\"}",
+        ) { _, _ -> "first-done" }
+        val id = started.substringAfterLast('：')
+        advanceUntilIdle()
+
+        assertTrue(manager.output(id).contains("[completed]"))
+        val send = manager.send(id, "继续验证边界")
+        assertTrue(send.contains("冷恢复"))
+
+        val snapshot = manager.interruptedSnapshots().single { it.id == id }
+        assertEquals(listOf("继续验证边界"), snapshot.inbox)
+        assertEquals("interrupted", snapshot.status)
+    }
+
 }
