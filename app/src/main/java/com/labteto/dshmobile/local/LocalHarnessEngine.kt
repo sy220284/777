@@ -1275,7 +1275,7 @@ class LocalHarnessEngine @Inject constructor(
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = eventLogFor(expectedSessionId)
         val key = apiKeys.get() ?: return false
-        val prompt = chatInteractionPlanner.suggestionsPrompt(
+        val prompt = chatTurnCoordinator.replySuggestionsPrompt(
             persona = snapshot.chatPersona,
             state = snapshot.chatState,
             userMessage = userMessage,
@@ -1306,7 +1306,7 @@ class LocalHarnessEngine @Inject constructor(
             return false
         }
         usageTracker.record(snapshot.model, reply.usage)
-        val suggestions = chatInteractionPlanner.parseSuggestions(reply.content.orEmpty())
+        val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
             boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "parse-failed")

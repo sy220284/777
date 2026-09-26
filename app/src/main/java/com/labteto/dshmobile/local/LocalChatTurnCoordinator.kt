@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
+import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -102,6 +103,21 @@ internal class LocalChatTurnCoordinator(
         userMessage = userMessage,
         assistantMessage = assistantMessage,
     )
+
+    fun replySuggestionsPrompt(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+        userMessage: String,
+        assistantMessage: String,
+    ): String = interactionPlanner.suggestionsPrompt(
+        persona = persona,
+        state = state,
+        userMessage = userMessage,
+        assistantMessage = assistantMessage,
+    )
+
+    fun parseReplySuggestions(text: String): List<ChatReplySuggestion>? =
+        interactionPlanner.parseSuggestions(text)
 }
 
 
