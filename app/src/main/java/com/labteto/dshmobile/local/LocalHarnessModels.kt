@@ -124,6 +124,8 @@ data class LocalConversationFiles(
 data class LocalAutomationRunResult(
     val sessionId: String,
     val output: String,
+    val delivered: Boolean = true,
+    val skipReason: String? = null,
 )
 
 
