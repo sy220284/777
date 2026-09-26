@@ -95,7 +95,13 @@ internal object ChatContextAssembler {
         val b = semanticCore(right)
         if (a.isBlank() || b.isBlank()) return false
         if (a == b) return true
-        if (a.length >= 8 && b.length >= 8 && (a.contains(b) || b.contains(a))) return true
+        val lengthRatio = minOf(a.length, b.length).toDouble() / maxOf(a.length, b.length).toDouble()
+        if (
+            a.length >= 8 &&
+            b.length >= 8 &&
+            lengthRatio >= 0.72 &&
+            (a.contains(b) || b.contains(a))
+        ) return true
         val aa = bigrams(a)
         val bb = bigrams(b)
         if (aa.isEmpty() || bb.isEmpty()) return false
@@ -103,7 +109,7 @@ internal object ChatContextAssembler {
         val containment = shared.toDouble() / minOf(aa.size, bb.size).toDouble()
         val union = aa.union(bb).size.toDouble()
         val jaccard = if (union == 0.0) 0.0 else shared / union
-        return containment >= 0.78 || jaccard >= 0.68
+        return (containment >= 0.78 && lengthRatio >= 0.72) || jaccard >= 0.68
     }
 
     private fun semanticCore(text: String): String {
