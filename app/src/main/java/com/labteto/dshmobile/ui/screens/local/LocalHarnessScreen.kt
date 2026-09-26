@@ -2432,7 +2432,7 @@ private fun WorkSessionStatusStrip(
                     )
                 }
                 if (state.activeAgents > 0) {
-                    DsPill(text = stringResource(R.string.subagents_title) + " " + state.activeAgents)
+                    DsPill(text = stringResource(R.string.local_run_agents, state.activeAgents))
                 }
                 if (state.jobs.isNotEmpty()) {
                     DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
