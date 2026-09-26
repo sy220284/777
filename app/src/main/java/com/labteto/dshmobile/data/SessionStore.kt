@@ -98,7 +98,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -445,9 +444,6 @@ class SessionStore @Inject constructor(
     // Open-session fold state.
     private var currentId: String? = null
     private val openSessionState = OpenSessionFoldState()
-
-    /** Child transcript follow is a separate presentation surface from the primary session stream. */
-    private var childFollowJob: Job? = null
 
     private val remoteStreams = SessionRemoteStreamCoordinator(
         scope = scope,
@@ -1659,7 +1655,7 @@ class SessionStore @Inject constructor(
 
     suspend fun openSubagentTranscript(childSessionId: String) {
         val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
+        apiOrNull() ?: return
         val entry = _subagents.value.firstOrNull { subagentEntryId(it) == childSessionId }
         val mode = when (entry) {
             is SubagentListEntry.ChildOneShot -> "one-shot"
@@ -1672,47 +1668,52 @@ class SessionStore @Inject constructor(
             log("subagent $childSessionId has no readable transcript mode")
             return
         }
-        childFollowJob?.cancel()
+        remoteStreams.cancelSubagentFollow()
         _subagentConversation.value = null
         val host = activeHostKey ?: return
-        val mux = muxForHost(host) ?: return
-        val request = SessionFollowRequest(
-            address = SessionAddress.Subagent(parentSessionId = sid, childSessionId = childSessionId, mode = mode),
-            maxMessages = HISTORY_PAGE_SIZE, assistantStream = true,
-        )
-        childFollowJob = scope.launch {
-            val events = mutableListOf<SessionEventEnvelope>()
-            val live = AssistantLiveState()
-            var hasMore = false
-            try {
-                mux.openStream("session/follow", buildJsonObject {
-                    put("request", encodeToJsonElement(SessionFollowRequest.serializer(), request))
-                }).collect { item ->
-                    if (activeHostKey != host || currentSessionId.value != sid) return@collect
-                    when (val frame = decodeOrNull(SessionFollowFrameSerializer, item)) {
-                        is SessionFollowFrame.Snapshot -> {
-                            events.clear()
-                            events.addAll(expandRecords(frame.records))
-                            live.seed(frame.assistantStream)
-                            hasMore = frame.hasMore
-                        }
-                        is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
-                            if (events.none { it.seq == event.seq }) events.add(event)
-                            val data = event.data as? JsonObject
-                            live.acceptDurable(event.type, data?.get("turn")?.jsonPrimitive?.intOrNull,
-                                data?.get("step")?.jsonPrimitive?.intOrNull, event.seq, event.surfaceOp)
-                        }
-                        is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
-                        null -> Unit
+        val events = mutableListOf<SessionEventEnvelope>()
+        val live = AssistantLiveState()
+        var hasMore = false
+        val opened = remoteStreams.followSubagent(
+            parentSessionId = sid,
+            childSessionId = childSessionId,
+            mode = mode,
+            maxMessages = HISTORY_PAGE_SIZE,
+        ) { frame ->
+            if (activeHostKey == host && currentSessionId.value == sid) {
+                when (frame) {
+                    is SessionFollowFrame.Snapshot -> {
+                        events.clear()
+                        events.addAll(expandRecords(frame.records))
+                        live.seed(frame.assistantStream)
+                        hasMore = frame.hasMore
                     }
-                    _subagentConversation.value = EventFold(childSessionId).fold(events.sortedBy { it.seq }, live.transientEnvelopes()).copy(hasMore = hasMore)
+                    is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
+                        if (events.none { it.seq == event.seq }) events.add(event)
+                        val data = event.data as? JsonObject
+                        live.acceptDurable(
+                            event.type,
+                            data?.get("turn")?.jsonPrimitive?.intOrNull,
+                            data?.get("step")?.jsonPrimitive?.intOrNull,
+                            event.seq,
+                            event.surfaceOp,
+                        )
+                    }
+                    is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
                 }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { setConnectionError(failure.message) }
+                _subagentConversation.value = EventFold(childSessionId)
+                    .fold(events.sortedBy { it.seq }, live.transientEnvelopes())
+                    .copy(hasMore = hasMore)
+            }
+        }
+        if (!opened) {
+            log("cannot follow subagent $childSessionId: no connection generation")
         }
     }
 
-    fun closeSubagentTranscript() { childFollowJob?.cancel(); childFollowJob = null }
+    fun closeSubagentTranscript() {
+        remoteStreams.cancelSubagentFollow()
+    }
 
     suspend fun createWorkspace(path: String) {
         val api = apiOrNull() ?: return
