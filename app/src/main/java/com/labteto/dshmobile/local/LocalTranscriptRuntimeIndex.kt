@@ -85,10 +85,6 @@ internal fun appendLocalTranscriptRuntimeIndex(
         latestMessageRole = message.role
         if (message.createdAt > latestCreatedAt) latestCreatedAt = message.createdAt
 
-        if (message.role !in setOf("user", "assistant", "system")) {
-            branchingEligible = false
-        }
-
         if (message.role == "user" || message.role == "assistant") {
             hasDialogue = true
             latestDialogueMessageId = message.id
@@ -103,15 +99,9 @@ internal fun appendLocalTranscriptRuntimeIndex(
             }
             latestUserMessageId = message.id
             latestUserContent = message.content
-            if (chatMessageHasAttachmentContext(message)) branchingEligible = false
         }
 
         if (message.role == "user" || (message.role == "assistant" && !message.proactive)) {
-            if (lastTurnDialogueRole == null && message.role != "user") {
-                branchingEligible = false
-            } else if (lastTurnDialogueRole == message.role) {
-                branchingEligible = false
-            }
             lastTurnDialogueRole = message.role
         }
     }
