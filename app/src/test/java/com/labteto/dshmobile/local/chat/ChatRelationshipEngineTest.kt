@@ -127,7 +127,7 @@ class ChatRelationshipEngineTest {
     @Test
     fun flirtActionRepertoireAddsPoseAndGestureVariety() {
         val prompt = engine.prompt(
-            "靠近点，陪我聊会儿",
+            "撩我一下，靠近点陪我聊会儿",
             ChatCharacterState(),
         )
 
@@ -137,6 +137,34 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("整理衣领或头发"))
         assertTrue(prompt.contains("压低声音"))
         assertTrue(prompt.contains("近期已经反复出现的动作优先换一种"))
+    }
+
+    @Test
+    fun flirtVerbalRepertoireAddsLanguageVariety() {
+        val prompt = engine.prompt(
+            "今晚撩我一下",
+            ChatCharacterState(),
+        )
+
+        assertTrue(hasFlirtingOrIntimateIntent("今晚撩我一下"))
+        assertTrue(prompt.contains("暧昧话语变化"))
+        assertTrue(prompt.contains("轻挑逗、反撩接梗、含蓄双关、半句留白、短促直球"))
+        assertTrue(prompt.contains("带专属感的称呼"))
+        assertTrue(prompt.contains("把用户刚说的话反转回来"))
+        assertTrue(prompt.contains("不要连续多轮只用同一种套路"))
+        assertTrue(prompt.contains("近期已经重复的句式、称呼和挑逗结构优先换掉"))
+    }
+
+    @Test
+    fun ordinaryChatKeepsFlirtAbilityWithoutDetailedRepertoire() {
+        val prompt = engine.prompt(
+            "今天工作有点累，陪我聊会儿",
+            ChatCharacterState(),
+        )
+
+        assertTrue(prompt.contains("聊天模式底层亲密倾向"))
+        assertFalse(prompt.contains("暧昧动作与姿态变化"))
+        assertFalse(prompt.contains("暧昧话语变化"))
     }
 
     @Test
