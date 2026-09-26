@@ -73,6 +73,7 @@ data class AppSettings(
     val notifyNeedsAction: Boolean = true,
     val notifyLocalJobs: Boolean = true,
     val themePreference: String = "system", // light | dark | matte_black | system
+    val accentTheme: String = "celadon", // 中国风传统色卡 key，见 ui/theme/AccentPalettes
     val localeOverride: String? = null, // null = system
     /**
      * Absolute path of the copied background image inside app storage, or null for the plain theme

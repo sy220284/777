@@ -253,6 +253,9 @@
     <string name="settings_background_adaptive_contrast">Adaptive readability</string>
     <string name="settings_background_adaptive_contrast_hint">Analyzes wallpaper brightness, contrast, saturation and detail density, then adapts top, content and bottom surfaces so chats stay readable after changing backgrounds.</string>
     <string name="settings_notifications">Notifications</string>
+    <string name="settings_accent_theme">Accent color</string>
+    <string name="settings_notifications_group_agent">Agent feedback</string>
+    <string name="settings_notifications_group_jobs">Background tasks</string>
     <string name="settings_notifications_turn">Notify when a turn completes</string>
     <string name="settings_notifications_goal">Notify when a goal completes or blocks</string>
     <string name="settings_notifications_action">Notify when your action is needed</string>
@@ -261,6 +264,8 @@
     <string name="settings_connection">Connection</string>
     <string name="settings_connection_status">Status</string>
     <string name="settings_connection_host">Connected to</string>
+    <string name="settings_connection_protocol">Protocol</string>
+    <string name="settings_connection_attempts">Reconnect attempts</string>
     <string name="settings_connection_disconnect">Disconnect</string>
     <string name="settings_connection_disconnect_confirm">Disconnect from harness?</string>
     <string name="settings_connection_disconnect_message">You will return to the connection screen.</string>
@@ -507,6 +512,15 @@
     <string name="advanced_deactivate">Deactivate</string>
     <string name="advanced_default_model">Default model</string>
     <string name="advanced_device_capabilities">Device capabilities</string>
+    <string name="advanced_device_status_checking">Checking device capabilities</string>
+    <string name="advanced_device_status_ready">Device capabilities ready</string>
+    <string name="advanced_device_status_needs_setup">Some capabilities need setup</string>
+    <string name="advanced_device_status_error">Capability check failed</string>
+    <string name="advanced_shizuku_service_hint">Checks whether the Shizuku service is running on this device.</string>
+    <string name="advanced_shizuku_permission_hint">Authorizes privileged device operations through Shizuku.</string>
+    <string name="advanced_accessibility_hint">Lets the agent click, type, and navigate ordinary device UI.</string>
+    <string name="advanced_notification_access_hint">Lets the agent read notifications when a task needs that context.</string>
+    <string name="advanced_virtual_display_hint">Allows isolated device work to continue on a virtual display.</string>
     <string name="advanced_discover_models">Discover models</string>
     <string name="advanced_discovering_models">Discovering…</string>
     <string name="advanced_enable_accessibility">Enable accessibility control</string>
@@ -524,6 +538,16 @@
     <string name="advanced_memory_content">Memory content</string>
     <string name="advanced_memory_deactivated">Memory deactivated</string>
     <string name="advanced_memory_empty">There is no long-term memory in the current scope.</string>
+    <string name="advanced_memory_overview">Memory status</string>
+    <string name="advanced_auto_recall_on">Auto recall on</string>
+    <string name="advanced_auto_recall_off">Auto recall off</string>
+    <string name="advanced_auto_memory_on">Auto memory on</string>
+    <string name="advanced_auto_memory_off">Auto memory off</string>
+    <string name="advanced_memory_active_count">%1$d active memories</string>
+    <string name="advanced_memory_search">Search memories</string>
+    <string name="advanced_memory_filter_all">All</string>
+    <string name="advanced_memory_visible_count">Showing %1$d of %2$d</string>
+    <string name="advanced_memory_filter_empty">No memories match this search or filter.</string>
     <string name="advanced_memory_manage_hint">Shows long-term memories available to the current conversation. Editing or deactivating one affects future automatic recall.</string>
     <string name="advanced_memory_saved">Memory settings saved</string>
     <string name="advanced_memory_settings">Memory settings</string>
@@ -621,6 +645,9 @@
     <string name="pricing_same_thinking">Thinking / non-thinking: same token rates</string>
     <string name="pricing_off_peak_row">Off-peak · cache hit ¥%1$s · miss ¥%2$s · output ¥%3$s / 1M tokens</string>
     <string name="pricing_peak_row">Peak · cache hit ¥%1$s · miss ¥%2$s · output ¥%3$s / 1M tokens</string>
+    <string name="pricing_col_cache_hit">Cache hit</string>
+    <string name="pricing_col_cache_miss">Cache miss</string>
+    <string name="pricing_col_output">Output</string>
     <string name="pricing_holiday_hint">Cost estimates use Beijing-time weekday peak periods. DeepSeek prices Chinese statutory holidays as off-peak; the app does not embed a holiday calendar yet, so holiday estimates may be slightly high.</string>
     <string name="pricing_refresh">Fetch latest official prices</string>
     <string name="pricing_refreshing">Checking official prices…</string>
@@ -931,6 +958,9 @@
     <string name="persona_gallery_import_failed">Could not import character</string>
 
 <string name="tasks_schedule_label">Schedule</string>
+<string name="tasks_status_running">Running</string>
+<string name="tasks_status_queued">Queued</string>
+<string name="tasks_status_scheduled">Scheduled</string>
 <string name="tasks_schedule_once">Once</string>
 <string name="tasks_schedule_daily">Daily</string>
 <string name="tasks_schedule_weekly">Weekly</string>
@@ -967,4 +997,35 @@
 
     <string name="local_transcript_load_older">Load earlier messages · %1$d hidden</string>
     <string name="local_transcript_load_older_unknown">Load earlier messages</string>
+    <string name="advanced_project_risk_notice">Changes here write directly to the Harness settings namespace. Some options apply immediately and others require restart; coordinate with the Harness administrator before changing production configuration.</string>
+    <string name="advanced_user_rules_count">%1$d / %2$d chars</string>
+    <string name="advanced_memory_filter_count">%1$s %2$d</string>
+    <string name="advanced_edit_memory">Edit memory</string>
+    <string name="advanced_pinned">Pinned</string>
+    <string name="settings_notifications_usage_hint">Turn-complete alerts are most useful for long-running work. In pure chat sessions, disabling them can reduce unnecessary interruptions.</string>
+    <string name="persona_gallery_overview_stats">%1$d characters · %2$d storylines · %3$d archived dialogue lines</string>
+    <string name="persona_gallery_my_characters">My characters</string>
+    <string name="local_current_session">Current</string>
+    <string name="chatlist_exit_remote_control">Exit remote control</string>
+    <string name="local_work_process">Work process</string>
+    <string name="local_work_composer_hint">Ask something, or hand the task to Harness…</string>
+    <string name="local_group_chat_composer_hint">Message the group…</string>
+    <string name="local_chat_composer_persona_hint">Message %1$s…</string>
+    <string name="local_plan_button_on">Planning</string>
+    <string name="local_plan_button_off">Plan</string>
+    <string name="local_auto_approve_short">Auto-approve</string>
+    <string name="local_harness_title">On-device Harness</string>
+    <string name="local_on_device_execution_title">Run directly on this phone</string>
+    <string name="local_on_device_execution_hint">Models, files, web access, commands, skills, and subagents are orchestrated on-device. Remote control now lives in the sidebar.</string>
+    <string name="local_model_section_title">Model &amp; endpoint</string>
+    <string name="local_model_flash_label">DeepSeek Flash | V4.1 · Reasoning on by default</string>
+    <string name="local_model_pro_label">DeepSeek V4 Pro | Expert model</string>
+    <string name="local_endpoint_hint">OpenAI-compatible chat completion services are supported.</string>
+    <string name="local_model_save_enter">Save and enter on-device Harness</string>
+    <string name="local_file_import_failed">File import failed</string>
+    <string name="local_restore_request">Restore request</string>
+    <string name="local_manage_model_config">Manage model settings</string>
+    <string name="local_attachment_image">Image</string>
+    <string name="local_attachment_file">File</string>
+    <string name="local_run_agents">Agents %1$d</string>
 </resources>

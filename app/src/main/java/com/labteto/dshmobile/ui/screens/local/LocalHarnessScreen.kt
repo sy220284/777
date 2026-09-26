@@ -125,6 +125,7 @@ import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
@@ -140,13 +141,19 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsIconBox
+import com.labteto.dshmobile.ui.components.DsIconFamily
+import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.WhaleMark
+import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -457,10 +464,7 @@ private fun GroupChatMemberAvatar(
         key1 = member.portraitPath,
     ) {
         value = withContext(Dispatchers.IO) {
-            member.portraitPath
-                .takeIf(String::isNotBlank)
-                ?.let { path -> BitmapFactory.decodeFile(path) }
-                ?.asImageBitmap()
+            decodeLocalPersonaHeaderPortrait(member.portraitPath)
         }
     }
 
@@ -609,56 +613,67 @@ private fun LocalModeDrawer(
                     )
                 }
 
-                if (usageMode == LocalUsageMode.CHAT) {
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.PersonSearch,
-                        title = stringResource(R.string.local_group_chat),
-                        trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
-                        onClick = onOpenGroupChat,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Image,
-                        title = stringResource(R.string.persona_gallery_title),
-                        trailing = galleryCount.toString(),
-                        onClick = onOpenPersonaGallery,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Filled.Add,
-                        title = stringResource(R.string.local_persona_picker_new),
-                        onClick = onNewPersona,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(R.string.tasks_chat_title),
-                        onClick = onTasks,
-                    )
-                } else {
-                    DrawerPrimaryAction(
-                        icon = FeatherIcons.FileText,
-                        title = stringResource(R.string.chatlist_workspace_files),
-                        onClick = onWorkspaceFiles,
-                    )
-                    DrawerPrimaryAction(
-                        icon = FeatherIcons.CheckSquare,
-                        title = stringResource(R.string.local_run_center),
-                        onClick = onOpenRunCenter,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(R.string.tasks_title),
-                        onClick = onTasks,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Extension,
-                        title = stringResource(R.string.tools_title),
-                        onClick = onTools,
-                    )
+                DsGroupCard {
+                    if (usageMode == LocalUsageMode.CHAT) {
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.PersonSearch,
+                            title = stringResource(R.string.local_group_chat),
+                            trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
+                            iconFamily = DsIconFamily.Purple,
+                            onClick = onOpenGroupChat,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Image,
+                            title = stringResource(R.string.persona_gallery_title),
+                            trailing = galleryCount.toString(),
+                            iconFamily = DsIconFamily.Purple,
+                            onClick = onOpenPersonaGallery,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Filled.Add,
+                            title = stringResource(R.string.local_persona_picker_new),
+                            iconFamily = DsIconFamily.Green,
+                            onClick = onNewPersona,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(R.string.tasks_chat_title),
+                            iconFamily = DsIconFamily.Amber,
+                            onClick = onTasks,
+                        )
+                    } else {
+                        DrawerPrimaryAction(
+                            icon = FeatherIcons.FileText,
+                            title = stringResource(R.string.chatlist_workspace_files),
+                            iconFamily = DsIconFamily.Cyan,
+                            onClick = onWorkspaceFiles,
+                        )
+                        DrawerPrimaryAction(
+                            icon = FeatherIcons.CheckSquare,
+                            title = stringResource(R.string.local_run_center),
+                            iconFamily = DsIconFamily.Green,
+                            onClick = onOpenRunCenter,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(R.string.tasks_title),
+                            iconFamily = DsIconFamily.Amber,
+                            onClick = onTasks,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Extension,
+                            title = stringResource(R.string.tools_title),
+                            iconFamily = DsIconFamily.Neutral,
+                            onClick = onTools,
+                        )
+                    }
                 }
                 DrawerSectionTitle(
-                    stringResource(
+                    title = stringResource(
                         if (usageMode == LocalUsageMode.CHAT) R.string.chatlist_title
                         else R.string.local_work_history_title,
                     ),
+                    count = filteredSessions.size,
                 )
             }
 
@@ -683,6 +698,7 @@ private fun LocalModeDrawer(
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
                     LocalSessionDrawerRow(
                         title = session.title,
+                        updatedAt = session.updatedAt,
                         groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
                         selected = session.id in selectedIds,
@@ -705,25 +721,30 @@ private fun LocalModeDrawer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                if (usageMode == LocalUsageMode.WORK) {
+                DsGroupCard {
+                    if (usageMode == LocalUsageMode.WORK) {
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            title = stringResource(R.string.local_remote_control),
+                            iconFamily = DsIconFamily.Cyan,
+                            onClick = onRemote,
+                        )
+                    }
                     DrawerPrimaryAction(
-                        icon = Icons.Outlined.QrCodeScanner,
-                        title = stringResource(R.string.local_remote_control),
-                        onClick = onRemote,
+                        icon = Icons.Outlined.Settings,
+                        title = stringResource(R.string.settings_title),
+                        iconFamily = DsIconFamily.Neutral,
+                        onClick = onSettings,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.CloudDownload,
+                        title = stringResource(R.string.settings_update_check),
+                        iconFamily = DsIconFamily.Green,
+                        onClick = onCheckUpdate,
                     )
                 }
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.Settings,
-                    title = stringResource(R.string.settings_title),
-                    onClick = onSettings,
-                )
-                DrawerPrimaryAction(
-                    icon = Icons.Outlined.CloudDownload,
-                    title = stringResource(R.string.settings_update_check),
-                    onClick = onCheckUpdate,
-                )
                 updateStatus?.let { status ->
                     Text(
                         status,
@@ -731,7 +752,7 @@ private fun LocalModeDrawer(
                         color = colors.labelSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = DsSpacing.xxlarge, end = DsSpacing.small),
+                        modifier = Modifier.padding(horizontal = DsSpacing.small),
                     )
                 }
             }
@@ -798,6 +819,7 @@ private fun DrawerPrimaryAction(
     title: String,
     onClick: () -> Unit,
     trailing: String? = null,
+    iconFamily: DsIconFamily = DsIconFamily.Neutral,
 ) {
     val colors = DsTheme.colors
     Row(
@@ -809,13 +831,8 @@ private fun DrawerPrimaryAction(
             .padding(horizontal = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = colors.labelSecondary,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(DsSpacing.medium))
+        DsIconBox(icon = icon, family = iconFamily)
+        Spacer(Modifier.width(DsSpacing.small))
         Text(
             title,
             style = DsType.base16,
@@ -825,10 +842,8 @@ private fun DrawerPrimaryAction(
             modifier = Modifier.weight(1f),
         )
         trailing?.let {
-            Text(
-                it,
-                style = DsType.caption11,
-                color = colors.labelTertiary,
+            DsPill(
+                text = it,
                 modifier = Modifier.padding(start = DsSpacing.small),
             )
         }
@@ -836,19 +851,31 @@ private fun DrawerPrimaryAction(
 }
 
 @Composable
-private fun DrawerSectionTitle(title: String) {
-    Text(
-        title,
-        style = DsType.std14,
-        color = DsTheme.colors.labelTertiary,
-        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
-    )
+private fun DrawerSectionTitle(
+    title: String,
+    count: Int? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = DsType.std14,
+            color = DsTheme.colors.labelTertiary,
+            modifier = Modifier.weight(1f),
+        )
+        count?.let { DsPill(text = it.toString()) }
+    }
 }
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalSessionDrawerRow(
     title: String,
+    updatedAt: Long,
     groupChat: Boolean,
     current: Boolean,
     selected: Boolean,
@@ -867,7 +894,7 @@ private fun LocalSessionDrawerRow(
             contentDescription = stringResource(R.string.local_delete_session),
             onClick = { swipe = 0f; onDelete() },
             tint = colors.error,
-            modifier = Modifier.align(Alignment.CenterStart),
+            modifier = Modifier.align(Alignment.CenterEnd),
         )
     Row(
         modifier = Modifier
@@ -877,9 +904,9 @@ private fun LocalSessionDrawerRow(
                 detectHorizontalDragGestures(
                     onHorizontalDrag = { change, amount ->
                         change.consume()
-                        swipe = (swipe + amount).coerceIn(0f, reveal)
+                        swipe = (swipe + amount).coerceIn(-reveal, 0f)
                     },
-                    onDragEnd = { swipe = if (swipe > reveal / 2) reveal else 0f },
+                    onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
                 )
             }
             .heightIn(min = DsSpacing.touchTarget)
@@ -890,25 +917,37 @@ private fun LocalSessionDrawerRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selectionOpen) Checkbox(checked = selected, onCheckedChange = { onClick() })
-        Text(
-            title,
-            style = DsType.std14,
-            color = colors.labelPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Column(
             modifier = Modifier.weight(1f),
-        )
-        if (groupChat) {
-            Spacer(Modifier.width(DsSpacing.small))
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
-                stringResource(R.string.local_group_chat_title),
-                style = DsType.caption11,
-                color = colors.accent,
+                title,
+                style = DsType.std14,
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (current) {
-            Spacer(Modifier.width(DsSpacing.small))
-            Text("当前", style = DsType.caption11, color = colors.accent)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                Text(
+                    relativeTime(updatedAt),
+                    style = DsType.caption11,
+                    color = colors.labelCaption,
+                    maxLines = 1,
+                )
+                if (groupChat) {
+                    DsPill(text = stringResource(R.string.local_group_chat_title))
+                }
+                if (current) {
+                    DsPill(
+                        text = stringResource(R.string.local_current_session),
+                        selected = true,
+                    )
+                }
+            }
         }
     }
     }
@@ -947,44 +986,46 @@ private fun LocalConfiguration(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             DsIconButton(
                 icon = FeatherIcons.Menu,
-                contentDescription = "菜单",
+                contentDescription = stringResource(R.string.local_open_menu),
                 onClick = onOpenMenu,
                 containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 3.dp,
             )
             Text(
-                "本机 Harness",
+                stringResource(R.string.local_harness_title),
                 style = DsType.large20,
                 color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
             if (canCancel) {
-                DsButton("取消", onCancel, variant = DsButtonVariant.Ghost)
+                DsButton(stringResource(R.string.common_cancel), onCancel, variant = DsButtonVariant.Ghost)
             } else {
                 Spacer(Modifier.size(56.dp))
             }
         }
 
         DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text("手机直接执行", style = DsType.base16Strong, color = colors.labelPrimary)
+            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong, color = colors.labelPrimary)
             Text(
-                "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。",
+                stringResource(R.string.local_on_device_execution_hint),
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )
         }
 
-        Text("模型与接口", style = DsType.std14, color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_section_title), style = DsType.std14, color = colors.labelTertiary)
         DsGroupCard {
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (state.configured) "新的 API 密钥" else "DeepSeek API 密钥") },
+                label = { Text(stringResource(if (state.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
                 supportingText = {
                     Text(
-                        if (state.configured) "留空可保留现有密钥；新密钥仍由安卓系统密钥库加密。"
-                        else "密钥由安卓系统密钥库加密，不写入会话或工作区。",
+                        stringResource(
+                            if (state.configured) R.string.advanced_model_configured
+                            else R.string.advanced_model_unconfigured,
+                        ),
                     )
                 },
                 visualTransformation = PasswordVisualTransformation(),
@@ -992,17 +1033,17 @@ private fun LocalConfiguration(
             )
             Spacer(Modifier.height(DsSpacing.medium))
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text("模型", style = DsType.std14Strong, color = colors.labelPrimary)
-                ModelChoice("deepseek-flash", "DeepSeek Flash｜V4.1 · 思考默认开启", model) { model = it }
-                ModelChoice("deepseek-v4-pro", "DeepSeek V4 Pro｜专家模型", model) { model = it }
+                Text(stringResource(R.string.models_title), style = DsType.std14Strong, color = colors.labelPrimary)
+                ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
+                ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
             Spacer(Modifier.height(DsSpacing.medium))
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("接口地址") },
-                supportingText = { Text("兼容 OpenAI 聊天补全协议的服务也可使用。") },
+                label = { Text(stringResource(R.string.advanced_endpoint)) },
+                supportingText = { Text(stringResource(R.string.local_endpoint_hint)) },
                 singleLine = true,
             )
         }
@@ -1010,14 +1051,14 @@ private fun LocalConfiguration(
         state.error?.let { Text(it, style = DsType.small13, color = colors.error) }
 
         DsButton(
-            text = "保存并进入本机 Harness",
+            text = stringResource(R.string.local_model_save_enter),
             onClick = { onSave(apiKey, model, baseUrl) },
             modifier = Modifier.fillMaxWidth(),
             enabled = (state.configured || apiKey.isNotBlank()) && baseUrl.isNotBlank(),
         )
         if (state.configured) {
             DsButton(
-                text = "清除本机模型密钥",
+                text = stringResource(R.string.advanced_clear_key),
                 onClick = onClearCredential,
                 modifier = Modifier.fillMaxWidth(),
                 variant = DsButtonVariant.Danger,
@@ -1165,6 +1206,14 @@ private fun LocalChat(
         !state.groupChat.enabled &&
         state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
+    val currentGalleryEntry = remember(gallery, state.galleryId) {
+        state.galleryId?.let { id -> gallery.firstOrNull { it.id == id } }
+    }
+    val currentGalleryStory = remember(currentGalleryEntry, state.galleryStoryId) {
+        state.galleryStoryId?.let { id ->
+            currentGalleryEntry?.stories?.firstOrNull { it.id == id }
+        }
+    }
     LaunchedEffect(
         state.sessionId,
         state.usageMode,
@@ -1190,6 +1239,7 @@ private fun LocalChat(
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
+    val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
     val editUserMessageFailed = stringResource(R.string.local_edit_user_message_failed)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -1224,7 +1274,7 @@ private fun LocalChat(
                         attachments += it
                         attachmentError = null
                     }
-                    .onFailure { attachmentError = it.message ?: "文件导入失败" }
+                    .onFailure { attachmentError = it.message ?: fileImportFailedMessage }
             }
         }
     }
@@ -1284,6 +1334,12 @@ private fun LocalChat(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 ) {
                     if (state.usageMode == LocalUsageMode.CHAT) {
+                        if (!state.groupChat.enabled) {
+                            LocalPersonaHeaderAvatar(
+                                name = state.chatPersona.name,
+                                portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+                            )
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 if (state.groupChat.enabled) {
@@ -1322,9 +1378,12 @@ private fun LocalChat(
                                     )
                                 }
                             } else {
-                                state.chatState.relationshipState.takeIf { it.isNotBlank() }?.let { relationship ->
+                                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                                val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
+                                val secondary = listOfNotNull(storyTitle, relationship).joinToString(" · ")
+                                if (secondary.isNotBlank()) {
                                     Text(
-                                        relationship,
+                                        secondary,
                                         style = DsType.caption11,
                                         color = colors.labelSecondary,
                                         maxLines = 1,
@@ -1377,6 +1436,13 @@ private fun LocalChat(
                     tint = colors.labelSecondary,
                 )
             }
+        }
+
+        if (state.usageMode == LocalUsageMode.WORK) {
+            WorkSessionStatusStrip(
+                state = state,
+                onClick = onOpenRunCenter,
+            )
         }
 
         modeIntro?.let { mode ->
@@ -1487,7 +1553,7 @@ private fun LocalChat(
                         )
                     }
                     DsButton(
-                        "关闭",
+                        stringResource(R.string.common_close),
                         onDisableDeviceTurn,
                         modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
                         variant = DsButtonVariant.Ghost,
@@ -1716,7 +1782,7 @@ private fun LocalChat(
                     )
                     state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
                         DsButton(
-                            "恢复请求",
+                            stringResource(R.string.local_restore_request),
                             { drafts[state.sessionId] = lastRequest.content },
                             variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
@@ -1778,8 +1844,17 @@ private fun LocalChat(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
-                            if (state.usageMode == LocalUsageMode.CHAT) stringResource(R.string.local_chat_composer_hint)
-                            else "问点什么，或直接交给 Harness 执行…",
+                            when {
+                                state.usageMode == LocalUsageMode.WORK ->
+                                    stringResource(R.string.local_work_composer_hint)
+                                state.groupChat.enabled ->
+                                    stringResource(R.string.local_group_chat_composer_hint)
+                                else ->
+                                    stringResource(
+                                        R.string.local_chat_composer_persona_hint,
+                                        state.chatPersona.name,
+                                    )
+                            },
                         )
                     },
                     shape = DsShapes.block,
@@ -1793,6 +1868,31 @@ private fun LocalChat(
                     minLines = 1,
                     maxLines = 5,
                 )
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsButton(
+                            text = stringResource(
+                                if (state.planMode) R.string.local_plan_button_on
+                                else R.string.local_plan_button_off,
+                            ),
+                            onClick = { onPlanModeChange(!state.planMode) },
+                            modifier = Modifier.weight(1f),
+                            variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                            enabled = !state.running,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.local_auto_approve_short),
+                            onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                            modifier = Modifier.weight(1f),
+                            variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -1800,7 +1900,7 @@ private fun LocalChat(
                 ) {
                     DsIconButton(
                         icon = Icons.Filled.Add,
-                        contentDescription = "添加附件",
+                        contentDescription = stringResource(R.string.chat_composer_add_attachment),
                         onClick = { showAttachmentPicker = true },
                         enabled = !state.running,
                         tint = colors.labelPrimary,
@@ -1818,25 +1918,10 @@ private fun LocalChat(
                             size = DsButtonSize.Small,
                         )
                     }
-                    if (state.usageMode == LocalUsageMode.WORK) {
-                        DsButton(
-                            if (state.planMode) "规划中" else "规划",
-                            { onPlanModeChange(!state.planMode) },
-                            variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                            enabled = !state.running,
-                        )
-                        DsButton(
-                            "自动批准",
-                            if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                            variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                        )
-                    }
                     Spacer(Modifier.weight(1f))
                     if (!state.running) {
                         DsButton(
-                            "发送",
+                            stringResource(R.string.chat_composer_send),
                             onClick = {
                                 if (!state.configured) {
                                     onConfigure()
@@ -1859,7 +1944,7 @@ private fun LocalChat(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.End),
                     ) {
                         DsButton(
-                            "停止",
+                            stringResource(R.string.chat_composer_stop),
                             onStop,
                             variant = DsButtonVariant.Danger,
                             size = DsButtonSize.Small,
@@ -2089,7 +2174,7 @@ private fun LocalChat(
         }
     }
     if (showModelPicker) {
-        DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
+        DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
             state.configuredModels.forEach { model ->
                 DsButton(
                     text = model,
@@ -2102,7 +2187,7 @@ private fun LocalChat(
                 )
             }
             DsButton(
-                text = "管理模型配置",
+                text = stringResource(R.string.local_manage_model_config),
                 onClick = {
                     showModelPicker = false
                     onConfigure()
@@ -2113,14 +2198,14 @@ private fun LocalChat(
         }
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = "添加附件", onDismiss = { showAttachmentPicker = false }) {
+        DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsQuickActionTile(
                     icon = Icons.Outlined.Image,
-                    label = "图片",
+                    label = stringResource(R.string.local_attachment_image),
                     onClick = {
                         showAttachmentPicker = false
                         imagePicker.launch(arrayOf("image/*"))
@@ -2129,7 +2214,7 @@ private fun LocalChat(
                 )
                 DsQuickActionTile(
                     icon = Icons.Outlined.AttachFile,
-                    label = "文件",
+                    label = stringResource(R.string.local_attachment_file),
                     onClick = {
                         showAttachmentPicker = false
                         filePicker.launch(arrayOf("*/*"))
@@ -2228,6 +2313,140 @@ private fun LocalUsageModePill(
 }
 
 @Composable
+private fun LocalPersonaHeaderAvatar(
+    name: String,
+    portraitPath: String,
+) {
+    val colors = DsTheme.colors
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            decodeLocalPersonaHeaderPortrait(portraitPath)
+        }
+    }
+    Surface(
+        modifier = Modifier.size(34.dp),
+        shape = CircleShape,
+        color = colors.accentTertiary,
+        border = BorderStroke(1.dp, colors.borderL1),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (portrait != null) {
+                Image(
+                    bitmap = portrait!!,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    name.trim().take(1).ifBlank { "·" },
+                    style = DsType.small13Strong,
+                    color = colors.accent,
+                )
+            }
+        }
+    }
+}
+
+private fun decodeLocalPersonaHeaderPortrait(path: String): ImageBitmap? {
+    if (path.isBlank()) return null
+    val file = File(path)
+    if (!file.isFile) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    while (longest / sample > 256) sample *= 2
+    return BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply { inSampleSize = sample },
+    )?.asImageBitmap()
+}
+
+@Composable
+private fun WorkSessionStatusStrip(
+    state: LocalHarnessState,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val hasStatus = state.running ||
+        state.goal != null ||
+        state.todos.isNotEmpty() ||
+        state.activeAgents > 0 ||
+        state.jobs.isNotEmpty()
+    if (!hasStatus) return
+
+    val completedTasks = state.todos.count { it.status == "completed" }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsStatusPill(
+                    state = if (state.running) DsStatus.Running else DsStatus.Neutral,
+                    label = stringResource(
+                        if (state.running) R.string.local_execution_notification_running
+                        else R.string.local_run_center,
+                    ),
+                )
+                state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
+                    Text(
+                        goal,
+                        style = DsType.small13Strong,
+                        color = colors.labelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.local_run_center),
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (state.todos.isNotEmpty()) {
+                    DsPill(
+                        text = stringResource(
+                            R.string.local_run_tasks_progress,
+                            completedTasks,
+                            state.todos.size,
+                        ),
+                    )
+                }
+                if (state.activeAgents > 0) {
+                    DsPill(text = stringResource(R.string.local_run_agents, state.activeAgents))
+                }
+                if (state.jobs.isNotEmpty()) {
+                    DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
     workspacePath: String,
@@ -2272,7 +2491,7 @@ private fun ImportedAttachmentRow(
                     color = colors.labelTertiary,
                 )
             }
-            DsButton("移除", onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+            DsButton(stringResource(R.string.common_remove), onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
         }
     }
 }
@@ -2687,38 +2906,99 @@ private fun WorkProcessRow(messages: List<LocalHarnessMessage>) {
     val toolMessages = messages.filter { it.role == "tool" }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Text("工作过程", style = DsType.small13Strong, color = colors.labelSecondary)
+            Text(
+                stringResource(R.string.local_work_process),
+                style = DsType.small13Strong,
+                color = colors.labelPrimary,
+            )
             if (toolMessages.isEmpty()) {
-                Text(
-                    stringResource(R.string.agent_operation_generic) + " · " +
-                        stringResource(R.string.agent_operation_status_running),
-                    style = DsType.small13,
-                    color = colors.labelTertiary,
+                WorkProcessOperationRow(
+                    kind = AgentOperationKind.Generic,
+                    toolName = null,
+                    failed = false,
+                    running = true,
+                    count = 1,
                 )
             } else {
-                val grouped = linkedMapOf<com.labteto.dshmobile.ui.AgentOperationKind, MutableList<LocalHarnessMessage>>()
+                val grouped = linkedMapOf<AgentOperationKind, MutableList<LocalHarnessMessage>>()
                 toolMessages.forEach { message ->
                     grouped.getOrPut(agentOperationKind(message.toolName)) { mutableListOf() }.add(message)
                 }
-                grouped.values.forEach { group ->
-                    val failed = group.any { toolResultFailed(it.content) }
-                    val exemplar = group.first()
-                    Text(
-                        stringResource(agentOperationLabelRes(exemplar.toolName)) + " · " +
-                            stringResource(agentOperationStatusRes(running = false, failed = failed)),
-                        style = DsType.small13,
-                        color = if (failed) colors.error else colors.labelTertiary,
+                grouped.forEach { (kind, group) ->
+                    WorkProcessOperationRow(
+                        kind = kind,
+                        toolName = group.first().toolName,
+                        failed = group.any { toolResultFailed(it.content) },
+                        running = false,
+                        count = group.size,
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WorkProcessOperationRow(
+    kind: AgentOperationKind,
+    toolName: String?,
+    failed: Boolean,
+    running: Boolean,
+    count: Int,
+) {
+    val colors = DsTheme.colors
+    val icon = when (kind) {
+        AgentOperationKind.Inspect -> FeatherIcons.FileText
+        AgentOperationKind.Search -> Icons.Outlined.Search
+        AgentOperationKind.Update -> Icons.Outlined.Tune
+        AgentOperationKind.Execute -> Icons.Outlined.Terminal
+        AgentOperationKind.Web -> Icons.Outlined.Extension
+        AgentOperationKind.Device -> Icons.Outlined.QrCodeScanner
+        AgentOperationKind.Image -> Icons.Outlined.Image
+        AgentOperationKind.Background -> Icons.Outlined.Schedule
+        AgentOperationKind.Delegate -> Icons.Outlined.PersonSearch
+        AgentOperationKind.External -> Icons.Outlined.Extension
+        AgentOperationKind.Generic -> Icons.Outlined.Tune
+    }
+    val family = when (kind) {
+        AgentOperationKind.Update -> DsIconFamily.Green
+        AgentOperationKind.Execute -> DsIconFamily.Cyan
+        AgentOperationKind.Search,
+        AgentOperationKind.Web -> DsIconFamily.Accent
+        AgentOperationKind.Device -> DsIconFamily.Amber
+        AgentOperationKind.Delegate -> DsIconFamily.Purple
+        else -> DsIconFamily.Neutral
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        DsIconBox(icon = icon, family = family)
+        Text(
+            stringResource(agentOperationLabelRes(toolName)),
+            style = DsType.std14,
+            color = colors.labelSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        if (count > 1) {
+            DsPill(text = count.toString())
+        }
+        DsStatusPill(
+            state = when {
+                failed -> DsStatus.Failed
+                running -> DsStatus.Running
+                else -> DsStatus.Done
+            },
+            label = stringResource(agentOperationStatusRes(running = running, failed = failed)),
+        )
     }
 }
 
