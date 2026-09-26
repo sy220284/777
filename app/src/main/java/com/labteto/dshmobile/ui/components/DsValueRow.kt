@@ -52,7 +52,13 @@ fun DsValueRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable(enabled = onClick != null, onClick = { onClick?.invoke() })
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -82,11 +88,13 @@ fun DsValueRow(
                     ),
             )
         }
-        Spacer(Modifier.width(DsSpacing.small))
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = colors.labelCaption,
-        )
+        if (onClick != null) {
+            Spacer(Modifier.width(DsSpacing.small))
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+            )
+        }
     }
 }
