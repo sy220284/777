@@ -995,4 +995,10 @@
 
     <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
     <string name="local_transcript_load_older_unknown">加载更早消息</string>
+    <string name="advanced_project_risk_notice">此区块直接修改 Harness 侧 settings 命名空间。部分配置立即生效，部分需要重启；修改生产配置前建议与 Harness 管理员确认。</string>
+    <string name="advanced_user_rules_count">%1$d / %2$d 字</string>
+    <string name="advanced_memory_filter_count">%1$s %2$d</string>
+    <string name="advanced_edit_memory">编辑记忆</string>
+    <string name="advanced_pinned">置顶</string>
+    <string name="settings_notifications_usage_hint">回合完成通知更适合长任务场景；纯聊天时关闭可减少不必要的打扰。</string>
 </resources>
