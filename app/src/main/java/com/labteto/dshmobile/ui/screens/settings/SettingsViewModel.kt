@@ -372,6 +372,16 @@ class SettingsViewModel @Inject constructor(
         localHarness.configure(apiKey, model, baseUrl)
     }
 
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String) =
+        withContext(Dispatchers.IO) { localHarness.saveModelConfiguration(apiKey, model, baseUrl) }
+
+    fun selectLocalModel(id: String) = localHarness.selectModel(id)
+
+    fun removeLocalModel(id: String) = localHarness.removeModelProfile(id)
+
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String): String =
+        localHarness.testModelConfiguration(apiKey, model, baseUrl)
+
     fun configureLocalImageInputMode(mode: LocalImageInputMode) {
         localHarness.configureImageInputMode(mode)
     }

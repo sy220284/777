@@ -115,7 +115,7 @@ private fun isOfficialDeepSeekEndpoint(baseUrl: String?): Boolean {
     }.getOrDefault(false)
 }
 
-private val OFFICIAL_DEEPSEEK_MODELS = setOf("deepseek-flash", "deepseek-v4-pro")
+private val OFFICIAL_DEEPSEEK_MODELS = setOf("deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro")
 private const val OFFICIAL_CONTEXT_WINDOW_TOKENS = 1_000_000
 private const val OFFICIAL_OUTPUT_RESERVE_TOKENS = 256_000
 private const val OFFICIAL_HEADROOM_TOKENS = 65_536

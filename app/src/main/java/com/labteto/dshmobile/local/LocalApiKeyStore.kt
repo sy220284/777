@@ -8,7 +8,7 @@ import javax.inject.Singleton
 /** DeepSeek API key encrypted with the original non-exportable Android Keystore key. */
 @Singleton
 class LocalApiKeyStore @Inject constructor(
-    dataStore: DataStore<Preferences>,
+    private val dataStore: DataStore<Preferences>,
 ) {
     // Keep both identifiers stable so existing encrypted credentials remain readable after refactor.
     private val delegate = KeystorePreferenceSecretStore(
@@ -17,9 +17,29 @@ class LocalApiKeyStore @Inject constructor(
         alias = "dsh_local_harness_api_key",
     )
 
-    suspend fun get(): String? = delegate.get()
+    @Volatile private var activeId: String? = null
 
-    suspend fun put(value: String) = delegate.put(value)
+    fun activate(id: String) { activeId = id }
 
-    suspend fun clear() = delegate.clear()
+    private fun route(id: String) = KeystorePreferenceSecretStore(
+        dataStore, "local_model_key_$id", "dsh_local_harness_api_key",
+    )
+
+    suspend fun get(): String? = activeId?.let { route(it).get() } ?: delegate.get()
+
+    suspend fun getFor(id: String): String? = route(id).get()
+
+    suspend fun putFor(id: String, value: String) = route(id).put(value)
+
+    suspend fun clearFor(id: String) = route(id).clear()
+
+    suspend fun migrate(ids: List<String>) {
+        val old = delegate.get() ?: return
+        ids.forEach { id -> if (getFor(id) == null) putFor(id, old) }
+        delegate.clear()
+    }
+
+    suspend fun put(value: String) = activeId?.let { route(it).put(value) } ?: delegate.put(value)
+
+    suspend fun clear() = activeId?.let { route(it).clear() } ?: delegate.clear()
 }
