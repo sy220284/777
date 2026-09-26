@@ -59,7 +59,6 @@ internal fun appendLocalTranscriptRuntimeIndex(
         }
 
         if (message.role == "user" || message.role == "assistant") {
-            if (!hasDialogue && message.role != "user") branchingEligible = false
             hasDialogue = true
             latestDialogueMessageId = message.id
             if (message.createdAt > latestDialogueCreatedAt) {
@@ -77,7 +76,9 @@ internal fun appendLocalTranscriptRuntimeIndex(
         }
 
         if (message.role == "user" || (message.role == "assistant" && !message.proactive)) {
-            if (lastTurnDialogueRole != null && lastTurnDialogueRole == message.role) {
+            if (lastTurnDialogueRole == null && message.role != "user") {
+                branchingEligible = false
+            } else if (lastTurnDialogueRole == message.role) {
                 branchingEligible = false
             }
             lastTurnDialogueRole = message.role
