@@ -27,19 +27,22 @@ internal enum class ChatInteractionIntent {
     STRATEGIST,
 }
 
-internal fun hasChineseSuggestiveFlirtingIntent(input: String): Boolean {
+internal fun chineseSuggestiveFlirtingScore(input: String): Int {
     val text = input.trim().lowercase()
-    if (text.isBlank()) return false
-    if (CHINESE_SUGGESTIVE_STRONG_HINTS.any { text.contains(it) }) return true
-    if (CHINESE_INNUENDO_NEUTRAL_CONTEXT_HINTS.any { text.contains(it) }) return false
+    if (text.isBlank()) return 0
 
-    val weakHits = CHINESE_SUGGESTIVE_CONTEXT_HINTS.count { text.contains(it) }
-    if (weakHits == 0) return false
-
-    val hasInterpersonalAnchor = CHINESE_INTERPERSONAL_HINTS.any { text.contains(it) }
-    val hasTeasingTone = CHINESE_TEASING_TONE_HINTS.any { text.contains(it) }
-    return weakHits >= 2 || hasInterpersonalAnchor || hasTeasingTone
+    var score = 0
+    score += (CHINESE_SUGGESTIVE_STRONG_HINTS.count { text.contains(it) } * 4).coerceAtMost(8)
+    score += (CHINESE_SUGGESTIVE_CONTEXT_HINTS.count { text.contains(it) } * 2).coerceAtMost(6)
+    if (CHINESE_INTERPERSONAL_HINTS.any { text.contains(it) }) score += 1
+    if (CHINESE_TEASING_TONE_HINTS.any { text.contains(it) }) score += 1
+    score -= (CHINESE_INNUENDO_NEUTRAL_CONTEXT_HINTS.count { text.contains(it) } * 4).coerceAtMost(8)
+    if (CHINESE_LITERAL_CHALLENGE_HINTS.any { text.contains(it) }) score -= 2
+    return score.coerceIn(0, 10)
 }
+
+internal fun hasChineseSuggestiveFlirtingIntent(input: String): Boolean =
+    chineseSuggestiveFlirtingScore(input) >= CHINESE_FLIRTING_SCORE_THRESHOLD
 
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
     val text = input.trim().lowercase()
@@ -130,6 +133,73 @@ internal fun hasFlirtingOrIntimateIntent(
     -> true
     else -> false
 }
+internal fun nextInteractionIntensity(
+    input: String,
+    previous: ChatCharacterState = ChatCharacterState(),
+): Int {
+    val text = input.trim().lowercase()
+    if (INTENT_RESET_HINTS.any { text.contains(it) }) return 0
+
+    val explicit = classifyExplicitInteractionIntent(input)
+    val resolved = resolveChatInteractionIntent(input, previous)
+    return when (resolved) {
+        ChatInteractionIntent.NORMAL,
+        ChatInteractionIntent.STRATEGIST,
+        -> 0
+        ChatInteractionIntent.RELATIONSHIP_PROGRESS ->
+            maxOf(1, previous.interactionIntensity.coerceAtMost(2))
+        ChatInteractionIntent.INTIMATE -> 5
+        ChatInteractionIntent.FLIRTING -> {
+            val signalScore = chineseSuggestiveFlirtingScore(input)
+            val explicitTarget = when {
+                signalScore >= 6 -> 3
+                signalScore >= CHINESE_FLIRTING_SCORE_THRESHOLD -> 2
+                explicit == ChatInteractionIntent.FLIRTING -> 2
+                else -> 1
+            }
+            if (explicit == ChatInteractionIntent.NORMAL) {
+                (previous.interactionIntensity - 1).coerceAtLeast(1)
+            } else {
+                maxOf(previous.interactionIntensity.coerceAtMost(3), explicitTarget)
+            }
+        }
+    }
+}
+
+internal data class ChatInteractionPerformanceSignals(
+    val actionTags: List<String> = emptyList(),
+    val poseTags: List<String> = emptyList(),
+    val verbalTags: List<String> = emptyList(),
+    val addressTerms: List<String> = emptyList(),
+)
+
+internal fun extractInteractionPerformanceSignals(text: String): ChatInteractionPerformanceSignals {
+    if (text.isBlank()) return ChatInteractionPerformanceSignals()
+    val normalized = text.lowercase()
+
+    fun tags(source: Map<String, List<String>>): List<String> = source
+        .filterValues { hints -> hints.any { normalized.contains(it) } }
+        .keys
+        .take(MAX_INTERACTION_TAGS_PER_TURN)
+
+    val verbal = tags(INTERACTION_VERBAL_TAG_HINTS).toMutableList()
+    if (hasChineseSuggestiveFlirtingIntent(normalized) && "双关回钩" !in verbal) {
+        verbal += "双关回钩"
+    }
+    if ((normalized.contains("……") || normalized.contains("...")) && "半句留白" !in verbal) {
+        verbal += "半句留白"
+    }
+
+    return ChatInteractionPerformanceSignals(
+        actionTags = tags(INTERACTION_ACTION_TAG_HINTS),
+        poseTags = tags(INTERACTION_POSE_TAG_HINTS),
+        verbalTags = verbal.distinct().take(MAX_INTERACTION_TAGS_PER_TURN),
+        addressTerms = INTERACTION_ADDRESS_TERMS
+            .filter { normalized.contains(it) }
+            .distinct()
+            .take(MAX_INTERACTION_TAGS_PER_TURN),
+    )
+}
 
 internal fun hasProactiveIntimacyIntent(
     input: String,
@@ -175,6 +245,7 @@ private val CHINESE_SUGGESTIVE_STRONG_HINTS = listOf(
 private val CHINESE_SUGGESTIVE_CONTEXT_HINTS = listOf(
     "深入了解", "深入交流", "你行不行", "行不行啊", "敢不敢", "别光说", "有本事就", "留下来",
     "离我近点", "过来点", "靠近点", "再近一点", "不正经", "别这么规矩", "嘴硬", "怕了", "怂了",
+    "来我家", "去你家", "上来坐坐", "进去坐坐", "喝杯水再走",
 )
 private val CHINESE_INTERPERSONAL_HINTS = listOf(
     "你", "我", "我们", "咱俩", "两个人", "陪我", "对我", "跟我", "靠近我", "过来",
@@ -185,7 +256,42 @@ private val CHINESE_TEASING_TONE_HINTS = listOf(
 private val CHINESE_INNUENDO_NEUTRAL_CONTEXT_HINTS = listOf(
     "项目", "代码", "文档", "产品", "需求", "业务", "客户", "会议", "工作", "学习", "课程",
     "考试", "作业", "资料", "知识", "医学", "医生", "小说", "剧情", "台词", "文案", "翻译",
+    "bug", "接口", "仓库", "提交", "构建", "测试用例",
 )
+private val CHINESE_LITERAL_CHALLENGE_HINTS = listOf(
+    "吃辣", "火锅", "做饭", "跑步", "健身", "运动", "比赛", "打球", "游戏", "打游戏",
+    "做题", "考试", "唱歌", "游泳", "爬山", "加班", "开会",
+)
+private const val CHINESE_FLIRTING_SCORE_THRESHOLD = 3
+
+private val INTERACTION_ACTION_TAG_HINTS = linkedMapOf(
+    "靠近" to listOf("靠近", "凑近", "走近", "贴近", "挪近"),
+    "牵手" to listOf("牵手", "握住你的手", "握住手", "十指交扣", "扣住手指"),
+    "拥抱" to listOf("抱住", "拥抱", "搂住", "环住", "揽住"),
+    "贴耳" to listOf("耳边", "耳畔", "贴耳"),
+    "整理" to listOf("整理衣领", "理了理衣领", "整理头发", "拨开头发", "理了理头发"),
+    "轻触" to listOf("碰了碰", "轻碰", "指尖", "手背", "轻触"),
+    "亲吻" to listOf("亲了一下", "亲一口", "吻了", "吻上", "轻吻"),
+)
+private val INTERACTION_POSE_TAG_HINTS = linkedMapOf(
+    "面对面" to listOf("面对面", "转过身看你", "正对着你"),
+    "并肩" to listOf("并肩", "肩并肩"),
+    "侧身" to listOf("侧过身", "侧身"),
+    "倚靠" to listOf("倚着", "靠在你", "靠着你", "倚在你"),
+    "坐近" to listOf("坐近", "挪到你身边", "坐到你身边"),
+    "身后" to listOf("从身后", "站到你身后"),
+)
+private val INTERACTION_VERBAL_TAG_HINTS = linkedMapOf(
+    "反问激将" to listOf("怕了", "怂了", "敢不敢", "行不行", "有本事", "还敢"),
+    "反撩接梗" to listOf("这可是你说的", "你自己说的", "刚才可是你", "现在知道"),
+    "故意误解" to listOf("你想哪去了", "想到哪去了", "我可没说那个", "别想歪"),
+    "直球" to listOf("想你", "喜欢你", "舍不得你", "今晚别走"),
+    "细节夸赞" to listOf("好看", "可爱", "漂亮", "迷人", "真乖"),
+)
+private val INTERACTION_ADDRESS_TERMS = listOf(
+    "宝贝", "乖乖", "亲爱的", "小坏蛋", "笨蛋", "老婆", "老公",
+)
+private const val MAX_INTERACTION_TAGS_PER_TURN = 4
 private val PROACTIVE_INTIMACY_HINTS = listOf(
     "主动一点", "主动点", "你主动", "再主动", "更主动", "主动些", "主动起来",
     "大胆一点", "大胆点", "别躲", "别回避", "别含蓄",
@@ -289,6 +395,30 @@ class ChatRelationshipEngine @Inject constructor() {
         if (hasFlirtingOrIntimateIntent(input, state)) {
             appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
             appendLine(CHAT_FLIRT_VERBAL_REPERTOIRE)
+            appendLine("【互动强度】当前=${nextInteractionIntensity(input, state)}/5；按强度自然升降，不因单个模糊词突然跨级。")
+            if (
+                state.recentActionTags.isNotEmpty() ||
+                state.recentPoseTags.isNotEmpty() ||
+                state.recentVerbalTags.isNotEmpty() ||
+                state.recentAddressTerms.isNotEmpty()
+            ) {
+                appendLine(
+                    "【近期互动表现】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}；" +
+                        "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}；" +
+                        "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}；" +
+                        "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
+                )
+            }
+            val cooling = state.interactionCooldowns
+                .filterValues { it > 0 }
+                .entries
+                .sortedByDescending { it.value }
+                .take(8)
+            if (cooling.isNotEmpty()) {
+                appendLine(
+                    "【互动冷却】${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}。冷却中的动作、姿态、话术和称呼尽量换一种，除非当前语境明确要求重复。",
+                )
+            }
             if (hasChineseSuggestiveFlirtingIntent(input)) {
                 appendLine(CHAT_CHINESE_INNUENDO_GUIDANCE)
             }
