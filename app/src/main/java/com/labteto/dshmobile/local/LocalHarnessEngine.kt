@@ -5806,7 +5806,7 @@ class LocalHarnessEngine @Inject constructor(
         val body = if (leadingSystem == null) history else history.drop(1)
         val compactedSummary = body.lastOrNull { message ->
             message["role"]?.jsonPrimitive?.contentOrNull == "user" &&
-                message["content"]?.jsonPrimitive?.contentOrNull?.contains("<compacted-summary>") == true
+                (message["content"] as? JsonPrimitive)?.contentOrNull?.contains("<compacted-summary>") == true
         }
         val recent = body.asSequence()
             .filter { message ->
