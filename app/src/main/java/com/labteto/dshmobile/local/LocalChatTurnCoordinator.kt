@@ -39,6 +39,18 @@ internal class LocalChatTurnCoordinator(
         )
     }
 
+    fun prepareProfile(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+        userInput: String,
+        storyContext: String?,
+    ): ChatTurnContext = runner.prepareProfile(
+        persona = persona,
+        state = state,
+        userInput = userInput,
+        storyContext = storyContext,
+    )
+
     suspend fun finalize(
         snapshot: LocalHarnessState,
         persona: PersonaProfile,
