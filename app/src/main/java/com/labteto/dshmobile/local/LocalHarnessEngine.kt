@@ -2460,10 +2460,10 @@ class LocalHarnessEngine @Inject constructor(
                         selectedGalleryStory?.context(galleryEntry.persona.name).orEmpty()
                     } else if (mode == LocalConversationMode.CONTINUATION) {
                         if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
-                            listOfNotNull(
-                                sourceState.handoffSummary?.takeIf(String::isNotBlank),
-                                buildHandoffSummary(sourceState),
-                            ).joinToString("\n\n").takeLast(5_500)
+                            buildChatContinuationHandoff(
+                                state = sourceState.chatState,
+                                messages = sourceState.messages,
+                            )
                         } else {
                             buildHandoffSummary(sourceState)
                         }

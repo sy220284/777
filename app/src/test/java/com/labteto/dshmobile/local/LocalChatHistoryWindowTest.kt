@@ -3,11 +3,34 @@ package com.labteto.dshmobile.local
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.RelationshipDynamics
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalChatHistoryWindowTest {
+
+    @Test
+    fun continuationHandoffKeepsFactsAndUserEventsWithoutOldRoleWording() {
+        val handoff = buildChatContinuationHandoff(
+            state = ChatCharacterState(
+                dynamics = RelationshipDynamics(
+                    sharedMoments = listOf("一起看过日落"),
+                ),
+            ),
+            messages = listOf(
+                LocalHarnessMessage("u1", "user", "明天去海边", createdAt = 1L),
+                LocalHarnessMessage("a1", "assistant", "我会一直陪着你去", createdAt = 2L),
+            ),
+        )
+
+        assertTrue(handoff.contains("一起看过日落"))
+        assertTrue(handoff.contains("明天去海边"))
+        assertFalse(handoff.contains("我会一直陪着你去"))
+        assertTrue(handoff.contains("角色旧回复原文省略"))
+    }
+
 
     @Test
     fun preservesExistingCheckpointAndSummarizesTheGapAfterIt() {

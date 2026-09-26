@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.ChatCharacterState
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -88,3 +89,25 @@ private fun normalizeChatContinuityText(text: String): String =
         .joinToString(" ")
         .replace(Regex("\\s+"), " ")
         .trim()
+
+
+internal fun buildChatContinuationHandoff(
+    state: ChatCharacterState,
+    messages: List<LocalHarnessMessage>,
+): String = buildString {
+    appendLine("【聊天连续性｜已发生】")
+    state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
+        appendLine("共同经历：${moments.joinToString("；").take(1_200)}")
+    }
+    val recentUserEvents = messages.asSequence()
+        .filter { it.role == "user" }
+        .map { normalizeChatContinuityText(it.content) }
+        .filter(String::isNotBlank)
+        .toList()
+        .takeLast(6)
+    if (recentUserEvents.isNotEmpty()) {
+        appendLine("近期用户表达与事件：")
+        recentUserEvents.forEach { appendLine("- ${it.take(500)}") }
+    }
+    append("角色旧回复原文省略；当前关系、情绪、目标和开放线索由实时状态提供。")
+}.trim().take(3_500)
