@@ -131,6 +131,34 @@ internal fun buildLocalUserModelMessage(
     }
 }
 
+internal fun replaceLocalUserModelMessageText(
+    message: JsonObject,
+    visibleText: String,
+): JsonObject {
+    val clean = visibleText.trim()
+    val content = message["content"]
+    val nextContent = if (content is JsonArray) {
+        buildJsonArray {
+            if (clean.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", clean)
+                })
+            }
+            content.forEach { part ->
+                val obj = part as? JsonObject
+                if (obj?.get("type")?.jsonPrimitive?.contentOrNull != "text") add(part)
+            }
+        }
+    } else {
+        JsonPrimitive(clean)
+    }
+    return JsonObject(message.toMutableMap().apply {
+        put("role", JsonPrimitive("user"))
+        put("content", nextContent)
+    })
+}
+
 internal fun hasLocalImageRefs(messages: List<JsonObject>): Boolean =
     messages.any(::hasLocalImageRefs)
 
