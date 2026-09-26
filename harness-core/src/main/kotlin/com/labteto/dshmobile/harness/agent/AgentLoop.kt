@@ -177,6 +177,11 @@ class AgentLoop(
     ): AgentRunResult {
         val cleanInput = input.trim()
         require(cleanInput.isNotEmpty()) { "用户输入不能为空" }
+        context?.let { run ->
+            require(run.depth in 0..run.resources.maxDepth) {
+                "Agent 深度超过上限：" + run.depth + "/" + run.resources.maxDepth
+            }
+        }
         val turnId = context?.runId?.takeIf(String::isNotBlank) ?: idFactory()
         val effectiveMaxSteps = context?.resources?.maxSteps
             ?.coerceIn(1, maxSteps)
