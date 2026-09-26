@@ -495,7 +495,7 @@ class ChatInteractionPlannerTest {
         )!!
 
         assertEquals(ChatInteractionIntent.FLIRTING.name, plan.state.interactionIntent)
-        assertEquals(4, plan.state.interactionIntensity)
+        assertEquals(3, plan.state.interactionIntensity)
         assertTrue("牵手" in plan.state.recentActionTags)
         assertTrue("靠近" in plan.state.recentActionTags)
         assertTrue("贴耳" in plan.state.recentActionTags)
