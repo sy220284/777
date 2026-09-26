@@ -42,6 +42,7 @@ internal class LocalModelRequestCoordinator(
         persistOverflowHistory: Boolean = false,
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
+        temperature: Double? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val log = requestLog ?: defaultEventLog()
@@ -64,6 +65,7 @@ internal class LocalModelRequestCoordinator(
             put("tool_count", tools.size)
             put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
+            temperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
             put("step", step)
@@ -155,6 +157,7 @@ internal class LocalModelRequestCoordinator(
                         model = snapshot.model,
                         messages = messages,
                         tools = tools,
+                        temperature = temperature,
                         onDelta = { delta ->
                             val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                             streamPreview.append(visible)
@@ -196,6 +199,7 @@ internal class LocalModelRequestCoordinator(
                 persistOverflowHistory = false,
                 streamFilterPhrases = streamFilterPhrases,
                 requestLog = log,
+                temperature = temperature,
             )
         }
     }

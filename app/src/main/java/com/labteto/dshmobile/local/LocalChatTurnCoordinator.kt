@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
 import com.labteto.dshmobile.local.chat.ChatTurnContext
@@ -12,10 +13,6 @@ internal data class LocalPreparedChatTurn(
     val dynamicContext: String,
 )
 
-/**
- * Owns chat-only semantic preparation/finalization while leaving session persistence and UI state
- * projection to the engine/session coordinators.
- */
 internal class LocalChatTurnCoordinator(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
@@ -31,11 +28,19 @@ internal class LocalChatTurnCoordinator(
             userInput = input,
             storyContext = snapshot.handoffSummary,
         )
+        val recentAssistantReplies = recentRoleReplies(
+            messages = snapshot.messages,
+            groupEnabled = snapshot.groupChat.enabled,
+            persona = context.persona,
+        )
         return LocalPreparedChatTurn(
             context = context,
-            dynamicContext = listOf(context.dynamicPrompt, relationshipMemory)
-                .filter(String::isNotBlank)
-                .joinToString("\n\n"),
+            dynamicContext = ChatContextAssembler.assemble(
+                dynamicPrompt = context.dynamicPrompt,
+                relationshipMemory = relationshipMemory,
+                userInput = input,
+                recentAssistantReplies = recentAssistantReplies,
+            ),
         )
     }
 
@@ -63,6 +68,11 @@ internal class LocalChatTurnCoordinator(
         recordUsage = recordUsage,
         guardEnabled = snapshot.chatStyleGuardEnabled,
         additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
+        recentAssistantReplies = recentRoleReplies(
+            messages = snapshot.messages,
+            groupEnabled = snapshot.groupChat.enabled,
+            persona = persona,
+        ),
         onGuardEvent = onGuardEvent,
     )
 
@@ -93,3 +103,25 @@ internal class LocalChatTurnCoordinator(
         assistantMessage = assistantMessage,
     )
 }
+
+
+internal fun recentRoleReplies(
+    messages: List<LocalHarnessMessage>,
+    groupEnabled: Boolean,
+    persona: PersonaProfile,
+    limit: Int = 4,
+): List<String> = messages.asReversed()
+    .asSequence()
+    .filter { message ->
+        message.role == "assistant" &&
+            (
+                !groupEnabled ||
+                    message.speakerId == persona.id ||
+                    message.speakerName == persona.name
+            )
+    }
+    .map { it.content }
+    .filter(String::isNotBlank)
+    .take(limit.coerceAtLeast(1))
+    .toList()
+    .asReversed()

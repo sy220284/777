@@ -36,8 +36,10 @@ class ChatPersonaGalleryTest {
 
         val context = entry.storyContext("story-1")
         assertTrue(context.contains("雪夜在桥边重逢"))
-        assertTrue(context.contains("对白30"))
+        assertTrue(context.contains("对白29"))
+        assertFalse(context.contains("对白30"))
         assertFalse(context.contains("对白1\n"))
+        assertTrue(context.contains("角色旧回复已归档"))
         assertEquals(30, story.history.size)
     }
 
