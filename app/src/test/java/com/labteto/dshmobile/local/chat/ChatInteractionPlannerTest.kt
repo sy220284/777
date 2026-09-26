@@ -366,7 +366,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun noOpTurnPreservesCharacterStateButKeepsReplySuggestions() {
+    fun noOpTurnIgnoresSpuriousStateChangesButStillAgesTransientState() {
         val previous = ChatCharacterState(
             mood = "开心",
             relationshipState = "熟悉中",
@@ -400,7 +400,15 @@ class ChatInteractionPlannerTest {
         )!!
 
         assertEquals("NONE", plan.turnSignificance)
-        assertEquals(previous, plan.state)
+        assertEquals(previous.mood, plan.state.mood)
+        assertEquals(previous.relationshipState, plan.state.relationshipState)
+        assertEquals(previous.activeGoal, plan.state.activeGoal)
+        assertEquals(previous.currentAgenda, plan.state.currentAgenda)
+        assertEquals(previous.internalConflict, plan.state.internalConflict)
+        assertEquals(previous.immediateConcern, plan.state.immediateConcern)
+        assertEquals(previous.initiative, plan.state.initiative)
+        assertEquals(previous.dynamics, plan.state.dynamics)
+        assertTrue(plan.state.transientAges.values.all { it >= 1 })
         assertEquals(1, plan.suggestions.size)
         assertEquals("你刚才笑什么？说来听听。", plan.suggestions.single().text)
     }
