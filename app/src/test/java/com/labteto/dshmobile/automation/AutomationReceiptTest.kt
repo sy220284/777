@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.automation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,6 +35,45 @@ class AutomationReceiptTest {
 
         assertEquals(1, history.size)
         assertTrue(history.single().status == "failed")
+    }
+
+    @Test
+    fun chatRecurringTaskAutoPausesAfterThirdFailure() {
+        val task = AutomationTask(
+            id = "chat",
+            prompt = "主动来找我",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            recurringMinutes = 60L,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session",
+        )
+
+        assertFalse(shouldAutoPauseChatAutomation(task, 1))
+        assertFalse(shouldAutoPauseChatAutomation(task, 2))
+        assertTrue(shouldAutoPauseChatAutomation(task, 3))
+    }
+
+    @Test
+    fun workAndOneShotTasksDoNotUseChatAutoPausePolicy() {
+        val work = AutomationTask(
+            id = "work",
+            prompt = "task",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            recurringMinutes = 60L,
+        )
+        val oneShotChat = AutomationTask(
+            id = "chat-once",
+            prompt = "主动来找我",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session",
+        )
+
+        assertFalse(shouldAutoPauseChatAutomation(work, 3))
+        assertFalse(shouldAutoPauseChatAutomation(oneShotChat, 3))
     }
 
     @Test
