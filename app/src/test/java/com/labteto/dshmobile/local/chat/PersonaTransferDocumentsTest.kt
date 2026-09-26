@@ -53,6 +53,7 @@ class PersonaTransferDocumentsTest {
         assertTrue(archive.memorySummaries.single().continuitySummary.contains("剧情提要：第一次一起去海边"))
         assertTrue(archive.memorySummaries.single().continuitySummary.contains("保存时的关系：挚友"))
         assertTrue(archive.entry.stories.single().sourceSessionIds.isEmpty())
+        assertTrue(archive.entry.stories.single().excludedMessageKeys.isEmpty())
     }
 
     @Test
