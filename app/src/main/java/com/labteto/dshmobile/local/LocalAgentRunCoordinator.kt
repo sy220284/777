@@ -213,6 +213,12 @@ internal class LocalAgentRunCoordinator(
         val status = data["status"]?.jsonPrimitive?.contentOrNull ?: return null
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
+        val log = eventLogFor(sessionId)
+        if (repair.repaired && hasDurableFinalAssistant(log)) {
+            // Covers the narrower crash window where assistant/message reached disk but the
+            // AssistantObserved checkpoint itself did not.
+            return null
+        }
         val phase = data["phase"]?.jsonPrimitive?.contentOrNull
         val toolCallCount = data["tool_call_count"]?.jsonPrimitive?.intOrNull
         if (
@@ -319,6 +325,14 @@ internal class LocalAgentRunCoordinator(
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
+    }
+
+    private fun hasDurableFinalAssistant(log: LocalSessionEventLog): Boolean {
+        val turnStart = log.latest("turn/start") ?: return false
+        val assistant = log.latest("assistant/message") ?: return false
+        if (assistant.sequence <= turnStart.sequence) return false
+        val toolCalls = assistant.data["tool_calls"] as? JsonArray
+        return toolCalls == null || toolCalls.isEmpty()
     }
 
     private fun eventType(kind: LocalAgentRunKind): String = when (kind) {
