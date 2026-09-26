@@ -871,13 +871,17 @@ internal fun MemoryManagementCard(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(MemoryFilter.ALL) }
     var editingId by remember { mutableStateOf<String?>(null) }
+    var visibleLimit by remember(records, query, filter) { mutableStateOf(20) }
 
-    val visibleRecords = remember(records, query, filter) {
+    val filteredRecords = remember(records, query, filter) {
         val needle = query.trim()
         records.filter { record ->
             record.kind.matchesFilter(filter) &&
                 (needle.isBlank() || record.content.contains(needle, ignoreCase = true))
         }
+    }
+    val visibleRecords = remember(filteredRecords, visibleLimit) {
+        filteredRecords.take(visibleLimit)
     }
 
     SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
@@ -933,7 +937,7 @@ internal fun MemoryManagementCard(
         }
 
         Text(
-            stringResource(R.string.advanced_memory_visible_count, visibleRecords.size, records.size),
+            stringResource(R.string.advanced_memory_visible_count, filteredRecords.size, records.size),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -1003,6 +1007,21 @@ internal fun MemoryManagementCard(
                     }
                 }
             }
+        }
+        if (visibleRecords.size < filteredRecords.size) {
+            val remaining = filteredRecords.size - visibleRecords.size
+            DsButton(
+                text = stringResource(
+                    R.string.advanced_memory_show_more,
+                    minOf(20, remaining),
+                ),
+                onClick = {
+                    visibleLimit = (visibleLimit + 20).coerceAtMost(filteredRecords.size)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
         }
     }
 

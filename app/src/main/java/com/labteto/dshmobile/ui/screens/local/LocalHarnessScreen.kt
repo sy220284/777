@@ -113,6 +113,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalChatMode
+import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -1394,7 +1395,11 @@ private fun LocalChat(
                             } else {
                                 val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
                                 val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
-                                val secondary = listOfNotNull(storyTitle, relationship).joinToString(" · ")
+                                val contextSource = when (state.conversationMode) {
+                                    LocalConversationMode.INDEPENDENT -> null
+                                    else -> localConversationModeLabel(state.conversationMode)
+                                }
+                                val secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · ")
                                 if (secondary.isNotBlank()) {
                                     Text(
                                         secondary,
@@ -1986,7 +1991,11 @@ private fun LocalChat(
                         )
                         if (state.usageMode == LocalUsageMode.WORK) {
                             DsButton(
-                                stringResource(R.string.local_queue_message),
+                                if (state.queuedInputCount > 0) {
+                                    stringResource(R.string.local_queue_message_count, state.queuedInputCount)
+                                } else {
+                                    stringResource(R.string.local_queue_message)
+                                },
                                 onClick = {
                                     val selected = attachments.toList()
                                     onSend(input, selected)
@@ -2603,6 +2612,14 @@ private fun ExecutionStatusCard(
         state.contextChars,
         state.contextBudgetChars,
     )
+    val pressureSummary = stringResource(
+        R.string.local_resource_pressure,
+        localResourcePressureLabel(state.resourcePressure),
+    )
+    val contextSourceSummary = stringResource(
+        R.string.local_context_source,
+        localConversationModeLabel(state.conversationMode),
+    )
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -2777,11 +2794,55 @@ private fun ExecutionStatusCard(
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                 Text(stringResource(R.string.local_run_resources), style = DsType.caption11Strong, color = colors.labelTertiary)
                 Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
+                Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
+                if (state.queuedInputCount > 0) {
+                    Text(
+                        stringResource(R.string.local_queue_count, state.queuedInputCount),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                    )
+                }
                 Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
+                Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                if (
+                    state.conversationMode == LocalConversationMode.CONTINUATION &&
+                    !state.handoffSummary.isNullOrBlank()
+                ) {
+                    Text(
+                        stringResource(R.string.local_context_handoff),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    Text(
+                        state.handoffSummary.orEmpty(),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun localResourcePressureLabel(pressure: String): String = stringResource(
+    when (pressure.lowercase()) {
+        "high" -> R.string.local_resource_pressure_high
+        "medium" -> R.string.local_resource_pressure_medium
+        else -> R.string.local_resource_pressure_low
+    },
+)
+
+@Composable
+private fun localConversationModeLabel(mode: LocalConversationMode): String = stringResource(
+    when (mode) {
+        LocalConversationMode.INDEPENDENT -> R.string.local_context_source_independent
+        LocalConversationMode.PROJECT -> R.string.local_context_source_project
+        LocalConversationMode.CONTINUATION -> R.string.local_context_source_continuation
+    },
+)
 
 @Composable
 private fun localJobStatusLabel(status: String): String = when (status) {
