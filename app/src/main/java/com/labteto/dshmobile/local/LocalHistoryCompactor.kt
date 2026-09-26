@@ -189,17 +189,16 @@ internal class LocalHistoryCompactor(
         val text = buildString {
             when (summaryMode) {
                 LocalHistorySummaryMode.WORK -> {
-                    append("以下是较早会话的提取式压缩摘要，共折叠 ")
+                    val sections = structuredWorkSummary(messages, summaryLimit)
+                    append("以下是较早会话的结构化提取式检查点，共折叠 ")
                     append(messages.size)
-                    append(" 条模型消息。内容只摘自原会话，用于保留任务连续性；当前目标、计划、任务清单与工作区文件仍以实时状态为准。")
-                    if (user.isNotEmpty()) {
-                        append("\n\n用户目标与约束：")
-                        user.forEach { append("\n- ").append(it) }
-                    }
-                    if (assistant.isNotEmpty()) {
-                        append("\n\n阶段结论与进展：")
-                        assistant.forEach { append("\n- ").append(it) }
-                    }
+                    append(" 条模型消息。所有条目只摘自原会话；当前目标、计划、任务清单与工作区文件仍以实时状态为准。")
+                    appendSummarySection("目标与需求", sections.goals)
+                    appendSummarySection("约束与边界", sections.constraints)
+                    appendSummarySection("关键决定与阶段结论", sections.decisions)
+                    appendSummarySection("失败尝试与风险", sections.failures)
+                    appendSummarySection("未完成事项", sections.unfinished)
+                    appendSummarySection("其他阶段进展", sections.progress)
                     if (tools.isNotEmpty()) {
                         append("\n\n已涉及工具：")
                         append(tools.joinToString("、"))
@@ -221,6 +220,69 @@ internal class LocalHistoryCompactor(
             }
         }
         return truncateWithoutSplittingSurrogatePair(text, summaryLimit)
+    }
+
+    private data class WorkSummarySections(
+        val goals: List<String>,
+        val constraints: List<String>,
+        val decisions: List<String>,
+        val failures: List<String>,
+        val unfinished: List<String>,
+        val progress: List<String>,
+    )
+
+    private fun StringBuilder.appendSummarySection(title: String, values: List<String>) {
+        if (values.isEmpty()) return
+        append("\n\n").append(title).append("：")
+        values.forEach { append("\n- ").append(it) }
+    }
+
+    private fun structuredWorkSummary(
+        messages: List<JsonObject>,
+        summaryLimit: Int,
+    ): WorkSummarySections {
+        val used = linkedSetOf<String>()
+        val maxPerItem = (summaryLimit / 18).coerceIn(200, 800)
+
+        fun select(
+            role: String? = null,
+            cues: Set<String>? = null,
+            maxItems: Int,
+        ): List<String> = messages.asReversed()
+            .asSequence()
+            .filter { role == null || it["role"].asText() == role }
+            .mapNotNull(::messageText)
+            .map(::normalize)
+            .filter(String::isNotBlank)
+            .filter { text -> cues == null || text.containsAnyCue(cues) }
+            .filter { used.add(it) }
+            .take(maxItems)
+            .map { truncateWithoutSplittingSurrogatePair(it, maxPerItem) }
+            .toList()
+            .asReversed()
+
+        // Prioritize the facts most likely to change future execution. Every row remains a direct
+        // extract from model-visible history; classification only decides which heading owns it.
+        val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 4)
+        val failures = select(cues = WORK_FAILURE_CUES, maxItems = 4)
+        val unfinished = select(cues = WORK_UNFINISHED_CUES, maxItems = 5)
+        val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 5)
+        val goals = select(role = "user", maxItems = 6)
+        val progress = select(role = "assistant", maxItems = 4)
+
+        return WorkSummarySections(
+            goals = goals,
+            constraints = constraints,
+            decisions = decisions,
+            failures = failures,
+            unfinished = unfinished,
+            progress = progress,
+        )
+    }
+
+    private fun String.containsAnyCue(cues: Set<String>): Boolean {
+        val lower = lowercase()
+        return cues.any { cue -> lower.contains(cue.lowercase()) }
     }
 
     private fun recentText(
@@ -280,6 +342,23 @@ internal class LocalHistoryCompactor(
         (this as? JsonPrimitive)?.contentOrNull
 
     private companion object {
+        val WORK_CONSTRAINT_CUES = setOf(
+            "必须", "禁止", "不能", "不要", "只允许", "仅限", "限制", "约束", "要求",
+            "保持", "兼容", "边界", "must", "must not", "never", "only", "constraint",
+        )
+        val WORK_FAILURE_CUES = setOf(
+            "失败", "报错", "错误", "异常", "超时", "冲突", "回退", "无法", "风险",
+            "未通过", "failure", "failed", "error", "timeout", "conflict", "rollback", "risk",
+        )
+        val WORK_UNFINISHED_CUES = setOf(
+            "下一步", "继续", "剩余", "未完成", "待处理", "后续", "还要", "尚未",
+            "next", "remaining", "todo", "pending", "follow-up",
+        )
+        val WORK_DECISION_CUES = setOf(
+            "决定", "确认", "采用", "改为", "保留", "结论", "方案", "选择", "完成",
+            "decide", "confirmed", "adopt", "keep", "conclusion", "completed",
+        )
+
         const val DEFAULT_MAX_HISTORY_CHARS = 500_000
         const val DEFAULT_TAIL_CHARS = 240_000
         const val DEFAULT_MAX_SUMMARY_CHARS = 16_000

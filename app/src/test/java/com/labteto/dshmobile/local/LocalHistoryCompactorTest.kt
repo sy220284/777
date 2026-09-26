@@ -43,6 +43,43 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun workCompactionBuildsStructuredCheckpointWithoutInventingFacts() {
+        val pad = "旧".repeat(2_000)
+        val history = listOf(
+            message("system", "系统"),
+            message("user", "目标：完成无限会话分页。" + pad),
+            message("user", "约束：必须保持旧会话兼容，禁止新增第二份完整历史。" + pad),
+            message("assistant", "已确认方案：保留 Session Event 为事实源。" + pad),
+            message("user", "下一步继续处理运行态与界面态拆分。" + pad),
+            message("assistant", "失败尝试：旧方案会造成快照线性膨胀，需要回退。" + pad),
+            message("user", "最新请求" + "新".repeat(120)),
+            message("assistant", "正在继续" + "新".repeat(120)),
+        )
+
+        val compaction = LocalHistoryCompactor(
+            maxHistoryChars = 500,
+            tailChars = 300,
+            maxSummaryChars = 3_000,
+        )
+            .compact(history, summaryMode = LocalHistorySummaryMode.WORK)
+            ?: error("expected structured compaction")
+
+        assertTrue(compaction.summary.contains("结构化提取式检查点"))
+        assertTrue(compaction.summary.contains("目标与需求："))
+        assertTrue(compaction.summary.contains("约束与边界："))
+        assertTrue(compaction.summary.contains("关键决定与阶段结论："))
+        assertTrue(compaction.summary.contains("失败尝试与风险："))
+        assertTrue(compaction.summary.contains("未完成事项："))
+        assertTrue(compaction.summary.contains("完成无限会话分页"))
+        assertTrue(compaction.summary.contains("保持旧会话兼容"))
+        assertTrue(compaction.summary.contains("Session Event 为事实源"))
+        assertTrue(compaction.summary.contains("快照线性膨胀"))
+        assertTrue(compaction.summary.contains("运行态与界面态拆分"))
+        assertFalse(compaction.summary.contains("不存在的结论"))
+        assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
+    }
+
+    @Test
     fun summaryIsBoundedForVeryLargeOlderMessages() {
         val huge = "长".repeat(20_000)
         val history = listOf(
