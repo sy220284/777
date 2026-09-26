@@ -2689,7 +2689,7 @@ class LocalHarnessEngine @Inject constructor(
                 cancelActiveRunAndJoin()
                 jobs.stopNonPersistentAndJoin()
                 persist()
-                val available = sessionRepository.summaries()
+                val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
                 if (currentSessionId in ids) {
                     val previous = _state.value
@@ -6214,7 +6214,7 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
     ) {
         val loaded = try {
-            sessionRepository.readWithLegacyApproval(sessionId)
+            sessionCoordinator.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
             _state.update {
                 it.copy(
@@ -6596,7 +6596,6 @@ class LocalHarnessEngine @Inject constructor(
         const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
-        const val TRANSCRIPT_PROJECTION_BASELINE_EVENT = "session/transcript-projection-baseline"
 
 
         val CONVERSATION_FILE_EVENT_TYPES = setOf(
