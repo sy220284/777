@@ -903,7 +903,7 @@ class LocalHarnessEngine @Inject constructor(
                     gallerySaveSuppressedThrough = if (sameBoundCharacter) {
                         state.gallerySaveSuppressedThrough
                     } else {
-                        state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis()
+                        state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
                     },
                     chatPersona = saved,
                     chatState = if (sameBoundCharacter) state.chatState else ChatCharacterState(),
@@ -1282,6 +1282,7 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             current.copy(
                 messages = activeMessages,
+                transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                 chatState = baseState,
                 replySuggestions = emptyList(),
                 chatBranches = branches,
@@ -1329,6 +1330,7 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             current.copy(
                 messages = activeMessages,
+                transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                 chatState = snapshot?.first ?: current.chatState,
                 replySuggestions = snapshot?.second.orEmpty(),
                 chatBranches = selected,
@@ -1440,7 +1442,13 @@ class LocalHarnessEngine @Inject constructor(
             resetModelHistory(modelHistory.dropLast(1))
             appendModelHistory(reply.message)
             updateContextMetrics()
-            _state.update { it.copy(messages = it.messages.filterNot { message -> message.id == messageId }) }
+            _state.update {
+                val retained = it.messages.filterNot { message -> message.id == messageId }
+                it.copy(
+                    messages = retained,
+                    transcriptIndex = buildLocalTranscriptRuntimeIndex(retained),
+                )
+            }
             applyTranscriptMessages(transcript, event.sequence, clearStreamingPreview = true)
             checkpointModelHistory("work/regenerated")
             persist()
@@ -1529,9 +1537,7 @@ class LocalHarnessEngine @Inject constructor(
                 chatState = before.chatState,
                 replySuggestions = before.replySuggestions,
             )
-            val parentId = before.messages.lastOrNull {
-                it.role == "user" || it.role == "assistant"
-            }?.id
+            val parentId = before.transcriptIndex.latestDialogueMessageId
             val branches = upsertChatBranchNode(
                 synced,
                 LocalChatBranchNode(
@@ -1753,6 +1759,7 @@ class LocalHarnessEngine @Inject constructor(
                     projectId = session.projectId,
                     handoffSummary = session.handoffSummary,
                     messages = session.messages,
+                    transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
                     planMode = false,
                     jobs = emptyList(),
                     queuedInputCount = 0,
@@ -2025,6 +2032,7 @@ class LocalHarnessEngine @Inject constructor(
             projectId = session.projectId ?: LOCAL_PROJECT_ID,
             handoffSummary = session.handoffSummary,
             messages = session.messages,
+            transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
             plan = session.plan,
             todos = session.todos,
             goal = session.goal,
@@ -2448,6 +2456,7 @@ class LocalHarnessEngine @Inject constructor(
                             projectId = projectId,
                             handoffSummary = handoff,
                             messages = emptyList(),
+                            transcriptIndex = LocalTranscriptRuntimeIndex(),
                             plan = emptyList(),
                             todos = emptyList(),
                             goal = null,
@@ -3593,7 +3602,7 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             val snapshot = _state.value
             val branchEligible = chatBranchingEligible(snapshot.messages)
-            val branchParentId = snapshot.messages.lastOrNull { it.role == "user" }?.id
+            val branchParentId = snapshot.transcriptIndex.latestDialogueMessageId
             val branchBase = if (branchEligible) {
                 syncMaterializedChatBranchState(
                     current = snapshot.chatBranches,
@@ -3677,7 +3686,13 @@ class LocalHarnessEngine @Inject constructor(
             )
             if (replacingMessageId != null) {
                 resetModelHistory(modelHistory.dropLast(1))
-                _state.update { state -> state.copy(messages = state.messages.filterNot { it.id == replacingMessageId }) }
+                _state.update { state ->
+                    val retained = state.messages.filterNot { it.id == replacingMessageId }
+                    state.copy(
+                        messages = retained,
+                        transcriptIndex = buildLocalTranscriptRuntimeIndex(retained),
+                    )
+                }
             }
             appendModelHistory(reply.message)
             updateContextMetrics()
@@ -5221,9 +5236,7 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         cancelChatPostTurn()
         val current = _state.value
-        val latestDialogueId = current.messages.lastOrNull {
-            it.role == "user" || it.role == "assistant"
-        }?.id
+        val latestDialogueId = current.transcriptIndex.latestDialogueMessageId
         if (
             current.sessionId != expectedSessionId ||
             latestDialogueId != expectedAssistantMessageId ||
@@ -5311,9 +5324,7 @@ class LocalHarnessEngine @Inject constructor(
 
         var applied = false
         _state.update { current ->
-            val latestDialogueId = current.messages.lastOrNull {
-                it.role == "user" || it.role == "assistant"
-            }?.id
+            val latestDialogueId = current.transcriptIndex.latestDialogueMessageId
             if (
                 current.sessionId != expectedSessionId ||
                 latestDialogueId != expectedAssistantMessageId ||
@@ -5933,6 +5944,11 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { state ->
                 state.copy(
                     messages = if (messages.isEmpty()) state.messages else state.messages + messages,
+                    transcriptIndex = if (messages.isEmpty()) {
+                        state.transcriptIndex
+                    } else {
+                        appendLocalTranscriptRuntimeIndex(state.transcriptIndex, messages)
+                    },
                     streamingAssistant = if (clearStreamingPreview) "" else state.streamingAssistant,
                     streamingReasoning = if (clearStreamingPreview) "" else state.streamingReasoning,
                 )
@@ -6088,6 +6104,7 @@ class LocalHarnessEngine @Inject constructor(
             usage = usageTracker.state.value,
             sessions = sessionSummaries(),
             messages = projectedTranscript.messages,
+            transcriptIndex = buildLocalTranscriptRuntimeIndex(projectedTranscript.messages),
             plan = projectedControls.plan,
             todos = projectedControls.todos,
             goal = projectedControls.goal,
@@ -6266,8 +6283,7 @@ class LocalHarnessEngine @Inject constructor(
         val state = _state.value
         val snapshot = LocalHarnessSession(
             id = currentSessionId,
-            title = state.messages.firstOrNull { it.role == "user" }?.content?.lineSequence()?.firstOrNull()
-                ?.take(40) ?: "新会话",
+            title = state.transcriptIndex.firstUserTitle ?: "新会话",
             updatedAt = System.currentTimeMillis(),
             usageMode = state.usageMode,
             personaId = state.personaId,
