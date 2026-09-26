@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationRunReceipt
+import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.LocalHarnessEngine
@@ -65,7 +66,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class TasksNotice { CANCELLED, MISSING }
 
-private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
+private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE }
 
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
@@ -107,16 +108,52 @@ class TasksViewModel @Inject constructor(
         refresh()
     }
 
+    fun runNow(id: String): Boolean {
+        val started = scheduler.runTaskNow(id)
+        refresh()
+        return started
+    }
+
+    fun updateTask(
+        id: String,
+        prompt: String,
+        firstRunAt: Long,
+        recurringMinutes: Long?,
+        scheduleType: AutomationScheduleType,
+        silenceMinutes: Long?,
+        quietHoursEnabled: Boolean,
+    ): Boolean = runCatching {
+        scheduler.updateTask(
+            id = id,
+            prompt = prompt,
+            firstRunAtMillis = firstRunAt,
+            recurringMinutes = recurringMinutes,
+            scheduleType = scheduleType,
+            silenceMinutes = silenceMinutes,
+            quietHoursEnabled = quietHoursEnabled,
+        )
+    }.getOrDefault(false).also {
+        if (it) refresh()
+    }
+
     fun createAt(
         prompt: String,
         firstRunAt: Long,
         recurringMinutes: Long?,
         mode: AutomationMode,
+        scheduleType: AutomationScheduleType,
+        silenceMinutes: Long? = null,
         quietHoursEnabled: Boolean = false,
     ): Boolean {
-        if (prompt.isBlank() || firstRunAt <= System.currentTimeMillis()) return false
+        val now = System.currentTimeMillis()
+        if (prompt.isBlank()) return false
+        if (scheduleType != AutomationScheduleType.SILENCE && firstRunAt <= now) return false
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
+        if (
+            scheduleType == AutomationScheduleType.SILENCE &&
+            (silenceMinutes == null || silenceMinutes < 60L)
+        ) return false
         val snapshot = engine.state.value
         if (mode == AutomationMode.CHAT) {
             if (
@@ -131,8 +168,17 @@ class TasksViewModel @Inject constructor(
             val actorName = snapshot.chatPersona.name.takeIf {
                 mode == AutomationMode.CHAT && it.isNotBlank()
             }
-            if (recurringMinutes == null) {
-                scheduler.scheduleOnce(
+            when {
+                scheduleType == AutomationScheduleType.SILENCE -> scheduler.scheduleSilence(
+                    id = id,
+                    prompt = prompt.trim(),
+                    silenceMinutes = requireNotNull(silenceMinutes),
+                    notify = true,
+                    targetSessionId = requireNotNull(targetSessionId),
+                    actorName = actorName,
+                    quietHoursEnabled = quietHoursEnabled,
+                )
+                recurringMinutes == null -> scheduler.scheduleOnce(
                     id = id,
                     prompt = prompt.trim(),
                     triggerAtMillis = firstRunAt,
@@ -142,8 +188,7 @@ class TasksViewModel @Inject constructor(
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
                 )
-            } else {
-                scheduler.schedulePeriodic(
+                else -> scheduler.schedulePeriodic(
                     id = id,
                     prompt = prompt.trim(),
                     intervalMinutes = recurringMinutes,
@@ -153,11 +198,17 @@ class TasksViewModel @Inject constructor(
                     targetSessionId = targetSessionId,
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
+                    scheduleType = if (mode == AutomationMode.CHAT) {
+                        scheduleType
+                    } else {
+                        AutomationScheduleType.LEGACY
+                    },
                 )
             }
             refresh()
         }.isSuccess
     }
+
 }
 
 @Composable
