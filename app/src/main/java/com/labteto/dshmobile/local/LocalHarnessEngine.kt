@@ -60,6 +60,7 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
+import com.labteto.dshmobile.harness.tools.ToolExecutionMode
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowCheckpoint
@@ -4172,7 +4173,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             isParallelTool = { call ->
-                runPolicy.allowToolExecution && call.name in PARALLEL_AGENT_TOOLS
+                runPolicy.allowToolExecution && canRunToolInParallel(call.name)
             },
             eventSink = AgentEventSink { event ->
                 when (event) {
@@ -4445,11 +4446,17 @@ class LocalHarnessEngine @Inject constructor(
         rawArguments = rawArguments,
     )
 
+    private fun canRunToolInParallel(name: String): Boolean {
+        val canonical = LocalToolPolicy.canonical(name)
+        if (canonical in PARALLEL_SUBAGENT_TOOLS) return true
+        return toolRegistry.get(canonical)?.executionMode == ToolExecutionMode.PARALLEL
+    }
+
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
     ): List<Pair<LocalToolCall, AgentToolResult>> {
-        val parallel = calls.size > 1 && calls.all { it.name in PARALLEL_AGENT_TOOLS }
+        val parallel = calls.size > 1 && calls.all { canRunToolInParallel(it.name) }
         if (!parallel) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
         }
