@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentToolCall
+import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.session.RecoveredToolResult
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
@@ -139,6 +140,128 @@ class LocalAgentRunCoordinatorTest {
 
             assertNotNull(log.latest(LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT))
             assertNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+        }
+    }
+
+    @Test
+    fun completedAutomationRunReturnsDurableOutputInsteadOfReplaying() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = true,
+                maxSteps = 8,
+                input = "后台任务",
+                memoryInput = "后台任务",
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+            coordinator.recordEvent(
+                context,
+                AgentEvent.TurnCompleted(context.runId, 2, "已经完成的后台结果"),
+            )
+
+            val decision = coordinator.recoveryDecision(
+                sessionId = "s1",
+                repair = SessionRepairResult(),
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+
+            assertNotNull(decision)
+            assertEquals("已经完成的后台结果", decision!!.completedOutput)
+            assertNull(decision.queuedInput)
+            assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun automationWithPossibleToolSideEffectBlocksReplay() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = true,
+                maxSteps = 8,
+                input = "修改文件",
+                memoryInput = "修改文件",
+                kind = LocalAgentRunKind.AUTOMATION,
+                allowMutation = true,
+            )
+            val call = AgentToolCall(
+                id = "call-write",
+                name = "write",
+                arguments = buildJsonObject { put("path", "a.txt") },
+            )
+            coordinator.recordEvent(context, AgentEvent.ToolStarted(context.runId, 1, call))
+            coordinator.recordEvent(
+                context,
+                AgentEvent.ToolFinished(
+                    turnId = context.runId,
+                    step = 1,
+                    call = call,
+                    output = "ok",
+                    sideEffect = AgentToolSideEffect.POSSIBLE,
+                ),
+            )
+
+            val decision = coordinator.recoveryDecision(
+                sessionId = "s1",
+                repair = SessionRepairResult(),
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+
+            assertNotNull(decision)
+            assertNull(decision!!.queuedInput)
+            assertTrue(decision.blockedReason.orEmpty().contains("重复操作"))
+        }
+    }
+
+    @Test
+    fun readonlySubagentCanReplayAfterInterruptedTool() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "读取资料",
+                memoryInput = "读取资料",
+                kind = LocalAgentRunKind.SUBAGENT,
+                allowMutation = false,
+            )
+            coordinator.recordEvent(
+                context,
+                AgentEvent.ToolStarted(
+                    turnId = context.runId,
+                    step = 1,
+                    call = AgentToolCall(
+                        id = "call-read",
+                        name = "read",
+                        arguments = buildJsonObject { put("path", "README.md") },
+                    ),
+                ),
+            )
+
+            val decision = coordinator.recoveryDecision(
+                sessionId = "s1",
+                repair = SessionRepairResult(),
+                kind = LocalAgentRunKind.SUBAGENT,
+            )
+
+            assertNotNull(decision)
+            assertNotNull(decision!!.queuedInput)
+            assertNull(decision.blockedReason)
         }
     }
 
