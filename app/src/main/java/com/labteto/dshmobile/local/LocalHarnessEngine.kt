@@ -1989,14 +1989,10 @@ class LocalHarnessEngine @Inject constructor(
                 output = reason,
                 delivered = false,
                 skipReason = reason,
-                nextRunAtHint = if (minimumSilenceMinutes != null) {
-                    nextQuietHoursEndMillis(
-                        nowMillis = System.currentTimeMillis(),
-                        endHour = quietEndHour,
-                    )
-                } else {
-                    null
-                },
+                nextRunAtHint = nextQuietHoursEndMillis(
+                    nowMillis = System.currentTimeMillis(),
+                    endHour = quietEndHour,
+                ),
             )
         }
 
