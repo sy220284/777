@@ -279,10 +279,19 @@ class HarnessJobManager(
     fun send(id: String, message: String): String {
         val clean = message.trim()
         require(clean.isNotEmpty()) { "消息不能为空" }
+        var coldResume = false
         synchronized(lock) {
             val record = records[id] ?: return "后台代理不存在：$id"
-            if (record.status != "running" || !record.label.startsWith(AGENT_PREFIX)) {
-                return "目标不是正在运行的后台代理：$id"
+            if (!record.label.startsWith(AGENT_PREFIX)) {
+                return "目标不是后台代理：$id"
+            }
+            if (record.status != "running") {
+                if (record.resumeKind != CONTINUABLE_SUBAGENT_KIND) {
+                    return "后台代理不可续接：$id [${record.status}]"
+                }
+                coldResume = true
+                record.status = "interrupted"
+                record.output = record.output.takeLast(MAX_OUTPUT)
             }
             record.inbox += clean.take(MAX_INBOX_MESSAGE)
             while (record.inbox.size > MAX_INBOX_MESSAGES) {
@@ -290,8 +299,15 @@ class HarnessJobManager(
             }
             record.updatedAt = System.currentTimeMillis()
         }
-        publish()
-        return "消息已发送给后台代理：$id"
+        // A continuation message is execution authority. Persist it before reporting success so a
+        // process death after send_message cannot lose a message the parent was told had been sent.
+        persistCurrentSnapshots()
+        notifyChanged()
+        return if (coldResume) {
+            "消息已发送，后台代理将从持久检查点冷恢复：$id"
+        } else {
+            "消息已发送给后台代理：$id"
+        }
     }
 
     fun drainMessages(id: String): List<String> {
@@ -386,6 +402,7 @@ class HarnessJobManager(
 
     private companion object {
         const val AGENT_PREFIX = "子代理："
+        const val CONTINUABLE_SUBAGENT_KIND = "subagent_readonly"
         const val MAX_LABEL = 160
         const val MAX_OUTPUT = 65_536
         const val MAX_INBOX_MESSAGE = 4_000
