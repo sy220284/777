@@ -1417,9 +1417,11 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("chat/branch-state", JsonObject(
             encodeChatBranchStateEvent(state.chatBranches) + ("reason" to JsonPrimitive(reason)),
         ))
+        val activeTranscript = activeChatBranchMessages(state.chatBranches)
+            .ifEmpty { state.messages }
         val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
             put("reason", reason)
-            put("transcript", encodeTranscriptMessages(state.messages))
+            put("transcript", encodeTranscriptMessages(activeTranscript))
         })
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
@@ -1456,7 +1458,10 @@ class LocalHarnessEngine @Inject constructor(
                 val retained = it.messages.filterNot { message -> message.id == messageId }
                 it.copy(
                     messages = retained,
-                    transcriptIndex = buildLocalTranscriptRuntimeIndex(retained),
+                    transcriptIndex = it.transcriptIndex.copy(
+                        totalMessageCount = (it.transcriptIndex.totalMessageCount - 1L)
+                            .coerceAtLeast(0L),
+                    ),
                 )
             }
             applyTranscriptMessages(transcript, event.sequence, clearStreamingPreview = true)
@@ -3695,16 +3700,7 @@ class LocalHarnessEngine @Inject constructor(
             val snapshot = _state.value
             val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
-            val branchBase = if (branchEligible) {
-                syncMaterializedChatBranchState(
-                    current = snapshot.chatBranches,
-                    activeMessages = snapshot.messages,
-                    chatState = snapshot.chatState,
-                    replySuggestions = snapshot.replySuggestions,
-                )
-            } else {
-                snapshot.chatBranches
-            }
+            val branchBase = snapshot.chatBranches
             captureAutoMemoryDirective(input)
             val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input, snapshot.handoffSummary)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
@@ -3782,7 +3778,10 @@ class LocalHarnessEngine @Inject constructor(
                     val retained = state.messages.filterNot { it.id == replacingMessageId }
                     state.copy(
                         messages = retained,
-                        transcriptIndex = buildLocalTranscriptRuntimeIndex(retained),
+                        transcriptIndex = state.transcriptIndex.copy(
+                            totalMessageCount = (state.transcriptIndex.totalMessageCount - 1L)
+                                .coerceAtLeast(0L),
+                        ),
                     )
                 }
             }
