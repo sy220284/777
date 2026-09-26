@@ -2,17 +2,21 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -23,6 +27,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
@@ -121,8 +127,35 @@ internal fun ProjectSettingsCard(
                     style = DsType.caption11,
                     color = DsTheme.colors.labelTertiary,
                 )
-                state.namespaces.forEach { namespace ->
-                    NamespaceSettings(namespace, state.writable, viewModel, report)
+                // 折叠收纳：编辑器默认收起，警示条始终可见
+                var namespacesExpanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(DsShapes.row)
+                        .clickable { namespacesExpanded = !namespacesExpanded }
+                        .padding(vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.advanced_project_namespaces_toggle, state.namespaces.size),
+                        style = DsType.small13Strong,
+                        color = if (state.writable) DsTheme.colors.warnLabel else DsTheme.colors.labelPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = DsTheme.colors.labelCaption,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .rotate(if (namespacesExpanded) 90f else 0f),
+                    )
+                }
+                if (namespacesExpanded) {
+                    state.namespaces.forEach { namespace ->
+                        NamespaceSettings(namespace, state.writable, viewModel, report)
+                    }
                 }
             }
         }
