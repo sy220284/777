@@ -305,12 +305,6 @@ internal fun imageInputUnsupported(error: Throwable): Boolean {
         .any(value::contains)
 }
 
-internal fun localImageModeLabel(mode: LocalImageInputMode): String = when (mode) {
-    LocalImageInputMode.AUTO -> "自动"
-    LocalImageInputMode.NATIVE -> "主模型直读"
-    LocalImageInputMode.TOOL -> "视觉工具"
-}
-
 internal val SUPPORTED_LOCAL_IMAGE_TYPES = setOf(
     "image/png",
     "image/jpeg",

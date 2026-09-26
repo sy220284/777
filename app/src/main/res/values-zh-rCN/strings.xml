@@ -365,6 +365,7 @@
     <string name="time_months">%1$d 个月</string>
     <string name="time_years">%1$d 年</string>
     <string name="chatlist_open">打开会话列表</string>
+    <string name="chatlist_manage_workspaces">管理工作区</string>
     <string name="chatlist_workspace_rename">重命名工作区</string>
     <string name="chatlist_workspace_delete">移除工作区</string>
     <string name="chatlist_workspace_delete_confirm">要从 Harness 中移除该工作区吗？文件夹及其会话日志不会被改动。</string>
@@ -755,7 +756,25 @@
     <string name="advanced_vision_optional">可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。</string>
     <string name="advanced_vision_saved">视觉模型配置已保存</string>
 
-    <string name="settings_page_pricing">API 价格</string>
+        <string name="usage_calculation_title">消耗计算</string>
+    <string name="usage_calculation_subtitle">本机 API 用量、费用估算与缓存命中</string>
+    <string name="usage_calculation_estimate">累计预估金额</string>
+    <string name="usage_calculation_scope">DeepSeek API · 本机累计 · 聊天、工作及视觉等调用</string>
+    <string name="usage_calculation_updated">最近记录：%1$s</string>
+    <string name="usage_calculation_no_data">暂无数据</string>
+    <string name="usage_calculation_total_tokens">Token 总消耗</string>
+    <string name="usage_calculation_requests">请求次数</string>
+    <string name="usage_calculation_token_breakdown">Token 用量</string>
+    <string name="usage_calculation_input">输入</string>
+    <string name="usage_calculation_output">输出</string>
+    <string name="usage_calculation_reasoning_note">其中推理 Token %1$s，已包含在输出中</string>
+    <string name="usage_calculation_hit">缓存命中</string>
+    <string name="usage_calculation_miss">缓存未命中</string>
+    <string name="usage_calculation_cache_note">命中率 = 缓存命中 ÷（命中 + 未命中）</string>
+    <string name="usage_calculation_partial">部分用量未计入金额</string>
+    <string name="usage_calculation_disclaimer">金额按每次请求当时的模型价格估算，仅供参考；不等同于平台账单。</string>
+    <string name="usage_calculation_view_prices">查看 API 价格与计价规则</string>
+<string name="settings_page_pricing">API 价格</string>
     <string name="settings_pricing_subtitle">模型 Token 价格、计价规则与官网自动更新</string>
     <string name="pricing_deepseek_title">DeepSeek API 价格</string>
     <string name="pricing_current_period">当前计价时段：%1$s</string>

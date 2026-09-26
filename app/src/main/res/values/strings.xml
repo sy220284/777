@@ -119,6 +119,7 @@
     <string name="chatlist_sort_updated">Sort by last update</string>
     <string name="chatlist_sort_manual">Manual order</string>
     <string name="chatlist_open">Open chats</string>
+    <string name="chatlist_manage_workspaces">Manage workspaces</string>
     <string name="chatlist_workspace_rename">Rename workspace</string>
     <string name="chatlist_workspace_delete">Remove workspace</string>
     <string name="chatlist_workspace_delete_confirm">Remove this workspace from the harness? The folder and its session logs are left untouched.</string>
@@ -757,7 +758,25 @@
     <string name="advanced_vision_optional">Optional. After you configure a multimodal model that accepts OpenAI-compatible image messages, Harness can send screenshots to it for analysis.</string>
     <string name="advanced_vision_saved">Vision settings saved</string>
 
-    <string name="settings_page_pricing">API pricing</string>
+        <string name="usage_calculation_title">Usage calculation</string>
+    <string name="usage_calculation_subtitle">Device API usage, cost estimate and cache hit rate</string>
+    <string name="usage_calculation_estimate">Cumulative estimated cost</string>
+    <string name="usage_calculation_scope">DeepSeek API · this device · chat, work, vision and more</string>
+    <string name="usage_calculation_updated">Last recorded: %1$s</string>
+    <string name="usage_calculation_no_data">No data</string>
+    <string name="usage_calculation_total_tokens">Total tokens</string>
+    <string name="usage_calculation_requests">Requests</string>
+    <string name="usage_calculation_token_breakdown">Token usage</string>
+    <string name="usage_calculation_input">Input</string>
+    <string name="usage_calculation_output">Output</string>
+    <string name="usage_calculation_reasoning_note">Reasoning tokens: %1$s, already included in output</string>
+    <string name="usage_calculation_hit">Cache hits</string>
+    <string name="usage_calculation_miss">Cache misses</string>
+    <string name="usage_calculation_cache_note">Hit rate = hits ÷ (hits + misses)</string>
+    <string name="usage_calculation_partial">Some usage is excluded from the estimate</string>
+    <string name="usage_calculation_disclaimer">Estimated using the model price at each request; this is not your provider bill.</string>
+    <string name="usage_calculation_view_prices">View API prices and billing rules</string>
+<string name="settings_page_pricing">API pricing</string>
     <string name="settings_pricing_subtitle">Current model token rates and automatic official price updates</string>
     <string name="pricing_deepseek_title">DeepSeek API pricing</string>
     <string name="pricing_current_period">Current billing period: %1$s</string>

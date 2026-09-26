@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.main
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -159,6 +156,10 @@ fun ChatListDrawer(
     val sortByRecency = sessionSort == SORT_UPDATED
     var newWorkspaceOpen by remember { mutableStateOf(false) }
     var newSessionOpen by remember { mutableStateOf(false) }
+    var manageWorkspacesOpen by remember { mutableStateOf(false) }
+    var workspaceMenuTarget by remember { mutableStateOf<WorkspaceRow?>(null) }
+    var workspaceRenameTarget by remember { mutableStateOf<WorkspaceRow?>(null) }
+    var workspaceDeleteTarget by remember { mutableStateOf<WorkspaceRow?>(null) }
     var workspacePanelKey by remember { mutableStateOf<ComposerKey?>(null) }
 
     LaunchedEffect(query) {
@@ -329,7 +330,7 @@ fun ChatListDrawer(
                         onToggle = { archivedExpanded = !archivedExpanded },
                     ) {
                         archivedSessions.forEach { session ->
-                            SessionRowItem(session, false, store, scope, onClose)
+                            SessionRowItem(session, false, store, scope, onClose, archived = true)
                         }
                     }
                 }
@@ -364,7 +365,17 @@ fun ChatListDrawer(
                 stringResource(R.string.chatlist_new_workspace),
                 style = DsType.std14,
                 color = colors.labelSecondary,
+                modifier = Modifier.weight(1f),
             )
+            if (workspaces.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.chatlist_manage_workspaces),
+                    style = DsType.small13Strong,
+                    color = colors.accent,
+                    modifier = Modifier.clickable { manageWorkspacesOpen = true }
+                        .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                )
+            }
         }
 
         Column(
@@ -451,6 +462,60 @@ fun ChatListDrawer(
         )
     }
 
+    if (manageWorkspacesOpen) {
+        ManageWorkspacesDialog(
+            workspaces = workspaces,
+            onDismiss = { manageWorkspacesOpen = false },
+            onPick = { workspace ->
+                manageWorkspacesOpen = false
+                workspaceMenuTarget = workspace
+            },
+        )
+    }
+    workspaceMenuTarget?.let { workspace ->
+        WorkspaceMenu(
+            onDismiss = { workspaceMenuTarget = null },
+            onNewSession = {
+                workspaceMenuTarget = null
+                scope.launch {
+                    store.createSession(workspaceId = workspace.workspaceId)
+                    onClose()
+                }
+            },
+            onRename = {
+                workspaceMenuTarget = null
+                workspaceRenameTarget = workspace
+            },
+            onDelete = {
+                workspaceMenuTarget = null
+                workspaceDeleteTarget = workspace
+            },
+        )
+    }
+    workspaceRenameTarget?.let { workspace ->
+        RenameDialog(
+            initial = workspace.title,
+            title = stringResource(R.string.chatlist_workspace_rename),
+            onDismiss = { workspaceRenameTarget = null },
+            onConfirm = {
+                scope.launch { store.renameWorkspace(workspace.workspaceId, it) }
+                workspaceRenameTarget = null
+            },
+        )
+    }
+    workspaceDeleteTarget?.let { workspace ->
+        ConfirmDialog(
+            title = stringResource(R.string.chatlist_workspace_delete),
+            body = stringResource(R.string.chatlist_workspace_delete_confirm),
+            confirmLabel = stringResource(R.string.common_remove),
+            onDismiss = { workspaceDeleteTarget = null },
+            onConfirm = {
+                scope.launch { store.deleteWorkspace(workspace.workspaceId) }
+                workspaceDeleteTarget = null
+            },
+        )
+    }
+
     if (newSessionOpen) {
         NewSessionDialog(
             workspaces = workspaces,
@@ -527,106 +592,6 @@ private fun SortChip(byRecency: Boolean, onPick: (byRecency: Boolean) -> Unit) {
 // Rows
 // ---------------------------------------------------------------------------
 
-/**
- * A workspace header that collapses its group and carries the workspace verbs.
- *
- * Rename and remove exist on the wire and had no UI at all; a long-press menu is where a
- * phone user expects to find them.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun WorkspaceHeader(
-    workspace: WorkspaceRow,
-    collapsed: Boolean,
-    sessionCount: Int,
-    onToggle: () -> Unit,
-    store: SessionStore,
-    scope: CoroutineScope,
-    onNewSession: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    var menuOpen by remember { mutableStateOf(false) }
-    var renaming by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(
-        targetValue = if (collapsed) 0f else 90f,
-        animationSpec = DsAnimations.chevron,
-        label = "workspaceChevron",
-    )
-    val label = workspace.title.ifBlank { basename(workspace.path) }
-
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(DsShapes.row)
-                .combinedClickable(onClick = onToggle, onLongClick = { menuOpen = true })
-                .padding(vertical = DsSpacing.xsmall),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = colors.labelTertiary,
-                modifier = Modifier
-                    .size(16.dp)
-                    .graphicsLayer { rotationZ = rotation },
-            )
-            Spacer(Modifier.width(DsSpacing.tiny))
-            Text(
-                label,
-                style = DsType.std14Strong,
-                color = colors.labelSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(sessionCount.toString(), style = DsType.caption11, color = colors.labelCaption)
-        }
-        if (menuOpen) {
-            WorkspaceMenu(
-                onDismiss = { menuOpen = false },
-                onNewSession = {
-                    menuOpen = false
-                    onNewSession()
-                },
-                onRename = {
-                    menuOpen = false
-                    renaming = true
-                },
-                onDelete = {
-                    menuOpen = false
-                    deleting = true
-                },
-            )
-        }
-    }
-
-    if (renaming) {
-        RenameDialog(
-            initial = workspace.title,
-            title = stringResource(R.string.chatlist_workspace_rename),
-            onDismiss = { renaming = false },
-            onConfirm = {
-                scope.launch { store.renameWorkspace(workspace.workspaceId, it) }
-                renaming = false
-            },
-        )
-    }
-    if (deleting) {
-        ConfirmDialog(
-            title = stringResource(R.string.chatlist_workspace_delete),
-            body = stringResource(R.string.chatlist_workspace_delete_confirm),
-            confirmLabel = stringResource(R.string.common_remove),
-            onDismiss = { deleting = false },
-            onConfirm = {
-                scope.launch { store.deleteWorkspace(workspace.workspaceId) }
-                deleting = false
-            },
-        )
-    }
-}
-
 @Composable
 private fun WorkspaceMenu(
     onDismiss: () -> Unit,
@@ -657,6 +622,7 @@ private fun SessionRowItem(
     store: SessionStore,
     scope: CoroutineScope,
     onClose: () -> Unit,
+    archived: Boolean = false,
     depth: Int = 0,
     childCount: Int = 0,
     childrenExpanded: Boolean = false,
@@ -666,6 +632,7 @@ private fun SessionRowItem(
     var menuOpen by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var archiveConfirmOpen by remember { mutableStateOf(false) }
+    var restoreFailed by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (childrenExpanded) 90f else 0f,
         animationSpec = DsAnimations.chevron,
@@ -683,6 +650,10 @@ private fun SessionRowItem(
                 .combinedClickable(
                     onClick = {
                         scope.launch {
+                            if (archived && !store.unarchiveSession(session.sessionId)) {
+                                restoreFailed = true
+                                return@launch
+                            }
                             store.openSession(session.sessionId)
                             onClose()
                         }
@@ -738,20 +709,31 @@ private fun SessionRowItem(
 
         if (menuOpen) {
             DsDialog(title = null, onDismiss = { menuOpen = false }) {
-                SheetRow(title = stringResource(R.string.chatlist_session_rename)) {
-                    menuOpen = false
-                    renameOpen = true
-                }
-                SheetRow(title = stringResource(R.string.chatlist_session_fork)) {
-                    menuOpen = false
-                    scope.launch { store.forkSession(session.sessionId) }
-                }
-                SheetRow(title = stringResource(R.string.chatlist_session_archive)) {
-                    menuOpen = false
-                    archiveConfirmOpen = true
+                if (archived) {
+                    SheetRow(title = stringResource(R.string.archived_restore)) {
+                        menuOpen = false
+                        scope.launch { restoreFailed = !store.unarchiveSession(session.sessionId) }
+                    }
+                } else {
+                    SheetRow(title = stringResource(R.string.chatlist_session_rename)) {
+                        menuOpen = false
+                        renameOpen = true
+                    }
+                    SheetRow(title = stringResource(R.string.chatlist_session_fork)) {
+                        menuOpen = false
+                        scope.launch { store.forkSession(session.sessionId) }
+                    }
+                    SheetRow(title = stringResource(R.string.chatlist_session_archive)) {
+                        menuOpen = false
+                        archiveConfirmOpen = true
+                    }
                 }
             }
         }
+    }
+
+    if (restoreFailed) {
+        Text(stringResource(R.string.panel_failed), style = DsType.caption11, color = colors.warnLabel)
     }
 
     if (renameOpen) {
@@ -875,6 +857,23 @@ private fun NewSessionDialog(
             subtitle = homeCwd,
             onClick = { onPick(null) },
         )
+    }
+}
+
+@Composable
+private fun ManageWorkspacesDialog(
+    workspaces: List<WorkspaceRow>,
+    onDismiss: () -> Unit,
+    onPick: (WorkspaceRow) -> Unit,
+) {
+    DsDialog(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
+        workspaces.forEach { workspace ->
+            SheetRow(
+                title = workspace.title.ifBlank { basename(workspace.path) },
+                subtitle = workspace.path,
+                onClick = { onPick(workspace) },
+            )
+        }
     }
 }
 
