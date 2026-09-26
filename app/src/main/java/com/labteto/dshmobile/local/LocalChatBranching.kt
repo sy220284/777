@@ -48,12 +48,42 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
     val turnDialogue = dialogue.filterNot { it.role == "assistant" && it.proactive }
     if (turnDialogue.isEmpty()) return true
     if (turnDialogue.first().role != "user") return false
-    if (turnDialogue.any(::chatMessageHasAttachmentContext)) return false
-    return turnDialogue.zipWithNext().all { (left, right) -> left.role != right.role }
+    // Group chat may legitimately produce several assistant messages for one user turn.
+    // What cannot be branched safely is two human turns with no completed assistant turn between
+    // them, because those are queued/steering inputs rather than independent conversation turns.
+    return turnDialogue.zipWithNext().none { (left, right) ->
+        left.role == "user" && right.role == "user"
+    }
 }
 
 internal fun chatMessageHasAttachmentContext(message: LocalHarnessMessage): Boolean =
     message.role == "user" && LOCAL_IMPORTED_ATTACHMENT_MARKER in message.content
+
+internal fun editableChatUserText(message: LocalHarnessMessage): String {
+    if (message.role != "user") return message.content
+    val markerIndex = message.content.indexOf(LOCAL_IMPORTED_ATTACHMENT_MARKER)
+    if (markerIndex < 0) return message.content
+    return message.content.substring(0, markerIndex).trimEnd()
+}
+
+internal fun withEditedChatUserText(
+    message: LocalHarnessMessage,
+    replacement: String,
+): String {
+    val clean = replacement.trim()
+    if (message.role != "user") return clean
+
+    val markerIndex = message.content.indexOf(LOCAL_IMPORTED_ATTACHMENT_MARKER)
+    if (markerIndex < 0) return clean
+    val attachmentContext = message.content.substring(markerIndex).trim()
+    return buildString {
+        if (clean.isNotEmpty()) {
+            append(clean)
+            append("\n\n")
+        }
+        append(attachmentContext)
+    }
+}
 
 internal fun syncChatBranchState(
     current: LocalChatBranchState,
