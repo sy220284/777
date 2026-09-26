@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 
 private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
+private const val PERSONA_INSPECTION_RECENT_MESSAGES = 28
+private const val PERSONA_AUTOFILL_RECENT_MESSAGES = 12
 
 /** UI adapter for the process-wide on-device Harness engine. */
 @HiltViewModel
@@ -80,15 +82,18 @@ class LocalHarnessViewModel @Inject constructor(
         ) {
             "请在单人聊天空闲时保存人设与故事"
         }
+        val completeHistory = withContext(Dispatchers.IO) {
+            engine.completeTranscriptForUi(snapshot.sessionId)
+        }
         val archiveHistory = if (
             snapshot.galleryStoryId == null &&
             snapshot.gallerySaveSuppressedThrough > 0L
         ) {
-            snapshot.messages.filter { message ->
+            completeHistory.filter { message ->
                 message.createdAt > snapshot.gallerySaveSuppressedThrough
             }
         } else {
-            snapshot.messages
+            completeHistory
         }
         val outcome = withContext(Dispatchers.IO) {
             galleryStore.save(
@@ -205,7 +210,10 @@ class LocalHarnessViewModel @Inject constructor(
             snapshot.galleryId == id &&
             snapshot.galleryStoryId == story?.id
         ) {
-            (archived + snapshot.messages)
+            val recent = withContext(Dispatchers.IO) {
+                engine.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
+            }
+            (archived + recent)
                 .distinctBy { it.id.ifBlank { "${it.role}|${it.createdAt}|${it.content}" } }
         } else {
             archived
@@ -571,11 +579,14 @@ class LocalHarnessViewModel @Inject constructor(
             return Result.failure(IllegalStateException("persona_autofill_unconfigured"))
         }
         return runCatching {
+            val recentMessages = withContext(Dispatchers.IO) {
+                engine.transcriptTailForUi(snapshot.sessionId, PERSONA_AUTOFILL_RECENT_MESSAGES)
+            }
             val generated = personaAutoFillService.generate(
                 model = snapshot.model,
                 baseUrl = snapshot.baseUrl,
                 current = snapshot.chatPersona,
-                recentMessages = snapshot.messages,
+                recentMessages = recentMessages,
                 description = description,
             )
             engine.syncDefaultChatPersona(generated)
