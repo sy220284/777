@@ -121,7 +121,16 @@ internal class LocalToolExecutionCoordinator(
             ),
         )
 
-        if (!result.isError) return AgentToolResult(result.content)
+        if (!result.isError) {
+            return AgentToolResult(
+                content = result.content,
+                sideEffect = if (registered.access in MUTATING_ACCESSES) {
+                    AgentToolSideEffect.POSSIBLE
+                } else {
+                    AgentToolSideEffect.NONE
+                },
+            )
+        }
 
         return AgentToolResult(
             content = result.content,
