@@ -1025,4 +1025,5 @@
     <string name="local_manage_model_config">管理模型配置</string>
     <string name="local_attachment_image">图片</string>
     <string name="local_attachment_file">文件</string>
+    <string name="local_run_agents">智能体 %1$d</string>
 </resources>
