@@ -201,6 +201,7 @@ class SettingsViewModel @Inject constructor(
         refreshRemoteSettings()
         refreshDeviceCapabilities()
         refreshVisionSettings()
+        refreshMemories()
     }
 
     fun refreshDeepSeekPricing() {

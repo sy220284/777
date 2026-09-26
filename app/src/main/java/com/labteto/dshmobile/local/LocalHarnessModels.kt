@@ -101,6 +101,8 @@ data class LocalSessionSummary(
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val chatMode: LocalChatMode = LocalChatMode.SINGLE,
     val blank: Boolean = false,
+    /** 最近一条用户消息的预览（截断到 72 字符），供侧边栏第二行展示。 */
+    val summaryPreview: String? = null,
 )
 
 /** One real file currently present in the app-private local Harness workspace. */

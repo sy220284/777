@@ -254,9 +254,9 @@ internal fun PersonaGalleryScreen(
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
                             it.write(payload)
-                        } ?: error("无法写入目标文件")
+                        } ?: error("Unable to write target file")
                     }
-                }.onFailure { error = it.message ?: exportFailedText }
+                }.onFailure { error = exportFailedText }
             }
         }
     }
@@ -283,7 +283,7 @@ internal fun PersonaGalleryScreen(
                 val payload = runCatching {
                     withContext(Dispatchers.IO) { readPersonaShareText(context, uri) }
                 }.getOrElse {
-                    error = it.message ?: importFailedText
+                    error = importFailedText
                     return@launch
                 }
                 importPayload(payload)
@@ -372,7 +372,11 @@ internal fun PersonaGalleryScreen(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 if (selected == null) {
-            GalleryOverviewHeader(entries.size)
+            GalleryOverviewHeader(
+                characterCount = entries.size,
+                storyCount = entries.sumOf { it.stories.size },
+                dialogueCount = entries.sumOf { it.totalDialogueCount() },
+            )
 
             val installedPresetIds = entries
                 .map { it.persona.presetId }
@@ -517,6 +521,20 @@ internal fun PersonaGalleryScreen(
                 }
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.persona_gallery_my_characters),
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                GalleryPill(entries.size.toString())
+            }
+
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
@@ -591,7 +609,7 @@ internal fun PersonaGalleryScreen(
                 entry = selected,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(380.dp),
+                    .height(320.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -629,25 +647,31 @@ internal fun PersonaGalleryScreen(
                 }
             }
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_export_file),
-                onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        onExport(selected.id, false)
-                            .onSuccess { payload ->
-                                pendingExportPayload = payload
-                                exportDocument.launch(personaExportFileName(selected.persona.name))
-                            }
-                            .onFailure { error = it.message ?: exportFailedText }
-                        busy = false
-                    }
-                },
-                variant = DsButtonVariant.Outline,
+            selectedStory?.let { story ->
+                PersonaRelationshipStatusCard(story)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_continue_story),
+                        onClick = { onStart(selected.id, story.id, false) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canSave && !busy && !hasLocalStoryEdits,
+                    )
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_start_fresh_story),
+                        onClick = { onStart(selected.id, null, true) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canSave && !busy && !hasLocalStoryEdits,
+                        variant = DsButtonVariant.Outline,
+                    )
+                }
+            } ?: DsButton(
+                text = stringResource(R.string.persona_gallery_start_fresh_story),
+                onClick = { onStart(selected.id, null, true) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
+                enabled = canSave && !busy && !hasLocalStoryEdits,
             )
 
             notice?.let {
@@ -677,6 +701,26 @@ internal fun PersonaGalleryScreen(
             if (showPersonaDetails) {
                 PersonaDetails(selected.persona)
             }
+
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_file),
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onExport(selected.id, false)
+                            .onSuccess { payload ->
+                                pendingExportPayload = payload
+                                exportDocument.launch(personaExportFileName(selected.persona.name))
+                            }
+                            .onFailure { error = it.message ?: exportFailedText }
+                        busy = false
+                    }
+                },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
@@ -743,22 +787,6 @@ internal fun PersonaGalleryScreen(
                     enabled = !busy,
                 )
             }
-
-            selectedStory?.let { story ->
-                DsButton(
-                    text = stringResource(R.string.persona_gallery_continue_story),
-                    onClick = { onStart(selected.id, story.id, false) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy && !hasLocalStoryEdits,
-                )
-            }
-            DsButton(
-                text = stringResource(R.string.persona_gallery_start_fresh_story),
-                onClick = { onStart(selected.id, null, true) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy && !hasLocalStoryEdits,
-                variant = DsButtonVariant.Outline,
-            )
 
             selectedStory?.let { story ->
                 if (editingStoryTitle) {
@@ -1088,7 +1116,7 @@ private fun personaExportFileName(name: String): String {
 }
 
 private fun readPersonaShareText(context: android.content.Context, uri: android.net.Uri): String {
-    val input = context.contentResolver.openInputStream(uri) ?: error("无法读取人物文件")
+    val input = context.contentResolver.openInputStream(uri) ?: error("Unable to read persona file")
     return input.bufferedReader().use { reader ->
         val result = StringBuilder()
         val buffer = CharArray(4_096)
@@ -1097,7 +1125,7 @@ private fun readPersonaShareText(context: android.content.Context, uri: android.
             if (count < 0) break
             result.append(buffer, 0, count)
         }
-        require(result.length <= 64_000) { "人物文件过大" }
+        require(result.length <= 64_000) { "Persona file is too large" }
         result.toString()
     }
 }
@@ -1328,7 +1356,11 @@ private fun StoryDetailSection(
 }
 
 @Composable
-private fun GalleryOverviewHeader(count: Int) {
+private fun GalleryOverviewHeader(
+    characterCount: Int,
+    storyCount: Int,
+    dialogueCount: Int,
+) {
     DsCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
@@ -1346,7 +1378,10 @@ private fun GalleryOverviewHeader(count: Int) {
                 }
             }
             Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 Text(
                     stringResource(R.string.persona_gallery_master),
                     style = DsType.large20,
@@ -1354,7 +1389,12 @@ private fun GalleryOverviewHeader(count: Int) {
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    stringResource(R.string.persona_gallery_count, count),
+                    stringResource(
+                        R.string.persona_gallery_overview_stats,
+                        characterCount,
+                        storyCount,
+                        dialogueCount,
+                    ),
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                 )
@@ -1683,6 +1723,55 @@ private fun ArchivedDialogueRow(
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         )
+    }
+}
+
+@Composable
+private fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
+    val colors = DsTheme.colors
+    val state = story.chatState
+    DsCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
+                    style = DsType.std14,
+                    color = colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.persona_gallery_story_relation),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+            }
+            GalleryPill(state.relationshipState)
+            state.mood.takeIf(String::isNotBlank)?.let { GalleryPill(it) }
+        }
+        state.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
+            Text(
+                focus,
+                style = DsType.small13,
+                color = colors.labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        state.dynamics.sharedMoments.lastOrNull()?.takeIf(String::isNotBlank)?.let { moment ->
+            Text(
+                moment,
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
