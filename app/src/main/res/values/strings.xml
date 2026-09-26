@@ -423,6 +423,7 @@
     <string name="tasks_run_completed">Completed</string>
     <string name="tasks_run_blocked">Needs attention</string>
     <string name="tasks_run_failed">Failed</string>
+    <string name="tasks_run_skipped">Skipped</string>
     <string name="tasks_last_result">Latest result: %1$s</string>
     <string name="tasks_last_status">Latest status: %1$s</string>
     <string name="tasks_open_result">Open result</string>
