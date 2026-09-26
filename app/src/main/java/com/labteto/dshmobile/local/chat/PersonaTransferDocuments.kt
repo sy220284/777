@@ -97,7 +97,7 @@ internal object PersonaTransferDocuments {
                     bytes[3] == 0x04.toByte())
         if (looksLikeDocx) return extractDocxPayload(bytes)
 
-        val text = bytes.toString(StandardCharsets.UTF_8).trim()
+        val text = String(bytes, StandardCharsets.UTF_8).trim()
         require(text.isNotEmpty()) { "人物导入文件为空" }
         if (text.startsWith("{")) return text
         return extractMarkdownPayload(text)
@@ -172,7 +172,7 @@ internal object PersonaTransferDocuments {
         require(end > payloadStart) { "Markdown 人物迁移数据不完整" }
         val encoded = text.substring(payloadStart, end).filterNot(Char::isWhitespace)
         return runCatching {
-            Base64.getDecoder().decode(encoded).toString(StandardCharsets.UTF_8)
+            String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8)
         }.getOrElse { throw IllegalArgumentException("Markdown 人物迁移数据损坏", it) }
     }
 
@@ -326,7 +326,7 @@ internal object PersonaTransferDocuments {
                 require(totalInflated <= MAX_PERSONA_TRANSFER_BYTES * 2) {
                     "Word 人物文档解压内容过大"
                 }
-                val text = data.toString(StandardCharsets.UTF_8)
+                val text = String(data, StandardCharsets.UTF_8)
                 if (entry.name == CUSTOM_XML_ENTRY) {
                     customPayload = Regex(
                         """<payload>([^<]+)</payload>""",
@@ -345,7 +345,7 @@ internal object PersonaTransferDocuments {
         val encoded = customPayload ?: hiddenPayload
         require(!encoded.isNullOrBlank()) { "Word 中未找到 777 人物迁移数据" }
         return runCatching {
-            Base64.getDecoder().decode(encoded).toString(StandardCharsets.UTF_8)
+            String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8)
         }.getOrElse { throw IllegalArgumentException("Word 人物迁移数据损坏", it) }
     }
 
