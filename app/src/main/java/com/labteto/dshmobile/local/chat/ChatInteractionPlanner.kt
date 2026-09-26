@@ -384,16 +384,23 @@ class ChatInteractionPlanner @Inject constructor(
         previous: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
-    ): ChatCharacterState = applyInteractionPerformance(
-        state = applyInteractionIntent(
-            state = previous,
+    ): ChatCharacterState {
+        val intentState = if (userMessage.isBlank()) {
+            previous
+        } else {
+            applyInteractionIntent(
+                state = previous,
+                previous = previous,
+                userMessage = userMessage,
+            )
+        }
+        return applyInteractionPerformance(
+            state = intentState,
             previous = previous,
             userMessage = userMessage,
-        ),
-        previous = previous,
-        userMessage = userMessage,
-        assistantMessage = assistantMessage,
-    )
+            assistantMessage = assistantMessage,
+        )
+    }
 
     private fun applyInteractionIntent(
         state: ChatCharacterState,
