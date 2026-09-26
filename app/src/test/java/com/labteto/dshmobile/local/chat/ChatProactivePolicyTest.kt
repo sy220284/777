@@ -33,6 +33,14 @@ class ChatProactivePolicyTest {
     }
 
     @Test
+    fun quietWindowSupportsOvernightRange() {
+        assertTrue(isHourInQuietWindow(hour = 23, startHour = 23, endHour = 7))
+        assertTrue(isHourInQuietWindow(hour = 2, startHour = 23, endHour = 7))
+        assertFalse(isHourInQuietWindow(hour = 7, startHour = 23, endHour = 7))
+        assertFalse(isHourInQuietWindow(hour = 18, startHour = 23, endHour = 7))
+    }
+
+    @Test
     fun detectsNearDuplicateProactiveCopy() {
         val messages = listOf(
             message(
