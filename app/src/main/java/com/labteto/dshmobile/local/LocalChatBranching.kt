@@ -100,6 +100,40 @@ internal fun syncChatBranchState(
     return state
 }
 
+/**
+ * Keep ordinary linear chats out of the branch graph.
+ *
+ * A branch graph is only useful after the user actually creates an alternative. Until then the
+ * active transcript is already the source of truth, so mirroring every message here only doubles
+ * long-chat memory and snapshot size.
+ */
+internal fun syncMaterializedChatBranchState(
+    current: LocalChatBranchState,
+    activeMessages: List<LocalHarnessMessage>,
+    chatState: ChatCharacterState,
+    replySuggestions: List<ChatReplySuggestion>,
+): LocalChatBranchState =
+    if (current.nodes.isEmpty()) {
+        current
+    } else {
+        syncChatBranchState(current, activeMessages, chatState, replySuggestions)
+    }
+
+/**
+ * Drop legacy linear-only branch graphs on load, while preserving real user-created alternatives.
+ */
+internal fun restoreMaterializedChatBranchState(
+    current: LocalChatBranchState,
+    activeMessages: List<LocalHarnessMessage>,
+    chatState: ChatCharacterState,
+    replySuggestions: List<ChatReplySuggestion>,
+): LocalChatBranchState =
+    if (!hasChatBranchAlternatives(current)) {
+        LocalChatBranchState()
+    } else {
+        syncChatBranchState(current, activeMessages, chatState, replySuggestions)
+    }
+
 internal fun upsertChatBranchNode(
     state: LocalChatBranchState,
     node: LocalChatBranchNode,
