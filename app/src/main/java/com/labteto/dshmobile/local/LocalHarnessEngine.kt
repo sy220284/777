@@ -4096,7 +4096,7 @@ class LocalHarnessEngine @Inject constructor(
                     allowMutation = true,
                 ).map { (_, result) -> result }
             },
-            isParallelTool = { call -> call.name in PARALLEL_SUBAGENT_TOOLS },
+            isParallelTool = { call -> call.name in PARALLEL_AGENT_TOOLS },
             eventSink = AgentEventSink { event ->
                 when (event) {
                     is AgentEvent.TurnStarted -> {
@@ -4369,8 +4369,8 @@ class LocalHarnessEngine @Inject constructor(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
     ): List<Pair<LocalToolCall, AgentToolResult>> {
-        val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
-        if (!parallelSubagents) {
+        val parallel = calls.size > 1 && calls.all { it.name in PARALLEL_AGENT_TOOLS }
+        if (!parallel) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
         }
         return isolatedParallelMap(calls) { call ->
@@ -6607,6 +6607,16 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
+        val PARALLEL_READ_ONLY_TOOLS = setOf(
+            "read", "read_file", "list_files", "glob", "grep", "file_inspect",
+            "tool_output_read", "json_query", "web_search",
+            "session_event_search", "session_search", "session_trace",
+            "session_event_trace", "session_event_read",
+            "memory_search", "memory_list", "runtime_command_status",
+            "lsp_definition", "lsp_references", "lsp_hover", "lsp_implementation",
+            "lsp_document_symbols", "lsp_workspace_symbols", "lsp_diagnostics",
+        )
+        val PARALLEL_AGENT_TOOLS = PARALLEL_SUBAGENT_TOOLS + PARALLEL_READ_ONLY_TOOLS
 
         val PLAN_MODE_BLOCKED_TOOLS = setOf(
             "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",
