@@ -65,6 +65,7 @@ fun DsTimeline(
                         val nodeColor = when (item.state) {
                             DsStatus.Running -> colors.accent
                             DsStatus.Done -> colors.success
+                            DsStatus.Warning -> colors.warn
                             DsStatus.Failed -> colors.error
                             DsStatus.Neutral -> colors.labelCaption
                         }
