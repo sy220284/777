@@ -258,7 +258,7 @@ internal fun PersonaGalleryScreen(
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri, "w")?.use { output ->
                         output.write(document.bytes)
-                    } ?: error("无法写入人物导出文件")
+                    } ?: error(exportFailedText)
                 }
             }.onFailure { error = exportFailedText }
         }
@@ -1203,7 +1203,7 @@ private fun readPersonaShareDocument(
         val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
         if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
     }
-    val input = resolver.openInputStream(uri) ?: error("无法读取人物导入文件")
+    val input = resolver.openInputStream(uri) ?: error(context.getString(R.string.persona_gallery_import_failed))
     val bytes = input.use { stream ->
         val output = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(8_192)
