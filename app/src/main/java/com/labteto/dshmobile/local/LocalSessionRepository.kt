@@ -175,6 +175,11 @@ internal class LocalSessionRepository(
                             message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
                         } ?: true
                     },
+                    summaryPreview = transcriptIndex?.latestUserContent
+                        ?.replace(Regex("\\s+"), " ")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { if (it.length > 72) it.take(72) + "…" else it },
                 )
             }.getOrNull()
         }
@@ -188,5 +193,10 @@ internal class LocalSessionRepository(
         blank = transcriptIndex.totalMessageCount == 0L &&
             transcriptWindow.none { it.content.isNotBlank() } &&
             messages.none { it.content.isNotBlank() },
+        summaryPreview = transcriptIndex.latestUserContent
+            ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { if (it.length > 72) it.take(72) + "…" else it },
     )
 }

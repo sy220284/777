@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ fun DsCategoryRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     value: String? = null,
+    iconFamily: DsIconFamily = DsIconFamily.Neutral,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -74,12 +76,7 @@ fun DsCategoryRow(
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(28.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(DsMetrics.icon))
-        }
+        DsIconBox(icon = icon, family = iconFamily)
         Spacer(Modifier.width(DsSpacing.small))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -101,7 +98,14 @@ fun DsCategoryRow(
         }
         value?.let {
             Spacer(Modifier.width(DsSpacing.small))
-            Text(it, style = DsType.std14, color = colors.labelTertiary, maxLines = 1)
+            Text(
+                it,
+                style = DsType.std14,
+                color = colors.labelTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 144.dp),
+            )
         }
         if (trailing != null) {
             Spacer(Modifier.width(DsSpacing.small))
