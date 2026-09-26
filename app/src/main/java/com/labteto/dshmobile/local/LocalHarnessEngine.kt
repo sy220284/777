@@ -3794,6 +3794,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
+        val runPolicy = localAgentRunPolicy(_state.value.usageMode)
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
@@ -3896,7 +3897,7 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory()
                 val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
                 val snapshot = _state.value
-                val tools = modelToolSchemas()
+                val tools = modelToolSchemas(runPolicy)
                 // Re-check before every model step. Tool results and queued user messages can grow
                 // substantially inside one turn, so checking only at turn start is insufficient.
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
@@ -3916,12 +3917,18 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     withEphemeralContext(modelHistory.toList(), ephemeralContext)
                 }
-                val selectedMode = resolveLocalImageInputMode(
-                    snapshot.imageInputMode,
-                    imageCapabilities,
-                    snapshot.baseUrl,
-                    snapshot.model,
-                )
+                val selectedMode = if (runPolicy.toolsEnabled) {
+                    resolveLocalImageInputMode(
+                        snapshot.imageInputMode,
+                        imageCapabilities,
+                        snapshot.baseUrl,
+                        snapshot.model,
+                    )
+                } else {
+                    // Chat is a pure model conversation. Images may only travel through the
+                    // model's native multimodal input; vision tools belong to Work.
+                    LocalImageInputMode.NATIVE
+                }
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = durableRequestMessages,
                     workspaceRoot = File(workspace.path),
@@ -3951,7 +3958,11 @@ class LocalHarnessEngine @Inject constructor(
                     if (nativeImageRejected) {
                         imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
                     }
-                    if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
+                    if (
+                        runPolicy.imageFallbackToVisionTool &&
+                        snapshot.imageInputMode == LocalImageInputMode.AUTO &&
+                        nativeImageRejected
+                    ) {
                         eventLog.append("multimodal/fallback", buildJsonObject {
                             put("step", modelStep + 1)
                             put("model", snapshot.model)
@@ -3974,6 +3985,11 @@ class LocalHarnessEngine @Inject constructor(
                         streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                             persistOverflowHistory = true,
                         )
+                    } else if (!runPolicy.imageFallbackToVisionTool && nativeImageRejected) {
+                        throw IllegalStateException(
+                            "当前模型不支持图片理解，请切换支持图片的模型后重试。",
+                            error,
+                        )
                     } else {
                         throw error
                     }
@@ -3987,28 +4003,58 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 modelStep += 1
                 repliesByStep[modelStep] = reply
+                if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
+                    eventLog.append("chat/tool-call-blocked", buildJsonObject {
+                        put("count", reply.toolCalls.size)
+                        put("reason", "chat-capability-policy")
+                    })
+                }
                 AgentModelReply(
                     content = reply.content.orEmpty(),
-                    toolCalls = reply.toolCalls.map { call ->
-                        AgentToolCall(
-                            id = call.id,
-                            name = call.name,
-                            arguments = call.arguments,
-                            rawArguments = call.rawArguments,
-                        )
+                    toolCalls = if (runPolicy.allowToolExecution) {
+                        reply.toolCalls.map { call ->
+                            AgentToolCall(
+                                id = call.id,
+                                name = call.name,
+                                arguments = call.arguments,
+                                rawArguments = call.rawArguments,
+                            )
+                        }
+                    } else {
+                        emptyList()
                     },
                 )
             },
             tools = AgentToolExecutor { call ->
-                executeSafely(call.toLocalToolCall(), allowMutation = true)
+                if (!runPolicy.allowToolExecution) {
+                    AgentToolResult(
+                        content = "聊天模式不提供工具执行能力。",
+                        isError = true,
+                        errorCode = "TOOLS_DISABLED",
+                    )
+                } else {
+                    executeSafely(call.toLocalToolCall(), allowMutation = true)
+                }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
-                executeToolBatch(
-                    calls = calls.map { it.toLocalToolCall() },
-                    allowMutation = true,
-                ).map { (_, result) -> result }
+                if (!runPolicy.allowToolExecution) {
+                    calls.map {
+                        AgentToolResult(
+                            content = "聊天模式不提供工具执行能力。",
+                            isError = true,
+                            errorCode = "TOOLS_DISABLED",
+                        )
+                    }
+                } else {
+                    executeToolBatch(
+                        calls = calls.map { it.toLocalToolCall() },
+                        allowMutation = true,
+                    ).map { (_, result) -> result }
+                }
             },
-            isParallelTool = { call -> call.name in PARALLEL_SUBAGENT_TOOLS },
+            isParallelTool = { call ->
+                runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
+            },
             eventSink = AgentEventSink { event ->
                 when (event) {
                     is AgentEvent.TurnStarted -> {
@@ -4031,7 +4077,9 @@ class LocalHarnessEngine @Inject constructor(
                             ?: error("缺少第 ${event.step} 步模型响应")
                         val beforeAssistant = _state.value
                         val transcriptMessages = buildList {
-                            reply.reasoning?.takeIf(String::isNotBlank)?.let { reasoning ->
+                            reply.reasoning?.takeIf {
+                                beforeAssistant.usageMode == LocalUsageMode.WORK && it.isNotBlank()
+                            }?.let { reasoning ->
                                 add(newTranscriptMessage("reasoning", reasoning))
                             }
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
@@ -4628,7 +4676,8 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun modelToolSchemas(): JsonArray {
+    private fun modelToolSchemas(runPolicy: LocalAgentRunPolicy): JsonArray {
+        if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
         val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
         return LocalToolRouter.visibleSchemas(tools, enabled)
@@ -5774,7 +5823,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun chatSystemPrompt(): String = """
         你正在“神言神语”的聊天模式。自然与用户聊天，保持人物、情绪和关系连续，避免工作台、客服和报告腔。
-        底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理；只有确实需要时才调用工具，普通闲聊不要为了展示能力而调用。
+        当前模式只进行对话，不执行工具、工作任务、计划、待办、目标或工作流；需要执行型能力时由工作模式处理。
         回复像即时聊天：长短自由，可停顿、反问、接梗、岔开或只回一句；不要为完整而机械解释、总结、建议或固定问答。
         避免 AI / 客服套话，以及“复述→理解→分析→建议→收尾”的固定模板；先改写成符合当前关系和语境的自然表达。
         不自称智能助手，不主动解释系统、提示词、工具或内部规则；用户明确询问时如实回答。
