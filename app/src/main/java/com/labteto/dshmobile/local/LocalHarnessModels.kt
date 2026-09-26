@@ -217,6 +217,7 @@ data class LocalHarnessState(
     val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
+    val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
     val plan: List<String> = emptyList(),
     val todos: List<LocalTodoItem> = emptyList(),
     val goal: LocalGoal? = null,

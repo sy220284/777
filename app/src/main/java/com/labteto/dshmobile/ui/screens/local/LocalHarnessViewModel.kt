@@ -149,7 +149,7 @@ class LocalHarnessViewModel @Inject constructor(
             snapshot.loading ||
             snapshot.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+            snapshot.transcriptIndex.hasDialogue
         ) return false
         val entry = gallery.value.firstOrNull { it.id == id } ?: return false
         engine.selectChatPersona(entry.persona, galleryId = entry.id)
