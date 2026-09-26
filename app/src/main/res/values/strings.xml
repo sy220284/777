@@ -565,6 +565,12 @@
     <string name="tasks_every_minutes">Every %1$d minutes</string>
     <string name="tasks_cancel">Cancel</string>
     <string name="tasks_next_run">Next run: %1$s</string>
+    <string name="tasks_last_run">Last run: %1$s</string>
+    <string name="tasks_run_history">Run history · %1$d retained</string>
+    <string name="tasks_run_history_item">%1$s · %2$s</string>
+    <string name="tasks_run_completed">Completed</string>
+    <string name="tasks_run_blocked">Needs attention</string>
+    <string name="tasks_run_failed">Failed</string>
     <string name="tasks_last_result">Latest result: %1$s</string>
     <string name="tasks_last_status">Latest status: %1$s</string>
     <string name="tasks_open_result">Open result</string>

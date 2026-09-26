@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
 
 internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
-    context.trim().takeIf(String::isNotEmpty)?.take(maxChars.coerceAtLeast(1))
+    context.trim().takeIf(String::isNotEmpty)?.let {
+        truncateWithoutSplittingSurrogatePair(it, maxChars.coerceAtLeast(1))
+    }
 
 internal fun inheritedHistoryBeforeToolCall(
     history: List<JsonObject>,
@@ -55,9 +57,9 @@ internal class LocalSubagentRunner(
     private val historySnapshot: () -> List<JsonObject>,
     private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
-    private val schemas: (Boolean, Boolean) -> JsonArray,
-    private val execute: suspend (LocalToolCall, Boolean) -> AgentToolResult,
-    private val pruneToolResult: (String) -> String,
+    private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
+    private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
+    private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
     private val onUsage: (String, DeepSeekTokenUsage) -> Unit = { _, _ -> },
@@ -66,7 +68,7 @@ internal class LocalSubagentRunner(
     private val resourceScheduler: HarnessResourceScheduler,
     private val acquireVirtualScreen: suspend (String) -> String? = { null },
     private val releaseVirtualScreen: (String) -> Unit = { },
-    private val historyBudget: (() -> LocalHistoryBudget)? = null,
+    private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
 ) {
     suspend fun run(
@@ -142,8 +144,12 @@ internal class LocalSubagentRunner(
         val stepLimit = maxSteps.coerceIn(1, 128)
         val snapshot = state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
+        val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
+        // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
+        // runtime capability must never make that capability appear in its parent or sibling run.
+        val enabledOptionalTools = linkedSetOf<String>()
 
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
@@ -208,7 +214,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         }
                     }
-                    compactSubagentHistory(history, subagentId)
+                    compactSubagentHistory(history, subagentId, runHistoryBudget)
                     modelStep += 1
                     val durableHistory = history.toList()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
@@ -225,7 +231,7 @@ internal class LocalSubagentRunner(
                             baseUrl = snapshot.baseUrl,
                             model = routeModel,
                             history = preparedHistory,
-                            tools = schemas(allowMutation, virtualScreenId != null),
+                            tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                             subagentId = subagentId,
                             step = modelStep,
                         ).also {
@@ -259,7 +265,7 @@ internal class LocalSubagentRunner(
                                     snapshot.baseUrl,
                                     routeModel,
                                 ),
-                                tools = schemas(allowMutation, virtualScreenId != null),
+                                tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                                 subagentId = subagentId,
                                 step = modelStep,
                             )
@@ -306,7 +312,7 @@ internal class LocalSubagentRunner(
                                 errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
-                        else -> execute(call.toLocalToolCall(), allowMutation)
+                        else -> execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                     }
                 },
                 eventSink = AgentEventSink { event ->
@@ -332,7 +338,11 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val boundedContent = pruneToolResult(event.output)
+                            val boundedContent = retainSubagentToolResult(
+                                event.call.id,
+                                event.output,
+                                runHistoryBudget,
+                            )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
                                 isError = event.isError,
@@ -343,14 +353,18 @@ internal class LocalSubagentRunner(
                             ).modelVisibleContent()
                             rememberSubagentProgress(
                                 progress,
-                                "第 ${event.step} 步 · ${event.call.name}：${event.output.take(1_500)}",
+                                "第 ${event.step} 步 · ${event.call.name}：" +
+                                    truncateWithoutSplittingSurrogatePair(event.output, 1_500),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
-                                put("content", event.output.take(SUBAGENT_EVENT_CHARS))
+                                put(
+                                    "content",
+                                    truncateWithoutSplittingSurrogatePair(event.output, SUBAGENT_EVENT_CHARS),
+                                )
                                 put("model_content", modelOutput)
                                 put("is_error", event.isError)
                                 event.errorCode?.let { put("error_code", it) }
@@ -450,6 +464,7 @@ internal class LocalSubagentRunner(
         tools: JsonArray,
         subagentId: String,
         step: Int,
+        allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
         val executor = AgentRequestExecutor(
             maxAttempts = state.value.modelAttempts.coerceIn(1, 5),
@@ -497,21 +512,75 @@ internal class LocalSubagentRunner(
                 }
             },
         )
-        return executor.execute {
-            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                modelClient.complete(key, baseUrl, model, history, tools)
+        return try {
+            executor.execute {
+                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                    modelClient.complete(key, baseUrl, model, history, tools)
+                }
             }
+        } catch (error: Throwable) {
+            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+            val compacted = historyCompactor.compactForOverflow(
+                history,
+                LocalHistorySummaryMode.WORK,
+            ) ?: throw error
+            eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                put("agent_id", subagentId)
+                put("step", step)
+                put("model", model)
+                put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                put("omitted_messages", compacted.omittedMessages)
+            })
+            completeSubagentStep(
+                key = key,
+                baseUrl = baseUrl,
+                model = model,
+                history = compacted.messages,
+                tools = tools,
+                subagentId = subagentId,
+                step = step,
+                allowContextOverflowRecovery = false,
+            )
         }
     }
 
-    private fun compactSubagentHistory(history: MutableList<JsonObject>, subagentId: String) {
-        val compaction = historyCompactor.compact(history, historyBudget?.invoke()) ?: return
+    private fun retainSubagentToolResult(
+        callId: String,
+        output: String,
+        budget: LocalHistoryBudget?,
+    ): String {
+        budget ?: return output
+        val retained = retainTextForModel(
+            value = output,
+            maxTokens = budget.maxToolResultTokens,
+            maxChars = budget.maxToolResultChars,
+        )
+        if (!retained.truncated) return retained.text
+        val stored = spillToolOutput(callId, output)
+        val recovery = if (stored) {
+            "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
+        } else {
+            "完整结果超过本机私有保留上限；请缩小原查询后重试。"
+        }
+        return retained.text +
+            "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
+    }
+
+    private fun compactSubagentHistory(
+        history: MutableList<JsonObject>,
+        subagentId: String,
+        budget: LocalHistoryBudget?,
+    ) {
+        val compaction = historyCompactor.compact(history, budget) ?: return
         history.clear()
         history += compaction.messages
         eventLog().append("subagent/compaction", buildJsonObject {
             put("agent_id", subagentId)
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
         })
     }
 

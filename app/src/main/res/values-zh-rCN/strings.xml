@@ -563,6 +563,12 @@
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
     <string name="tasks_cancel">取消</string>
     <string name="tasks_next_run">下次执行：%1$s</string>
+    <string name="tasks_last_run">最近执行：%1$s</string>
+    <string name="tasks_run_history">运行记录 · 保留 %1$d 条</string>
+    <string name="tasks_run_history_item">%1$s · %2$s</string>
+    <string name="tasks_run_completed">已完成</string>
+    <string name="tasks_run_blocked">需要处理</string>
+    <string name="tasks_run_failed">执行失败</string>
     <string name="tasks_last_result">最近结果：%1$s</string>
     <string name="tasks_last_status">最近状态：%1$s</string>
     <string name="tasks_open_result">查看结果</string>

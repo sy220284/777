@@ -23,6 +23,7 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.LocalAutomationWorkException
 import com.labteto.dshmobile.local.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -49,6 +50,29 @@ enum class AutomationMode {
 }
 
 @Serializable
+data class AutomationRunReceipt(
+    val startedAt: Long,
+    val finishedAt: Long,
+    val status: String,
+    val sessionId: String? = null,
+    val resultPreview: String? = null,
+    val errorPreview: String? = null,
+)
+
+internal fun appendAutomationReceipt(
+    current: List<AutomationRunReceipt>,
+    receipt: AutomationRunReceipt,
+): List<AutomationRunReceipt> {
+    val cutoff = receipt.finishedAt - AUTOMATION_HISTORY_DAYS * 24L * 60L * 60L * 1000L
+    return (current + receipt)
+        .filter { it.finishedAt >= cutoff }
+        .takeLast(AUTOMATION_HISTORY_RECORDS)
+}
+
+private const val AUTOMATION_HISTORY_DAYS = 30L
+private const val AUTOMATION_HISTORY_RECORDS = 200
+
+@Serializable
 data class AutomationTask(
     val id: String,
     val prompt: String,
@@ -66,6 +90,7 @@ data class AutomationTask(
     val lastRunAt: Long? = null,
     val lastResult: String? = null,
     val lastError: String? = null,
+    val runReceipts: List<AutomationRunReceipt> = emptyList(),
 )
 
 @Serializable
@@ -283,13 +308,27 @@ class HarnessAutomationWorker(
             }
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
+            val finished = System.currentTimeMillis()
             store.update(id) {
                 it.copy(
                     workSessionId = if (it.mode == AutomationMode.WORK) run.sessionId else it.workSessionId,
                     status = if (it.recurringMinutes == null) "completed" else "scheduled",
                     nextRunAt = next,
-                    lastResult = run.output.take(20_000),
+                    lastResult = truncateWithoutSplittingSurrogatePair(run.output, 20_000),
                     lastError = null,
+                    runReceipts = appendAutomationReceipt(
+                        it.runReceipts,
+                        AutomationRunReceipt(
+                            startedAt = started,
+                            finishedAt = finished,
+                            status = "completed",
+                            sessionId = run.sessionId,
+                            resultPreview = truncateWithoutSplittingSurrogatePair(
+                                run.output.replace("\n", " "),
+                                320,
+                            ),
+                        ),
+                    ),
                 )
             }
             maybeNotify(
@@ -304,11 +343,23 @@ class HarnessAutomationWorker(
             throw cancelled
         } catch (blocked: LocalHarnessBlockedException) {
             val sessionId = blocked.sessionId ?: task.workSessionId
+            val finished = System.currentTimeMillis()
+            val detail = blocked.message ?: "需要人工处理"
             store.update(id) {
                 it.copy(
                     workSessionId = sessionId ?: it.workSessionId,
                     status = "blocked",
-                    lastError = (blocked.message ?: "需要人工处理").take(4_000),
+                    lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
+                    runReceipts = appendAutomationReceipt(
+                        it.runReceipts,
+                        AutomationRunReceipt(
+                            startedAt = started,
+                            finishedAt = finished,
+                            status = "blocked",
+                            sessionId = sessionId,
+                            errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
+                        ),
+                    ),
                 )
             }
             maybeNotify(
@@ -319,6 +370,8 @@ class HarnessAutomationWorker(
             )
             Result.success()
         } catch (error: LocalAutomationWorkException) {
+            val finished = System.currentTimeMillis()
+            val detail = error.message ?: "后台任务失败"
             store.update(id) {
                 it.copy(
                     workSessionId = error.sessionId,
@@ -326,7 +379,17 @@ class HarnessAutomationWorker(
                     nextRunAt = it.recurringMinutes?.let { minutes ->
                         System.currentTimeMillis() + minutes * 60_000L
                     } ?: it.nextRunAt,
-                    lastError = (error.message ?: "后台任务失败").take(4_000),
+                    lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
+                    runReceipts = appendAutomationReceipt(
+                        it.runReceipts,
+                        AutomationRunReceipt(
+                            startedAt = started,
+                            finishedAt = finished,
+                            status = "failed",
+                            sessionId = error.sessionId,
+                            errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
+                        ),
+                    ),
                 )
             }
             maybeNotify(
@@ -337,13 +400,25 @@ class HarnessAutomationWorker(
             )
             Result.success()
         } catch (error: Throwable) {
+            val finished = System.currentTimeMillis()
+            val detail = error.message ?: error::class.java.simpleName
             store.update(id) {
                 it.copy(
                     status = if (it.recurringMinutes == null) "failed" else "scheduled",
                     nextRunAt = it.recurringMinutes?.let { minutes ->
                         System.currentTimeMillis() + minutes * 60_000L
                     } ?: it.nextRunAt,
-                    lastError = (error.message ?: error::class.java.simpleName).take(4_000),
+                    lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
+                    runReceipts = appendAutomationReceipt(
+                        it.runReceipts,
+                        AutomationRunReceipt(
+                            startedAt = started,
+                            finishedAt = finished,
+                            status = "failed",
+                            sessionId = task.workSessionId ?: task.targetSessionId,
+                            errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
+                        ),
+                    ),
                 )
             }
             maybeNotify(
