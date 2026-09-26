@@ -5216,16 +5216,12 @@ class LocalHarnessEngine @Inject constructor(
                             }
                             ?.data
                             ?.let(::decodeSubagentContinuationCheckpoint)
-                        val pendingContinuation = if (checkpoint != null) {
-                            jobs.drainMessages(snapshot.id)
+                        val resumeTask = if (checkpoint != null) {
+                            // The durable inbox remains untouched here. LocalSubagentRunner drains
+                            // it only after resumePersistent has durably transitioned to running.
+                            "继续处理父代理追加的消息；若没有新消息，则从上一检查点继续未完成任务。"
                         } else {
-                            emptyList()
-                        }
-                        val resumeTask = when {
-                            pendingContinuation.isNotEmpty() ->
-                                pendingContinuation.joinToString("\n\n") { "【父代理新消息】\n$it" }
-                            checkpoint != null -> "继续完成上一轮尚未结束的任务。"
-                            else -> originalTask
+                            originalTask
                         }
                         val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
