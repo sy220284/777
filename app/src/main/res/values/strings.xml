@@ -1027,4 +1027,5 @@
     <string name="local_manage_model_config">Manage model settings</string>
     <string name="local_attachment_image">Image</string>
     <string name="local_attachment_file">File</string>
+    <string name="local_run_agents">Agents %1$d</string>
 </resources>
