@@ -158,17 +158,18 @@ internal class LocalSubagentRunner(
 
         fun checkpoint(reason: String) {
             if (backgroundJobId == null || history.isEmpty()) return
+            val checkpoint = encodeSubagentContinuationCheckpoint(
+                agentId = subagentId,
+                model = routeModel,
+                maxSteps = stepLimit,
+                allowMutation = allowMutation,
+                virtualScreen = virtualScreenId != null,
+                history = history,
+                compactor = historyCompactor,
+            )
             eventLog().append(
                 LOCAL_SUBAGENT_CHECKPOINT_EVENT,
-                encodeSubagentContinuationCheckpoint(
-                    agentId = subagentId,
-                    model = routeModel,
-                    maxSteps = stepLimit,
-                    allowMutation = allowMutation,
-                    virtualScreen = virtualScreenId != null,
-                    history = history,
-                    compactor = historyCompactor,
-                ) + ("reason" to JsonPrimitive(reason)),
+                JsonObject(checkpoint + ("reason" to JsonPrimitive(reason))),
             )
         }
 
