@@ -96,6 +96,16 @@ internal fun hasAdultIntimacyIntent(
     state: ChatCharacterState = ChatCharacterState(),
 ): Boolean = resolveChatInteractionIntent(input, state) == ChatInteractionIntent.INTIMATE
 
+internal fun hasFlirtingOrIntimateIntent(
+    input: String,
+    state: ChatCharacterState = ChatCharacterState(),
+): Boolean = when (resolveChatInteractionIntent(input, state)) {
+    ChatInteractionIntent.FLIRTING,
+    ChatInteractionIntent.INTIMATE,
+    -> true
+    else -> false
+}
+
 internal fun hasProactiveIntimacyIntent(
     input: String,
     state: ChatCharacterState = ChatCharacterState(),
@@ -113,6 +123,9 @@ internal const val CHAT_DEFAULT_RELATIONAL_BIAS =
 
 internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
     "【暧昧动作与姿态变化】当语境适合暧昧、调情或亲密互动时，不要只重复亲、抱、靠近。可自然变化姿态与距离，例如面对面、并肩、侧身贴近、坐近、倚靠、俯身靠近、从身后轻抱、额头相抵、贴近耳边说话；可穿插牵手、十指交扣、勾住手指、轻碰手背、整理衣领或头发、靠肩、轻捏指尖、短暂停留的目光、压低声音、故意拉近又稍退开的距离感。每轮优先选少量最贴合情境的动作连续推进，不列动作清单，不机械轮播；近期已经反复出现的动作优先换一种。"
+
+internal const val CHAT_FLIRT_VERBAL_REPERTOIRE =
+    "【暧昧话语变化】在暧昧、调情或成年亲密语境中，话语要有变化和来回感。可按当下关系选择轻挑逗、反撩接梗、含蓄双关、半句留白、短促直球、带专属感的称呼、贴近当下细节的夸赞、把用户刚说的话反转回来、压低语气的提醒或故意停顿后再补一句。不要连续多轮只用同一种套路，例如反复“你猜”“怕了？”“嘴硬”“还敢不敢”；不要堆情话、连续审问或每句都故作神秘。每轮优先选一到两种表达手段，贴合角色原有说话方式和当前关系强度；近期已经重复的句式、称呼和挑逗结构优先换掉。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -222,7 +235,10 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("【关系内核】保持人设、立场和情绪惯性；关系变化渐进，以持续行为证据为准。")
         appendLine("判断分清已确认事实、暂定推测、仍未知；长期状态只吸收稳定高置信信息。")
         appendLine(CHAT_DEFAULT_RELATIONAL_BIAS)
-        appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
+        if (hasFlirtingOrIntimateIntent(input, state)) {
+            appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
+            appendLine(CHAT_FLIRT_VERBAL_REPERTOIRE)
+        }
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
             appendLine("优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。")
@@ -234,7 +250,7 @@ class ChatRelationshipEngine @Inject constructor() {
         }
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> {
-                appendLine("【本轮视角：角色本人】自然承接当前互动；允许嘴硬、反问、打趣、短回复或不同意。已发生内容只作连续性，不主动复述；推测不冒充事实。")
+                appendLine("【本轮视角：角色本人】自然承接当前互动；允许嘴硬、反问、打趣、短回复或不同意。已发生内容只作连续性，不主动复述；推测不冒充事实。暧昧语境下让话语和动作互相承接，避免动作很主动、台词却突然变成解释腔或客服腔。")
             }
             ChatRelationshipView.STRATEGIST -> {
                 appendLine("【本轮视角：军师】先给判断或下一步，再给少量依据；分清事实/推测/未知，重点看持续主动、兑现、投入、边界、互惠和修复。")
