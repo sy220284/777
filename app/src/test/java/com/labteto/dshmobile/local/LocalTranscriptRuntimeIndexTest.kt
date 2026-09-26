@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -133,7 +135,7 @@ class LocalTranscriptRuntimeIndexTest {
                 sequence = 100L,
                 type = "user/message",
                 createdAt = 1_000L,
-                data = kotlinx.serialization.json.buildJsonObject {
+                data = buildJsonObject {
                     put(
                         "transcript",
                         encodeTranscriptMessages(listOf(message("u500", "user", "新问题", 1_000L))),
@@ -144,7 +146,7 @@ class LocalTranscriptRuntimeIndexTest {
                 sequence = 101L,
                 type = "assistant/message",
                 createdAt = 1_001L,
-                data = kotlinx.serialization.json.buildJsonObject {
+                data = buildJsonObject {
                     put(
                         "transcript",
                         encodeTranscriptMessages(listOf(message("a500", "assistant", "新回答", 1_001L))),
