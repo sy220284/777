@@ -84,6 +84,25 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun chatProjectionHidesWorkProcessAndKeepsOnlyConversationRows() {
+        val items = buildLocalTranscript(
+            messages = listOf(
+                message("u1", "user", "在吗"),
+                message("r1", "reasoning", "内部思考"),
+                message("p1", "progress", "准备调用工具"),
+                message("t1", "tool", "tool output", toolName = "read"),
+                message("a1", "assistant", "在。"),
+            ),
+            includeWorkProcess = false,
+        )
+
+        assertEquals(2, items.size)
+        assertEquals("user", (items[0] as LocalTranscriptItem.Message).message.role)
+        assertEquals("assistant", (items[1] as LocalTranscriptItem.Message).message.role)
+        assertEquals("在。", (items[1] as LocalTranscriptItem.Message).message.content)
+    }
+
+    @Test
     fun transcriptWindowKeepsOnlyNewestMessagesAndReportsHiddenCount() {
         val messages = (1..500).map { index ->
             message("m$index", if (index % 2 == 0) "assistant" else "user", "message-$index")
