@@ -358,6 +358,7 @@ fun LocalHarnessScreen(
                 onEditAndResend = viewModel::editAndResendUserMessage,
                 onSelectMessageVariant = viewModel::selectChatMessageVariant,
                 onRegenerate = viewModel::regenerateReply,
+                onGenerateReplySuggestions = viewModel::generateReplySuggestions,
                 onLoadOlderTranscript = viewModel::loadOlderTranscript,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
@@ -1104,6 +1105,7 @@ private fun LocalChat(
     onEditAndResend: (String, String) -> Boolean,
     onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    onGenerateReplySuggestions: suspend () -> Boolean,
     onLoadOlderTranscript: suspend (String) -> Result<Int>,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
@@ -1166,6 +1168,7 @@ private fun LocalChat(
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
+    var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var editingUserText by rememberSaveable { mutableStateOf("") }
     var editingUserError by remember { mutableStateOf<String?>(null) }
@@ -1919,14 +1922,35 @@ private fun LocalChat(
                     )
                     if (
                         state.usageMode == LocalUsageMode.CHAT &&
-                        !state.groupChat.enabled &&
-                        state.replySuggestions.any { it.text.isNotBlank() }
+                        !state.groupChat.enabled
                     ) {
                         DsButton(
-                            text = stringResource(R.string.local_reply_suggestions_open),
-                            onClick = { showReplySuggestions = true },
+                            text = stringResource(
+                                if (replySuggestionsLoading) R.string.common_loading
+                                else R.string.local_reply_suggestions_open,
+                            ),
+                            onClick = {
+                                if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                                    showReplySuggestions = true
+                                } else if (!replySuggestionsLoading) {
+                                    replySuggestionsLoading = true
+                                    scope.launch {
+                                        val generated = try {
+                                            onGenerateReplySuggestions()
+                                        } finally {
+                                            replySuggestionsLoading = false
+                                        }
+                                        if (generated) showReplySuggestions = true
+                                    }
+                                }
+                            },
                             variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
+                            enabled = !state.running &&
+                                !replySuggestionsLoading &&
+                                state.messages.any { message ->
+                                    message.role == "assistant" && message.content.isNotBlank()
+                                },
                         )
                     }
                     Spacer(Modifier.weight(1f))
