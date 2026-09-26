@@ -90,7 +90,7 @@ internal fun projectSessionTranscriptTail(
     )
 }
 
-private fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage>? {
+internal fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessage>? {
     val encoded = data["transcript"] as? JsonArray ?: return emptyList()
     val decoded = mutableListOf<LocalHarnessMessage>()
     for (element in encoded) {
