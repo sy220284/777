@@ -145,21 +145,8 @@ class ChatInteractionPlanner @Inject constructor(
             appendLine("共同经历：${state.dynamics.sharedMoments.joinToString("；")}")
         }
 
-        val dialogue = recentDialogue
-            .filter { (role, content) ->
-                (role == "user" || role == "assistant") && content.isNotBlank()
-            }
-            .takeLast(6)
-        if (dialogue.isNotEmpty()) {
-            appendLine("最近对话（按时间从旧到新；越靠后优先级越高）：")
-            dialogue.forEach { (role, content) ->
-                val speaker = if (role == "user") "用户" else "角色"
-                appendLine("${speaker}：${content.take(MAX_MESSAGE_CHARS)}")
-            }
-        } else {
-            appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
-            appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        }
+        appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
+        appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         if (hasAdultIntimacyIntent(userMessage, state)) {
             appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
         }
