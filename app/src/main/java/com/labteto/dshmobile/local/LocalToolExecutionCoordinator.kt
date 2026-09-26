@@ -41,6 +41,12 @@ internal class LocalToolExecutionCoordinator(
         return LocalToolRouter.visibleSchemas(tools, enabledOptionalSnapshot())
     }
 
+    fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =
+        visibleSchemas(policy).mapNotNull { element ->
+            val function = (element as? JsonObject)?.get("function") as? JsonObject
+            (function?.get("name") as? JsonPrimitive)?.content
+        }
+
     fun searchCapabilities(
         query: String,
         target: MutableSet<String> = enabledOptionalTools,
