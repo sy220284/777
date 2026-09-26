@@ -12,18 +12,13 @@ internal enum class LocalAutoApprovalScope {
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
     /**
-     * Shell commands are auto-approved by default, because the sandbox boundary is defined by what a
-     * command can *reach*, not by what it is called.
+     * Android's app UID/SELinux sandbox is useful isolation, but it is not the official Harness
+     * workspace-write filesystem sandbox: a child shell can still reach this app's own private files
+     * outside the selected workspace. Until a process-level mount/namespace sandbox is available,
+     * shell execution is therefore an explicit permission escalation and is never auto-approved.
      *
-     * Everything the device already refused before this policy existed stays refused: firmware
-     * partitions are mounted read-only and other apps' private directories are unreachable under the
-     * untrusted-app SELinux domain. Auto-approval therefore does not create access the kernel does
-     * not already grant.
-     *
-     * These markers are a best-effort second line, not a guarantee. Shell text admits too many
-     * equivalent spellings — `cd / && cat system/x`, quoted splices, variable expansion — for static
-     * matching to be airtight, and the kernel is what actually holds. Their purpose is to keep the
-     * prompt in front of a command that visibly names firmware, so the user sees it before it runs.
+     * The markers below remain useful for diagnostics and UI risk summaries, but they are not used
+     * as a substitute for an enforceable filesystem boundary.
      */
     // Reuse the boundary's canonical deny set so shell prompts and file enforcement cannot drift.
     // This is intentionally conservative for shell text: a visible forbidden prefix keeps a prompt.
@@ -57,11 +52,20 @@ internal object LocalToolPolicy {
      * latter two because the damage they do cannot be undone from a remote.
      */
     fun canAutoApproveCommand(command: String): Boolean {
+        if (command.isBlank()) return false
+        // Fail closed while Android has no enforceable process-level workspace sandbox.
+        return false
+    }
+
+    fun shellRiskReason(command: String): String {
         val trimmed = command.trim()
-        if (trimmed.isEmpty()) return false
-        if (FIRMWARE_PATH_MARKERS.any { trimmed.contains(it) }) return false
-        if (DESTRUCTIVE_GIT_OPERATIONS.any { trimmed.contains(it) }) return false
-        return !isForcePush(trimmed)
+        return when {
+            trimmed.isEmpty() -> "空命令"
+            FIRMWARE_PATH_MARKERS.any { trimmed.contains(it) } -> "命令显式引用系统/内核路径"
+            DESTRUCTIVE_GIT_OPERATIONS.any { trimmed.contains(it) } -> "命令会不可逆重写工作历史"
+            isForcePush(trimmed) -> "命令包含强制推送"
+            else -> "Android 当前无法为子进程施加真正的 workspace-write 文件系统沙箱"
+        }
     }
 
     /**
@@ -115,10 +119,9 @@ internal object LocalToolPolicy {
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
-        // Shell execution is approved by the sandbox boundary. The per-command check in
-        // canAutoApproveCommand() still withholds firmware-targeting and history-rewriting commands,
-        // and it needs the command text, so it runs in the parameter-aware caller instead.
-        "bash" -> LocalAutoApprovalScope.WORKSPACE
+        // Shell remains available, but without a process-level filesystem sandbox it must always
+        // pass through explicit approval rather than inheriting workspace auto-approval.
+        "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
             LocalAutoApprovalScope.READ_ONLY
         } else {
