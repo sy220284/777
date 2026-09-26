@@ -163,6 +163,7 @@ class AgentLoop(
     },
     private val isParallelTool: (AgentToolCall) -> Boolean = { false },
     private val eventSink: AgentEventSink = AgentEventSink { },
+    private val runInterceptors: List<AgentRunInterceptor> = emptyList(),
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -192,7 +193,34 @@ class AgentLoop(
         }
         eventSink.append(AgentEvent.TurnStarted(turnId, cleanInput))
 
+        suspend fun notifyAfter(result: AgentRunResult) {
+            val run = context ?: return
+            runInterceptors.forEach { interceptor ->
+                try {
+                    interceptor.afterRun(run, result)
+                } catch (_: Throwable) {
+                    // Post-run observers cannot rewrite a completed Agent result.
+                }
+            }
+        }
+
+        suspend fun notifyFailure(error: Throwable) {
+            val run = context ?: return
+            withContext(NonCancellable) {
+                runInterceptors.forEach { interceptor ->
+                    try {
+                        interceptor.onRunFailure(run, error)
+                    } catch (_: Throwable) {
+                        // Preserve the original cancellation/failure.
+                    }
+                }
+            }
+        }
+
         try {
+            if (context != null) {
+                runInterceptors.forEach { interceptor -> interceptor.beforeRun(context, cleanInput) }
+            }
             repeat(effectiveMaxSteps) { stepIndex ->
                 val step = stepIndex + 1
                 context?.cancellation?.throwIfCancelled()
@@ -216,13 +244,15 @@ class AgentLoop(
                 if (reply.toolCalls.isEmpty()) {
                     eventSink.append(AgentEvent.StepFinished(turnId, step))
                     eventSink.append(AgentEvent.TurnCompleted(turnId, step, reply.content))
-                    return AgentRunResult(
+                    val completed = AgentRunResult(
                         turnId = turnId,
                         answer = reply.content,
                         messages = messages.toList(),
                         steps = step,
                         stopReason = AgentStopReason.COMPLETED,
                     )
+                    notifyAfter(completed)
+                    return completed
                 }
 
                 var callIndex = 0
@@ -315,17 +345,20 @@ class AgentLoop(
             }
 
             eventSink.append(AgentEvent.TurnStepLimit(turnId, effectiveMaxSteps))
-            return AgentRunResult(
+            val limited = AgentRunResult(
                 turnId = turnId,
                 answer = messages.lastOrNull { it.role == "assistant" }?.content.orEmpty(),
                 messages = messages.toList(),
                 steps = effectiveMaxSteps,
                 stopReason = AgentStopReason.STEP_LIMIT,
             )
+            notifyAfter(limited)
+            return limited
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
                 eventSink.append(AgentEvent.TurnCancelled(turnId))
             }
+            notifyFailure(cancelled)
             throw cancelled
         } catch (error: Exception) {
             eventSink.append(
@@ -334,6 +367,7 @@ class AgentLoop(
                     reason = error.message ?: error::class.java.simpleName,
                 ),
             )
+            notifyFailure(error)
             throw error
         }
     }
