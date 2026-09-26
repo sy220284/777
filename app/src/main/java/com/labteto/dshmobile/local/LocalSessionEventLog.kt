@@ -37,6 +37,14 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
+    /** One chronological page strictly older than [sequenceExclusive], read newest-first on disk. */
+    fun pageBefore(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = delegate.pageBefore(sequenceExclusive, limit).map { event ->
+        event.toLocalEvent()
+    }
+
     /**
      * Stream durable events in sequence order without materializing the whole session in memory.
      * UI projections such as conversation files only keep their compact projection state.
