@@ -487,6 +487,7 @@ class LocalHarnessEngine @Inject constructor(
                 baseUrl = baseUrl,
             )
         },
+        runInterceptors = { pluginRegistry.context.runInterceptors.values() },
     )
 
     private val subagents by lazy {
@@ -4290,6 +4291,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                 }
             },
+            runInterceptors = pluginRegistry.context.runInterceptors.values(),
             maxSteps = mainMaxSteps,
         )
 
