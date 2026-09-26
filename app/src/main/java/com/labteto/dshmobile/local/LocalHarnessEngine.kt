@@ -1273,6 +1273,7 @@ class LocalHarnessEngine @Inject constructor(
             .orEmpty()
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
+        val boundEventLog = eventLogFor(expectedSessionId)
         val key = apiKeys.get() ?: return false
         val prompt = chatInteractionPlanner.suggestionsPrompt(
             persona = snapshot.chatPersona,
@@ -1293,11 +1294,12 @@ class LocalHarnessEngine @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP + 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                requestLog = boundEventLog,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            eventLog.append("chat/reply-suggestions", buildJsonObject {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
             })
@@ -1306,7 +1308,7 @@ class LocalHarnessEngine @Inject constructor(
         usageTracker.record(snapshot.model, reply.usage)
         val suggestions = chatInteractionPlanner.parseSuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
-            eventLog.append("chat/reply-suggestions", buildJsonObject {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "parse-failed")
                 put("content", reply.content.orEmpty().take(2_000))
             })
@@ -1340,14 +1342,14 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         if (!applied) {
-            eventLog.append("chat/reply-suggestions", buildJsonObject {
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "stale-discarded")
                 put("assistant_message_id", expectedAssistantMessageId)
             })
             return false
         }
 
-        eventLog.append("chat/reply-suggestions", buildJsonObject {
+        boundEventLog.append("chat/reply-suggestions", buildJsonObject {
             put("status", "updated")
             put("assistant_message_id", expectedAssistantMessageId)
             put("suggestion_count", suggestions.size)
