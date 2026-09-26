@@ -2067,12 +2067,16 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun automationBoundState(session: LocalHarnessSession): LocalHarnessState {
         val runtime = _state.value
+        val route = resolveSessionModelRoute(session, runtime.baseUrl, runtime.model)
         val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
             .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
             .messages
             .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
         return runtime.copy(
             sessionId = session.id,
+            model = route.model,
+            baseUrl = route.baseUrl,
+            modelProtocol = route.protocol,
             usageMode = LocalUsageMode.WORK,
             personaId = PersonaProfile.DEFAULT_PERSONA_ID,
             galleryId = null,
