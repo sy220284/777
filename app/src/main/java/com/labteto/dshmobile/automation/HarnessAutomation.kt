@@ -656,6 +656,7 @@ class HarnessAutomationWorker(
                         null
                     },
                     silenceReferenceAt = task.createdAt,
+                    bypassProactivePolicy = manualRun,
                 )
             }
             val finished = System.currentTimeMillis()
