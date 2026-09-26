@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.plugin
 
+import com.labteto.dshmobile.harness.agent.AgentRunInterceptor
 import com.labteto.dshmobile.harness.capability.CapabilityRegistry
 import com.labteto.dshmobile.harness.registry.NamedRegistry
 import com.labteto.dshmobile.harness.tools.ToolRegistry
@@ -12,6 +13,7 @@ data class HarnessContext(
     val commands: NamedRegistry<Any> = NamedRegistry(),
     val models: NamedRegistry<Any> = NamedRegistry(),
     val settings: NamedRegistry<Any> = NamedRegistry(),
+    val runInterceptors: NamedRegistry<AgentRunInterceptor> = NamedRegistry(),
 )
 
 interface HarnessPlugin {
