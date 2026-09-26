@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.agent.AgentModelProtocol
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +86,7 @@ class DeepSeekClient @Inject constructor(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                        retryAfterMillis = parseRetryAfterMillis(response.header("Retry-After")),
                     )
                 }
                 parse(body)
@@ -154,6 +157,7 @@ class DeepSeekClient @Inject constructor(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                        retryAfterMillis = parseRetryAfterMillis(response.header("Retry-After")),
                     )
                 }
                 val responseBody = response.body ?: error("模型响应为空")
@@ -320,7 +324,11 @@ class DeepSeekClient @Inject constructor(
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
-                    throw anthropicHttpError(response.code, body)
+                    throw anthropicHttpError(
+                        code = response.code,
+                        body = body,
+                        retryAfter = response.header("Retry-After"),
+                    )
                 }
                 val accumulator = DeepSeekAnthropicStreamAccumulator(json, onDelta)
                 val responseBody = response.body ?: error("模型响应为空")
@@ -371,7 +379,13 @@ class DeepSeekClient @Inject constructor(
     ): T = try {
         runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
             val body = response.readModelBodyBounded()
-            if (!response.isSuccessful) throw anthropicHttpError(response.code, body)
+            if (!response.isSuccessful) {
+                throw anthropicHttpError(
+                    code = response.code,
+                    body = body,
+                    retryAfter = response.header("Retry-After"),
+                )
+            }
             parse(body)
         }
     } catch (error: LocalModelException) {
@@ -392,7 +406,11 @@ class DeepSeekClient @Inject constructor(
         )
     }
 
-    private fun anthropicHttpError(code: Int, body: String): LocalModelException {
+    private fun anthropicHttpError(
+        code: Int,
+        body: String,
+        retryAfter: String? = null,
+    ): LocalModelException {
         val detail = runCatching {
             val root = json.parseToJsonElement(body).jsonObject
             val error = root["error"] as? JsonObject
@@ -403,6 +421,7 @@ class DeepSeekClient @Inject constructor(
             code = "MODEL_HTTP_" + code,
             message = "模型请求失败（HTTP " + code + "）：" + (detail ?: body.take(500)),
             retryable = code == 408 || code == 429 || code >= 500,
+            retryAfterMillis = parseRetryAfterMillis(retryAfter),
         )
     }
 
@@ -481,6 +500,24 @@ class DeepSeekClient @Inject constructor(
         return output.toString(Charsets.UTF_8.name())
     }
 
+    internal fun parseRetryAfterMillis(
+        value: String?,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): Long? {
+        val raw = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        raw.toLongOrNull()?.let { seconds ->
+            return seconds.coerceAtLeast(0L)
+                .coerceAtMost(120L)
+                .times(1_000L)
+        }
+        val target = runCatching {
+            ZonedDateTime.parse(raw, DateTimeFormatter.RFC_1123_DATE_TIME)
+                .toInstant()
+                .toEpochMilli()
+        }.getOrNull() ?: return null
+        return (target - nowMillis).coerceIn(0L, 120_000L)
+    }
+
     private fun endpoint(baseUrl: String): String {
         val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')
         return if (clean.endsWith("/chat/completions")) clean else "$clean/chat/completions"
@@ -501,6 +538,7 @@ class LocalModelException(
     message: String,
     val retryable: Boolean,
     cause: Throwable? = null,
+    val retryAfterMillis: Long? = null,
 ) : Exception(message, cause)
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {
