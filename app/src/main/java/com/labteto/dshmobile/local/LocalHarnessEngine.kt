@@ -5191,6 +5191,17 @@ class LocalHarnessEngine @Inject constructor(
         return eventLogFor(id)
     }
 
+    internal fun transcriptPageForUi(
+        sessionId: String,
+        cursor: LocalTranscriptPageCursor? = null,
+        limit: Int = 200,
+    ): LocalTranscriptPage = LocalSessionTranscriptPager(
+        eventLog = eventLogForAuthorized(sessionId),
+    ).page(
+        cursor = cursor,
+        limit = limit,
+    )
+
     private fun cancelChatPostTurn() {
         val job = synchronized(chatPostTurnLock) {
             val current = chatPostTurnJob

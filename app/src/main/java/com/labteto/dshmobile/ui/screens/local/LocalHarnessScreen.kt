@@ -180,6 +180,7 @@ fun LocalHarnessScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
+    val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -199,6 +200,10 @@ fun LocalHarnessScreen(
             delay(6_000)
             modeIntro = null
         }
+    }
+
+    LaunchedEffect(state.sessionId) {
+        viewModel.prepareTranscriptHistory(state.sessionId)
     }
 
     fun switchUsageMode(target: LocalUsageMode) {
@@ -334,6 +339,7 @@ fun LocalHarnessScreen(
             else -> LocalChat(
                 state = state,
                 gallery = gallery,
+                transcriptHistory = transcriptHistory,
                 modeIntro = modeIntro,
                 onOpenMenu = { scope.launch { drawerState.open() } },
                 onConfigure = onOpenSettings,
@@ -342,6 +348,7 @@ fun LocalHarnessScreen(
                 onEditAndResend = viewModel::editAndResendUserMessage,
                 onSelectMessageVariant = viewModel::selectChatMessageVariant,
                 onRegenerate = viewModel::regenerateReply,
+                onLoadOlderTranscript = viewModel::loadOlderTranscript,
                 onImportAttachment = viewModel::importAttachment,
                 onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
@@ -1033,6 +1040,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 private fun LocalChat(
     state: LocalHarnessState,
     gallery: List<PersonaGalleryEntry>,
+    transcriptHistory: LocalTranscriptHistoryState,
     modeIntro: LocalUsageMode?,
     onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
@@ -1041,6 +1049,7 @@ private fun LocalChat(
     onEditAndResend: (String, String) -> Boolean,
     onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    onLoadOlderTranscript: suspend (String) -> Result<Int>,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
@@ -1118,7 +1127,11 @@ private fun LocalChat(
     }
     LaunchedEffect(state.messages.size) {
         val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
-        if (added > 0 && transcriptWindowSize > LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES) {
+        if (
+            added > 0 &&
+            transcriptHistory.sessionId == state.sessionId &&
+            transcriptHistory.olderMessages.isNotEmpty()
+        ) {
             transcriptWindowSize += added
         }
         previousTranscriptMessageCount = state.messages.size
@@ -1126,9 +1139,22 @@ private fun LocalChat(
     val transcriptWindow = remember(state.messages, transcriptWindowSize) {
         localTranscriptWindow(state.messages, transcriptWindowSize)
     }
-    val transcriptItems = remember(transcriptWindow.messages) {
-        buildLocalTranscript(transcriptWindow.messages)
+    val pagedOlderMessages = if (transcriptHistory.sessionId == state.sessionId) {
+        transcriptHistory.olderMessages
+    } else {
+        emptyList()
     }
+    val transcriptMessages = remember(pagedOlderMessages, transcriptWindow.messages) {
+        mergeLocalTranscriptHistory(pagedOlderMessages, transcriptWindow.messages)
+    }
+    val transcriptItems = remember(transcriptMessages) {
+        buildLocalTranscript(transcriptMessages)
+    }
+    val hiddenTranscriptCount = (state.messages.size - transcriptMessages.size).coerceAtLeast(0)
+    val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
+        transcriptHistory.hasMore
+    val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
+        transcriptHistory.loading
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
         !state.groupChat.enabled &&
         chatBranchingEligible(state.messages)
@@ -1483,18 +1509,25 @@ private fun LocalChat(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-                if (transcriptWindow.hiddenCount > 0) {
+                if (hiddenTranscriptCount > 0 || hasOlderTranscript) {
                     item(key = "local-transcript-load-older") {
                         DsButton(
-                            text = stringResource(
-                                R.string.local_transcript_load_older,
-                                transcriptWindow.hiddenCount,
-                            ),
-                            onClick = {
-                                transcriptWindowSize = (
-                                    transcriptWindowSize + LOCAL_TRANSCRIPT_PAGE_MESSAGES
-                                ).coerceAtMost(state.messages.size)
+                            text = when {
+                                loadingOlderTranscript -> stringResource(R.string.tools_processing)
+                                hiddenTranscriptCount > 0 -> stringResource(
+                                    R.string.local_transcript_load_older,
+                                    hiddenTranscriptCount,
+                                )
+                                else -> stringResource(R.string.local_transcript_load_older_unknown)
                             },
+                            onClick = {
+                                if (!loadingOlderTranscript) {
+                                    scope.launch {
+                                        onLoadOlderTranscript(state.sessionId)
+                                    }
+                                }
+                            },
+                            enabled = !loadingOlderTranscript,
                             modifier = Modifier.fillMaxWidth(),
                             variant = DsButtonVariant.Ghost,
                         )
@@ -2681,7 +2714,6 @@ private fun toolResultFailed(content: String): Boolean =
         "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
 
 private const val LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES = 200
-private const val LOCAL_TRANSCRIPT_PAGE_MESSAGES = 200
 private const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 

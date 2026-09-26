@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -36,6 +38,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
+private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
 
 /** UI adapter for the process-wide on-device Harness engine. */
 @HiltViewModel
@@ -50,6 +53,10 @@ class LocalHarnessViewModel @Inject constructor(
     val state = engine.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
+    private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
+    internal val transcriptHistory = _transcriptHistory.asStateFlow()
+    private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
+    private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
 
     init {
@@ -381,6 +388,115 @@ class LocalHarnessViewModel @Inject constructor(
             freshGalleryStory = freshStory,
         )
         return true
+    }
+
+    internal suspend fun prepareTranscriptHistory(
+        sessionId: String,
+        force: Boolean = false,
+    ) {
+        if (sessionId.isBlank()) {
+            transcriptHistoryCursor = null
+            transcriptHistoryInitializedSessionId = null
+            _transcriptHistory.value = LocalTranscriptHistoryState()
+            return
+        }
+        val current = _transcriptHistory.value
+        if (
+            !force &&
+            current.sessionId == sessionId &&
+            transcriptHistoryInitializedSessionId == sessionId
+        ) {
+            return
+        }
+
+        transcriptHistoryCursor = null
+        transcriptHistoryInitializedSessionId = null
+        _transcriptHistory.value = LocalTranscriptHistoryState(
+            sessionId = sessionId,
+            loading = true,
+        )
+        try {
+            val firstPage = withContext(Dispatchers.IO) {
+                engine.transcriptPageForUi(
+                    sessionId = sessionId,
+                    cursor = null,
+                    limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+                )
+            }
+            if (state.value.sessionId != sessionId) return
+            transcriptHistoryCursor = firstPage.nextCursor
+            transcriptHistoryInitializedSessionId = sessionId
+            _transcriptHistory.value = LocalTranscriptHistoryState(
+                sessionId = sessionId,
+                hasMore = firstPage.nextCursor != null,
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (state.value.sessionId != sessionId) return
+            transcriptHistoryCursor = null
+            transcriptHistoryInitializedSessionId = null
+            _transcriptHistory.value = LocalTranscriptHistoryState(
+                sessionId = sessionId,
+                error = error.message ?: error::class.java.simpleName,
+            )
+        }
+    }
+
+    internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> {
+        if (sessionId.isBlank()) return Result.success(0)
+        if (
+            transcriptHistoryInitializedSessionId != sessionId ||
+            _transcriptHistory.value.sessionId != sessionId
+        ) {
+            prepareTranscriptHistory(sessionId)
+        }
+        if (
+            transcriptHistoryCursor == null &&
+            _transcriptHistory.value.olderMessages.isEmpty() &&
+            state.value.sessionId == sessionId &&
+            state.value.messages.size > LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES
+        ) {
+            prepareTranscriptHistory(sessionId, force = true)
+        }
+
+        val cursor = transcriptHistoryCursor ?: return Result.success(0)
+        val current = _transcriptHistory.value
+        if (current.loading) return Result.success(0)
+        _transcriptHistory.value = current.copy(loading = true, error = null)
+
+        return try {
+            val page = withContext(Dispatchers.IO) {
+                engine.transcriptPageForUi(
+                    sessionId = sessionId,
+                    cursor = cursor,
+                    limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+                )
+            }
+            if (state.value.sessionId != sessionId) return Result.success(0)
+            val latest = _transcriptHistory.value
+            if (latest.sessionId != sessionId) return Result.success(0)
+            val existingIds = latest.olderMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+            val newlyLoaded = page.messages.filterNot { message -> message.id in existingIds }
+            transcriptHistoryCursor = page.nextCursor
+            _transcriptHistory.value = latest.copy(
+                olderMessages = newlyLoaded + latest.olderMessages,
+                hasMore = page.nextCursor != null,
+                loading = false,
+                error = null,
+            )
+            Result.success(newlyLoaded.size)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (_transcriptHistory.value.sessionId == sessionId) {
+                _transcriptHistory.value = _transcriptHistory.value.copy(
+                    loading = false,
+                    error = error.message ?: error::class.java.simpleName,
+                )
+            }
+            Result.failure(error)
+        }
     }
 
     fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)

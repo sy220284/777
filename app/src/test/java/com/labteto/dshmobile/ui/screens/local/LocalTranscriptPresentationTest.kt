@@ -101,6 +101,24 @@ class LocalTranscriptPresentationTest {
         assertEquals("m101", expanded.messages.first().id)
     }
 
+    @Test
+    fun eventBackedOlderHistoryMergesBeforeLiveTailAndLiveMessageWins() {
+        val older = listOf(
+            message("m1", "user", "old-1"),
+            message("m2", "assistant", "stale-copy"),
+            message("m2", "assistant", "duplicate-old"),
+        )
+        val live = listOf(
+            message("m2", "assistant", "live-copy"),
+            message("m3", "user", "live-3"),
+        )
+
+        val merged = mergeLocalTranscriptHistory(older, live)
+
+        assertEquals(listOf("m1", "m2", "m3"), merged.map { it.id })
+        assertEquals("live-copy", merged[1].content)
+    }
+
     private fun message(
         id: String,
         role: String,
