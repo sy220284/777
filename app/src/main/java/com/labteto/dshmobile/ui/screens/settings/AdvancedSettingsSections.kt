@@ -876,21 +876,26 @@ internal fun MemoryManagementCard(
             MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
             MemoryFilter.FACT to R.string.advanced_kind_fact,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            filterOptions.forEach { (candidate, label) ->
-                val count = records.count { it.kind.matchesFilter(candidate) }
-                DsPill(
-                    text = stringResource(
-                        R.string.advanced_memory_filter_count,
-                        stringResource(label),
-                        count,
-                    ),
-                    selected = filter == candidate,
-                    onClick = { filter = candidate },
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+            filterOptions.chunked(2).forEach { rowOptions ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    rowOptions.forEach { (candidate, label) ->
+                        val count = records.count { it.kind.matchesFilter(candidate) }
+                        DsPill(
+                            text = stringResource(
+                                R.string.advanced_memory_filter_count,
+                                stringResource(label),
+                                count,
+                            ),
+                            selected = filter == candidate,
+                            onClick = { filter = candidate },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
 
