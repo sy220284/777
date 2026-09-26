@@ -33,6 +33,7 @@ internal data class PersonaTransferMemorySummary(
     val storyId: String,
     val storyTitle: String = "",
     val plotSummary: String = "",
+    val continuitySummary: String = "",
     val relationshipState: String = "",
     val mood: String = "",
     val sharedMoments: List<String> = emptyList(),
@@ -64,7 +65,9 @@ internal object PersonaTransferDocuments {
         val portable = portableEntry(entry)
         val archive = PersonaArchiveEnvelope(
             entry = portable,
-            memorySummaries = portable.stories.map(::memorySummary),
+            memorySummaries = portable.stories.map { story ->
+                memorySummary(story, portable.persona.name)
+            },
         )
         val canonicalJson = json.encodeToString(PersonaArchiveEnvelope.serializer(), archive)
         val bytes = when (format) {
@@ -123,11 +126,15 @@ internal object PersonaTransferDocuments {
             sourceSessionId = "",
         )
 
-    private fun memorySummary(story: PersonaGalleryStory): PersonaTransferMemorySummary =
+    private fun memorySummary(
+        story: PersonaGalleryStory,
+        personaName: String,
+    ): PersonaTransferMemorySummary =
         PersonaTransferMemorySummary(
             storyId = story.id,
             storyTitle = story.title,
             plotSummary = story.notes,
+            continuitySummary = story.context(personaName),
             relationshipState = story.chatState.relationshipState,
             mood = story.chatState.mood,
             sharedMoments = story.chatState.dynamics.sharedMoments,
@@ -232,6 +239,7 @@ internal object PersonaTransferDocuments {
                         3,
                     ))
                     addField("剧情提要", summary.plotSummary)
+                    addField("连续性摘要", summary.continuitySummary)
                     addField("关系状态", summary.relationshipState)
                     addField("当前情绪", summary.mood)
                     addField("当前关注", summary.currentFocus)
