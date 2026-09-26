@@ -101,6 +101,7 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        continuationHistory: List<JsonObject>? = null,
     ): LocalSubagentResult = resourceScheduler.withResource(
         HarnessResourceKind.AGENT,
         owner = "subagent:" + task.take(80),
@@ -119,6 +120,7 @@ internal class LocalSubagentRunner(
                 modelOverride = modelOverride,
                 maxSteps = maxSteps,
                 virtualScreenId = virtualScreenId,
+                continuationHistory = continuationHistory,
             )
         } finally {
             virtualScreenId?.let(releaseVirtualScreen)
@@ -134,13 +136,14 @@ internal class LocalSubagentRunner(
         modelOverride: String?,
         maxSteps: Int,
         virtualScreenId: String?,
+        continuationHistory: List<JsonObject>?,
     ): LocalSubagentResult {
         val subagentId = backgroundJobId
             ?: ("sa-" + UUID.randomUUID().toString().replace("-", "").take(12))
-        val history = if (inheritHistory) {
-            inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-        } else {
-            mutableListOf()
+        val history = when {
+            !continuationHistory.isNullOrEmpty() -> continuationHistory.toMutableList()
+            inheritHistory -> inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+            else -> mutableListOf()
         }
         val progress = ArrayDeque<String>()
         val stepLimit = maxSteps.coerceIn(1, 128)
@@ -152,6 +155,22 @@ internal class LocalSubagentRunner(
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
+
+        fun checkpoint(reason: String) {
+            if (backgroundJobId == null || history.isEmpty()) return
+            eventLog().append(
+                LOCAL_SUBAGENT_CHECKPOINT_EVENT,
+                encodeSubagentContinuationCheckpoint(
+                    agentId = subagentId,
+                    model = routeModel,
+                    maxSteps = stepLimit,
+                    allowMutation = allowMutation,
+                    virtualScreen = virtualScreenId != null,
+                    history = history,
+                    compactor = historyCompactor,
+                ) + ("reason" to JsonPrimitive(reason)),
+            )
+        }
 
         fun archive(status: String, detail: String? = null) {
             eventLog().append("subagent/archive", buildJsonObject {
@@ -189,7 +208,7 @@ internal class LocalSubagentRunner(
         }
 
         try {
-            if (!inheritHistory) history += buildJsonObject {
+            if (continuationHistory.isNullOrEmpty() && !inheritHistory) history += buildJsonObject {
                 put("role", "system")
                 put(
                     "content",
@@ -200,7 +219,7 @@ internal class LocalSubagentRunner(
                     },
                 )
             }
-            boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
+            if (continuationHistory.isNullOrEmpty()) boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
                 val insertion = buildJsonObject {
                     put("role", "system")
                     put(
@@ -223,6 +242,7 @@ internal class LocalSubagentRunner(
                 }
             }
             history += buildJsonObject { put("role", "user"); put("content", task) }
+            checkpoint(if (continuationHistory.isNullOrEmpty()) "initial" else "continued")
 
             val loop = AgentLoop(
                 model = AgentModel {
@@ -341,6 +361,7 @@ internal class LocalSubagentRunner(
                             val reply = repliesByStep.remove(event.step)
                                 ?: error("缺少子代理第 ${event.step} 步模型响应")
                             history += reply.message
+                            checkpoint("assistant")
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 rememberSubagentProgress(
                                     progress,
@@ -397,6 +418,7 @@ internal class LocalSubagentRunner(
                                 put("tool_call_id", event.call.id)
                                 put("content", modelOutput)
                             }
+                            checkpoint("tool-result")
                         }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -404,6 +426,7 @@ internal class LocalSubagentRunner(
                                 put("status", "completed")
                                 put("steps", event.steps)
                             })
+                            checkpoint("completed")
                             archive("completed")
                         }
                         is AgentEvent.TurnStepLimit -> {
@@ -412,6 +435,7 @@ internal class LocalSubagentRunner(
                                 put("status", "step_limit")
                                 put("steps", event.steps)
                             })
+                            checkpoint("step-limit")
                             archive("step_limit")
                         }
                         is AgentEvent.TurnCancelled -> {
@@ -419,6 +443,7 @@ internal class LocalSubagentRunner(
                                 put("agent_id", subagentId)
                                 put("status", "cancelled")
                             })
+                            checkpoint("cancelled")
                             archive("cancelled")
                         }
                         is AgentEvent.TurnFailed -> {
@@ -427,6 +452,7 @@ internal class LocalSubagentRunner(
                                 put("status", "failed")
                                 put("detail", event.reason.take(2_000))
                             })
+                            checkpoint("failed")
                             archive("failed", event.reason)
                         }
                         else -> Unit
