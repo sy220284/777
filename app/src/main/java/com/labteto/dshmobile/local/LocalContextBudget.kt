@@ -18,7 +18,7 @@ internal data class LocalHistoryBudget(
     val maxToolResultChars: Int,
     val maxHistoryTokens: Int? = null,
     val tailTokens: Int? = null,
-    val maxToolResultTokens: Int = DEFAULT_WORK_TOOL_RESULT_TOKENS,
+    val maxToolResultTokens: Int = DEFAULT_TOOL_RESULT_TOKENS,
     val outputReserveTokens: Int? = null,
     val headroomTokens: Int? = null,
 )
@@ -29,14 +29,12 @@ internal fun localHistoryBudgetFor(
 ): LocalHistoryBudget = localHistoryBudgetFor(
     memoryClassMb = memoryClassMb,
     pressure = pressure,
-    usageMode = LocalUsageMode.WORK,
     model = null,
 )
 
 internal fun localHistoryBudgetFor(
     memoryClassMb: Int,
     pressure: HarnessResourcePressure,
-    usageMode: LocalUsageMode,
     model: String?,
     baseUrl: String? = null,
 ): LocalHistoryBudget {
@@ -67,11 +65,6 @@ internal fun localHistoryBudgetFor(
     }
 
     val routed = officialDeepSeekContext(model, baseUrl)
-    val toolTokensBase = if (usageMode == LocalUsageMode.CHAT) {
-        DEFAULT_CHAT_TOOL_RESULT_TOKENS
-    } else {
-        DEFAULT_WORK_TOOL_RESULT_TOKENS
-    }
     return LocalHistoryBudget(
         maxHistoryChars = (base.maxHistoryChars * scale).toInt().coerceAtLeast(180_000),
         tailChars = (base.tailChars * scale).toInt().coerceAtLeast(80_000),
@@ -79,7 +72,7 @@ internal fun localHistoryBudgetFor(
         maxToolResultChars = (base.maxToolResultChars * scale).toInt().coerceAtLeast(24_000),
         maxHistoryTokens = routed?.messageBudgetTokens,
         tailTokens = routed?.tailTokens,
-        maxToolResultTokens = (toolTokensBase * scale).toInt().coerceAtLeast(4_000),
+        maxToolResultTokens = (DEFAULT_TOOL_RESULT_TOKENS * scale).toInt().coerceAtLeast(4_000),
         outputReserveTokens = routed?.outputReserveTokens,
         headroomTokens = routed?.headroomTokens,
     )
@@ -128,5 +121,4 @@ private const val OFFICIAL_OUTPUT_RESERVE_TOKENS = 256_000
 private const val OFFICIAL_HEADROOM_TOKENS = 65_536
 private const val CONTEXT_TRIGGER_RATIO = 0.8
 private const val TAIL_RATIO = 0.16
-private const val DEFAULT_WORK_TOOL_RESULT_TOKENS = 16_000
-private const val DEFAULT_CHAT_TOOL_RESULT_TOKENS = 8_000
+private const val DEFAULT_TOOL_RESULT_TOKENS = 16_000
