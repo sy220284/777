@@ -337,14 +337,14 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun exportGalleryPersona(
+    internal suspend fun exportGalleryPersona(
         id: String,
         format: PersonaTransferFormat,
     ): Result<PersonaTransferDocument> = runCatching {
         withContext(Dispatchers.IO) { galleryStore.exportPersonaDocument(id, format) }
     }
 
-    suspend fun importGalleryPersona(
+    internal suspend fun importGalleryPersona(
         bytes: ByteArray,
         fileName: String?,
         mimeType: String?,
