@@ -656,6 +656,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(automationPlugin)
                 pluginRegistry.install(webhookPlugin)
                 load()
+                startNextQueuedTurnIfIdle()?.start()
                 scheduleInterruptedSafeJobs()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
             }.onFailure { error ->
@@ -1469,17 +1470,24 @@ class LocalHarnessEngine @Inject constructor(
     ): Job? = synchronized(runStateLock) {
         if (sessionTransitioning) return@synchronized null
         if (activeJob?.isCompleted == false) {
-            val accepted = pendingInputs.offer(QueuedAgentInput(content, memoryInput, modelMessage))
+            val queuedInput = QueuedAgentInput(
+                content = content,
+                memoryInput = memoryInput,
+                modelMessage = modelMessage,
+                id = UUID.randomUUID().toString(),
+            )
+            val accepted = pendingInputs.offer(queuedInput)
             if (!accepted) {
                 _state.update { it.copy(error = "当前执行中的补充消息已达到 $MAX_PENDING_INPUTS 条上限") }
                 return@synchronized null
             }
-            recordUserTranscript(content, modelMessage, queued = true)
+            recordUserTranscript(
+                content = content,
+                modelMessage = modelMessage,
+                queued = true,
+                queuedInput = queuedInput,
+            )
             _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
-            eventLog.append("user/queue", buildJsonObject {
-                put("action", "queued")
-                put("queued_count", pendingInputs.size())
-            })
             persist()
             return@synchronized null
         }
@@ -1515,15 +1523,29 @@ class LocalHarnessEngine @Inject constructor(
         content: String,
         modelMessage: JsonObject?,
         queued: Boolean,
+        queuedInput: QueuedAgentInput? = null,
     ) {
         val before = _state.value
         val transcriptMessage = newTranscriptMessage("user", content)
-        val userEvent = eventLog.append("user/message", buildJsonObject {
-            put("content", content)
-            modelMessage?.let { put("model_message", it) }
-            put("queued", queued)
-            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
-        })
+        val userEvent = if (queued) {
+            val durableInput = requireNotNull(queuedInput) { "排队消息缺少持久编号" }
+            eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "queued",
+                    pending = pendingInputs.snapshot(),
+                    affected = listOf(durableInput),
+                    transcript = listOf(transcriptMessage),
+                ),
+            )
+        } else {
+            eventLog.append("user/message", buildJsonObject {
+                put("content", content)
+                modelMessage?.let { put("model_message", it) }
+                put("queued", false)
+                put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
+            })
+        }
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
         if (
             before.usageMode == LocalUsageMode.CHAT &&
@@ -2284,13 +2306,16 @@ class LocalHarnessEngine @Inject constructor(
         cancelChatPostTurn()
         interactions.cancelAll()
         val running = synchronized(runStateLock) {
-            val discarded = pendingInputs.clear()
-            if (discarded > 0) {
-                eventLog.append("user/queue", buildJsonObject {
-                    put("action", "cancelled")
-                    put("count", discarded)
-                    put("queued_count", 0)
-                })
+            val discarded = pendingInputs.drain()
+            if (discarded.isNotEmpty()) {
+                eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = pendingInputs.snapshot(),
+                        affected = discarded,
+                    ),
+                )
             }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
@@ -2680,13 +2705,16 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun cancelActiveRunAndJoin() {
         interactions.cancelAll()
         val job = synchronized(runStateLock) {
-            val discarded = pendingInputs.clear()
-            if (discarded > 0) {
-                eventLog.append("user/queue", buildJsonObject {
-                    put("action", "cancelled")
-                    put("count", discarded)
-                    put("queued_count", 0)
-                })
+            val discarded = pendingInputs.drain()
+            if (discarded.isNotEmpty()) {
+                eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = pendingInputs.snapshot(),
+                        affected = discarded,
+                    ),
+                )
             }
             _state.update { it.copy(queuedInputCount = 0) }
             activeJob
@@ -2887,12 +2915,15 @@ class LocalHarnessEngine @Inject constructor(
             captureAutoMemoryDirective(input.memoryInput)
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
-        eventLog.append("user/queue", buildJsonObject {
-            put("action", "consumed")
-            put("count", queued.size)
-            put("queued_count", pendingInputs.size())
-            put("model_messages", JsonArray(durableMessages))
-        })
+        eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "claimed",
+                pending = pendingInputs.snapshot(),
+                affected = queued,
+                modelMessages = durableMessages,
+            ),
+        )
         updateContextMetrics()
         persist()
     }
@@ -2906,11 +2937,15 @@ class LocalHarnessEngine @Inject constructor(
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
         appendUserToModelHistory(durableMessage)
-        eventLog.append("user/queue", buildJsonObject {
-            put("action", "resumed")
-            put("queued_count", pendingInputs.size())
-            put("model_messages", JsonArray(listOf(durableMessage)))
-        })
+        eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "resumed",
+                pending = pendingInputs.snapshot(),
+                affected = listOf(next),
+                modelMessages = listOf(durableMessage),
+            ),
+        )
         persist()
         scope.launch(start = CoroutineStart.LAZY) {
             runTurn(next.content, next.memoryInput)
@@ -6031,6 +6066,10 @@ class LocalHarnessEngine @Inject constructor(
         )
         resetModelHistory(restoredHistory.messages)
         applyRecoveredToolResults(recovery)
+        val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
+            ?.let { event -> decodeLocalAgentInboxPending(event.data) }
+            .orEmpty()
+        pendingInputs.restore(restoredInbox)
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
