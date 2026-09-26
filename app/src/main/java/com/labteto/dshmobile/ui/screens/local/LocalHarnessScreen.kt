@@ -464,10 +464,7 @@ private fun GroupChatMemberAvatar(
         key1 = member.portraitPath,
     ) {
         value = withContext(Dispatchers.IO) {
-            member.portraitPath
-                .takeIf(String::isNotBlank)
-                ?.let { path -> BitmapFactory.decodeFile(path) }
-                ?.asImageBitmap()
+            decodeLocalPersonaHeaderPortrait(member.portraitPath)
         }
     }
 
