@@ -205,17 +205,14 @@ internal class LocalHistoryCompactor(
                     }
                 }
                 LocalHistorySummaryMode.CHAT -> {
-                    append("以下是较早聊天的提取式连续性摘要，共折叠 ")
+                    append("以下是较早聊天的连续性检查点，共折叠 ")
                     append(messages.size)
-                    append(" 条模型消息。内容只摘自原聊天；当前人物设定、关系状态、长期记忆与群聊成员状态仍以实时状态为准。")
+                    append(" 条模型消息。这里记录的是已发生内容，只用于保持连续，禁止把摘要当成本轮要复述的台词或背景。")
                     if (user.isNotEmpty()) {
                         append("\n\n较早用户表达与事件：")
                         user.forEach { append("\n- ").append(it) }
                     }
-                    if (assistant.isNotEmpty()) {
-                        append("\n\n较早角色回应与互动：")
-                        assistant.forEach { append("\n- ").append(it) }
-                    }
+                    append("\n\n角色旧回复措辞已省略；当前人物设定、关系状态、长期记忆与最近原始对话以实时上下文为准。")
                 }
             }
         }

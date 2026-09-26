@@ -7,6 +7,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatInteractionPlannerTest {
+
+    @Test
+    fun shortLivedStateExpiresWhenPlannerKeepsReturningNone() {
+        var state = ChatCharacterState(
+            currentFocus = "刚才的争执",
+            immediateConcern = "担心用户生气",
+            unresolvedThreads = listOf("要不要继续争执"),
+        )
+        repeat(4) {
+            state = planner.parse(
+                """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+                previous = state,
+                userMessage = "嗯",
+                assistantMessage = "好",
+            )!!.state
+        }
+
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isNotEmpty())
+    }
+
+    @Test
+    fun topicResetImmediatelyDropsCurrentTopicAndOpenThreads() {
+        val previous = ChatCharacterState(
+            currentFocus = "旧话题",
+            currentAgenda = "继续解释旧事",
+            immediateConcern = "还在纠结",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "换个话题，说正事",
+            assistantMessage = "好",
+        )!!.state
+
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.currentAgenda.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test

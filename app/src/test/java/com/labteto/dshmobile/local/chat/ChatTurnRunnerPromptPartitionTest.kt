@@ -46,7 +46,8 @@ class ChatTurnRunnerPromptPartitionTest {
 
         assertTrue(context.stablePrompt.contains("身份：剑客"))
         assertTrue(context.stablePrompt.contains("性格：嘴硬心软"))
-        assertTrue(context.stablePrompt.contains("禁用表达"))
+        assertFalse(context.stablePrompt.contains("禁用表达"))
+        assertFalse(context.stablePrompt.contains("对白参考"))
         assertFalse(context.stablePrompt.contains("【当前状态】"))
         assertFalse(context.stablePrompt.contains("用户纠正"))
 

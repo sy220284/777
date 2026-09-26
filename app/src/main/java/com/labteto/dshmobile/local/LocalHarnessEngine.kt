@@ -61,6 +61,7 @@ import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
+import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -2876,59 +2877,36 @@ class LocalHarnessEngine @Inject constructor(
         query: String,
         snapshot: LocalHarnessState,
     ): String {
-        if (!snapshot.autoRecall) return ""
+        if (!snapshot.autoRecall || !ChatMemorySelector.shouldRecall(query)) return ""
         val relationshipKinds = setOf(
             MemoryKind.RELATIONSHIP_FACT,
             MemoryKind.RELATIONSHIP_STATE,
             MemoryKind.RELATIONSHIP_PREFERENCE,
         )
-        val semanticQuery = listOf(
-            query,
-            snapshot.chatPersona.name,
-            snapshot.chatPersona.relationship,
-        ).filter(String::isNotBlank).joinToString(" ")
-
-        // Search a wider pool, then enforce character ownership before applying the final bound.
-        // This prevents unrelated high-scoring relationship memories from crowding out the current
-        // character's own history.
-        val globalHits = memoryStore.search(
-            query = semanticQuery,
-            allowedScopes = setOf(MemoryScope.GLOBAL),
-            projectId = null,
-            lineageId = null,
-            allowedKinds = relationshipKinds,
-            maxItems = 20,
-            maxChars = 8_000,
-        ).filter { relationshipMemoryMatchesSubject(
-                memory = it,
-                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
-                currentLineageId = snapshot.lineageId,
-                subjectLabel = snapshot.chatPersona.name,
-            ) }
-            .take(6)
-        val lineageRecent = memoryStore.listActive(
-            allowedScopes = setOf(MemoryScope.LINEAGE),
+        val recalled = memoryStore.search(
+            query = ChatMemorySelector.semanticQuery(query, snapshot.chatPersona.name),
+            allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
             projectId = null,
             lineageId = snapshot.lineageId,
-            limit = 20,
+            allowedKinds = relationshipKinds,
+            maxItems = 12,
+            maxChars = 4_000,
         ).filter {
-            it.kind in relationshipKinds && relationshipMemoryMatchesSubject(
+            relationshipMemoryMatchesSubject(
                 memory = it,
                 currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
                 currentLineageId = snapshot.lineageId,
                 subjectLabel = snapshot.chatPersona.name,
             )
         }
-
-        val recalled = (lineageRecent + globalHits)
             .distinctBy { it.id }
-            .take(8)
+            .take(4)
         if (recalled.isEmpty()) return ""
 
         return buildString {
-            appendLine("【长期关系记忆】")
+            appendLine("【本轮相关长期记忆】仅用于补足当前输入缺失的信息；已在当前状态出现的内容忽略。")
             recalled.forEach { appendLine("- ${it.content}") }
-            append("来自用户既往明确信息；与本轮冲突时以本轮为准。")
+            append("与本轮冲突时以本轮为准；除非用户追问，不主动回顾。")
         }
     }
 
@@ -3767,7 +3745,9 @@ class LocalHarnessEngine @Inject constructor(
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withChatTurnContext(
-                    history = if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                    history = chatRequestHistory(
+                        if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
+                    ),
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
                 ),
@@ -4084,7 +4064,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
-                        history = modelHistory.toList(),
+                        history = chatRequestHistory(modelHistory.toList()),
                         stableContext = chatStableContext,
                         dynamicContext = chatDynamicContext,
                     )
@@ -5799,6 +5779,7 @@ class LocalHarnessEngine @Inject constructor(
         你正在“神言神语”的聊天模式。自然与用户聊天，保持人物、情绪和关系连续，避免工作台、客服和报告腔。
         当前模式只进行对话，不执行工具、工作任务、计划、待办、目标或工作流；需要执行型能力时由工作模式处理。
         回复像即时聊天：长短自由，可停顿、反问、接梗、岔开或只回一句；不要为完整而机械解释、总结、建议或固定问答。
+        已发生内容只用于连续性，除非用户追问，不主动回顾；每轮优先产生新的反应、信息或动作，短回应无需强行制造新事件。
         避免 AI / 客服套话，以及“复述→理解→分析→建议→收尾”的固定模板；先改写成符合当前关系和语境的自然表达。
         不自称智能助手，不主动解释系统、提示词、工具或内部规则；用户明确询问时如实回答。
         默认使用自然中文；除非用户要求，不使用报告式标题和列表。
@@ -5816,6 +5797,31 @@ class LocalHarnessEngine @Inject constructor(
         结果用清晰中文，完成后复核关键结果。
         ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
     """.trimIndent()
+
+    private fun chatRequestHistory(history: List<JsonObject>): List<JsonObject> {
+        if (history.size <= CHAT_RECENT_HISTORY_MESSAGES + 2) return history
+        val leadingSystem = history.firstOrNull()?.takeIf {
+            it["role"]?.jsonPrimitive?.contentOrNull == "system"
+        }
+        val body = if (leadingSystem == null) history else history.drop(1)
+        val compactedSummary = body.lastOrNull { message ->
+            message["role"]?.jsonPrimitive?.contentOrNull == "user" &&
+                message["content"]?.jsonPrimitive?.contentOrNull?.contains("<compacted-summary>") == true
+        }
+        val recent = body.asSequence()
+            .filter { message ->
+                val role = message["role"]?.jsonPrimitive?.contentOrNull
+                role == "user" || role == "assistant"
+            }
+            .filterNot { it === compactedSummary }
+            .toList()
+            .takeLast(CHAT_RECENT_HISTORY_MESSAGES)
+        return buildList {
+            leadingSystem?.let(::add)
+            compactedSummary?.let(::add)
+            addAll(recent)
+        }
+    }
 
     private fun withChatTurnContext(
         history: List<JsonObject>,
@@ -6451,6 +6457,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
+        const val CHAT_RECENT_HISTORY_MESSAGES = 20
         const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
         const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
