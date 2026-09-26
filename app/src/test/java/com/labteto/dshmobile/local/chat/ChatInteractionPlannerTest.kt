@@ -510,6 +510,23 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun assistantInitiatedFlirtingCreatesShortLivedInteractionState() {
+        val state = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = ChatCharacterState(),
+            userMessage = "今天有点累",
+            assistantMessage = "宝贝，过来点。我坐到你身边，凑近了些：今天这么累，还逞强？",
+        )!!.state
+
+        assertEquals(ChatInteractionIntent.FLIRTING.name, state.interactionIntent)
+        assertTrue(state.interactionIntentStrength >= 2)
+        assertTrue(state.interactionIntensity >= 1)
+        assertTrue("靠近" in state.recentActionTags)
+        assertTrue("坐近" in state.recentPoseTags)
+        assertTrue("宝贝" in state.recentAddressTerms)
+    }
+
+    @Test
     fun topicResetClearsInteractionIntensityAndCooldowns() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.FLIRTING.name,
