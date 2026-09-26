@@ -472,38 +472,67 @@ fun TasksScreen(
                     ) {
                         DsButton(
                             text = stringResource(R.string.common_cancel),
-                            onClick = { showCreate = false; createError = null },
+                            onClick = resetEditor,
                             variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                         )
                         DsButton(
-                            text = stringResource(R.string.tasks_create),
+                            text = stringResource(
+                                if (editingTaskId != null) R.string.tasks_save
+                                else R.string.tasks_create,
+                            ),
                             onClick = {
+                                val customMinutes = customHours.toLongOrNull()?.times(60L)
                                 val recurring = when (cadence) {
                                     AutomationCadence.ONCE -> null
                                     AutomationCadence.DAILY -> 24L * 60L
                                     AutomationCadence.WEEKLY -> 7L * 24L * 60L
-                                    AutomationCadence.CUSTOM -> customHours.toLongOrNull()?.times(60L)
+                                    AutomationCadence.CUSTOM -> customMinutes
+                                    AutomationCadence.SILENCE -> customMinutes
                                 }
-                                val ok = !(
+                                val scheduleType = when (cadence) {
+                                    AutomationCadence.ONCE -> AutomationScheduleType.ONCE
+                                    AutomationCadence.DAILY -> AutomationScheduleType.DAILY
+                                    AutomationCadence.WEEKLY -> AutomationScheduleType.WEEKLY
+                                    AutomationCadence.CUSTOM -> AutomationScheduleType.INTERVAL
+                                    AutomationCadence.SILENCE -> AutomationScheduleType.SILENCE
+                                }
+                                val silenceMinutes = recurring.takeIf {
+                                    cadence == AutomationCadence.SILENCE
+                                }
+                                val cadenceValid = when (cadence) {
+                                    AutomationCadence.CUSTOM,
+                                    AutomationCadence.SILENCE -> recurring != null
+                                    else -> true
+                                }
+                                val commonValid = !(
                                     chatMode && harnessState.groupChat.enabled
-                                ) &&
-                                    (cadence != AutomationCadence.CUSTOM || recurring != null) &&
-                                    viewModel.createAt(
+                                ) && cadenceValid
+                                val ok = if (!commonValid) {
+                                    false
+                                } else {
+                                    editingTaskId?.let { id ->
+                                        viewModel.updateTask(
+                                            id = id,
+                                            prompt = prompt,
+                                            firstRunAt = firstRunAt,
+                                            recurringMinutes = recurring,
+                                            scheduleType = scheduleType,
+                                            silenceMinutes = silenceMinutes,
+                                            quietHoursEnabled = chatMode && quietHoursEnabled,
+                                        )
+                                    } ?: viewModel.createAt(
                                         prompt = prompt,
                                         firstRunAt = firstRunAt,
                                         recurringMinutes = recurring,
                                         mode = taskMode,
+                                        scheduleType = scheduleType,
+                                        silenceMinutes = silenceMinutes,
                                         quietHoursEnabled = chatMode && quietHoursEnabled,
                                     )
+                                }
                                 if (ok) {
-                                    showCreate = false
-                                    prompt = ""
-                                    cadence = AutomationCadence.ONCE
-                                    firstRunAt = System.currentTimeMillis() + 60L * 60_000L
-                                    customHours = "6"
-                                    quietHoursEnabled = true
-                                    createError = null
+                                    resetEditor()
                                 } else {
                                     createError = createInvalidMessage
                                 }
@@ -530,6 +559,20 @@ fun TasksScreen(
                             onCancel = { viewModel.cancel(task.id) },
                             onPause = { viewModel.pause(task.id) },
                             onResume = { viewModel.resume(task.id) },
+                            onRunNow = { viewModel.runNow(task.id) },
+                            onEdit = {
+                                editingTaskId = task.id
+                                prompt = task.prompt
+                                cadence = cadenceForTask(task)
+                                firstRunAt = maxOf(
+                                    task.nextRunAt,
+                                    System.currentTimeMillis() + 60_000L,
+                                )
+                                customHours = customHoursForTask(task)
+                                quietHoursEnabled = task.quietHoursEnabled
+                                createError = null
+                                showCreate = true
+                            },
                             onOpenSession = onOpenSession,
                         )
                     }
