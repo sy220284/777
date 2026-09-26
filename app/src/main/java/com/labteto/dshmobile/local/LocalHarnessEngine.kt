@@ -2228,6 +2228,7 @@ class LocalHarnessEngine @Inject constructor(
     ): String? {
         val threshold = startedAt ?: return null
         var turnStartSequence: Long? = null
+        var turnEnded = false
         var recovered: String? = null
         eventLog.events().forEach { event ->
             if (
@@ -2237,17 +2238,34 @@ class LocalHarnessEngine @Inject constructor(
                 event.data["proactive"]?.jsonPrimitive?.booleanOrNull == true
             ) {
                 turnStartSequence = event.sequence
+                turnEnded = false
                 recovered = null
                 return@forEach
             }
             val startSequence = turnStartSequence ?: return@forEach
-            if (event.sequence <= startSequence || event.type != "assistant/message") return@forEach
+            if (event.sequence <= startSequence) return@forEach
+            if (event.type == "turn/end") {
+                turnEnded = true
+                return@forEach
+            }
+            if (event.type != "assistant/message") return@forEach
             decodeTranscriptMessages(event.data)
                 .orEmpty()
                 .lastOrNull { message -> message.role == "assistant" && message.proactive }
                 ?.let { message -> recovered = message.content }
         }
-        return recovered
+        val output = recovered ?: return null
+        if (!turnEnded) {
+            eventLog.append("turn/end", buildJsonObject {
+                put("reason", "completed")
+                put("steps", 1)
+                put("mode", "chat")
+                put("automation", true)
+                put("proactive", true)
+                put("recovered", true)
+            })
+        }
+        return output
     }
 
     private fun persistAutomationTranscript(
