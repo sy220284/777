@@ -93,8 +93,14 @@ if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not 
 if engine.count("startNextQueuedTurnIfIdle()?.start()") < 5:
     violations.append("Recovered durable Agent inbox must keep startup/session-switch wake paths")
 
-if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
-    violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
+if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
+    violations.append("Chat branching must materialize full history only on demand and preserve durable branch graphs")
+if "(state.messages + messages).takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)" not in engine:
+    violations.append("Runtime transcript must stay bounded to LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES")
+if "messages = emptyList()" not in engine or "transcriptWindow = state.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)" not in engine:
+    violations.append("Session snapshots must persist only a bounded transcriptWindow, never full state.messages")
+if "LocalSessionTranscriptPager(eventLog).all()" not in engine:
+    violations.append("Full transcript reads must go through the Session Event pager")
 
 if "if (!runPolicy.toolsEnabled) return JsonArray(emptyList())" not in engine:
     violations.append("Chat capability policy must project an empty model tool catalog")
