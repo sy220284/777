@@ -701,6 +701,7 @@ object LocalToolCatalog {
                     add(JsonPrimitive("pipeline"))
                 })
             },
+            "run_in_background" to boolean("是否作为可跨进程恢复的只读后台工作流执行，默认 false"),
         ), listOf("tasks")))
         add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(
             "query" to string("搜索内容"),
