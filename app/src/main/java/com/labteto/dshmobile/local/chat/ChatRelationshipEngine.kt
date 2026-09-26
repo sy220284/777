@@ -167,7 +167,8 @@ internal fun nextInteractionIntensity(
         ChatInteractionIntent.FLIRTING -> {
             val signalScore = chineseSuggestiveFlirtingScore(input)
             val explicitTarget = when {
-                signalScore >= 6 -> 3
+                signalScore >= 8 -> 4
+                signalScore >= 5 -> 3
                 signalScore >= CHINESE_FLIRTING_SCORE_THRESHOLD -> 2
                 explicit == ChatInteractionIntent.FLIRTING -> 2
                 else -> 1
