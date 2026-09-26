@@ -50,6 +50,35 @@ class ChatInteractionPlannerTest {
         assertTrue(state.unresolvedThreads.isEmpty())
     }
 
+    @Test
+    fun noneSignificanceStillHonorsExplicitTransientClears() {
+        val previous = ChatCharacterState(
+            mood = "平静",
+            currentFocus = "旧话题",
+            recentImpression = "还在介意",
+            activeGoal = "继续追问",
+            currentAgenda = "把旧事说完",
+            internalConflict = "想问又不想问",
+            immediateConcern = "怕对方回避",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{"mood":"生气","currentFocus":"","recentImpression":"","activeGoal":"","currentAgenda":"","internalConflict":"","immediateConcern":"","unresolvedThreads":[]},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "没事了",
+            assistantMessage = "好",
+        )!!.state
+
+        assertEquals("平静", state.mood)
+        assertTrue(state.currentFocus.isBlank())
+        assertTrue(state.recentImpression.isBlank())
+        assertTrue(state.activeGoal.isBlank())
+        assertTrue(state.currentAgenda.isBlank())
+        assertTrue(state.internalConflict.isBlank())
+        assertTrue(state.immediateConcern.isBlank())
+        assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
