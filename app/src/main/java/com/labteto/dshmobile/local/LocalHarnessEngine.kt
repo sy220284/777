@@ -4281,7 +4281,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                 }
             },
-            maxSteps = mainMaxSteps,
+            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
         )
 
         try {
