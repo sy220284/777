@@ -442,9 +442,7 @@ class LocalHarnessViewModel @Inject constructor(
     }
 
     suspend fun loadOlderTranscript(sessionId: String): Result<Int> {
-        if (sessionId.isBlank()) {
-            return Result.failure(IllegalArgumentException("会话编号不能为空"))
-        }
+        if (sessionId.isBlank()) return Result.success(0)
         if (
             transcriptHistoryInitializedSessionId != sessionId ||
             _transcriptHistory.value.sessionId != sessionId
