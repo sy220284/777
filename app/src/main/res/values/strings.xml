@@ -966,4 +966,5 @@
     <string name="tasks_chat_notification_title">%1$s sent you a message</string>
 
     <string name="local_transcript_load_older">Load earlier messages · %1$d hidden</string>
+    <string name="local_transcript_load_older_unknown">Load earlier messages</string>
 </resources>
