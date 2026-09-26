@@ -516,18 +516,26 @@ class HarnessAutomationScheduler @Inject constructor(
         store.list()
             .filter { it.status == "scheduled" && usesChainedChatScheduling(it) }
             .forEach { task ->
-                enqueueOneTime(task.id, task.nextRunAt.coerceAtLeast(System.currentTimeMillis()))
+                enqueueOneTime(
+                    id = task.id,
+                    runAt = task.nextRunAt.coerceAtLeast(System.currentTimeMillis()),
+                    policy = ExistingWorkPolicy.KEEP,
+                )
             }
     }
 
-    private fun enqueueOneTime(id: String, runAt: Long) {
+    private fun enqueueOneTime(
+        id: String,
+        runAt: Long,
+        policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
+    ) {
         val now = System.currentTimeMillis()
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
             .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             .setInputData(Data.Builder().putString(KEY_TASK_ID, id).build())
             .addTag(WORK_TAG)
             .build()
-        workManager.enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
+        workManager.enqueueUniqueWork(workName(id), policy, request)
     }
 
     private fun enqueuePeriodic(id: String, intervalMinutes: Long, firstRunAt: Long) {
