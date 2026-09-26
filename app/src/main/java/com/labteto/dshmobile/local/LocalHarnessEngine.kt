@@ -3602,7 +3602,7 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             val snapshot = _state.value
             val branchEligible = chatBranchingEligible(snapshot.messages)
-            val branchParentId = snapshot.transcriptIndex.latestDialogueMessageId
+            val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = if (branchEligible) {
                 syncMaterializedChatBranchState(
                     current = snapshot.chatBranches,
