@@ -195,6 +195,42 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun restoringRealBranchDoesNotReparentFromTruncatedHotWindow() {
+        val rootUser = message("u1", "user", "第一句", 1)
+        val oldReply = message("a1", "assistant", "旧回答", 2)
+        val newReply = message("a2", "assistant", "新回答", 3)
+        val nextUser = message("u2", "user", "继续", 4)
+        var branches = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(rootUser, oldReply),
+            chatState = ChatCharacterState(),
+            replySuggestions = emptyList(),
+        )
+        branches = upsertChatBranchNode(
+            branches,
+            LocalChatBranchNode(newReply, parentId = rootUser.id),
+            select = true,
+        )
+        branches = appendMaterializedChatBranchMessage(
+            current = branches,
+            activeMessages = listOf(newReply),
+            message = nextUser,
+            parentId = newReply.id,
+            chatState = ChatCharacterState(),
+        )
+
+        val restored = restoreMaterializedChatBranchState(
+            current = branches,
+            activeMessages = listOf(nextUser),
+            chatState = ChatCharacterState(),
+            replySuggestions = emptyList(),
+        )
+
+        assertEquals(listOf("u1", "a2", "u2"), activeChatBranchMessages(restored).map { it.id })
+        assertEquals("a2", restored.nodes.first { it.message.id == "u2" }.parentId)
+    }
+
+    @Test
     fun consecutiveUserTurnsAreNotEligibleForBranchEditing() {
         val first = message("u1", "user", "第一条", 1)
         val queued = message("u2", "user", "排队补充", 2)
