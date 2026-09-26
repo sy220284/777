@@ -234,6 +234,7 @@ internal class LocalSubagentRunner(
                             tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                             subagentId = subagentId,
                             step = modelStep,
+                            durableHistory = history,
                         ).also {
                             if (nativeImagesSent) {
                                 onNativeImageAccepted(snapshot.baseUrl, routeModel)
@@ -268,6 +269,7 @@ internal class LocalSubagentRunner(
                                 tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
                                 subagentId = subagentId,
                                 step = modelStep,
+                                durableHistory = history,
                             )
                         } else {
                             throw error
@@ -464,6 +466,7 @@ internal class LocalSubagentRunner(
         tools: JsonArray,
         subagentId: String,
         step: Int,
+        durableHistory: MutableList<JsonObject>? = null,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
         val executor = AgentRequestExecutor(
@@ -524,6 +527,22 @@ internal class LocalSubagentRunner(
                 history,
                 LocalHistorySummaryMode.WORK,
             ) ?: throw error
+            durableHistory?.let { durable ->
+                applyOverflowCompaction(
+                    history = durable,
+                    compactor = historyCompactor,
+                    summaryMode = LocalHistorySummaryMode.WORK,
+                )?.let { durableCompaction ->
+                    eventLog().append("subagent/compaction", buildJsonObject {
+                        put("agent_id", subagentId)
+                        put("trigger", "context-overflow")
+                        put("omitted_messages", durableCompaction.omittedMessages)
+                        put("summary", durableCompaction.summary)
+                        put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
+                        put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
+                    })
+                }
+            }
             eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
                 put("agent_id", subagentId)
                 put("step", step)
@@ -540,6 +559,7 @@ internal class LocalSubagentRunner(
                 tools = tools,
                 subagentId = subagentId,
                 step = step,
+                durableHistory = null,
                 allowContextOverflowRecovery = false,
             )
         }
