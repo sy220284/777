@@ -964,4 +964,5 @@
     <string name="tasks_chat_notification_title">%1$s 发来一条消息</string>
 
     <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
+    <string name="local_transcript_load_older_unknown">加载更早消息</string>
 </resources>
