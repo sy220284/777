@@ -1374,6 +1374,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                persistOverflowHistory = true,
             )
             val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
             usageTracker.record(snapshot.model, reply.usage)
@@ -3600,6 +3601,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                persistOverflowHistory = true,
             )
 
             val reply = chatTurnRunner.finalizeReply(
@@ -3616,6 +3618,7 @@ class LocalHarnessEngine @Inject constructor(
                         step = 1,
                         toolsOverride = JsonArray(emptyList()),
                         publishPreview = false,
+                        persistOverflowHistory = true,
                     )
                 },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
@@ -3884,6 +3887,7 @@ class LocalHarnessEngine @Inject constructor(
                         step = modelStep + 1,
                         toolsOverride = tools,
                         publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                        persistOverflowHistory = true,
                     ).also {
                         if (nativeImagesSent) {
                             imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
@@ -3916,6 +3920,7 @@ class LocalHarnessEngine @Inject constructor(
                             step = modelStep + 1,
                             toolsOverride = tools,
                             publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                            persistOverflowHistory = true,
                         )
                     } else {
                         throw error
@@ -5242,6 +5247,7 @@ class LocalHarnessEngine @Inject constructor(
                     step = step,
                     toolsOverride = JsonArray(emptyList()),
                     publishPreview = false,
+                    persistOverflowHistory = true,
                 )
             },
             recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
