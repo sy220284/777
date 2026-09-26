@@ -65,6 +65,7 @@ import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
+import com.labteto.dshmobile.local.chat.nextQuietHoursEndMillis
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
@@ -1983,6 +1984,14 @@ class LocalHarnessEngine @Inject constructor(
                 output = reason,
                 delivered = false,
                 skipReason = reason,
+                nextRunAtHint = if (minimumSilenceMinutes != null) {
+                    nextQuietHoursEndMillis(
+                        nowMillis = System.currentTimeMillis(),
+                        endHour = quietEndHour,
+                    )
+                } else {
+                    null
+                },
             )
         }
 
