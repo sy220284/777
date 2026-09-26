@@ -609,7 +609,7 @@ internal fun PersonaGalleryScreen(
                 entry = selected,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(380.dp),
+                    .height(320.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -647,25 +647,31 @@ internal fun PersonaGalleryScreen(
                 }
             }
             PersonaHero(persona = selected.persona, subtitle = relationSummary)
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_export_file),
-                onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        onExport(selected.id, false)
-                            .onSuccess { payload ->
-                                pendingExportPayload = payload
-                                exportDocument.launch(personaExportFileName(selected.persona.name))
-                            }
-                            .onFailure { error = it.message ?: exportFailedText }
-                        busy = false
-                    }
-                },
-                variant = DsButtonVariant.Outline,
+            selectedStory?.let { story ->
+                PersonaRelationshipStatusCard(story)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_continue_story),
+                        onClick = { onStart(selected.id, story.id, false) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canSave && !busy && !hasLocalStoryEdits,
+                    )
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_start_fresh_story),
+                        onClick = { onStart(selected.id, null, true) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canSave && !busy && !hasLocalStoryEdits,
+                        variant = DsButtonVariant.Outline,
+                    )
+                }
+            } ?: DsButton(
+                text = stringResource(R.string.persona_gallery_start_fresh_story),
+                onClick = { onStart(selected.id, null, true) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
+                enabled = canSave && !busy && !hasLocalStoryEdits,
             )
 
             notice?.let {
@@ -695,6 +701,26 @@ internal fun PersonaGalleryScreen(
             if (showPersonaDetails) {
                 PersonaDetails(selected.persona)
             }
+
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_file),
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onExport(selected.id, false)
+                            .onSuccess { payload ->
+                                pendingExportPayload = payload
+                                exportDocument.launch(personaExportFileName(selected.persona.name))
+                            }
+                            .onFailure { error = it.message ?: exportFailedText }
+                        busy = false
+                    }
+                },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
@@ -761,22 +787,6 @@ internal fun PersonaGalleryScreen(
                     enabled = !busy,
                 )
             }
-
-            selectedStory?.let { story ->
-                DsButton(
-                    text = stringResource(R.string.persona_gallery_continue_story),
-                    onClick = { onStart(selected.id, story.id, false) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy && !hasLocalStoryEdits,
-                )
-            }
-            DsButton(
-                text = stringResource(R.string.persona_gallery_start_fresh_story),
-                onClick = { onStart(selected.id, null, true) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSave && !busy && !hasLocalStoryEdits,
-                variant = DsButtonVariant.Outline,
-            )
 
             selectedStory?.let { story ->
                 if (editingStoryTitle) {
@@ -1713,6 +1723,55 @@ private fun ArchivedDialogueRow(
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         )
+    }
+}
+
+@Composable
+private fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
+    val colors = DsTheme.colors
+    val state = story.chatState
+    DsCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
+                    style = DsType.std14,
+                    color = colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.persona_gallery_story_relation),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+            }
+            GalleryPill(state.relationshipState)
+            state.mood.takeIf(String::isNotBlank)?.let { GalleryPill(it) }
+        }
+        state.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
+            Text(
+                focus,
+                style = DsType.small13,
+                color = colors.labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        state.dynamics.sharedMoments.lastOrNull()?.takeIf(String::isNotBlank)?.let { moment ->
+            Text(
+                moment,
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
