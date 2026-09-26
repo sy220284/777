@@ -421,6 +421,7 @@
     <string name="tasks_run_completed">已完成</string>
     <string name="tasks_run_blocked">需要处理</string>
     <string name="tasks_run_failed">执行失败</string>
+    <string name="tasks_run_skipped">已暂缓</string>
     <string name="tasks_last_result">最近结果：%1$s</string>
     <string name="tasks_last_status">最近状态：%1$s</string>
     <string name="tasks_open_result">查看结果</string>
