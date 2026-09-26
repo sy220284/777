@@ -1001,4 +1001,6 @@
     <string name="advanced_edit_memory">编辑记忆</string>
     <string name="advanced_pinned">置顶</string>
     <string name="settings_notifications_usage_hint">回合完成通知更适合长任务场景；纯聊天时关闭可减少不必要的打扰。</string>
+    <string name="persona_gallery_overview_stats">%1$d 个人物 · %2$d 条故事线 · %3$d 条归档对白</string>
+    <string name="persona_gallery_my_characters">我的人物</string>
 </resources>
