@@ -662,12 +662,17 @@ class HarnessAutomationWorker(
             }
             val finished = System.currentTimeMillis()
             val chained = !manualRun && usesChainedChatScheduling(task)
+            val deferredOneShot = !manualRun &&
+                task.recurringMinutes == null &&
+                !run.delivered &&
+                run.nextRunAtHint != null
             val next = when {
                 chained -> nextAnchoredAutomationRun(
                     task = task,
                     afterMillis = finished,
                     suggestedRunAt = run.nextRunAtHint,
                 )
+                deferredOneShot -> run.nextRunAtHint
                 !manualRun && task.recurringMinutes != null ->
                     finished + task.recurringMinutes * 60_000L
                 else -> task.nextRunAt
@@ -677,7 +682,7 @@ class HarnessAutomationWorker(
             val updated = store.update(id) { current ->
                 val nextStatus = when {
                     manualRun -> current.status
-                    chained || current.recurringMinutes != null -> "scheduled"
+                    chained || deferredOneShot || current.recurringMinutes != null -> "scheduled"
                     else -> "completed"
                 }
                 current.copy(
@@ -716,7 +721,7 @@ class HarnessAutomationWorker(
                 )
             }
             if (
-                chained &&
+                (chained || deferredOneShot) &&
                 next != null &&
                 updated?.status == "scheduled"
             ) {
