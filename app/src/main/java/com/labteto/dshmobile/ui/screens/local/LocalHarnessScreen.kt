@@ -989,44 +989,46 @@ private fun LocalConfiguration(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             DsIconButton(
                 icon = FeatherIcons.Menu,
-                contentDescription = "菜单",
+                contentDescription = stringResource(R.string.local_open_menu),
                 onClick = onOpenMenu,
                 containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
                 shadowElevation = 3.dp,
             )
             Text(
-                "本机 Harness",
+                stringResource(R.string.local_harness_title),
                 style = DsType.large20,
                 color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
             if (canCancel) {
-                DsButton("取消", onCancel, variant = DsButtonVariant.Ghost)
+                DsButton(stringResource(R.string.common_cancel), onCancel, variant = DsButtonVariant.Ghost)
             } else {
                 Spacer(Modifier.size(56.dp))
             }
         }
 
         DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text("手机直接执行", style = DsType.base16Strong, color = colors.labelPrimary)
+            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong, color = colors.labelPrimary)
             Text(
-                "模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。",
+                stringResource(R.string.local_on_device_execution_hint),
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )
         }
 
-        Text("模型与接口", style = DsType.std14, color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_section_title), style = DsType.std14, color = colors.labelTertiary)
         DsGroupCard {
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (state.configured) "新的 API 密钥" else "DeepSeek API 密钥") },
+                label = { Text(stringResource(if (state.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
                 supportingText = {
                     Text(
-                        if (state.configured) "留空可保留现有密钥；新密钥仍由安卓系统密钥库加密。"
-                        else "密钥由安卓系统密钥库加密，不写入会话或工作区。",
+                        stringResource(
+                            if (state.configured) R.string.advanced_model_configured
+                            else R.string.advanced_model_unconfigured,
+                        ),
                     )
                 },
                 visualTransformation = PasswordVisualTransformation(),
@@ -1034,17 +1036,17 @@ private fun LocalConfiguration(
             )
             Spacer(Modifier.height(DsSpacing.medium))
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text("模型", style = DsType.std14Strong, color = colors.labelPrimary)
-                ModelChoice("deepseek-flash", "DeepSeek Flash｜V4.1 · 思考默认开启", model) { model = it }
-                ModelChoice("deepseek-v4-pro", "DeepSeek V4 Pro｜专家模型", model) { model = it }
+                Text(stringResource(R.string.models_title), style = DsType.std14Strong, color = colors.labelPrimary)
+                ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
+                ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
             Spacer(Modifier.height(DsSpacing.medium))
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("接口地址") },
-                supportingText = { Text("兼容 OpenAI 聊天补全协议的服务也可使用。") },
+                label = { Text(stringResource(R.string.advanced_endpoint)) },
+                supportingText = { Text(stringResource(R.string.local_endpoint_hint)) },
                 singleLine = true,
             )
         }
@@ -1052,14 +1054,14 @@ private fun LocalConfiguration(
         state.error?.let { Text(it, style = DsType.small13, color = colors.error) }
 
         DsButton(
-            text = "保存并进入本机 Harness",
+            text = stringResource(R.string.local_model_save_enter),
             onClick = { onSave(apiKey, model, baseUrl) },
             modifier = Modifier.fillMaxWidth(),
             enabled = (state.configured || apiKey.isNotBlank()) && baseUrl.isNotBlank(),
         )
         if (state.configured) {
             DsButton(
-                text = "清除本机模型密钥",
+                text = stringResource(R.string.advanced_clear_key),
                 onClick = onClearCredential,
                 modifier = Modifier.fillMaxWidth(),
                 variant = DsButtonVariant.Danger,
@@ -1240,6 +1242,7 @@ private fun LocalChat(
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
+    val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
     val editUserMessageFailed = stringResource(R.string.local_edit_user_message_failed)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -1274,7 +1277,7 @@ private fun LocalChat(
                         attachments += it
                         attachmentError = null
                     }
-                    .onFailure { attachmentError = it.message ?: "文件导入失败" }
+                    .onFailure { attachmentError = it.message ?: fileImportFailedMessage }
             }
         }
     }
@@ -1553,7 +1556,7 @@ private fun LocalChat(
                         )
                     }
                     DsButton(
-                        "关闭",
+                        stringResource(R.string.common_close),
                         onDisableDeviceTurn,
                         modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
                         variant = DsButtonVariant.Ghost,
@@ -1782,7 +1785,7 @@ private fun LocalChat(
                     )
                     state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
                         DsButton(
-                            "恢复请求",
+                            stringResource(R.string.local_restore_request),
                             { drafts[state.sessionId] = lastRequest.content },
                             variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
@@ -2167,7 +2170,7 @@ private fun LocalChat(
         }
     }
     if (showModelPicker) {
-        DsBottomSheet(title = "选择模型", onDismiss = { showModelPicker = false }) {
+        DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
             state.configuredModels.forEach { model ->
                 DsButton(
                     text = model,
@@ -2180,7 +2183,7 @@ private fun LocalChat(
                 )
             }
             DsButton(
-                text = "管理模型配置",
+                text = stringResource(R.string.local_manage_model_config),
                 onClick = {
                     showModelPicker = false
                     onConfigure()
@@ -2191,14 +2194,14 @@ private fun LocalChat(
         }
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = "添加附件", onDismiss = { showAttachmentPicker = false }) {
+        DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsQuickActionTile(
                     icon = Icons.Outlined.Image,
-                    label = "图片",
+                    label = stringResource(R.string.local_attachment_image),
                     onClick = {
                         showAttachmentPicker = false
                         imagePicker.launch(arrayOf("image/*"))
@@ -2207,7 +2210,7 @@ private fun LocalChat(
                 )
                 DsQuickActionTile(
                     icon = Icons.Outlined.AttachFile,
-                    label = "文件",
+                    label = stringResource(R.string.local_attachment_file),
                     onClick = {
                         showAttachmentPicker = false
                         filePicker.launch(arrayOf("*/*"))
@@ -2484,7 +2487,7 @@ private fun ImportedAttachmentRow(
                     color = colors.labelTertiary,
                 )
             }
-            DsButton("移除", onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+            DsButton(stringResource(R.string.common_remove), onRemove, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
         }
     }
 }
