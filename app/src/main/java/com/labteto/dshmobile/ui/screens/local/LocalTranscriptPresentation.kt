@@ -29,6 +29,24 @@ internal sealed interface LocalTranscriptItem {
     }
 }
 
+internal data class LocalTranscriptWindow(
+    val messages: List<LocalHarnessMessage>,
+    val hiddenCount: Int,
+)
+
+internal fun localTranscriptWindow(
+    messages: List<LocalHarnessMessage>,
+    maxMessages: Int,
+): LocalTranscriptWindow {
+    if (messages.isEmpty()) return LocalTranscriptWindow(emptyList(), 0)
+    val limit = maxMessages.coerceAtLeast(1)
+    val hidden = (messages.size - limit).coerceAtLeast(0)
+    return LocalTranscriptWindow(
+        messages = if (hidden == 0) messages else messages.takeLast(limit),
+        hiddenCount = hidden,
+    )
+}
+
 internal fun buildLocalTranscript(messages: List<LocalHarnessMessage>): List<LocalTranscriptItem> {
     if (messages.isEmpty()) return emptyList()
 
