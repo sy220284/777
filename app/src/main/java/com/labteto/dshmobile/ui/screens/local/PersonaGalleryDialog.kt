@@ -372,7 +372,11 @@ internal fun PersonaGalleryScreen(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 if (selected == null) {
-            GalleryOverviewHeader(entries.size)
+            GalleryOverviewHeader(
+                characterCount = entries.size,
+                storyCount = entries.sumOf { it.stories.size },
+                dialogueCount = entries.sumOf { it.totalDialogueCount() },
+            )
 
             val installedPresetIds = entries
                 .map { it.persona.presetId }
@@ -515,6 +519,20 @@ internal fun PersonaGalleryScreen(
                         modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                     )
                 }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.persona_gallery_my_characters),
+                    style = DsType.std14,
+                    color = DsTheme.colors.labelPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                GalleryPill(entries.size.toString())
             }
 
             OutlinedTextField(
@@ -1328,7 +1346,11 @@ private fun StoryDetailSection(
 }
 
 @Composable
-private fun GalleryOverviewHeader(count: Int) {
+private fun GalleryOverviewHeader(
+    characterCount: Int,
+    storyCount: Int,
+    dialogueCount: Int,
+) {
     DsCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
@@ -1346,7 +1368,10 @@ private fun GalleryOverviewHeader(count: Int) {
                 }
             }
             Spacer(Modifier.width(DsSpacing.medium))
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 Text(
                     stringResource(R.string.persona_gallery_master),
                     style = DsType.large20,
@@ -1354,7 +1379,12 @@ private fun GalleryOverviewHeader(count: Int) {
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    stringResource(R.string.persona_gallery_count, count),
+                    stringResource(
+                        R.string.persona_gallery_overview_stats,
+                        characterCount,
+                        storyCount,
+                        dialogueCount,
+                    ),
                     style = DsType.small13,
                     color = DsTheme.colors.labelSecondary,
                 )
