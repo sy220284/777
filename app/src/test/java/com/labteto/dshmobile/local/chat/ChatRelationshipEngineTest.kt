@@ -359,6 +359,39 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun intimateContextDoesNotStickToUnrelatedNewTopic() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("今天天气怎么样", previous),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("今天天气怎么样", previous),
+        )
+        assertEquals(0, nextInteractionIntensity("今天天气怎么样", previous))
+    }
+
+    @Test
+    fun flirtingContinuationExpiresInsteadOfStickingForever() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 1,
+            interactionIntensity = 2,
+        )
+
+        assertEquals(
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("继续", previous),
+        )
+    }
+
+    @Test
     fun genericRelationshipInitiativeDoesNotTriggerProactiveIntimacy() {
         assertFalse(hasProactiveIntimacyIntent("一直都是我主动，感觉投入失衡"))
     }
