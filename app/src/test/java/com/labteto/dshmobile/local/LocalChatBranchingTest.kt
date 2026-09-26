@@ -81,6 +81,63 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun linearChatDoesNotMaterializeDuplicateBranchHistory() {
+        val user = message("u1", "user", "你好", 1)
+        val reply = message("a1", "assistant", "你好。", 2)
+
+        val branches = syncMaterializedChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, reply),
+            chatState = ChatCharacterState(mood = "自然"),
+            replySuggestions = emptyList(),
+        )
+
+        assertTrue(branches.nodes.isEmpty())
+        assertTrue(branches.selectedChildByParent.isEmpty())
+    }
+
+    @Test
+    fun restoreDropsLegacyLinearGraphButKeepsRealAlternatives() {
+        val user = message("u1", "user", "在吗", 1)
+        val oldReply = message("a1", "assistant", "在。", 2)
+        val linear = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, oldReply),
+            chatState = ChatCharacterState(mood = "平静"),
+            replySuggestions = emptyList(),
+        )
+
+        assertTrue(
+            restoreMaterializedChatBranchState(
+                current = linear,
+                activeMessages = listOf(user, oldReply),
+                chatState = ChatCharacterState(mood = "平静"),
+                replySuggestions = emptyList(),
+            ).nodes.isEmpty(),
+        )
+
+        val newReply = message("a2", "assistant", "在啊。", 3)
+        val branched = upsertChatBranchNode(
+            linear,
+            LocalChatBranchNode(
+                message = newReply,
+                parentId = user.id,
+                chatStateAfter = ChatCharacterState(mood = "好奇"),
+            ),
+            select = true,
+        )
+        val restored = restoreMaterializedChatBranchState(
+            current = branched,
+            activeMessages = listOf(user, newReply),
+            chatState = ChatCharacterState(mood = "好奇"),
+            replySuggestions = emptyList(),
+        )
+
+        assertTrue(hasChatBranchAlternatives(restored))
+        assertEquals(listOf("u1", "a2"), activeChatBranchMessages(restored).map { it.id })
+    }
+
+    @Test
     fun consecutiveUserTurnsAreNotEligibleForBranchEditing() {
         val first = message("u1", "user", "第一条", 1)
         val queued = message("u2", "user", "排队补充", 2)

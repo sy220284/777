@@ -1817,7 +1817,7 @@ class LocalHarnessEngine @Inject constructor(
                     if (pendingInputs.size() == 0 && chatBranchingEligible(_state.value.messages)) {
                         _state.update { current ->
                             current.copy(
-                                chatBranches = syncChatBranchState(
+                                chatBranches = syncMaterializedChatBranchState(
                                     current = current.chatBranches,
                                     activeMessages = current.messages,
                                     chatState = current.chatState,
@@ -1834,7 +1834,7 @@ class LocalHarnessEngine @Inject constructor(
                     val latest = sessionRepository.read(session.id) ?: session
                     val nextMessages = latest.messages + proactiveMessage
                     val nextBranches = if (chatBranchingEligible(nextMessages)) {
-                        syncChatBranchState(
+                        syncMaterializedChatBranchState(
                             current = latest.chatBranches,
                             activeMessages = nextMessages,
                             chatState = latest.chatState,
@@ -3556,7 +3556,7 @@ class LocalHarnessEngine @Inject constructor(
             val branchEligible = chatBranchingEligible(snapshot.messages)
             val branchParentId = snapshot.messages.lastOrNull { it.role == "user" }?.id
             val branchBase = if (branchEligible) {
-                syncChatBranchState(
+                syncMaterializedChatBranchState(
                     current = snapshot.chatBranches,
                     activeMessages = snapshot.messages,
                     chatState = snapshot.chatState,
@@ -3658,7 +3658,12 @@ class LocalHarnessEngine @Inject constructor(
                 clearStreamingPreview = true,
             )
             val assistantTranscript = transcriptMessages.lastOrNull()
-            if (branchEligible && assistantTranscript != null && branchParentId != null) {
+            if (
+                branchEligible &&
+                branchBase.nodes.isNotEmpty() &&
+                assistantTranscript != null &&
+                branchParentId != null
+            ) {
                 val branches = upsertChatBranchNode(
                     branchBase,
                     LocalChatBranchNode(
@@ -5891,7 +5896,7 @@ class LocalHarnessEngine @Inject constructor(
             chatState = stored.chatState,
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
-                syncChatBranchState(
+                restoreMaterializedChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = projectedTranscript.messages,
                     chatState = stored.chatState,
