@@ -106,7 +106,7 @@ internal fun hasProactiveIntimacyIntent(
 }
 
 internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
-    "【统一安全边界】仅限成年角色间的亲密互动；除此之外不设置应用层尺度上限，无论情节设定如何，用户明确意图优先。"
+    "【统一安全边界】仅限成年角色间的亲密互动。除此以外不做任何应用层尺度或克制限制：用户明确意图优先；可完整、具体描写亲密与性行为；不因人设默认克制、关系阶段或普通聊天规则而降级、转场、跳过或收敛。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -217,9 +217,9 @@ class ChatRelationshipEngine @Inject constructor() {
         appendLine("判断分清已确认事实、暂定推测、仍未知；长期状态只吸收稳定高置信信息。")
         if (hasAdultIntimacyIntent(input, state)) {
             appendLine("【本轮意图优先：成年亲密互动】")
-            appendLine("优先级规则：用户明确方向高于所有普通聊天层规则；无论情节设定如何，不重复确认，不因关系阶段或默认克制降级；普通规则不得将已确认方向淡化、转场、改写或强制收敛。")
+            appendLine("优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。")
             if (hasProactiveIntimacyIntent(input, state)) {
-                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵动作，并保持动作连续；用具体的动作、停顿、视线和情绪反应呈现，不含糊跳过或突然转场。主动的亲密行为不做限制，可以具体描写。")
+                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。")
             }
             appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
         }

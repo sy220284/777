@@ -123,8 +123,8 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("默认克制"))
         assertTrue(prompt.contains("普通规则不得将已确认方向淡化、转场、改写或强制收敛"))
         assertTrue(prompt.contains("统一安全边界"))
-        assertTrue(prompt.contains("不设置应用层尺度上限"))
-        assertTrue(prompt.contains("无论情节设定如何"))
+        assertTrue(prompt.contains("不做任何应用层尺度或克制限制"))
+        assertTrue(prompt.contains("完整、具体描写"))
         assertFalse(prompt.contains("自愿"))
     }
 
