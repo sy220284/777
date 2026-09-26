@@ -1868,6 +1868,31 @@ private fun LocalChat(
                     minLines = 1,
                     maxLines = 5,
                 )
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsButton(
+                            text = stringResource(
+                                if (state.planMode) R.string.local_plan_button_on
+                                else R.string.local_plan_button_off,
+                            ),
+                            onClick = { onPlanModeChange(!state.planMode) },
+                            modifier = Modifier.weight(1f),
+                            variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                            enabled = !state.running,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.local_auto_approve_short),
+                            onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                            modifier = Modifier.weight(1f),
+                            variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -1890,24 +1915,6 @@ private fun LocalChat(
                             text = stringResource(R.string.local_reply_suggestions_open),
                             onClick = { showReplySuggestions = true },
                             variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                        )
-                    }
-                    if (state.usageMode == LocalUsageMode.WORK) {
-                        DsButton(
-                            stringResource(
-                                if (state.planMode) R.string.local_plan_button_on
-                                else R.string.local_plan_button_off,
-                            ),
-                            { onPlanModeChange(!state.planMode) },
-                            variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                            enabled = !state.running,
-                        )
-                        DsButton(
-                            stringResource(R.string.local_auto_approve_short),
-                            if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                            variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                         )
                     }
