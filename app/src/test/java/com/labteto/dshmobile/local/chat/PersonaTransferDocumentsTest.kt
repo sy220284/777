@@ -50,6 +50,8 @@ class PersonaTransferDocumentsTest {
         assertEquals(2, archive.entry.stories.single().history.size)
         assertEquals("挚友", archive.entry.stories.single().chatState.relationshipState)
         assertEquals(listOf("一起看过日出"), archive.memorySummaries.single().sharedMoments)
+        assertTrue(archive.memorySummaries.single().continuitySummary.contains("剧情提要：第一次一起去海边"))
+        assertTrue(archive.memorySummaries.single().continuitySummary.contains("保存时的关系：挚友"))
         assertTrue(archive.entry.stories.single().sourceSessionIds.isEmpty())
     }
 
