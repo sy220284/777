@@ -3973,6 +3973,14 @@ class LocalHarnessEngine @Inject constructor(
             maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
             input = input,
             memoryInput = memoryInput,
+            allowMutation = runPolicy.allowToolExecution,
+            resourceBudget = LocalAgentRunResourceBudget(
+                maxModelRequests = resourceScheduler.budget.maxModelRequests,
+                maxAgents = resourceScheduler.budget.maxAgents,
+                maxTerminals = resourceScheduler.budget.maxTerminals,
+                maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
+                maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
+            ),
         )
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
