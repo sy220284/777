@@ -97,6 +97,8 @@ if "runPolicy.imageFallbackToVisionTool" not in engine:
     violations.append("Chat native-image failures must not fall back to Work vision tools")
 if "runGroupChatTurn(input)" not in engine or "runAgentTurn(input, memoryInput)" not in engine:
     violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
+if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in engine:
+    violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
 
