@@ -18,7 +18,7 @@
     <string name="local_selected_count">Selected: %1$d</string>
     <string name="local_regenerate_reply">Regenerate reply</string>
     <string name="local_edit_user_message">Edit message</string>
-    <string name="local_edit_user_message_hint">Resending creates a new conversation branch from this message. The original message and its following replies stay available through the previous/next controls.</string>
+    <string name="local_edit_user_message_hint">Resending continues the conversation again from this message and regenerates the replies that follow.</string>
     <string name="local_edit_user_message_resend">Resend</string>
     <string name="local_edit_user_message_failed">This message cannot be resent right now. Make sure chat is idle and the text has actually changed.</string>
     <string name="local_previous_variant">Previous version</string>
