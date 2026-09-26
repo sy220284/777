@@ -657,39 +657,59 @@ private fun SessionRowItem(
                     },
                     onLongClick = { menuOpen = true },
                 )
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = sessionTitle(session),
-                style = DsType.std14,
-                color = colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Column(
                 modifier = Modifier.weight(1f),
-            )
-            if (session.pendingInteraction != null) {
-                Spacer(Modifier.width(DsSpacing.xsmall))
-                DsPill(text = stringResource(R.string.chatlist_needs_action), warn = true)
-            } else if (session.running) {
-                Spacer(Modifier.width(DsSpacing.xsmall))
-                Text(stringResource(R.string.subagents_running), style = DsType.caption11, color = colors.accent)
-            } else {
-                Spacer(Modifier.width(DsSpacing.xsmall))
-                Text(relativeTime(session.updatedAt), style = DsType.caption11, color = colors.labelCaption)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = sessionTitle(session),
+                    style = DsType.std14,
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    session.cwd
+                        ?.takeIf(String::isNotBlank)
+                        ?.let(::basename)
+                        ?.takeIf(String::isNotBlank)
+                        ?.let { folder ->
+                            Text(
+                                folder,
+                                style = DsType.caption11,
+                                color = colors.labelCaption,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    if (session.pendingInteraction != null) {
+                        DsPill(text = stringResource(R.string.chatlist_needs_action), warn = true)
+                    } else if (session.running) {
+                        Text(
+                            stringResource(R.string.subagents_running),
+                            style = DsType.caption11,
+                            color = colors.accent,
+                        )
+                    } else {
+                        Text(
+                            relativeTime(session.updatedAt),
+                            style = DsType.caption11,
+                            color = colors.labelCaption,
+                        )
+                    }
+                    if (childCount > 0) {
+                        DsPill(text = childCount.toString())
+                    } else if (session.origin == "subagent" && depth == 0) {
+                        DsPill(text = stringResource(R.string.chatlist_subagents))
+                    }
+                }
             }
-            // The count replaces the old "Subagents" pill on parents: with the children indented
-            // underneath, what is worth saying is how many are down there when the row is closed.
-            if (childCount > 0) {
-                Spacer(Modifier.width(DsSpacing.xsmall))
-                DsPill(text = childCount.toString())
-            } else if (session.origin == "subagent" && depth == 0) {
-                // Only reached by an orphan — its whole ancestry is archived or blank — where the
-                // indent cannot say what the row is.
-                Spacer(Modifier.width(DsSpacing.xsmall))
-                DsPill(text = stringResource(R.string.chatlist_subagents))
-            }
-            // Expansion stays available without placing an icon before the session title.
             if (childCount > 0) {
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 Icon(
