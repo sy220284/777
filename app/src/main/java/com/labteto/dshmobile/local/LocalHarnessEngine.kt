@@ -1239,16 +1239,19 @@ class LocalHarnessEngine @Inject constructor(
             !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
-        var branches = syncChatBranchState(
-            current = state.chatBranches,
-            activeMessages = state.messages,
-            chatState = state.chatState,
-            replySuggestions = state.replySuggestions,
-        )
-        val original = branches.nodes.firstOrNull { it.message.id == messageId } ?: return@synchronized false
-        if (original.message.role != "user" || state.messages.none { it.id == messageId }) {
-            return@synchronized false
+        val branchTranscript = transcriptForBranchMaterialization(state)
+        var branches = if (state.chatBranches.nodes.isNotEmpty()) {
+            state.chatBranches
+        } else {
+            syncChatBranchState(
+                current = LocalChatBranchState(),
+                activeMessages = branchTranscript,
+                chatState = state.chatState,
+                replySuggestions = state.replySuggestions,
+            )
         }
+        val original = branches.nodes.firstOrNull { it.message.id == messageId } ?: return@synchronized false
+        if (original.message.role != "user") return@synchronized false
         if (original.message.content.trim() == content) return@synchronized false
         cancelChatPostTurn()
 
@@ -1281,7 +1284,7 @@ class LocalHarnessEngine @Inject constructor(
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
         _state.update { current ->
             current.copy(
-                messages = activeMessages,
+                messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                 chatState = baseState,
                 replySuggestions = emptyList(),
@@ -1314,13 +1317,7 @@ class LocalHarnessEngine @Inject constructor(
             !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
-        val synced = syncChatBranchState(
-            current = state.chatBranches,
-            activeMessages = state.messages,
-            chatState = state.chatState,
-            replySuggestions = state.replySuggestions,
-        )
-        val selected = selectChatBranchVariant(synced, messageId, targetIndex)
+        val selected = selectChatBranchVariant(state.chatBranches, messageId, targetIndex)
             ?: return@synchronized false
         val activeMessages = activeChatBranchMessages(selected)
         if (activeMessages.isEmpty() || !chatBranchingEligible(activeMessages)) return@synchronized false
@@ -1329,7 +1326,7 @@ class LocalHarnessEngine @Inject constructor(
         rebuildChatModelHistoryFromTranscript(activeMessages)
         _state.update { current ->
             current.copy(
-                messages = activeMessages,
+                messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                 chatState = snapshot?.first ?: current.chatState,
                 replySuggestions = snapshot?.second.orEmpty(),
@@ -1360,12 +1357,16 @@ class LocalHarnessEngine @Inject constructor(
         cancelChatPostTurn()
 
         if (state.usageMode == LocalUsageMode.CHAT && state.transcriptIndex.branchingEligible) {
-            val branches = syncChatBranchState(
-                current = state.chatBranches,
-                activeMessages = state.messages,
-                chatState = state.chatState,
-                replySuggestions = state.replySuggestions,
-            )
+            val branches = if (state.chatBranches.nodes.isNotEmpty()) {
+                state.chatBranches
+            } else {
+                syncChatBranchState(
+                    current = LocalChatBranchState(),
+                    activeMessages = transcriptForBranchMaterialization(state),
+                    chatState = state.chatState,
+                    replySuggestions = state.replySuggestions,
+                )
+            }
             val baseState = chatBranchParentState(branches, messageId) ?: state.chatState
             _state.update {
                 it.copy(
@@ -1381,6 +1382,15 @@ class LocalHarnessEngine @Inject constructor(
         }
             .also { activeJob = it; it.start() }
         true
+    }
+
+    private fun transcriptForBranchMaterialization(
+        state: LocalHarnessState,
+    ): List<LocalHarnessMessage> {
+        val activeBranch = activeChatBranchMessages(state.chatBranches)
+        if (activeBranch.isNotEmpty()) return activeBranch
+        if (state.transcriptIndex.totalMessageCount <= state.messages.size.toLong()) return state.messages
+        return LocalSessionTranscriptPager(eventLog).all()
     }
 
     private fun rebuildChatModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
