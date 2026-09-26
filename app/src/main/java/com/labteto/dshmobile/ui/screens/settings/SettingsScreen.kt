@@ -201,33 +201,12 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_pricing),
-                                subtitle = stringResource(R.string.settings_pricing_subtitle),
-                                iconFamily = DsIconFamily.Amber,
-                                onClick = { page = SettingsDestination.PRICING },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.History,
-                                title = stringResource(R.string.usage_calculation_title),
-                                subtitle = stringResource(R.string.usage_calculation_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
-                                onClick = { page = SettingsDestination.USAGE },
-                            )
-                            DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
                                 iconFamily = DsIconFamily.Purple,
                                 value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_chat),
-                                subtitle = stringResource(R.string.settings_chat_subtitle),
-                                iconFamily = DsIconFamily.Purple,
-                                onClick = { page = SettingsDestination.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
@@ -302,6 +281,22 @@ fun SettingsScreen(
                                 sessionSort == "updated",
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
+                        }
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_chat_style_guard),
+                                subtitle = stringResource(R.string.settings_chat_style_guard_hint),
+                                iconFamily = DsIconFamily.Purple,
+                                value = stringResource(
+                                    if (localHarness.chatStyleGuardEnabled) {
+                                        R.string.common_enabled
+                                    } else {
+                                        R.string.common_disabled
+                                    },
+                                ),
+                                onClick = { page = SettingsDestination.CHAT },
+                            )
                         }
                     }
 
@@ -436,6 +431,22 @@ fun SettingsScreen(
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                         LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_pricing),
+                                subtitle = stringResource(R.string.settings_pricing_subtitle),
+                                iconFamily = DsIconFamily.Amber,
+                                onClick = { page = SettingsDestination.PRICING },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.History,
+                                title = stringResource(R.string.usage_calculation_title),
+                                subtitle = stringResource(R.string.usage_calculation_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                onClick = { page = SettingsDestination.USAGE },
+                            )
+                        }
                     }
 
                     SettingsDestination.PRICING -> {
