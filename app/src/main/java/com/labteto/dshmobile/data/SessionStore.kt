@@ -446,15 +446,35 @@ class SessionStore @Inject constructor(
     private var currentId: String? = null
     private val openSessionState = OpenSessionFoldState()
 
-    /** The open session's live journal. Cancelled and replaced whenever the open session changes. */
-    private var followJob: Job? = null
+    /** Child transcript follow is a separate presentation surface from the primary session stream. */
     private var childFollowJob: Job? = null
 
-    /** Host-wide live control (queue, jobs, projections). One per connection generation. */
-    private var controlJob: Job? = null
-
-    /** Workspace registry stream. One per connection generation. */
-    private var workspaceJob: Job? = null
+    private val remoteStreams = SessionRemoteStreamCoordinator(
+        scope = scope,
+        streamProvider = { endpoint, args ->
+            connectionManager.generation?.mux?.openStream(endpoint, args)
+        },
+        onControlFrame = ::handleControlFrame,
+        onWorkspaceFrame = ::handleWorkspaceFrame,
+        onFollowFrame = { sessionId, frame ->
+            when (frame) {
+                is SessionFollowFrame.Snapshot -> applyFollowSnapshot(sessionId, frame)
+                is SessionFollowFrame.Entry -> applyFollowEntry(sessionId, frame.record)
+                is SessionFollowFrame.AssistantStream -> applyAssistantFrame(sessionId, frame)
+            }
+        },
+        onFailure = { failure ->
+            when {
+                failure.endpoint == "session/follow" && failure.undecodable ->
+                    log("undecodable session/follow frame")
+                failure.endpoint == "session/follow" -> {
+                    log("session/follow ended for ${failure.sessionId}", failure.error)
+                    setConnectionError(failure.error?.message)
+                }
+                else -> log("${failure.endpoint} ended", failure.error)
+            }
+        },
+    )
 
     private data class ApprovalRequest(
         val sessionId: String,
@@ -527,35 +547,6 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Open the two host-wide streams for this connection generation.
-     *
-     * Both replace things that used to arrive unbidden on the all-session mux, and both open with
-     * a complete baseline — which is the point: a reconnect replaces the mirror wholesale rather
-     * than leaving whatever the old generation last said. They are cancelled and reopened with
-     * the generation, because a stream's items are only meaningful within the socket that carries
-     * them.
-     */
-    private fun startHostStreams() {
-        val mux = connectionManager.generation?.mux ?: return
-        controlJob?.cancel()
-        controlJob = scope.launch {
-            runCatching {
-                mux.openStream("session/control").collect { item ->
-                    decodeOrNull(SessionControlFrameSerializer, item)?.let { handleControlFrame(it) }
-                }
-            }.onFailure { log("session/control ended", it) }
-        }
-        workspaceJob?.cancel()
-        workspaceJob = scope.launch {
-            runCatching {
-                mux.openStream("workspace/follow").collect { item ->
-                    decodeOrNull(WorkspaceFollowFrameSerializer, item)?.let { handleWorkspaceFrame(it) }
-                }
-            }.onFailure { log("workspace/follow ended", it) }
-        }
-    }
-
     /** Decode one stream item, or null when it does not match the expected frame union. */
     private fun <T> decodeOrNull(serializer: kotlinx.serialization.KSerializer<T>, item: JsonElement): T? =
         runCatching { decodeFromJsonElement(serializer, item) }.getOrNull()
@@ -579,7 +570,7 @@ class SessionStore @Inject constructor(
         _contentSearchAvailable.value = true
         // Before the list read: the workspace and control streams each open with their own
         // complete baseline, and the list is what their increments are applied on top of.
-        startHostStreams()
+        remoteStreams.restartHostStreams()
         _hostInfo.value = connectionManager.generation?.description
         coroutineScope {
             // Host-scoped and needed before anything is tapped, but needed by nothing on the way to
@@ -1134,41 +1125,9 @@ class SessionStore @Inject constructor(
      * observation rather than an execution.
      */
     private fun startFollow(sessionId: String) {
-        followJob?.cancel()
         openSessionState.clearFollowCursor()
-        val mux = connectionManager.generation?.mux
-        if (mux == null) {
+        if (!remoteStreams.followSession(sessionId, HISTORY_PAGE_SIZE)) {
             log("cannot follow $sessionId: no connection generation")
-            return
-        }
-        val args = buildJsonObject {
-            put(
-                "request",
-                encodeToJsonElement(
-                    SessionFollowRequest.serializer(),
-                    SessionFollowRequest(
-                        address = SessionAddress.Session(sessionId = sessionId),
-                        maxMessages = HISTORY_PAGE_SIZE,
-                        assistantStream = true,
-                    ),
-                ),
-            )
-        }
-        followJob = scope.launch {
-            runCatching {
-                mux.openStream("session/follow", args).collect { item ->
-                    when (val frame = decodeOrNull(SessionFollowFrameSerializer, item)) {
-                        is SessionFollowFrame.Snapshot -> applyFollowSnapshot(sessionId, frame)
-                        is SessionFollowFrame.Entry -> applyFollowEntry(sessionId, frame.record)
-                        is SessionFollowFrame.AssistantStream -> applyAssistantFrame(sessionId, frame)
-                        null -> log("undecodable session/follow frame")
-                    }
-                }
-            }.onFailure { failure ->
-                if (failure is kotlinx.coroutines.CancellationException) throw failure
-                log("session/follow ended for $sessionId", failure)
-                setConnectionError(failure.message)
-            }
         }
     }
 
