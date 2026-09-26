@@ -3795,6 +3795,11 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            // Queued chat turns can start immediately after the previous answer. Stop that
+            // answer's background relationship/state refresh before capturing this turn's context.
+            cancelChatPostTurn()
+        }
         val foregroundSessionId = currentSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
         LocalExecutionService.holdTurn(context, foregroundSessionId)
@@ -3804,6 +3809,8 @@ class LocalHarnessEngine @Inject constructor(
         var modelStep = 0
         var requestPrepared = false
         var ephemeralContext = ""
+        var chatStableContext = ""
+        var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
@@ -3861,13 +3868,15 @@ class LocalHarnessEngine @Inject constructor(
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
                         captureAutoMemoryDirective(memoryInput)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
-                        ephemeralContext = listOf(
-                            chatTurnRunner.prepare(
-                                snapshot.personaId,
-                                snapshot.chatState,
-                                input,
-                                snapshot.handoffSummary,
-                            ).prompt,
+                        val chatContext = chatTurnRunner.prepare(
+                            snapshot.personaId,
+                            snapshot.chatState,
+                            input,
+                            snapshot.handoffSummary,
+                        )
+                        chatStableContext = chatContext.stablePrompt
+                        chatDynamicContext = listOf(
+                            chatContext.dynamicPrompt,
                             relationshipMemory,
                         ).filter(String::isNotBlank).joinToString("\n\n")
                     } else {
@@ -3890,11 +3899,23 @@ class LocalHarnessEngine @Inject constructor(
                 val tools = modelToolSchemas()
                 // Re-check before every model step. Tool results and queued user messages can grow
                 // substantially inside one turn, so checking only at turn start is insufficient.
+                val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                    estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
+                } else {
+                    estimateModelTokens(ephemeralContext)
+                }
                 compactHistoryIfNeeded(
-                    extraTokens = estimateModelTokens(ephemeralContext) +
-                        estimateModelTokens(tools.toString()),
+                    extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
                 )
-                val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
+                val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                    withChatTurnContext(
+                        history = modelHistory.toList(),
+                        stableContext = chatStableContext,
+                        dynamicContext = chatDynamicContext,
+                    )
+                } else {
+                    withEphemeralContext(modelHistory.toList(), ephemeralContext)
+                }
                 val selectedMode = resolveLocalImageInputMode(
                     snapshot.imageInputMode,
                     imageCapabilities,
@@ -5802,10 +5823,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "system")
                 put("content", dynamic)
             }
-            val currentUserIndex = result.lastIndex.takeIf { index ->
-                index >= 0 &&
-                    result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
-            } ?: -1
+            val currentUserIndex = result.indexOfLast { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull == "user"
+            }
             result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, dynamicMessage)
         }
         return result
