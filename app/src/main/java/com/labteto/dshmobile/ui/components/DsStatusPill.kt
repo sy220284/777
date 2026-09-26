@@ -17,7 +17,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 
 /** Semantic state of an automation task / run. */
-enum class DsStatus { Running, Done, Failed, Neutral }
+enum class DsStatus { Running, Done, Warning, Failed, Neutral }
 
 /**
  * Full-size status badge (运行中 / 已完成 / 失败). Where [StateDot] whispers, this speaks —
@@ -33,6 +33,7 @@ fun DsStatusPill(
     val (dot, tint) = when (state) {
         DsStatus.Running -> colors.accent to colors.accentTertiary
         DsStatus.Done -> colors.success to colors.successTertiary
+        DsStatus.Warning -> colors.warnLabel to colors.warnTertiary
         DsStatus.Failed -> colors.error to colors.errorTertiary
         DsStatus.Neutral -> colors.labelTertiary to colors.hover
     }

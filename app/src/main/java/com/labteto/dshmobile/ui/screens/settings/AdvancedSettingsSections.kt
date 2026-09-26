@@ -38,10 +38,12 @@ import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.ui.components.DisclosureRow
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -357,10 +359,22 @@ internal fun LocalModelSettingsCard(
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
     var imageMode by remember(local.imageInputMode) { mutableStateOf(local.imageInputMode) }
+    var showEditor by remember { mutableStateOf(false) }
+
+    val openEditor = {
+        model = local.model
+        baseUrl = local.baseUrl
+        apiKey = ""
+        showEditor = true
+    }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
         Text(
-            if (local.configured) stringResource(R.string.advanced_model_configured) else stringResource(R.string.advanced_model_unconfigured),
+            if (local.configured) {
+                stringResource(R.string.advanced_model_configured)
+            } else {
+                stringResource(R.string.advanced_model_unconfigured)
+            },
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -376,28 +390,27 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        OutlinedTextField(
-            value = model,
-            onValueChange = { model = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_default_model)) },
+
+        DsValueRow(
+            label = stringResource(R.string.advanced_default_model),
+            value = local.model,
+            configured = local.configured,
+            onClick = openEditor,
         )
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_endpoint)) },
+        DsValueRow(
+            label = stringResource(R.string.advanced_endpoint),
+            value = local.baseUrl,
+            configured = local.configured,
+            onClick = openEditor,
         )
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(if (local.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
-            visualTransformation = PasswordVisualTransformation(),
+        DsValueRow(
+            label = stringResource(R.string.advanced_model_key),
+            value = if (local.configured) "••••••••" else null,
+            masked = true,
+            configured = local.configured,
+            onClick = openEditor,
         )
+
         Text(
             stringResource(R.string.advanced_image_input_mode),
             style = DsType.small13Strong,
@@ -425,29 +438,77 @@ internal fun LocalModelSettingsCard(
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(
-                text = stringResource(R.string.advanced_save_model_settings),
-                onClick = {
-                    if (!local.configured && apiKey.isBlank()) {
-                        report(modelKeyRequiredMessage)
-                        return@DsButton
-                    }
-                    viewModel.configureLocalModel(apiKey, model, baseUrl)
-                    apiKey = ""
-                    report(modelSavedMessage)
-                },
-                variant = DsButtonVariant.Outline,
+    }
+
+    if (showEditor) {
+        DsBottomSheet(
+            title = stringResource(R.string.advanced_model_settings),
+            subtitle = if (local.configured) {
+                stringResource(R.string.advanced_model_configured)
+            } else {
+                stringResource(R.string.advanced_model_unconfigured)
+            },
+            onDismiss = { showEditor = false },
+        ) {
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.advanced_default_model)) },
             )
-            if (local.configured) {
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.advanced_endpoint)) },
+            )
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = {
+                    Text(
+                        stringResource(
+                            if (local.configured) {
+                                R.string.advanced_replace_model_key
+                            } else {
+                                R.string.advanced_model_key
+                            },
+                        ),
+                    )
+                },
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 DsButton(
-                    text = stringResource(R.string.advanced_clear_key),
+                    text = stringResource(R.string.advanced_save_model_settings),
                     onClick = {
-                        viewModel.clearLocalCredential()
-                        report(modelKeyClearedMessage)
+                        if (!local.configured && apiKey.isBlank()) {
+                            report(modelKeyRequiredMessage)
+                            return@DsButton
+                        }
+                        viewModel.configureLocalModel(apiKey, model, baseUrl)
+                        apiKey = ""
+                        showEditor = false
+                        report(modelSavedMessage)
                     },
-                    variant = DsButtonVariant.Ghost,
+                    variant = DsButtonVariant.Outline,
                 )
+                if (local.configured) {
+                    DsButton(
+                        text = stringResource(R.string.advanced_clear_key),
+                        onClick = {
+                            viewModel.clearLocalCredential()
+                            apiKey = ""
+                            showEditor = false
+                            report(modelKeyClearedMessage)
+                        },
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
             }
         }
     }
