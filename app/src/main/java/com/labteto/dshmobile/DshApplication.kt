@@ -5,8 +5,13 @@ import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import com.labteto.dshmobile.connection.KeepAliveWorker
 import com.labteto.dshmobile.notify.NotificationObserver
+import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class DshApplication : Application() {
@@ -15,11 +20,21 @@ class DshApplication : Application() {
     // their frame collectors; start() then begins notification classification.
     @Inject lateinit var notificationObserver: NotificationObserver
 
+    private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
+        val processStartedAt = System.currentTimeMillis()
         super.onCreate()
         AppCompatDelegate.setDefaultNightMode(nightModeFor(storedThemePreference(this)))
         KeepAliveWorker.schedule(this)
         notificationObserver.start()
+
+        // APKs and delta files are only installer staging artifacts. Keep the current process safe
+        // from races, but remove everything left by an earlier process (including legacy version
+        // directories that older builds accumulated indefinitely).
+        maintenanceScope.launch {
+            UpdateCache.cleanupStale(cacheDir, processStartedAt)
+        }
     }
 
     companion object {
