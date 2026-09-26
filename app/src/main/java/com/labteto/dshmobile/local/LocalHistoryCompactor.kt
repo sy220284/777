@@ -13,6 +13,7 @@ internal data class LocalHistoryCompaction(
     val summary: String,
     val estimatedTokensBefore: Int = 0,
     val estimatedTokensAfter: Int = 0,
+    val omittedHistory: List<JsonObject> = emptyList(),
 )
 
 internal enum class LocalHistorySummaryMode {
@@ -100,6 +101,39 @@ internal class LocalHistoryCompactor(
             summary = summary,
             estimatedTokensBefore = estimatedTokensBefore,
             estimatedTokensAfter = estimatedTokensAfter,
+            omittedHistory = omitted.toList(),
+        )
+    }
+
+    fun replaceSummary(
+        compaction: LocalHistoryCompaction,
+        summary: String,
+    ): LocalHistoryCompaction? {
+        val clean = truncateWithoutSplittingSurrogatePair(
+            summary.trim(),
+            DEFAULT_MAX_SUMMARY_CHARS,
+        ).takeIf(String::isNotBlank) ?: return null
+        val index = compaction.messages.indexOfFirst { message ->
+            message["role"].asText() == "user" &&
+                messageText(message)?.contains("<compacted-summary>") == true
+        }
+        if (index < 0) return null
+        val replacement = buildJsonObject {
+            put("role", "user")
+            put("content", "<compacted-summary>\n$clean\n</compacted-summary>")
+        }
+        val messages = compaction.messages.toMutableList().apply {
+            this[index] = replacement
+        }
+        val estimatedAfter = messages.sumOf { estimateModelTokens(it.toString()) }
+        // estimatedTokensBefore may include ephemeral request overhead. Keeping the semantic summary
+        // below the already accepted extractive footprint guarantees that refinement cannot make
+        // context pressure worse.
+        if (estimatedAfter > compaction.estimatedTokensAfter) return null
+        return compaction.copy(
+            messages = messages,
+            summary = clean,
+            estimatedTokensAfter = estimatedAfter,
         )
     }
 
