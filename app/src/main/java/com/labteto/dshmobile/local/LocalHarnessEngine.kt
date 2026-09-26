@@ -3745,7 +3745,7 @@ class LocalHarnessEngine @Inject constructor(
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withChatTurnContext(
-                    history = chatRequestHistory(
+                    history = boundedChatRequestHistory(
                         if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
                     ),
                     stableContext = chatContext.stablePrompt,
@@ -4064,7 +4064,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
-                        history = chatRequestHistory(modelHistory.toList()),
+                        history = boundedChatRequestHistory(modelHistory.toList()),
                         stableContext = chatStableContext,
                         dynamicContext = chatDynamicContext,
                     )
@@ -5797,31 +5797,6 @@ class LocalHarnessEngine @Inject constructor(
         结果用清晰中文，完成后复核关键结果。
         ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
     """.trimIndent()
-
-    private fun chatRequestHistory(history: List<JsonObject>): List<JsonObject> {
-        if (history.size <= CHAT_RECENT_HISTORY_MESSAGES + 2) return history
-        val leadingSystem = history.firstOrNull()?.takeIf {
-            it["role"]?.jsonPrimitive?.contentOrNull == "system"
-        }
-        val body = if (leadingSystem == null) history else history.drop(1)
-        val compactedSummary = body.lastOrNull { message ->
-            message["role"]?.jsonPrimitive?.contentOrNull == "user" &&
-                (message["content"] as? JsonPrimitive)?.contentOrNull?.contains("<compacted-summary>") == true
-        }
-        val recent = body.asSequence()
-            .filter { message ->
-                val role = message["role"]?.jsonPrimitive?.contentOrNull
-                role == "user" || role == "assistant"
-            }
-            .filterNot { it === compactedSummary }
-            .toList()
-            .takeLast(CHAT_RECENT_HISTORY_MESSAGES)
-        return buildList {
-            leadingSystem?.let(::add)
-            compactedSummary?.let(::add)
-            addAll(recent)
-        }
-    }
 
     private fun withChatTurnContext(
         history: List<JsonObject>,
