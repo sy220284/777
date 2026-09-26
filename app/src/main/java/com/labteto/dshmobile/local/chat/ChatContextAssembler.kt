@@ -14,6 +14,7 @@ internal object ChatMemorySelector {
         if (RESET_HINTS.any { text.contains(it) }) return false
         if (RECALL_HINTS.any { text.contains(it) }) return true
         if (text in LOW_INFORMATION_REPLIES) return false
+        if (SHORT_RELATIONSHIP_RECALL_HINTS.any { text.contains(it) }) return true
         if (text.length <= 12 && CONTINUATION_ONLY_HINTS.any { text == it || text.startsWith(it) }) {
             return false
         }
@@ -35,6 +36,10 @@ internal object ChatMemorySelector {
     private val RECALL_HINTS = listOf(
         "还记得", "你记得", "记不记得", "以前", "之前", "上次", "第一次", "当时",
         "我跟你说过", "我和你说过", "我们什么时候", "你知道我", "你还知道",
+    )
+    private val SHORT_RELATIONSHIP_RECALL_HINTS = listOf(
+        "喜欢我", "爱我", "讨厌我", "在意我", "介意我", "什么关系", "算什么关系",
+        "女朋友", "男朋友", "对象", "老婆", "老公", "前任", "在一起", "分手", "复合",
     )
     private val RELATIONSHIP_MEMORY_HINTS = listOf(
         "喜欢", "讨厌", "习惯", "在意", "介意", "女朋友", "男朋友", "对象", "老婆", "老公",

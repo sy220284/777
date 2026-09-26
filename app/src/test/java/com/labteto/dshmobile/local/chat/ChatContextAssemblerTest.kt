@@ -11,6 +11,10 @@ class ChatContextAssemblerTest {
         assertFalse(ChatMemorySelector.shouldRecall("继续"))
         assertFalse(ChatMemorySelector.shouldRecall("然后呢"))
         assertTrue(ChatMemorySelector.shouldRecall("你还记得我们第一次见面吗"))
+        assertTrue(ChatMemorySelector.shouldRecall("你喜欢我吗"))
+        assertTrue(ChatMemorySelector.shouldRecall("还爱我吗"))
+        assertTrue(ChatMemorySelector.shouldRecall("我们算什么关系"))
+        assertFalse(ChatMemorySelector.shouldRecall("喜欢"))
     }
 
     @Test

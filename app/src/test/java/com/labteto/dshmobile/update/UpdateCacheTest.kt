@@ -21,7 +21,7 @@ class UpdateCacheTest {
         legacy.parentFile?.mkdirs()
         legacy.writeBytes(ByteArray(32))
 
-        val prepared = UpdateCache.prepare(cacheDir)
+        val prepared = prepare(cacheDir)
 
         assertTrue(prepared.isDirectory)
         assertFalse(legacy.exists())
@@ -48,7 +48,7 @@ class UpdateCacheTest {
     @Test
     fun `active installer handoff protects only verified apk until grace expires`() {
         val cacheDir = temporary.newFolder("cache")
-        val root = UpdateCache.prepare(cacheDir)
+        val root = prepare(cacheDir)
         val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
         val residue = File(root, "leftover.patch").apply { writeBytes(ByteArray(8)) }
         val handedAt = 1_000_000L
@@ -73,9 +73,36 @@ class UpdateCacheTest {
     }
 
     @Test
+    fun `prepare preserves an active installer handoff instead of deleting it`() {
+        val cacheDir = temporary.newFolder("cache")
+        val handedAt = 1_000_000L
+        val root = prepare(cacheDir, currentVersionCode = 100L, nowMillis = handedAt)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
+
+        UpdateCache.markInstallerHandoff(
+            root = root,
+            apk = apk,
+            targetVersionCode = 101L,
+            handedAtMillis = handedAt,
+        )
+
+        val retry = runCatching {
+            prepare(
+                cacheDir = cacheDir,
+                currentVersionCode = 100L,
+                nowMillis = handedAt + 1_000L,
+            )
+        }
+
+        assertTrue(retry.isFailure)
+        assertTrue(apk.exists())
+        assertEquals(2, root.listFiles()?.size)
+    }
+
+    @Test
     fun `installed target version clears handoff immediately`() {
         val cacheDir = temporary.newFolder("cache")
-        val root = UpdateCache.prepare(cacheDir)
+        val root = prepare(cacheDir)
         val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
 
         UpdateCache.markInstallerHandoff(
@@ -97,7 +124,7 @@ class UpdateCacheTest {
     @Test
     fun `cancelled installer handoff is removed after bounded grace window`() {
         val cacheDir = temporary.newFolder("cache")
-        val root = UpdateCache.prepare(cacheDir)
+        val root = prepare(cacheDir)
         val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
         val handedAt = 1_000_000L
 
@@ -120,7 +147,7 @@ class UpdateCacheTest {
     @Test
     fun `discard removes failed staging attempt immediately`() {
         val cacheDir = temporary.newFolder("cache")
-        val root = UpdateCache.prepare(cacheDir)
+        val root = prepare(cacheDir)
         File(root, "app-release.apk").writeBytes(ByteArray(8))
         File(root, "app-release.apk.part").writeBytes(ByteArray(8))
 
@@ -128,4 +155,14 @@ class UpdateCacheTest {
 
         assertFalse(root.exists())
     }
+
+    private fun prepare(
+        cacheDir: File,
+        currentVersionCode: Long = 100L,
+        nowMillis: Long = 1_000_000L,
+    ): File = UpdateCache.prepare(
+        cacheDir = cacheDir,
+        currentVersionCode = currentVersionCode,
+        nowMillis = nowMillis,
+    )
 }

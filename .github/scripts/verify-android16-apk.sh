@@ -60,14 +60,37 @@ if unzip -Z1 "$apk" | grep -qx 'assets/runtime/python/python-version.txt'; then
   }
 fi
 
-native_dir="$(mktemp -d)"
-trap 'rm -rf "$native_dir"' EXIT
-unzip -qq "$apk" 'lib/*/*.so' -d "$native_dir" || true
+case "$expected_abi" in
+  arm64-v8a) expected_machine="AArch64" ;;
+  x86_64) expected_machine="Advanced Micro Devices X86-64" ;;
+  *) echo "Unsupported expected ABI: $expected_abi" >&2; exit 1 ;;
+esac
+
+elf_dir="$(mktemp -d)"
+trap 'rm -rf "$elf_dir"' EXIT
+unzip -qq "$apk" "lib/$expected_abi/*" "assets/runtime/*/$expected_abi/*" -d "$elf_dir" || true
+
+elf_count=0
 while IFS= read -r -d '' library; do
+  elf_magic="$(head -c 4 "$library" | od -An -tx1 | tr -d ' \n')"
+  if [ "$elf_magic" != "7f454c46" ]; then
+    continue
+  fi
+  elf_count=$((elf_count + 1))
+  machine="$(readelf -hW "$library" | awk -F: '/Machine:/ { sub(/^[[:space:]]+/, "", $2); print $2; exit }')"
+  if [ "$machine" != "$expected_machine" ]; then
+    echo "ELF machine mismatch for $library: expected $expected_machine, got $machine" >&2
+    exit 1
+  fi
   while IFS= read -r alignment; do
     case "$alignment" in
       0x4000|0x8000|0x10000|0x20000|0x40000|0x80000|0x100000) ;;
       *) echo "Native library is not 16 KB ELF-aligned: $library ($alignment)" >&2; exit 1 ;;
     esac
   done < <(readelf -lW "$library" | awk '$1 == "LOAD" { print $NF }')
-done < <(find "$native_dir" -type f -name '*.so' -print0)
+done < <(find "$elf_dir" -type f -print0)
+
+if [ "$elf_count" -eq 0 ]; then
+  echo "APK does not contain verifiable ELF payloads for $expected_abi" >&2
+  exit 1
+fi

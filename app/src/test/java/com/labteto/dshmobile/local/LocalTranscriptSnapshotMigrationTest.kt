@@ -51,6 +51,55 @@ class LocalTranscriptSnapshotMigrationTest {
     }
 
     @Test
+    fun interruptedMigrationResumesFromLastDurableChunk() {
+        withLog { log ->
+            val legacyMessages = (0 until 5).map { index ->
+                message("m$index", if (index % 2 == 0) "user" else "assistant", "消息$index")
+            }
+            val session = LocalHarnessSession(id = "legacy", messages = legacyMessages)
+            val baseline = log.append(
+                LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT,
+                buildJsonObject {
+                    put("source", "legacy-session-snapshot")
+                    put("message_count", legacyMessages.size)
+                    put("chunk_size", 2)
+                    put("first_message_id", legacyMessages.first().id)
+                    put("last_message_id", legacyMessages.last().id)
+                },
+            )
+            log.append(
+                LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT,
+                buildJsonObject {
+                    put("baseline_sequence", baseline.sequence)
+                    put("chunk_index", 0)
+                    put("transcript", encodeTranscriptMessages(legacyMessages.take(2)))
+                },
+            )
+
+            val migrated = migrateLegacyTranscriptSnapshot(
+                session = session,
+                eventLog = log,
+                windowSize = 2,
+                chunkSize = 2,
+            )
+
+            assertNotNull(migrated)
+            assertEquals(
+                1,
+                log.events().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT },
+            )
+            assertEquals(
+                3,
+                log.events().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT },
+            )
+            assertEquals(
+                legacyMessages.map { it.id },
+                LocalSessionTranscriptPager(log).all(pageSize = 2).map { it.id },
+            )
+        }
+    }
+
+    @Test
     fun completedMigrationCanRecoverBeforeSlimSnapshotFlush() {
         withLog { log ->
             val legacyMessages = (0 until 5).map { index ->
