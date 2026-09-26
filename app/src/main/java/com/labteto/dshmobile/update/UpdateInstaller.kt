@@ -43,52 +43,6 @@ class UpdateInstaller @Inject constructor(
 
     suspend fun downloadVerifyAndLaunch(update: AvailableUpdate): UpdateInstallResult =
         withContext(Dispatchers.IO) {
-            val apkUrl = update.apkUrl ?: error("该发行版没有 APK 资源")
-            val apkName = update.apkName ?: "777-${update.version}.apk"
-            val expected = update.expectedSha256
-                ?: update.checksumUrl
-                    ?.let { fetchText(it, MAX_CHECKSUM_BYTES) }
-                    ?.let { parseChecksum(it, apkName) }
-                ?: error("发行版缺少 ${apkName} 的 SHA-256 校验信息")
-
-            val root = File(context.cacheDir, "updates").apply { mkdirs() }
-            val versionDirectory = File(
-                root,
-                update.version.replace(Regex("[^A-Za-z0-9._-]"), "_"),
-            ).apply { mkdirs() }
-            val target = File(
-                versionDirectory,
-                apkName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
-            )
-
-            val canReuse = target.isFile &&
-                (update.apkSize == null || target.length() == update.apkSize) &&
-                sha256(target).equals(expected, ignoreCase = true)
-
-            var usedDelta = false
-            if (!canReuse) {
-                target.delete()
-                usedDelta = tryDeltaUpdate(update, target, expected)
-                if (!usedDelta) {
-                    target.delete()
-                    downloadFile(
-                        url = apkUrl,
-                        target = target,
-                        maxBytes = MAX_APK_BYTES,
-                        expectedBytes = update.apkSize,
-                        kind = "APK",
-                        accept = "application/vnd.android.package-archive, application/octet-stream",
-                    )
-                    val actual = sha256(target)
-                    if (!actual.equals(expected, ignoreCase = true)) {
-                        target.delete()
-                        error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
-                    }
-                }
-            }
-
-            verifyPackageAndSigner(target)
-
             if (!context.packageManager.canRequestPackageInstalls()) {
                 val settingsIntent = Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -100,6 +54,43 @@ class UpdateInstaller @Inject constructor(
                     message = "已打开“允许安装未知应用”设置；授权后再次点击更新即可安装。",
                 )
             }
+
+            val apkUrl = update.apkUrl ?: error("该发行版没有 APK 资源")
+            val apkName = update.apkName ?: "777-${update.version}.apk"
+            val expected = update.expectedSha256
+                ?: update.checksumUrl
+                    ?.let { fetchText(it, MAX_CHECKSUM_BYTES) }
+                    ?.let { parseChecksum(it, apkName) }
+                ?: error("发行版缺少 ${apkName} 的 SHA-256 校验信息")
+
+            // Update payloads are temporary staging data. Starting a new attempt always discards
+            // any APK/patch left by an older attempt instead of accumulating one directory per
+            // released version.
+            val root = UpdateCache.prepare(context.cacheDir)
+            val target = File(
+                root,
+                apkName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
+            )
+
+            var usedDelta = tryDeltaUpdate(update, target, expected)
+            if (!usedDelta) {
+                target.delete()
+                downloadFile(
+                    url = apkUrl,
+                    target = target,
+                    maxBytes = MAX_APK_BYTES,
+                    expectedBytes = update.apkSize,
+                    kind = "APK",
+                    accept = "application/vnd.android.package-archive, application/octet-stream",
+                )
+                val actual = sha256(target)
+                if (!actual.equals(expected, ignoreCase = true)) {
+                    target.delete()
+                    error("APK SHA-256 校验失败：期望 $expected，实际 $actual")
+                }
+            }
+
+            verifyPackageAndSigner(target)
 
             val uri = FileProvider.getUriForFile(
                 context,
@@ -175,14 +166,20 @@ class UpdateInstaller @Inject constructor(
                 }
                 output.delete()
 
-                val patchResult = HPatch.patch(
-                    source.absolutePath,
-                    patchFile.absolutePath,
-                    output.absolutePath,
-                    PATCH_CACHE_BYTES,
-                    PATCH_THREADS,
-                    true,
-                )
+                val patchResult = try {
+                    HPatch.patch(
+                        source.absolutePath,
+                        patchFile.absolutePath,
+                        output.absolutePath,
+                        PATCH_CACHE_BYTES,
+                        PATCH_THREADS,
+                        true,
+                    )
+                } finally {
+                    // A patch is never needed again after it has been applied. Do not retain it
+                    // beside the reconstructed APK while the system installer is open.
+                    patchFile.delete()
+                }
                 if (patchResult != 0 || !output.isFile) {
                     output.delete()
                     cleanupIntermediates(intermediates, target)
