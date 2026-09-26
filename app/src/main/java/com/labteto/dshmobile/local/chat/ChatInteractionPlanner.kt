@@ -380,6 +380,21 @@ class ChatInteractionPlanner @Inject constructor(
         )
     }
 
+    fun applyDeterministicInteractionState(
+        previous: ChatCharacterState,
+        userMessage: String,
+        assistantMessage: String,
+    ): ChatCharacterState = applyInteractionPerformance(
+        state = applyInteractionIntent(
+            state = previous,
+            previous = previous,
+            userMessage = userMessage,
+        ),
+        previous = previous,
+        userMessage = userMessage,
+        assistantMessage = assistantMessage,
+    )
+
     private fun applyInteractionIntent(
         state: ChatCharacterState,
         previous: ChatCharacterState,
