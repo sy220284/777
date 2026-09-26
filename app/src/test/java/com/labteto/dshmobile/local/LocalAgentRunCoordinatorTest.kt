@@ -168,7 +168,7 @@ class LocalAgentRunCoordinatorTest {
                 },
             )
 
-            val repair = SessionRecovery.repairInterruptedTail(log)
+            val repair = log.repairInterruptedTail()
 
             assertTrue(repair.repaired)
             assertNull(coordinator.recoveryDecision("s1", repair))
@@ -209,7 +209,7 @@ class LocalAgentRunCoordinatorTest {
                 ),
             )
 
-            val repair = SessionRecovery.repairInterruptedTail(log)
+            val repair = log.repairInterruptedTail()
 
             assertTrue(repair.repaired)
             assertNull(coordinator.recoveryDecision("s1", repair))

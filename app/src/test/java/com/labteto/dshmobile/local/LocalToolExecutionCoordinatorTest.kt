@@ -99,7 +99,7 @@ class LocalToolExecutionCoordinatorTest {
                     access = ToolAccess.READ_ONLY,
                     approvalPolicy = ToolApprovalPolicy.NEVER,
                     executor = HarnessToolExecutor { context, _, _ ->
-                        observedSessionId = context.sessionId
+                        observedSessionId = context.sessionId.orEmpty()
                         ToolResult("ok")
                     },
                 ),
