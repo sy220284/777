@@ -89,41 +89,6 @@ internal fun fileSizeText(bytes: Long): String = when {
 }
 
 // ---------------------------------------------------------------------------
-// Workflow
-// ---------------------------------------------------------------------------
-
-/** One member row of a workflow disclosure. */
-internal data class WorkflowMember(
-    val label: String?,
-    val childId: String?,
-    val status: String?,
-)
-
-/** Flatten a workflow event payload into its member rows, tolerating both wire shapes. */
-internal fun parseWorkflowMembers(data: JsonElement): List<WorkflowMember> {
-    val obj = data as? JsonObject ?: return emptyList()
-    val status = obj["status"].asString() ?: obj["stopReason"].asString() ?: obj["outcome"].asString()
-    val array = obj["members"] as? JsonArray ?: obj["phases"] as? JsonArray
-    if (array != null) {
-        return array.mapNotNull { member ->
-            val row = member as? JsonObject ?: return@mapNotNull null
-            WorkflowMember(
-                label = row["label"].asString() ?: row["name"].asString(),
-                childId = row["childId"].asString(),
-                status = row["status"].asString() ?: row["outcome"].asString(),
-            )
-        }
-    }
-    val childId = obj["childId"].asString()
-    val label = obj["label"].asString()
-    return if (childId != null || label != null) {
-        listOf(WorkflowMember(label, childId, status))
-    } else {
-        emptyList()
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Turn grouping
 // ---------------------------------------------------------------------------
 

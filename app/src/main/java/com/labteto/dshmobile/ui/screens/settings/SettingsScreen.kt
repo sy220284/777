@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,19 +18,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
@@ -42,10 +36,7 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,35 +57,24 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
-import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
-import com.labteto.dshmobile.core.wire.dto.PluginInventoryEntry
-import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
-import com.labteto.dshmobile.ui.components.DisclosureRow
-import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.MenuItem
-import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
-import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import java.util.Locale
 
 /**
  * App settings, grouped into cards.
@@ -110,6 +89,7 @@ enum class SettingsDestination {
     GENERAL,
     MODELS,
     PRICING,
+    USAGE,
     MEMORY,
     PERMISSIONS,
     NOTIFICATIONS,
@@ -165,6 +145,7 @@ fun SettingsScreen(
         SettingsDestination.GENERAL -> stringResource(R.string.settings_page_general)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
+        SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
         SettingsDestination.MEMORY -> stringResource(R.string.settings_page_memory)
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
@@ -204,6 +185,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
                                 onClick = { page = SettingsDestination.PRICING },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.History,
+                                title = stringResource(R.string.usage_calculation_title),
+                                subtitle = stringResource(R.string.usage_calculation_subtitle),
+                                onClick = { page = SettingsDestination.USAGE },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
@@ -312,6 +299,10 @@ fun SettingsScreen(
 
                     SettingsDestination.PRICING -> {
                         DeepSeekPricingCard(deepSeekPricing, viewModel)
+                    }
+
+                    SettingsDestination.USAGE -> {
+                        UsageCalculationPage(localHarness.usage) { page = SettingsDestination.PRICING }
                     }
 
                     SettingsDestination.MEMORY -> {
@@ -453,182 +444,6 @@ internal fun SettingsCard(
             content()
         }
     }
-}
-
-/**
- * The host's composed plugins, as one row that opens the list.
- *
- * A stock web composition mounts around forty of them. Inlined into a page that already scrolls,
- * that buries everything below it and gives the list no room of its own; the count is the part
- * worth seeing without asking, so the card carries that and the rest lives in [PluginsSheet].
- *
- * Read-only, because that is all the harness offers a client: `pluginInventory/list` has no
- * counterpart that changes anything, and the `settings.*` calls behind the web UI's configurable
- * plugin cards are loopback-pinned and answer 403 over the network. Enabling or disabling one means
- * editing `cordis.patch.yml` on the harness computer.
- */
-@Composable
-private fun PluginsCard(inventory: PluginInventorySnapshot, onOpen: () -> Unit) {
-    val colors = DsTheme.colors
-    SettingsCard(stringResource(R.string.settings_plugins), Icons.Outlined.Extension) {
-        if (inventory.entries.isEmpty()) {
-            Text(
-                stringResource(R.string.plugins_empty),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-            return@SettingsCard
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(DsShapes.row)
-                .clickable(onClick = onOpen)
-                .padding(vertical = DsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.settings_plugins_inventory),
-                style = DsType.std14,
-                color = colors.labelSecondary,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                inventory.entries.size.toString(),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-            Spacer(Modifier.width(DsSpacing.xsmall))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = colors.labelTertiary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-/**
- * The plugin list itself.
- *
- * A sheet rather than an expanding block: forty rows need their own scroll surface, and nesting one
- * inside the settings page's scroll means the list and the page fight over the same drag. The
- * filter sits above the scroll so it stays reachable however far down the list you are.
- *
- * Rows show the shortened module name, since the scope and `dsh-host-`/`dsh-client-` prefixes are
- * the same on nearly every row and push the part that differs off the end of a phone screen.
- */
-@Composable
-private fun PluginsSheet(inventory: PluginInventorySnapshot, onDismiss: () -> Unit) {
-    val colors = DsTheme.colors
-    var filter by remember { mutableStateOf("") }
-    val matching = remember(inventory, filter) {
-        val q = filter.trim().lowercase(Locale.ROOT)
-        if (q.isEmpty()) {
-            inventory.entries
-        } else {
-            inventory.entries.filter {
-                it.moduleName.lowercase(Locale.ROOT).contains(q) ||
-                    it.entryId.lowercase(Locale.ROOT).contains(q)
-            }
-        }
-    }
-    DsBottomSheet(
-        title = stringResource(R.string.settings_plugins),
-        subtitle = inventory.entries.size.toString(),
-        onDismiss = onDismiss,
-    ) {
-        TextField(
-            value = filter,
-            onValueChange = { filter = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.plugins_search_hint), style = DsType.std14) },
-            singleLine = true,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                focusedIndicatorColor = colors.accent,
-                unfocusedIndicatorColor = colors.borderL2,
-                cursorColor = colors.accent,
-            ),
-        )
-        if (matching.isEmpty()) {
-            Text(
-                stringResource(R.string.plugins_empty),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-            return@DsBottomSheet
-        }
-        LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-            items(matching, key = { it.entryId }) { entry -> PluginRow(entry) }
-        }
-    }
-}
-
-@Composable
-private fun PluginRow(entry: PluginInventoryEntry) {
-    val colors = DsTheme.colors
-    var expanded by remember(entry.entryId) { mutableStateOf(false) }
-    DisclosureRow(
-        title = moduleShortName(entry.moduleName),
-        summary = stringResource(
-            if (entry.enabled) R.string.plugins_enabled else R.string.plugins_disabled,
-        ),
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    ) {
-        Column(
-            modifier = Modifier.padding(start = DsSpacing.xlarge, bottom = DsSpacing.xsmall),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
-            Text(entry.entryId, style = DsType.caption11, color = colors.labelCaption)
-            Text(entry.moduleName, style = DsType.caption11, color = colors.labelCaption)
-            // The mount phase only means anything for a plugin the composition asked for.
-            if (entry.enabled) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StateDot(
-                        when (entry.fiberPhase) {
-                            PluginFiberPhase.ACTIVE -> StateDotState.Done
-                            PluginFiberPhase.LOADING, PluginFiberPhase.UNLOADING -> StateDotState.Running
-                            PluginFiberPhase.FAILED -> StateDotState.Error
-                            PluginFiberPhase.PENDING, null -> StateDotState.Idle
-                        },
-                    )
-                    Spacer(Modifier.width(DsSpacing.xsmall))
-                    Text(
-                        stringResource(pluginPhaseLabel(entry.fiberPhase)),
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@StringRes
-private fun pluginPhaseLabel(phase: PluginFiberPhase?): Int = when (phase) {
-    PluginFiberPhase.PENDING -> R.string.plugins_phase_pending
-    PluginFiberPhase.LOADING -> R.string.plugins_phase_loading
-    PluginFiberPhase.ACTIVE -> R.string.plugins_phase_active
-    PluginFiberPhase.FAILED -> R.string.plugins_phase_failed
-    PluginFiberPhase.UNLOADING -> R.string.plugins_phase_unloading
-    null -> R.string.plugins_phase_unmounted
-}
-
-/**
- * `@deepseek-ai/dsh-client-ui-plan` → `ui-plan`.
- *
- * Ported from the harness's own `moduleShortName`, prefix for prefix, so the two lists name the
- * same plugin the same way.
- */
-private fun moduleShortName(moduleName: String): String {
-    val prefixes = listOf("cordis:", "cordis-plugin-", "dsh-host-", "dsh-client-", "dsh-")
-    var name = moduleName.substringAfterLast('/')
-    for (prefix in prefixes) name = name.removePrefix(prefix)
-    return name.ifBlank { moduleName }
 }
 
 @Composable

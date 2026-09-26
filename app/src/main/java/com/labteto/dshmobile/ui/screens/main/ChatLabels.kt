@@ -26,12 +26,6 @@ internal fun goalPhaseLabelRes(phase: GoalPhase): Int = when (phase) {
     GoalPhase.COMPLETE -> R.string.goal_phase_complete
 }
 
-internal fun todoStatusDot(status: String): StateDotState = when (status) {
-    "completed" -> StateDotState.Done
-    "in_progress" -> StateDotState.Running
-    else -> StateDotState.Idle
-}
-
 internal fun jobStatusDot(status: JobStatus): StateDotState = when (status) {
     JobStatus.RUNNING, JobStatus.STOPPING -> StateDotState.Running
     JobStatus.COMPLETED -> StateDotState.Done
@@ -46,13 +40,6 @@ internal fun workflowStatusLabel(status: String?): String? = when (status) {
     else -> null
 }
 
-internal fun workflowMemberDot(status: String?): StateDotState = when (status) {
-    "running" -> StateDotState.Running
-    "completed" -> StateDotState.Done
-    "failed", "error", "cancelled" -> StateDotState.Error
-    else -> StateDotState.Idle
-}
-
 // ---------------------------------------------------------------------------
 // Subagents
 // ---------------------------------------------------------------------------
@@ -61,13 +48,6 @@ internal fun subagentId(entry: SubagentListEntry): String? = when (entry) {
     is SubagentListEntry.ChildOneShot -> entry.id
     is SubagentListEntry.ChildContinuable -> entry.id
     is SubagentListEntry.Diagnostic -> entry.id
-    else -> null
-}
-
-internal fun subagentLabel(entry: SubagentListEntry): String? = when (entry) {
-    is SubagentListEntry.ChildOneShot -> entry.label
-    is SubagentListEntry.ChildContinuable -> entry.label
-    is SubagentListEntry.Diagnostic -> entry.reason
     else -> null
 }
 

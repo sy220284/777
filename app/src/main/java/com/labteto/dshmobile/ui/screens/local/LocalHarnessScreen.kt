@@ -111,7 +111,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalChatBranchInfo
 import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalGroupChatMember
@@ -158,7 +157,6 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import java.util.Locale
 import kotlin.math.roundToInt
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.Dispatchers
@@ -905,82 +903,6 @@ private fun LocalSessionDrawerRow(
     }
     }
 }
-
-@Composable
-private fun LocalUsageFooter(usage: DeepSeekUsageSnapshot) {
-    val colors = DsTheme.colors
-    Column(
-        modifier = Modifier.padding(
-            start = DsSpacing.medium,
-            end = DsSpacing.medium,
-            bottom = DsSpacing.medium,
-        ),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-    ) {
-        Text(
-            stringResource(R.string.local_usage_title),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-        DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-            UsageStatRow(
-                label = stringResource(R.string.local_usage_tokens),
-                value = formatTokenCount(usage.totalTokens),
-            )
-            UsageStatRow(
-                label = stringResource(R.string.local_usage_cache_hit_rate),
-                value = String.format(Locale.US, "%.1f%%", usage.cacheHitRate * 100.0),
-            )
-            UsageStatRow(
-                label = stringResource(R.string.local_usage_estimated_cost),
-                value = formatCny(usage.estimatedCostCny),
-            )
-            Text(
-                stringResource(
-                    R.string.local_usage_breakdown,
-                    formatTokenCount(usage.inputTokens),
-                    formatTokenCount(usage.outputTokens),
-                    usage.totalRequestCount,
-                ),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-            if (usage.unreportedRequestCount > 0L) {
-                Text(
-                    stringResource(R.string.local_usage_unreported, usage.unreportedRequestCount),
-                    style = DsType.caption11,
-                    color = colors.warnLabel,
-                )
-            }
-            if (usage.unpricedTokens > 0L) {
-                Text(
-                    stringResource(R.string.local_usage_unpriced, formatTokenCount(usage.unpricedTokens)),
-                    style = DsType.caption11,
-                    color = colors.labelTertiary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun UsageStatRow(label: String, value: String) {
-    val colors = DsTheme.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = DsType.small13, color = colors.labelSecondary)
-        Text(value, style = DsType.small13Strong, color = colors.labelPrimary)
-    }
-}
-
-private fun formatTokenCount(value: Long): String = when {
-    value >= 100_000_000L -> String.format(Locale.US, "%.2f亿", value / 100_000_000.0)
-    value >= 10_000L -> String.format(Locale.US, "%.1f万", value / 10_000.0)
-    else -> value.toString()
-}
-
-private fun formatCny(value: Double): String =
-    if (value >= 1.0) String.format(Locale.US, "¥%.2f", value)
-    else String.format(Locale.US, "¥%.4f", value)
 
 @Composable
 private fun LoadingScreen() {
