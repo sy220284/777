@@ -5352,26 +5352,26 @@ class LocalHarnessEngine @Inject constructor(
         return try {
             executor.execute {
                 // The request executor retries this block. A new buffer prevents text from a failed
-            // attempt being prepended to the next attempt's visible answer.
-            val streamPreview = LocalStreamPreview(
-                maxChars = MAX_STREAM_PREVIEW_CHARS,
-                minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
-                clockMs = { System.nanoTime() / 1_000_000 },
-                publish = { preview ->
-                    if (publishPreview) {
-                        _state.update { it.copy(streamingAssistant = preview) }
-                    }
-                },
-            )
-            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                val reply = modelClient.completeStreaming(
-                    apiKey = key,
-                    baseUrl = snapshot.baseUrl,
-                    model = snapshot.model,
-                    messages = messages,
-                    tools = tools,
-                    onDelta = { delta -> streamPreview.append(delta.content) },
+                // attempt being prepended to the next attempt's visible answer.
+                val streamPreview = LocalStreamPreview(
+                    maxChars = MAX_STREAM_PREVIEW_CHARS,
+                    minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
+                    clockMs = { System.nanoTime() / 1_000_000 },
+                    publish = { preview ->
+                        if (publishPreview) {
+                            _state.update { it.copy(streamingAssistant = preview) }
+                        }
+                    },
                 )
+                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                    val reply = modelClient.completeStreaming(
+                        apiKey = key,
+                        baseUrl = snapshot.baseUrl,
+                        model = snapshot.model,
+                        messages = messages,
+                        tools = tools,
+                        onDelta = { delta -> streamPreview.append(delta.content) },
+                    )
                     streamPreview.flush()
                     reply
                 }
