@@ -2614,6 +2614,7 @@ class LocalHarnessEngine @Inject constructor(
                     _state.update { it.copy(loading = false) }
                 }
             }
+            startNextQueuedTurnIfIdle()?.start()
         }
     }
 
