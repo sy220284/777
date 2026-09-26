@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -126,13 +128,9 @@ internal fun ChatTopBar(
             )
             if (running) {
                 Spacer(Modifier.width(DsSpacing.small))
-                StateDot(StateDotState.Running, size = 7.dp)
-                Spacer(Modifier.width(DsSpacing.tiny))
-                Text(
-                    stringResource(R.string.chat_running_status),
-                    style = DsType.caption11,
-                    color = colors.labelSecondary,
-                    maxLines = 1,
+                DsStatusPill(
+                    state = DsStatus.Running,
+                    label = stringResource(R.string.chat_running_status),
                 )
             }
         }
