@@ -303,6 +303,9 @@ class LocalHarnessEngine @Inject constructor(
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         )
     }
+    private val agentRunCoordinator by lazy {
+        LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
+    }
     private val toolRegistry = ToolRegistry()
     private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
     private val enabledOptionalTools = linkedSetOf<String>()
@@ -3925,6 +3928,19 @@ class LocalHarnessEngine @Inject constructor(
         var chatStableContext = ""
         var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
+        val runSnapshot = _state.value
+        val runContext = agentRunCoordinator.start(
+            sessionId = foregroundSessionId,
+            usageMode = runSnapshot.usageMode,
+            model = runSnapshot.model,
+            baseUrl = runSnapshot.baseUrl,
+            planMode = runSnapshot.planMode,
+            policy = runPolicy,
+            safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
+            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            input = input,
+            memoryInput = memoryInput,
+        )
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
         val startedToolCallIds = linkedSetOf<String>()
@@ -4372,8 +4388,10 @@ class LocalHarnessEngine @Inject constructor(
                         persist()
                     }
                 }
+                agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            idFactory = { runContext.runId },
         )
 
         try {
@@ -6263,6 +6281,36 @@ class LocalHarnessEngine @Inject constructor(
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
         pendingInputs.restore(restoredInbox)
+        var runRecoveryError: String? = null
+        agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
+            val blocked = decision.blockedReason
+            if (blocked != null) {
+                runRecoveryError = blocked
+                agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
+            } else {
+                val queued = decision.queuedInput
+                if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
+                    if (pendingInputs.offer(queued)) {
+                        eventLog.append(
+                            LOCAL_AGENT_INBOX_EVENT_TYPE,
+                            encodeLocalAgentInboxEvent(
+                                action = "recovered-run",
+                                pending = pendingInputs.snapshot(),
+                                affected = listOf(queued),
+                            ),
+                        )
+                        agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
+                    } else {
+                        runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
+                        agentRunCoordinator.markRecoveryBlocked(
+                            sessionId,
+                            decision.runId,
+                            runRecoveryError.orEmpty(),
+                        )
+                    }
+                }
+            }
+        }
         val profile = userProfileStore.read()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
@@ -6352,6 +6400,7 @@ class LocalHarnessEngine @Inject constructor(
             resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
             contextChars = modelHistoryChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            error = runRecoveryError,
         )
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
