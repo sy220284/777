@@ -5012,7 +5012,14 @@ class LocalHarnessEngine @Inject constructor(
                 )
             "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
             "list_agents" -> jobs.listAgents()
-            "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
+            "send_message" -> jobs.send(
+                args.string("agent_id"),
+                args.string("message"),
+            ).also {
+                // Running agents consume immediately; terminal persistent agents are transitioned
+                // back to interrupted and picked up by the same safe recovery coordinator.
+                scheduleInterruptedSafeJobs()
+            }
             "interrupt_agent" -> jobs.kill(args.string("agent_id"))
             "workflow" -> {
                 val workflowTasks = args["tasks"]?.jsonArray
@@ -5196,22 +5203,41 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                     "subagent_readonly" -> {
-                        val task = payload["task"]?.jsonPrimitive?.contentOrNull
+                        val originalTask = payload["task"]?.jsonPrimitive?.contentOrNull
                             ?: error("恢复任务缺少 task")
-                        val model = payload["model"]?.jsonPrimitive?.contentOrNull
-                        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
+                        val configuredModel = payload["model"]?.jsonPrimitive?.contentOrNull
+                        val configuredMaxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
-                        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+                        val configuredVirtualScreen =
+                            payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+                        val checkpoint = eventLogFor(sessionId)
+                            .latestMatching(LOCAL_SUBAGENT_CHECKPOINT_EVENT) { event ->
+                                event.data["agent_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
+                            }
+                            ?.data
+                            ?.let(::decodeSubagentContinuationCheckpoint)
+                        val pendingContinuation = if (checkpoint != null) {
+                            jobs.drainMessages(snapshot.id)
+                        } else {
+                            emptyList()
+                        }
+                        val resumeTask = when {
+                            pendingContinuation.isNotEmpty() ->
+                                pendingContinuation.joinToString("\n\n") { "【父代理新消息】\n$it" }
+                            checkpoint != null -> "继续完成上一轮尚未结束的任务。"
+                            else -> originalTask
+                        }
                         val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
                         jobs.resumePersistent(snapshot.id) { jobId, _ ->
                             val result = boundSubagents.runResult(
-                                task = task,
+                                task = resumeTask,
                                 inheritHistory = false,
-                                allowMutation = false,
+                                allowMutation = checkpoint?.allowMutation ?: false,
                                 backgroundJobId = jobId,
-                                modelOverride = model,
-                                maxSteps = maxSteps,
-                                virtualScreen = virtualScreen,
+                                modelOverride = checkpoint?.model ?: configuredModel,
+                                maxSteps = checkpoint?.maxSteps ?: configuredMaxSteps,
+                                virtualScreen = checkpoint?.virtualScreen ?: configuredVirtualScreen,
+                                continuationHistory = checkpoint?.history,
                             )
                             result.requireCompletedOutput()
                         }
