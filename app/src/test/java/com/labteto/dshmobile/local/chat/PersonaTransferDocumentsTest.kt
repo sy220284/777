@@ -255,6 +255,7 @@ class PersonaTransferDocumentsTest {
                     updatedAt = 2L,
                 ),
                 sourceSessionIds = listOf("local-session-1"),
+                excludedMessageKeys = listOf("local-tombstone"),
                 updatedAt = 2L,
             ),
         ),
