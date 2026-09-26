@@ -50,6 +50,50 @@ class SessionRemoteStreamCoordinatorTest {
     }
 
     @Test
+    fun switchingSubagentCancelsPreviousChildFollowAndKeepsOwnershipAddress() = runTest {
+        val opened = mutableListOf<Pair<String, JsonElement>>()
+        val cancelled = mutableListOf<String>()
+        var childIndex = 0
+        val coordinator = coordinator(
+            scope = backgroundScope,
+            streamProvider = { endpoint, args ->
+                opened += endpoint to args
+                trackedFlow("child-${++childIndex}", cancelled)
+            },
+        )
+
+        assertTrue(
+            coordinator.followSubagent(
+                parentSessionId = "parent",
+                childSessionId = "child-1",
+                mode = "continuable",
+                maxMessages = 200,
+                onFrame = {},
+            ),
+        )
+        runCurrent()
+        assertTrue(
+            coordinator.followSubagent(
+                parentSessionId = "parent",
+                childSessionId = "child-2",
+                mode = "one-shot",
+                maxMessages = 200,
+                onFrame = {},
+            ),
+        )
+        runCurrent()
+
+        assertTrue("child-1" in cancelled)
+        val request = opened.last().second.jsonObject.getValue("request").jsonObject
+        val address = request.getValue("address").jsonObject
+        assertEquals("subagent", address.getValue("kind").jsonPrimitive.content)
+        assertEquals("parent", address.getValue("parentSessionId").jsonPrimitive.content)
+        assertEquals("child-2", address.getValue("childSessionId").jsonPrimitive.content)
+        assertEquals("one-shot", address.getValue("mode").jsonPrimitive.content)
+        assertTrue(request.getValue("assistantStream").jsonPrimitive.boolean)
+    }
+
+    @Test
     fun restartingHostStreamsCancelsPreviousGenerationCollectors() = runTest {
         val cancelled = mutableListOf<String>()
         val opened = mutableListOf<String>()
