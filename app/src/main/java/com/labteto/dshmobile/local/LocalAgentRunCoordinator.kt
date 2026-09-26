@@ -5,6 +5,8 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.util.UUID
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -64,6 +66,8 @@ internal data class LocalAgentRunContext(
     val allowMutation: Boolean,
     val maxSteps: Int,
     val resourceBudget: LocalAgentRunResourceBudget?,
+    val toolNames: List<String>,
+    val contextChars: Int,
     val input: String,
     val memoryInput: String,
     val startedAt: Long,
@@ -101,6 +105,8 @@ internal class LocalAgentRunCoordinator(
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
         allowMutation: Boolean = true,
         resourceBudget: LocalAgentRunResourceBudget? = null,
+        toolNames: List<String> = emptyList(),
+        contextChars: Int = 0,
     ): LocalAgentRunContext {
         val context = LocalAgentRunContext(
             runId = idFactory(),
@@ -115,6 +121,8 @@ internal class LocalAgentRunCoordinator(
             allowMutation = allowMutation,
             maxSteps = maxSteps,
             resourceBudget = resourceBudget,
+            toolNames = toolNames.distinct().sorted(),
+            contextChars = contextChars.coerceAtLeast(0),
             input = input.take(MAX_RECOVERY_INPUT_CHARS),
             memoryInput = memoryInput.take(MAX_RECOVERY_INPUT_CHARS),
             startedAt = now(),
@@ -281,6 +289,8 @@ internal class LocalAgentRunCoordinator(
                 put("allow_tool_execution", context.policy.allowToolExecution)
                 put("allow_mutation", context.allowMutation)
                 put("max_steps", context.maxSteps)
+                put("context_chars", context.contextChars)
+                put("tool_names", JsonArray(context.toolNames.map(::JsonPrimitive)))
                 context.resourceBudget?.let { budget ->
                     put("max_model_requests", budget.maxModelRequests)
                     put("max_agents", budget.maxAgents)
