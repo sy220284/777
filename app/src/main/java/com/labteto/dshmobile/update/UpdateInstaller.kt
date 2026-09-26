@@ -72,7 +72,7 @@ class UpdateInstaller @Inject constructor(
                 apkName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
             )
 
-            var usedDelta = tryDeltaUpdate(update, target, expected)
+            val usedDelta = tryDeltaUpdate(update, target, expected)
             if (!usedDelta) {
                 target.delete()
                 downloadFile(
