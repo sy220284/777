@@ -254,9 +254,9 @@ internal fun PersonaGalleryScreen(
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
                             it.write(payload)
-                        } ?: error("无法写入目标文件")
+                        } ?: error("Unable to write target file")
                     }
-                }.onFailure { error = it.message ?: exportFailedText }
+                }.onFailure { error = exportFailedText }
             }
         }
     }
@@ -283,7 +283,7 @@ internal fun PersonaGalleryScreen(
                 val payload = runCatching {
                     withContext(Dispatchers.IO) { readPersonaShareText(context, uri) }
                 }.getOrElse {
-                    error = it.message ?: importFailedText
+                    error = importFailedText
                     return@launch
                 }
                 importPayload(payload)
@@ -1116,7 +1116,7 @@ private fun personaExportFileName(name: String): String {
 }
 
 private fun readPersonaShareText(context: android.content.Context, uri: android.net.Uri): String {
-    val input = context.contentResolver.openInputStream(uri) ?: error("无法读取人物文件")
+    val input = context.contentResolver.openInputStream(uri) ?: error("Unable to read persona file")
     return input.bufferedReader().use { reader ->
         val result = StringBuilder()
         val buffer = CharArray(4_096)
@@ -1125,7 +1125,7 @@ private fun readPersonaShareText(context: android.content.Context, uri: android.
             if (count < 0) break
             result.append(buffer, 0, count)
         }
-        require(result.length <= 64_000) { "人物文件过大" }
+        require(result.length <= 64_000) { "Persona file is too large" }
         result.toString()
     }
 }
