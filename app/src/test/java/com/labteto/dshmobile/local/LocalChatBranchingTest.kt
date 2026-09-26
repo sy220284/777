@@ -97,6 +97,63 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun appendingMaterializedMessageKeepsLinearChatUnmaterialized() {
+        val user = message("u1", "user", "你好", 1)
+        val reply = message("a1", "assistant", "你好。", 2)
+
+        val afterUser = appendMaterializedChatBranchMessage(
+            current = LocalChatBranchState(),
+            activeMessages = emptyList(),
+            message = user,
+            parentId = null,
+            chatState = ChatCharacterState(),
+        )
+        val afterReply = appendMaterializedChatBranchMessage(
+            current = afterUser,
+            activeMessages = listOf(user),
+            message = reply,
+            parentId = user.id,
+            chatState = ChatCharacterState(),
+        )
+
+        assertTrue(afterUser.nodes.isEmpty())
+        assertTrue(afterReply.nodes.isEmpty())
+    }
+
+    @Test
+    fun appendingMaterializedMessageExtendsExistingRealBranch() {
+        val user = message("u1", "user", "在吗", 1)
+        val oldReply = message("a1", "assistant", "在。", 2)
+        val newReply = message("a2", "assistant", "在啊。", 3)
+        val branched = upsertChatBranchNode(
+            syncChatBranchState(
+                current = LocalChatBranchState(),
+                activeMessages = listOf(user, oldReply),
+                chatState = ChatCharacterState(),
+                replySuggestions = emptyList(),
+            ),
+            LocalChatBranchNode(
+                message = newReply,
+                parentId = user.id,
+                chatStateAfter = ChatCharacterState(mood = "新分支"),
+            ),
+            select = true,
+        )
+        val nextUser = message("u2", "user", "继续", 4)
+
+        val extended = appendMaterializedChatBranchMessage(
+            current = branched,
+            activeMessages = listOf(user, newReply),
+            message = nextUser,
+            parentId = newReply.id,
+            chatState = ChatCharacterState(mood = "新分支"),
+        )
+
+        assertEquals(listOf("u1", "a2", "u2"), activeChatBranchMessages(extended).map { it.id })
+        assertTrue(hasChatBranchAlternatives(extended))
+    }
+
+    @Test
     fun restoreDropsLegacyLinearGraphButKeepsRealAlternatives() {
         val user = message("u1", "user", "在吗", 1)
         val oldReply = message("a1", "assistant", "在。", 2)
