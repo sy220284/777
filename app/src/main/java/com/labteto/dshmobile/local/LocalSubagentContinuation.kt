@@ -54,11 +54,12 @@ internal fun encodeSubagentContinuationCheckpoint(
         bounded
     } else {
         buildList {
-            bounded.firstOrNull()?.let(::add)
-            var retainedChars = firstOrNull()?.toString()?.length ?: 0
+            val head = bounded.firstOrNull()
+            head?.let(::add)
+            var retainedChars = head?.toString()?.length ?: 0
             val tail = ArrayDeque<JsonObject>()
             for (message in bounded.asReversed()) {
-                if (message === bounded.firstOrNull()) continue
+                if (message === head) continue
                 val size = message.toString().length
                 if (retainedChars + size > MAX_CHECKPOINT_CHARS) break
                 tail.addFirst(message)
