@@ -35,34 +35,67 @@ internal fun deepSeekAnthropicEndpoint(baseUrl: String): String {
     }
 }
 
+internal fun deepSeekSupportsInHistorySystem(model: String): Boolean =
+    model.trim().equals("deepseek-flash", ignoreCase = true)
+
+internal fun deepSeekSupportsAdditionOnlyTools(model: String): Boolean =
+    model.trim().equals("deepseek-flash", ignoreCase = true)
+
 internal fun deepSeekAnthropicPayload(
     model: String,
     messages: List<JsonObject>,
     tools: JsonArray,
     stream: Boolean,
 ): JsonObject {
-    val system = messages
-        .filter { it["role"]?.jsonPrimitive?.contentOrNull == "system" }
-        .mapNotNull { messageText(it["content"]) }
-        .filter(String::isNotBlank)
-        .joinToString("\n\n")
+    val inHistory = deepSeekSupportsInHistorySystem(model)
+    val leadingSystem = if (inHistory) {
+        messages.takeWhile { it["role"]?.jsonPrimitive?.contentOrNull == "system" }
+            .mapNotNull { messageText(it["content"]) }
+            .lastOrNull(String::isNotBlank)
+            .orEmpty()
+    } else {
+        messages
+            .filter { it["role"]?.jsonPrimitive?.contentOrNull == "system" }
+            .mapNotNull { messageText(it["content"]) }
+            .filter(String::isNotBlank)
+            .joinToString("\n\n")
+    }
+    val deferredTools = if (deepSeekSupportsAdditionOnlyTools(model)) {
+        developerToolAdditions(messages)
+    } else {
+        emptySet()
+    }
 
     return buildJsonObject {
         put("model", model)
         put("max_tokens", 65_536)
-        if (system.isNotBlank()) put("system", system)
-        put("messages", anthropicMessages(messages))
+        if (leadingSystem.isNotBlank()) put("system", leadingSystem)
+        put("messages", anthropicMessages(messages, inHistory))
         if (tools.isNotEmpty()) {
-            put("tools", anthropicTools(tools))
+            put("tools", anthropicTools(tools, deferredTools))
             put("tool_choice", buildJsonObject { put("type", "auto") })
         }
         put("stream", stream)
     }
 }
 
-private fun anthropicMessages(messages: List<JsonObject>): JsonArray {
+internal fun deepSeekAnthropicHasToolChanges(payload: JsonObject): Boolean =
+    (payload["messages"] as? JsonArray).orEmpty().any { raw ->
+        val message = raw as? JsonObject ?: return@any false
+        (message["content"] as? JsonArray).orEmpty().any { block ->
+            val type = (block as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull
+            type == "tool_addition" || type == "tool_removal"
+        }
+    }
+
+private fun anthropicMessages(
+    messages: List<JsonObject>,
+    inHistorySystem: Boolean,
+): JsonArray {
     data class Row(val role: String, val blocks: MutableList<JsonElement>)
     val rows = mutableListOf<Row>()
+    val pendingSystemUpdates = mutableListOf<JsonElement>()
+    var sawConversation = false
 
     fun append(role: String, blocks: List<JsonElement>) {
         if (blocks.isEmpty()) return
@@ -71,11 +104,68 @@ private fun anthropicMessages(messages: List<JsonObject>): JsonArray {
         else rows += Row(role, blocks.toMutableList())
     }
 
+    fun flushUpdates() {
+        if (pendingSystemUpdates.isEmpty()) return
+        if (rows.lastOrNull()?.role != "user") {
+            error("DeepSeek Messages system/tool update lacks preceding user or tool-result turn")
+        }
+        rows += Row("system", pendingSystemUpdates.toMutableList())
+        pendingSystemUpdates.clear()
+    }
+
     messages.forEach { message ->
         when (message["role"]?.jsonPrimitive?.contentOrNull) {
-            "system" -> Unit
-            "user" -> append("user", anthropicContentBlocks(message["content"]))
+            "developer" -> {
+                val blocks = message["content"] as? JsonArray ?: return@forEach
+                blocks.forEach { raw ->
+                    val block = raw as? JsonObject ?: return@forEach
+                    when (block["type"]?.jsonPrimitive?.contentOrNull) {
+                        "tool-addition" -> {
+                            val name = block["toolName"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                            pendingSystemUpdates += buildJsonObject {
+                                put("type", "tool_addition")
+                                put("tool", buildJsonObject {
+                                    put("type", "tool_reference")
+                                    put("name", name)
+                                })
+                            }
+                        }
+                        "tool-removal" -> {
+                            val name = block["toolName"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                            pendingSystemUpdates += buildJsonObject {
+                                put("type", "tool_removal")
+                                put("tool", buildJsonObject {
+                                    put("type", "tool_reference")
+                                    put("name", name)
+                                })
+                            }
+                        }
+                        "text" -> block["text"]?.jsonPrimitive?.contentOrNull
+                            ?.takeIf(String::isNotBlank)
+                            ?.let { text ->
+                                pendingSystemUpdates += buildJsonObject {
+                                    put("type", "text")
+                                    put("text", text)
+                                }
+                            }
+                    }
+                }
+            }
+            "system" -> {
+                val text = messageText(message["content"]).orEmpty()
+                if (inHistorySystem && sawConversation && text.isNotBlank()) {
+                    pendingSystemUpdates += buildJsonObject {
+                        put("type", "text")
+                        put("text", text)
+                    }
+                }
+            }
+            "user" -> {
+                append("user", anthropicContentBlocks(message["content"]))
+                sawConversation = true
+            }
             "assistant" -> {
+                flushUpdates()
                 val blocks = mutableListOf<JsonElement>()
                 message["reasoning_content"]?.jsonPrimitive?.contentOrNull
                     ?.takeIf(String::isNotBlank)
@@ -102,6 +192,7 @@ private fun anthropicMessages(messages: List<JsonObject>): JsonArray {
                     }
                 }
                 append("assistant", blocks)
+                sawConversation = true
             }
             "tool" -> {
                 val id = message["tool_call_id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
@@ -116,9 +207,11 @@ private fun anthropicMessages(messages: List<JsonObject>): JsonArray {
                         },
                     ),
                 )
+                sawConversation = true
             }
         }
     }
+    if (pendingSystemUpdates.isNotEmpty()) flushUpdates()
     return JsonArray(rows.map { row ->
         buildJsonObject {
             put("role", row.role)
@@ -126,6 +219,17 @@ private fun anthropicMessages(messages: List<JsonObject>): JsonArray {
         }
     })
 }
+
+private fun developerToolAdditions(messages: List<JsonObject>): Set<String> =
+    messages.asSequence()
+        .filter { it["role"]?.jsonPrimitive?.contentOrNull == "developer" }
+        .flatMap { message -> ((message["content"] as? JsonArray).orEmpty()).asSequence() }
+        .mapNotNull { raw ->
+            val block = raw as? JsonObject ?: return@mapNotNull null
+            if (block["type"]?.jsonPrimitive?.contentOrNull != "tool-addition") return@mapNotNull null
+            block["toolName"]?.jsonPrimitive?.contentOrNull
+        }
+        .toSet()
 
 private fun anthropicContentBlocks(content: JsonElement?): List<JsonElement> = when (content) {
     null, JsonNull -> emptyList()
@@ -166,7 +270,10 @@ private fun dataUrlToAnthropicImage(url: String): JsonObject? {
     }
 }
 
-private fun anthropicTools(tools: JsonArray): JsonArray = buildJsonArray {
+private fun anthropicTools(
+    tools: JsonArray,
+    deferredNames: Set<String>,
+): JsonArray = buildJsonArray {
     tools.forEach { element ->
         val fn = (element as? JsonObject)?.get("function") as? JsonObject ?: return@forEach
         val name = fn["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
@@ -174,6 +281,7 @@ private fun anthropicTools(tools: JsonArray): JsonArray = buildJsonArray {
             put("name", name)
             fn["description"]?.jsonPrimitive?.contentOrNull?.let { put("description", it) }
             put("input_schema", fn["parameters"] as? JsonObject ?: JsonObject(emptyMap()))
+            if (name in deferredNames) put("defer_loading", true)
         })
     }
 }
