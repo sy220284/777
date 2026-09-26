@@ -146,7 +146,7 @@ jobs:
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           set +e
-          DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --stacktrace
+          DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug :app:assembleOptimized --stacktrace
           status=$?
           if [ "$status" -ne 0 ]; then
             echo "=== connected test XML ==="
@@ -159,3 +159,8 @@ jobs:
           adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
           sleep 2
           adb shell pidof com.sy220284.dshmobile.debug
+
+          # Android 17 must also launch the shrunk/minified build that is closest to release.
+          adb shell am force-stop com.sy220284.dshmobile.debug || true
+          adb install -r app/build/outputs/apk/optimized/app-optimized.apk
+          bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
