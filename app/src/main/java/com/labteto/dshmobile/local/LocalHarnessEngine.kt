@@ -289,6 +289,10 @@ class LocalHarnessEngine @Inject constructor(
     private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val approvalPreferences = LocalApprovalPreferences(preferences)
+    private val chatTurnCoordinator = LocalChatTurnCoordinator(
+        runner = chatTurnRunner,
+        interactionPlanner = chatInteractionPlanner,
+    )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
     private val sessionRepository by lazy {
         LocalSessionRepository(sessionsRoot, json, scope,
@@ -3739,11 +3743,14 @@ class LocalHarnessEngine @Inject constructor(
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = snapshot.chatBranches
             captureAutoMemoryDirective(input)
-            val chatContext = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState, input, snapshot.handoffSummary)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
-            val dynamicContext = listOf(chatContext.dynamicPrompt, relationshipMemory)
-                .filter(String::isNotBlank)
-                .joinToString("\n\n")
+            val preparedChat = chatTurnCoordinator.prepare(
+                snapshot = snapshot,
+                input = input,
+                relationshipMemory = relationshipMemory,
+            )
+            val chatContext = preparedChat.context
+            val dynamicContext = preparedChat.dynamicContext
             compactHistoryIfNeeded(
                 extraTokens = estimateModelTokens(chatContext.stablePrompt) +
                     estimateModelTokens(dynamicContext),
@@ -3777,12 +3784,11 @@ class LocalHarnessEngine @Inject constructor(
                 persistOverflowHistory = true,
             )
 
-            val reply = chatTurnRunner.finalizeReply(
+            val reply = chatTurnCoordinator.finalize(
+                snapshot = snapshot,
                 persona = chatContext.persona,
                 reply = rawReply,
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                guardEnabled = snapshot.chatStyleGuardEnabled,
-                additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
                 onGuardEvent = { action, violations ->
                     recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
@@ -4024,17 +4030,13 @@ class LocalHarnessEngine @Inject constructor(
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
                         captureAutoMemoryDirective(memoryInput)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
-                        val chatContext = chatTurnRunner.prepare(
-                            snapshot.personaId,
-                            snapshot.chatState,
-                            input,
-                            snapshot.handoffSummary,
+                        val preparedChat = chatTurnCoordinator.prepare(
+                            snapshot = snapshot,
+                            input = input,
+                            relationshipMemory = relationshipMemory,
                         )
-                        chatStableContext = chatContext.stablePrompt
-                        chatDynamicContext = listOf(
-                            chatContext.dynamicPrompt,
-                            relationshipMemory,
-                        ).filter(String::isNotBlank).joinToString("\n\n")
+                        chatStableContext = preparedChat.context.stablePrompt
+                        chatDynamicContext = preparedChat.dynamicContext
                     } else {
                         ephemeralContext = contextComposer.compose(
                             ContextRequest(
@@ -5463,7 +5465,7 @@ class LocalHarnessEngine @Inject constructor(
         val before = _state.value
         if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
         val key = apiKeys.get() ?: return
-        val prompt = chatInteractionPlanner.prompt(
+        val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = expectedBaseState,
             userMessage = userMessage,
@@ -5494,8 +5496,8 @@ class LocalHarnessEngine @Inject constructor(
             return
         }
         usageTracker.record(before.model, plannerReply.usage)
-        val plan = chatInteractionPlanner.parse(
-            plannerReply.content.orEmpty(),
+        val plan = chatTurnCoordinator.parsePostTurn(
+            text = plannerReply.content.orEmpty(),
             previous = expectedBaseState,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
@@ -5566,13 +5568,12 @@ class LocalHarnessEngine @Inject constructor(
             usageTracker.record(snapshot.model, reply.usage)
             return reply
         }
-        val persona = chatTurnRunner.prepare(snapshot.personaId, snapshot.chatState).persona
-        return chatTurnRunner.finalizeReply(
+        val persona = chatTurnCoordinator.persona(snapshot)
+        return chatTurnCoordinator.finalize(
+            snapshot = snapshot,
             persona = persona,
             reply = reply,
             recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-            guardEnabled = snapshot.chatStyleGuardEnabled,
-            additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
             onGuardEvent = { action, violations ->
                 recordStyleGuardHits(violations)
                 eventLog.append("chat/style-guard", buildJsonObject {
