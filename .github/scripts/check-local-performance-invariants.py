@@ -6,6 +6,8 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+full_runtime_conformance = ROOT / "app/src/test/java/com/labteto/dshmobile/local/FullRuntimeSemanticConformanceTest.kt"
+ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
@@ -124,6 +126,15 @@ else:
         violations.append("Unified Chat turns must preserve stable/dynamic context placement")
 if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
     violations.append("Chat branch continuation must only materialize after a real branch already exists")
+
+if not full_runtime_conformance.is_file():
+    violations.append("Full Runtime Semantic Conformance test suite must remain present")
+if "Full Runtime Semantic Conformance" not in ci_workflow:
+    violations.append("CI must run the full Android runtime semantic conformance gate")
+if "LOCAL_SUBAGENT_CHECKPOINT_EVENT" not in engine:
+    violations.append("Continuable subagents must keep durable model-history checkpoints")
+if 'autoApprovalScope("bash")' in engine:
+    violations.append("Shell approval policy must be resolved through the registered tool policy")
 
 if violations:
     print("Local performance invariant guard failed:", file=sys.stderr)
