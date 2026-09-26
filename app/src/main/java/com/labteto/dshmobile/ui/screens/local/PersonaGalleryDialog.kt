@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.graphics.BitmapFactory
+import android.provider.OpenableColumns
 import java.io.File
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,6 +69,10 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.MAX_PERSONA_TRANSFER_BYTES
+import com.labteto.dshmobile.local.chat.PERSONA_WORD_MIME
+import com.labteto.dshmobile.local.chat.PersonaTransferDocument
+import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.chat.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -173,8 +178,8 @@ internal fun PersonaGalleryScreen(
     onDelete: suspend (String) -> Result<Unit>,
     onDeleteStory: suspend (String, String) -> Result<Unit>,
     onDeleteHistoryMessage: suspend (String, String, String) -> Result<Unit>,
-    onExport: suspend (String, Boolean) -> Result<String>,
-    onImport: suspend (String) -> Result<PersonaGalleryEntry>,
+    onExport: suspend (String, PersonaTransferFormat) -> Result<PersonaTransferDocument>,
+    onImport: suspend (ByteArray, String?, String?) -> Result<PersonaGalleryEntry>,
     onInstallPreset: suspend (String) -> Result<PersonaGalleryEntry>,
     onSetPortrait: suspend (String, android.net.Uri) -> Result<PersonaGalleryEntry>,
     onRemovePortrait: suspend (String) -> Result<PersonaGalleryEntry>,
@@ -218,7 +223,8 @@ internal fun PersonaGalleryScreen(
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
-    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
+    var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
+    var showExportFormatDialog by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
@@ -243,34 +249,50 @@ internal fun PersonaGalleryScreen(
     val presetInstalledText = stringResource(R.string.persona_gallery_preset_installed)
     val portraitSaveFailedText = stringResource(R.string.persona_gallery_portrait_save_failed)
 
-    val exportDocument = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
-    ) { uri ->
-        val payload = pendingExportPayload
-        pendingExportPayload = null
-        if (uri != null && payload != null) {
-            scope.launch {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
-                            it.write(payload)
-                        } ?: error("Unable to write target file")
-                    }
-                }.onFailure { error = exportFailedText }
-            }
+    fun writePendingExport(uri: android.net.Uri?) {
+        val document = pendingExportDocument
+        pendingExportDocument = null
+        if (uri == null || document == null) return
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                        output.write(document.bytes)
+                    } ?: error("Unable to write target file")
+                }
+            }.onFailure { error = exportFailedText }
         }
     }
 
-    fun importPayload(payload: String) {
+    val exportJsonDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(PersonaTransferFormat.JSON.mimeType),
+        onResult = ::writePendingExport,
+    )
+    val exportMarkdownDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(PersonaTransferFormat.MARKDOWN.mimeType),
+        onResult = ::writePendingExport,
+    )
+    val exportWordDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(PersonaTransferFormat.WORD.mimeType),
+        onResult = ::writePendingExport,
+    )
+
+    fun requestExport(entry: PersonaGalleryEntry, format: PersonaTransferFormat) {
+        showExportFormatDialog = false
         busy = true
         error = null
         scope.launch {
-            onImport(payload)
-                .onSuccess { imported ->
-                    selectedId = imported.id
-                    selectedStoryId = null
+            onExport(entry.id, format)
+                .onSuccess { document ->
+                    pendingExportDocument = document
+                    val fileName = personaExportFileName(entry.persona.name, format)
+                    when (format) {
+                        PersonaTransferFormat.JSON -> exportJsonDocument.launch(fileName)
+                        PersonaTransferFormat.MARKDOWN -> exportMarkdownDocument.launch(fileName)
+                        PersonaTransferFormat.WORD -> exportWordDocument.launch(fileName)
+                    }
                 }
-                .onFailure { error = it.message ?: importFailedText }
+                .onFailure { error = it.message ?: exportFailedText }
             busy = false
         }
     }
@@ -279,14 +301,23 @@ internal fun PersonaGalleryScreen(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
+            busy = true
+            error = null
             scope.launch {
-                val payload = runCatching {
-                    withContext(Dispatchers.IO) { readPersonaShareText(context, uri) }
+                val document = runCatching {
+                    withContext(Dispatchers.IO) { readPersonaShareDocument(context, uri) }
                 }.getOrElse {
-                    error = importFailedText
+                    error = it.message ?: importFailedText
+                    busy = false
                     return@launch
                 }
-                importPayload(payload)
+                onImport(document.bytes, document.fileName, document.mimeType)
+                    .onSuccess { imported ->
+                        selectedId = imported.id
+                        selectedStoryId = null
+                    }
+                    .onFailure { error = it.message ?: importFailedText }
+                busy = false
             }
         }
     }
@@ -348,6 +379,39 @@ internal fun PersonaGalleryScreen(
                 pendingPresetDeleteId = null
             },
         )
+    }
+
+    if (showExportFormatDialog && selected != null) {
+        DsDialog(
+            title = stringResource(R.string.persona_gallery_export_format_title),
+            onDismiss = { showExportFormatDialog = false },
+        ) {
+            Text(
+                stringResource(R.string.persona_gallery_export_format_hint),
+                style = DsType.small13,
+                color = DsTheme.colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_json),
+                onClick = { requestExport(selected, PersonaTransferFormat.JSON) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_markdown),
+                onClick = { requestExport(selected, PersonaTransferFormat.MARKDOWN) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                variant = DsButtonVariant.Outline,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_export_word),
+                onClick = { requestExport(selected, PersonaTransferFormat.WORD) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                variant = DsButtonVariant.Outline,
+            )
+        }
     }
 
     Surface(
@@ -452,7 +516,16 @@ internal fun PersonaGalleryScreen(
 
             DsButton(
                 text = stringResource(R.string.persona_gallery_import_file),
-                onClick = { importDocument.launch(arrayOf("application/json", "text/plain")) },
+                onClick = {
+                    importDocument.launch(
+                        arrayOf(
+                            "application/json",
+                            "text/plain",
+                            "text/markdown",
+                            PERSONA_WORD_MIME,
+                        ),
+                    )
+                },
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
@@ -705,17 +778,8 @@ internal fun PersonaGalleryScreen(
             DsButton(
                 text = stringResource(R.string.persona_gallery_export_file),
                 onClick = {
-                    busy = true
                     error = null
-                    scope.launch {
-                        onExport(selected.id, false)
-                            .onSuccess { payload ->
-                                pendingExportPayload = payload
-                                exportDocument.launch(personaExportFileName(selected.persona.name))
-                            }
-                            .onFailure { error = it.message ?: exportFailedText }
-                        busy = false
-                    }
+                    showExportFormatDialog = true
                 },
                 variant = DsButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
@@ -1107,27 +1171,57 @@ private fun PersonaGalleryTopBar(
     }
 }
 
-private fun personaExportFileName(name: String): String {
+private fun personaExportFileName(
+    name: String,
+    format: PersonaTransferFormat,
+): String {
     val safe = name.trim()
         .replace(Regex("""[\\/:*?"<>|]"""), "_")
         .take(48)
         .ifBlank { "persona" }
-    return "$safe.persona.json"
+    return "$safe.persona.${format.extension}"
 }
 
-private fun readPersonaShareText(context: android.content.Context, uri: android.net.Uri): String {
-    val input = context.contentResolver.openInputStream(uri) ?: error("Unable to read persona file")
-    return input.bufferedReader().use { reader ->
-        val result = StringBuilder()
-        val buffer = CharArray(4_096)
-        while (result.length <= 64_000) {
-            val count = reader.read(buffer)
-            if (count < 0) break
-            result.append(buffer, 0, count)
-        }
-        require(result.length <= 64_000) { "Persona file is too large" }
-        result.toString()
+private data class PersonaImportDocument(
+    val bytes: ByteArray,
+    val fileName: String?,
+    val mimeType: String?,
+)
+
+private fun readPersonaShareDocument(
+    context: android.content.Context,
+    uri: android.net.Uri,
+): PersonaImportDocument {
+    val resolver = context.contentResolver
+    val fileName = resolver.query(
+        uri,
+        arrayOf(OpenableColumns.DISPLAY_NAME),
+        null,
+        null,
+        null,
+    )?.use { cursor ->
+        val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
     }
+    val input = resolver.openInputStream(uri) ?: error("Unable to read persona file")
+    val bytes = input.use { stream ->
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8_192)
+        while (true) {
+            val count = stream.read(buffer)
+            if (count < 0) break
+            output.write(buffer, 0, count)
+            require(output.size() <= MAX_PERSONA_TRANSFER_BYTES) {
+                "人物导入文件超过 16 MB"
+            }
+        }
+        output.toByteArray()
+    }
+    return PersonaImportDocument(
+        bytes = bytes,
+        fileName = fileName,
+        mimeType = resolver.getType(uri),
+    )
 }
 
 @Composable
