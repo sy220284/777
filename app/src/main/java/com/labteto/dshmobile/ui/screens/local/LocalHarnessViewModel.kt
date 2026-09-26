@@ -54,7 +54,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
     private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
-    val transcriptHistory = _transcriptHistory.asStateFlow()
+    internal val transcriptHistory = _transcriptHistory.asStateFlow()
     private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
     private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
@@ -390,7 +390,7 @@ class LocalHarnessViewModel @Inject constructor(
         return true
     }
 
-    suspend fun prepareTranscriptHistory(
+    internal suspend fun prepareTranscriptHistory(
         sessionId: String,
         force: Boolean = false,
     ) {
@@ -443,7 +443,7 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun loadOlderTranscript(sessionId: String): Result<Int> {
+    internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> {
         if (sessionId.isBlank()) return Result.success(0)
         if (
             transcriptHistoryInitializedSessionId != sessionId ||
