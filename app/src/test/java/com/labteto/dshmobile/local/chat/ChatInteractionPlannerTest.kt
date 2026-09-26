@@ -527,6 +527,26 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun proactiveTurnWithoutUserMessagePreservesExistingInteractionIntent() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+
+        val state = planner.applyDeterministicInteractionState(
+            previous = previous,
+            userMessage = "",
+            assistantMessage = "宝贝，突然有点想你。",
+        )
+
+        assertEquals(ChatInteractionIntent.INTIMATE.name, state.interactionIntent)
+        assertEquals(100, state.interactionIntentStrength)
+        assertEquals(5, state.interactionIntensity)
+        assertTrue("宝贝" in state.recentAddressTerms)
+    }
+
+    @Test
     fun topicResetClearsInteractionIntensityAndCooldowns() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.FLIRTING.name,
