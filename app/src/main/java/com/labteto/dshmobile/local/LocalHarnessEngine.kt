@@ -4278,6 +4278,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
         } catch (_: CancellationException) {
+            runContext.cancel("coroutine-cancelled")
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
