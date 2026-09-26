@@ -1524,14 +1524,47 @@ private fun LocalChat(
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                     }
                 }
-                if (state.running) {
+                if (
+                    state.usageMode == LocalUsageMode.CHAT &&
+                    state.running &&
+                    state.streamingAssistant.isNotBlank()
+                ) {
+                    item(key = "streaming:${state.sessionId}") {
+                        LocalMessageRow(
+                            message = LocalHarnessMessage(
+                                id = "streaming:${state.sessionId}",
+                                role = "assistant",
+                                content = state.streamingAssistant,
+                                createdAt = 0L,
+                            ),
+                            chatMode = true,
+                            groupMode = false,
+                            canEdit = false,
+                            canRegenerate = false,
+                            branchInfo = null,
+                            onEdit = { },
+                            onSelectVariant = { _, _ -> false },
+                            onRegenerate = { false },
+                        )
+                    }
+                }
+                if (
+                    state.running &&
+                    (state.usageMode == LocalUsageMode.WORK || state.streamingAssistant.isBlank())
+                ) {
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(DsSpacing.small))
                                 Text(
-                                    stringResource(R.string.local_streaming_status),
+                                    stringResource(
+                                        if (state.usageMode == LocalUsageMode.CHAT) {
+                                            R.string.local_chat_replying
+                                        } else {
+                                            R.string.local_streaming_status
+                                        },
+                                    ),
                                     style = DsType.small13,
                                     color = colors.labelTertiary,
                                 )
@@ -1557,7 +1590,11 @@ private fun LocalChat(
             )
         }
 
-        if (state.running && state.streamingAssistant.isNotBlank()) {
+        if (
+            state.usageMode == LocalUsageMode.WORK &&
+            state.running &&
+            state.streamingAssistant.isNotBlank()
+        ) {
             Surface(
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
@@ -1750,19 +1787,21 @@ private fun LocalChat(
                             variant = DsButtonVariant.Danger,
                             size = DsButtonSize.Small,
                         )
-                        DsButton(
-                            stringResource(R.string.local_queue_message),
-                            onClick = {
-                                val selected = attachments.toList()
-                                onSend(input, selected)
-                                drafts[state.sessionId] = ""
-                                attachments.clear()
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                            },
-                            size = DsButtonSize.Small,
-                            enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
-                        )
+                        if (state.usageMode == LocalUsageMode.WORK) {
+                            DsButton(
+                                stringResource(R.string.local_queue_message),
+                                onClick = {
+                                    val selected = attachments.toList()
+                                    onSend(input, selected)
+                                    drafts[state.sessionId] = ""
+                                    attachments.clear()
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                },
+                                size = DsButtonSize.Small,
+                                enabled = groupChatReady && (input.isNotBlank() || attachments.isNotEmpty()),
+                            )
+                        }
                     }
                 }
             }

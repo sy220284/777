@@ -60,56 +60,26 @@ class ChatTurnRunner @Inject constructor(
     suspend fun finalizeReply(
         persona: PersonaProfile,
         reply: LocalModelReply,
-        rewrite: suspend (String, List<String>) -> LocalModelReply,
         recordUsage: (DeepSeekTokenUsage) -> Unit,
-        builtInGuardEnabled: Boolean = true,
+        guardEnabled: Boolean = true,
+        additionalBannedPhrases: List<String> = emptyList(),
         onGuardEvent: (String, List<String>) -> Unit = { _, _ -> },
     ): LocalModelReply {
-        val extraBanned = persona.bannedPhrases
-        val firstViolations = ChatStyleGuard.violations(
-            reply.content.orEmpty(),
-            extraBanned,
-            builtInEnabled = builtInGuardEnabled,
-        )
-        if (firstViolations.isEmpty()) {
-            recordUsage(reply.usage)
-            return reply
-        }
-
-        onGuardEvent("rewrite", firstViolations)
         recordUsage(reply.usage)
-        val repaired = try {
-            rewrite(reply.content.orEmpty(), firstViolations)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            onGuardEvent("rewrite-failed", firstViolations)
-            return ChatStyleGuard.withContent(
-                reply,
-                ChatStyleGuard.scrub(
-                    reply.content.orEmpty(),
-                    extraBanned,
-                    builtInEnabled = builtInGuardEnabled,
-                ),
-            )
-        }
+        if (!guardEnabled || reply.toolCalls.isNotEmpty()) return reply
 
-        recordUsage(repaired.usage)
-        val remaining = ChatStyleGuard.violations(
-            repaired.content.orEmpty(),
-            extraBanned,
-            builtInEnabled = builtInGuardEnabled,
+        val phrases = ChatStyleGuard.activePhrases(
+            customPhrases = additionalBannedPhrases,
+            personaPhrases = persona.bannedPhrases,
+            enabled = true,
         )
-        if (remaining.isEmpty()) return repaired
+        val violations = ChatStyleGuard.violations(reply.content.orEmpty(), phrases)
+        if (violations.isEmpty()) return reply
 
-        onGuardEvent("scrub", remaining)
+        onGuardEvent("filter", violations)
         return ChatStyleGuard.withContent(
-            repaired,
-            ChatStyleGuard.scrub(
-                repaired.content.orEmpty(),
-                extraBanned,
-                builtInEnabled = builtInGuardEnabled,
-            ),
+            reply,
+            ChatStyleGuard.filterLiteral(reply.content.orEmpty(), phrases),
         )
     }
 

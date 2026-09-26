@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.ChatStyleGuard
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
@@ -87,6 +89,7 @@ import com.labteto.dshmobile.ui.theme.rootSurface
 enum class SettingsDestination {
     ROOT,
     GENERAL,
+    CHAT,
     MODELS,
     PRICING,
     USAGE,
@@ -119,6 +122,7 @@ fun SettingsScreen(
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
+    var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
 
     BackHandler {
         if (page == SettingsDestination.ROOT) onClose() else page = SettingsDestination.ROOT
@@ -143,6 +147,7 @@ fun SettingsScreen(
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
         SettingsDestination.GENERAL -> stringResource(R.string.settings_page_general)
+        SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
@@ -197,6 +202,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
                                 onClick = { page = SettingsDestination.MEMORY },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_chat),
+                                subtitle = stringResource(R.string.settings_chat_subtitle),
+                                onClick = { page = SettingsDestination.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
@@ -254,6 +265,22 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
+                    }
+
+                    SettingsDestination.CHAT -> {
+                        val builtInFilters = ChatStyleGuard.bannedPhrases
+                        val customFilters = localHarness.chatStyleGuardCustomPhrases
+                        val personaFilters = localHarness.chatPersona.bannedPhrases
+                            .map(String::trim)
+                            .filter(String::isNotBlank)
+                            .distinct()
+                        val candidate = customChatFilterDraft.trim()
+                        val canAddFilter =
+                            candidate.isNotEmpty() &&
+                                candidate.length <= MAX_CUSTOM_CHAT_FILTER_CHARS &&
+                                candidate !in customFilters &&
+                                customFilters.size < MAX_CUSTOM_CHAT_FILTERS
+
                         SettingsCard(stringResource(R.string.settings_page_chat), Icons.Outlined.Tune) {
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
@@ -262,10 +289,90 @@ fun SettingsScreen(
                             ) {
                                 viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
                             }
+
+                            if (!localHarness.chatStyleGuardEnabled) {
+                                Text(
+                                    stringResource(R.string.settings_chat_filter_disabled_notice),
+                                    style = DsType.small13,
+                                    color = colors.labelSecondary,
+                                )
+                            }
+
+                            Text(
+                                stringResource(R.string.settings_chat_builtin_filters_title, builtInFilters.size),
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
+                            )
+                            builtInFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
+
+                            Text(
+                                stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.settings_chat_filter_limits,
+                                    MAX_CUSTOM_CHAT_FILTERS,
+                                    MAX_CUSTOM_CHAT_FILTER_CHARS,
+                                ),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                TextField(
+                                    value = customChatFilterDraft,
+                                    onValueChange = {
+                                        customChatFilterDraft = it
+                                            .replace("\n", " ")
+                                            .take(MAX_CUSTOM_CHAT_FILTER_CHARS)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text(stringResource(R.string.settings_chat_custom_filter_hint)) },
+                                    singleLine = true,
+                                )
+                                DsButton(
+                                    text = stringResource(R.string.settings_chat_custom_filter_add),
+                                    onClick = {
+                                        if (viewModel.addChatStyleGuardPhrase(candidate)) {
+                                            customChatFilterDraft = ""
+                                        }
+                                    },
+                                    enabled = canAddFilter,
+                                    size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+                                )
+                            }
+                            customFilters.forEach { phrase ->
+                                ChatFilterPhraseRow(
+                                    phrase = phrase,
+                                    removeLabel = stringResource(R.string.settings_chat_custom_filter_remove),
+                                    onRemove = { viewModel.removeChatStyleGuardPhrase(phrase) },
+                                )
+                            }
+
+                            Text(
+                                stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
+                            )
+                            if (personaFilters.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.settings_chat_persona_filters_empty),
+                                    style = DsType.caption11,
+                                    color = colors.labelTertiary,
+                                )
+                            } else {
+                                personaFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
+                            }
+
                             Text(
                                 stringResource(R.string.settings_chat_guard_hits_title),
-                                style = DsType.small13,
-                                color = colors.labelSecondary,
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
                             )
                             if (localHarness.styleGuardHits.isEmpty()) {
                                 Text(
@@ -275,11 +382,7 @@ fun SettingsScreen(
                                 )
                             } else {
                                 localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
-                                    Text(
-                                        "• " + hit,
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                    )
+                                    ChatFilterPhraseRow(phrase = hit)
                                 }
                                 DsButton(
                                     text = stringResource(R.string.settings_chat_guard_hits_clear),
@@ -420,6 +523,35 @@ fun SettingsScreen(
 }
 
 /** One settings group as a raised card, so groups read as blocks rather than a running list. */
+@Composable
+private fun ChatFilterPhraseRow(
+    phrase: String,
+    removeLabel: String? = null,
+    onRemove: (() -> Unit)? = null,
+) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text(
+            text = "• " + phrase,
+            style = DsType.caption11,
+            color = colors.labelSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        if (removeLabel != null && onRemove != null) {
+            DsButton(
+                text = removeLabel,
+                onClick = onRemove,
+                variant = DsButtonVariant.Ghost,
+                size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun SettingsCard(
     title: String,
@@ -679,3 +811,6 @@ private fun BackgroundRow(
         }
     }
 }
+
+private const val MAX_CUSTOM_CHAT_FILTERS = 50
+private const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32

@@ -127,6 +127,7 @@
     <string name="local_resource_summary">Agents %1$d/%2$d · terminals %3$d/%4$d · screens %5$d/%6$d · language servers %7$d/%8$d</string>
     <string name="local_context_summary">Context %1$d / %2$d chars</string>
     <string name="local_streaming_status">Agent is responding…</string>
+    <string name="local_chat_replying">Replying…</string>
     <string name="local_device_approval_on">Device actions approved for this turn</string>
     <string name="local_approval_scope_show">View permission scope</string>
     <string name="local_approval_scope_hide">Hide permission scope</string>
@@ -886,11 +887,21 @@
 
 
     <string name="settings_page_chat">Chat</string>
-    <string name="settings_chat_style_guard">Generic phrase guard</string>
-    <string name="settings_chat_style_guard_hint">Blocks common canned assistant phrasing. Character-specific banned phrases remain enforced when this is off.</string>
-    <string name="settings_chat_guard_hits_title">Recent matched phrases</string>
-    <string name="settings_chat_guard_hits_empty">No recent guard matches.</string>
-    <string name="settings_chat_guard_hits_clear">Clear match history</string>
+    <string name="settings_chat_subtitle">Streaming filters, phrases, and match history</string>
+    <string name="settings_chat_style_guard">Chat streaming safety filter</string>
+    <string name="settings_chat_style_guard_hint">When enabled, filters built-in, custom, and current-character banned phrases before they are streamed. When disabled, model output streams directly with no local output review.</string>
+    <string name="settings_chat_filter_disabled_notice">Local output review is off: model text streams directly. Character-card wording constraints are still sent as prompt guidance, but output is not filtered or rewritten afterward.</string>
+    <string name="settings_chat_builtin_filters_title">Built-in filters (%1$d)</string>
+    <string name="settings_chat_custom_filters_title">Custom filters (%1$d)</string>
+    <string name="settings_chat_custom_filter_hint">Add a word or phrase to filter</string>
+    <string name="settings_chat_custom_filter_add">Add</string>
+    <string name="settings_chat_custom_filter_remove">Remove</string>
+    <string name="settings_chat_filter_limits">Up to %1$d phrases, each no longer than %2$d characters.</string>
+    <string name="settings_chat_persona_filters_title">Current character bans (%1$d)</string>
+    <string name="settings_chat_persona_filters_empty">The current character has no extra banned phrases.</string>
+    <string name="settings_chat_guard_hits_title">Recently filtered</string>
+    <string name="settings_chat_guard_hits_empty">Nothing has been filtered recently.</string>
+    <string name="settings_chat_guard_hits_clear">Clear filter history</string>
     <string name="local_mode_intro_chat">Chat mode: everyday conversation, roleplay, and relationship continuity, with persona and chat-style guards.</string>
     <string name="local_mode_intro_work">Work mode: tasks, files, commands, tools, and subagents, with the full execution chain available here.</string>
     <string name="local_persona_correction_recorded">Persona correction saved</string>

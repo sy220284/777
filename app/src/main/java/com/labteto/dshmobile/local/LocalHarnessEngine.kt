@@ -386,6 +386,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionId = currentSessionId,
             usage = usageTracker.state.value,
             chatStyleGuardEnabled = preferences.getBoolean(KEY_CHAT_STYLE_GUARD, true),
+            chatStyleGuardCustomPhrases = loadChatStyleGuardCustomPhrases(),
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
@@ -613,6 +614,8 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
+    private val chatPostTurnLock = Any()
+    private var chatPostTurnJob: Job? = null
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
 
@@ -806,15 +809,63 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    /** Toggle only the generic chat-style gate. Persona-specific banned phrases remain enforced. */
+    /** Master switch for local chat output filtering. Off means the model stream is shown as-is. */
     fun configureChatStyleGuard(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
         _state.update { it.copy(chatStyleGuardEnabled = enabled) }
     }
 
+    fun addChatStyleGuardPhrase(value: String): Boolean {
+        val phrase = normalizeChatStyleGuardPhrase(value) ?: return false
+        val current = _state.value.chatStyleGuardCustomPhrases
+        if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
+        val updated = current + phrase
+        preferences.edit()
+            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
+            .apply()
+        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
+        return true
+    }
+
+    fun removeChatStyleGuardPhrase(value: String) {
+        val phrase = value.trim()
+        if (phrase.isEmpty()) return
+        val current = _state.value.chatStyleGuardCustomPhrases
+        val updated = current.filterNot { it == phrase }
+        if (updated == current) return
+        preferences.edit()
+            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
+            .apply()
+        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
+    }
+
     fun clearChatStyleGuardHits() {
         _state.update { it.copy(styleGuardHits = emptyList()) }
     }
+
+    private fun loadChatStyleGuardCustomPhrases(): List<String> =
+        preferences.getString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, "")
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull(::normalizeChatStyleGuardPhrase)
+            .distinct()
+            .take(MAX_CUSTOM_CHAT_FILTERS)
+            .toList()
+
+    private fun normalizeChatStyleGuardPhrase(value: String): String? =
+        value.replace('\n', ' ')
+            .trim()
+            .takeIf(String::isNotBlank)
+            ?.take(MAX_CUSTOM_CHAT_FILTER_CHARS)
+
+    private fun chatStreamFilterPhrases(
+        snapshot: LocalHarnessState,
+        persona: PersonaProfile = snapshot.chatPersona,
+    ): List<String> = ChatStyleGuard.activePhrases(
+        customPhrases = snapshot.chatStyleGuardCustomPhrases,
+        personaPhrases = persona.bannedPhrases,
+        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
+    )
 
     private fun recordStyleGuardHits(violations: List<String>) {
         if (violations.isEmpty()) return
@@ -1147,6 +1198,7 @@ class LocalHarnessEngine @Inject constructor(
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
         if ((prompt.isEmpty() && attachments.isEmpty()) || _state.value.loading || !_state.value.configured) return
+        cancelChatPostTurn()
         val attachmentBlock = attachments.joinToString("\n") { attachment ->
             val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
             "- $kind：${attachment.name} → ${attachment.relativePath}（${attachment.bytes} B）"
@@ -1198,6 +1250,7 @@ class LocalHarnessEngine @Inject constructor(
             return@synchronized false
         }
         if (original.message.content.trim() == content) return@synchronized false
+        cancelChatPostTurn()
 
         val baseState = original.parentId
             ?.let { parentId -> branches.nodes.firstOrNull { it.message.id == parentId }?.chatStateAfter }
@@ -1302,6 +1355,7 @@ class LocalHarnessEngine @Inject constructor(
         if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
             return@synchronized false
         }
+        cancelChatPostTurn()
 
         if (state.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(state.messages)) {
             val branches = syncChatBranchState(
@@ -1763,18 +1817,9 @@ class LocalHarnessEngine @Inject constructor(
                 val reply = chatTurnRunner.finalizeReply(
                     persona = persona,
                     reply = rawReply,
-                    rewrite = { candidate, violations ->
-                        completeAutomationChat(
-                            key = key,
-                            snapshot = boundState,
-                            messages = chatGuardRewriteMessages(
-                                requestMessages,
-                                ChatStyleGuard.repairPrompt(candidate, violations),
-                            ),
-                        )
-                    },
                     recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
-                    builtInGuardEnabled = boundState.chatStyleGuardEnabled,
+                    guardEnabled = boundState.chatStyleGuardEnabled,
+                    additionalBannedPhrases = boundState.chatStyleGuardCustomPhrases,
                     onGuardEvent = { action, violations ->
                         recordStyleGuardHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
@@ -2229,6 +2274,7 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
+        cancelChatPostTurn()
         interactions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.clear()
@@ -2609,10 +2655,14 @@ class LocalHarnessEngine @Inject constructor(
         sessionTransitioning || activeJob?.isCompleted == false
     }
 
-    private fun beginSessionTransition(): Boolean = synchronized(runStateLock) {
-        if (sessionTransitioning) return@synchronized false
-        sessionTransitioning = true
-        true
+    private fun beginSessionTransition(): Boolean {
+        val started = synchronized(runStateLock) {
+            if (sessionTransitioning) return@synchronized false
+            sessionTransitioning = true
+            true
+        }
+        if (started) cancelChatPostTurn()
+        return started
     }
 
     private fun endSessionTransition() {
@@ -3111,22 +3161,9 @@ class LocalHarnessEngine @Inject constructor(
             val guarded = chatTurnRunner.finalizeReply(
                 persona = persona,
                 reply = rawReply,
-                rewrite = { candidate, violations ->
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = chatGuardRewriteMessages(
-                            requestMessages,
-                            ChatStyleGuard.repairPrompt(candidate, violations),
-                        ),
-                        step = 100 + index,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        maxAttemptsOverride = interactiveAttempts,
-                    )
-                },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
+                guardEnabled = snapshot.chatStyleGuardEnabled,
+                additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
                 onGuardEvent = { action, violations ->
                     recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
@@ -3542,6 +3579,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
+        cancelChatPostTurn()
         _state.update {
             it.copy(
                 running = true,
@@ -3600,29 +3638,17 @@ class LocalHarnessEngine @Inject constructor(
                 messages = requestMessages,
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
+                publishPreview = true,
+                streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
                 persistOverflowHistory = true,
             )
 
             val reply = chatTurnRunner.finalizeReply(
                 persona = chatContext.persona,
                 reply = rawReply,
-                rewrite = { candidate, violations ->
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = chatGuardRewriteMessages(
-                            requestMessages,
-                            ChatStyleGuard.repairPrompt(candidate, violations),
-                        ),
-                        step = 1,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        persistOverflowHistory = true,
-                    )
-                },
                 recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
+                guardEnabled = snapshot.chatStyleGuardEnabled,
+                additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
                 onGuardEvent = { action, violations ->
                     recordStyleGuardHits(violations)
                     eventLog.append("chat/style-guard", buildJsonObject {
@@ -3677,26 +3703,7 @@ class LocalHarnessEngine @Inject constructor(
                     select = true,
                 )
                 _state.update { it.copy(chatBranches = branches) }
-            }
-            reply.content?.takeIf(String::isNotBlank)?.let { assistantMessage ->
-                refreshChatPostTurn(
-                    userMessage = input,
-                    assistantMessage = assistantMessage,
-                    persona = chatContext.persona,
-                )
-            }
-            if (branchEligible && assistantTranscript != null) {
-                _state.update { current ->
-                    current.copy(
-                        chatBranches = updateChatBranchNodeSnapshot(
-                            state = current.chatBranches,
-                            messageId = assistantTranscript.id,
-                            chatState = current.chatState,
-                            replySuggestions = current.replySuggestions,
-                        ),
-                    )
-                }
-                if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+                if (hasChatBranchAlternatives(branches)) {
                     persistChatBranchState(
                         if (replacingMessageId != null) "assistant-regenerated" else "assistant-branch-completed",
                     )
@@ -3710,7 +3717,30 @@ class LocalHarnessEngine @Inject constructor(
             })
             if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
             else checkpointModelHistoryAtTurnBoundary("chat/completed")
+
+            _state.update {
+                it.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    deviceApprovalLease = false,
+                    streamingAssistant = "",
+                    streamingReasoning = "",
+                )
+            }
             persist()
+
+            val assistantMessage = reply.content?.takeIf(String::isNotBlank)
+            if (assistantTranscript != null && assistantMessage != null) {
+                scheduleChatPostTurn(
+                    userMessage = input,
+                    assistantMessage = assistantMessage,
+                    persona = chatContext.persona,
+                    expectedSessionId = snapshot.sessionId,
+                    expectedAssistantMessageId = assistantTranscript.id,
+                    expectedBaseState = _state.value.chatState,
+                )
+            }
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "aborted")
@@ -3886,7 +3916,8 @@ class LocalHarnessEngine @Inject constructor(
                         messages = requestMessages,
                         step = modelStep + 1,
                         toolsOverride = tools,
-                        publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                        publishPreview = true,
+                        streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                         persistOverflowHistory = true,
                     ).also {
                         if (nativeImagesSent) {
@@ -3919,7 +3950,8 @@ class LocalHarnessEngine @Inject constructor(
                             ),
                             step = modelStep + 1,
                             toolsOverride = tools,
-                            publishPreview = snapshot.usageMode == LocalUsageMode.WORK,
+                            publishPreview = true,
+                        streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                             persistOverflowHistory = true,
                         )
                     } else {
@@ -4127,13 +4159,17 @@ class LocalHarnessEngine @Inject constructor(
         try {
             loop.run(input)
             if (_state.value.usageMode == LocalUsageMode.CHAT) {
-                _state.value.messages.lastOrNull { message ->
+                val postTurnSnapshot = _state.value
+                postTurnSnapshot.messages.lastOrNull { message ->
                     message.role == "assistant" && message.content.isNotBlank()
-                }?.content?.let { assistantMessage ->
-                    refreshChatPostTurn(
+                }?.let { assistantMessage ->
+                    scheduleChatPostTurn(
                         userMessage = memoryInput,
-                        assistantMessage = assistantMessage,
-                        persona = _state.value.chatPersona,
+                        assistantMessage = assistantMessage.content,
+                        persona = postTurnSnapshot.chatPersona,
+                        expectedSessionId = postTurnSnapshot.sessionId,
+                        expectedAssistantMessageId = assistantMessage.id,
+                        expectedBaseState = postTurnSnapshot.chatState,
                     )
                 }
             }
@@ -5155,17 +5191,71 @@ class LocalHarnessEngine @Inject constructor(
         return eventLogFor(id)
     }
 
+    private fun cancelChatPostTurn() {
+        val job = synchronized(chatPostTurnLock) {
+            val current = chatPostTurnJob
+            chatPostTurnJob = null
+            current
+        }
+        job?.cancel()
+    }
+
+    private fun scheduleChatPostTurn(
+        userMessage: String,
+        assistantMessage: String,
+        persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedAssistantMessageId: String,
+        expectedBaseState: ChatCharacterState,
+    ) {
+        cancelChatPostTurn()
+        val current = _state.value
+        val latestDialogueId = current.messages.lastOrNull {
+            it.role == "user" || it.role == "assistant"
+        }?.id
+        if (
+            current.sessionId != expectedSessionId ||
+            latestDialogueId != expectedAssistantMessageId ||
+            current.chatState != expectedBaseState
+        ) {
+            return
+        }
+        val boundEventLog = eventLogFor(expectedSessionId)
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            refreshChatPostTurn(
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+                persona = persona,
+                expectedSessionId = expectedSessionId,
+                expectedAssistantMessageId = expectedAssistantMessageId,
+                expectedBaseState = expectedBaseState,
+                boundEventLog = boundEventLog,
+            )
+        }
+        synchronized(chatPostTurnLock) { chatPostTurnJob = job }
+        job.invokeOnCompletion {
+            synchronized(chatPostTurnLock) {
+                if (chatPostTurnJob === job) chatPostTurnJob = null
+            }
+        }
+        job.start()
+    }
+
     private suspend fun refreshChatPostTurn(
         userMessage: String,
         assistantMessage: String,
         persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedAssistantMessageId: String,
+        expectedBaseState: ChatCharacterState,
+        boundEventLog: LocalSessionEventLog,
     ) {
         val before = _state.value
-        if (before.usageMode != LocalUsageMode.CHAT) return
+        if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
         val key = apiKeys.get() ?: return
         val prompt = chatInteractionPlanner.prompt(
             persona = persona,
-            state = before.chatState,
+            state = expectedBaseState,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
@@ -5182,11 +5272,12 @@ class LocalHarnessEngine @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
+                requestLog = boundEventLog,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            eventLog.append("chat/post-turn", buildJsonObject {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
             })
@@ -5195,29 +5286,64 @@ class LocalHarnessEngine @Inject constructor(
         usageTracker.record(before.model, plannerReply.usage)
         val plan = chatInteractionPlanner.parse(
             plannerReply.content.orEmpty(),
-            previous = before.chatState,
+            previous = expectedBaseState,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
         if (plan == null) {
-            eventLog.append("chat/post-turn", buildJsonObject {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "parse-failed")
                 put("content", plannerReply.content.orEmpty().take(2_000))
             })
             return
         }
+
+        var applied = false
         _state.update { current ->
-            if (current.sessionId != before.sessionId) current else current.copy(
-                chatState = plan.state,
-                replySuggestions = plan.suggestions,
-            )
+            val latestDialogueId = current.messages.lastOrNull {
+                it.role == "user" || it.role == "assistant"
+            }?.id
+            if (
+                current.sessionId != expectedSessionId ||
+                latestDialogueId != expectedAssistantMessageId ||
+                current.chatState != expectedBaseState
+            ) {
+                current
+            } else {
+                applied = true
+                current.copy(
+                    chatState = plan.state,
+                    replySuggestions = plan.suggestions,
+                    chatBranches = if (chatBranchingEligible(current.messages)) {
+                        updateChatBranchNodeSnapshot(
+                            state = current.chatBranches,
+                            messageId = expectedAssistantMessageId,
+                            chatState = plan.state,
+                            replySuggestions = plan.suggestions,
+                        )
+                    } else {
+                        current.chatBranches
+                    },
+                )
+            }
         }
-        eventLog.append("chat/post-turn", buildJsonObject {
+        if (!applied) {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "stale-discarded")
+                put("assistant_message_id", expectedAssistantMessageId)
+            })
+            return
+        }
+
+        boundEventLog.append("chat/post-turn", buildJsonObject {
             put("status", "updated")
             put("mood", plan.state.mood)
             put("relationship_state", plan.state.relationshipState)
             put("suggestion_count", plan.suggestions.size)
         })
+        if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+            persistChatBranchState("chat/post-turn-updated")
+        }
         persist()
     }
 
@@ -5236,22 +5362,9 @@ class LocalHarnessEngine @Inject constructor(
         return chatTurnRunner.finalizeReply(
             persona = persona,
             reply = reply,
-            rewrite = { candidate, violations ->
-                completeWithRetry(
-                    key = key,
-                    snapshot = snapshot,
-                    messages = chatGuardRewriteMessages(
-                        messages,
-                        ChatStyleGuard.repairPrompt(candidate, violations),
-                    ),
-                    step = step,
-                    toolsOverride = JsonArray(emptyList()),
-                    publishPreview = false,
-                    persistOverflowHistory = true,
-                )
-            },
             recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-            builtInGuardEnabled = snapshot.chatStyleGuardEnabled,
+            guardEnabled = snapshot.chatStyleGuardEnabled,
+            additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
             onGuardEvent = { action, violations ->
                 recordStyleGuardHits(violations)
                 eventLog.append("chat/style-guard", buildJsonObject {
@@ -5273,8 +5386,11 @@ class LocalHarnessEngine @Inject constructor(
         maxAttemptsOverride: Int? = null,
         allowContextOverflowRecovery: Boolean = true,
         persistOverflowHistory: Boolean = false,
+        streamFilterPhrases: List<String> = emptyList(),
+        requestLog: LocalSessionEventLog? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: modelToolSchemas()
+        val log = requestLog ?: eventLog
         val logMessages = redactModelImages(messages)
         val contextChars = logMessages.sumOf { it.toString().length }
         val toolNames = buildJsonArray {
@@ -5283,7 +5399,7 @@ class LocalHarnessEngine @Inject constructor(
                 function?.get("name")?.jsonPrimitive?.contentOrNull?.let { name -> add(JsonPrimitive(name)) }
             }
         }
-        eventLog.append("request/header", buildJsonObject {
+        log.append("request/header", buildJsonObject {
             put("model", snapshot.model)
             put("base_url", snapshot.baseUrl)
             put("step", step)
@@ -5293,7 +5409,7 @@ class LocalHarnessEngine @Inject constructor(
             put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
         })
-        eventLog.append("request/context", buildJsonObject {
+        log.append("request/context", buildJsonObject {
             put("step", step)
             put("model", snapshot.model)
             put("message_count", logMessages.size)
@@ -5310,12 +5426,14 @@ class LocalHarnessEngine @Inject constructor(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
-                        _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                        if (publishPreview) {
+                            _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                        }
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         if (!failureContextLogged) {
                             runCatching {
-                                eventLog.append("request/context-full", buildJsonObject {
+                                log.append("request/context-full", buildJsonObject {
                                     put("step", step)
                                     put("model", snapshot.model)
                                     put("messages", JsonArray(logMessages))
@@ -5324,14 +5442,14 @@ class LocalHarnessEngine @Inject constructor(
                             }
                             failureContextLogged = true
                         }
-                        eventLog.append("request/error", buildJsonObject {
+                        log.append("request/error", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
                         })
-                        eventLog.append("assistant/attempt", buildJsonObject {
+                        log.append("assistant/attempt", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "failed")
@@ -5341,7 +5459,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentRequestEvent.RetryScheduled -> {
-                        eventLog.append("llm/retry", buildJsonObject {
+                        log.append("llm/retry", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
                             put("next_attempt", event.nextAttempt)
@@ -5349,7 +5467,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentRequestEvent.AttemptCancelled -> {
-                        eventLog.append("assistant/attempt", buildJsonObject {
+                        log.append("assistant/attempt", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "cancelled")
@@ -5363,8 +5481,8 @@ class LocalHarnessEngine @Inject constructor(
         )
         return try {
             executor.execute {
-                // The request executor retries this block. A new buffer prevents text from a failed
-                // attempt being prepended to the next attempt's visible answer.
+                // A fresh filter and preview per attempt prevents failed-attempt text from leaking
+                // into the next visible retry.
                 val streamPreview = LocalStreamPreview(
                     maxChars = MAX_STREAM_PREVIEW_CHARS,
                     minIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
@@ -5375,6 +5493,9 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     },
                 )
+                val streamFilter = streamFilterPhrases
+                    .takeIf { it.isNotEmpty() }
+                    ?.let(::ChatStreamFilter)
                 resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
                     val reply = modelClient.completeStreaming(
                         apiKey = key,
@@ -5382,8 +5503,12 @@ class LocalHarnessEngine @Inject constructor(
                         model = snapshot.model,
                         messages = messages,
                         tools = tools,
-                        onDelta = { delta -> streamPreview.append(delta.content) },
+                        onDelta = { delta ->
+                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                            streamPreview.append(visible)
+                        },
                     )
+                    streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                     streamPreview.flush()
                     reply
                 }
@@ -5400,7 +5525,7 @@ class LocalHarnessEngine @Inject constructor(
             if (persistOverflowHistory) {
                 persistForegroundOverflowCompaction(snapshot, summaryMode)
             }
-            eventLog.append("request/context-overflow-recovery", buildJsonObject {
+            log.append("request/context-overflow-recovery", buildJsonObject {
                 put("step", step)
                 put("model", snapshot.model)
                 put("estimated_tokens_before", compacted.estimatedTokensBefore)
@@ -5417,6 +5542,8 @@ class LocalHarnessEngine @Inject constructor(
                 maxAttemptsOverride = maxAttemptsOverride,
                 allowContextOverflowRecovery = false,
                 persistOverflowHistory = false,
+                streamFilterPhrases = streamFilterPhrases,
+                requestLog = log,
             )
         }
     }
@@ -6212,6 +6339,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
         const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
+        const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
@@ -6240,6 +6368,8 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_PENDING_INPUTS = 16
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
+        const val MAX_CUSTOM_CHAT_FILTERS = 50
+        const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000

@@ -145,6 +145,13 @@ class SettingsViewModel @Inject constructor(
         localHarness.configureChatStyleGuard(enabled)
     }
 
+    fun addChatStyleGuardPhrase(phrase: String): Boolean =
+        localHarness.addChatStyleGuardPhrase(phrase)
+
+    fun removeChatStyleGuardPhrase(phrase: String) {
+        localHarness.removeChatStyleGuardPhrase(phrase)
+    }
+
     fun clearChatStyleGuardHits() {
         localHarness.clearChatStyleGuardHits()
     }

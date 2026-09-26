@@ -212,6 +212,7 @@ data class LocalHarnessState(
     val autoRecall: Boolean = true,
     val autoMemory: Boolean = true,
     val chatStyleGuardEnabled: Boolean = true,
+    val chatStyleGuardCustomPhrases: List<String> = emptyList(),
     val styleGuardHits: List<String> = emptyList(),
     val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
