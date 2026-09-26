@@ -1137,7 +1137,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
             if (_state.value.sessionId == snapshot.sessionId) {
-                rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+                refreshGroupModelSystemPrompt()
                 checkpointModelHistory("group/members-updated")
                 eventLog.append("group/members", buildJsonObject {
                     put("count", members.size)
@@ -1183,7 +1183,7 @@ class LocalHarnessEngine @Inject constructor(
                 groupActiveSpeakerName = null,
             )
         }
-        rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+        refreshGroupModelSystemPrompt()
         checkpointModelHistory("group/member-deleted")
         eventLog.append("group/members", buildJsonObject {
             put("action", "member-deleted")
@@ -3087,6 +3087,19 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         resetModelHistory(rebuilt)
+        updateContextMetrics()
+    }
+
+    private fun refreshGroupModelSystemPrompt() {
+        val system = buildJsonObject {
+            put("role", "system")
+            put("content", groupChatSystemPrompt())
+        }
+        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+            replaceSystemModelHistory(system)
+        } else {
+            prependModelHistory(system)
+        }
         updateContextMetrics()
     }
 
@@ -5274,6 +5287,13 @@ class LocalHarnessEngine @Inject constructor(
         eventLog = eventLogForAuthorized(sessionId),
     ).all()
 
+    private fun transcriptIndexForSession(session: LocalHarnessSession): LocalTranscriptRuntimeIndex =
+        if (session.transcriptIndex.totalMessageCount > 0L || session.messages.isEmpty()) {
+            session.transcriptIndex
+        } else {
+            buildLocalTranscriptRuntimeIndex(session.messages)
+        }
+
     private fun cancelChatPostTurn() {
         val job = synchronized(chatPostTurnLock) {
             val current = chatPostTurnJob
@@ -6449,6 +6469,8 @@ class LocalHarnessEngine @Inject constructor(
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
         const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
+        const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
+        const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
         const val MAX_CUSTOM_CHAT_FILTERS = 50
