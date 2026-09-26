@@ -1960,6 +1960,29 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
 
+        val earlyQuietDecision = evaluateChatProactivePolicy(
+            messages = emptyList(),
+            nowMillis = System.currentTimeMillis(),
+            quietHoursEnabled = quietHoursEnabled,
+            quietStartHour = quietStartHour,
+            quietEndHour = quietEndHour,
+        )
+        if (!earlyQuietDecision.shouldSend) {
+            val reason = earlyQuietDecision.reason ?: "当前处于免打扰时段"
+            eventLogFor(targetSessionId).append("chat/proactive-skipped", buildJsonObject {
+                put("reason", reason)
+                put("automation", true)
+                put("proactive", true)
+                put("persona_id", initialSession.personaId)
+            })
+            return LocalAutomationRunResult(
+                sessionId = targetSessionId,
+                output = reason,
+                delivered = false,
+                skipReason = reason,
+            )
+        }
+
         val automationJob = currentCoroutineContext()[Job]
         var ownsVisibleTurn = false
         if (_state.value.sessionId == targetSessionId) {
@@ -2014,9 +2037,6 @@ class LocalHarnessEngine @Inject constructor(
                 val proactiveDecision = evaluateChatProactivePolicy(
                     messages = recentTranscript,
                     nowMillis = System.currentTimeMillis(),
-                    quietHoursEnabled = quietHoursEnabled,
-                    quietStartHour = quietStartHour,
-                    quietEndHour = quietEndHour,
                 )
                 if (!proactiveDecision.shouldSend) {
                     val reason = proactiveDecision.reason ?: "当前不适合继续主动互动"
