@@ -177,7 +177,11 @@ class ChatInteractionPlanner @Inject constructor(
         return decoded.copy(
             state = applyInteractionIntent(
                 state = if (significance == "NONE") {
-                    agedPrevious
+                    applyExplicitTransientClears(
+                        value = decoded.state,
+                        previous = agedPrevious,
+                        rawState = rawState,
+                    )
                 } else {
                     sanitizeState(
                         value = decoded.state,
@@ -207,6 +211,57 @@ class ChatInteractionPlanner @Inject constructor(
                 .take(4)
                 .toList(),
             turnSignificance = significance,
+        )
+    }
+
+    private fun applyExplicitTransientClears(
+        value: ChatCharacterState,
+        previous: ChatCharacterState,
+        rawState: JsonObject?,
+    ): ChatCharacterState {
+        if (rawState == null) return previous
+
+        val ages = previous.transientAges.toMutableMap()
+        var changed = false
+
+        fun shouldClear(key: String, value: String): Boolean =
+            rawState.containsKey(key) && value.isBlank()
+
+        val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
+        val clearRecentImpression = shouldClear("recentImpression", value.recentImpression)
+        val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
+        val clearCurrentAgenda = shouldClear("currentAgenda", value.currentAgenda)
+        val clearInternalConflict = shouldClear("internalConflict", value.internalConflict)
+        val clearImmediateConcern = shouldClear("immediateConcern", value.immediateConcern)
+        val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
+
+        listOf(
+            "currentFocus" to clearCurrentFocus,
+            "recentImpression" to clearRecentImpression,
+            "activeGoal" to clearActiveGoal,
+            "currentAgenda" to clearCurrentAgenda,
+            "internalConflict" to clearInternalConflict,
+            "immediateConcern" to clearImmediateConcern,
+        ).forEach { (key, clear) ->
+            if (clear) {
+                ages.remove(key)
+                changed = true
+            }
+        }
+        if (clearThreads) changed = true
+        if (!changed) return previous
+
+        return previous.copy(
+            currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
+            recentImpression = if (clearRecentImpression) "" else previous.recentImpression,
+            activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
+            currentAgenda = if (clearCurrentAgenda) "" else previous.currentAgenda,
+            internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
+            immediateConcern = if (clearImmediateConcern) "" else previous.immediateConcern,
+            unresolvedThreads = if (clearThreads) emptyList() else previous.unresolvedThreads,
+            transientAges = ages,
+            unresolvedThreadAges = if (clearThreads) emptyMap() else previous.unresolvedThreadAges,
+            updatedAt = System.currentTimeMillis(),
         )
     }
 
