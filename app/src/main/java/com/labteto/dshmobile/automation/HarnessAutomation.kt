@@ -252,6 +252,54 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun list(): List<AutomationTask> = store.list()
 
+    fun pauseTask(id: String): Boolean {
+        val task = store.get(id) ?: return false
+        if (task.status == "paused") return true
+        workManager.cancelUniqueWork(workName(id))
+        store.update(id) { it.copy(status = "paused") }
+        return true
+    }
+
+    fun resumeTask(id: String): Boolean {
+        val task = store.get(id) ?: return false
+        if (task.status != "paused") return false
+
+        val now = System.currentTimeMillis()
+        val runAt = task.nextRunAt.coerceAtLeast(now)
+        store.update(id) {
+            it.copy(
+                status = "scheduled",
+                nextRunAt = runAt,
+                lastError = null,
+            )
+        }
+
+        val input = Data.Builder().putString(KEY_TASK_ID, id).build()
+        if (task.recurringMinutes == null) {
+            val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
+                .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+                .setInputData(input)
+                .addTag(WORK_TAG)
+                .build()
+            workManager.enqueueUniqueWork(workName(id), ExistingWorkPolicy.REPLACE, request)
+        } else {
+            val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
+                task.recurringMinutes,
+                TimeUnit.MINUTES,
+            )
+                .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+                .setInputData(input)
+                .addTag(WORK_TAG)
+                .build()
+            workManager.enqueueUniquePeriodicWork(
+                workName(id),
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request,
+            )
+        }
+        return true
+    }
+
     fun cancelTask(id: String): Boolean {
         workManager.cancelUniqueWork(workName(id))
         return store.remove(id)
@@ -290,6 +338,7 @@ class HarnessAutomationWorker(
         )
         val store = entry.automationStore()
         var task = store.get(id) ?: return Result.success()
+        if (task.status == "paused") return Result.success()
         val recovering = task.status == "running" && task.lastRunAt != null
         val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
         store.update(id) {
