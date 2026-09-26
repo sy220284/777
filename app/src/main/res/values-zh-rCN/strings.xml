@@ -86,6 +86,7 @@
     <string name="local_resource_summary">智能体 %1$d/%2$d · 终端 %3$d/%4$d · 虚拟屏 %5$d/%6$d · 语言服务 %7$d/%8$d</string>
     <string name="local_context_summary">上下文 %1$d / %2$d 字符</string>
     <string name="local_streaming_status">代理正在实时响应…</string>
+    <string name="local_chat_replying">正在回复…</string>
     <string name="local_device_approval_on">本轮设备操作已授权</string>
     <string name="local_approval_scope_show">查看授权范围</string>
     <string name="local_approval_scope_hide">收起授权范围</string>
@@ -884,11 +885,21 @@
 
 
     <string name="settings_page_chat">聊天</string>
-    <string name="settings_chat_style_guard">通用套话门禁</string>
-    <string name="settings_chat_style_guard_hint">拦截常见客服腔和机械套话。关闭后人物自己设置的禁用表达仍然生效。</string>
-    <string name="settings_chat_guard_hits_title">最近命中的表达</string>
-    <string name="settings_chat_guard_hits_empty">最近没有命中门禁规则。</string>
-    <string name="settings_chat_guard_hits_clear">清空命中记录</string>
+    <string name="settings_chat_subtitle">流式过滤、过滤词与命中记录</string>
+    <string name="settings_chat_style_guard">聊天流式安全过滤</string>
+    <string name="settings_chat_style_guard_hint">开启后，在流式显示前拦截内置、自定义和当前角色的禁用表达；关闭后不做本地输出审查，模型内容直接流式显示。</string>
+    <string name="settings_chat_filter_disabled_notice">当前已关闭本地输出审查：模型内容会直接流式显示。角色卡中的用语约束仍会作为提示词提供给模型，但不会在输出后过滤或重写。</string>
+    <string name="settings_chat_builtin_filters_title">内置过滤词（%1$d）</string>
+    <string name="settings_chat_custom_filters_title">自定义过滤词（%1$d）</string>
+    <string name="settings_chat_custom_filter_hint">输入要追加过滤的词或短语</string>
+    <string name="settings_chat_custom_filter_add">添加</string>
+    <string name="settings_chat_custom_filter_remove">移除</string>
+    <string name="settings_chat_filter_limits">最多 %1$d 条，每条不超过 %2$d 个字符。</string>
+    <string name="settings_chat_persona_filters_title">当前角色禁用表达（%1$d）</string>
+    <string name="settings_chat_persona_filters_empty">当前角色没有额外禁用表达。</string>
+    <string name="settings_chat_guard_hits_title">最近实际过滤</string>
+    <string name="settings_chat_guard_hits_empty">最近没有过滤到内容。</string>
+    <string name="settings_chat_guard_hits_clear">清空过滤记录</string>
     <string name="local_mode_intro_chat">聊天模式：用于日常聊天、角色扮演和连续关系记忆；会启用人设与聊天风格门禁。</string>
     <string name="local_mode_intro_work">工作模式：用于任务执行、文件、命令、工具和子代理；完整执行链只在这里展开。</string>
     <string name="local_persona_correction_recorded">已记入人设纠正</string>

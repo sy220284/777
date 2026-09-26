@@ -56,4 +56,32 @@ class ChatStyleGuardTest {
         assertTrue(ChatStyleGuard.violations(text).isEmpty())
         assertEquals(text, ChatStyleGuard.scrub(text))
     }
+    @Test fun masterSwitchCanDisableEveryOutputFilter() {
+        val phrases = ChatStyleGuard.activePhrases(
+            customPhrases = listOf("自定义词"),
+            personaPhrases = listOf("角色禁用词"),
+            enabled = false,
+        )
+        assertTrue(phrases.isEmpty())
+    }
+
+    @Test fun activePhraseSetCombinesBuiltInCustomAndPersonaTerms() {
+        val phrases = ChatStyleGuard.activePhrases(
+            customPhrases = listOf("自定义词"),
+            personaPhrases = listOf("角色禁用词"),
+            enabled = true,
+        )
+        assertTrue("我理解你的感受" in phrases)
+        assertTrue("自定义词" in phrases)
+        assertTrue("角色禁用词" in phrases)
+    }
+
+    @Test fun literalFilterMatchesStreamingSemantics() {
+        val filtered = ChatStyleGuard.filterLiteral(
+            "开头我理解你的感受中间自定义词结尾",
+            listOf("我理解你的感受", "自定义词"),
+        )
+        assertEquals("开头中间结尾", filtered)
+    }
+
 }

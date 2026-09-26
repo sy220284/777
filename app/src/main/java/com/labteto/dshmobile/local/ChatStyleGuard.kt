@@ -4,10 +4,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Hard output gate for chat mode.
+ * User-configurable output filter for chat mode.
  *
- * Prompt instructions shape the answer; this guard enforces the exact high-risk phrases that
- * should never reach the transcript. A failed rewrite still gets a deterministic final scrub.
+ * The master switch lives in settings. When it is off, callers should bypass this gate completely
+ * and expose the model stream as-is. When it is on, the same literal phrase set is used by the
+ * streaming gate and the final durable reply so the user never sees one answer and stores another.
  */
 internal object ChatStyleGuard {
     val bannedPhrases: List<String> = listOf(
@@ -28,6 +29,20 @@ internal object ChatStyleGuard {
         "让我们一起",
     )
 
+    fun activePhrases(
+        customPhrases: List<String> = emptyList(),
+        personaPhrases: List<String> = emptyList(),
+        enabled: Boolean = true,
+    ): List<String> {
+        if (!enabled) return emptyList()
+        return (bannedPhrases + customPhrases + personaPhrases)
+            .asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .toList()
+    }
+
     fun violations(
         text: String,
         extraBannedPhrases: List<String> = emptyList(),
@@ -41,6 +56,31 @@ internal object ChatStyleGuard {
             .filter { phrase -> phrase in text }
             .toList()
 
+    fun violations(text: String, phrases: Collection<String>): List<String> =
+        phrases.asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .filter { phrase -> phrase in text }
+            .toList()
+
+    /**
+     * Literal filtering used by the streaming path and final persisted answer.
+     *
+     * This intentionally does not ask the model for a second rewrite. It removes only configured
+     * phrases and keeps all other generated text intact.
+     */
+    fun filterLiteral(text: String, phrases: Collection<String>): String {
+        var result = text
+        phrases.asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sortedByDescending(String::length)
+            .forEach { phrase -> result = result.replace(phrase, "") }
+        return result.ifBlank { "……" }
+    }
+
     fun repairPrompt(candidate: String, violations: List<String>): String = buildString {
         appendLine("上一版聊天回复命中了禁止使用的 AI / 客服套话，请重新写一版。")
         appendLine("必须保留原本想表达的意思和当前情绪，但改成自然即时聊天，不要解释你在改写。")
@@ -49,6 +89,10 @@ internal object ChatStyleGuard {
         append(candidate.take(MAX_CANDIDATE_CHARS))
     }
 
+    /**
+     * Legacy deterministic scrub kept for compatibility with older callers and tests.
+     * New real-time chat uses [filterLiteral] so streamed and durable text stay identical.
+     */
     fun scrub(
         text: String,
         extraBannedPhrases: List<String> = emptyList(),
