@@ -11,6 +11,7 @@ data class LocalTranscriptRuntimeIndex(
     val firstUserTitle: String? = null,
     val latestCreatedAt: Long = 0L,
     val latestDialogueMessageId: String? = null,
+    val latestUserMessageId: String? = null,
     val hasDialogue: Boolean = false,
 )
 
@@ -20,6 +21,7 @@ internal fun buildLocalTranscriptRuntimeIndex(
     var firstUserTitle: String? = null
     var latestCreatedAt = 0L
     var latestDialogueMessageId: String? = null
+    var latestUserMessageId: String? = null
     var hasDialogue = false
 
     messages.forEach { message ->
@@ -27,6 +29,12 @@ internal fun buildLocalTranscriptRuntimeIndex(
             firstUserTitle = message.content.lineSequence().firstOrNull()?.take(40)
         }
         if (message.createdAt > latestCreatedAt) latestCreatedAt = message.createdAt
+        if (message.role == "user") {
+            latestUserMessageId = message.id
+        }
+        if (message.role == "user") {
+            latestUserMessageId = message.id
+        }
         if (message.role == "user" || message.role == "assistant") {
             hasDialogue = true
             latestDialogueMessageId = message.id
@@ -37,6 +45,7 @@ internal fun buildLocalTranscriptRuntimeIndex(
         firstUserTitle = firstUserTitle,
         latestCreatedAt = latestCreatedAt,
         latestDialogueMessageId = latestDialogueMessageId,
+        latestUserMessageId = latestUserMessageId,
         hasDialogue = hasDialogue,
     )
 }
@@ -49,6 +58,7 @@ internal fun appendLocalTranscriptRuntimeIndex(
     var firstUserTitle = current.firstUserTitle
     var latestCreatedAt = current.latestCreatedAt
     var latestDialogueMessageId = current.latestDialogueMessageId
+    var latestUserMessageId = current.latestUserMessageId
     var hasDialogue = current.hasDialogue
 
     messages.forEach { message ->
@@ -56,6 +66,9 @@ internal fun appendLocalTranscriptRuntimeIndex(
             firstUserTitle = message.content.lineSequence().firstOrNull()?.take(40)
         }
         if (message.createdAt > latestCreatedAt) latestCreatedAt = message.createdAt
+        if (message.role == "user") {
+            latestUserMessageId = message.id
+        }
         if (message.role == "user" || message.role == "assistant") {
             hasDialogue = true
             latestDialogueMessageId = message.id
@@ -66,6 +79,7 @@ internal fun appendLocalTranscriptRuntimeIndex(
         firstUserTitle = firstUserTitle,
         latestCreatedAt = latestCreatedAt,
         latestDialogueMessageId = latestDialogueMessageId,
+        latestUserMessageId = latestUserMessageId,
         hasDialogue = hasDialogue,
     )
 }
