@@ -153,6 +153,7 @@ internal class LocalAgentRunCoordinator(
                 LocalAgentRunCheckpointStatus.RUNNING,
                 LocalAgentRunPhase.ASSISTANT_OBSERVED,
                 step = event.step,
+                toolCallCount = event.toolCalls.size,
             )
             is AgentEvent.ToolStarted -> append(
                 context,
@@ -170,12 +171,10 @@ internal class LocalAgentRunCoordinator(
                 callId = event.call.id,
                 toolName = event.call.name,
             )
-            is AgentEvent.StepFinished -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.STEP_FINISHED,
-                step = event.step,
-            )
+            // ToolFinished already captures the durable continuation point for tool-using steps.
+            // Keeping a generic StepFinished checkpoint would erase whether an AssistantObserved
+            // event was a final no-tool answer and could cause duplicate replies after restart.
+            is AgentEvent.StepFinished -> Unit
             is AgentEvent.TurnCompleted -> append(
                 context,
                 LocalAgentRunCheckpointStatus.COMPLETED,
@@ -214,6 +213,16 @@ internal class LocalAgentRunCoordinator(
         val status = data["status"]?.jsonPrimitive?.contentOrNull ?: return null
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
+        val phase = data["phase"]?.jsonPrimitive?.contentOrNull
+        val toolCallCount = data["tool_call_count"]?.jsonPrimitive?.intOrNull
+        if (
+            phase == LocalAgentRunPhase.ASSISTANT_OBSERVED.name.lowercase() &&
+            toolCallCount == 0
+        ) {
+            // The user-visible final answer is already durable. SessionRecovery only needs to close
+            // the interrupted bookkeeping tail; replaying the model would duplicate the answer.
+            return null
+        }
 
         // A process may die after turn/end is durable but before the terminal run checkpoint is
         // appended. In that narrow window the stale RUNNING checkpoint must never replay a turn
@@ -270,6 +279,7 @@ internal class LocalAgentRunCoordinator(
         callId: String? = null,
         toolName: String? = null,
         reason: String? = null,
+        toolCallCount: Int? = null,
     ) {
         eventLogFor(context.sessionId).append(
             eventType(context.kind),
@@ -305,6 +315,7 @@ internal class LocalAgentRunCoordinator(
                 step?.let { put("step", it) }
                 callId?.let { put("call_id", it) }
                 toolName?.let { put("tool_name", it) }
+                toolCallCount?.let { put("tool_call_count", it) }
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
