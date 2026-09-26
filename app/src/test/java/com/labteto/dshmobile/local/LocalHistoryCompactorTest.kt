@@ -130,7 +130,7 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
-    fun overflowCompactionPreservesAllSystemMessagesAndShrinksRequest() {
+    fun overflowCompactionPreservesHeadAndTailSystemOrderingAndShrinksRequest() {
         val history = listOf(
             message("system", "固定系统规则"),
             message("system", "当前角色设定"),
@@ -145,16 +145,46 @@ class LocalHistoryCompactorTest {
             .compactForOverflow(history, LocalHistorySummaryMode.CHAT)
             ?: error("expected overflow compaction")
 
-        val systems = compaction.messages
-            .filter { it["role"].toString().trim('"') == "system" }
-            .map { it["content"].toString() }
-        assertTrue(systems.any { it.contains("固定系统规则") })
-        assertTrue(systems.any { it.contains("当前角色设定") })
-        assertTrue(systems.any { it.contains("当前关系状态") })
-        assertEquals("user", compaction.messages.first { 
+        assertTrue(compaction.messages[0]["content"].toString().contains("固定系统规则"))
+        assertTrue(compaction.messages[1]["content"].toString().contains("当前角色设定"))
+
+        val summaryIndex = compaction.messages.indexOfFirst {
             it["content"].toString().contains("<compacted-summary>")
-        }["role"].toString().trim('"'))
+        }
+        val relationIndex = compaction.messages.indexOfFirst {
+            it["content"].toString().contains("当前关系状态")
+        }
+        val currentUserIndex = compaction.messages.indexOfFirst {
+            it["content"].toString().contains("现在继续聊")
+        }
+        assertTrue(summaryIndex >= 2)
+        assertTrue(relationIndex > summaryIndex)
+        assertTrue(currentUserIndex > relationIndex)
+        assertEquals("user", compaction.messages[summaryIndex]["role"].toString().trim('"'))
         assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
+    }
+
+    @Test
+    fun overflowCompactionCanBeAppliedBackToDurableHistory() {
+        val history = mutableListOf(
+            message("system", "系统"),
+            message("user", "旧请求" + "旧".repeat(5_000)),
+            message("assistant", "旧答复" + "旧".repeat(5_000)),
+            message("user", "新请求" + "新".repeat(600)),
+            message("assistant", "新答复" + "新".repeat(600)),
+        )
+        val before = history.sumOf { estimateModelTokens(it.toString()) }
+
+        val compaction = applyOverflowCompaction(
+            history = history,
+            compactor = LocalHistoryCompactor(),
+            summaryMode = LocalHistorySummaryMode.WORK,
+        ) ?: error("expected durable overflow compaction")
+
+        val after = history.sumOf { estimateModelTokens(it.toString()) }
+        assertEquals(compaction.messages, history)
+        assertTrue(history.any { it["content"].toString().contains("<compacted-summary>") })
+        assertTrue(after < before)
     }
 
     @Test
