@@ -86,6 +86,17 @@ if "parse(synthetic.toString())" in deepseek:
 if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TOKENS" in context_budget:
     violations.append("Context/tool-result budgets must be shared across Chat and Work product surfaces")
 
+for forbidden_mode_gate in (
+    "LocalAgentRunPolicy",
+    "toolsEnabled = false",
+    "allowToolExecution = false",
+    "CHAT_MODE_TOOLS",
+):
+    if forbidden_mode_gate in engine:
+        violations.append(
+            f"Shared Agent runtime must not gate core capabilities by Chat/Work mode: {forbidden_mode_gate}"
+        )
+
 if 'eventLog.append("user/queue"' in engine:
     violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
 if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
