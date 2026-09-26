@@ -46,6 +46,7 @@ internal class SessionRemoteStreamCoordinator(
     private var controlJob: Job? = null
     private var workspaceJob: Job? = null
     private var followJob: Job? = null
+    private var childFollowJob: Job? = null
 
     fun restartHostStreams() {
         controlJob?.cancel()
@@ -76,40 +77,82 @@ internal class SessionRemoteStreamCoordinator(
             "session/follow",
             sessionFollowStreamArgs(sessionId, maxMessages),
         ) ?: return false
-        followJob = scope.launch {
-            try {
-                flow.collect { item ->
-                    val frame = decodeOrNull(SessionFollowFrameSerializer, item)
-                    if (frame == null) {
-                        onFailure(
-                            SessionRemoteStreamFailure(
-                                endpoint = "session/follow",
-                                sessionId = sessionId,
-                                undecodable = true,
-                            ),
-                        )
-                    } else {
-                        onFollowFrame(sessionId, frame)
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Throwable) {
-                onFailure(
-                    SessionRemoteStreamFailure(
-                        endpoint = "session/follow",
-                        sessionId = sessionId,
-                        error = error,
-                    ),
-                )
-            }
-        }
+        followJob = collectFollow(
+            sessionId = sessionId,
+            flow = flow,
+            onFrame = { frame -> onFollowFrame(sessionId, frame) },
+        )
         return true
     }
 
     fun cancelSessionFollow() {
         followJob?.cancel()
         followJob = null
+    }
+
+    fun followSubagent(
+        parentSessionId: String,
+        childSessionId: String,
+        mode: String,
+        maxMessages: Int,
+        onFrame: (SessionFollowFrame) -> Unit,
+    ): Boolean {
+        childFollowJob?.cancel()
+        val flow = streamProvider(
+            "session/follow",
+            sessionFollowStreamArgs(
+                address = SessionAddress.Subagent(
+                    parentSessionId = parentSessionId,
+                    childSessionId = childSessionId,
+                    mode = mode,
+                ),
+                maxMessages = maxMessages,
+            ),
+        ) ?: return false
+        childFollowJob = collectFollow(
+            sessionId = childSessionId,
+            flow = flow,
+            onFrame = onFrame,
+        )
+        return true
+    }
+
+    fun cancelSubagentFollow() {
+        childFollowJob?.cancel()
+        childFollowJob = null
+    }
+
+    private fun collectFollow(
+        sessionId: String,
+        flow: Flow<JsonElement>,
+        onFrame: (SessionFollowFrame) -> Unit,
+    ): Job = scope.launch {
+        try {
+            flow.collect { item ->
+                val frame = decodeOrNull(SessionFollowFrameSerializer, item)
+                if (frame == null) {
+                    onFailure(
+                        SessionRemoteStreamFailure(
+                            endpoint = "session/follow",
+                            sessionId = sessionId,
+                            undecodable = true,
+                        ),
+                    )
+                } else {
+                    onFrame(frame)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            onFailure(
+                SessionRemoteStreamFailure(
+                    endpoint = "session/follow",
+                    sessionId = sessionId,
+                    error = error,
+                ),
+            )
+        }
     }
 
     private fun <T> collectDecoded(
@@ -136,13 +179,21 @@ internal class SessionRemoteStreamCoordinator(
 internal fun sessionFollowStreamArgs(
     sessionId: String,
     maxMessages: Int,
+): JsonObject = sessionFollowStreamArgs(
+    address = SessionAddress.Session(sessionId = sessionId),
+    maxMessages = maxMessages,
+)
+
+internal fun sessionFollowStreamArgs(
+    address: SessionAddress,
+    maxMessages: Int,
 ): JsonObject = buildJsonObject {
     put(
         "request",
         encodeToJsonElement(
             SessionFollowRequest.serializer(),
             SessionFollowRequest(
-                address = SessionAddress.Session(sessionId = sessionId),
+                address = address,
                 maxMessages = maxMessages,
                 assistantStream = true,
             ),
