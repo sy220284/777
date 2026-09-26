@@ -57,8 +57,8 @@ private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
         .map(::normalizeChatContinuityText)
         .filter(String::isNotBlank)
         .distinct()
-        .takeLast(8)
         .toList()
+        .takeLast(8)
     if (userEvents.isEmpty()) return null
 
     val summary = buildString {
