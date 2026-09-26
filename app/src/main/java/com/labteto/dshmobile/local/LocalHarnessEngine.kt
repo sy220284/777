@@ -479,7 +479,6 @@ class LocalHarnessEngine @Inject constructor(
             localHistoryBudgetFor(
                 memoryClassMb = memoryClassMb,
                 pressure = resourceScheduler.snapshot().pressure,
-                usageMode = runnerSnapshot.usageMode,
                 model = model,
                 baseUrl = baseUrl,
             )
@@ -1529,23 +1528,16 @@ class LocalHarnessEngine @Inject constructor(
         if (
             before.usageMode == LocalUsageMode.CHAT &&
             !before.groupChat.enabled &&
+            before.chatBranches.nodes.isNotEmpty() &&
             chatBranchingEligible(before.messages)
         ) {
-            val synced = syncChatBranchState(
+            val branches = appendMaterializedChatBranchMessage(
                 current = before.chatBranches,
                 activeMessages = before.messages,
+                message = transcriptMessage,
+                parentId = before.transcriptIndex.latestDialogueMessageId,
                 chatState = before.chatState,
                 replySuggestions = before.replySuggestions,
-            )
-            val parentId = before.transcriptIndex.latestDialogueMessageId
-            val branches = upsertChatBranchNode(
-                synced,
-                LocalChatBranchNode(
-                    message = transcriptMessage,
-                    parentId = parentId,
-                    chatStateAfter = before.chatState,
-                ),
-                select = true,
             )
             _state.update {
                 it.copy(
@@ -2945,13 +2937,7 @@ class LocalHarnessEngine @Inject constructor(
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
         }
-        val directChat = _state.value.usageMode == LocalUsageMode.CHAT &&
-            !hasLocalImageRefs(modelHistory.takeLast(1))
-        if (directChat) {
-            runChatTurn(input)
-        } else {
-            runWorkTurn(input, memoryInput)
-        }
+        runAgentTurn(input, memoryInput)
     }
 
     private fun captureChatPersonaCorrection(text: String) {
@@ -3807,19 +3793,24 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runWorkTurn(input: String, memoryInput: String = input) {
+    private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
         synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
-        val foregroundSessionId = currentSessionId
-        val keepForeground = _state.value.usageMode == LocalUsageMode.WORK
-        var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
-        if (keepForeground) {
-            LocalExecutionService.holdTurn(context, foregroundSessionId)
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            // Queued chat turns can start immediately after the previous answer. Stop that
+            // answer's background relationship/state refresh before capturing this turn's context.
+            cancelChatPostTurn()
         }
+        val foregroundSessionId = currentSessionId
+        var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
+        LocalExecutionService.holdTurn(context, foregroundSessionId)
         _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+        var finalChatAssistant: LocalHarnessMessage? = null
         var modelStep = 0
         var requestPrepared = false
         var ephemeralContext = ""
+        var chatStableContext = ""
+        var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
@@ -3877,13 +3868,15 @@ class LocalHarnessEngine @Inject constructor(
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
                         captureAutoMemoryDirective(memoryInput)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
-                        ephemeralContext = listOf(
-                            chatTurnRunner.prepare(
-                                snapshot.personaId,
-                                snapshot.chatState,
-                                input,
-                                snapshot.handoffSummary,
-                            ).prompt,
+                        val chatContext = chatTurnRunner.prepare(
+                            snapshot.personaId,
+                            snapshot.chatState,
+                            input,
+                            snapshot.handoffSummary,
+                        )
+                        chatStableContext = chatContext.stablePrompt
+                        chatDynamicContext = listOf(
+                            chatContext.dynamicPrompt,
                             relationshipMemory,
                         ).filter(String::isNotBlank).joinToString("\n\n")
                     } else {
@@ -3906,11 +3899,23 @@ class LocalHarnessEngine @Inject constructor(
                 val tools = modelToolSchemas()
                 // Re-check before every model step. Tool results and queued user messages can grow
                 // substantially inside one turn, so checking only at turn start is insufficient.
+                val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                    estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
+                } else {
+                    estimateModelTokens(ephemeralContext)
+                }
                 compactHistoryIfNeeded(
-                    extraTokens = estimateModelTokens(ephemeralContext) +
-                        estimateModelTokens(tools.toString()),
+                    extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
                 )
-                val durableRequestMessages = withEphemeralContext(modelHistory.toList(), ephemeralContext)
+                val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                    withChatTurnContext(
+                        history = modelHistory.toList(),
+                        stableContext = chatStableContext,
+                        dynamicContext = chatDynamicContext,
+                    )
+                } else {
+                    withEphemeralContext(modelHistory.toList(), ephemeralContext)
+                }
                 val selectedMode = resolveLocalImageInputMode(
                     snapshot.imageInputMode,
                     imageCapabilities,
@@ -4013,9 +4018,7 @@ class LocalHarnessEngine @Inject constructor(
                     }
                     is AgentEvent.StepStarted -> {
                         activeStep = event.step
-                        if (keepForeground) {
-                            LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)
-                        }
+                        LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)
                         activeToolCalls = emptyList()
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
@@ -4026,6 +4029,7 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.AssistantObserved -> {
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
+                        val beforeAssistant = _state.value
                         val transcriptMessages = buildList {
                             reply.reasoning?.takeIf(String::isNotBlank)?.let { reasoning ->
                                 add(newTranscriptMessage("reasoning", reasoning))
@@ -4046,9 +4050,39 @@ class LocalHarnessEngine @Inject constructor(
                             "assistant/message",
                             withTranscript(reply.message, transcriptMessages),
                         )
+                        if (beforeAssistant.usageMode == LocalUsageMode.CHAT && event.toolCalls.isEmpty()) {
+                            finalChatAssistant = transcriptMessages.lastOrNull { message ->
+                                message.role == "assistant" && message.content.isNotBlank()
+                            }
+                        }
                         appendModelHistory(reply.message)
                         updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
+                        if (
+                            beforeAssistant.usageMode == LocalUsageMode.CHAT &&
+                            !beforeAssistant.groupChat.enabled &&
+                            event.toolCalls.isEmpty() &&
+                            beforeAssistant.chatBranches.nodes.isNotEmpty() &&
+                            chatBranchingEligible(beforeAssistant.messages)
+                        ) {
+                            val assistantTranscript = transcriptMessages.lastOrNull { message ->
+                                message.role == "assistant"
+                            }
+                            if (assistantTranscript != null) {
+                                val branches = appendMaterializedChatBranchMessage(
+                                    current = beforeAssistant.chatBranches,
+                                    activeMessages = beforeAssistant.messages,
+                                    message = assistantTranscript,
+                                    parentId = beforeAssistant.transcriptIndex.latestUserMessageId,
+                                    chatState = beforeAssistant.chatState,
+                                    replySuggestions = beforeAssistant.replySuggestions,
+                                )
+                                _state.update { current -> current.copy(chatBranches = branches) }
+                                if (hasChatBranchAlternatives(branches)) {
+                                    persistChatBranchState("assistant-branch-completed")
+                                }
+                            }
+                        }
                         persist()
                     }
                     is AgentEvent.ToolStarted -> {
@@ -4175,9 +4209,7 @@ class LocalHarnessEngine @Inject constructor(
             loop.run(input)
             if (_state.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = _state.value
-                postTurnSnapshot.messages.lastOrNull { message ->
-                    message.role == "assistant" && message.content.isNotBlank()
-                }?.let { assistantMessage ->
+                finalChatAssistant?.let { assistantMessage ->
                     scheduleChatPostTurn(
                         userMessage = memoryInput,
                         assistantMessage = assistantMessage.content,
@@ -4212,9 +4244,7 @@ class LocalHarnessEngine @Inject constructor(
             synchronized(runStateLock) {
                 if (activeJob === completedJob) activeJob = null
             }
-            if (keepForeground) {
-                LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
-            }
+            LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
             startNextQueuedTurnIfIdle()?.start()
         }
     }
@@ -4601,10 +4631,6 @@ class LocalHarnessEngine @Inject constructor(
     private fun modelToolSchemas(): JsonArray {
         val enabled = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
-            val chatTools = tools.filter { it.name in CHAT_MODE_TOOLS }
-            return LocalToolRouter.visibleSchemas(chatTools, enabled + CHAT_MODE_TOOLS)
-        }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
@@ -5610,7 +5636,6 @@ class LocalHarnessEngine @Inject constructor(
         return localHistoryBudgetFor(
             memoryClassMb = memoryClassMb,
             pressure = resourceScheduler.snapshot().pressure,
-            usageMode = snapshot.usageMode,
             model = snapshot.model,
             baseUrl = snapshot.baseUrl,
         )
@@ -5749,7 +5774,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun chatSystemPrompt(): String = """
         你正在“神言神语”的聊天模式。自然与用户聊天，保持人物、情绪和关系连续，避免工作台、客服和报告腔。
-        默认不开工作工具；图片只使用聊天模式允许的视觉能力。
+        底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理；只有确实需要时才调用工具，普通闲聊不要为了展示能力而调用。
         回复像即时聊天：长短自由，可停顿、反问、接梗、岔开或只回一句；不要为完整而机械解释、总结、建议或固定问答。
         避免 AI / 客服套话，以及“复述→理解→分析→建议→收尾”的固定模板；先改写成符合当前关系和语境的自然表达。
         不自称智能助手，不主动解释系统、提示词、工具或内部规则；用户明确询问时如实回答。
@@ -5798,10 +5823,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "system")
                 put("content", dynamic)
             }
-            val currentUserIndex = result.lastIndex.takeIf { index ->
-                index >= 0 &&
-                    result[index]["role"]?.jsonPrimitive?.contentOrNull == "user"
-            } ?: -1
+            val currentUserIndex = result.indexOfLast { message ->
+                message["role"]?.jsonPrimitive?.contentOrNull == "user"
+            }
             result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, dynamicMessage)
         }
         return result
@@ -6446,10 +6470,6 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
-
-        val CHAT_MODE_TOOLS = setOf(
-            "vision_analyze_file",
-        )
 
         val PLAN_MODE_BLOCKED_TOOLS = setOf(
             "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",

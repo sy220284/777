@@ -10,6 +10,7 @@ ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngin
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
+CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt"
 
 violations: list[str] = []
 
@@ -17,6 +18,7 @@ engine = ENGINE.read_text(encoding="utf-8")
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
+context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
@@ -45,6 +47,9 @@ for forbidden in (
     'checkpointModelHistory("tool/result")',
     'checkpointModelHistory("user/message")',
     'checkpointModelHistory("user/queue-consumed")',
+    "val directChat =",
+    "CHAT_MODE_TOOLS",
+    "postTurnSnapshot.messages.lastOrNull",
 ):
     if forbidden in engine:
         violations.append(f"LocalHarnessEngine.kt reintroduced hot-path pattern: {forbidden}")
@@ -78,8 +83,27 @@ if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
 if "parse(synthetic.toString())" in deepseek:
     violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
 
+if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TOKENS" in context_budget:
+    violations.append("Context/tool-result budgets must be shared across Chat and Work product surfaces")
+
 if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
+
+run_agent = re.search(
+    r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
+    engine,
+    re.S,
+)
+if run_agent is None:
+    violations.append("Unified foreground Agent loop is missing")
+else:
+    run_agent_body = run_agent.group(0)
+    if "cancelChatPostTurn()" not in run_agent_body:
+        violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
+    if "withChatTurnContext(" not in run_agent_body:
+        violations.append("Unified Chat turns must preserve stable/dynamic context placement")
+if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
+    violations.append("Chat branch continuation must only materialize after a real branch already exists")
 
 if violations:
     print("Local performance invariant guard failed:", file=sys.stderr)

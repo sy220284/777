@@ -22,6 +22,7 @@
 - 长对话压缩已拆为独立的 `LocalHistoryCompactor`：字符预算保护 Android 资源，官方 DeepSeek 路由额外按模型窗口估算 token 压力；主 Agent 每个模型 step 都会重新检查，较早历史生成有界提取式摘要。提供方明确返回上下文超限时，会保留 system 指令、强制缩短较早历史并仅重试一次；普通请求错误不进入该恢复路径。
 - 工具结果使用 Unicode/UTF-8 安全头尾保留；超限完整结果可进入 Session 私有 spill，并通过 `tool_output_read` 分页恢复，不再以“节省上下文”为代价永久丢失可恢复内容。
 - 普通、持久和自动化子 Agent 的可选工具启用集合已经按单次 Agent Run 隔离；子 Agent 的能力发现不会修改父回合工具视图。
+- Chat / Work 只保留产品层提示、人格与后处理差异；正常前台请求共用同一 `AgentLoop`、工具目录、权限链、上下文预算与 Android 前台执行保活。底层 capability 不再按产品模式裁剪。
 - 自动化任务保存 30 天 / 200 条轻量运行回执，完整结果继续复用原工作会话，避免重复持久化。
 - 核心单测、官方差分门禁、Android 安装包构建与模拟器运行由 CI 负责验证。
 
@@ -30,7 +31,7 @@
 - `SessionEventLog` 已承担主要会话事实源职责：Plan / Todo / Goal / 规划模式、模型历史和用户可见 transcript 均可从事件检查点/语义尾重建；会话 JSON 主要保留物化快照、索引元数据和旧版本兼容字段。
 - `AgentLoop` 已拥有 turn / step 调度权；Android 层 `modelHistory` 仍负责组装当前请求，但已降级为可从 Session 事件检查点和语义尾部重建的运行时投影，不再作为会话 JSON 中的第二份持久权威状态。
 - 内置工具已经通过核心 `ToolRegistry` 注册，但 `LocalHarnessEngine` 仍承担较大的 Android 内置工具分派、上下文组装和会话桥接职责。
-- 主前台 Agent 的可选工具集合仍由 `LocalHarnessEngine` 持有，但严格在每个前台回合开始清空；子 Agent 与后台自动化已使用独立 Agent Run 集合。后续统一 `AgentRunContext` 时再把主回合集合一并下沉，当前不存在父子共享集合。
+- 主前台 Agent 的可选工具集合仍由 `LocalHarnessEngine` 持有，但严格在每个前台回合开始清空；Chat / Work 已共用同一工具视图生成逻辑，子 Agent 与后台自动化也使用独立 Agent Run 集合。后续统一 `AgentRunContext` 时再把主回合集合一并下沉，当前不存在父子共享集合。
 - 工具执行失败在部分 Android 适配链路中仍主要以文本返回给模型；后续应保留结构化错误、错误码和可重试信息。
 - 历史压缩已从简单截尾升级为有界提取式摘要，但尚未形成显式的“目标 / 约束 / 关键决定 / 失败尝试 / 未完成事项”结构化检查点。
 - 后台 Job 控制器已核心化，但正在运行的进程/代理本身仍受 Android 进程生命周期限制，尚不能在进程被杀后透明续跑。

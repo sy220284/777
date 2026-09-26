@@ -134,6 +134,32 @@ internal fun restoreMaterializedChatBranchState(
         syncChatBranchState(current, activeMessages, chatState, replySuggestions)
     }
 
+internal fun appendMaterializedChatBranchMessage(
+    current: LocalChatBranchState,
+    activeMessages: List<LocalHarnessMessage>,
+    message: LocalHarnessMessage,
+    parentId: String?,
+    chatState: ChatCharacterState,
+    replySuggestions: List<ChatReplySuggestion> = emptyList(),
+): LocalChatBranchState {
+    if (current.nodes.isEmpty()) return current
+    val synced = syncChatBranchState(
+        current = current,
+        activeMessages = activeMessages,
+        chatState = chatState,
+        replySuggestions = replySuggestions,
+    )
+    return upsertChatBranchNode(
+        state = synced,
+        node = LocalChatBranchNode(
+            message = message,
+            parentId = parentId,
+            chatStateAfter = chatState,
+        ),
+        select = true,
+    )
+}
+
 internal fun upsertChatBranchNode(
     state: LocalChatBranchState,
     node: LocalChatBranchNode,

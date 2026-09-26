@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalContextBudgetTest {
@@ -12,7 +12,6 @@ class LocalContextBudgetTest {
         val budget = localHistoryBudgetFor(
             memoryClassMb = 512,
             pressure = HarnessResourcePressure.LOW,
-            usageMode = LocalUsageMode.WORK,
             model = "deepseek-flash",
             baseUrl = "https://api.deepseek.com",
         )
@@ -27,7 +26,6 @@ class LocalContextBudgetTest {
         val budget = localHistoryBudgetFor(
             memoryClassMb = 512,
             pressure = HarnessResourcePressure.LOW,
-            usageMode = LocalUsageMode.WORK,
             model = "deepseek-flash",
             baseUrl = "https://api.example.com/v1",
         )
@@ -38,22 +36,14 @@ class LocalContextBudgetTest {
     }
 
     @Test
-    fun chatKeepsSmallerToolResultBudgetThanWork() {
-        val work = localHistoryBudgetFor(
-            512,
-            HarnessResourcePressure.LOW,
-            LocalUsageMode.WORK,
-            "deepseek-flash",
-            "https://api.deepseek.com",
-        )
-        val chat = localHistoryBudgetFor(
-            512,
-            HarnessResourcePressure.LOW,
-            LocalUsageMode.CHAT,
-            "deepseek-flash",
-            "https://api.deepseek.com",
+    fun toolResultBudgetIsSharedByEveryProductSurface() {
+        val budget = localHistoryBudgetFor(
+            memoryClassMb = 512,
+            pressure = HarnessResourcePressure.LOW,
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
         )
 
-        assertTrue(chat.maxToolResultTokens < work.maxToolResultTokens)
+        assertEquals(16_000, budget.maxToolResultTokens)
     }
 }
