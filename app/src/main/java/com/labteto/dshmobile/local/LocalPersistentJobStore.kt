@@ -66,6 +66,11 @@ internal class LocalPersistentJobStore(
                     put("output", snapshot.output.takeLast(MAX_PERSISTED_OUTPUT_CHARS))
                     snapshot.resumeKind?.let { put("resume_kind", it) }
                     snapshot.resumePayload?.let { put("resume_payload", it) }
+                    put("inbox", buildJsonArray {
+                        snapshot.inbox.takeLast(MAX_PERSISTED_INBOX_MESSAGES).forEach { message ->
+                            add(kotlinx.serialization.json.JsonPrimitive(message.take(MAX_PERSISTED_INBOX_CHARS)))
+                        }
+                    })
                     put("updated_at", snapshot.updatedAt)
                 })
             }
@@ -98,6 +103,10 @@ internal class LocalPersistentJobStore(
                 output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull,
                 resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull,
+                inbox = item["inbox"]?.jsonArray
+                    ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    ?.takeLast(MAX_PERSISTED_INBOX_MESSAGES)
+                    .orEmpty(),
                 updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
             )
         }
@@ -132,5 +141,7 @@ internal class LocalPersistentJobStore(
     private companion object {
         const val MAX_RECORDS = 64
         const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
+        const val MAX_PERSISTED_INBOX_MESSAGES = 32
+        const val MAX_PERSISTED_INBOX_CHARS = 4_000
     }
 }
