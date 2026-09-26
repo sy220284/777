@@ -926,7 +926,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.groupChat.enabled ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+            snapshot.transcriptIndex.hasDialogue
         ) return
 
         scope.launch {
@@ -958,7 +958,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.groupChat.enabled ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+            snapshot.transcriptIndex.hasDialogue
         ) return
 
         scope.launch {
@@ -1137,7 +1137,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
             if (_state.value.sessionId == snapshot.sessionId) {
-                rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+                refreshGroupModelSystemPrompt()
                 checkpointModelHistory("group/members-updated")
                 eventLog.append("group/members", buildJsonObject {
                     put("count", members.size)
@@ -1183,7 +1183,7 @@ class LocalHarnessEngine @Inject constructor(
                 groupActiveSpeakerName = null,
             )
         }
-        rebuildGroupModelHistoryFromTranscript(_state.value.messages)
+        refreshGroupModelSystemPrompt()
         checkpointModelHistory("group/member-deleted")
         eventLog.append("group/members", buildJsonObject {
             put("action", "member-deleted")
@@ -1235,7 +1235,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0 ||
-            !chatBranchingEligible(state.messages)
+            !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
         var branches = syncChatBranchState(
@@ -1310,7 +1310,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0 ||
-            !chatBranchingEligible(state.messages)
+            !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
         val synced = syncChatBranchState(
@@ -1358,7 +1358,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         cancelChatPostTurn()
 
-        if (state.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(state.messages)) {
+        if (state.usageMode == LocalUsageMode.CHAT && state.transcriptIndex.branchingEligible) {
             val branches = syncChatBranchState(
                 current = state.chatBranches,
                 activeMessages = state.messages,
@@ -1529,7 +1529,7 @@ class LocalHarnessEngine @Inject constructor(
             before.usageMode == LocalUsageMode.CHAT &&
             !before.groupChat.enabled &&
             before.chatBranches.nodes.isNotEmpty() &&
-            chatBranchingEligible(before.messages)
+            before.transcriptIndex.branchingEligible
         ) {
             val branches = appendMaterializedChatBranchMessage(
                 current = before.chatBranches,
@@ -1733,6 +1733,12 @@ class LocalHarnessEngine @Inject constructor(
 
                 val runtime = _state.value
                 val persona = chatPersonaStore.get(session.personaId)
+                val boundEventLog = eventLogFor(session.id)
+                val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
+                    .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    .messages
+                    .ifEmpty { session.messages.takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES) }
+                val sessionTranscriptIndex = transcriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
                     usageMode = LocalUsageMode.CHAT,
@@ -1750,8 +1756,8 @@ class LocalHarnessEngine @Inject constructor(
                     lineageId = session.lineageId.ifBlank { session.id },
                     projectId = session.projectId,
                     handoffSummary = session.handoffSummary,
-                    messages = session.messages,
-                    transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
+                    messages = recentTranscript,
+                    transcriptIndex = sessionTranscriptIndex,
                     planMode = false,
                     jobs = emptyList(),
                     queuedInputCount = 0,
@@ -1759,7 +1765,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingQuestion = null,
                     error = null,
                 )
-                val boundEventLog = eventLogFor(session.id)
                 val chatContext = chatTurnRunner.prepareProfile(
                     persona = persona,
                     state = session.chatState,
@@ -1781,9 +1786,8 @@ class LocalHarnessEngine @Inject constructor(
                         put("role", "system")
                         put("content", chatSystemPrompt())
                     })
-                    session.messages
+                    recentTranscript
                         .filter { it.role == "user" || it.role == "assistant" }
-                        .takeLast(48)
                         .forEach { message ->
                             add(buildJsonObject {
                                 put("role", message.role)
@@ -1859,7 +1863,7 @@ class LocalHarnessEngine @Inject constructor(
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
-                    if (pendingInputs.size() == 0 && chatBranchingEligible(_state.value.messages)) {
+                    if (pendingInputs.size() == 0 && _state.value.transcriptIndex.branchingEligible) {
                         _state.update { current ->
                             current.copy(
                                 chatBranches = syncMaterializedChatBranchState(
@@ -1878,7 +1882,11 @@ class LocalHarnessEngine @Inject constructor(
                     // foreground turn that completed while the model was generating.
                     val latest = sessionRepository.read(session.id) ?: session
                     val nextMessages = latest.messages + proactiveMessage
-                    val nextBranches = if (chatBranchingEligible(nextMessages)) {
+                    val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
+                        transcriptIndexForSession(latest),
+                        listOf(proactiveMessage),
+                    )
+                    val nextBranches = if (nextTranscriptIndex.branchingEligible) {
                         syncMaterializedChatBranchState(
                             current = latest.chatBranches,
                             activeMessages = nextMessages,
@@ -1892,6 +1900,7 @@ class LocalHarnessEngine @Inject constructor(
                         latest.copy(
                             updatedAt = System.currentTimeMillis(),
                             messages = nextMessages,
+                            transcriptIndex = nextTranscriptIndex,
                             chatBranches = nextBranches,
                             transcriptProjectedThroughSequence = assistantEvent.sequence,
                         ),
@@ -2009,6 +2018,10 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun automationBoundState(session: LocalHarnessSession): LocalHarnessState {
         val runtime = _state.value
+        val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
+            .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+            .messages
+            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
         return runtime.copy(
             sessionId = session.id,
             usageMode = LocalUsageMode.WORK,
@@ -2023,8 +2036,8 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = session.lineageId.ifBlank { session.id },
             projectId = session.projectId ?: LOCAL_PROJECT_ID,
             handoffSummary = session.handoffSummary,
-            messages = session.messages,
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
+            messages = recentTranscript,
+            transcriptIndex = transcriptIndexForSession(session),
             plan = session.plan,
             todos = session.todos,
             goal = session.goal,
@@ -2060,11 +2073,16 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         val latest = sessionRepository.read(session.id) ?: session
+        val appendedTranscript = messages + finalMessage
         sessionRepository.enqueue(
             latest.copy(
                 title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
                 updatedAt = System.currentTimeMillis(),
-                messages = latest.messages + messages + finalMessage,
+                messages = latest.messages + appendedTranscript,
+                transcriptIndex = appendLocalTranscriptRuntimeIndex(
+                    transcriptIndexForSession(latest),
+                    appendedTranscript,
+                ),
                 transcriptProjectedThroughSequence = event.sequence,
             ),
         )
@@ -3072,6 +3090,19 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
+    private fun refreshGroupModelSystemPrompt() {
+        val system = buildJsonObject {
+            put("role", "system")
+            put("content", groupChatSystemPrompt())
+        }
+        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+            replaceSystemModelHistory(system)
+        } else {
+            prependModelHistory(system)
+        }
+        updateContextMetrics()
+    }
+
     private fun groupAgentPrompt(
         persona: PersonaProfile,
         member: LocalGroupChatMember,
@@ -3587,7 +3618,7 @@ class LocalHarnessEngine @Inject constructor(
         try {
             ensureSystemMessage()
             val snapshot = _state.value
-            val branchEligible = chatBranchingEligible(snapshot.messages)
+            val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = if (branchEligible) {
                 syncMaterializedChatBranchState(
@@ -3713,7 +3744,7 @@ class LocalHarnessEngine @Inject constructor(
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "completed")
                 put("steps", 1)
-                put("messages", _state.value.messages.size)
+                put("messages", _state.value.transcriptIndex.totalMessageCount)
                 put("mode", "chat")
             })
             if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
@@ -4063,7 +4094,7 @@ class LocalHarnessEngine @Inject constructor(
                             !beforeAssistant.groupChat.enabled &&
                             event.toolCalls.isEmpty() &&
                             beforeAssistant.chatBranches.nodes.isNotEmpty() &&
-                            chatBranchingEligible(beforeAssistant.messages)
+                            beforeAssistant.transcriptIndex.branchingEligible
                         ) {
                             val assistantTranscript = transcriptMessages.lastOrNull { message ->
                                 message.role == "assistant"
@@ -4155,7 +4186,7 @@ class LocalHarnessEngine @Inject constructor(
                         eventLog.append("turn/end", buildJsonObject {
                             put("reason", "completed")
                             put("steps", event.steps)
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount)
                         })
                         checkpointModelHistoryAtTurnBoundary("turn/completed")
                     }
@@ -4167,7 +4198,7 @@ class LocalHarnessEngine @Inject constructor(
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
                             put("steps", event.steps)
-                            put("messages", _state.value.messages.size + 1)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
@@ -4181,7 +4212,7 @@ class LocalHarnessEngine @Inject constructor(
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "error")
                             put("detail", detail)
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
@@ -4193,7 +4224,7 @@ class LocalHarnessEngine @Inject constructor(
                         val transcriptMessage = newTranscriptMessage("system", "本轮已停止。")
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "aborted")
-                            put("messages", _state.value.messages.size)
+                            put("messages", _state.value.transcriptIndex.totalMessageCount + 1L)
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         applyTranscriptMessages(listOf(transcriptMessage), turnEnd.sequence)
@@ -5256,6 +5287,13 @@ class LocalHarnessEngine @Inject constructor(
         eventLog = eventLogForAuthorized(sessionId),
     ).all()
 
+    private fun transcriptIndexForSession(session: LocalHarnessSession): LocalTranscriptRuntimeIndex =
+        if (session.transcriptIndex.totalMessageCount > 0L || session.messages.isEmpty()) {
+            session.transcriptIndex
+        } else {
+            buildLocalTranscriptRuntimeIndex(session.messages)
+        }
+
     private fun cancelChatPostTurn() {
         val job = synchronized(chatPostTurnLock) {
             val current = chatPostTurnJob
@@ -5375,7 +5413,7 @@ class LocalHarnessEngine @Inject constructor(
                 current.copy(
                     chatState = plan.state,
                     replySuggestions = plan.suggestions,
-                    chatBranches = if (chatBranchingEligible(current.messages)) {
+                    chatBranches = if (current.transcriptIndex.branchingEligible) {
                         updateChatBranchNodeSnapshot(
                             state = current.chatBranches,
                             messageId = expectedAssistantMessageId,
@@ -6337,6 +6375,7 @@ class LocalHarnessEngine @Inject constructor(
             projectId = state.projectId,
             handoffSummary = state.handoffSummary,
             messages = state.messages,
+            transcriptIndex = state.transcriptIndex,
             plan = state.plan,
             todos = state.todos,
             goal = state.goal,
@@ -6430,6 +6469,8 @@ class LocalHarnessEngine @Inject constructor(
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
         const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
+        const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
+        const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
         const val MAX_STYLE_GUARD_HITS = 20
         const val MAX_CUSTOM_CHAT_FILTERS = 50

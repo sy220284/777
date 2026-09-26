@@ -117,7 +117,6 @@ import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
-import com.labteto.dshmobile.local.chatBranchingEligible
 import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.groupMessageVisibleContent
 import com.labteto.dshmobile.local.LocalImportedAttachment
@@ -1157,7 +1156,7 @@ private fun LocalChat(
         transcriptHistory.loading
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
         !state.groupChat.enabled &&
-        chatBranchingEligible(state.messages)
+        state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     LaunchedEffect(
         state.sessionId,
