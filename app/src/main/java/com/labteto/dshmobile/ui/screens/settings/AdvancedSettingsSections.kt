@@ -686,11 +686,7 @@ internal fun MemoryOverviewCard(
     recordCount: Int,
 ) {
     SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsStatusPill(
                 state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
                 label = stringResource(
@@ -822,19 +818,28 @@ internal fun MemoryManagementCard(
             singleLine = true,
             label = { Text(stringResource(R.string.advanced_memory_search)) },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
-            listOf(
-                MemoryFilter.ALL to R.string.advanced_memory_filter_all,
-                MemoryFilter.RULE to R.string.advanced_kind_rule,
-                MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
-                MemoryFilter.FACT to R.string.advanced_kind_fact,
-            ).forEach { (candidate, label) ->
-                DsButton(
-                    text = stringResource(label),
-                    onClick = { filter = candidate },
-                    size = DsButtonSize.Small,
-                    variant = if (filter == candidate) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                )
+        val filterOptions = listOf(
+            MemoryFilter.ALL to R.string.advanced_memory_filter_all,
+            MemoryFilter.RULE to R.string.advanced_kind_rule,
+            MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
+            MemoryFilter.FACT to R.string.advanced_kind_fact,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+            filterOptions.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+                    row.forEach { (candidate, label) ->
+                        DsButton(
+                            text = stringResource(label),
+                            onClick = { filter = candidate },
+                            size = DsButtonSize.Small,
+                            variant = if (filter == candidate) {
+                                DsButtonVariant.Info
+                            } else {
+                                DsButtonVariant.Ghost
+                            },
+                        )
+                    }
+                }
             }
         }
         Text(
