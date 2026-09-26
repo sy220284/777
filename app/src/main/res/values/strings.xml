@@ -416,6 +416,8 @@
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
     <string name="tasks_cancel">Cancel</string>
+    <string name="tasks_pause">Pause</string>
+    <string name="tasks_resume">Resume</string>
     <string name="tasks_next_run">Next run: %1$s</string>
     <string name="tasks_last_run">Last run: %1$s</string>
     <string name="tasks_run_history">Run history · %1$d retained</string>
@@ -968,6 +970,7 @@
 <string name="tasks_status_running">Running</string>
 <string name="tasks_status_queued">Queued</string>
 <string name="tasks_status_scheduled">Scheduled</string>
+<string name="tasks_status_paused">Paused</string>
 <string name="tasks_schedule_once">Once</string>
 <string name="tasks_schedule_daily">Daily</string>
 <string name="tasks_schedule_weekly">Weekly</string>
