@@ -30,7 +30,7 @@ class PersonaGalleryEntryTest {
         assertTrue(context.contains("彼此信任"))
         assertTrue(context.contains("曾经在雨里一起等车"))
         assertTrue(context.contains("答应过一起去海边"))
-        assertTrue(context.contains("日常片段30"))
-        assertFalse(context.contains("日常片段1\n"))
+        assertFalse(context.contains("日常片段30"))
+        assertTrue(context.contains("角色旧回复已归档"))
     }
 }
