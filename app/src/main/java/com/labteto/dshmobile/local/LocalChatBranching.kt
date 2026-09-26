@@ -48,12 +48,11 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
     val turnDialogue = dialogue.filterNot { it.role == "assistant" && it.proactive }
     if (turnDialogue.isEmpty()) return true
     if (turnDialogue.first().role != "user") return false
-    // Group chat may legitimately produce several assistant messages for one user turn.
-    // What cannot be branched safely is two human turns with no completed assistant turn between
-    // them, because those are queued/steering inputs rather than independent conversation turns.
-    return turnDialogue.zipWithNext().none { (left, right) ->
-        left.role == "user" && right.role == "user"
-    }
+    // Group chat may legitimately produce several assistant messages for one user turn, while
+    // queued/steering input can legitimately leave several user messages next to each other.
+    // Once the run is idle, either shape can be edited safely because the new sibling branch starts
+    // at the selected human message and does not inherit the old downstream path.
+    return true
 }
 
 internal fun chatMessageHasAttachmentContext(message: LocalHarnessMessage): Boolean =
