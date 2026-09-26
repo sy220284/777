@@ -413,7 +413,29 @@ internal class LocalSubagentRunner(
                 maxSteps = stepLimit,
             )
 
-            val result = loop.run(task)
+            val result = loop.run(
+                task,
+                context = AgentRunContext(
+                    runId = subagentId,
+                    sessionId = snapshot.sessionId,
+                    lineageId = snapshot.lineageId,
+                    modelRoute = AgentModelRoute(
+                        provider = if (snapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible",
+                        baseUrl = snapshot.baseUrl,
+                        model = routeModel,
+                        protocol = snapshot.modelProtocol,
+                    ),
+                    permissions = AgentPermissionScope(
+                        allowMutation = allowMutation,
+                        approvalScope = "subagent",
+                    ),
+                    resources = AgentResourceBudget(maxSteps = stepLimit),
+                    attributes = mapOf(
+                        "kind" to "subagent",
+                        "background" to (backgroundJobId != null).toString(),
+                    ),
+                ),
+            )
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
                 return LocalSubagentResult(
                     status = LocalSubagentStatus.COMPLETED,
