@@ -2063,6 +2063,7 @@ class LocalHarnessEngine @Inject constructor(
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
+        temperature = CHAT_ROLEPLAY_TEMPERATURE,
     )
 
     private fun resolveAutomationWorkSession(
@@ -3258,6 +3259,7 @@ class LocalHarnessEngine @Inject constructor(
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
+                temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
             val guarded = chatTurnCoordinator.finalize(
                 snapshot = snapshot,
@@ -3738,6 +3740,7 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = true,
                 streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
                 persistOverflowHistory = true,
+                temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
 
             val reply = chatTurnCoordinator.finalize(
@@ -4072,6 +4075,9 @@ class LocalHarnessEngine @Inject constructor(
                         publishPreview = true,
                         streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                         persistOverflowHistory = true,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE.takeIf {
+                            snapshot.usageMode == LocalUsageMode.CHAT
+                        },
                     ).also {
                         if (nativeImagesSent) {
                             imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
@@ -5564,6 +5570,7 @@ class LocalHarnessEngine @Inject constructor(
         persistOverflowHistory: Boolean = false,
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
+        temperature: Double? = null,
     ): LocalModelReply = modelRequestCoordinator.complete(
         key = key,
         snapshot = snapshot,
@@ -5576,6 +5583,7 @@ class LocalHarnessEngine @Inject constructor(
         persistOverflowHistory = persistOverflowHistory,
         streamFilterPhrases = streamFilterPhrases,
         requestLog = requestLog,
+        temperature = temperature,
     )
 
     private fun persistForegroundOverflowCompaction(
@@ -6399,6 +6407,7 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
         const val CHAT_RECENT_HISTORY_MESSAGES = 20
+        const val CHAT_ROLEPLAY_TEMPERATURE = 0.85
         const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
         const val MAX_PENDING_INPUTS = 16
         const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
