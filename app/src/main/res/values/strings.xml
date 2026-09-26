@@ -1014,4 +1014,17 @@
     <string name="local_plan_button_on">Planning</string>
     <string name="local_plan_button_off">Plan</string>
     <string name="local_auto_approve_short">Auto-approve</string>
+    <string name="local_harness_title">On-device Harness</string>
+    <string name="local_on_device_execution_title">Run directly on this phone</string>
+    <string name="local_on_device_execution_hint">Models, files, web access, commands, skills, and subagents are orchestrated on-device. Remote control now lives in the sidebar.</string>
+    <string name="local_model_section_title">Model & endpoint</string>
+    <string name="local_model_flash_label">DeepSeek Flash | V4.1 · Reasoning on by default</string>
+    <string name="local_model_pro_label">DeepSeek V4 Pro | Expert model</string>
+    <string name="local_endpoint_hint">OpenAI-compatible chat completion services are supported.</string>
+    <string name="local_model_save_enter">Save and enter on-device Harness</string>
+    <string name="local_file_import_failed">File import failed</string>
+    <string name="local_restore_request">Restore request</string>
+    <string name="local_manage_model_config">Manage model settings</string>
+    <string name="local_attachment_image">Image</string>
+    <string name="local_attachment_file">File</string>
 </resources>
