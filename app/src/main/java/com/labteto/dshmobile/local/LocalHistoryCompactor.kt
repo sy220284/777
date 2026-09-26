@@ -125,11 +125,12 @@ internal class LocalHistoryCompactor(
         val messages = compaction.messages.toMutableList().apply {
             this[index] = replacement
         }
-        val estimatedAfter = messages.sumOf { estimateModelTokens(it.toString()) }
-        // estimatedTokensBefore may include ephemeral request overhead. Keeping the semantic summary
-        // below the already accepted extractive footprint guarantees that refinement cannot make
-        // context pressure worse.
-        if (estimatedAfter > compaction.estimatedTokensAfter) return null
+        val oldMessageTokens = compaction.messages.sumOf { estimateModelTokens(it.toString()) }
+        val newMessageTokens = messages.sumOf { estimateModelTokens(it.toString()) }
+        if (newMessageTokens > oldMessageTokens) return null
+        val estimatedAfter = (
+            compaction.estimatedTokensAfter - oldMessageTokens + newMessageTokens
+        ).coerceAtLeast(0)
         return compaction.copy(
             messages = messages,
             summary = clean,
