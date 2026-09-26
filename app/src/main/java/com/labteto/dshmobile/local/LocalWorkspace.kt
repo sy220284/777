@@ -253,7 +253,7 @@ class LocalWorkspace(
             environmentProvider()
                 .filterKeys { key -> SAFE_ENV_NAME.matches(key) && key !in BLOCKED_SHELL_ENV_KEYS }
                 .filterValues { value -> '\u0000' !in value }
-                .forEach(::put)
+                .forEach { (key, value) -> put(key, value) }
             val runtimePath = extraSearchPaths()
                 .filter(File::isDirectory)
                 .joinToString(File.pathSeparator) { it.absolutePath }
