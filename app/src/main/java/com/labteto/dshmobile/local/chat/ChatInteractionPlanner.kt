@@ -414,13 +414,32 @@ class ChatInteractionPlanner @Inject constructor(
         cool("话术", signals.verbalTags, VERBAL_COOLDOWN_TURNS)
         cool("称呼", signals.addressTerms, ADDRESS_COOLDOWN_TURNS)
 
-        val reset = nextInteractionIntensity(userMessage, previous) == 0
+        val resetRequested = isInteractionResetIntent(userMessage)
+        val assistantIntensity = if (resetRequested) 0 else assistantInitiatedInteractionIntensity(assistantMessage)
+        val finalIntensity = if (resetRequested) 0 else maxOf(state.interactionIntensity, assistantIntensity)
+        val finalIntent = when {
+            resetRequested -> ChatInteractionIntent.NORMAL.name
+            finalIntensity > 0 && state.interactionIntent == ChatInteractionIntent.NORMAL.name ->
+                ChatInteractionIntent.FLIRTING.name
+            else -> state.interactionIntent
+        }
+        val finalStrength = when {
+            resetRequested -> 0
+            finalIntent == ChatInteractionIntent.FLIRTING.name &&
+                state.interactionIntent == ChatInteractionIntent.NORMAL.name ->
+                maxOf(state.interactionIntentStrength, 2)
+            else -> state.interactionIntentStrength
+        }
+
         return state.copy(
+            interactionIntent = finalIntent,
+            interactionIntentStrength = finalStrength,
+            interactionIntensity = finalIntensity,
             recentActionTags = mergeRecentTags(previous.recentActionTags, signals.actionTags, RECENT_ACTION_LIMIT),
             recentPoseTags = mergeRecentTags(previous.recentPoseTags, signals.poseTags, RECENT_POSE_LIMIT),
             recentVerbalTags = mergeRecentTags(previous.recentVerbalTags, signals.verbalTags, RECENT_VERBAL_LIMIT),
             recentAddressTerms = mergeRecentTags(previous.recentAddressTerms, signals.addressTerms, RECENT_ADDRESS_LIMIT),
-            interactionCooldowns = if (reset) emptyMap() else cooldowns.toMap(),
+            interactionCooldowns = if (finalIntensity == 0) emptyMap() else cooldowns.toMap(),
         )
     }
 
