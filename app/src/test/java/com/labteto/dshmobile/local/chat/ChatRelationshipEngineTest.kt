@@ -173,6 +173,14 @@ class ChatRelationshipEngineTest {
             ChatInteractionIntent.FLIRTING,
             classifyExplicitInteractionIntent("你又开车了吧，车速有点快"),
         )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("咱俩找个安静地方深入交流一下"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("懂得都懂，别装正经"),
+        )
     }
 
     @Test
