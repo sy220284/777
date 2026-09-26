@@ -5579,6 +5579,7 @@ class LocalHarnessEngine @Inject constructor(
         log.append("request/header", buildJsonObject {
             put("model", snapshot.model)
             put("base_url", snapshot.baseUrl)
+            put("protocol", snapshot.modelProtocol.name.lowercase())
             put("step", step)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
@@ -5589,12 +5590,22 @@ class LocalHarnessEngine @Inject constructor(
         log.append("request/context", buildJsonObject {
             put("step", step)
             put("model", snapshot.model)
+            put("protocol", snapshot.modelProtocol.name.lowercase())
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
             put("tool_count", tools.size)
             put("tool_names", toolNames)
         })
-        var failureContextLogged = false
+        log.append("request/context-full", buildJsonObject {
+            put("step", step)
+            put("provider", if (snapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible")
+            put("base_url", snapshot.baseUrl)
+            put("model", snapshot.model)
+            put("protocol", snapshot.modelProtocol.name.lowercase())
+            put("messages", JsonArray(logMessages))
+            put("tools", tools)
+            put("images_redacted", true)
+        })
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -5608,17 +5619,6 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                     is AgentRequestEvent.AttemptFailed -> {
-                        if (!failureContextLogged) {
-                            runCatching {
-                                log.append("request/context-full", buildJsonObject {
-                                    put("step", step)
-                                    put("model", snapshot.model)
-                                    put("messages", JsonArray(logMessages))
-                                    put("tools", tools)
-                                })
-                            }
-                            failureContextLogged = true
-                        }
                         log.append("request/error", buildJsonObject {
                             put("step", step)
                             put("attempt", event.attempt)
