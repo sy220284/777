@@ -6114,7 +6114,11 @@ class LocalHarnessEngine @Inject constructor(
         if (messages.isNotEmpty() || clearStreamingPreview) {
             _state.update { state ->
                 state.copy(
-                    messages = if (messages.isEmpty()) state.messages else state.messages + messages,
+                    messages = if (messages.isEmpty()) {
+                        state.messages
+                    } else {
+                        (state.messages + messages).takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+                    },
                     transcriptIndex = if (messages.isEmpty()) {
                         state.transcriptIndex
                     } else {
@@ -6474,7 +6478,8 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = state.lineageId,
             projectId = state.projectId,
             handoffSummary = state.handoffSummary,
-            messages = state.messages,
+            messages = emptyList(),
+            transcriptWindow = state.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
             transcriptIndex = state.transcriptIndex,
             plan = state.plan,
             todos = state.todos,
