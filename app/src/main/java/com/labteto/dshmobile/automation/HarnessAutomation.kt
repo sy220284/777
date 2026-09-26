@@ -334,35 +334,39 @@ class HarnessAutomationWorker(
             val next = task.recurringMinutes?.let { System.currentTimeMillis() + it * 60_000L }
                 ?: task.nextRunAt
             val finished = System.currentTimeMillis()
+            val receiptStatus = if (run.delivered) "completed" else "skipped"
+            val resultText = run.skipReason ?: run.output
             store.update(id) {
                 it.copy(
                     workSessionId = if (it.mode == AutomationMode.WORK) run.sessionId else it.workSessionId,
                     status = if (it.recurringMinutes == null) "completed" else "scheduled",
                     nextRunAt = next,
-                    lastResult = truncateWithoutSplittingSurrogatePair(run.output, 20_000),
+                    lastResult = truncateWithoutSplittingSurrogatePair(resultText, 20_000),
                     lastError = null,
                     runReceipts = appendAutomationReceipt(
                         it.runReceipts,
                         AutomationRunReceipt(
                             startedAt = started,
                             finishedAt = finished,
-                            status = "completed",
+                            status = receiptStatus,
                             sessionId = run.sessionId,
                             resultPreview = truncateWithoutSplittingSurrogatePair(
-                                run.output.replace("\n", " "),
+                                resultText.replace("\n", " "),
                                 320,
                             ),
                         ),
                     ),
                 )
             }
-            maybeNotify(
-                entry = entry,
-                task = task,
-                titleRes = R.string.tasks_notification_complete,
-                sessionId = run.sessionId,
-                resultText = run.output,
-            )
+            if (run.delivered) {
+                maybeNotify(
+                    entry = entry,
+                    task = task,
+                    titleRes = R.string.tasks_notification_complete,
+                    sessionId = run.sessionId,
+                    resultText = run.output,
+                )
+            }
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
