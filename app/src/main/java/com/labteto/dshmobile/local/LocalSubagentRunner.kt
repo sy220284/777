@@ -522,6 +522,9 @@ internal class LocalSubagentRunner(
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
+            providerRetryDelayMillis = { error, _ ->
+                (error as? LocalModelException)?.retryAfterMillis
+            },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
