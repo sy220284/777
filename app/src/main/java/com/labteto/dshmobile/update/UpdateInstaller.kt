@@ -72,7 +72,11 @@ class UpdateInstaller @Inject constructor(
             // Update payloads are temporary staging data. Starting a new attempt always discards
             // any APK/patch left by an older attempt instead of accumulating one directory per
             // released version.
-            val root = UpdateCache.prepare(context.cacheDir)
+            val root = UpdateCache.prepare(
+                cacheDir = context.cacheDir,
+                currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                nowMillis = System.currentTimeMillis(),
+            )
             val target = File(
                 root,
                 apkName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
