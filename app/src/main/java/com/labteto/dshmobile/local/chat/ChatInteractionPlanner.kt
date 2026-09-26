@@ -176,7 +176,7 @@ class ChatInteractionPlanner @Inject constructor(
         val agedPrevious = ageTransientState(previous, userMessage)
         return decoded.copy(
             state = applyInteractionIntent(
-                state = if (significance == "NONE") {
+                state = if (significance == "NONE" && rawState.isNullOrEmpty()) {
                     agedPrevious
                 } else {
                     sanitizeState(
