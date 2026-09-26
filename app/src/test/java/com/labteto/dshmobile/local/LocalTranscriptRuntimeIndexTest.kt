@@ -20,6 +20,7 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals("第一行", index.firstUserTitle)
         assertEquals(5L, index.latestCreatedAt)
         assertEquals("a1", index.latestDialogueMessageId)
+        assertEquals("u1", index.latestUserMessageId)
         assertTrue(index.hasDialogue)
     }
 
@@ -41,7 +42,21 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals("原始标题", updated.firstUserTitle)
         assertEquals(13L, updated.latestCreatedAt)
         assertEquals("u2", updated.latestDialogueMessageId)
+        assertEquals("u2", updated.latestUserMessageId)
         assertTrue(updated.hasDialogue)
+    }
+
+    @Test
+    fun latestUserRemainsParentWhenAssistantIsNewestDialogue() {
+        val index = buildLocalTranscriptRuntimeIndex(
+            listOf(
+                message("u1", "user", "问题", 1L),
+                message("a1", "assistant", "旧回答", 2L),
+            ),
+        )
+
+        assertEquals("a1", index.latestDialogueMessageId)
+        assertEquals("u1", index.latestUserMessageId)
     }
 
     @Test
@@ -51,6 +66,7 @@ class LocalTranscriptRuntimeIndexTest {
         assertEquals(null, index.firstUserTitle)
         assertEquals(0L, index.latestCreatedAt)
         assertEquals(null, index.latestDialogueMessageId)
+        assertEquals(null, index.latestUserMessageId)
         assertFalse(index.hasDialogue)
     }
 
