@@ -1003,4 +1003,6 @@
     <string name="advanced_edit_memory">Edit memory</string>
     <string name="advanced_pinned">Pinned</string>
     <string name="settings_notifications_usage_hint">Turn-complete alerts are most useful for long-running work. In pure chat sessions, disabling them can reduce unnecessary interruptions.</string>
+    <string name="persona_gallery_overview_stats">%1$d characters · %2$d storylines · %3$d archived dialogue lines</string>
+    <string name="persona_gallery_my_characters">My characters</string>
 </resources>
