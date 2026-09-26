@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -18,8 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.Ds
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -43,7 +44,7 @@ fun DsValueRow(
 ) {
     val colors = DsTheme.colors
     val display = when {
-        value.isNullOrBlank() -> "未设置"
+        value.isNullOrBlank() -> "—"
         masked && value.length > 4 -> "••••••••${value.takeLast(4)}"
         else -> value
     }
@@ -63,15 +64,18 @@ fun DsValueRow(
                 color = if (value.isNullOrBlank()) colors.labelTertiary else colors.labelPrimary,
                 maxLines = 1,
                 softWrap = false,
+                overflow = TextOverflow.Ellipsis,
                 fontFamily = if (masked) FontFamily.Monospace else FontFamily.Default,
             )
+            hint?.let {
+                Text(it, style = DsType.caption11, color = colors.labelCaption, maxLines = 2)
+            }
         }
         configured?.let { ok ->
             Spacer(Modifier.width(DsSpacing.small))
             androidx.compose.foundation.layout.Box(
                 Modifier
-                    .width(8.dp)
-                    .heightIn(min = 8.dp)
+                    .size(8.dp)
                     .background(
                         if (ok) colors.success else colors.error,
                         CircleShape,
@@ -84,9 +88,5 @@ fun DsValueRow(
             contentDescription = null,
             tint = colors.labelCaption,
         )
-        hint?.let {
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(it, style = DsType.caption11, color = colors.labelCaption)
-        }
     }
 }

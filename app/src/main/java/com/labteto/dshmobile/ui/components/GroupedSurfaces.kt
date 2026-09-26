@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -97,7 +98,14 @@ fun DsCategoryRow(
         }
         value?.let {
             Spacer(Modifier.width(DsSpacing.small))
-            Text(it, style = DsType.std14, color = colors.labelTertiary, maxLines = 1)
+            Text(
+                it,
+                style = DsType.std14,
+                color = colors.labelTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 144.dp),
+            )
         }
         if (trailing != null) {
             Spacer(Modifier.width(DsSpacing.small))

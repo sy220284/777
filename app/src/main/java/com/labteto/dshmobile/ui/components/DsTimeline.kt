@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +39,7 @@ fun DsTimeline(
         items.forEachIndexed { index, item ->
             Row(Modifier.fillMaxWidth()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.width(16.dp)) {
+                    Box(Modifier.width(16.dp).height(24.dp)) {
                         // Connector above
                         if (index > 0) {
                             Box(

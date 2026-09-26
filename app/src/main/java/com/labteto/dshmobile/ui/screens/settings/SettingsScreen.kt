@@ -46,7 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.wrapContentWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
@@ -187,6 +187,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
                                 iconFamily = DsIconFamily.Accent,
+                                value = localHarness.model.takeIf { it.isNotBlank() },
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
@@ -208,6 +209,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
                                 iconFamily = DsIconFamily.Purple,
+                                value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
                             DsCategoryRow(
@@ -235,12 +237,16 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
                                 iconFamily = DsIconFamily.Green,
                                 onClick = { page = SettingsDestination.PERMISSIONS },
+                                trailing = {
+                                    StateDot(deviceCapabilitiesState(deviceCapabilities))
+                                },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
                                 iconFamily = DsIconFamily.Amber,
+                                value = enabledNotificationCount(settings).toString(),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
@@ -256,7 +262,7 @@ fun SettingsScreen(
                             )
                         }
                         Text(
-                            "神言神语 v${BuildConfig.VERSION_NAME}",
+                            "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
                             style = DsType.caption11,
                             color = colors.labelCaption,
                             modifier = Modifier
@@ -720,6 +726,22 @@ private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
             },
         )
     }
+}
+
+private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
+    settings.notifyTurnComplete,
+    settings.notifyGoal,
+    settings.notifyNeedsAction,
+    settings.notifyLocalJobs,
+).count { it }
+
+private fun deviceCapabilitiesState(state: DeviceCapabilitiesState): StateDotState = when {
+    state.loading -> StateDotState.Running
+    state.error != null -> StateDotState.Error
+    state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
+        StateDotState.Done
+    state.shizukuAlive || state.accessibility || state.notifications -> StateDotState.Warning
+    else -> StateDotState.Idle
 }
 
 @Composable

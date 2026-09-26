@@ -38,8 +38,8 @@ private fun colorsFor(family: DsIconFamily): DsIconFamilyColors {
         DsIconFamily.Accent -> DsIconFamilyColors(c.accentTertiary, c.accent)
         DsIconFamily.Purple -> DsIconFamilyColors(Ds.FamilyPurple.copy(alpha = 0.12f), Ds.FamilyPurple)
         DsIconFamily.Cyan -> DsIconFamilyColors(Ds.FamilyCyan.copy(alpha = 0.12f), Ds.FamilyCyan)
-        DsIconFamily.Amber -> DsIconFamilyColors(Ds.Amber100, Ds.Amber500)
-        DsIconFamily.Green -> DsIconFamilyColors(Ds.Green100, Ds.Green500)
+        DsIconFamily.Amber -> DsIconFamilyColors(c.warnTertiary, c.warn)
+        DsIconFamily.Green -> DsIconFamilyColors(c.successTertiary, c.success)
         DsIconFamily.Neutral -> DsIconFamilyColors(c.hover, c.labelSecondary)
     }
 }
