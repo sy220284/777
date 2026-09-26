@@ -54,7 +54,7 @@ internal fun migrateLegacyTranscriptSnapshot(
             sequenceExclusive = cursor,
         ).messages
     } ?: session.messages
-    val chunks = source.chunked(boundedChunk)
+    val chunkCount = chunkCount(source.size, boundedChunk)
     val resumable = findResumableLegacyMigration(
         source = source,
         chunkSize = boundedChunk,
@@ -71,13 +71,15 @@ internal fun migrateLegacyTranscriptSnapshot(
         },
     )
     val nextChunkIndex = resumable?.nextChunkIndex ?: 0
-    for (index in nextChunkIndex until chunks.size) {
+    for (index in nextChunkIndex until chunkCount) {
+        val from = index * boundedChunk
+        val to = minOf(from + boundedChunk, source.size)
         eventLog.append(
             LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT,
             buildJsonObject {
                 put("baseline_sequence", baseline.sequence)
                 put("chunk_index", index)
-                put("transcript", encodeTranscriptMessages(chunks[index]))
+                put("transcript", encodeTranscriptMessages(source.subList(from, to)))
             },
         )
     }
@@ -113,7 +115,7 @@ private fun findResumableLegacyMigration(
     if (data.stringValue("first_message_id") != source.firstOrNull()?.id.orEmpty()) return null
     if (data.stringValue("last_message_id") != source.lastOrNull()?.id.orEmpty()) return null
 
-    val chunkCount = source.chunked(chunkSize).size
+    val chunkCount = chunkCount(source.size, chunkSize)
     val latestChunk = eventLog.latest(LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT)
     if (
         latestChunk == null ||
@@ -130,6 +132,9 @@ private fun findResumableLegacyMigration(
         nextChunkIndex = latestIndex + 1,
     )
 }
+
+private fun chunkCount(messageCount: Int, chunkSize: Int): Int =
+    if (messageCount == 0) 0 else ((messageCount - 1) / chunkSize) + 1
 
 private fun kotlinx.serialization.json.JsonObject.intValue(key: String): Int? =
     (this[key] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
