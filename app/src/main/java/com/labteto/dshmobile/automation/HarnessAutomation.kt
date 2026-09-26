@@ -50,6 +50,16 @@ enum class AutomationMode {
 }
 
 @Serializable
+enum class AutomationScheduleType {
+    LEGACY,
+    ONCE,
+    INTERVAL,
+    DAILY,
+    WEEKLY,
+    SILENCE,
+}
+
+@Serializable
 data class AutomationRunReceipt(
     val startedAt: Long,
     val finishedAt: Long,
@@ -79,6 +89,9 @@ data class AutomationTask(
     val createdAt: Long,
     val nextRunAt: Long,
     val recurringMinutes: Long? = null,
+    val scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
+    val scheduleAnchorAt: Long? = null,
+    val silenceMinutes: Long? = null,
     val notify: Boolean = true,
     /** Existing tasks decode as WORK; chat interactions explicitly bind to a durable chat session. */
     val mode: AutomationMode = AutomationMode.WORK,
