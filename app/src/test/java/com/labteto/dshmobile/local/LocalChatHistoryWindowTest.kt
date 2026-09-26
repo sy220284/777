@@ -51,7 +51,8 @@ class LocalChatHistoryWindowTest {
         val text = bounded.joinToString("\n") { it.toString() }
 
         assertTrue(text.contains("第一次见面"))
-        assertTrue(text.contains("检查点后的用户事件0"))
+        assertFalse(text.contains("检查点后的用户事件0"))
+        assertTrue(text.contains("检查点后的用户事件3"))
         assertFalse(text.contains("检查点后的角色回复0"))
         assertTrue(text.contains("检查点后的角色回复15"))
     }
@@ -69,7 +70,8 @@ class LocalChatHistoryWindowTest {
         val bounded = boundedChatRequestHistory(history, recentMessages = 10)
         val text = bounded.joinToString("\n") { it.toString() }
 
-        assertTrue(text.contains("用户事件0"))
+        assertFalse(text.contains("用户事件0"))
+        assertTrue(text.contains("用户事件2"))
         assertFalse(text.contains("角色旧回复0"))
         assertTrue(text.contains("用户事件14"))
         assertTrue(text.contains("角色旧回复14"))
