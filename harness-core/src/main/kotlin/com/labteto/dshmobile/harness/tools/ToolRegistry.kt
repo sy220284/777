@@ -21,6 +21,18 @@ enum class ToolApprovalPolicy {
     ALWAYS,
 }
 
+enum class ToolExecutionMode {
+    PARALLEL,
+    EXCLUSIVE,
+}
+
+fun defaultToolExecutionMode(access: ToolAccess): ToolExecutionMode =
+    if (access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+        ToolExecutionMode.PARALLEL
+    } else {
+        ToolExecutionMode.EXCLUSIVE
+    }
+
 data class ToolContext(
     val sessionId: String? = null,
     val allowMutation: Boolean = true,
@@ -42,6 +54,7 @@ data class HarnessTool(
     val schema: JsonObject,
     val access: ToolAccess = ToolAccess.READ_ONLY,
     val approvalPolicy: ToolApprovalPolicy = ToolApprovalPolicy.NEVER,
+    val executionMode: ToolExecutionMode = defaultToolExecutionMode(access),
     val timeoutMillis: Long? = null,
     val executor: HarnessToolExecutor,
 )
