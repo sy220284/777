@@ -1733,6 +1733,12 @@ class LocalHarnessEngine @Inject constructor(
 
                 val runtime = _state.value
                 val persona = chatPersonaStore.get(session.personaId)
+                val boundEventLog = eventLogFor(session.id)
+                val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
+                    .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    .messages
+                    .ifEmpty { session.messages.takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES) }
+                val sessionTranscriptIndex = transcriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
                     usageMode = LocalUsageMode.CHAT,
@@ -1750,8 +1756,8 @@ class LocalHarnessEngine @Inject constructor(
                     lineageId = session.lineageId.ifBlank { session.id },
                     projectId = session.projectId,
                     handoffSummary = session.handoffSummary,
-                    messages = session.messages,
-                    transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
+                    messages = recentTranscript,
+                    transcriptIndex = sessionTranscriptIndex,
                     planMode = false,
                     jobs = emptyList(),
                     queuedInputCount = 0,
@@ -1759,7 +1765,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingQuestion = null,
                     error = null,
                 )
-                val boundEventLog = eventLogFor(session.id)
                 val chatContext = chatTurnRunner.prepareProfile(
                     persona = persona,
                     state = session.chatState,
@@ -1781,9 +1786,8 @@ class LocalHarnessEngine @Inject constructor(
                         put("role", "system")
                         put("content", chatSystemPrompt())
                     })
-                    session.messages
+                    recentTranscript
                         .filter { it.role == "user" || it.role == "assistant" }
-                        .takeLast(48)
                         .forEach { message ->
                             add(buildJsonObject {
                                 put("role", message.role)
@@ -1878,7 +1882,11 @@ class LocalHarnessEngine @Inject constructor(
                     // foreground turn that completed while the model was generating.
                     val latest = sessionRepository.read(session.id) ?: session
                     val nextMessages = latest.messages + proactiveMessage
-                    val nextBranches = if (chatBranchingEligible(nextMessages)) {
+                    val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
+                        transcriptIndexForSession(latest),
+                        listOf(proactiveMessage),
+                    )
+                    val nextBranches = if (nextTranscriptIndex.branchingEligible) {
                         syncMaterializedChatBranchState(
                             current = latest.chatBranches,
                             activeMessages = nextMessages,
@@ -1892,6 +1900,7 @@ class LocalHarnessEngine @Inject constructor(
                         latest.copy(
                             updatedAt = System.currentTimeMillis(),
                             messages = nextMessages,
+                            transcriptIndex = nextTranscriptIndex,
                             chatBranches = nextBranches,
                             transcriptProjectedThroughSequence = assistantEvent.sequence,
                         ),
@@ -2009,6 +2018,10 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun automationBoundState(session: LocalHarnessSession): LocalHarnessState {
         val runtime = _state.value
+        val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
+            .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+            .messages
+            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
         return runtime.copy(
             sessionId = session.id,
             usageMode = LocalUsageMode.WORK,
@@ -2023,8 +2036,8 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = session.lineageId.ifBlank { session.id },
             projectId = session.projectId ?: LOCAL_PROJECT_ID,
             handoffSummary = session.handoffSummary,
-            messages = session.messages,
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(session.messages),
+            messages = recentTranscript,
+            transcriptIndex = transcriptIndexForSession(session),
             plan = session.plan,
             todos = session.todos,
             goal = session.goal,
@@ -2060,11 +2073,16 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
         val latest = sessionRepository.read(session.id) ?: session
+        val appendedTranscript = messages + finalMessage
         sessionRepository.enqueue(
             latest.copy(
                 title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
                 updatedAt = System.currentTimeMillis(),
-                messages = latest.messages + messages + finalMessage,
+                messages = latest.messages + appendedTranscript,
+                transcriptIndex = appendLocalTranscriptRuntimeIndex(
+                    transcriptIndexForSession(latest),
+                    appendedTranscript,
+                ),
                 transcriptProjectedThroughSequence = event.sequence,
             ),
         )
@@ -6337,6 +6355,7 @@ class LocalHarnessEngine @Inject constructor(
             projectId = state.projectId,
             handoffSummary = state.handoffSummary,
             messages = state.messages,
+            transcriptIndex = state.transcriptIndex,
             plan = state.plan,
             todos = state.todos,
             goal = state.goal,
