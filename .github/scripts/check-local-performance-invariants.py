@@ -88,6 +88,20 @@ if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TO
 
 if "syncMaterializedChatBranchState(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Linear chat history must stay out of the branch graph until alternatives exist")
+
+run_agent = re.search(
+    r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
+    engine,
+    re.S,
+)
+if run_agent is None:
+    violations.append("Unified foreground Agent loop is missing")
+else:
+    run_agent_body = run_agent.group(0)
+    if "cancelChatPostTurn()" not in run_agent_body:
+        violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
+    if "withChatTurnContext(" not in run_agent_body:
+        violations.append("Unified Chat turns must preserve stable/dynamic context placement")
 if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
     violations.append("Chat branch continuation must only materialize after a real branch already exists")
 
