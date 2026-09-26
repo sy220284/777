@@ -62,6 +62,10 @@ import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatMemorySelector
+import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
+import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
+import com.labteto.dshmobile.local.chat.proactiveConversationFocus
+import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -2004,6 +2008,29 @@ class LocalHarnessEngine @Inject constructor(
                             .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
                             .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
                     }
+                val proactiveDecision = evaluateChatProactivePolicy(
+                    messages = recentTranscript,
+                    nowMillis = System.currentTimeMillis(),
+                )
+                if (!proactiveDecision.shouldSend) {
+                    val reason = proactiveDecision.reason ?: "当前不适合继续主动互动"
+                    boundEventLog.append("chat/proactive-skipped", buildJsonObject {
+                        put("reason", reason)
+                        put("automation", true)
+                        put("proactive", true)
+                        put("persona_id", persona.id)
+                    })
+                    return@withTimeout LocalAutomationRunResult(
+                        sessionId = session.id,
+                        output = reason,
+                        delivered = false,
+                        skipReason = reason,
+                    )
+                }
+                val conversationFocus = proactiveConversationFocus(
+                    messages = recentTranscript,
+                    fallback = session.handoffSummary?.takeIf(String::isNotBlank) ?: trigger,
+                )
                 val sessionTranscriptIndex = transcriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
@@ -2034,10 +2061,11 @@ class LocalHarnessEngine @Inject constructor(
                 val chatContext = chatTurnCoordinator.prepareProfile(
                     persona = persona,
                     state = session.chatState,
-                    userInput = trigger,
+                    userInput = conversationFocus,
                     storyContext = session.handoffSummary,
                 )
-                val relationshipMemory = chatRelationshipMemoryContext(trigger, boundState)
+                val relationshipMemory = chatRelationshipMemoryContext(conversationFocus, boundState)
+                val proactiveAvoidance = recentProactiveAvoidanceContext(recentTranscript)
                 val proactiveDirective = """
                     【定时主动互动】
                     这是用户提前为当前角色设置的主动互动意图，时间到了。它只是幕后触发条件，不是用户刚发来的消息。
@@ -2061,7 +2089,12 @@ class LocalHarnessEngine @Inject constructor(
                             })
                         }
                 }
-                val dynamicContext = listOf(chatContext.dynamicPrompt, relationshipMemory, proactiveDirective)
+                val dynamicContext = listOf(
+                    chatContext.dynamicPrompt,
+                    relationshipMemory,
+                    proactiveAvoidance,
+                    proactiveDirective,
+                )
                     .filter(String::isNotBlank)
                     .joinToString("\n\n")
                 val requestMessages = withChatTurnContext(
@@ -2083,7 +2116,7 @@ class LocalHarnessEngine @Inject constructor(
                     snapshot = boundState,
                     messages = requestMessages,
                 )
-                val reply = chatTurnCoordinator.finalize(
+                var reply = chatTurnCoordinator.finalize(
                     snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
@@ -2098,8 +2131,42 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     },
                 )
-                val content = reply.content.orEmpty().trim()
+                var content = reply.content.orEmpty().trim()
                 require(content.isNotEmpty()) { "角色没有生成可用的主动消息" }
+
+                if (isNearDuplicateProactive(content, recentTranscript)) {
+                    val retryRawReply = completeAutomationChat(
+                        key = key,
+                        snapshot = boundState,
+                        messages = withEphemeralContext(
+                            requestMessages,
+                            """
+                            【主动互动去重重写】
+                            刚生成的内容与最近主动消息过于相似。
+                            换一个话题切入点、开场方式和句式重新写；仍需保持当前人设、关系与故事连续性。
+                            只输出角色真正会发出的新消息。
+                            """.trimIndent(),
+                        ),
+                    )
+                    reply = chatTurnCoordinator.finalize(
+                        snapshot = boundState,
+                        persona = persona,
+                        reply = retryRawReply,
+                        recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                        onGuardEvent = { action, violations ->
+                            recordStyleGuardHits(violations)
+                            boundEventLog.append("chat/style-guard", buildJsonObject {
+                                put("action", action)
+                                put("automation", true)
+                                put("proactive", true)
+                                put("dedupe_retry", true)
+                                put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                            })
+                        },
+                    )
+                    content = reply.content.orEmpty().trim()
+                    require(content.isNotEmpty()) { "角色主动消息去重重写后为空" }
+                }
 
                 val proactiveMessage = LocalHarnessMessage(
                     id = UUID.randomUUID().toString(),
