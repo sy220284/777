@@ -477,6 +477,61 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun plannerPersistsActualInteractionPerformanceAndCooldowns() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 2,
+            recentActionTags = listOf("牵手"),
+            recentVerbalTags = listOf("直球"),
+            interactionCooldowns = mapOf("动作:牵手" to 2),
+        )
+
+        val plan = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "你敢不敢过来点",
+            assistantMessage = "宝贝，我坐到你身边，凑近耳边笑了一声：这可是你说的……现在怕了？",
+        )!!
+
+        assertEquals(ChatInteractionIntent.FLIRTING.name, plan.state.interactionIntent)
+        assertEquals(3, plan.state.interactionIntensity)
+        assertTrue("牵手" in plan.state.recentActionTags)
+        assertTrue("靠近" in plan.state.recentActionTags)
+        assertTrue("贴耳" in plan.state.recentActionTags)
+        assertTrue("坐近" in plan.state.recentPoseTags)
+        assertTrue("反问激将" in plan.state.recentVerbalTags)
+        assertTrue("反撩接梗" in plan.state.recentVerbalTags)
+        assertTrue("宝贝" in plan.state.recentAddressTerms)
+        assertEquals(1, plan.state.interactionCooldowns["动作:牵手"])
+        assertEquals(3, plan.state.interactionCooldowns["动作:靠近"])
+        assertEquals(3, plan.state.interactionCooldowns["话术:反问激将"])
+        assertEquals(2, plan.state.interactionCooldowns["称呼:宝贝"])
+    }
+
+    @Test
+    fun topicResetClearsInteractionIntensityAndCooldowns() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+            recentVerbalTags = listOf("反问激将"),
+            interactionCooldowns = mapOf("话术:反问激将" to 3),
+        )
+
+        val state = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "换个话题，说正事",
+            assistantMessage = "行，说正事。",
+        )!!.state
+
+        assertEquals(ChatInteractionIntent.NORMAL.name, state.interactionIntent)
+        assertEquals(0, state.interactionIntensity)
+        assertTrue(state.interactionCooldowns.isEmpty())
+    }
+
+    @Test
     fun automaticPostTurnPromptDoesNotRequestReplySuggestions() {
         val prompt = planner.prompt(
             persona = PersonaProfile(name = "测试角色"),
@@ -487,6 +542,7 @@ class ChatInteractionPlannerTest {
 
         assertTrue(prompt.contains("\"suggestions\":[]"))
         assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
+        assertTrue(prompt.contains("由系统根据真实对话维护"))
     }
 
     @Test
@@ -527,6 +583,34 @@ class ChatInteractionPlannerTest {
         assertNotNull(suggestions)
         assertEquals(4, suggestions!!.size)
         assertTrue(suggestions.any { it.bold && it.style == "放飞" })
+    }
+
+    @Test
+    fun replySuggestionsInheritFlirtingIntensityAndChineseInnuendo() {
+        val prompt = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试角色"),
+            state = ChatCharacterState(
+                interactionIntent = ChatInteractionIntent.FLIRTING.name,
+                interactionIntentStrength = 2,
+                interactionIntensity = 3,
+                recentActionTags = listOf("靠近"),
+                recentVerbalTags = listOf("反问激将"),
+                recentAddressTerms = listOf("宝贝"),
+            ),
+            userMessage = "你行不行啊，别光说",
+            assistantMessage = "这可是你说的。",
+            recentDialogue = listOf(
+                "user" to "你行不行啊，别光说",
+                "assistant" to "这可是你说的。",
+            ),
+        )
+
+        assertTrue(prompt.contains("互动状态"))
+        assertTrue(prompt.contains("强度=3/5"))
+        assertTrue(prompt.contains("当前为暧昧/亲密语境"))
+        assertTrue(prompt.contains("至少2条能自然接梗、反撩或延续双关"))
+        assertTrue(prompt.contains("中文暗示或双关"))
+        assertTrue(prompt.contains("不做词义解释"))
     }
 
     @Test
