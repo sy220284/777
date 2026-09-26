@@ -57,6 +57,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.workflow.HarnessWorkflowCheckpoint
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
@@ -4952,10 +4953,17 @@ class LocalHarnessEngine @Inject constructor(
             "list_agents" -> jobs.listAgents()
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
             "interrupt_agent" -> jobs.kill(args.string("agent_id"))
-            "workflow" -> runWorkflow(
-                args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
-                args.optionalString("mode") ?: "parallel",
-            )
+            "workflow" -> {
+                val workflowTasks = args["tasks"]?.jsonArray
+                    ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    .orEmpty()
+                val workflowMode = args.optionalString("mode") ?: "parallel"
+                if (args.boolean("run_in_background", false)) {
+                    startPersistentWorkflow(workflowTasks, workflowMode)
+                } else {
+                    runWorkflow(workflowTasks, workflowMode)
+                }
+            }
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools.execute(call.name, args, allowMutation)
@@ -5098,6 +5106,31 @@ class LocalHarnessEngine @Inject constructor(
                                 maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
                                 format,
                                 timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
+                            )
+                        }
+                    }
+                    "workflow_readonly" -> {
+                        val workflowId = payload["workflow_id"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复工作流缺少 workflow_id")
+                        val mode = payload["mode"]?.jsonPrimitive?.contentOrNull ?: "parallel"
+                        val tasks = payload["tasks"]?.jsonArray
+                            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                            ?.take(4)
+                            .orEmpty()
+                        require(tasks.isNotEmpty()) { "恢复工作流缺少 tasks" }
+                        val boundState = _state.value
+                        val boundRunner = persistentSubagentRunner(sessionId, boundState)
+                        val boundLog = eventLogFor(sessionId)
+                        jobs.resumePersistent(snapshot.id) { _, report ->
+                            report("正在恢复工作流：" + workflowId)
+                            runWorkflow(
+                                tasks = tasks,
+                                mode = mode,
+                                workflowId = workflowId,
+                                runner = boundRunner,
+                                workflowLog = boundLog,
+                                subagentMaxSteps = boundState.subagentMaxSteps,
+                                failOnTaskError = true,
                             )
                         }
                     }
@@ -5297,23 +5330,60 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runWorkflow(tasks: List<String>, mode: String): String {
+    private suspend fun runWorkflow(
+        tasks: List<String>,
+        mode: String,
+        workflowId: String = "wf-" + UUID.randomUUID().toString().replace("-", "").take(16),
+        runner: LocalSubagentRunner = subagents,
+        workflowLog: LocalSessionEventLog = eventLog,
+        subagentMaxSteps: Int = _state.value.subagentMaxSteps,
+        failOnTaskError: Boolean = false,
+    ): String {
         val workflowMode = HarnessWorkflowMode.parse(mode)
-        val results = workflowRunner.run(tasks, workflowMode) { _, task, previous ->
+        val resume = workflowLog.latestMatching(LOCAL_WORKFLOW_CHECKPOINT_EVENT) { event ->
+            event.data["workflow_id"]?.jsonPrimitive?.contentOrNull == workflowId
+        }?.let { decodeWorkflowCheckpoint(it.data) }
+        workflowLog.append(
+            if (resume == null) "workflow/start" else "workflow/resume",
+            buildJsonObject {
+                put("workflow_id", workflowId)
+                put("mode", workflowMode.name.lowercase())
+                put("task_count", tasks.size)
+                put("completed_count", resume?.results?.size ?: 0)
+            },
+        )
+        val results = workflowRunner.run(
+            tasks = tasks,
+            mode = workflowMode,
+            resume = resume,
+            onCheckpoint = { checkpoint ->
+                workflowLog.append(
+                    LOCAL_WORKFLOW_CHECKPOINT_EVENT,
+                    encodeWorkflowCheckpoint(workflowId, checkpoint),
+                )
+            },
+        ) { _, task, previous ->
             val prompt = if (workflowMode == HarnessWorkflowMode.PIPELINE && !previous.isNullOrBlank()) {
                 "上一步结果：\n" + pruneToolResult(previous) + "\n\n当前阶段：\n" + task
             } else {
                 task
             }
-            val result = subagents.runResult(
+            val result = runner.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
-                maxSteps = _state.value.subagentMaxSteps,
+                maxSteps = subagentMaxSteps,
             )
             result.requireCompletedOutput()
         }
-        return results.joinToString("\n\n") { result ->
+        val failed = results.filterNot { it.succeeded }
+        workflowLog.append("workflow/end", buildJsonObject {
+            put("workflow_id", workflowId)
+            put("status", if (failed.isEmpty()) "completed" else "failed")
+            put("completed_count", results.count { it.succeeded })
+            put("failed_count", failed.size)
+        })
+        val output = results.joinToString("\n\n") { result ->
             val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
             if (result.succeeded) {
                 label + " " + (result.index + 1) + "：" + result.task + "\n" + result.output.orEmpty()
@@ -5325,6 +5395,41 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 label + " " + (result.index + 1) + " 失败：" + result.error.orEmpty() + "；" + suffix
             }
+        }
+        if (failOnTaskError && failed.isNotEmpty()) error(output)
+        return output
+    }
+
+    private fun startPersistentWorkflow(tasks: List<String>, mode: String): String {
+        val workflowMode = HarnessWorkflowMode.parse(mode)
+        val cleanTasks = tasks.map(String::trim).filter(String::isNotBlank).take(4)
+        require(cleanTasks.isNotEmpty()) { "工作流至少需要一个子任务" }
+        val workflowId = "wf-" + UUID.randomUUID().toString().replace("-", "").take(16)
+        val sessionId = currentSessionId
+        val boundState = _state.value
+        val boundRunner = persistentSubagentRunner(sessionId, boundState)
+        val boundLog = eventLogFor(sessionId)
+        val payload = buildJsonObject {
+            put("session_id", sessionId)
+            put("workflow_id", workflowId)
+            put("mode", workflowMode.name.lowercase())
+            put("tasks", JsonArray(cleanTasks.map(::JsonPrimitive)))
+        }.toString()
+        return jobs.startPersistent(
+            label = "工作流：" + cleanTasks.first().take(100),
+            resumeKind = "workflow_readonly",
+            resumePayload = payload,
+        ) { _, report ->
+            report("正在执行工作流：" + workflowId)
+            runWorkflow(
+                tasks = cleanTasks,
+                mode = workflowMode.name.lowercase(),
+                workflowId = workflowId,
+                runner = boundRunner,
+                workflowLog = boundLog,
+                subagentMaxSteps = boundState.subagentMaxSteps,
+                failOnTaskError = true,
+            )
         }
     }
 
