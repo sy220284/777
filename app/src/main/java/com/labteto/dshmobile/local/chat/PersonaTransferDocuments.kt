@@ -117,6 +117,7 @@ internal object PersonaTransferDocuments {
             stories = entry.stories.map { story ->
                 story.copy(
                     sourceSessionIds = emptyList(),
+                    excludedMessageKeys = emptyList(),
                     history = story.history.filter { it.role == "user" || it.role == "assistant" },
                 )
             },
