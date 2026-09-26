@@ -105,7 +105,11 @@ internal fun resolveChatInteractionIntent(
     val continuesPrevious =
         CONTINUATION_HINTS.any { text.contains(it) } ||
             text in SHORT_INTERACTION_CONTINUATIONS ||
-            hasChineseSuggestiveFlirtingIntent(text)
+            hasChineseSuggestiveFlirtingIntent(text) ||
+            (
+                previous == ChatInteractionIntent.INTIMATE &&
+                    PROACTIVE_INTIMACY_HINTS.any { text.contains(it) }
+                )
     return if (continuesPrevious) previous else ChatInteractionIntent.NORMAL
 }
 
