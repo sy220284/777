@@ -5266,6 +5266,7 @@ class LocalHarnessEngine @Inject constructor(
         publishPreview: Boolean = true,
         maxAttemptsOverride: Int? = null,
         allowContextOverflowRecovery: Boolean = true,
+        persistOverflowHistory: Boolean = false,
     ): LocalModelReply {
         val tools = toolsOverride ?: modelToolSchemas()
         val logMessages = redactModelImages(messages)
@@ -5390,6 +5391,9 @@ class LocalHarnessEngine @Inject constructor(
             }
             val compacted = historyCompactor.compactForOverflow(messages, summaryMode)
                 ?: throw error
+            if (persistOverflowHistory) {
+                persistForegroundOverflowCompaction(snapshot, summaryMode)
+            }
             eventLog.append("request/context-overflow-recovery", buildJsonObject {
                 put("step", step)
                 put("model", snapshot.model)
@@ -5406,8 +5410,31 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = publishPreview,
                 maxAttemptsOverride = maxAttemptsOverride,
                 allowContextOverflowRecovery = false,
+                persistOverflowHistory = false,
             )
         }
+    }
+
+    private fun persistForegroundOverflowCompaction(
+        snapshot: LocalHarnessState,
+        summaryMode: LocalHistorySummaryMode,
+    ) {
+        if (snapshot.sessionId != currentSessionId || snapshot.groupChat.enabled) return
+        val compaction = applyOverflowCompaction(
+            history = modelHistory,
+            compactor = historyCompactor,
+            summaryMode = summaryMode,
+        ) ?: return
+        eventLog.append("session/compaction", buildJsonObject {
+            put("trigger", "context-overflow")
+            put("omitted_messages", compaction.omittedMessages)
+            put("summary", compaction.summary)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
+        })
+        checkpointModelHistory("session/context-overflow")
+        updateContextMetrics()
+        persist()
     }
 
     private fun currentHistoryBudget(): LocalHistoryBudget {
