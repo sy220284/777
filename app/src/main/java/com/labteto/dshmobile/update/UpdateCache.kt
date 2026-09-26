@@ -26,8 +26,22 @@ internal object UpdateCache {
     )
 
     @Synchronized
-    fun prepare(cacheDir: File): File {
+    fun prepare(
+        cacheDir: File,
+        currentVersionCode: Long,
+        nowMillis: Long,
+    ): File {
         val root = File(cacheDir, DIRECTORY_NAME)
+        val protectedForMillis = cleanupStale(
+            cacheDir = cacheDir,
+            currentVersionCode = currentVersionCode,
+            nowMillis = nowMillis,
+        )
+        if (protectedForMillis != null) {
+            throw IOException(
+                "上一份更新仍由系统安装器处理，请先完成安装；安装包会在系统释放后自动清理",
+            )
+        }
         if (root.exists() && !root.deleteRecursively()) {
             throw IOException("无法清理旧更新缓存，请释放存储空间后重试")
         }
