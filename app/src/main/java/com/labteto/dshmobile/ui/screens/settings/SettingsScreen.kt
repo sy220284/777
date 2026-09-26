@@ -1,10 +1,13 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +21,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,13 +47,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,7 +72,9 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -72,11 +85,14 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * App settings, grouped into cards.
@@ -183,36 +199,24 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.Cloud,
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
+                                iconFamily = DsIconFamily.Accent,
+                                value = localHarness.model.takeIf { it.isNotBlank() },
                                 onClick = { page = SettingsDestination.MODELS },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_pricing),
-                                subtitle = stringResource(R.string.settings_pricing_subtitle),
-                                onClick = { page = SettingsDestination.PRICING },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.History,
-                                title = stringResource(R.string.usage_calculation_title),
-                                subtitle = stringResource(R.string.usage_calculation_subtitle),
-                                onClick = { page = SettingsDestination.USAGE },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
+                                iconFamily = DsIconFamily.Purple,
+                                value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
-                            )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_chat),
-                                subtitle = stringResource(R.string.settings_chat_subtitle),
-                                onClick = { page = SettingsDestination.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
                                 title = stringResource(R.string.settings_page_general),
                                 subtitle = stringResource(R.string.settings_general_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                value = appearanceLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.GENERAL },
                             )
                         }
@@ -223,12 +227,18 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.PhoneAndroid,
                                 title = stringResource(R.string.settings_page_permissions),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
+                                iconFamily = DsIconFamily.Green,
                                 onClick = { page = SettingsDestination.PERMISSIONS },
+                                trailing = {
+                                    StateDot(deviceCapabilitiesState(deviceCapabilities))
+                                },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
+                                iconFamily = DsIconFamily.Amber,
+                                value = enabledNotificationCount(settings).toString(),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
@@ -239,15 +249,26 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
+                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
                         }
+                        Text(
+                            "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
+                            style = DsType.caption11,
+                            color = colors.labelCaption,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = DsSpacing.small)
+                                .wrapContentWidth(Alignment.CenterHorizontally),
+                        )
                     }
 
                     SettingsDestination.GENERAL -> {
                         SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                             LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
                             BackgroundRow(
                                 path = settings.backgroundImagePath,
                                 adaptiveContrast = settings.backgroundAdaptiveContrast,
@@ -264,6 +285,22 @@ fun SettingsScreen(
                                 sessionSort == "updated",
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
+                        }
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_chat_style_guard),
+                                subtitle = stringResource(R.string.settings_chat_style_guard_hint),
+                                iconFamily = DsIconFamily.Purple,
+                                value = stringResource(
+                                    if (localHarness.chatStyleGuardEnabled) {
+                                        R.string.common_enabled
+                                    } else {
+                                        R.string.common_disabled
+                                    },
+                                ),
+                                onClick = { page = SettingsDestination.CHAT },
+                            )
                         }
                     }
 
@@ -398,6 +435,22 @@ fun SettingsScreen(
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                         LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_pricing),
+                                subtitle = stringResource(R.string.settings_pricing_subtitle),
+                                iconFamily = DsIconFamily.Amber,
+                                onClick = { page = SettingsDestination.PRICING },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.History,
+                                title = stringResource(R.string.usage_calculation_title),
+                                subtitle = stringResource(R.string.usage_calculation_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                onClick = { page = SettingsDestination.USAGE },
+                            )
+                        }
                     }
 
                     SettingsDestination.PRICING -> {
@@ -409,6 +462,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MEMORY -> {
+                        MemoryOverviewCard(localHarness, memories.size)
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
                         MemoryManagementCard(memories, viewModel, toast.second)
                     }
@@ -426,7 +480,8 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
-                        SettingsCard(stringResource(R.string.settings_notifications), Icons.Outlined.Notifications) {
+                        // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
+                        SettingsCard(stringResource(R.string.settings_notifications_group_agent), Icons.Outlined.Notifications) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_turn),
                                 settings.notifyTurnComplete,
@@ -442,11 +497,25 @@ fun SettingsScreen(
                                 settings.notifyNeedsAction,
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs), Icons.Outlined.Notifications) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
                                 stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = DsShapes.row,
+                            color = colors.warnTertiary,
+                        ) {
+                            Text(
+                                stringResource(R.string.settings_notifications_usage_hint),
+                                style = DsType.caption11,
+                                color = colors.warnLabel,
+                                modifier = Modifier.padding(DsSpacing.medium),
+                            )
                         }
                     }
 
@@ -454,17 +523,17 @@ fun SettingsScreen(
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {
-                            DsButton(
-                                text = stringResource(R.string.settings_network_diagnostic),
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Link,
+                                title = stringResource(R.string.settings_network_diagnostic),
+                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { showDiagnostic = true },
-                                variant = DsButtonVariant.Outline,
-                                modifier = Modifier.fillMaxWidth(),
                             )
-                            DsButton(
-                                text = stringResource(R.string.settings_environment_capabilities),
+                            DsCategoryRow(
+                                icon = Icons.Outlined.PhoneAndroid,
+                                title = stringResource(R.string.settings_environment_capabilities),
+                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { showEnvironment = true },
-                                variant = DsButtonVariant.Ghost,
-                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
@@ -599,41 +668,58 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
     val colors = DsTheme.colors
     val isConnected = connectionState.phase == ConnectionPhase.CONNECTED ||
         connectionState.phase == ConnectionPhase.RECONNECTING
+    val statusText = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> stringResource(R.string.common_connected)
+        ConnectionPhase.RECONNECTING -> stringResource(R.string.common_reconnecting)
+        ConnectionPhase.CONNECTING -> stringResource(R.string.common_loading)
+        ConnectionPhase.DISCONNECTED -> stringResource(R.string.common_offline)
+    }
+    val statusState = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> StateDotState.Done
+        ConnectionPhase.RECONNECTING, ConnectionPhase.CONNECTING -> StateDotState.Running
+        ConnectionPhase.DISCONNECTED -> StateDotState.Idle
+    }
+    val heroColor = when (connectionState.phase) {
+        ConnectionPhase.CONNECTED -> colors.successTertiary
+        ConnectionPhase.RECONNECTING -> colors.warnTertiary
+        ConnectionPhase.CONNECTING -> colors.accentTertiary
+        ConnectionPhase.DISCONNECTED -> colors.hoverSolid
+    }
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            stringResource(R.string.settings_connection_status),
-            style = DsType.std14,
-            color = colors.labelSecondary,
-            modifier = Modifier.weight(1f),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StateDot(
-                when (connectionState.phase) {
-                    ConnectionPhase.CONNECTED -> StateDotState.Done
-                    ConnectionPhase.RECONNECTING, ConnectionPhase.CONNECTING -> StateDotState.Running
-                    else -> StateDotState.Idle
-                },
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(
-                when (connectionState.phase) {
-                    ConnectionPhase.CONNECTED -> stringResource(R.string.common_connected)
-                    ConnectionPhase.RECONNECTING -> stringResource(R.string.common_reconnecting)
-                    ConnectionPhase.CONNECTING -> stringResource(R.string.common_loading)
-                    else -> stringResource(R.string.common_offline)
-                },
-                style = DsType.small13,
-                color = colors.labelTertiary,
-            )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = heroColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StateDot(statusState)
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(statusText, style = DsType.std14Strong, color = colors.labelPrimary)
+            }
+            connectionState.host?.let { host ->
+                LabelledValue(
+                    stringResource(R.string.settings_connection_host),
+                    host.displayAddress,
+                )
+                LabelledValue(
+                    stringResource(R.string.settings_connection_protocol),
+                    if (host.useTls) "HTTPS" else "HTTP",
+                )
+            }
+            if (connectionState.phase == ConnectionPhase.RECONNECTING && connectionState.attempts > 0) {
+                LabelledValue(
+                    stringResource(R.string.settings_connection_attempts),
+                    connectionState.attempts.toString(),
+                )
+            }
         }
     }
 
     if (isConnected && connectionState.host != null) {
-        LabelledValue(
-            stringResource(R.string.settings_connection_host),
-            connectionState.host.authority,
-        )
         DsButton(
             text = stringResource(R.string.settings_connection_disconnect),
             onClick = onDisconnect,
@@ -700,9 +786,39 @@ private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
     }
 }
 
+private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
+    settings.notifyTurnComplete,
+    settings.notifyGoal,
+    settings.notifyNeedsAction,
+    settings.notifyLocalJobs,
+).count { it }
+
+private fun deviceCapabilitiesState(state: DeviceCapabilitiesState): StateDotState = when {
+    state.loading -> StateDotState.Running
+    state.error != null -> StateDotState.Error
+    state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
+        StateDotState.Done
+    state.shizukuAlive || state.accessibility || state.notifications -> StateDotState.Warning
+    else -> StateDotState.Idle
+}
+
+@Composable
+private fun appearanceLabel(preference: String): String = when (preference) {
+    "light" -> stringResource(R.string.settings_appearance_light)
+    "dark" -> stringResource(R.string.settings_appearance_dark)
+    "matte_black" -> stringResource(R.string.settings_appearance_matte_black)
+    else -> stringResource(R.string.settings_appearance_system)
+}
+
 @Composable
 private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = DsTheme.colors
+    val options = listOf(
+        "light" to stringResource(R.string.settings_appearance_light),
+        "dark" to stringResource(R.string.settings_appearance_dark),
+        "matte_black" to stringResource(R.string.settings_appearance_matte_black),
+        "system" to stringResource(R.string.settings_appearance_system),
+    )
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
         Text(
             stringResource(R.string.settings_appearance),
@@ -710,26 +826,137 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_light),
-                    settings.themePreference == "light",
-                ) { onSelect("light") }
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_dark),
-                    settings.themePreference == "dark",
-                ) { onSelect("dark") }
+        // 预览先行：每块内画出主题本身的底色与卡片条，选中块描 accent 边
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            options.take(2).forEach { (key, label) ->
+                ThemePreviewBlock(
+                    themeKey = key,
+                    label = label,
+                    selected = settings.themePreference == key,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(key) },
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_matte_black),
-                    settings.themePreference == "matte_black",
-                ) { onSelect("matte_black") }
-                AppearanceChip(
-                    stringResource(R.string.settings_appearance_system),
-                    settings.themePreference == "system",
-                ) { onSelect("system") }
+        }
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            options.takeLast(2).forEach { (key, label) ->
+                ThemePreviewBlock(
+                    themeKey = key,
+                    label = label,
+                    selected = settings.themePreference == key,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(key) },
+                )
+            }
+        }
+    }
+}
+
+/** 单个主题预览块：上半段画该主题的底色与卡片条，下半段是名称。 */
+@Composable
+private fun ThemePreviewBlock(
+    themeKey: String,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    // 各主题的示意底色/卡片色（与 Color.kt 语义值一致）
+    val (bg, card) = when (themeKey) {
+        "light" -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
+        "dark" -> Color(0xFF0F1514) to Color(0xFF182120)
+        "matte_black" -> Color(0xFF000000) to Color(0xFF111111)
+        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514)
+    }
+    Column(
+        modifier = modifier
+            .clip(DsShapes.cube)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) colors.accent else colors.borderL2,
+                shape = DsShapes.cube,
+            )
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .background(bg),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (themeKey == "system") {
+                Row(Modifier.fillMaxWidth()) {
+                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFFF7F8F6)))
+                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFF0F1514)))
+                }
+            }
+            // 卡片条示意
+            Box(
+                Modifier
+                    .padding(start = 10.dp)
+                    .size(width = 64.dp, height = 16.dp)
+                    .background(card, RoundedCornerShape(5.dp)),
+            )
+        }
+        Text(
+            label,
+            style = DsType.small13,
+            color = if (selected) colors.accent else colors.labelSecondary,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
+    }
+}
+
+@Composable
+private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
+    val colors = DsTheme.colors
+    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+        Text(
+            stringResource(R.string.settings_accent_theme),
+            style = DsType.std14,
+            color = colors.labelSecondary,
+        )
+        Spacer(Modifier.height(DsSpacing.small))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        ) {
+            AccentPalettes.ALL.forEach { palette ->
+                val selected = settings.accentTheme == palette.key
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .width(68.dp)
+                        .clip(DsShapes.cube)
+                        .border(
+                            width = if (selected) 1.5.dp else 1.dp,
+                            color = if (selected) palette.lightAccent else colors.borderL2,
+                            shape = DsShapes.cube,
+                        )
+                        .clickable { onSelect(palette.key) }
+                        .padding(8.dp),
+                ) {
+                    // 色卡本体：亮档/暗档/浅衬 三段色条
+                    Row(Modifier.fillMaxWidth().height(24.dp).clip(DsShapes.row)) {
+                        Box(Modifier.weight(1f).fillMaxHeight().background(palette.lightAccent))
+                        Box(Modifier.weight(1f).fillMaxHeight().background(palette.darkAccent))
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .background(palette.lightAccent.copy(alpha = 0.35f)),
+                        )
+                    }
+                    Spacer(Modifier.height(DsSpacing.xsmall))
+                    Text(
+                        palette.cnName,
+                        style = DsType.caption11,
+                        color = if (selected) colors.labelPrimary else colors.labelTertiary,
+                    )
+                }
             }
         }
     }
@@ -779,6 +1006,33 @@ private fun BackgroundRow(
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
+        if (path != null) {
+            val imagePath = path
+            val thumbnail by produceState<ImageBitmap?>(initialValue = null, key1 = imagePath) {
+                value = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(imagePath, bounds)
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                        var sample = 1
+                        while (bounds.outHeight / (sample * 2) >= 96) sample *= 2
+                        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                        BitmapFactory.decodeFile(imagePath, opts)?.asImageBitmap()
+                    }.getOrNull()
+                }
+            }
+            thumbnail?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 96.dp, height = 56.dp)
+                        .clip(DsShapes.cube),
+                )
+                Spacer(Modifier.height(DsSpacing.small))
+            }
+        }
         Text(
             stringResource(
                 if (path == null) {

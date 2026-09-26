@@ -203,6 +203,9 @@
     <string name="settings_background_adaptive_contrast">背景自适应</string>
     <string name="settings_background_adaptive_contrast_hint">自动分析背景的亮度、对比度、饱和度和细节密度，并按顶部、正文、底部区域调整阅读层、气泡和输入区，换图后也保持清晰。</string>
     <string name="settings_notifications">通知</string>
+    <string name="settings_accent_theme">配色</string>
+    <string name="settings_notifications_group_agent">智能体反馈</string>
+    <string name="settings_notifications_group_jobs">后台任务</string>
     <string name="settings_notifications_turn">回合完成时通知</string>
     <string name="settings_notifications_goal">目标完成或受阻时通知</string>
     <string name="settings_notifications_action">需要你操作时通知</string>
@@ -290,6 +293,8 @@
     <string name="settings_connection">连接</string>
     <string name="settings_connection_status">状态</string>
     <string name="settings_connection_host">已连接到</string>
+    <string name="settings_connection_protocol">协议</string>
+    <string name="settings_connection_attempts">重连次数</string>
     <string name="settings_connection_disconnect">断开连接</string>
     <string name="settings_connection_disconnect_confirm">要断开与 Harness 的连接吗？</string>
     <string name="settings_connection_disconnect_message">你将返回连接界面。</string>
@@ -505,6 +510,15 @@
     <string name="advanced_deactivate">停用</string>
     <string name="advanced_default_model">默认模型</string>
     <string name="advanced_device_capabilities">设备能力</string>
+    <string name="advanced_device_status_checking">正在检查设备能力</string>
+    <string name="advanced_device_status_ready">设备能力已就绪</string>
+    <string name="advanced_device_status_needs_setup">部分能力需要配置</string>
+    <string name="advanced_device_status_error">设备能力检查失败</string>
+    <string name="advanced_shizuku_service_hint">检查本机 Shizuku 服务是否正在运行。</string>
+    <string name="advanced_shizuku_permission_hint">用于通过 Shizuku 执行需要较高权限的设备操作。</string>
+    <string name="advanced_accessibility_hint">用于执行常规界面点击、输入与导航。</string>
+    <string name="advanced_notification_access_hint">任务需要通知上下文时读取本机通知。</string>
+    <string name="advanced_virtual_display_hint">允许设备任务在隔离的虚拟屏幕中持续执行。</string>
     <string name="advanced_discover_models">发现可用模型</string>
     <string name="advanced_discovering_models">正在发现…</string>
     <string name="advanced_enable_accessibility">开启无障碍控制</string>
@@ -522,6 +536,16 @@
     <string name="advanced_memory_content">记忆内容</string>
     <string name="advanced_memory_deactivated">记忆已停用</string>
     <string name="advanced_memory_empty">当前作用域还没有长期记忆。</string>
+    <string name="advanced_memory_overview">记忆状态</string>
+    <string name="advanced_auto_recall_on">自动召回已开启</string>
+    <string name="advanced_auto_recall_off">自动召回已关闭</string>
+    <string name="advanced_auto_memory_on">自动记忆已开启</string>
+    <string name="advanced_auto_memory_off">自动记忆已关闭</string>
+    <string name="advanced_memory_active_count">%1$d 条活跃记忆</string>
+    <string name="advanced_memory_search">搜索记忆</string>
+    <string name="advanced_memory_filter_all">全部</string>
+    <string name="advanced_memory_visible_count">显示 %1$d / %2$d</string>
+    <string name="advanced_memory_filter_empty">没有符合当前搜索或筛选条件的记忆。</string>
     <string name="advanced_memory_manage_hint">显示当前对话允许访问的长期记忆。修改和停用会直接影响后续自动召回。</string>
     <string name="advanced_memory_saved">记忆设置已保存</string>
     <string name="advanced_memory_settings">记忆设置</string>
@@ -619,6 +643,9 @@
     <string name="pricing_same_thinking">思考 / 非思考：Token 单价相同</string>
     <string name="pricing_off_peak_row">空闲 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
     <string name="pricing_peak_row">高峰 · 缓存命中 ¥%1$s · 未命中 ¥%2$s · 输出 ¥%3$s / 百万 Token</string>
+    <string name="pricing_col_cache_hit">缓存命中</string>
+    <string name="pricing_col_cache_miss">缓存未命中</string>
+    <string name="pricing_col_output">输出</string>
     <string name="pricing_holiday_hint">预估金额按北京时间工作日峰谷计算。DeepSeek 官网将中国法定节假日按空闲价计费；应用暂未内置节假日表，因此节假日预估可能略高。</string>
     <string name="pricing_refresh">联网查询官网最新价格</string>
     <string name="pricing_refreshing">正在查询官网价格…</string>
@@ -929,6 +956,9 @@
     <string name="persona_gallery_import_failed">人物导入失败</string>
 
 <string name="tasks_schedule_label">执行方式</string>
+<string name="tasks_status_running">运行中</string>
+<string name="tasks_status_queued">等待执行</string>
+<string name="tasks_status_scheduled">已排期</string>
 <string name="tasks_schedule_once">一次</string>
 <string name="tasks_schedule_daily">每天</string>
 <string name="tasks_schedule_weekly">每周</string>
@@ -965,4 +995,12 @@
 
     <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
     <string name="local_transcript_load_older_unknown">加载更早消息</string>
+    <string name="advanced_project_risk_notice">此区块直接修改 Harness 侧 settings 命名空间。部分配置立即生效，部分需要重启；修改生产配置前建议与 Harness 管理员确认。</string>
+    <string name="advanced_user_rules_count">%1$d / %2$d 字</string>
+    <string name="advanced_memory_filter_count">%1$s %2$d</string>
+    <string name="advanced_edit_memory">编辑记忆</string>
+    <string name="advanced_pinned">置顶</string>
+    <string name="settings_notifications_usage_hint">回合完成通知更适合长任务场景；纯聊天时关闭可减少不必要的打扰。</string>
+    <string name="persona_gallery_overview_stats">%1$d 个人物 · %2$d 条故事线 · %3$d 条归档对白</string>
+    <string name="persona_gallery_my_characters">我的人物</string>
 </resources>

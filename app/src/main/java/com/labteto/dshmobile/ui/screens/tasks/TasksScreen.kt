@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,10 +42,13 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.components.DsTimeline
+import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -529,30 +533,38 @@ private fun TaskCard(
             }
         }
     }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-    ) {
+    val title = if (task.mode == AutomationMode.CHAT) {
+        val actor = task.actorName?.takeIf(String::isNotBlank) ?: chatCharacterFallback
+        "$actor · ${task.prompt.lineSequence().firstOrNull()?.trim()?.take(42).orEmpty()}"
+    } else {
+        task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
+            .ifBlank { backgroundTaskLabel }
+    }
+    val terminalOneShot = task.recurringMinutes == null &&
+        task.status in setOf("completed", "failed", "blocked")
+    val timing = if (terminalOneShot && task.lastRunAt != null) {
+        stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+    } else {
+        stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+    }
+
+    DsGroupCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalAlignment = Alignment.Top,
         ) {
-            StateDot(taskStatus(task.status))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (task.mode == AutomationMode.CHAT) {
-                        val actor = task.actorName?.takeIf(String::isNotBlank) ?: chatCharacterFallback
-                        "$actor · ${task.prompt.lineSequence().firstOrNull()?.trim()?.take(42).orEmpty()}"
-                    } else {
-                        task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
-                            .ifBlank { backgroundTaskLabel }
-                    },
+                    title,
                     style = DsType.std14Strong,
                     color = colors.labelPrimary,
                 )
-                Text(scheduleLabel, style = DsType.caption11, color = colors.labelTertiary)
+                Text(
+                    timing,
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
             }
             DsButton(
                 text = stringResource(R.string.tasks_cancel),
@@ -561,24 +573,24 @@ private fun TaskCard(
                 variant = DsButtonVariant.Ghost,
             )
         }
-        val terminalOneShot = task.recurringMinutes == null &&
-            task.status in setOf("completed", "failed", "blocked")
-        Text(
-            if (terminalOneShot && task.lastRunAt != null) {
-                stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
-            } else {
-                stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
-            },
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-            modifier = Modifier.padding(start = DsSpacing.xlarge),
-        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsStatusPill(
+                state = taskStatus(task.status),
+                label = taskStatusLabel(task.status),
+            )
+            DsPill(text = scheduleLabel)
+        }
+
         task.lastError?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_status, it.take(160)),
                 style = DsType.caption11,
                 color = colors.error,
-                modifier = Modifier.padding(start = DsSpacing.xlarge),
             )
         }
         task.lastResult?.takeIf(String::isNotBlank)?.let {
@@ -586,31 +598,30 @@ private fun TaskCard(
                 stringResource(R.string.tasks_last_result, it.replace("\n", " ").take(180)),
                 style = DsType.caption11,
                 color = colors.labelSecondary,
-                modifier = Modifier.padding(start = DsSpacing.xlarge),
                 maxLines = 2,
             )
         }
+
         if (task.runReceipts.isNotEmpty()) {
             Text(
                 stringResource(R.string.tasks_run_history, task.runReceipts.size),
                 style = DsType.caption11,
                 color = colors.labelTertiary,
-                modifier = Modifier.padding(start = DsSpacing.xlarge),
             )
-            task.runReceipts.takeLast(3).asReversed().forEach { receipt ->
-                Text(
-                    stringResource(
+            val timelineItems = mutableListOf<DsTimelineItem>()
+            for (receipt in task.runReceipts.takeLast(3).asReversed()) {
+                timelineItems += DsTimelineItem(
+                    text = stringResource(
                         R.string.tasks_run_history_item,
                         formatTime(receipt.finishedAt),
                         receiptStatusLabel(receipt),
                     ),
-                    style = DsType.caption11,
-                    color = if (receipt.status == "failed") colors.error else colors.labelSecondary,
-                    modifier = Modifier.padding(start = DsSpacing.xlarge),
-                    maxLines = 2,
+                    state = receiptStatus(receipt.status),
                 )
             }
+            DsTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
         }
+
         (task.targetSessionId ?: task.workSessionId)?.takeIf(String::isNotBlank)?.let { sessionId ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -639,12 +650,31 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
     return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
-private fun taskStatus(status: String): StateDotState = when (status) {
-    "running", "queued" -> StateDotState.Running
-    "completed", "scheduled" -> StateDotState.Done
-    "blocked" -> StateDotState.Warning
-    "failed" -> StateDotState.Error
-    else -> StateDotState.Idle
+private fun receiptStatus(status: String): DsStatus = when (status) {
+    "completed" -> DsStatus.Done
+    "blocked" -> DsStatus.Warning
+    "failed" -> DsStatus.Failed
+    "running", "queued" -> DsStatus.Running
+    else -> DsStatus.Neutral
+}
+
+private fun taskStatus(status: String): DsStatus = when (status) {
+    "running", "queued" -> DsStatus.Running
+    "completed" -> DsStatus.Done
+    "blocked" -> DsStatus.Warning
+    "failed" -> DsStatus.Failed
+    else -> DsStatus.Neutral
+}
+
+@Composable
+private fun taskStatusLabel(status: String): String = when (status) {
+    "running" -> stringResource(R.string.tasks_status_running)
+    "queued" -> stringResource(R.string.tasks_status_queued)
+    "scheduled" -> stringResource(R.string.tasks_status_scheduled)
+    "completed" -> stringResource(R.string.tasks_run_completed)
+    "blocked" -> stringResource(R.string.tasks_run_blocked)
+    "failed" -> stringResource(R.string.tasks_run_failed)
+    else -> stringResource(R.string.tasks_status_scheduled)
 }
 
 private fun formatTime(time: Long): String =

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Memory
@@ -25,7 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.DeepSeekBillingSchedule
@@ -38,10 +43,18 @@ import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.ui.components.DisclosureRow
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
+
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -88,6 +101,20 @@ internal fun ProjectSettingsCard(
             }
             state.namespaces.isEmpty() -> Text(stringResource(R.string.advanced_project_empty), style = DsType.small13, color = DsTheme.colors.labelTertiary)
             else -> {
+                if (state.writable) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = DsShapes.row,
+                        color = DsTheme.colors.warnTertiary,
+                    ) {
+                        Text(
+                            stringResource(R.string.advanced_project_risk_notice),
+                            style = DsType.caption11,
+                            color = DsTheme.colors.warnLabel,
+                            modifier = Modifier.padding(DsSpacing.small),
+                        )
+                    }
+                }
                 Text(
                     if (state.writable) stringResource(R.string.advanced_project_dynamic)
                     else stringResource(R.string.advanced_project_read_only),
@@ -327,17 +354,34 @@ private fun ModelProviderRow(
                 variant = DsButtonVariant.Outline,
             )
             if (models.isNotEmpty()) {
-                Text(
-                    models.joinToString("\n") { model ->
-                        buildString {
-                            append(model.name ?: model.id)
-                            if (model.name != null && model.name != model.id) append(" · ${model.id}")
-                            model.contextWindow?.let { append(" · $contextWindowLabel $it") }
+                // 发现结果逐行成卡：名称 + id + 上下文窗口，替代 \n 拼接的文本墙
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+                    models.forEach { model ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    model.name ?: model.id,
+                                    style = DsType.small13Strong,
+                                    color = colors.labelPrimary,
+                                )
+                                if (model.name != null && model.name != model.id) {
+                                    Text(
+                                        model.id,
+                                        style = DsType.caption11,
+                                        color = colors.labelTertiary,
+                                    )
+                                }
+                            }
+                            model.contextWindow?.let {
+                                Text(
+                                    "$contextWindowLabel $it",
+                                    style = DsType.caption11,
+                                    color = colors.labelTertiary,
+                                )
+                            }
                         }
-                    },
-                    style = DsType.caption11,
-                    color = colors.labelSecondary,
-                )
+                    }
+                }
             }
         }
     }
@@ -356,14 +400,31 @@ internal fun LocalModelSettingsCard(
     var model by remember(local.model) { mutableStateOf(local.model) }
     var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
     var apiKey by remember { mutableStateOf("") }
-    var imageMode by remember(local.imageInputMode) { mutableStateOf(local.imageInputMode) }
+    var showEditor by remember { mutableStateOf(false) }
+
+    val openEditor = {
+        model = local.model
+        baseUrl = local.baseUrl
+        apiKey = ""
+        showEditor = true
+    }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
-        Text(
-            if (local.configured) stringResource(R.string.advanced_model_configured) else stringResource(R.string.advanced_model_unconfigured),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
+        // 状态英雄行：配置现状先于一切可编辑项
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DsStatusPill(
+                state = if (local.configured) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.configured) R.string.advanced_model_configured
+                    else R.string.advanced_model_unconfigured,
+                ),
+            )
+            Spacer(Modifier.width(DsSpacing.small))
+            Column {
+                Text(local.model, style = DsType.std14Strong, color = colors.labelPrimary)
+                Text(local.baseUrl, style = DsType.caption11, color = colors.labelTertiary)
+            }
+        }
         if (local.configured && local.configuredModels.isNotEmpty()) {
             Text(
                 stringResource(R.string.local_saved_models, local.configuredModels.joinToString("、")),
@@ -376,28 +437,26 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        OutlinedTextField(
-            value = model,
-            onValueChange = { model = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_default_model)) },
+
+        DsValueRow(
+            label = stringResource(R.string.advanced_default_model),
+            value = local.model,
+            configured = local.configured,
+            onClick = openEditor,
         )
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_endpoint)) },
+        DsValueRow(
+            label = stringResource(R.string.advanced_endpoint),
+            value = local.baseUrl,
+            configured = local.configured,
+            onClick = openEditor,
         )
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(if (local.configured) R.string.advanced_replace_model_key else R.string.advanced_model_key)) },
-            visualTransformation = PasswordVisualTransformation(),
+        DsValueRow(
+            label = stringResource(R.string.advanced_model_key),
+            value = if (local.configured) "••••" else null,
+            configured = local.configured,
+            onClick = openEditor,
         )
+
         Text(
             stringResource(R.string.advanced_image_input_mode),
             style = DsType.small13Strong,
@@ -408,46 +467,89 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            listOf(
-                LocalImageInputMode.AUTO to R.string.advanced_image_mode_auto,
-                LocalImageInputMode.NATIVE to R.string.advanced_image_mode_native,
-                LocalImageInputMode.TOOL to R.string.advanced_image_mode_tool,
-            ).forEach { (mode, label) ->
-                DsButton(
-                    text = stringResource(label),
-                    onClick = {
-                        imageMode = mode
-                        viewModel.configureLocalImageInputMode(mode)
-                    },
-                    size = DsButtonSize.Small,
-                    variant = if (imageMode == mode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                )
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(
-                text = stringResource(R.string.advanced_save_model_settings),
-                onClick = {
-                    if (!local.configured && apiKey.isBlank()) {
-                        report(modelKeyRequiredMessage)
-                        return@DsButton
-                    }
-                    viewModel.configureLocalModel(apiKey, model, baseUrl)
-                    apiKey = ""
-                    report(modelSavedMessage)
-                },
-                variant = DsButtonVariant.Outline,
+        DsSegmented(
+            segments = listOf(
+                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.advanced_image_mode_auto)),
+                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.advanced_image_mode_native)),
+                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.advanced_image_mode_tool)),
+            ),
+            selectedKey = local.imageInputMode.name,
+            onSelect = { key ->
+                viewModel.configureLocalImageInputMode(LocalImageInputMode.valueOf(key))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    if (showEditor) {
+        DsBottomSheet(
+            title = stringResource(R.string.advanced_model_settings),
+            subtitle = if (local.configured) {
+                stringResource(R.string.advanced_model_configured)
+            } else {
+                stringResource(R.string.advanced_model_unconfigured)
+            },
+            onDismiss = { showEditor = false },
+        ) {
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.advanced_default_model)) },
             )
-            if (local.configured) {
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.advanced_endpoint)) },
+            )
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = {
+                    Text(
+                        stringResource(
+                            if (local.configured) {
+                                R.string.advanced_replace_model_key
+                            } else {
+                                R.string.advanced_model_key
+                            },
+                        ),
+                    )
+                },
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 DsButton(
-                    text = stringResource(R.string.advanced_clear_key),
+                    text = stringResource(R.string.advanced_save_model_settings),
                     onClick = {
-                        viewModel.clearLocalCredential()
-                        report(modelKeyClearedMessage)
+                        if (!local.configured && apiKey.isBlank()) {
+                            report(modelKeyRequiredMessage)
+                            return@DsButton
+                        }
+                        viewModel.configureLocalModel(apiKey, model, baseUrl)
+                        apiKey = ""
+                        showEditor = false
+                        report(modelSavedMessage)
                     },
-                    variant = DsButtonVariant.Ghost,
+                    variant = DsButtonVariant.Outline,
                 )
+                if (local.configured) {
+                    DsButton(
+                        text = stringResource(R.string.advanced_clear_key),
+                        onClick = {
+                            viewModel.clearLocalCredential()
+                            apiKey = ""
+                            showEditor = false
+                            report(modelKeyClearedMessage)
+                        },
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
             }
         }
     }
@@ -508,25 +610,38 @@ internal fun DeepSeekPricingCard(
                         style = DsType.caption11,
                         color = colors.labelSecondary,
                     )
-                    Text(
-                        stringResource(
-                            R.string.pricing_off_peak_row,
-                            formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
-                            formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
-                            formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
-                        ),
-                        style = DsType.small13,
-                        color = if (currentPeriod == DeepSeekPricePeriod.OFF_PEAK) colors.labelPrimary else colors.labelSecondary,
+                    // 表头：缓存命中 / 缓存未命中 / 输出
+                    Row(Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.weight(1.5f))
+                        Text(
+                            stringResource(R.string.pricing_col_cache_hit),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                        Text(
+                            stringResource(R.string.pricing_col_cache_miss),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                        Text(
+                            stringResource(R.string.pricing_col_output),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                        )
+                    }
+                    PriceTableRow(
+                        periodLabel = stringResource(R.string.pricing_period_off_peak),
+                        cacheHit = formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
+                        cacheMiss = formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
+                        output = formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
+                        active = currentPeriod == DeepSeekPricePeriod.OFF_PEAK,
                     )
-                    Text(
-                        stringResource(
-                            R.string.pricing_peak_row,
-                            formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
-                            formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
-                            formatDeepSeekPrice(model.peak.outputCnyPerMillion),
-                        ),
-                        style = DsType.small13,
-                        color = if (currentPeriod == DeepSeekPricePeriod.PEAK) colors.labelPrimary else colors.labelSecondary,
+                    PriceTableRow(
+                        periodLabel = stringResource(R.string.pricing_period_peak),
+                        cacheHit = formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
+                        cacheMiss = formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
+                        output = formatDeepSeekPrice(model.peak.outputCnyPerMillion),
+                        active = currentPeriod == DeepSeekPricePeriod.PEAK,
                     )
                 }
             }
@@ -556,8 +671,76 @@ internal fun DeepSeekPricingCard(
     }
 }
 
+/** 价格表行：时段标签 + 三列右对齐价格；当前计价时段整行提亮。 */
+@Composable
+private fun PriceTableRow(
+    periodLabel: String,
+    cacheHit: String,
+    cacheMiss: String,
+    output: String,
+    active: Boolean,
+) {
+    val colors = DsTheme.colors
+    val labelColor = if (active) colors.accent else colors.labelSecondary
+    val priceColor = if (active) colors.labelPrimary else colors.labelSecondary
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            periodLabel,
+            style = DsType.small13,
+            color = labelColor,
+            modifier = Modifier.weight(1.5f),
+        )
+        Text(cacheHit, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(cacheMiss, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(output, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+    }
+}
+
 private fun formatDeepSeekPrice(value: Double): String =
     String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
+
+@Composable
+internal fun MemoryOverviewCard(
+    local: LocalHarnessState,
+    recordCount: Int,
+) {
+    SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            DsStatusPill(
+                state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.autoRecall) R.string.advanced_auto_recall_on
+                    else R.string.advanced_auto_recall_off,
+                ),
+            )
+            DsStatusPill(
+                state = if (local.autoMemory) DsStatus.Done else DsStatus.Neutral,
+                label = stringResource(
+                    if (local.autoMemory) R.string.advanced_auto_memory_on
+                    else R.string.advanced_auto_memory_off,
+                ),
+            )
+            DsPill(text = stringResource(R.string.advanced_memory_active_count, recordCount))
+        }
+    }
+}
+
+private enum class MemoryFilter { ALL, RULE, PREFERENCE, FACT }
+
+private fun MemoryKind.matchesFilter(filter: MemoryFilter): Boolean = when (filter) {
+    MemoryFilter.ALL -> true
+    MemoryFilter.RULE -> this == MemoryKind.RULE || this == MemoryKind.CONSTRAINT
+    MemoryFilter.PREFERENCE ->
+        this == MemoryKind.PREFERENCE || this == MemoryKind.RELATIONSHIP_PREFERENCE
+    MemoryFilter.FACT -> this in setOf(
+        MemoryKind.FACT,
+        MemoryKind.DECISION,
+        MemoryKind.STATE,
+        MemoryKind.SUMMARY,
+        MemoryKind.RELATIONSHIP_FACT,
+        MemoryKind.RELATIONSHIP_STATE,
+    )
+}
 
 @Composable
 internal fun LocalMemorySettingsCard(
@@ -568,18 +751,14 @@ internal fun LocalMemorySettingsCard(
     val memorySavedMessage = stringResource(R.string.advanced_memory_saved)
     val colors = DsTheme.colors
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
-    var autoRecall by remember(local.autoRecall) { mutableStateOf(local.autoRecall) }
-    var autoMemory by remember(local.autoMemory) { mutableStateOf(local.autoMemory) }
+    var showRulesEditor by remember { mutableStateOf(false) }
 
     SettingsCard(stringResource(R.string.advanced_memory_settings), Icons.Outlined.Memory) {
-        OutlinedTextField(
-            value = userRules,
-            onValueChange = { userRules = it.take(6_000) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.advanced_user_rules)) },
-            supportingText = { Text(stringResource(R.string.advanced_user_rules_hint)) },
-            minLines = 3,
-            maxLines = 6,
+        DsValueRow(
+            label = stringResource(R.string.advanced_user_rules),
+            value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
+            hint = stringResource(R.string.advanced_user_rules_hint),
+            onClick = { showRulesEditor = true },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -590,7 +769,13 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong, color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11, color = colors.labelTertiary)
             }
-            Switch(checked = autoRecall, onCheckedChange = { autoRecall = it })
+            Switch(
+                checked = local.autoRecall,
+                onCheckedChange = { next ->
+                    viewModel.configureLocalMemory(userRules, next, local.autoMemory)
+                    report(memorySavedMessage)
+                },
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -601,16 +786,43 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong, color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11, color = colors.labelTertiary)
             }
-            Switch(checked = autoMemory, onCheckedChange = { autoMemory = it })
+            Switch(
+                checked = local.autoMemory,
+                onCheckedChange = { next ->
+                    viewModel.configureLocalMemory(userRules, local.autoRecall, next)
+                    report(memorySavedMessage)
+                },
+            )
         }
-        DsButton(
-            text = stringResource(R.string.advanced_save_memory_settings),
-            onClick = {
-                viewModel.configureLocalMemory(userRules, autoRecall, autoMemory)
-                report(memorySavedMessage)
-            },
-            variant = DsButtonVariant.Outline,
-        )
+    }
+
+    if (showRulesEditor) {
+        DsBottomSheet(
+            title = stringResource(R.string.advanced_user_rules),
+            subtitle = stringResource(R.string.advanced_user_rules_hint),
+            onDismiss = { showRulesEditor = false },
+        ) {
+            OutlinedTextField(
+                value = userRules,
+                onValueChange = { userRules = it.take(6_000) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 5,
+                maxLines = 10,
+                label = { Text(stringResource(R.string.advanced_user_rules)) },
+                supportingText = {
+                    Text(stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000))
+                },
+            )
+            DsButton(
+                text = stringResource(R.string.common_save),
+                onClick = {
+                    viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory)
+                    report(memorySavedMessage)
+                    showRulesEditor = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -623,6 +835,18 @@ internal fun MemoryManagementCard(
     val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
     val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
     val colors = DsTheme.colors
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(MemoryFilter.ALL) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+
+    val visibleRecords = remember(records, query, filter) {
+        val needle = query.trim()
+        records.filter { record ->
+            record.kind.matchesFilter(filter) &&
+                (needle.isBlank() || record.content.contains(needle, ignoreCase = true))
+        }
+    }
+
     SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
         if (records.isEmpty()) {
             Text(
@@ -638,55 +862,100 @@ internal fun MemoryManagementCard(
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it.take(200) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(stringResource(R.string.advanced_memory_search)) },
+        )
 
-        records.forEach { record ->
-            var expanded by remember(record.id) { mutableStateOf(false) }
-            var content by remember(record.id, record.updatedAt) { mutableStateOf(record.content) }
-            var pinned by remember(record.id, record.updatedAt) { mutableStateOf(record.pinned) }
-            DisclosureRow(
-                title = record.content.take(54),
-                summary = memoryScopeLabel(record.scope) + " · " + memoryKindLabel(record.kind) +
-                    if (record.pinned) stringResource(R.string.advanced_pinned_suffix) else "",
-                expanded = expanded,
-                onToggle = { expanded = !expanded },
+        val filterOptions = listOf(
+            MemoryFilter.ALL to R.string.advanced_memory_filter_all,
+            MemoryFilter.RULE to R.string.advanced_kind_rule,
+            MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
+            MemoryFilter.FACT to R.string.advanced_kind_fact,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+            filterOptions.chunked(2).forEach { rowOptions ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    rowOptions.forEach { (candidate, label) ->
+                        val count = records.count { it.kind.matchesFilter(candidate) }
+                        DsPill(
+                            text = stringResource(
+                                R.string.advanced_memory_filter_count,
+                                stringResource(label),
+                                count,
+                            ),
+                            selected = filter == candidate,
+                            onClick = { filter = candidate },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+
+        Text(
+            stringResource(R.string.advanced_memory_visible_count, visibleRecords.size, records.size),
+            style = DsType.caption11,
+            color = colors.labelTertiary,
+        )
+
+        if (visibleRecords.isEmpty()) {
+            Text(
+                stringResource(R.string.advanced_memory_filter_empty),
+                style = DsType.small13,
+                color = colors.labelTertiary,
+            )
+        }
+
+        visibleRecords.forEach { record ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = DsShapes.block,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             ) {
                 Column(
-                    modifier = Modifier.padding(start = DsSpacing.large),
+                    modifier = Modifier.padding(DsSpacing.medium),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                    OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it.take(2_000) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.advanced_memory_content)) },
-                        minLines = 2,
-                        maxLines = 6,
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DsPill(text = memoryKindLabel(record.kind), selected = true)
+                        DsPill(text = memoryScopeLabel(record.scope))
+                        if (record.pinned) {
+                            DsPill(text = stringResource(R.string.advanced_pinned), warn = true)
+                        }
+                    }
+                    Text(
+                        record.content,
+                        style = DsType.std14,
+                        color = colors.labelPrimary,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Row(
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong, color = colors.labelPrimary)
-                            Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11, color = colors.labelTertiary)
-                        }
-                        Switch(checked = pinned, onCheckedChange = { pinned = it })
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        Text(
+                            DateFormat.getDateInstance(DateFormat.SHORT).format(Date(record.updatedAt)),
+                            style = DsType.caption11,
+                            color = colors.labelCaption,
+                            modifier = Modifier.weight(1f),
+                        )
                         DsButton(
-                            text = stringResource(R.string.common_save),
-                            onClick = {
-                                viewModel.updateMemory(
-                                    id = record.id,
-                                    content = content,
-                                    pinned = pinned,
-                                ) { error ->
-                                    report(error ?: memoryUpdatedMessage)
-                                }
-                            },
+                            text = stringResource(R.string.advanced_edit_memory),
+                            onClick = { editingId = record.id },
                             size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Outline,
+                            variant = DsButtonVariant.Ghost,
                         )
                         DsButton(
                             text = stringResource(R.string.advanced_deactivate),
@@ -701,6 +970,51 @@ internal fun MemoryManagementCard(
                     }
                 }
             }
+        }
+    }
+
+    val editing = records.firstOrNull { it.id == editingId }
+    if (editing != null) {
+        var content by remember(editing.id, editing.updatedAt) { mutableStateOf(editing.content) }
+        var pinned by remember(editing.id, editing.updatedAt) { mutableStateOf(editing.pinned) }
+        DsBottomSheet(
+            title = stringResource(R.string.advanced_edit_memory),
+            subtitle = memoryScopeLabel(editing.scope) + " · " + memoryKindLabel(editing.kind),
+            onDismiss = { editingId = null },
+        ) {
+            OutlinedTextField(
+                value = content,
+                onValueChange = { content = it.take(2_000) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.advanced_memory_content)) },
+                minLines = 4,
+                maxLines = 8,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong, color = colors.labelPrimary)
+                    Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11, color = colors.labelTertiary)
+                }
+                Switch(checked = pinned, onCheckedChange = { pinned = it })
+            }
+            DsButton(
+                text = stringResource(R.string.common_save),
+                onClick = {
+                    viewModel.updateMemory(
+                        id = editing.id,
+                        content = content,
+                        pinned = pinned,
+                    ) { error ->
+                        report(error ?: memoryUpdatedMessage)
+                    }
+                    editingId = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -737,46 +1051,93 @@ internal fun LocalAgentSettingsCard(
     report: (String) -> Unit,
 ) {
     val agentSavedMessage = stringResource(R.string.advanced_agent_saved)
-    var mainSteps by remember(local.mainMaxSteps) { mutableStateOf(local.mainMaxSteps.toString()) }
-    var subagentSteps by remember(local.subagentMaxSteps) { mutableStateOf(local.subagentMaxSteps.toString()) }
-    var attempts by remember(local.modelAttempts) { mutableStateOf(local.modelAttempts.toString()) }
+
+    // 步进即保存：不再积攒草稿等“保存”按钮，误触也不可能（有边界钳制）
+    fun clampUpdate(current: Int, delta: Int, min: Int, max: Int, apply: (Int) -> Unit) {
+        val next = (current + delta).coerceIn(min, max)
+        if (next != current) {
+            apply(next)
+            report(agentSavedMessage)
+        }
+    }
 
     SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            OutlinedTextField(
-                value = mainSteps,
-                onValueChange = { mainSteps = it.filter(Char::isDigit).take(3) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_main_steps)) },
-            )
-            OutlinedTextField(
-                value = subagentSteps,
-                onValueChange = { subagentSteps = it.filter(Char::isDigit).take(2) },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_subagent_steps)) },
-            )
+        StepperRow(
+            label = stringResource(R.string.advanced_main_steps),
+            hint = stringResource(R.string.advanced_agent_limits_hint),
+            value = local.mainMaxSteps,
+            range = 4..128,
+            onDelta = { delta ->
+                clampUpdate(local.mainMaxSteps, delta, 4, 128) {
+                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts)
+                }
+            },
+        )
+        StepperRow(
+            label = stringResource(R.string.advanced_subagent_steps),
+            hint = null,
+            value = local.subagentMaxSteps,
+            range = 1..128,
+            onDelta = { delta ->
+                clampUpdate(local.subagentMaxSteps, delta, 1, 128) {
+                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts)
+                }
+            },
+        )
+        StepperRow(
+            label = stringResource(R.string.advanced_model_attempts),
+            hint = null,
+            value = local.modelAttempts,
+            range = 1..5,
+            onDelta = { delta ->
+                clampUpdate(local.modelAttempts, delta, 1, 5) {
+                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it)
+                }
+            },
+        )
+    }
+}
+
+/** 数值行：标签 + 说明在左，−/值/＋ 在右。 */
+@Composable
+private fun StepperRow(
+    label: String,
+    hint: String?,
+    value: Int,
+    range: IntRange,
+    onDelta: (Int) -> Unit,
+) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = DsType.small13Strong, color = colors.labelPrimary)
+            hint?.let {
+                Text(it, style = DsType.caption11, color = colors.labelTertiary)
+            }
         }
-        OutlinedTextField(
-            value = attempts,
-            onValueChange = { attempts = it.filter(Char::isDigit).take(1) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_model_attempts)) },
-            supportingText = { Text(stringResource(R.string.advanced_agent_limits_hint)) },
+        DsButton(
+            text = "−",
+            onClick = { onDelta(-1) },
+            enabled = value > range.first,
+            size = DsButtonSize.Small,
+            variant = DsButtonVariant.Ghost,
+        )
+        Text(
+            value.toString(),
+            style = DsType.std14Strong,
+            color = colors.labelPrimary,
+            modifier = Modifier.widthIn(min = 30.dp),
+            textAlign = TextAlign.Center,
         )
         DsButton(
-            text = stringResource(R.string.advanced_save_agent_settings),
-            onClick = {
-                viewModel.configureLocalAgent(
-                    mainMaxSteps = mainSteps.toIntOrNull() ?: local.mainMaxSteps,
-                    subagentMaxSteps = subagentSteps.toIntOrNull() ?: local.subagentMaxSteps,
-                    modelAttempts = attempts.toIntOrNull() ?: local.modelAttempts,
-                )
-                report(agentSavedMessage)
-            },
-            variant = DsButtonVariant.Outline,
+            text = "＋",
+            onClick = { onDelta(1) },
+            enabled = value < range.last,
+            size = DsButtonSize.Small,
+            variant = DsButtonVariant.Ghost,
         )
     }
 }
@@ -874,55 +1235,107 @@ internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
 ) {
+    val overallState = when {
+        state.loading -> DsStatus.Running
+        state.error != null -> DsStatus.Failed
+        state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
+            DsStatus.Done
+        else -> DsStatus.Warning
+    }
+    val overallLabel = stringResource(
+        when {
+            state.loading -> R.string.advanced_device_status_checking
+            state.error != null -> R.string.advanced_device_status_error
+            overallState == DsStatus.Done -> R.string.advanced_device_status_ready
+            else -> R.string.advanced_device_status_needs_setup
+        },
+    )
+
     SettingsCard(stringResource(R.string.advanced_device_capabilities), Icons.Outlined.PhoneAndroid) {
-        CapabilityRow(stringResource(R.string.advanced_shizuku_service), state.shizukuAlive)
-        CapabilityRow(stringResource(R.string.advanced_shizuku_permission), state.shizukuGranted)
-        CapabilityRow(stringResource(R.string.advanced_accessibility), state.accessibility)
-        CapabilityRow(stringResource(R.string.advanced_notification_access), state.notifications)
-        CapabilityRow(stringResource(R.string.advanced_virtual_display), state.virtualDisplay)
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            if (!state.shizukuGranted) {
-                DsButton(
-                    text = stringResource(R.string.advanced_request_shizuku),
-                    onClick = viewModel::requestShizukuPermission,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
-                )
-            }
-            if (!state.accessibility) {
-                DsButton(
-                    text = stringResource(R.string.advanced_enable_accessibility),
-                    onClick = viewModel::openAccessibilitySettings,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
-                )
-            }
-            if (!state.notifications) {
-                DsButton(
-                    text = stringResource(R.string.advanced_enable_notifications),
-                    onClick = viewModel::openNotificationAccessSettings,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
-                )
-            }
-            DsButton(
-                text = stringResource(R.string.common_refresh),
-                onClick = viewModel::refreshDeviceCapabilities,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
-            )
-        }
+        DsStatusPill(state = overallState, label = overallLabel)
+        CapabilityRow(
+            label = stringResource(R.string.advanced_shizuku_service),
+            enabled = state.shizukuAlive,
+            hint = stringResource(R.string.advanced_shizuku_service_hint),
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_shizuku_permission),
+            enabled = state.shizukuGranted,
+            hint = stringResource(R.string.advanced_shizuku_permission_hint),
+            actionLabel = stringResource(R.string.advanced_request_shizuku),
+            onAction = viewModel::requestShizukuPermission,
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_accessibility),
+            enabled = state.accessibility,
+            hint = stringResource(R.string.advanced_accessibility_hint),
+            actionLabel = stringResource(R.string.advanced_enable_accessibility),
+            onAction = viewModel::openAccessibilitySettings,
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_notification_access),
+            enabled = state.notifications,
+            hint = stringResource(R.string.advanced_notification_access_hint),
+            actionLabel = stringResource(R.string.advanced_enable_notifications),
+            onAction = viewModel::openNotificationAccessSettings,
+        )
+        CapabilityRow(
+            label = stringResource(R.string.advanced_virtual_display),
+            enabled = state.virtualDisplay,
+            hint = stringResource(R.string.advanced_virtual_display_hint),
+        )
+        DsButton(
+            text = stringResource(R.string.common_refresh),
+            onClick = viewModel::refreshDeviceCapabilities,
+            size = DsButtonSize.Small,
+            variant = DsButtonVariant.Ghost,
+            modifier = Modifier.fillMaxWidth(),
+        )
         state.error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
     }
 }
 
 @Composable
-private fun CapabilityRow(label: String, enabled: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun CapabilityRow(
+    label: String,
+    enabled: Boolean,
+    hint: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    val colors = DsTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = DsSpacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
         StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
-        Spacer(Modifier.width(DsSpacing.small))
-        Text(label, style = DsType.std14, color = DsTheme.colors.labelSecondary, modifier = Modifier.weight(1f))
-        Text(stringResource(if (enabled) R.string.advanced_available else R.string.advanced_not_authorized), style = DsType.caption11, color = DsTheme.colors.labelTertiary)
+        Column(Modifier.weight(1f)) {
+            Text(label, style = DsType.std14, color = colors.labelSecondary)
+            Text(hint, style = DsType.caption11, color = colors.labelCaption)
+        }
+        if (enabled) {
+            Text(
+                stringResource(R.string.advanced_available),
+                style = DsType.caption11,
+                color = colors.success,
+            )
+        } else if (actionLabel != null && onAction != null) {
+            DsButton(
+                text = actionLabel,
+                onClick = onAction,
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Outline,
+            )
+        } else {
+            Text(
+                stringResource(R.string.advanced_not_authorized),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+        }
     }
 }
 

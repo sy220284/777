@@ -56,6 +56,7 @@ fun AppRoot(
 
     DshTheme(
         preference = themePreference,
+        accentKey = settings.accentTheme,
         backgroundPath = settings.backgroundImagePath,
         backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
     ) {

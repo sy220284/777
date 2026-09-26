@@ -226,6 +226,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 @Composable
 fun DshTheme(
     preference: ThemePreference = ThemePreference.SYSTEM,
+    accentKey: String? = null,
     backgroundPath: String? = null,
     backgroundAdaptiveContrast: Boolean = true,
     content: @Composable () -> Unit,
@@ -242,15 +243,18 @@ fun DshTheme(
         ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
         ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
     }
-    val scheme = if (dark) materialDarkScheme(ds) else materialLightScheme(ds)
-    CompositionLocalProvider(LocalDsColors provides ds) {
+    // 用户自选传统色卡：默认青瓷（原样），其余卡覆盖 accent 家族
+    val palette = AccentPalettes.of(accentKey)
+    val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
+    val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
+    CompositionLocalProvider(LocalDsColors provides themed) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
         // screens draw their own Material surfaces on top of whatever is beneath them.
         AppBackgroundHost(
             path = backgroundPath,
             adaptiveEnabled = backgroundAdaptiveContrast,
             darkTheme = dark,
-            surfaceBase = ds.bgBase,
+            surfaceBase = themed.bgBase,
         ) {
             MaterialTheme(
                 colorScheme = scheme,
