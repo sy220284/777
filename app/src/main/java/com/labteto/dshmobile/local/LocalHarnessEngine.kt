@@ -1985,6 +1985,17 @@ class LocalHarnessEngine @Inject constructor(
         messages: List<JsonObject>,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
+        val automationLog = eventLogFor(snapshot.sessionId)
+        automationLog.append("request/context-full", buildJsonObject {
+            put("purpose", "automation-chat")
+            put("provider", if (snapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible")
+            put("base_url", snapshot.baseUrl)
+            put("model", snapshot.model)
+            put("protocol", snapshot.modelProtocol.name.lowercase())
+            put("messages", JsonArray(redactModelImages(messages)))
+            put("tools", JsonArray(emptyList()))
+            put("images_redacted", true)
+        })
         val executor = AgentRequestExecutor(
             maxAttempts = snapshot.modelAttempts.coerceIn(1, 3),
             retryable = { error ->
@@ -6110,6 +6121,16 @@ class LocalHarnessEngine @Inject constructor(
         val key = apiKeys.get() ?: return null
         val snapshot = _state.value
         val request = semanticCompactionRequest(extractive)
+        eventLog.append("request/context-full", buildJsonObject {
+            put("purpose", "semantic-compaction")
+            put("provider", if (snapshot.baseUrl.contains("api.deepseek.com")) "deepseek" else "openai-compatible")
+            put("base_url", snapshot.baseUrl)
+            put("model", snapshot.model)
+            put("protocol", snapshot.modelProtocol.name.lowercase())
+            put("messages", JsonArray(request))
+            put("tools", JsonArray(emptyList()))
+            put("images_redacted", true)
+        })
         val executor = AgentRequestExecutor(
             maxAttempts = snapshot.modelAttempts.coerceIn(1, 2),
             retryable = { error ->
