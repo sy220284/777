@@ -1438,16 +1438,6 @@ private fun LocalChat(
             }
         }
 
-        if (
-            state.usageMode == LocalUsageMode.WORK &&
-            (state.running || state.goal != null || state.todos.isNotEmpty())
-        ) {
-            WorkSessionStatusStrip(
-                state = state,
-                onClick = onOpenRunCenter,
-            )
-        }
-
         if (state.usageMode == LocalUsageMode.WORK) {
             WorkSessionStatusStrip(
                 state = state,
@@ -2512,62 +2502,6 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
                 title = stringResource(R.string.local_suggestion_tasks),
                 subtitle = stringResource(R.string.local_suggestion_tasks_hint),
                 onClick = { onSuggestion(tasksPrompt) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorkSessionStatusStrip(
-    state: LocalHarnessState,
-    onClick: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    val completed = state.todos.count { it.status == "completed" }
-    val total = state.todos.size
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.tiny),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    state.goal?.description ?: stringResource(R.string.local_run_center),
-                    style = DsType.small13Strong,
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (total > 0) {
-                    Text(
-                        stringResource(R.string.local_run_tasks_progress, completed, total),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 1,
-                    )
-                } else if (state.running) {
-                    Text(
-                        stringResource(R.string.chat_running_status),
-                        style = DsType.caption11,
-                        color = colors.accent,
-                        maxLines = 1,
-                    )
-                }
-            }
-            Icon(
-                Icons.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.local_run_center),
-                tint = colors.labelTertiary,
-                modifier = Modifier.size(18.dp),
             )
         }
     }
