@@ -1,0 +1,92 @@
+package com.labteto.dshmobile.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.ui.theme.Ds
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+
+/**
+ * A row that shows a stored value (model name, endpoint, masked key…) and opens an editor.
+ * Kills the bare-OutlinedTextField stack: the page always reads as state, never as a form.
+ *
+ * [configured] renders a success dot after the value; [masked] shows the last four characters
+ * for secrets. Long values ellipsize toward the start so key suffixes stay visible.
+ */
+@Composable
+fun DsValueRow(
+    label: String,
+    value: String?,
+    modifier: Modifier = Modifier,
+    hint: String? = null,
+    masked: Boolean = false,
+    configured: Boolean? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val colors = DsTheme.colors
+    val display = when {
+        value.isNullOrBlank() -> "未设置"
+        masked && value.length > 4 -> "••••••••${value.takeLast(4)}"
+        else -> value
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(enabled = onClick != null, onClick = { onClick?.invoke() })
+            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = DsType.std14, color = colors.labelSecondary)
+            Text(
+                display,
+                style = DsType.std14Strong,
+                color = if (value.isNullOrBlank()) colors.labelTertiary else colors.labelPrimary,
+                maxLines = 1,
+                softWrap = false,
+                fontFamily = if (masked) FontFamily.Monospace else FontFamily.Default,
+            )
+        }
+        configured?.let { ok ->
+            Spacer(Modifier.width(DsSpacing.small))
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .width(8.dp)
+                    .heightIn(min = 8.dp)
+                    .background(
+                        if (ok) colors.success else colors.error,
+                        CircleShape,
+                    ),
+            )
+        }
+        Spacer(Modifier.width(DsSpacing.small))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = colors.labelCaption,
+        )
+        hint?.let {
+            Spacer(Modifier.width(DsSpacing.small))
+            Text(it, style = DsType.caption11, color = colors.labelCaption)
+        }
+    }
+}

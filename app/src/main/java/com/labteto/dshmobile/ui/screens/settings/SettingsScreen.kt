@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.wrapContentWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
@@ -61,7 +62,9 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -183,36 +186,43 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.Cloud,
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
+                                iconFamily = DsIconFamily.Accent,
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
+                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.PRICING },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.History,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
+                                iconFamily = DsIconFamily.Purple,
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_chat),
                                 subtitle = stringResource(R.string.settings_chat_subtitle),
+                                iconFamily = DsIconFamily.Purple,
                                 onClick = { page = SettingsDestination.CHAT },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Language,
                                 title = stringResource(R.string.settings_page_general),
                                 subtitle = stringResource(R.string.settings_general_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                value = appearanceLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.GENERAL },
                             )
                         }
@@ -223,12 +233,14 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.PhoneAndroid,
                                 title = stringResource(R.string.settings_page_permissions),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
+                                iconFamily = DsIconFamily.Green,
                                 onClick = { page = SettingsDestination.PERMISSIONS },
                             )
                             DsCategoryRow(
                                 icon = Icons.Outlined.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
+                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
@@ -239,9 +251,19 @@ fun SettingsScreen(
                                 icon = Icons.Outlined.Tune,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
+                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
                         }
+                        Text(
+                            "神言神语 v${BuildConfig.VERSION_NAME}",
+                            style = DsType.caption11,
+                            color = colors.labelCaption,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = DsSpacing.small)
+                                .wrapContentWidth(Alignment.CenterHorizontally),
+                        )
                     }
 
                     SettingsDestination.GENERAL -> {
@@ -698,6 +720,14 @@ private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
             },
         )
     }
+}
+
+@Composable
+private fun appearanceLabel(preference: String): String = when (preference) {
+    "light" -> stringResource(R.string.settings_appearance_light)
+    "dark" -> stringResource(R.string.settings_appearance_dark)
+    "matte_black" -> stringResource(R.string.settings_appearance_matte_black)
+    else -> stringResource(R.string.settings_appearance_system)
 }
 
 @Composable

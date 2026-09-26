@@ -61,6 +61,7 @@ fun DsCategoryRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     value: String? = null,
+    iconFamily: DsIconFamily = DsIconFamily.Neutral,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -74,12 +75,7 @@ fun DsCategoryRow(
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(28.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(DsMetrics.icon))
-        }
+        DsIconBox(icon = icon, family = iconFamily)
         Spacer(Modifier.width(DsSpacing.small))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
