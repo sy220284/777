@@ -544,6 +544,15 @@ internal class LocalSubagentRunner(
         durableHistory: MutableList<JsonObject>? = null,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
+        eventLog().append("subagent/request-context-full", buildJsonObject {
+            put("agent_id", subagentId)
+            put("step", step)
+            put("base_url", baseUrl)
+            put("model", model)
+            put("protocol", protocol.name.lowercase())
+            put("messages", JsonArray(history))
+            put("tools", tools)
+        })
         val executor = AgentRequestExecutor(
             maxAttempts = state.value.modelAttempts.coerceIn(1, 5),
             retryable = { error ->
