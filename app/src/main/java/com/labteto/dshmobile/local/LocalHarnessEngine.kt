@@ -807,16 +807,22 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Switch the active route and its corresponding encrypted key together. */
     fun selectModel(id: String) {
-        val selected = _state.value.modelProfiles.firstOrNull { it.id == id } ?: return
-        val current = _state.value
-        if (current.loading || current.running ||
-            isRunBusy() || (selected.model == current.model && selected.baseUrl == current.baseUrl)
-        ) return
-        preferences.edit().putString(KEY_MODEL, selected.model)
-            .putString(KEY_BASE_URL, selected.baseUrl).apply()
-        apiKeys.activate(selected.id)
-        _state.update { state ->
-            state.copy(model = selected.model, baseUrl = selected.baseUrl, error = null)
+        scope.launch {
+            val current = _state.value
+            val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
+            if (current.loading || current.running || isRunBusy() ||
+                (selected.model == current.model && selected.baseUrl == current.baseUrl)) return@launch
+            if (apiKeys.getFor(id) == null) {
+                _state.update { it.copy(error = "该模型密钥不可用，请编辑配置重新填写") }
+                return@launch
+            }
+            if (isRunBusy()) return@launch
+            preferences.edit().putString(KEY_MODEL, selected.model)
+                .putString(KEY_BASE_URL, selected.baseUrl).apply()
+            apiKeys.activate(selected.id)
+            _state.update { state ->
+                state.copy(configured = true, model = selected.model, baseUrl = selected.baseUrl, error = null)
+            }
         }
     }
 
@@ -6364,7 +6370,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         if (!preferences.contains(KEY_MODEL_PROFILES)) {
-            val oldModels = configuredModelNames(model)
+            val oldModels = if (apiKeys.hasLegacyCredential()) configuredModelNames(model) else emptyList()
             val profiles = oldModels.map { name ->
                 LocalModelProfile(modelProfileId(name, baseUrl), name, baseUrl)
             }

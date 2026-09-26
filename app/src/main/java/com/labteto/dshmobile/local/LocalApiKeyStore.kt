@@ -29,6 +29,8 @@ class LocalApiKeyStore @Inject constructor(
 
     suspend fun getFor(id: String): String? = route(id).get()
 
+    suspend fun hasLegacyCredential(): Boolean = delegate.get() != null
+
     suspend fun putFor(id: String, value: String) = route(id).put(value)
 
     suspend fun clearFor(id: String) = route(id).clear()

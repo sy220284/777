@@ -462,6 +462,7 @@ internal fun LocalModelSettingsCard(
             Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13,
                 color = colors.labelTertiary)
         }
+        local.error?.let { Text(it, style = DsType.small13, color = colors.error) }
         local.modelProfiles.forEach { profile ->
             Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                 modifier = Modifier.fillMaxWidth()) {
