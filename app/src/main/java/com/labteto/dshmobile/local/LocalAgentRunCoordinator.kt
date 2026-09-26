@@ -214,11 +214,23 @@ internal class LocalAgentRunCoordinator(
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
         val log = eventLogFor(sessionId)
-        if (repair.repaired && hasDurableFinalAssistant(log)) {
+        val unsafe = repair.toolResults.any { recovered ->
+            recovered.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
+        }
+        if (unsafe) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
+            )
+        }
+
+        if (repair.repaired && repair.toolResults.isEmpty() && hasDurableFinalAssistant(log)) {
             // Covers the narrower crash window where assistant/message reached disk but the
-            // AssistantObserved checkpoint itself did not.
+            // AssistantObserved checkpoint itself did not. Pending/recovered tools always win over
+            // this shortcut so unknown side effects can never be hidden.
             return null
         }
+
         val phase = data["phase"]?.jsonPrimitive?.contentOrNull
         val toolCallCount = data["tool_call_count"]?.jsonPrimitive?.intOrNull
         if (
@@ -234,18 +246,8 @@ internal class LocalAgentRunCoordinator(
         // appended. In that narrow window the stale RUNNING checkpoint must never replay a turn
         // that already completed.
         if (!repair.repaired) {
-            val durableTurnEnd = eventLogFor(sessionId).latest("turn/end")
+            val durableTurnEnd = log.latest("turn/end")
             if (durableTurnEnd != null && durableTurnEnd.sequence > event.sequence) return null
-        }
-
-        val unsafe = repair.toolResults.any { recovered ->
-            recovered.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
-        }
-        if (unsafe) {
-            return LocalAgentRunRecoveryDecision(
-                runId = runId,
-                blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
-            )
         }
 
         val originalInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
