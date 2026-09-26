@@ -484,6 +484,7 @@ internal class LocalSubagentRunner(
         key: String,
         baseUrl: String,
         model: String,
+        protocol: AgentModelProtocol,
         history: List<JsonObject>,
         tools: JsonArray,
         subagentId: String,
@@ -540,7 +541,14 @@ internal class LocalSubagentRunner(
         return try {
             executor.execute {
                 resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    modelClient.complete(key, baseUrl, model, history, tools)
+                    modelClient.complete(
+                        apiKey = key,
+                        baseUrl = baseUrl,
+                        model = model,
+                        messages = history,
+                        tools = tools,
+                        protocol = protocol,
+                    )
                 }
             }
         } catch (error: Throwable) {
@@ -577,6 +585,7 @@ internal class LocalSubagentRunner(
                 key = key,
                 baseUrl = baseUrl,
                 model = model,
+                protocol = protocol,
                 history = compacted.messages,
                 tools = tools,
                 subagentId = subagentId,
