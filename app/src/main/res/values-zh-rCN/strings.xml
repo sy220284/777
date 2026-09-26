@@ -1005,4 +1005,5 @@
     <string name="persona_gallery_my_characters">我的人物</string>
     <string name="local_current_session">当前</string>
     <string name="chatlist_exit_remote_control">退出远程控制</string>
+    <string name="local_work_process">工作过程</string>
 </resources>
