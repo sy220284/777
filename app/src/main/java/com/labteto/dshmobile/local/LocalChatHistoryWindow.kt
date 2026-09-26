@@ -24,8 +24,14 @@ internal fun boundedChatRequestHistory(
         it["role"]?.jsonPrimitive?.contentOrNull == "system"
     }
     val body = if (leadingSystem == null) history else history.drop(1)
-    val existingSummary = body.lastOrNull(::isChatContinuitySummary)
-    val dialogue = body.asSequence()
+    val existingSummaryIndex = body.indexOfLast(::isChatContinuitySummary)
+    val existingSummary = body.getOrNull(existingSummaryIndex)
+    val dialogueSource = if (existingSummaryIndex >= 0) {
+        body.drop(existingSummaryIndex + 1)
+    } else {
+        body
+    }
+    val dialogue = dialogueSource.asSequence()
         .filter { message ->
             val role = message["role"]?.jsonPrimitive?.contentOrNull
             role == "user" || role == "assistant"
@@ -35,11 +41,12 @@ internal fun boundedChatRequestHistory(
 
     val recent = dialogue.takeLast(recentMessages)
     val older = dialogue.dropLast(recent.size)
-    val continuity = existingSummary ?: buildRequestOnlyContinuity(older)
+    val deltaContinuity = buildRequestOnlyContinuity(older)
 
     return buildList {
         leadingSystem?.let(::add)
-        continuity?.let(::add)
+        existingSummary?.let(::add)
+        deltaContinuity?.let(::add)
         addAll(recent)
     }
 }

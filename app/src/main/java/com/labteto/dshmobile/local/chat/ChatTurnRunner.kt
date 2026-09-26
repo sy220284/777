@@ -73,18 +73,20 @@ class ChatTurnRunner @Inject constructor(
         onGuardEvent: (String, List<String>) -> Unit = { _, _ -> },
     ): LocalModelReply {
         recordUsage(reply.usage)
-        if (!guardEnabled || reply.toolCalls.isNotEmpty()) return reply
+        if (reply.toolCalls.isNotEmpty()) return reply
 
         var content = reply.content.orEmpty()
-        val phrases = ChatStyleGuard.activePhrases(
-            customPhrases = additionalBannedPhrases,
-            personaPhrases = persona.bannedPhrases,
-            enabled = true,
-        )
-        val violations = ChatStyleGuard.violations(content, phrases)
-        if (violations.isNotEmpty()) {
-            onGuardEvent("filter", violations)
-            content = ChatStyleGuard.filterLiteral(content, phrases)
+        if (guardEnabled) {
+            val phrases = ChatStyleGuard.activePhrases(
+                customPhrases = additionalBannedPhrases,
+                personaPhrases = persona.bannedPhrases,
+                enabled = true,
+            )
+            val violations = ChatStyleGuard.violations(content, phrases)
+            if (violations.isNotEmpty()) {
+                onGuardEvent("filter", violations)
+                content = ChatStyleGuard.filterLiteral(content, phrases)
+            }
         }
 
         val repetition = ChatRepetitionGuard.filter(content, recentAssistantReplies)
