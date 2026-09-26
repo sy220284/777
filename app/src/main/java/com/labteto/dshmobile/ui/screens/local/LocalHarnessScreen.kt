@@ -698,6 +698,7 @@ private fun LocalModeDrawer(
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
                     LocalSessionDrawerRow(
                         title = session.title,
+                        summaryPreview = session.summaryPreview,
                         updatedAt = session.updatedAt,
                         groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
@@ -875,6 +876,7 @@ private fun DrawerSectionTitle(
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalSessionDrawerRow(
     title: String,
+    summaryPreview: String?,
     updatedAt: Long,
     groupChat: Boolean,
     current: Boolean,
@@ -928,6 +930,15 @@ private fun LocalSessionDrawerRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            summaryPreview?.let { preview ->
+                Text(
+                    preview,
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
