@@ -97,9 +97,10 @@ internal fun nextAnchoredAutomationRun(
     afterMillis: Long,
     suggestedRunAt: Long? = null,
 ): Long? {
+    suggestedRunAt?.takeIf { it > afterMillis }?.let { return it }
+
     if (task.scheduleType == AutomationScheduleType.SILENCE) {
-        return suggestedRunAt?.takeIf { it > afterMillis }
-            ?: task.silenceMinutes?.let { afterMillis + it * 60_000L }
+        return task.silenceMinutes?.let { afterMillis + it * 60_000L }
     }
 
     val anchor = task.scheduleAnchorAt ?: task.nextRunAt
