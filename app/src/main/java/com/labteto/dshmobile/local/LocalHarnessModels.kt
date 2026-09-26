@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.AgentModelProtocol
+import com.labteto.dshmobile.harness.agent.AgentModelRoute
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -54,6 +56,8 @@ data class LocalHarnessSession(
     val lineageId: String = "",
     val projectId: String? = null,
     val handoffSummary: String? = null,
+    /** Stable model route for this Session. Legacy sessions resolve from current settings once. */
+    val modelRoute: AgentModelRoute? = null,
     /**
      * Legacy compatibility/runtime acceleration only. New snapshots will progressively stop
      * materializing complete transcript history here; Session Event remains authoritative.
@@ -191,6 +195,7 @@ data class LocalHarnessState(
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
     val configuredModels: List<String> = emptyList(),
+    val modelProtocol: AgentModelProtocol = AgentModelProtocol.OPENAI_CHAT,
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
