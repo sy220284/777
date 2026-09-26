@@ -1008,4 +1008,10 @@
     <string name="local_current_session">Current</string>
     <string name="chatlist_exit_remote_control">Exit remote control</string>
     <string name="local_work_process">Work process</string>
+    <string name="local_work_composer_hint">Ask something, or hand the task to Harness…</string>
+    <string name="local_group_chat_composer_hint">Message the group…</string>
+    <string name="local_chat_composer_persona_hint">Message %1$s…</string>
+    <string name="local_plan_button_on">Planning</string>
+    <string name="local_plan_button_off">Plan</string>
+    <string name="local_auto_approve_short">Auto-approve</string>
 </resources>
