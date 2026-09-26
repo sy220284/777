@@ -66,7 +66,10 @@ internal fun mergeLocalTranscriptHistory(
     }
 }
 
-internal fun buildLocalTranscript(messages: List<LocalHarnessMessage>): List<LocalTranscriptItem> {
+internal fun buildLocalTranscript(
+    messages: List<LocalHarnessMessage>,
+    includeWorkProcess: Boolean = true,
+): List<LocalTranscriptItem> {
     if (messages.isEmpty()) return emptyList()
 
     val result = mutableListOf<LocalTranscriptItem>()
@@ -87,7 +90,9 @@ internal fun buildLocalTranscript(messages: List<LocalHarnessMessage>): List<Loc
             work += messages[index]
             index += 1
         }
-        result += LocalTranscriptItem.WorkProcess(work)
+        if (includeWorkProcess) {
+            result += LocalTranscriptItem.WorkProcess(work)
+        }
     }
     return result
 }
