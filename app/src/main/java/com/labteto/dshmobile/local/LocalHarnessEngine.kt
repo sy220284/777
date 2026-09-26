@@ -926,7 +926,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.groupChat.enabled ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+            snapshot.transcriptIndex.hasDialogue
         ) return
 
         scope.launch {
@@ -958,7 +958,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.groupChat.enabled ||
-            snapshot.messages.any { it.role == "user" || it.role == "assistant" }
+            snapshot.transcriptIndex.hasDialogue
         ) return
 
         scope.launch {
@@ -1235,7 +1235,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0 ||
-            !chatBranchingEligible(state.messages)
+            !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
         var branches = syncChatBranchState(
@@ -1310,7 +1310,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0 ||
-            !chatBranchingEligible(state.messages)
+            !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
         val synced = syncChatBranchState(
@@ -1358,7 +1358,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         cancelChatPostTurn()
 
-        if (state.usageMode == LocalUsageMode.CHAT && chatBranchingEligible(state.messages)) {
+        if (state.usageMode == LocalUsageMode.CHAT && state.transcriptIndex.branchingEligible) {
             val branches = syncChatBranchState(
                 current = state.chatBranches,
                 activeMessages = state.messages,
@@ -1529,7 +1529,7 @@ class LocalHarnessEngine @Inject constructor(
             before.usageMode == LocalUsageMode.CHAT &&
             !before.groupChat.enabled &&
             before.chatBranches.nodes.isNotEmpty() &&
-            chatBranchingEligible(before.messages)
+            before.transcriptIndex.branchingEligible
         ) {
             val branches = appendMaterializedChatBranchMessage(
                 current = before.chatBranches,
@@ -1859,7 +1859,7 @@ class LocalHarnessEngine @Inject constructor(
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
-                    if (pendingInputs.size() == 0 && chatBranchingEligible(_state.value.messages)) {
+                    if (pendingInputs.size() == 0 && _state.value.transcriptIndex.branchingEligible) {
                         _state.update { current ->
                             current.copy(
                                 chatBranches = syncMaterializedChatBranchState(
@@ -3587,7 +3587,7 @@ class LocalHarnessEngine @Inject constructor(
         try {
             ensureSystemMessage()
             val snapshot = _state.value
-            val branchEligible = chatBranchingEligible(snapshot.messages)
+            val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = if (branchEligible) {
                 syncMaterializedChatBranchState(
@@ -4063,7 +4063,7 @@ class LocalHarnessEngine @Inject constructor(
                             !beforeAssistant.groupChat.enabled &&
                             event.toolCalls.isEmpty() &&
                             beforeAssistant.chatBranches.nodes.isNotEmpty() &&
-                            chatBranchingEligible(beforeAssistant.messages)
+                            beforeAssistant.transcriptIndex.branchingEligible
                         ) {
                             val assistantTranscript = transcriptMessages.lastOrNull { message ->
                                 message.role == "assistant"
@@ -5375,7 +5375,7 @@ class LocalHarnessEngine @Inject constructor(
                 current.copy(
                     chatState = plan.state,
                     replySuggestions = plan.suggestions,
-                    chatBranches = if (chatBranchingEligible(current.messages)) {
+                    chatBranches = if (current.transcriptIndex.branchingEligible) {
                         updateChatBranchNodeSnapshot(
                             state = current.chatBranches,
                             messageId = expectedAssistantMessageId,
