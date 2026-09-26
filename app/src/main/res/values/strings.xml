@@ -997,4 +997,10 @@
 
     <string name="local_transcript_load_older">Load earlier messages · %1$d hidden</string>
     <string name="local_transcript_load_older_unknown">Load earlier messages</string>
+    <string name="advanced_project_risk_notice">Changes here write directly to the Harness settings namespace. Some options apply immediately and others require restart; coordinate with the Harness administrator before changing production configuration.</string>
+    <string name="advanced_user_rules_count">%1$d / %2$d chars</string>
+    <string name="advanced_memory_filter_count">%1$s %2$d</string>
+    <string name="advanced_edit_memory">Edit memory</string>
+    <string name="advanced_pinned">Pinned</string>
+    <string name="settings_notifications_usage_hint">Turn-complete alerts are most useful for long-running work. In pure chat sessions, disabling them can reduce unnecessary interruptions.</string>
 </resources>
