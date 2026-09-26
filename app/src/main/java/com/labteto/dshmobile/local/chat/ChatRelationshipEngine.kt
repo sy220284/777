@@ -44,6 +44,11 @@ internal fun chineseSuggestiveFlirtingScore(input: String): Int {
 internal fun hasChineseSuggestiveFlirtingIntent(input: String): Boolean =
     chineseSuggestiveFlirtingScore(input) >= CHINESE_FLIRTING_SCORE_THRESHOLD
 
+internal fun isInteractionResetIntent(input: String): Boolean {
+    val text = input.trim().lowercase()
+    return INTENT_RESET_HINTS.any { text.contains(it) }
+}
+
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
@@ -79,7 +84,7 @@ internal fun resolveChatInteractionIntent(
         ChatInteractionIntent.valueOf(state.interactionIntent)
     }.getOrDefault(ChatInteractionIntent.NORMAL)
     val explicit = classifyExplicitInteractionIntent(input)
-    val resetsPrevious = INTENT_RESET_HINTS.any { text.contains(it) }
+    val resetsPrevious = isInteractionResetIntent(text)
     if (explicit != ChatInteractionIntent.NORMAL) {
         if (
             !resetsPrevious &&
@@ -148,7 +153,7 @@ internal fun nextInteractionIntensity(
     previous: ChatCharacterState = ChatCharacterState(),
 ): Int {
     val text = input.trim().lowercase()
-    if (INTENT_RESET_HINTS.any { text.contains(it) }) return 0
+    if (isInteractionResetIntent(text)) return 0
 
     val explicit = classifyExplicitInteractionIntent(input)
     val resolved = resolveChatInteractionIntent(input, previous)
@@ -209,6 +214,22 @@ internal fun extractInteractionPerformanceSignals(text: String): ChatInteraction
             .distinct()
             .take(MAX_INTERACTION_TAGS_PER_TURN),
     )
+}
+
+internal fun assistantInitiatedInteractionIntensity(text: String): Int {
+    if (text.isBlank()) return 0
+    val suggestiveScore = chineseSuggestiveFlirtingScore(text)
+    if (suggestiveScore >= 6) return 3
+    if (suggestiveScore >= CHINESE_FLIRTING_SCORE_THRESHOLD) return 2
+
+    val signals = extractInteractionPerformanceSignals(text)
+    val hasPhysicalCue = signals.actionTags.isNotEmpty() || signals.poseTags.isNotEmpty()
+    val hasVerbalCue = signals.verbalTags.isNotEmpty() || signals.addressTerms.isNotEmpty()
+    return when {
+        hasPhysicalCue && hasVerbalCue -> 2
+        hasVerbalCue -> 1
+        else -> 0
+    }
 }
 
 internal fun hasProactiveIntimacyIntent(
