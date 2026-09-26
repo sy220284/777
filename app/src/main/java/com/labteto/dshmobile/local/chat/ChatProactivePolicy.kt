@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import java.util.Calendar
 
 internal data class ChatProactiveDecision(
     val shouldSend: Boolean,
@@ -13,7 +14,25 @@ private const val MAX_RECENT_PROACTIVE_FOR_CONTEXT = 5
 internal fun evaluateChatProactivePolicy(
     messages: List<LocalHarnessMessage>,
     nowMillis: Long,
+    quietHoursEnabled: Boolean = false,
+    quietStartHour: Int = 23,
+    quietEndHour: Int = 7,
 ): ChatProactiveDecision {
+    if (
+        quietHoursEnabled &&
+        isHourInQuietWindow(
+            hour = Calendar.getInstance().apply { timeInMillis = nowMillis }
+                .get(Calendar.HOUR_OF_DAY),
+            startHour = quietStartHour,
+            endHour = quietEndHour,
+        )
+    ) {
+        return ChatProactiveDecision(
+            shouldSend = false,
+            reason = "当前处于夜间免打扰时段，已暂缓本次互动",
+        )
+    }
+
     val dialogue = messages.filter { it.role == "user" || it.role == "assistant" }
     if (dialogue.isEmpty()) return ChatProactiveDecision(shouldSend = true)
 
@@ -122,4 +141,21 @@ private fun bigramJaccard(left: String, right: String): Double {
     val union = leftSet union rightSet
     if (union.isEmpty()) return 0.0
     return (leftSet intersect rightSet).size.toDouble() / union.size.toDouble()
+}
+
+
+internal fun isHourInQuietWindow(
+    hour: Int,
+    startHour: Int,
+    endHour: Int,
+): Boolean {
+    require(hour in 0..23) { "hour must be 0..23" }
+    require(startHour in 0..23) { "startHour must be 0..23" }
+    require(endHour in 0..23) { "endHour must be 0..23" }
+    if (startHour == endHour) return false
+    return if (startHour < endHour) {
+        hour in startHour until endHour
+    } else {
+        hour >= startHour || hour < endHour
+    }
 }
