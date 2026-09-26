@@ -1009,7 +1009,7 @@ class LocalHarnessEngine @Inject constructor(
                 galleryId = if (keepCharacter) state.galleryId else null,
                 galleryStoryId = null,
                 gallerySaveSuppressedThrough =
-                    state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis(),
+                    state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
             )
         }
         if (_state.value.sessionId == snapshot.sessionId) persist()
@@ -1066,7 +1066,7 @@ class LocalHarnessEngine @Inject constructor(
                     galleryId = null,
                     galleryStoryId = null,
                     gallerySaveSuppressedThrough =
-                        state.messages.maxOfOrNull(LocalHarnessMessage::createdAt) ?: System.currentTimeMillis(),
+                        state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
                     chatPersona = saved,
                 )
             }
