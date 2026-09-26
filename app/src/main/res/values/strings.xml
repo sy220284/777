@@ -965,4 +965,5 @@
     <string name="tasks_chat_preset_promise_prompt">Naturally bring up a real promise, plan, or important thing from our existing conversation in the character’s own voice. If no clear promise exists, do not invent one.</string>
     <string name="tasks_chat_notification_title">%1$s sent you a message</string>
 
+    <string name="local_transcript_load_older">Load earlier messages · %1$d hidden</string>
 </resources>
