@@ -1773,7 +1773,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         require(_state.value.configured) { "本机 Harness 尚未配置模型" }
 
-        val initialSession = sessionRepository.read(targetSessionId)
+        val initialSession = sessionCoordinator.read(targetSessionId)
             ?: error("定时互动绑定的聊天已不存在")
         require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
@@ -1813,7 +1813,7 @@ class LocalHarnessEngine @Inject constructor(
 
         try {
             return withTimeout(timeoutMillis.coerceIn(5_000L, 10 * 60_000L)) {
-                val session = sessionRepository.read(targetSessionId)
+                val session = sessionCoordinator.read(targetSessionId)
                     ?: error("定时互动绑定的聊天已不存在")
                 require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
                 require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
@@ -1978,7 +1978,7 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
-                    val latest = sessionRepository.read(session.id) ?: session
+                    val latest = sessionCoordinator.read(session.id) ?: session
                     val latestIndex = transcriptIndexForSession(latest)
                     val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
                         latestIndex,
@@ -2002,7 +2002,7 @@ class LocalHarnessEngine @Inject constructor(
                     } else {
                         latest.chatBranches
                     }
-                    sessionRepository.enqueue(
+                    sessionCoordinator.enqueue(
                         latest.copy(
                             updatedAt = System.currentTimeMillis(),
                             messages = emptyList(),
@@ -2103,7 +2103,7 @@ class LocalHarnessEngine @Inject constructor(
     ): LocalHarnessSession {
         preferredSessionId
             ?.takeIf(String::isNotBlank)
-            ?.let(sessionRepository::read)
+            ?.let(sessionCoordinator::read)
             ?.takeIf { it.usageMode == LocalUsageMode.WORK }
             ?.let { return it }
 
@@ -2120,7 +2120,7 @@ class LocalHarnessEngine @Inject constructor(
             lineageId = id,
             projectId = LOCAL_PROJECT_ID,
         )
-        sessionRepository.enqueue(session)
+        sessionCoordinator.enqueue(session)
         return session
     }
 
@@ -2183,12 +2183,12 @@ class LocalHarnessEngine @Inject constructor(
                 put("transcript", encodeTranscriptMessages(listOf(finalMessage)))
             },
         )
-        val latest = sessionRepository.read(session.id) ?: session
+        val latest = sessionCoordinator.read(session.id) ?: session
         val appendedTranscript = messages + finalMessage
         val latestWindow = latest.transcriptWindow.ifEmpty {
             latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
         }
-        sessionRepository.enqueue(
+        sessionCoordinator.enqueue(
             latest.copy(
                 title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
                 updatedAt = System.currentTimeMillis(),
@@ -2753,7 +2753,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 withContext(Dispatchers.IO) {
                     ids.forEach { id ->
-                        sessionRepository.delete(id)
+                        sessionCoordinator.delete(id)
                         toolOutputStore.deleteSession(id)
                         sessionsRoot.listFiles().orEmpty()
                             .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
@@ -6375,7 +6375,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun eventLogFor(id: String) = LocalSessionEventLog(File(sessionsRoot, "$id.events.jsonl"), json)
 
     private fun sessionSummaries(): List<LocalSessionSummary> = try {
-        sessionRepository.summaries()
+        sessionCoordinator.summaries()
     } catch (future: FutureSessionVersionException) {
         _state.update { it.copy(error = future.message) }
         emptyList()
