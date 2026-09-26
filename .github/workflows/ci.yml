@@ -39,6 +39,8 @@ jobs:
         run: ./gradlew :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :mock-harness:test :app:testDebugUnitTest --stacktrace
       - name: Official Harness conformance
         run: ./gradlew :reference-validation:test --stacktrace
+      - name: Full Runtime Semantic Conformance
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.labteto.dshmobile.local.FullRuntimeSemanticConformanceTest' --stacktrace
       - name: Lint
         run: |
           set +e
