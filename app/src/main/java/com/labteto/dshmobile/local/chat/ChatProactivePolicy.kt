@@ -8,6 +8,29 @@ internal data class ChatProactiveDecision(
     val reason: String? = null,
 )
 
+internal data class ChatSilenceDecision(
+    val ready: Boolean,
+    val retryAt: Long? = null,
+)
+
+internal fun evaluateChatSilenceTrigger(
+    messages: List<LocalHarnessMessage>,
+    nowMillis: Long,
+    silenceMinutes: Long?,
+    fallbackReferenceAt: Long,
+): ChatSilenceDecision {
+    if (silenceMinutes == null) return ChatSilenceDecision(ready = true)
+    require(silenceMinutes > 0L) { "silenceMinutes must be positive" }
+    val referenceAt = messages.lastOrNull { it.role == "user" }?.createdAt
+        ?: fallbackReferenceAt
+    val dueAt = referenceAt + silenceMinutes * 60_000L
+    return if (nowMillis >= dueAt) {
+        ChatSilenceDecision(ready = true)
+    } else {
+        ChatSilenceDecision(ready = false, retryAt = dueAt)
+    }
+}
+
 private const val PROACTIVE_MIN_RETRY_GAP_MS = 6L * 60L * 60L * 1000L
 private const val MAX_RECENT_PROACTIVE_FOR_CONTEXT = 5
 
