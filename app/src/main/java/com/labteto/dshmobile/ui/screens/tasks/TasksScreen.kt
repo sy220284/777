@@ -635,6 +635,9 @@ private fun TaskCard(
                 label = taskStatusLabel(task.status),
             )
             DsPill(text = scheduleLabel)
+            if (task.mode == AutomationMode.CHAT && task.quietHoursEnabled) {
+                DsPill(text = stringResource(R.string.tasks_chat_quiet_hours))
+            }
         }
 
         task.lastError?.takeIf(String::isNotBlank)?.let {
