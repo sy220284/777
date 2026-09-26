@@ -96,6 +96,16 @@ class TasksViewModel @Inject constructor(
         )
     }
 
+    fun pause(id: String) {
+        scheduler.pauseTask(id)
+        refresh()
+    }
+
+    fun resume(id: String) {
+        scheduler.resumeTask(id)
+        refresh()
+    }
+
     fun createAt(
         prompt: String,
         firstRunAt: Long,
@@ -358,6 +368,8 @@ fun TasksScreen(
                         TaskCard(
                             task = task,
                             onCancel = { viewModel.cancel(task.id) },
+                            onPause = { viewModel.pause(task.id) },
+                            onResume = { viewModel.resume(task.id) },
                             onOpenSession = onOpenSession,
                         )
                     }
@@ -515,6 +527,8 @@ private fun showSchedulePicker(
 private fun TaskCard(
     task: AutomationTask,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -627,6 +641,17 @@ private fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
+                if (task.mode == AutomationMode.CHAT && task.recurringMinutes != null) {
+                    DsButton(
+                        text = stringResource(
+                            if (task.status == "paused") R.string.tasks_resume
+                            else R.string.tasks_pause,
+                        ),
+                        onClick = if (task.status == "paused") onResume else onPause,
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
                 DsButton(
                     text = stringResource(R.string.tasks_open_result),
                     onClick = { onOpenSession(sessionId) },
@@ -644,6 +669,7 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
         "completed" -> stringResource(R.string.tasks_run_completed)
         "blocked" -> stringResource(R.string.tasks_run_blocked)
         "failed" -> stringResource(R.string.tasks_run_failed)
+        "skipped" -> stringResource(R.string.tasks_run_skipped)
         else -> receipt.status
     }
     val detail = receipt.errorPreview ?: receipt.resultPreview
@@ -655,6 +681,7 @@ private fun receiptStatus(status: String): DsStatus = when (status) {
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
     "running", "queued" -> DsStatus.Running
+    "skipped" -> DsStatus.Neutral
     else -> DsStatus.Neutral
 }
 
@@ -663,6 +690,7 @@ private fun taskStatus(status: String): DsStatus = when (status) {
     "completed" -> DsStatus.Done
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
+    "paused" -> DsStatus.Neutral
     else -> DsStatus.Neutral
 }
 
@@ -674,6 +702,7 @@ private fun taskStatusLabel(status: String): String = when (status) {
     "completed" -> stringResource(R.string.tasks_run_completed)
     "blocked" -> stringResource(R.string.tasks_run_blocked)
     "failed" -> stringResource(R.string.tasks_run_failed)
+    "paused" -> stringResource(R.string.tasks_status_paused)
     else -> stringResource(R.string.tasks_status_scheduled)
 }
 
