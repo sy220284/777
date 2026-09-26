@@ -1006,4 +1006,5 @@
     <string name="persona_gallery_overview_stats">%1$d characters · %2$d storylines · %3$d archived dialogue lines</string>
     <string name="persona_gallery_my_characters">My characters</string>
     <string name="local_current_session">Current</string>
+    <string name="chatlist_exit_remote_control">Exit remote control</string>
 </resources>
