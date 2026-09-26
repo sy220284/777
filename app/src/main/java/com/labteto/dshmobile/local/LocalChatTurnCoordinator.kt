@@ -28,13 +28,11 @@ internal class LocalChatTurnCoordinator(
             userInput = input,
             storyContext = snapshot.handoffSummary,
         )
-        val recentAssistantReplies = snapshot.messages.asReversed()
-            .asSequence()
-            .filter { it.role == "assistant" }
-            .map { it.content }
-            .take(4)
-            .toList()
-            .asReversed()
+        val recentAssistantReplies = recentRoleReplies(
+            messages = snapshot.messages,
+            groupEnabled = snapshot.groupChat.enabled,
+            persona = context.persona,
+        )
         return LocalPreparedChatTurn(
             context = context,
             dynamicContext = ChatContextAssembler.assemble(
@@ -70,13 +68,11 @@ internal class LocalChatTurnCoordinator(
         recordUsage = recordUsage,
         guardEnabled = snapshot.chatStyleGuardEnabled,
         additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
-        recentAssistantReplies = snapshot.messages.asReversed()
-            .asSequence()
-            .filter { it.role == "assistant" }
-            .map { it.content }
-            .take(4)
-            .toList()
-            .asReversed(),
+        recentAssistantReplies = recentRoleReplies(
+            messages = snapshot.messages,
+            groupEnabled = snapshot.groupChat.enabled,
+            persona = persona,
+        ),
         onGuardEvent = onGuardEvent,
     )
 
@@ -107,3 +103,25 @@ internal class LocalChatTurnCoordinator(
         assistantMessage = assistantMessage,
     )
 }
+
+
+internal fun recentRoleReplies(
+    messages: List<LocalHarnessMessage>,
+    groupEnabled: Boolean,
+    persona: PersonaProfile,
+    limit: Int = 4,
+): List<String> = messages.asReversed()
+    .asSequence()
+    .filter { message ->
+        message.role == "assistant" &&
+            (
+                !groupEnabled ||
+                    message.speakerId == persona.id ||
+                    message.speakerName == persona.name
+            )
+    }
+    .map { it.content }
+    .filter(String::isNotBlank)
+    .take(limit.coerceAtLeast(1))
+    .toList()
+    .asReversed()
