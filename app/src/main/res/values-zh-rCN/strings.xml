@@ -1012,4 +1012,17 @@
     <string name="local_plan_button_on">规划中</string>
     <string name="local_plan_button_off">规划</string>
     <string name="local_auto_approve_short">自动批准</string>
+    <string name="local_harness_title">本机 Harness</string>
+    <string name="local_on_device_execution_title">手机直接执行</string>
+    <string name="local_on_device_execution_hint">模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。</string>
+    <string name="local_model_section_title">模型与接口</string>
+    <string name="local_model_flash_label">DeepSeek Flash｜V4.1 · 思考默认开启</string>
+    <string name="local_model_pro_label">DeepSeek V4 Pro｜专家模型</string>
+    <string name="local_endpoint_hint">兼容 OpenAI 聊天补全协议的服务也可使用。</string>
+    <string name="local_model_save_enter">保存并进入本机 Harness</string>
+    <string name="local_file_import_failed">文件导入失败</string>
+    <string name="local_restore_request">恢复请求</string>
+    <string name="local_manage_model_config">管理模型配置</string>
+    <string name="local_attachment_image">图片</string>
+    <string name="local_attachment_file">文件</string>
 </resources>
