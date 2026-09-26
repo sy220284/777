@@ -167,6 +167,24 @@ private fun bigramJaccard(left: String, right: String): Double {
 }
 
 
+internal fun nextQuietHoursEndMillis(
+    nowMillis: Long,
+    endHour: Int,
+): Long {
+    require(endHour in 0..23) { "endHour must be 0..23" }
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = nowMillis
+        set(Calendar.HOUR_OF_DAY, endHour)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= nowMillis) {
+            add(Calendar.DAY_OF_YEAR, 1)
+        }
+    }
+    return calendar.timeInMillis
+}
+
 internal fun isHourInQuietWindow(
     hour: Int,
     startHour: Int,
