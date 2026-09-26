@@ -20,6 +20,7 @@ data class JobSnapshot(
     val output: String = "",
     val resumeKind: String? = null,
     val resumePayload: String? = null,
+    val inbox: List<String> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
@@ -73,6 +74,10 @@ class HarnessJobManager(
                     } else {
                         snapshot.output.takeLast(MAX_OUTPUT)
                     },
+                    inbox = snapshot.inbox
+                        .takeLast(MAX_INBOX_MESSAGES)
+                        .map { it.take(MAX_INBOX_MESSAGE) }
+                        .toMutableList(),
                     resumeKind = snapshot.resumeKind,
                     resumePayload = snapshot.resumePayload,
                     updatedAt = snapshot.updatedAt,
@@ -289,9 +294,18 @@ class HarnessJobManager(
         return "消息已发送给后台代理：$id"
     }
 
-    fun drainMessages(id: String): List<String> = synchronized(lock) {
-        val record = records[id] ?: return@synchronized emptyList()
-        record.inbox.toList().also { record.inbox.clear() }
+    fun drainMessages(id: String): List<String> {
+        val drained = synchronized(lock) {
+            val record = records[id] ?: return emptyList()
+            record.inbox.toList().also {
+                if (it.isNotEmpty()) {
+                    record.inbox.clear()
+                    record.updatedAt = System.currentTimeMillis()
+                }
+            }
+        }
+        if (drained.isNotEmpty()) publish()
+        return drained
     }
 
     fun stopAll() {
@@ -344,6 +358,7 @@ class HarnessJobManager(
         output = record.output,
         resumeKind = record.resumeKind,
         resumePayload = record.resumePayload,
+        inbox = record.inbox.toList(),
         updatedAt = record.updatedAt,
     )
 
