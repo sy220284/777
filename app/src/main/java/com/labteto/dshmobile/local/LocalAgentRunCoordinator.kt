@@ -12,8 +12,16 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal const val LOCAL_AGENT_RUN_CHECKPOINT_EVENT = "agent/run-checkpoint"
+internal const val LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT = "agent/subagent-run-checkpoint"
+internal const val LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT = "agent/automation-run-checkpoint"
 private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 1
 private const val MAX_RECOVERY_INPUT_CHARS = 8_000
+
+internal enum class LocalAgentRunKind {
+    FOREGROUND,
+    SUBAGENT,
+    AUTOMATION,
+}
 
 internal enum class LocalAgentRunCheckpointStatus {
     RUNNING,
@@ -37,6 +45,7 @@ internal enum class LocalAgentRunPhase {
 
 internal data class LocalAgentRunContext(
     val runId: String,
+    val kind: LocalAgentRunKind,
     val sessionId: String,
     val usageMode: LocalUsageMode,
     val model: String,
@@ -79,9 +88,11 @@ internal class LocalAgentRunCoordinator(
         maxSteps: Int,
         input: String,
         memoryInput: String,
+        kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
     ): LocalAgentRunContext {
         val context = LocalAgentRunContext(
             runId = idFactory(),
+            kind = kind,
             sessionId = sessionId,
             usageMode = usageMode,
             model = model,
@@ -231,10 +242,11 @@ internal class LocalAgentRunCoordinator(
         reason: String? = null,
     ) {
         eventLogFor(context.sessionId).append(
-            LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+            eventType(context.kind),
             buildJsonObject {
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", context.runId)
+                put("run_kind", context.kind.name.lowercase())
                 put("session_id", context.sessionId)
                 put("status", status.name.lowercase())
                 put("phase", phase.name.lowercase())
@@ -256,6 +268,12 @@ internal class LocalAgentRunCoordinator(
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
+    }
+
+    private fun eventType(kind: LocalAgentRunKind): String = when (kind) {
+        LocalAgentRunKind.FOREGROUND -> LOCAL_AGENT_RUN_CHECKPOINT_EVENT
+        LocalAgentRunKind.SUBAGENT -> LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
+        LocalAgentRunKind.AUTOMATION -> LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
     }
 
     private fun appendRecoveryState(
