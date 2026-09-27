@@ -177,7 +177,7 @@ if "toolCalls = if (runPolicy.allowToolExecution)" not in engine:
     violations.append("Chat model replies must strip unexpected tool calls before AgentLoop execution")
 if "runPolicy.imageFallbackToVisionTool" not in engine:
     violations.append("Chat native-image failures must not fall back to Work vision tools")
-if "runGroupChatTurn(input)" not in engine or "runAgentTurn(input, memoryInput)" not in engine:
+if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
     violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
 if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in engine:
     violations.append("Single chat must remain a one-step primary-agent reply")
