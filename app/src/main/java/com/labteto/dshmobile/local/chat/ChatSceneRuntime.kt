@@ -324,3 +324,63 @@ internal object ChatSceneRuntime {
         "等她",
     )
 }
+
+
+internal enum class ChatContinuityGuardMode(
+    val actionPrefix: String,
+    val failureMessage: String,
+) {
+    DIRECT("", "角色回复连续两次违反当前场景连续性，请重试本轮。"),
+    GROUP("group-", "群聊角色回复连续两次违反当前场景连续性"),
+    PROACTIVE("proactive-", "角色主动消息连续两次违反当前场景连续性"),
+}
+
+internal object ChatReplyContinuityGuard {
+    suspend fun <T> enforce(
+        previous: ChatSceneState,
+        userMessage: String,
+        initial: T,
+        mode: ChatContinuityGuardMode,
+        contentOf: (T) -> String,
+        retry: suspend (repairHint: String) -> T,
+        onEvent: (action: String, check: ChatContinuityCheck) -> Unit = { _, _ -> },
+    ): T {
+        val firstCheck = ChatSceneRuntime.inspectReply(
+            previous = previous,
+            userMessage = userMessage,
+            assistantMessage = contentOf(initial),
+        )
+        if (firstCheck.accepted) return initial
+
+        onEvent("${mode.actionPrefix}retry", firstCheck)
+        val retried = retry(repairHint(previous, mode))
+        val retryCheck = ChatSceneRuntime.inspectReply(
+            previous = previous,
+            userMessage = userMessage,
+            assistantMessage = contentOf(retried),
+        )
+        if (!retryCheck.accepted) {
+            onEvent("${mode.actionPrefix}rejected", retryCheck)
+            throw IllegalStateException(mode.failureMessage)
+        }
+
+        onEvent("${mode.actionPrefix}repaired", retryCheck)
+        return retried
+    }
+
+    private fun repairHint(
+        scene: ChatSceneState,
+        mode: ChatContinuityGuardMode,
+    ): String = buildString {
+        when (mode) {
+            ChatContinuityGuardMode.DIRECT -> appendLine("【场景连续性修复】")
+            ChatContinuityGuardMode.GROUP -> appendLine("【群聊场景连续性修复】")
+            ChatContinuityGuardMode.PROACTIVE -> appendLine("【主动互动场景连续性修复】")
+        }
+        appendLine("刚才候选回复无过渡改变了当前场景，因此不会提交。")
+        if (scene.location.isNotBlank()) appendLine("当前已确认地点：${scene.location}")
+        if (scene.sceneTime.isNotBlank()) appendLine("当前已确认时间：${scene.sceneTime}")
+        appendLine("重新生成本轮回复；若确实需要换地点，请自然写出实际移动、进入、返回或明确的时间/场景过渡。")
+        append("只输出角色最终回复，不解释修复过程。")
+    }
+}
