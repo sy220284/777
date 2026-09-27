@@ -66,7 +66,11 @@ class LocalSessionEventLog(
     fun repairInterruptedTail(): SessionRepairResult =
         SessionRecovery.repairInterruptedTail(delegate)
 
-    fun search(query: String, limit: Int = 50): String = delegate.search(query, limit)
+    fun search(
+        query: String,
+        limit: Int = 50,
+        afterSequence: Long = -1L,
+    ): String = delegate.search(query, limit, afterSequence)
 
     fun tail(limit: Int = 40): String = delegate.tail(limit)
 
