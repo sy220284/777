@@ -63,6 +63,8 @@ fun AppRoot(
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
+        var utilityReturnSurface by rememberSaveable { mutableStateOf<String?>(null) }
+        var settingsReturnUtilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         var localNavigationSessionId by rememberSaveable { mutableStateOf<String?>(null) }
         val effectiveLocalSessionId = requestedLocalSessionId ?: localNavigationSessionId
         // Local Harness is always the product home. Remote control has exactly one transport:
@@ -81,7 +83,9 @@ fun AppRoot(
         LaunchedEffect(effectiveLocalSessionId) {
             if (!effectiveLocalSessionId.isNullOrBlank()) {
                 showSettings = false
+                settingsReturnUtilitySurface = null
                 utilitySurface = null
+                utilityReturnSurface = null
                 showPair = false
                 relayClaimed = false
                 surface = "local"
@@ -100,10 +104,15 @@ fun AppRoot(
         }
         when {
             utilitySurface == "tasks" -> TasksScreen(
-                onClose = { utilitySurface = null },
+                onClose = {
+                    utilitySurface = utilityReturnSurface
+                    utilityReturnSurface = null
+                },
                 onOpenSession = { sessionId ->
                     utilitySurface = null
+                    utilityReturnSurface = null
                     showSettings = false
+                    settingsReturnUtilitySurface = null
                     showPair = false
                     viewModel.disconnectRemote()
                     relayClaimed = false
@@ -113,15 +122,23 @@ fun AppRoot(
             )
             utilitySurface == "tools" -> ToolsScreen(
                 onClose = { utilitySurface = null },
-                onOpenTasks = { utilitySurface = "tasks" },
+                onOpenTasks = {
+                    utilityReturnSurface = "tools"
+                    utilitySurface = "tasks"
+                },
                 onOpenSettings = { destination ->
                     utilitySurface = null
+                    settingsReturnUtilitySurface = "tools"
                     settingsDestination = destination
                     showSettings = true
                 },
             )
             showSettings -> SettingsScreen(
-                onClose = { showSettings = false },
+                onClose = {
+                    showSettings = false
+                    utilitySurface = settingsReturnUtilitySurface
+                    settingsReturnUtilitySurface = null
+                },
                 initialDestination = settingsDestination,
             )
             showPair -> PairScreen(
@@ -154,11 +171,18 @@ fun AppRoot(
                     showPair = true
                 },
                 onOpenSettings = {
+                    settingsReturnUtilitySurface = null
                     settingsDestination = SettingsDestination.ROOT
                     showSettings = true
                 },
-                onOpenTasks = { utilitySurface = "tasks" },
-                onOpenTools = { utilitySurface = "tools" },
+                onOpenTasks = {
+                    utilityReturnSurface = null
+                    utilitySurface = "tasks"
+                },
+                onOpenTools = {
+                    utilityReturnSurface = null
+                    utilitySurface = "tools"
+                },
                 onCheckUpdate = {
                     viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                 },
@@ -166,11 +190,18 @@ fun AppRoot(
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = {
+                    settingsReturnUtilitySurface = null
                     settingsDestination = SettingsDestination.ROOT
                     showSettings = true
                 },
-                onOpenTasks = { utilitySurface = "tasks" },
-                onOpenTools = { utilitySurface = "tools" },
+                onOpenTasks = {
+                    utilityReturnSurface = null
+                    utilitySurface = "tasks"
+                },
+                onOpenTools = {
+                    utilityReturnSurface = null
+                    utilitySurface = "tools"
+                },
                 onOpenLocalHarness = {
                     viewModel.disconnectRemote()
                     relayClaimed = false
