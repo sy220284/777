@@ -2,11 +2,9 @@ package com.labteto.dshmobile.local
 
 import android.app.ActivityManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import com.labteto.dshmobile.observability.AppLog
 import android.os.Environment
-import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
 import com.labteto.dshmobile.automation.AutomationStore
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
@@ -87,7 +85,6 @@ import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
