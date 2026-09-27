@@ -592,7 +592,10 @@ class HarnessAutomationScheduler @Inject constructor(
                     usesChainedChatScheduling(task) ->
                         nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
                     task.recurringMinutes != null ->
-                        maxOf(task.nextRunAt, userMessageAt)
+                        maxOf(
+                            task.nextRunAt,
+                            userMessageAt + task.recurringMinutes * 60_000L,
+                        )
                     else -> userMessageAt
                 }
                 val resumed = store.update(task.id) {
