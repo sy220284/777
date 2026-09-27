@@ -1414,14 +1414,14 @@ class LocalHarnessEngine @Inject constructor(
         if (editableChatUserText(original).trim() == requestedText) return@synchronized false
         cancelChatPostTurn()
 
-        val sourceSequence = sourceEventSequenceForMessage(messageId)
+        val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
         val baseState = state.chatBranches.nodes
             .firstOrNull { node -> node.message.id == messageId }
             ?.parentId
             ?.let { parentId ->
                 state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
             }
-            ?: restoreChatStateBefore(sourceSequence, original.createdAt)
+            ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
         val baseGroupState = if (state.groupChat.enabled) {
             restoreGroupStateBefore(sourceSequence, original.createdAt)
@@ -1444,9 +1444,9 @@ class LocalHarnessEngine @Inject constructor(
                 chatPersonaGalleryStore.excludeHistoryMessages(
                     id = galleryId,
                     storyId = storyId,
-                    messageKeys = discarded.map(
-                        com.labteto.dshmobile.local.chat::galleryMessageArchiveKey,
-                    ),
+                    messageKeys = discarded.map { message ->
+                        com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(message)
+                    },
                 )
             }
         } else {
@@ -1584,7 +1584,9 @@ class LocalHarnessEngine @Inject constructor(
             }
             val baseState = chatBranchParentState(branches, messageId)
                 ?: restoreChatStateBefore(
-                    sourceEventSequenceForMessage(promptMessage.id),
+                    eventLog.events(),
+                    json,
+                    sourceEventSequenceForMessage(eventLog.events(), promptMessage.id),
                     promptMessage.createdAt,
                 )
                 ?: ChatCharacterState()
@@ -1603,79 +1605,6 @@ class LocalHarnessEngine @Inject constructor(
             .also { activeJob = it; it.start() }
         true
     }
-
-    private fun sourceEventSequenceForMessage(messageId: String): Long? =
-        eventLog.events().asSequence()
-            .filter { event ->
-                event.type == "user/message" || event.type == LOCAL_AGENT_INBOX_EVENT_TYPE
-            }
-            .filter { event ->
-                decodeTranscriptMessages(event.data)
-                    .orEmpty()
-                    .any { message -> message.id == messageId }
-            }
-            .maxOfOrNull(LocalSessionEventLog.Event::sequence)
-
-    private fun restoreChatStateBefore(
-        sequenceExclusive: Long?,
-        createdAtExclusive: Long,
-    ): ChatCharacterState? =
-        eventLog.events().asSequence()
-            .filter { event ->
-                if (sequenceExclusive != null) {
-                    event.sequence < sequenceExclusive
-                } else {
-                    event.createdAt < createdAtExclusive
-                }
-            }
-            .filter { event ->
-                event.type == "chat/post-turn" &&
-                    event.data["status"]?.jsonPrimitive?.contentOrNull == "updated"
-            }
-            .sortedBy(LocalSessionEventLog.Event::sequence)
-            .mapNotNull { event ->
-                val encoded = event.data["state"] as? JsonObject
-                if (encoded != null) {
-                    runCatching {
-                        json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
-                    }.getOrNull()
-                } else {
-                    val mood = event.data["mood"]?.jsonPrimitive?.contentOrNull
-                    val relationship = event.data["relationship_state"]?.jsonPrimitive?.contentOrNull
-                    if (mood == null && relationship == null) {
-                        null
-                    } else {
-                        ChatCharacterState(
-                            mood = mood ?: "自然",
-                            relationshipState = relationship ?: "熟悉中",
-                            updatedAt = event.createdAt,
-                        )
-                    }
-                }
-            }
-            .lastOrNull()
-
-    private fun restoreGroupStateBefore(
-        sequenceExclusive: Long?,
-        createdAtExclusive: Long,
-    ): LocalGroupChatState? =
-        eventLog.events().asSequence()
-            .filter { event ->
-                if (sequenceExclusive != null) {
-                    event.sequence < sequenceExclusive
-                } else {
-                    event.createdAt < createdAtExclusive
-                }
-            }
-            .filter { event -> event.type == "group/state" }
-            .sortedBy(LocalSessionEventLog.Event::sequence)
-            .mapNotNull { event ->
-                val encoded = event.data["state"] as? JsonObject ?: return@mapNotNull null
-                runCatching {
-                    json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
-                }.getOrNull()
-            }
-            .lastOrNull()
 
     private fun editedUserModelMessage(
         originalMessageId: String,
