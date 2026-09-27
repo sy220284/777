@@ -2,7 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.normalized
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -103,6 +106,34 @@ internal fun rewriteChatTranscriptFromUserEdit(
         addAll(activeMessages.subList(0, index))
         add(editedMessage)
     }
+}
+
+internal fun replayHardChatContextFromTranscript(
+    messages: List<LocalHarnessMessage>,
+    generation: Long,
+): ChatContextState {
+    var context = ChatContextState(generation = generation)
+    val pendingUsers = mutableListOf<String>()
+    var syntheticSequence = 1L
+    messages.forEach { message ->
+        when (message.role) {
+            "user" -> if (message.content.isNotBlank()) pendingUsers += message.content
+            "assistant" -> {
+                context = context.applySceneTurn(
+                    userMessage = pendingUsers.joinToString("\n"),
+                    assistantMessage = message.content,
+                    sequence = syntheticSequence++,
+                )
+                pendingUsers.clear()
+            }
+        }
+    }
+    return context.copy(
+        continuity = ChatContinuityState(),
+        pendingTurns = emptyList(),
+        processedThroughSequence = 0L,
+        generation = generation,
+    ).normalized()
 }
 
 internal fun syncChatBranchState(
