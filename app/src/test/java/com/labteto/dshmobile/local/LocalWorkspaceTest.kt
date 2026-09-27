@@ -189,4 +189,26 @@ class LocalWorkspaceTest {
 
         assertTrue(output.contains("ready:runtime-ok"))
     }
+
+    @Test
+    fun fileObservationCacheIsBoundedAndLru() {
+        val cache = LocalFileObservationCache(maxEntries = 2)
+        cache.put("a", "1")
+        cache.put("b", "2")
+        assertEquals("1", cache.get("a"))
+        cache.put("c", "3")
+
+        assertEquals(2, cache.size())
+        assertEquals("1", cache.get("a"))
+        assertEquals("3", cache.get("c"))
+        assertEquals(null, cache.get("b"))
+    }
+
+    @Test
+    fun fileObservationCacheRejectsInvalidCapacity() {
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalFileObservationCache(maxEntries = 0)
+        }
+    }
+
 }

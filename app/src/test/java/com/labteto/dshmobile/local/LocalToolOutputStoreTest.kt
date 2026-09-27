@@ -130,4 +130,35 @@ class LocalToolOutputStoreTest {
 
         assertTrue(store.store("session-a", "call-1", "12345") == null)
     }
+
+    @Test
+    fun rechecksGlobalBytesAfterTransientDeleteFailure() {
+        val root = File(temporary.root, "tool-output")
+        var failFirstDelete = true
+        val store = LocalToolOutputStore(
+            root = root,
+            maxOutputBytes = 32,
+            maxFilesPerSession = 10,
+            maxSessionBytes = 64,
+            maxGlobalBytes = 10,
+            deleteFile = { file ->
+                if (failFirstDelete) {
+                    failFirstDelete = false
+                    false
+                } else {
+                    file.delete()
+                }
+            },
+        )
+
+        store.store("session-a", "call-1", "123456")
+        store.store("session-b", "call-2", "abcdef")
+        store.store("session-c", "call-3", "x")
+
+        val retainedBytes = root.walkTopDown()
+            .filter(File::isFile)
+            .sumOf(File::length)
+        assertTrue(retainedBytes <= 10L)
+    }
+
 }

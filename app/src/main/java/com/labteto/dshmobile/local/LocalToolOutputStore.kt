@@ -16,6 +16,7 @@ internal class LocalToolOutputStore(
     private val maxFilesPerSession: Int = DEFAULT_MAX_FILES_PER_SESSION,
     private val maxSessionBytes: Long = DEFAULT_MAX_SESSION_BYTES,
     private val maxGlobalBytes: Long = DEFAULT_MAX_GLOBAL_BYTES,
+    private val deleteFile: (File) -> Boolean = { it.delete() },
 ) {
     init {
         root.mkdirs()
@@ -159,7 +160,7 @@ internal class LocalToolOutputStore(
                 val length = file.length()
                 val nextBytes = keptBytes + length
                 if (index >= maxFilesPerSession || nextBytes > maxSessionBytes) {
-                    if (file.delete()) removedBytes += length
+                    if (deleteFile(file)) removedBytes += length
                 } else {
                     keptBytes = nextBytes
                 }
@@ -179,7 +180,7 @@ internal class LocalToolOutputStore(
                 val length = file.length()
                 val nextBytes = keptBytes + length
                 if (nextBytes > maxGlobalBytes) {
-                    file.delete()
+                    deleteFile(file)
                 } else {
                     keptBytes = nextBytes
                 }
@@ -189,7 +190,10 @@ internal class LocalToolOutputStore(
             .filter(File::isDirectory)
             .filter { it.listFiles().isNullOrEmpty() }
             .forEach(File::delete)
-        return keptBytes
+        // Deletion may fail transiently (for example while a file is held by the OS). Re-measure
+        // instead of caching the optimistic keptBytes value, otherwise a later write can skip
+        // pruning even though the real store is still above the global budget.
+        return measureGlobalBytes()
     }
 
     private fun measureGlobalBytes(): Long = storedBytes(root)
