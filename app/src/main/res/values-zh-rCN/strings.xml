@@ -177,6 +177,7 @@
     <string name="workflow_failed">失败</string>
     <string name="skills_title">技能</string>
     <string name="skills_user_only">仅用户</string>
+    <string name="skills_empty">此会话没有可用技能</string>
     <string name="models_title">模型</string>
     <string name="models_current">当前模型</string>
     <string name="models_reasoning_effort">推理力度</string>
