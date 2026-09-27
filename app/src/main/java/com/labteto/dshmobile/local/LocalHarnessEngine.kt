@@ -3157,19 +3157,16 @@ class LocalHarnessEngine @Inject constructor(
                 try {
                     cancelActiveRunAndJoin()
                     val current = _state.value
-                    val id = modelProfileId(current.model, current.baseUrl)
-                    apiKeys.clearFor(id)
-                    val remaining = readModelProfiles().filterNot { it.id == id }
-                    val next = remaining.firstOrNull()
-                    preferences.edit().putString(KEY_MODEL_PROFILES, encodeModelProfiles(remaining))
-                        .putString(KEY_MODEL, next?.model ?: DEFAULT_MODEL)
-                        .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL).apply()
-                    apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-                    _state.update { it.copy(configured = next != null,
-                        model = next?.model ?: DEFAULT_MODEL,
-                        baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
-                        modelProfiles = remaining,
-                        configuredModels = remaining.map(LocalModelProfile::model).distinct().sorted()) }
+                    val result = modelConfiguration.clearActive(current.model, current.baseUrl)
+                    _state.update {
+                        it.copy(
+                            configured = result.configured,
+                            model = result.model,
+                            baseUrl = result.baseUrl,
+                            modelProfiles = result.profiles,
+                            configuredModels = result.configuredModels,
+                        )
+                    }
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -6829,10 +6826,6 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MODEL_PROFILES = "model_profiles_v2"
         const val KEY_BASE_URL = "base_url"
         const val KEY_SESSION_ID = "session_id"
-        const val LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS = "main_max_steps"
-        const val LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
-        const val LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS = "model_attempts"
-        const val LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
