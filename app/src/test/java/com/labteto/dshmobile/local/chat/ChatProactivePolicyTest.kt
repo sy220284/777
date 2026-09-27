@@ -83,6 +83,96 @@ class ChatProactivePolicyTest {
     }
 
     @Test
+    fun customCooldownReturnsExactRetryTime() {
+        val hour = 60L * 60L * 1000L
+        val messages = listOf(
+            message("u1", "user", "先忙", 1L),
+            message("p1", "assistant", "那我晚点再来。", 2L * hour, proactive = true),
+        )
+
+        val decision = evaluateChatProactivePolicy(
+            messages = messages,
+            nowMillis = 5L * hour,
+            minimumGapMinutes = 6L * 60L,
+        )
+
+        assertFalse(decision.shouldSend)
+        assertEquals(8L * hour, decision.retryAt)
+        assertFalse(decision.waitingForUserReply)
+    }
+
+    @Test
+    fun unansweredLimitWaitsForNextUserReply() {
+        val messages = listOf(
+            message("u1", "user", "晚点聊", 1L),
+            message("p1", "assistant", "好。", 2L, proactive = true),
+            message("p2", "assistant", "有空再叫我。", 3L, proactive = true),
+            message("p3", "assistant", "我先不打扰。", 4L, proactive = true),
+        )
+
+        val decision = evaluateChatProactivePolicy(
+            messages = messages,
+            nowMillis = 100L,
+            minimumGapMinutes = 0L,
+            maxUnanswered = 3,
+        )
+
+        assertFalse(decision.shouldSend)
+        assertTrue(decision.waitingForUserReply)
+        assertEquals(null, decision.retryAt)
+    }
+
+    @Test
+    fun quietWindowSupportsMinutePrecision() {
+        assertTrue(
+            isMinuteInQuietWindow(
+                minuteOfDay = 23 * 60,
+                startMinuteOfDay = 22 * 60 + 30,
+                endMinuteOfDay = 6 * 60 + 45,
+            ),
+        )
+        assertTrue(
+            isMinuteInQuietWindow(
+                minuteOfDay = 6 * 60 + 44,
+                startMinuteOfDay = 22 * 60 + 30,
+                endMinuteOfDay = 6 * 60 + 45,
+            ),
+        )
+        assertFalse(
+            isMinuteInQuietWindow(
+                minuteOfDay = 6 * 60 + 45,
+                startMinuteOfDay = 22 * 60 + 30,
+                endMinuteOfDay = 6 * 60 + 45,
+            ),
+        )
+    }
+
+    @Test
+    fun quietHoursDecisionCarriesMinutePreciseRetry() {
+        val now = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 2, 23, 15, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val expected = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 3, 6, 45, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val decision = evaluateChatProactivePolicy(
+            messages = emptyList(),
+            nowMillis = now,
+            quietHoursEnabled = true,
+            quietStartHour = 22,
+            quietStartMinute = 30,
+            quietEndHour = 6,
+            quietEndMinute = 45,
+        )
+
+        assertFalse(decision.shouldSend)
+        assertEquals(expected, decision.retryAt)
+    }
+
+    @Test
     fun detectsNearDuplicateProactiveCopy() {
         val messages = listOf(
             message(
