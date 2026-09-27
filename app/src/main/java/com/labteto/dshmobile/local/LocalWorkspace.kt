@@ -7,13 +7,38 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
+import java.util.LinkedHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+
+internal class LocalFileObservationCache(
+    private val maxEntries: Int = 2_048,
+) {
+    private val entries = object : LinkedHashMap<String, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > maxEntries
+    }
+
+    init {
+        require(maxEntries > 0) { "文件观察缓存容量必须大于 0" }
+    }
+
+    fun get(path: String): String? = synchronized(entries) { entries[path] }
+
+    fun put(path: String, fingerprint: String) {
+        synchronized(entries) { entries[path] = fingerprint }
+    }
+
+    fun remove(path: String) {
+        synchronized(entries) { entries.remove(path) }
+    }
+
+    internal fun size(): Int = synchronized(entries) { entries.size }
+}
 
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
@@ -28,7 +53,7 @@ class LocalWorkspace(
     private val boundary: LocalSandboxBoundary = LocalSandboxBoundary.workspaceOnly(root),
 ) {
     private val canonicalRoot = root.canonicalFile
-    private val observations = ConcurrentHashMap<String, String>()
+    private val observations = LocalFileObservationCache()
 
     init {
         canonicalRoot.mkdirs()
@@ -46,7 +71,7 @@ class LocalWorkspace(
         val lines = file.readLines()
         val after = fingerprint(file)
         require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
-        observations[file.path] = after
+        observations.put(file.path, after)
         val from = (startLine.coerceAtLeast(1) - 1).coerceAtMost(lines.size)
         val to = endLine.coerceAtLeast(startLine).coerceAtMost(lines.size)
         return lines.subList(from, to).mapIndexed { index, line ->
@@ -93,7 +118,7 @@ class LocalWorkspace(
         val content = file.readText()
         val after = fingerprint(file)
         require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
-        observations[file.path] = after
+        observations.put(file.path, after)
         return content
     }
 
@@ -101,7 +126,7 @@ class LocalWorkspace(
     fun requireFreshObservation(relativePath: String): String {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
-        val observed = observations[file.path]
+        val observed = observations.get(file.path)
             ?: error("编辑前必须先读取文件：$relativePath。write 创建或覆盖文件不算读取；请先用 read 读取包含待替换内容的目标区域，再调用 edit")
         require(observed == fingerprint(file)) {
             "文件在读取后已发生变化，请重新读取再编辑：$relativePath"
@@ -125,7 +150,7 @@ class LocalWorkspace(
         val result = source.replaceRange(first, first + oldText.length, newText)
         require(result.toByteArray().size <= MAX_WRITE_BYTES) { "编辑结果超过 ${MAX_WRITE_BYTES / 1024} KB" }
         atomicWrite(file, result)
-        observations[file.path] = fingerprint(file)
+        observations.put(file.path, fingerprint(file))
         return "已编辑 $relativePath"
     }
 
