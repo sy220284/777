@@ -134,10 +134,6 @@ internal fun ChatContextState.pendingForRequest(limit: Int = 6): List<ChatPendin
 internal fun ChatContextState.hasUsefulFacts(): Boolean =
     scene.sceneTime.isNotBlank() ||
         scene.location.isNotBlank() ||
-        scene.participants.isNotEmpty() ||
-        scene.positions.isNotEmpty() ||
-        scene.activeActions.isNotEmpty() ||
-        scene.keyObjects.isNotEmpty() ||
         continuity.recentEvents.isNotEmpty() ||
         continuity.decisions.isNotEmpty() ||
         continuity.unfinished.isNotEmpty() ||
@@ -174,26 +170,16 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
     if (!normalized.hasUsefulFacts()) return ""
     return buildString {
         val scene = normalized.scene
-        if (
-            scene.sceneTime.isNotBlank() ||
-            scene.location.isNotBlank() ||
-            scene.participants.isNotEmpty() ||
-            scene.positions.isNotEmpty() ||
-            scene.activeActions.isNotEmpty() ||
-            scene.keyObjects.isNotEmpty()
-        ) {
+        if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
             appendLine("【当前场景｜硬连续性】")
             appendLine(
-                "时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
-                    "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+                "时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
             )
-            if (scene.positions.isNotEmpty()) appendLine("位置：${scene.positions.joinToString("；")}")
-            if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
-            if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
             normalized.sceneEvents.lastOrNull()?.let { event ->
                 val label = if (event.kind == ChatSceneEventKind.LOCATION) "地点变化" else "时间推进"
                 appendLine("最近硬状态事件：$label=${event.to}")
             }
+            appendLine("硬状态目前只包含有确定性事件来源的时间与地点；人物位置、进行中动作和物件以最近原始对话为准，不把旧快照当成当前事实。")
             appendLine("若没有明确移动、时间推进或合理叙事跳切，保持当前场景不变。")
         }
 
