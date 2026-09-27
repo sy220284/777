@@ -449,8 +449,8 @@ private fun toolResultFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
         "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
 
-private const val LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES = 200
-private const val MAX_LOCAL_IMAGE_SELECTION = 20
+internal const val LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES = 200
+internal const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 
 internal fun decodeLocalAttachmentThumbnail(
