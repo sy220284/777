@@ -825,9 +825,10 @@ class LocalHarnessEngine @Inject constructor(
     fun selectModel(id: String) {
         scope.launch {
             val current = _state.value
+            val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
                 current.loading || current.running || isRunBusy() ||
-                current.modelProfiles.none { it.id == id }
+                (selected.model == current.model && selected.baseUrl == current.baseUrl)
             ) return@launch
             runCatching { modelConfiguration.select(id, current.modelProfiles) }
                 .onSuccess { result ->
