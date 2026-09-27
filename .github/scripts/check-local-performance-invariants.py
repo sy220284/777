@@ -34,9 +34,9 @@ if engine_lines > 6_500:
     )
 
 local_screen_lines = len(LOCAL_SCREEN.read_text(encoding="utf-8").splitlines())
-if local_screen_lines > 2_920:
+if local_screen_lines > 2_450:
     violations.append(
-        f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2920); extract UI/state into focused components"
+        f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2450); extract UI/state into focused components"
     )
 
 persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
