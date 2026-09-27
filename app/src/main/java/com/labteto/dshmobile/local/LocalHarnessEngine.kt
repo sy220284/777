@@ -1487,7 +1487,11 @@ class LocalHarnessEngine @Inject constructor(
         }
 
         val discarded = activeTranscript.drop(originalIndex)
-        memoryStore.rollbackSourceSessionFrom(state.sessionId, original.createdAt)
+        memoryStore.rollbackSourceSessionFrom(
+            sourceSessionId = state.sessionId,
+            createdAtInclusive = original.createdAt,
+            discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
+        )
         if (!state.groupChat.enabled) {
             val galleryId = state.galleryId
             val storyId = state.galleryStoryId
