@@ -311,8 +311,12 @@ class SessionStore @Inject constructor(
 
     private val _skills = MutableStateFlow<List<SkillEntry>>(emptyList())
     val skills: StateFlow<List<SkillEntry>> = _skills.asStateFlow()
+    private val _skillsLoading = MutableStateFlow(false)
+    val skillsLoading: StateFlow<Boolean> = _skillsLoading.asStateFlow()
 
     private val _models = MutableStateFlow<ModelCatalog?>(null)
+    private val _modelsLoading = MutableStateFlow(false)
+    val modelsLoading: StateFlow<Boolean> = _modelsLoading.asStateFlow()
 
     /** The host generation's routable model catalog, before the session's own selection is joined in. */
     val modelCatalog: StateFlow<ModelCatalog?> = _models.asStateFlow()
@@ -1072,7 +1076,9 @@ class SessionStore @Inject constructor(
                 _currentConversation.value = null
                 _jobs.value = emptyList()
                 _skills.value = emptyList()
+                _skillsLoading.value = true
                 _models.value = null
+                _modelsLoading.value = true
                 _subagents.value = emptyList()
                 _subagentConversation.value = null
                 _subagentMode.value = null
@@ -1960,24 +1966,48 @@ class SessionStore @Inject constructor(
     }
 
     private suspend fun loadSkills(sessionId: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.skillList(SkillListRequest(sessionId))) {
-            is RpcResult.Ok -> synchronized(lock) {
-                if (currentId == sessionId) _skills.value = r.value.skills
+        val api = apiOrNull()
+        if (api == null) {
+            synchronized(lock) {
+                if (currentId == sessionId) _skillsLoading.value = false
             }
-            is RpcResult.Err -> setConnectionError(r.error.message)
+            return
+        }
+        try {
+            when (val r = api.skillList(SkillListRequest(sessionId))) {
+                is RpcResult.Ok -> synchronized(lock) {
+                    if (currentId == sessionId) _skills.value = r.value.skills
+                }
+                is RpcResult.Err -> setConnectionError(r.error.message)
+            }
+        } finally {
+            synchronized(lock) {
+                if (currentId == sessionId) _skillsLoading.value = false
+            }
         }
     }
 
     private suspend fun loadModels(sessionId: String) {
-        val api = apiOrNull() ?: return
+        val api = apiOrNull()
+        if (api == null) {
+            synchronized(lock) {
+                if (currentId == sessionId) _modelsLoading.value = false
+            }
+            return
+        }
         // Host-scoped now, not session-scoped: `session/modelCatalog` describes the generation's
         // routable models, and the session's own current selection comes from its projections.
-        when (val r = api.sessionModelCatalog()) {
-            is RpcResult.Ok -> synchronized(lock) {
-                if (currentId == sessionId) _models.value = r.value
+        try {
+            when (val r = api.sessionModelCatalog()) {
+                is RpcResult.Ok -> synchronized(lock) {
+                    if (currentId == sessionId) _models.value = r.value
+                }
+                is RpcResult.Err -> setConnectionError(r.error.message)
             }
-            is RpcResult.Err -> setConnectionError(r.error.message)
+        } finally {
+            synchronized(lock) {
+                if (currentId == sessionId) _modelsLoading.value = false
+            }
         }
     }
 
