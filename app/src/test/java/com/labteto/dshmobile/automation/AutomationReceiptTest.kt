@@ -117,6 +117,27 @@ class AutomationReceiptTest {
     }
 
     @Test
+    fun chatTaskKeepsProactivePolicyDefaults() {
+        val task = AutomationTask(
+            id = "chat-policy",
+            prompt = "来找我",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            recurringMinutes = 360L,
+            scheduleType = AutomationScheduleType.INTERVAL,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session",
+        )
+
+        assertEquals(23, task.quietStartHour)
+        assertEquals(0, task.quietStartMinute)
+        assertEquals(7, task.quietEndHour)
+        assertEquals(0, task.quietEndMinute)
+        assertEquals(360L, task.proactiveMinGapMinutes)
+        assertEquals(2, task.proactiveMaxUnanswered)
+    }
+
+    @Test
     fun keepsReceiptExactlyAtThirtyDayCutoff() {
         val day = 24L * 60L * 60L * 1000L
         val atCutoff = AutomationRunReceipt(day, day, "completed")
