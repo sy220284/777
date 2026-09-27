@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -291,7 +293,9 @@ fun TasksScreen(
         proactiveMaxUnanswered = 2
         createError = null
     }
-    BackHandler(onBack = onClose)
+    BackHandler {
+        if (showCreate) resetEditor() else onClose()
+    }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
@@ -333,6 +337,9 @@ fun TasksScreen(
             )
 
             if (showCreate) {
+                Column(
+                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                ) {
                 DsGroupCard {
                     Text(
                         stringResource(
@@ -658,9 +665,8 @@ fun TasksScreen(
                         )
                     }
                 }
-            }
-
-            if (visibleTasks.isEmpty() && !showCreate) {
+                }
+            } else if (visibleTasks.isEmpty()) {
                 EmptyHero(
                     headline = stringResource(R.string.tasks_empty_title),
                     subtitle = stringResource(R.string.tasks_empty_subtitle),

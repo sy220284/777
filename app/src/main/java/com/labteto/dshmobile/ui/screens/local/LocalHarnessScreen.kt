@@ -644,6 +644,12 @@ private fun LocalModeDrawer(
                             iconFamily = DsIconFamily.Amber,
                             onClick = onTasks,
                         )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Extension,
+                            title = stringResource(R.string.tools_title),
+                            iconFamily = DsIconFamily.Neutral,
+                            onClick = onTools,
+                        )
                     } else {
                         DrawerPrimaryAction(
                             icon = FeatherIcons.FileText,
