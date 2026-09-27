@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.notify.DshNotifications
+import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -63,7 +64,8 @@ class ConnectionService : Service() {
         val text = host?.let { getString(R.string.notif_connected_text, it.authority) }
             ?: getString(R.string.common_connected)
         return NotificationCompat.Builder(this, DshNotifications.CHANNEL_CONNECTION)
-            .setSmallIcon(R.drawable.ic_notification_whale)
+            .setSmallIcon(R.drawable.ic_notification_butterfly)
+            .setLargeIcon(NotificationArtwork.largeIcon(this))
             .setContentTitle(getString(R.string.notif_connected_title))
             .setContentText(text)
             .setContentIntent(openIntent)
