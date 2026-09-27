@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.core.session.AssistantMessageNode
 import com.labteto.dshmobile.core.session.ConversationSnapshot
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.data.SessionStore
@@ -39,6 +40,8 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -67,6 +70,9 @@ internal fun SubagentsSheet(
     val scope = rememberCoroutineScope()
     val colors = DsTheme.colors
     val childId = conversation?.sessionId
+    val toast = rememberDsToast()
+    val copiedLabel = stringResource(R.string.chat_copy_success)
+    var feedback by remember(childId) { mutableStateOf<Pair<String, Boolean>?>(null) }
     val connection by store.connectionState.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(connection.phase) {
         if (connection.phase == com.labteto.dshmobile.connection.ConnectionPhase.CONNECTED && childId != null) {
@@ -134,8 +140,25 @@ internal fun SubagentsSheet(
                                 store.panels.get(ComposerKey(store.activeHostKey.orEmpty(), child.sessionId)).open(path); childPanel = true
                             },
                         ) {
-                            val childContext = ChatNodeContext(child.nodes, child.running, null,
-                                onOpenSubagent = {}, onBranchFrom = {}, onFeedback = { _, _ -> })
+                            val childContext = ChatNodeContext(
+                                nodes = child.nodes,
+                                running = child.running,
+                                cwd = null,
+                                onOpenSubagent = { nestedId ->
+                                    scope.launch { store.openSubagentTranscript(nestedId) }
+                                },
+                                onBranchFrom = { seq ->
+                                    scope.launch { store.forkSession(child.sessionId, seq) }
+                                },
+                                onFeedback = { seq, positive ->
+                                    child.nodes
+                                        .filterIsInstance<AssistantMessageNode>()
+                                        .firstOrNull { it.seq == seq }
+                                        ?.messageId
+                                        ?.let { feedback = it to positive }
+                                },
+                                onCopied = { toast.second(copiedLabel) },
+                            )
                             child.nodes.forEach { node -> ChatNodeItem(node, childContext) }
                         }
                     }
@@ -200,6 +223,19 @@ internal fun SubagentsSheet(
             }
         }
     }
+    feedback?.let { (messageId, positive) ->
+        val id = childId
+        if (id != null) {
+            FeedbackDialog(
+                store = store,
+                key = ComposerKey(store.activeHostKey.orEmpty(), id),
+                messageId = messageId,
+                positive = positive,
+                onDismiss = { feedback = null },
+            )
+        }
+    }
+    DsToastHost(toast, modifier = Modifier.fillMaxWidth())
     if (childPanel && childId != null) WorkspacePanels(store, store.panels.get(ComposerKey(store.activeHostKey.orEmpty(), childId))) { childPanel = false }
 }
 
