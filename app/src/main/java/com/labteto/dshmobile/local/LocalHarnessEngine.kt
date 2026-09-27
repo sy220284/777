@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import android.os.Environment
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -92,6 +93,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -274,7 +276,14 @@ class LocalHarnessEngine @Inject constructor(
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // P0 修复（审计 2026-09-27）：SupervisorJob 之下未捕获的 launch 异常会走进程崩溃。
+    // 挂上 handler 后引擎内部失败降级为日志 + 状态可见，不再炸穿整个应用。
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, throwable ->
+                Log.e("LocalHarnessEngine", "engine coroutine failure", throwable)
+            },
+    )
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
