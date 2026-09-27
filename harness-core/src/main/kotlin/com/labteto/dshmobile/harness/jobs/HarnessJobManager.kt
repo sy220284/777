@@ -241,7 +241,7 @@ class HarnessJobManager(
 
     fun list(): String = snapshotRecords().let { snapshot ->
         if (snapshot.isEmpty()) "没有后台任务"
-        else snapshot.joinToString("\n") { "${it.id} [${it.status}] ${it.label}" }
+        else snapshot.joinToString("\n") { "${it.id} [${it.status}] ${publicLabel(it.label)}" }
     }
 
     fun listAgents(): String = synchronized(lock) {
@@ -253,7 +253,7 @@ class HarnessJobManager(
     fun output(id: String): String {
         return synchronized(lock) {
             val record = records[id] ?: return "后台任务不存在：$id"
-            "${record.id} [${record.status}] ${record.label}\n${record.output.ifBlank { "暂无输出" }}"
+            "${record.id} [${record.status}] ${publicLabel(record.label)}\n${record.output.ifBlank { "暂无输出" }}"
         }
     }
 
@@ -336,6 +336,10 @@ class HarnessJobManager(
     private fun snapshotRecords(): List<JobInfo> = synchronized(lock) {
         records.values.map { JobInfo(it.id, it.label, it.status) }
     }
+
+    // Old snapshots may still contain a full shell command, including credentials.
+    private fun publicLabel(label: String): String =
+        if (label.startsWith(AGENT_PREFIX)) label.removePrefix(AGENT_PREFIX) else "后台命令"
 
     private fun snapshot(record: Record): JobSnapshot = JobSnapshot(
         id = record.id,

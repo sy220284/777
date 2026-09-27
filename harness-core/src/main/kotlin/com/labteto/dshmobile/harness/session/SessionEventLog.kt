@@ -114,24 +114,35 @@ class SessionEventLog(
         forEachAfterUnsafe(sequenceExclusive, visitor)
     }
 
-    fun search(query: String, limit: Int = 50): String {
+    fun search(query: String, limit: Int = 20, beforeSequenceExclusive: Long = Long.MAX_VALUE): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
-        val wanted = limit.coerceIn(1, MAX_READ_LINES)
+        val wanted = limit.coerceIn(1, MAX_SEARCH_RESULTS)
         val matches = synchronized(lock) {
             val result = mutableListOf<String>()
-            var row = 0
-            for (source in orderedFilesUnsafe()) {
-                source.forEachLine { line ->
-                    row += 1
-                    if (result.size < wanted && line.contains(query, ignoreCase = true)) {
-                        result += "$row: $line"
-                    }
+            var size = 0
+            for (source in orderedFilesUnsafe().asReversed()) {
+                val first = readFirstValidEventUnsafe(source) ?: continue
+                if (first.sequence >= beforeSequenceExclusive) continue
+                val completed = forEachEventReverseUnsafe(source) { event ->
+                    if (event.sequence >= beforeSequenceExclusive) return@forEachEventReverseUnsafe true
+                    val value = json.encodeToString(SessionEvent.serializer(), event)
+                    val index = value.indexOf(query, ignoreCase = true)
+                    if (index < 0) return@forEachEventReverseUnsafe true
+                    val start = (index - 100).coerceAtLeast(0)
+                    val preview = value.substring(start, minOf(value.length, start + MAX_SEARCH_PREVIEW))
+                    val row = "序号 ${event.sequence}：${if (start > 0) "…" else ""}$preview" +
+                        if (start + MAX_SEARCH_PREVIEW < value.length) "…" else ""
+                    if (size + row.length > MAX_SEARCH_CHARS && result.isNotEmpty()) return@forEachEventReverseUnsafe false
+                    result += row
+                    size += row.length
+                    result.size < wanted && size < MAX_SEARCH_CHARS
                 }
-                if (result.size >= wanted) break
+                if (!completed || result.size >= wanted) break
             }
             result
         }
-        return if (matches.isEmpty()) "未找到会话事件" else matches.joinToString("\n")
+        return if (matches.isEmpty()) "未找到会话事件" else matches.joinToString("\n") +
+            "\n继续检索更早结果：before_sequence=${matches.last().substringAfter("序号 ").substringBefore('：')}"
     }
 
     fun tail(limit: Int = 40): String {
@@ -444,6 +455,9 @@ class SessionEventLog(
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
+        const val MAX_SEARCH_RESULTS = 50
+        const val MAX_SEARCH_PREVIEW = 1_200
+        const val MAX_SEARCH_CHARS = 32_000
         const val MAX_CONTEXT_LINES = 20
         const val DEFAULT_PAGE_EVENTS = 80
         const val MAX_PAGE_EVENTS = 200

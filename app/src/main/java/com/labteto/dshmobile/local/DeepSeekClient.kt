@@ -408,8 +408,8 @@ object LocalToolCatalog {
             "pattern" to string("例如 **/*.kt"),
             "path" to string("相对路径，默认 ."),
         ), listOf("pattern")))
-        add(tool("grep", "在工作区文件中搜索文字", properties(
-            "query" to string("搜索内容"),
+        add(tool("grep", "在工作区文件中按字面量搜索文字；不支持正则表达式", properties(
+            "query" to string("字面量搜索内容，不解析 |、^ 等正则符号"),
             "path" to string("相对路径，默认 ."),
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
@@ -556,6 +556,8 @@ object LocalToolCatalog {
         add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(
             "query" to string("搜索内容"),
             "session_id" to string("可选；留空使用当前会话"),
+            "limit" to integer("每页结果数，默认 20、最大 50"),
+            "before_sequence" to string("可选；上一页末尾提示的序号，只搜索更早事件"),
         ), listOf("query")))
         add(tool("session_search", "跨本机历史会话搜索事件", properties(
             "query" to string("搜索内容"),

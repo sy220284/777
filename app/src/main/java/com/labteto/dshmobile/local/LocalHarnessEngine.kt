@@ -4855,7 +4855,7 @@ class LocalHarnessEngine @Inject constructor(
                     if (background) MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
                 )
                 if (background) {
-                    jobs.start(command) { _, report -> workspace.shell(command, timeout, report) }
+                    jobs.start("后台命令") { _, report -> workspace.shell(command, timeout, report) }
                 } else {
                     workspace.shell(command, timeout)
                 }
@@ -4971,7 +4971,11 @@ class LocalHarnessEngine @Inject constructor(
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools.execute(call.name, args, allowMutation)
-            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
+            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(
+                args.string("query"),
+                args.int("limit", 20),
+                args.optionalString("before_sequence")?.toLongOrNull() ?: Long.MAX_VALUE,
+            )
             "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
             "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
                 .read(args.int("seq", -1).toLong(), before = 1, after = 1)

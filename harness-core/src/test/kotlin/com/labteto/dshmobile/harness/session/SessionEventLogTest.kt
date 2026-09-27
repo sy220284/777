@@ -12,6 +12,27 @@ class SessionEventLogTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun searchBoundsLargeMatchesAndPagesToOlderEvents() {
+        val directory = Files.createTempDirectory("harness-event-search").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 2_000_000)
+            repeat(4) { index ->
+                log.append("test", buildJsonObject { put("value", "needle-$index-" + "x".repeat(500_000)) })
+            }
+            val first = log.search("needle", limit = 2)
+            assertTrue(first.length < 4_000)
+            assertTrue(first.contains("序号 3："))
+            assertTrue(first.contains("before_sequence=2"))
+            val second = log.search("needle", limit = 2, beforeSequenceExclusive = 2)
+            assertTrue(second.contains("序号 1："))
+            assertTrue(second.contains("序号 0："))
+            assertTrue(!second.contains("序号 2："))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rotatesWithoutDiscardingRowsAndContinuesSequenceAfterRestart() {
         val directory = Files.createTempDirectory("harness-event-log").toFile()
         val file = directory.resolve("session.events.jsonl")

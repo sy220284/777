@@ -15,6 +15,15 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalJobManagerTest {
     @Test
+    fun historicalCommandLabelsDoNotRevealCredentialsInJobList() = runTest {
+        val manager = LocalJobManager(this, onChanged = { })
+        val token = "test-secret-123"
+        val started = manager.start("curl -H 'Authorization: Bearer $token' https://example.test") { _, _ -> "ok" }
+        assertTrue(manager.list().contains(started.substringAfterLast('：')))
+        assertTrue(!manager.list().contains(token))
+        assertTrue(!manager.output(started.substringAfterLast('：')).contains(token))
+    }
+    @Test
     fun exposesProgressBeforeJobCompletesAndThenPublishesFinalOutput() = runTest {
         val gate = CompletableDeferred<Unit>()
         val manager = LocalJobManager(this) { }

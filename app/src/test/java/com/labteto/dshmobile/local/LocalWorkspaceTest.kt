@@ -72,6 +72,7 @@ class LocalWorkspaceTest {
 
     @Test
     fun editRequiresUniqueObservationAndGlobFindsFiles() {
+        workspace.write("AGENT_GUARDRAILS.md", "top level\n")
         workspace.write("src/one.kt", "val before = 1\n")
         workspace.write("src/two.txt", "before before\n")
         workspace.read("src/one.kt")
@@ -80,6 +81,8 @@ class LocalWorkspaceTest {
         assertEquals("已编辑 src/one.kt", workspace.edit("src/one.kt", "before", "after"))
         assertTrue(workspace.read("src/one.kt").contains("after"))
         assertTrue(workspace.glob("**/*.kt").contains("src/one.kt"))
+        assertTrue(workspace.glob("**/AGENT_GUARDRAILS.md").contains("AGENT_GUARDRAILS.md"))
+        assertTrue(workspace.glob("**/*.md").contains("AGENT_GUARDRAILS.md"))
         assertThrows(IllegalArgumentException::class.java) {
             workspace.edit("src/two.txt", "before", "after")
         }

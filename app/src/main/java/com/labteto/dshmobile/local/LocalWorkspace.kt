@@ -102,7 +102,7 @@ class LocalWorkspace(
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
         val observed = observations[file.path]
-            ?: error("编辑前必须先读取文件：$relativePath")
+            ?: error("编辑前必须先读取文件（write 新建或覆盖不算读取）：$relativePath")
         require(observed == fingerprint(file)) {
             "文件在读取后已发生变化，请重新读取再编辑：$relativePath"
         }
@@ -373,8 +373,13 @@ class LocalWorkspace(
             when (val char = glob[index]) {
                 '*' -> {
                     if (index + 1 < glob.length && glob[index + 1] == '*') {
-                        output.append(".*")
-                        index++
+                        if (index + 2 < glob.length && glob[index + 2] == '/') {
+                            output.append("(?:.*/)?")
+                            index += 2
+                        } else {
+                            output.append(".*")
+                            index++
+                        }
                     } else output.append("[^/]*")
                 }
                 '?' -> output.append("[^/]")
