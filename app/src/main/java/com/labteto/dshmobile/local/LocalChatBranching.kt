@@ -50,8 +50,7 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
     if (turnDialogue.first().role != "user") return false
     // Group chat may legitimately produce several assistant messages for one user turn, while
     // queued/steering input can legitimately leave several user messages next to each other.
-    // Once the run is idle, either shape can be edited safely because the new sibling branch starts
-    // at the selected human message and does not inherit the old downstream path.
+    // Either shape remains valid for branch navigation and historical-edit eligibility once idle.
     return true
 }
 
