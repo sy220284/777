@@ -153,4 +153,31 @@ class LocalWorkspaceTest {
 
         assertTrue(output.contains("ready:runtime-ok"))
     }
+
+    @Test
+    fun doubleStarSlashAlsoMatchesTopLevelFiles() {
+        workspace.write("AGENT_GUARDRAILS.md", "top-level")
+        workspace.write("nested/AGENT_GUARDRAILS.md", "nested")
+
+        val matches = workspace.glob("**/AGENT_GUARDRAILS.md").lineSequence().toSet()
+
+        assertTrue("AGENT_GUARDRAILS.md" in matches)
+        assertTrue("nested/AGENT_GUARDRAILS.md" in matches)
+    }
+
+
+
+    @Test
+    fun editErrorExplainsThatWriteDoesNotCountAsRead() {
+        workspace.write("fresh.txt", "before")
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            workspace.edit("fresh.txt", "before", "after")
+        }
+
+        assertTrue(error.message.orEmpty().contains("write 创建或覆盖文件不算读取"))
+        assertTrue(error.message.orEmpty().contains("包含待替换内容"))
+    }
+
+
 }
