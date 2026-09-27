@@ -12,7 +12,6 @@ import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
-import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -146,8 +145,7 @@ class LocalExecutionService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, DshNotifications.CHANNEL_LOCAL_JOBS)
-            .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setLargeIcon(NotificationArtwork.largeIcon(this))
+            .setSmallIcon(R.drawable.ic_notification_whale)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pending)

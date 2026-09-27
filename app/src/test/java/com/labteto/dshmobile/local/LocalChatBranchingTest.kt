@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -310,6 +312,35 @@ class LocalChatBranchingTest {
             replySuggestions = emptyList(),
         )
         assertEquals(listOf("u1", "a1", "a2"), activeChatBranchMessages(branches).map { it.id })
+    }
+
+    @Test
+    fun switchingBranchRestoresItsOwnSceneContext() {
+        val user = message("u1", "user", "去哪边", 1)
+        val courtyard = message("a1", "assistant", "留在院子。", 2)
+        var branches = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, courtyard),
+            chatState = ChatCharacterState(),
+            replySuggestions = emptyList(),
+            chatContext = ChatContextState(scene = ChatSceneState(location = "院子")),
+        )
+        val room = message("a2", "assistant", "回到房间。", 3)
+        branches = upsertChatBranchNode(
+            branches,
+            LocalChatBranchNode(
+                message = room,
+                parentId = user.id,
+                chatStateAfter = ChatCharacterState(),
+                chatContextAfter = ChatContextState(scene = ChatSceneState(location = "房间")),
+            ),
+            select = true,
+        )
+
+        assertEquals("房间", chatBranchLastContext(branches)!!.scene.location)
+
+        val oldSelected = selectChatBranchVariant(branches, "a2", 0)!!
+        assertEquals("院子", chatBranchLastContext(oldSelected)!!.scene.location)
     }
 
     @Test

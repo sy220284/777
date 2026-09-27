@@ -26,11 +26,13 @@ class ChatTurnRunner @Inject constructor(
     fun prepare(
         personaId: String,
         state: ChatCharacterState = ChatCharacterState(),
+        context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext = prepareProfile(
         persona = personaStore.get(personaId),
         state = state,
+        context = context,
         userInput = userInput,
         storyContext = storyContext,
     )
@@ -38,9 +40,11 @@ class ChatTurnRunner @Inject constructor(
     fun prepareProfile(
         persona: PersonaProfile,
         state: ChatCharacterState = ChatCharacterState(),
+        context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext {
+        val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val lorePrompt = loreEngine.prompt(persona, userInput)
         val backgroundPrompt = composeRelevantBackgroundPrompt(persona, userInput)
         val storyPrompt = storyContext?.takeIf { it.isNotBlank() }?.let {
@@ -54,11 +58,12 @@ class ChatTurnRunner @Inject constructor(
             persona = persona,
             stablePrompt = composeStablePersonaPrompt(persona),
             dynamicPrompt = listOf(
-                composeDynamicPersonaPrompt(persona, state),
+                composeDynamicPersonaPrompt(persona, privateState),
+                renderChatContextForModel(context),
                 backgroundPrompt,
                 storyPrompt,
                 lorePrompt,
-                relationshipEngine.prompt(userInput, state),
+                relationshipEngine.prompt(userInput, privateState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }

@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
@@ -23,9 +25,17 @@ internal class LocalChatTurnCoordinator(
         input: String,
         relationshipMemory: String = "",
     ): LocalPreparedChatTurn {
+        val sharedContext = if (snapshot.groupChat.enabled) {
+            snapshot.groupChat.context.withLegacyFallback(
+                snapshot.groupChat.members.firstOrNull()?.chatState ?: snapshot.chatState,
+            )
+        } else {
+            snapshot.chatContext.withLegacyFallback(snapshot.chatState)
+        }
         val context = runner.prepare(
             personaId = snapshot.personaId,
             state = snapshot.chatState,
+            context = sharedContext,
             userInput = input,
             storyContext = snapshot.handoffSummary,
         )
@@ -48,11 +58,13 @@ internal class LocalChatTurnCoordinator(
     fun prepareProfile(
         persona: PersonaProfile,
         state: ChatCharacterState,
+        context: ChatContextState = ChatContextState(),
         userInput: String,
         storyContext: String?,
     ): ChatTurnContext = runner.prepareProfile(
         persona = persona,
         state = state,
+        context = context,
         userInput = userInput,
         storyContext = storyContext,
     )

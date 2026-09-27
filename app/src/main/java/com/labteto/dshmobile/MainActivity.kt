@@ -1,8 +1,6 @@
 package com.labteto.dshmobile
 
-import android.app.UiModeManager
 import android.content.Intent
-import android.graphics.drawable.ColorDrawable
 import androidx.compose.runtime.mutableStateOf
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -28,7 +26,6 @@ class MainActivity : AppCompatActivity() {
 
     private val requestedSession = mutableStateOf<String?>(null)
     private val requestedLocalSession = mutableStateOf<String?>(null)
-    private var appliedApplicationNightMode: Int? = null
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -37,11 +34,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        val storedTheme = DshApplication.storedThemePreference(this)
-        val uiModeManager = getSystemService(UiModeManager::class.java)
-        appliedApplicationNightMode =
-            DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
-        applyWindowBackground(storedTheme)
         requestedSession.value = savedInstanceState?.getString("pending_session")
             ?: notificationSession(intent)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
@@ -50,10 +42,11 @@ class MainActivity : AppCompatActivity() {
         notifications.ensureChannels()
         notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
-        // Keep runtime appearance and app language aligned with persisted settings.
+        // Apply the persisted in-app language (English or Simplified Chinese).
+        //
+        // Only set the locale when it actually differs, or the recreate it triggers loops.
         lifecycleScope.launch {
             hostsStore.settings.collect { settings ->
-                applyWindowBackground(settings.themePreference)
                 applyNightMode(settings.themePreference)
 
                 val desiredLocales = settings.localeOverride?.let { tag ->
@@ -62,7 +55,7 @@ class MainActivity : AppCompatActivity() {
                 
                 val currentLocales = AppCompatDelegate.getApplicationLocales()
                 
-                // Only dispatch a locale update when the effective language really changed.
+                // Only update if locales actually changed to prevent recreation loop
                 if (desiredLocales.toLanguageTags() != currentLocales.toLanguageTags()) {
                     AppCompatDelegate.setApplicationLocales(desiredLocales)
                 }
@@ -111,23 +104,18 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    /** Persist the app-local qualifier so the platform splash uses the same day/night scheme. */
+    /**
+     * Keep the resource layer's scheme in step when the preference *changes* while running.
+     *
+     * [DshApplication.applyStoredNightMode] does the same thing at process start, which is where
+     * the cost is zero; this only has to catch someone tapping Light or Dark. The guard is what
+     * makes that true — without it, every settings emission would re-enter
+     * [AppCompatDelegate.setDefaultNightMode] and recreate the activity.
+     */
     private fun applyNightMode(themePreference: String) {
-        val uiModeManager = getSystemService(UiModeManager::class.java)
-        val mode = DshApplication.applicationNightModeFor(themePreference, uiModeManager.nightMode)
-        if (appliedApplicationNightMode == mode) return
-        appliedApplicationNightMode = mode
-        uiModeManager.setApplicationNightMode(mode)
-    }
-
-    /** Match the post-splash window to the exact Compose canvas, including Matte black. */
-    private fun applyWindowBackground(themePreference: String?) {
-        val color = when (themePreference) {
-            "light" -> getColor(R.color.window_background_light)
-            "dark" -> getColor(R.color.window_background_dark)
-            "matte_black" -> getColor(R.color.window_background_matte_black)
-            else -> getColor(R.color.window_background)
+        val mode = DshApplication.nightModeFor(themePreference)
+        if (AppCompatDelegate.getDefaultNightMode() != mode) {
+            AppCompatDelegate.setDefaultNightMode(mode)
         }
-        window.setBackgroundDrawable(ColorDrawable(color))
     }
 }

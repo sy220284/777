@@ -2,9 +2,13 @@
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
 
-    <!-- Window/splash colours mirror the Compose canvas tokens exactly. -->
-    <color name="window_background_light">#F7F8F6</color>
-    <color name="window_background_dark">#141A19</color>
-    <color name="window_background_matte_black">#11110F</color>
-    <color name="window_background">#F7F8F6</color>
+    <!--
+        What the window paints when no content is drawn over it yet.
+
+        It matches `DsLight.bgBase` (and `DsDark.bgBase` in values-night) on purpose. Changing the
+        app language recreates the activity, and a transparent window has nothing to show between
+        the old Compose tree going away and the new one's first frame — which is where the black
+        flash came from. An opaque background of the right colour makes that gap invisible.
+    -->
+    <color name="window_background">#FFFFFF</color>
 </resources>

@@ -7,6 +7,8 @@ import com.labteto.dshmobile.harness.session.HandoffMessage
 import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -113,6 +115,7 @@ internal class LocalSessionLifecycleCoordinator(
                             buildChatContinuationHandoff(
                                 state = sourceState.chatState,
                                 messages = sourceState.messages,
+                                context = sourceState.chatContext,
                             )
                         } else {
                             buildHandoffSummary(sourceState)
@@ -154,6 +157,17 @@ internal class LocalSessionLifecycleCoordinator(
                         ChatCharacterState()
                     }
 
+                    val chatContext = when {
+                        resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
+                        galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
+                            ChatContextState().withLegacyFallback(chatState)
+                        usageMode == LocalUsageMode.CHAT &&
+                            mode == LocalConversationMode.CONTINUATION &&
+                            sourceState.usageMode == LocalUsageMode.CHAT &&
+                            !sourceState.groupChat.enabled -> sourceState.chatContext
+                        else -> ChatContextState()
+                    }
+
                     state.update {
                         it.copy(
                             loading = false,
@@ -181,6 +195,7 @@ internal class LocalSessionLifecycleCoordinator(
                             gallerySaveSuppressedThrough = 0L,
                             chatPersona = chatPersona,
                             chatState = chatState,
+                            chatContext = chatContext,
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),
                             groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {

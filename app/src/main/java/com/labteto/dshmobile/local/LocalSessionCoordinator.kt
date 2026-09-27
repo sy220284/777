@@ -115,6 +115,7 @@ internal class LocalSessionCoordinator(
         usageMode = state.usageMode,
         personaId = state.personaId,
         chatState = state.chatState,
+        chatContext = state.chatContext,
         replySuggestions = state.replySuggestions,
         chatBranches = state.chatBranches,
         groupChat = state.groupChat,

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -17,6 +18,7 @@ data class LocalChatBranchNode(
     val message: LocalHarnessMessage,
     val parentId: String? = null,
     val chatStateAfter: ChatCharacterState? = null,
+    val chatContextAfter: ChatContextState? = null,
     val replySuggestionsAfter: List<ChatReplySuggestion> = emptyList(),
 )
 
@@ -108,6 +110,7 @@ internal fun syncChatBranchState(
     activeMessages: List<LocalHarnessMessage>,
     chatState: ChatCharacterState,
     replySuggestions: List<ChatReplySuggestion>,
+    chatContext: ChatContextState = ChatContextState(),
 ): LocalChatBranchState {
     val dialogue = activeMessages.filter { it.role == "user" || it.role == "assistant" }
     if (dialogue.isEmpty()) return if (current.nodes.isEmpty()) current else current
@@ -121,6 +124,7 @@ internal fun syncChatBranchState(
                 message = message,
                 parentId = parentId,
                 chatStateAfter = if (index == dialogue.lastIndex) chatState else null,
+                chatContextAfter = if (index == dialogue.lastIndex) chatContext else null,
                 replySuggestionsAfter = if (index == dialogue.lastIndex) replySuggestions else emptyList(),
             )
         } else {
@@ -131,6 +135,11 @@ internal fun syncChatBranchState(
                     chatState
                 } else {
                     existing.chatStateAfter
+                },
+                chatContextAfter = if (index == dialogue.lastIndex && existing.chatContextAfter == null) {
+                    chatContext
+                } else {
+                    existing.chatContextAfter
                 },
                 replySuggestionsAfter = if (
                     index == dialogue.lastIndex &&
@@ -160,11 +169,12 @@ internal fun syncMaterializedChatBranchState(
     activeMessages: List<LocalHarnessMessage>,
     chatState: ChatCharacterState,
     replySuggestions: List<ChatReplySuggestion>,
+    chatContext: ChatContextState = ChatContextState(),
 ): LocalChatBranchState =
     if (current.nodes.isEmpty()) {
         current
     } else {
-        syncChatBranchState(current, activeMessages, chatState, replySuggestions)
+        syncChatBranchState(current, activeMessages, chatState, replySuggestions, chatContext)
     }
 
 /**
@@ -191,6 +201,7 @@ internal fun appendMaterializedChatBranchMessage(
     parentId: String?,
     chatState: ChatCharacterState,
     replySuggestions: List<ChatReplySuggestion> = emptyList(),
+    chatContext: ChatContextState = ChatContextState(),
 ): LocalChatBranchState {
     if (current.nodes.isEmpty()) return current
     return upsertChatBranchNode(
@@ -199,6 +210,7 @@ internal fun appendMaterializedChatBranchMessage(
             message = message,
             parentId = parentId,
             chatStateAfter = chatState,
+            chatContextAfter = chatContext,
             replySuggestionsAfter = replySuggestions,
         ),
         select = true,
@@ -224,12 +236,14 @@ internal fun updateChatBranchNodeSnapshot(
     messageId: String,
     chatState: ChatCharacterState,
     replySuggestions: List<ChatReplySuggestion>,
+    chatContext: ChatContextState = ChatContextState(),
 ): LocalChatBranchState {
     val index = state.nodes.indexOfFirst { it.message.id == messageId }
     if (index < 0) return state
     val nodes = state.nodes.toMutableList()
     nodes[index] = nodes[index].copy(
         chatStateAfter = chatState,
+        chatContextAfter = chatContext,
         replySuggestionsAfter = replySuggestions,
     )
     return state.copy(nodes = nodes)
@@ -293,6 +307,15 @@ internal fun chatBranchParentState(
     return state.nodes.firstOrNull { it.message.id == parentId }?.chatStateAfter
 }
 
+internal fun chatBranchParentContext(
+    state: LocalChatBranchState,
+    messageId: String,
+): ChatContextState? {
+    val node = state.nodes.firstOrNull { it.message.id == messageId } ?: return null
+    val parentId = node.parentId ?: return null
+    return state.nodes.firstOrNull { it.message.id == parentId }?.chatContextAfter
+}
+
 internal fun chatBranchLastSnapshot(
     state: LocalChatBranchState,
 ): Pair<ChatCharacterState, List<ChatReplySuggestion>>? {
@@ -301,6 +324,14 @@ internal fun chatBranchLastSnapshot(
     val node = state.nodes.firstOrNull { it.message.id == last.id } ?: return null
     val chatState = node.chatStateAfter ?: return null
     return chatState to node.replySuggestionsAfter
+}
+
+internal fun chatBranchLastContext(
+    state: LocalChatBranchState,
+): ChatContextState? {
+    val active = activeChatBranchMessages(state)
+    val last = active.lastOrNull() ?: return null
+    return state.nodes.firstOrNull { it.message.id == last.id }?.chatContextAfter
 }
 
 internal fun encodeChatBranchStateEvent(state: LocalChatBranchState): JsonObject =

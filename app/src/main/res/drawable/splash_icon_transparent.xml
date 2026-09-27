@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Deliberately invisible splash artwork.
+    Invisible splash icon, on purpose.
 
-    Android's system splash can fall back to the launcher icon when no animated icon is supplied.
-    This transparent vector keeps cold/warm launch hand-offs to the plain theme background without
-    flashing a brand mark. The launcher artwork itself is unchanged.
+    Android 12+ paints a splash screen on *every* activity creation and always animates whatever
+    `windowSplashScreenAnimatedIcon` resolves to. Leaving the attribute out does not remove the
+    mark: the system falls back to the launcher icon instead. Pointing it at this blank 1dp vector
+    is the only way to keep the launch window to the plain theme background, so a cold start — and
+    the recreate that a language or theme change forces — no longer flashes the brand mark over an
+    already-running app.
+
+    The brand artwork itself is untouched; it still appears in the launcher icon.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="1dp"

@@ -50,9 +50,15 @@
         tools:targetApi="36">
 
         <!--
-            Locale, layout direction and app-local day/night changes are delivered in place.
-            Compose observes the new configuration/resources directly, preserving transcript and
-            scroll state while avoiding a fresh launch-window hand-off for these setting changes.
+            `configChanges` handles the locale itself rather than being torn down for it.
+
+            Applying a language is a configuration change, and the default response is to destroy
+            and rebuild the activity. Between the two there is no window at all — not a window with
+            the wrong background, none — so the screen goes to whatever is behind it, which is
+            black. Declaring these two means the framework delivers `onConfigurationChanged`
+            instead; Compose re-reads its resources and the text simply changes, with the transcript
+            and scroll position kept. `layoutDirection` is listed with `locale` on purpose: without
+            it, switching to Arabic or Urdu would still tear the activity down.
         -->
         <activity
             android:name=".ui.screens.pair.PortraitCaptureActivity"
@@ -62,7 +68,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="locale|layoutDirection|uiMode"
+            android:configChanges="locale|layoutDirection"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"

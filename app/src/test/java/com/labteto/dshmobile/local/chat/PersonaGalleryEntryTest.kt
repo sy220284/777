@@ -43,7 +43,7 @@ class PersonaGalleryEntryTest {
         assertTrue(context.contains("答应过一起去海边"))
         assertTrue(context.contains("地点=院子"))
         assertTrue(context.contains("两人坐在石桌旁"))
-        assertTrue(context.contains("多次表示继续留在院中"))
+        assertFalse(context.contains("多次表示继续留在院中"))
         assertTrue(context.contains("明早九点出发"))
         assertFalse(context.contains("日常片段30"))
         assertTrue(context.contains("角色旧回复已归档"))

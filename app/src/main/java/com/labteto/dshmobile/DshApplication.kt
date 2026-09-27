@@ -1,8 +1,8 @@
 package com.labteto.dshmobile
 
 import android.app.Application
-import android.app.UiModeManager
 import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
 import com.labteto.dshmobile.connection.KeepAliveWorker
 import com.labteto.dshmobile.notify.NotificationObserver
 import com.labteto.dshmobile.update.UpdateCache
@@ -25,10 +25,7 @@ class DshApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val uiModeManager = getSystemService(UiModeManager::class.java)
-        uiModeManager.setApplicationNightMode(
-            applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),
-        )
+        AppCompatDelegate.setDefaultNightMode(nightModeFor(storedThemePreference(this)))
         KeepAliveWorker.schedule(this)
         notificationObserver.start()
 
@@ -60,7 +57,7 @@ class DshApplication : Application() {
          * A synchronously-readable copy of the Appearance preference.
          *
          * The preference itself lives in DataStore, which is only readable from a coroutine — and
-         * the scheme has to be known before any activity exists (see [applicationNightModeFor]). Reading
+         * the scheme has to be known before any activity exists (see [nightModeFor]). Reading
          * DataStore with `runBlocking` here deadlocked startup and left the app on its splash
          * screen, so this mirror exists purely to be readable at that moment.
          * [com.labteto.dshmobile.connection.HostsStore] writes it whenever the preference changes;
@@ -78,26 +75,23 @@ class DshApplication : Application() {
         }
 
         /**
-         * Application-local night mode used by the platform resource layer.
+         * The [AppCompatDelegate] mode for a stored `themePreference`.
          *
-         * This fork starts at API 36, so UiModeManager can persist the app-local day/night mode
-         * before MainActivity exists. That lets the system splash resolve the matching -night
-         * resources instead of briefly following the phone's opposite scheme.
+         * Compose owns the palette; this is for everything it does not draw — the window
+         * background, and the theme a starting window uses — which resolve from `values` vs
+         * `values-night` and otherwise follow the *device's* setting. An app set to Dark on a light
+         * phone therefore had a white window behind it, and that window is what shows during the
+         * activity recreate a language change forces.
          *
-         * The System option mirrors the device's configured night policy. Matte black shares the platform's night qualifier with Dark; MainActivity applies the
-         * exact matte canvas colour during the splash-to-Compose hand-off.
+         * Applied from `Application.onCreate` because [AppCompatDelegate.setDefaultNightMode]
+         * recreates any activity already running, and the mode is not persisted across process
+         * death — doing it from `MainActivity` would cost an extra recreate on every cold start for
+         * anyone who had chosen a scheme. Nothing is running yet at this point, so it is free.
          */
-        fun applicationNightModeFor(themePreference: String?, systemNightMode: Int): Int =
-            when (themePreference) {
-                "light" -> UiModeManager.MODE_NIGHT_NO
-                "dark", "matte_black" -> UiModeManager.MODE_NIGHT_YES
-                else -> when (systemNightMode) {
-                    UiModeManager.MODE_NIGHT_AUTO,
-                    UiModeManager.MODE_NIGHT_CUSTOM,
-                    UiModeManager.MODE_NIGHT_NO,
-                    UiModeManager.MODE_NIGHT_YES -> systemNightMode
-                    else -> UiModeManager.MODE_NIGHT_AUTO
-                }
-            }
+        fun nightModeFor(themePreference: String?): Int = when (themePreference) {
+            "light" -> AppCompatDelegate.MODE_NIGHT_NO
+            "dark", "matte_black" -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
     }
 }

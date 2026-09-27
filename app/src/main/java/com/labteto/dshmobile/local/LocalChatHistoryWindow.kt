@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.pendingForRequest
+import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -100,16 +103,18 @@ private fun normalizeChatContinuityText(text: String): String =
 internal fun buildChatContinuationHandoff(
     state: ChatCharacterState,
     messages: List<LocalHarnessMessage>,
+    context: ChatContextState = ChatContextState(),
 ): String = buildString {
     appendLine("【聊天连续性｜已发生】")
-    val scene = state.scene
+    val shared = context.withLegacyFallback(state)
+    val scene = shared.scene
     if (
         scene.sceneTime.isNotBlank() ||
         scene.location.isNotBlank() ||
         scene.participants.isNotEmpty() ||
         scene.positions.isNotEmpty() ||
         scene.activeActions.isNotEmpty() ||
-        scene.currentEvent.isNotBlank()
+        scene.keyObjects.isNotEmpty()
     ) {
         appendLine(
             "当前场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
@@ -118,33 +123,37 @@ internal fun buildChatContinuationHandoff(
         if (scene.positions.isNotEmpty()) appendLine("人物位置：${scene.positions.joinToString("；")}")
         if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
         if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
-        scene.currentEvent.takeIf(String::isNotBlank)?.let { appendLine("当前事件：$it") }
-        scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
     }
-    state.continuity.recentEvents.takeLast(6).takeIf { it.isNotEmpty() }?.let {
-        appendLine("近期关键事件：${it.joinToString("；").take(1_000)}")
+    shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
+        appendLine("近期关键事件：${it.joinToString("；").take(900)}")
     }
-    state.continuity.recurringEvents.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("重复事项归并：${it.joinToString("；").take(800)}")
+    shared.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("当前有效决定：${it.joinToString("；").take(720)}")
     }
-    state.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("已定事项：${it.joinToString("；").take(800)}")
+    shared.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("待续事项：${it.joinToString("；").take(720)}")
     }
-    state.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("待续事项：${it.joinToString("；").take(800)}")
+    val pending = shared.pendingForRequest()
+    if (pending.isNotEmpty()) {
+        appendLine("尚未归并的最新事实：")
+        pending.forEach { turn ->
+            if (turn.userMessage.isNotBlank()) appendLine("- 用户：${normalizeChatContinuityText(turn.userMessage).take(320)}")
+            if (turn.assistantMessage.isNotBlank()) appendLine("- 角色：${normalizeChatContinuityText(turn.assistantMessage).take(360)}")
+        }
     }
     state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
-        appendLine("共同经历：${moments.joinToString("；").take(1_200)}")
+        appendLine("共同经历：${moments.joinToString("；").take(1_000)}")
     }
     val recentUserEvents = messages.asSequence()
         .filter { it.role == "user" }
         .map { normalizeChatContinuityText(it.content) }
         .filter(String::isNotBlank)
         .toList()
-        .takeLast(6)
+        .takeLast(4)
     if (recentUserEvents.isNotEmpty()) {
         appendLine("近期用户表达与事件：")
-        recentUserEvents.forEach { appendLine("- ${it.take(500)}") }
+        recentUserEvents.forEach { appendLine("- ${it.take(420)}") }
     }
-    append("角色旧回复原文省略；当前关系、情绪、目标和开放线索由实时状态提供。")
+    append("原始聊天仍是最终事实来源；本摘要只保留当前有效状态与待续线索。")
 }.trim().take(3_500)
+

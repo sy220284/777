@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.SerialName
@@ -43,6 +44,7 @@ data class LocalHarnessSession(
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
     val chatState: ChatCharacterState = ChatCharacterState(),
+    val chatContext: ChatContextState = ChatContextState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
     val groupChat: LocalGroupChatState = LocalGroupChatState(),
@@ -225,6 +227,7 @@ data class LocalHarnessState(
     val gallerySaveSuppressedThrough: Long = 0L,
     val chatPersona: PersonaProfile = PersonaProfile(),
     val chatState: ChatCharacterState = ChatCharacterState(),
+    val chatContext: ChatContextState = ChatContextState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
     val groupChat: LocalGroupChatState = LocalGroupChatState(),

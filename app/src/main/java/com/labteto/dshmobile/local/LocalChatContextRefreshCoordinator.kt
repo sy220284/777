@@ -1,0 +1,210 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatPendingTurn
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.commitProcessed
+import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.withContextForPlanner
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/**
+ * Owns asynchronous consolidation of durable pending Chat facts.
+ *
+ * Foreground generation never depends on this job finishing: raw pending turns are already
+ * persisted and injected near the request tail. This coordinator only folds those facts into the
+ * small Scene/Continuity checkpoint and advances processedThroughSequence.
+ */
+internal class LocalChatContextRefreshCoordinator(
+    private val state: MutableStateFlow<LocalHarnessState>,
+    private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val requestPlanner: suspend (
+        snapshot: LocalHarnessState,
+        prompt: String,
+        eventLog: LocalSessionEventLog,
+    ) -> LocalModelReply?,
+    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
+    private val persistBranchState: (String) -> Unit,
+    private val persist: () -> Unit,
+) {
+    fun enqueue(
+        userMessage: String,
+        assistantMessage: String,
+        expectedSessionId: String,
+        expectedAssistantMessageId: String,
+        boundEventLog: LocalSessionEventLog,
+    ): Long? {
+        if (state.value.sessionId != expectedSessionId) return null
+        val sequence = boundEventLog.events().toList().asReversed()
+            .firstOrNull { event ->
+                event.type == "assistant/message" &&
+                    decodeTranscriptMessages(event.data).orEmpty()
+                        .any { message -> message.id == expectedAssistantMessageId }
+            }
+            ?.sequence
+            ?: return null
+
+        var generation: Long? = null
+        state.update { current ->
+            if (current.sessionId != expectedSessionId) {
+                current
+            } else {
+                val baseContext = current.chatContext
+                    .withLegacyFallback(current.chatState)
+                    .applySceneTurn(
+                        userMessage = userMessage,
+                        assistantMessage = assistantMessage,
+                        sequence = sequence,
+                    )
+                val nextContext = baseContext.enqueuePending(
+                    ChatPendingTurn(
+                        sequence = sequence,
+                        assistantMessageId = expectedAssistantMessageId,
+                        branchHeadId = expectedAssistantMessageId,
+                        userMessage = userMessage,
+                        assistantMessage = assistantMessage,
+                        generation = baseContext.generation,
+                    ),
+                )
+                generation = nextContext.generation
+                current.copy(chatContext = nextContext)
+            }
+        }
+        if (generation != null) persist()
+        return generation
+    }
+
+    suspend fun refresh(
+        persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedBaseState: ChatCharacterState,
+        expectedGeneration: Long,
+        boundEventLog: LocalSessionEventLog,
+    ) {
+        val before = state.value
+        if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
+        val baseContext = before.chatContext.withLegacyFallback(before.chatState)
+        if (baseContext.generation != expectedGeneration) return
+
+        val pending = baseContext.pendingTurns.asSequence()
+            .filter { it.sequence > baseContext.processedThroughSequence }
+            .filter { it.generation == expectedGeneration }
+            .sortedBy(ChatPendingTurn::sequence)
+            .take(PENDING_BATCH)
+            .toList()
+        if (pending.isEmpty()) return
+
+        val userBatch = pending.joinToString("\n") { turn ->
+            "#${turn.sequence} 用户：${turn.userMessage}"
+        }
+        val assistantBatch = pending.joinToString("\n") { turn ->
+            "#${turn.sequence} 角色：${turn.assistantMessage}"
+        }
+        val plannerState = before.chatState.withContextForPlanner(baseContext)
+        val prompt = chatTurnCoordinator.postTurnPrompt(
+            persona = persona,
+            state = plannerState,
+            userMessage = userBatch,
+            assistantMessage = assistantBatch,
+        )
+        val plannerReply = try {
+            requestPlanner(before, prompt, boundEventLog) ?: return
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(1_000))
+                put("pending_count", pending.size)
+            })
+            return
+        }
+        recordUsage(before, plannerReply)
+
+        val plan = chatTurnCoordinator.parsePostTurn(
+            text = plannerReply.content.orEmpty(),
+            previous = plannerState,
+            userMessage = userBatch,
+            assistantMessage = assistantBatch,
+        )
+        if (plan == null) {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "parse-failed")
+                put("content", plannerReply.content.orEmpty().take(2_000))
+                put("pending_count", pending.size)
+            })
+            return
+        }
+
+        val throughSequence = pending.maxOf(ChatPendingTurn::sequence)
+        val deterministicState = plan.state.copy(
+            scene = baseContext.scene,
+            continuity = plan.state.continuity,
+        )
+        val nextContext = baseContext.commitProcessed(
+            scene = baseContext.scene,
+            continuity = deterministicState.continuity,
+            throughSequence = throughSequence,
+        )
+        var applied = false
+        state.update { current ->
+            val currentContext = current.chatContext.withLegacyFallback(current.chatState)
+            if (
+                current.sessionId != expectedSessionId ||
+                currentContext.generation != expectedGeneration ||
+                current.chatState != expectedBaseState
+            ) {
+                current
+            } else {
+                applied = true
+                current.copy(
+                    // The legacy mirror keeps old gallery/session data readable. Generation uses
+                    // conversation-scoped chatContext as the canonical continuity state.
+                    chatState = deterministicState,
+                    chatContext = nextContext,
+                    chatBranches = if (current.transcriptIndex.branchingEligible) {
+                        updateChatBranchNodeSnapshot(
+                            state = current.chatBranches,
+                            messageId = pending.last().assistantMessageId,
+                            chatState = deterministicState,
+                            replySuggestions = current.replySuggestions,
+                            chatContext = nextContext,
+                        )
+                    } else {
+                        current.chatBranches
+                    },
+                )
+            }
+        }
+        if (!applied) {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "stale-discarded")
+                put("through_sequence", throughSequence)
+                put("pending_preserved", true)
+            })
+            return
+        }
+
+        boundEventLog.append("chat/post-turn", buildJsonObject {
+            put("status", "updated")
+            put("mood", deterministicState.mood)
+            put("relationship_state", deterministicState.relationshipState)
+            put("processed_through_sequence", throughSequence)
+            put("remaining_pending", nextContext.pendingTurns.size)
+        })
+        if (hasChatBranchAlternatives(state.value.chatBranches)) {
+            persistBranchState("chat/post-turn-updated")
+        }
+        persist()
+    }
+
+    private companion object {
+        const val PENDING_BATCH = 8
+    }
+}
