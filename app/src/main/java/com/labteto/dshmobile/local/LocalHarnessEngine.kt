@@ -292,6 +292,11 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val fileInspector = LocalFileInspector(File(workspace.path))
+    private val attachmentImporter = LocalAttachmentImporter(
+        context = context,
+        workspace = workspace,
+        maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
+    )
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
@@ -2671,103 +2676,8 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = withContext(Dispatchers.IO) {
-        val resolver = context.contentResolver
-        var displayName: String? = null
-        var declaredSize: Long? = null
-        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (nameIndex >= 0) displayName = cursor.getString(nameIndex)
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) declaredSize = cursor.getLong(sizeIndex)
-            }
-        }
-        if ((declaredSize ?: 0L) > MAX_ATTACHMENT_BYTES) {
-            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
-        }
-        val safeName = (displayName ?: "attachment-${System.currentTimeMillis()}")
-            .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
-            .take(120)
-            .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
-        val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
-        val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
-        val digest = MessageDigest.getInstance("SHA-256")
-        val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
-        try {
-            input.use { source ->
-                incoming.outputStream().use { output ->
-                    val buffer = ByteArray(32 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        total += read
-                        if (total > MAX_ATTACHMENT_BYTES) {
-                            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
-                        }
-                        digest.update(buffer, 0, read)
-                        output.write(buffer, 0, read)
-                    }
-                }
-            }
-        } catch (error: Throwable) {
-            incoming.delete()
-            throw error
-        }
-        val imageMetadata = inspectImportedImage(incoming)
-        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
-            incoming.delete()
-            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
-        }
-        if (imageMetadata != null) {
-            try {
-                validateLocalImageMetadata(imageMetadata)
-            } catch (error: Throwable) {
-                incoming.delete()
-                throw error
-            }
-        }
-        val mediaType = imageMetadata?.mediaType ?: declaredMediaType
-        val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = when (mediaType) {
-            "image/png" -> "png"
-            "image/jpeg" -> "jpg"
-            "image/webp" -> "webp"
-            "image/gif" -> "gif"
-            else -> safeName.substringAfterLast('.', "")
-                .lowercase()
-                .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
-        }
-        val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
-        if (target.exists()) {
-            incoming.delete()
-        } else if (!incoming.renameTo(target)) {
-            incoming.copyTo(target, overwrite = false)
-            incoming.delete()
-        }
-        LocalImportedAttachment(
-            name = displayName ?: safeName,
-            relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
-            mediaType = mediaType,
-            bytes = target.length(),
-            attachmentId = attachmentId,
-            width = imageMetadata?.width,
-            height = imageMetadata?.height,
-        )
-    }
-
-    private fun inspectImportedImage(file: File): LocalImageMetadata? {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, options)
-        val mediaType = options.outMimeType?.lowercase()?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
-            ?: return null
-        val width = options.outWidth
-        val height = options.outHeight
-        if (width <= 0 || height <= 0) return null
-        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
-    }
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
+        withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
