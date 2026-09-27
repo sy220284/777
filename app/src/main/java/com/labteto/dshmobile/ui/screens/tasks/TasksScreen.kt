@@ -25,7 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -305,20 +305,20 @@ fun TasksScreen(
     val visibleTasks = state.tasks.filter { it.mode == taskMode }
     val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
-    var showCreate by remember { mutableStateOf(false) }
-    var editingTaskId by remember { mutableStateOf<String?>(null) }
-    var prompt by remember { mutableStateOf("") }
-    var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
-    var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
-    var customHours by remember { mutableStateOf("6") }
-    var windowStartMinuteOfDay by remember { mutableStateOf(20 * 60) }
-    var windowEndMinuteOfDay by remember { mutableStateOf(22 * 60) }
-    var quietHoursEnabled by remember { mutableStateOf(true) }
-    var quietStartMinuteOfDay by remember { mutableStateOf(23 * 60) }
-    var quietEndMinuteOfDay by remember { mutableStateOf(7 * 60) }
-    var proactiveMinGapHours by remember { mutableStateOf(6) }
-    var proactiveMaxUnanswered by remember { mutableStateOf(2) }
-    var createError by remember { mutableStateOf<String?>(null) }
+    var showCreate by rememberSaveable { mutableStateOf(false) }
+    var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var prompt by rememberSaveable { mutableStateOf("") }
+    var cadence by rememberSaveable { mutableStateOf(AutomationCadence.ONCE) }
+    var firstRunAt by rememberSaveable { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
+    var customHours by rememberSaveable { mutableStateOf("6") }
+    var windowStartMinuteOfDay by rememberSaveable { mutableStateOf(20 * 60) }
+    var windowEndMinuteOfDay by rememberSaveable { mutableStateOf(22 * 60) }
+    var quietHoursEnabled by rememberSaveable { mutableStateOf(true) }
+    var quietStartMinuteOfDay by rememberSaveable { mutableStateOf(23 * 60) }
+    var quietEndMinuteOfDay by rememberSaveable { mutableStateOf(7 * 60) }
+    var proactiveMinGapHours by rememberSaveable { mutableStateOf(6) }
+    var proactiveMaxUnanswered by rememberSaveable { mutableStateOf(2) }
+    var createError by rememberSaveable { mutableStateOf<String?>(null) }
     val resetEditor = {
         showCreate = false
         editingTaskId = null
