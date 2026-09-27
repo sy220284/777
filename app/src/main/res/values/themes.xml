@@ -3,20 +3,14 @@
     <style name="Theme.DshMobile" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
-    <!--
-        The manifest theme, so it is what the window starts with on *every* creation of the
-        activity — including the recreate that applying a language forces, which happens long after
-        any splash. Its background was a hardcoded white, which is why that recreate flashed against
-        a dark app; it now follows the same token as the post-splash theme.
-    -->
+
+    <!-- Manifest launch theme used while the platform hands off to MainActivity. -->
     <style name="Theme.DshMobile.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/window_background</item>
         <item name="android:windowBackground">@color/window_background</item>
         <!--
-            Deliberately blank: the system splash runs on every activity creation and animates
-            whatever icon is configured here, so a cold start (and a language/theme recreate) used
-            to flash the brand mark across the window. Omitting the attribute is not an option —
-            the launcher icon is used as the fallback — hence the invisible drawable.
+            Keep the system splash visually blank. Omitting this attribute lets Android fall back to
+            the launcher icon on supported launch paths, which reintroduces the unwanted brand flash.
         -->
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
         <item name="postSplashScreenTheme">@style/Theme.DshMobile</item>
