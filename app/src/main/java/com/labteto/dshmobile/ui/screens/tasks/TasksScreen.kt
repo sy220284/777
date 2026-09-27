@@ -68,7 +68,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class TasksNotice { CANCELLED, MISSING }
 
-private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE }
+private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE, WINDOW }
 
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
@@ -123,6 +123,8 @@ class TasksViewModel @Inject constructor(
         recurringMinutes: Long?,
         scheduleType: AutomationScheduleType,
         silenceMinutes: Long?,
+        windowStartMinuteOfDay: Int?,
+        windowEndMinuteOfDay: Int?,
         quietHoursEnabled: Boolean,
         quietStartHour: Int,
         quietStartMinute: Int,
@@ -138,6 +140,8 @@ class TasksViewModel @Inject constructor(
             recurringMinutes = recurringMinutes,
             scheduleType = scheduleType,
             silenceMinutes = silenceMinutes,
+            windowStartMinuteOfDay = windowStartMinuteOfDay,
+            windowEndMinuteOfDay = windowEndMinuteOfDay,
             quietHoursEnabled = quietHoursEnabled,
             quietStartHour = quietStartHour,
             quietStartMinute = quietStartMinute,
@@ -157,6 +161,8 @@ class TasksViewModel @Inject constructor(
         mode: AutomationMode,
         scheduleType: AutomationScheduleType,
         silenceMinutes: Long? = null,
+        windowStartMinuteOfDay: Int? = null,
+        windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean = false,
         quietStartHour: Int = 23,
         quietStartMinute: Int = 0,
@@ -167,12 +173,28 @@ class TasksViewModel @Inject constructor(
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
-        if (scheduleType != AutomationScheduleType.SILENCE && firstRunAt <= now) return false
+        if (
+            scheduleType !in setOf(
+                AutomationScheduleType.SILENCE,
+                AutomationScheduleType.WINDOW,
+            ) &&
+            firstRunAt <= now
+        ) return false
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
         if (
             scheduleType == AutomationScheduleType.SILENCE &&
             (silenceMinutes == null || silenceMinutes < 60L)
+        ) return false
+        if (
+            scheduleType == AutomationScheduleType.WINDOW &&
+            (
+                windowStartMinuteOfDay == null ||
+                    windowEndMinuteOfDay == null ||
+                    windowStartMinuteOfDay !in 0 until 24 * 60 ||
+                    windowEndMinuteOfDay !in 0 until 24 * 60 ||
+                    windowStartMinuteOfDay == windowEndMinuteOfDay
+            )
         ) return false
         val snapshot = engine.state.value
         if (mode == AutomationMode.CHAT) {
@@ -189,6 +211,22 @@ class TasksViewModel @Inject constructor(
                 mode == AutomationMode.CHAT && it.isNotBlank()
             }
             when {
+                scheduleType == AutomationScheduleType.WINDOW -> scheduler.scheduleWindow(
+                    id = id,
+                    prompt = prompt.trim(),
+                    startMinuteOfDay = requireNotNull(windowStartMinuteOfDay),
+                    endMinuteOfDay = requireNotNull(windowEndMinuteOfDay),
+                    notify = true,
+                    targetSessionId = requireNotNull(targetSessionId),
+                    actorName = actorName,
+                    quietHoursEnabled = quietHoursEnabled,
+                    quietStartHour = quietStartHour,
+                    quietStartMinute = quietStartMinute,
+                    quietEndHour = quietEndHour,
+                    quietEndMinute = quietEndMinute,
+                    proactiveMinGapMinutes = proactiveMinGapMinutes,
+                    proactiveMaxUnanswered = proactiveMaxUnanswered,
+                )
                 scheduleType == AutomationScheduleType.SILENCE -> scheduler.scheduleSilence(
                     id = id,
                     prompt = prompt.trim(),
@@ -273,6 +311,8 @@ fun TasksScreen(
     var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
     var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
     var customHours by remember { mutableStateOf("6") }
+    var windowStartMinuteOfDay by remember { mutableStateOf(20 * 60) }
+    var windowEndMinuteOfDay by remember { mutableStateOf(22 * 60) }
     var quietHoursEnabled by remember { mutableStateOf(true) }
     var quietStartMinuteOfDay by remember { mutableStateOf(23 * 60) }
     var quietEndMinuteOfDay by remember { mutableStateOf(7 * 60) }
@@ -286,6 +326,8 @@ fun TasksScreen(
         cadence = AutomationCadence.ONCE
         firstRunAt = System.currentTimeMillis() + 60L * 60_000L
         customHours = "6"
+        windowStartMinuteOfDay = 20 * 60
+        windowEndMinuteOfDay = 22 * 60
         quietHoursEnabled = true
         quietStartMinuteOfDay = 23 * 60
         quietEndMinuteOfDay = 7 * 60
@@ -326,6 +368,8 @@ fun TasksScreen(
                         cadence = AutomationCadence.ONCE
                         firstRunAt = System.currentTimeMillis() + 60L * 60_000L
                         customHours = "6"
+                        windowStartMinuteOfDay = 20 * 60
+                        windowEndMinuteOfDay = 22 * 60
                         quietHoursEnabled = true
                         quietStartMinuteOfDay = 23 * 60
                         quietEndMinuteOfDay = 7 * 60
@@ -417,16 +461,13 @@ fun TasksScreen(
                             selected = cadence,
                             onSelect = { cadence = it },
                         )
-                        DsButton(
-                            text = stringResource(R.string.tasks_schedule_custom),
-                            onClick = { cadence = AutomationCadence.CUSTOM },
-                            variant = if (cadence == AutomationCadence.CUSTOM) {
-                                DsButtonVariant.Info
-                            } else {
-                                DsButtonVariant.Ghost
-                            },
-                            size = DsButtonSize.Small,
-                            modifier = Modifier.fillMaxWidth(),
+                        CadenceRow(
+                            first = AutomationCadence.CUSTOM,
+                            firstLabel = stringResource(R.string.tasks_schedule_custom),
+                            second = AutomationCadence.WINDOW,
+                            secondLabel = stringResource(R.string.tasks_schedule_window),
+                            selected = cadence,
+                            onSelect = { cadence = it },
                         )
                     } else {
                         CadenceRow(
@@ -439,7 +480,10 @@ fun TasksScreen(
                         )
                     }
 
-                    if (cadence != AutomationCadence.SILENCE) {
+                    if (
+                        cadence != AutomationCadence.SILENCE &&
+                        cadence != AutomationCadence.WINDOW
+                    ) {
                         DsButton(
                             text = stringResource(
                                 R.string.tasks_first_run_value,
@@ -491,6 +535,49 @@ fun TasksScreen(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
+                    }
+
+                    if (cadence == AutomationCadence.WINDOW) {
+                        Text(
+                            stringResource(R.string.tasks_chat_window_hint),
+                            style = DsType.caption11,
+                            color = colors.labelSecondary,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            DsButton(
+                                text = stringResource(
+                                    R.string.tasks_chat_window_start_value,
+                                    formatMinuteOfDay(windowStartMinuteOfDay),
+                                ),
+                                onClick = {
+                                    showTimeOfDayPicker(
+                                        context = context,
+                                        initialMinuteOfDay = windowStartMinuteOfDay,
+                                    ) { windowStartMinuteOfDay = it }
+                                },
+                                modifier = Modifier.weight(1f),
+                                variant = DsButtonVariant.Outline,
+                                size = DsButtonSize.Small,
+                            )
+                            DsButton(
+                                text = stringResource(
+                                    R.string.tasks_chat_window_end_value,
+                                    formatMinuteOfDay(windowEndMinuteOfDay),
+                                ),
+                                onClick = {
+                                    showTimeOfDayPicker(
+                                        context = context,
+                                        initialMinuteOfDay = windowEndMinuteOfDay,
+                                    ) { windowEndMinuteOfDay = it }
+                                },
+                                modifier = Modifier.weight(1f),
+                                variant = DsButtonVariant.Outline,
+                                size = DsButtonSize.Small,
+                            )
+                        }
                     }
 
                     if (chatMode) {
@@ -601,6 +688,7 @@ fun TasksScreen(
                                     AutomationCadence.WEEKLY -> 7L * 24L * 60L
                                     AutomationCadence.CUSTOM -> customMinutes
                                     AutomationCadence.SILENCE -> customMinutes
+                                    AutomationCadence.WINDOW -> 24L * 60L
                                 }
                                 val scheduleType = when (cadence) {
                                     AutomationCadence.ONCE -> AutomationScheduleType.ONCE
@@ -608,6 +696,7 @@ fun TasksScreen(
                                     AutomationCadence.WEEKLY -> AutomationScheduleType.WEEKLY
                                     AutomationCadence.CUSTOM -> AutomationScheduleType.INTERVAL
                                     AutomationCadence.SILENCE -> AutomationScheduleType.SILENCE
+                                    AutomationCadence.WINDOW -> AutomationScheduleType.WINDOW
                                 }
                                 val silenceMinutes = recurring.takeIf {
                                     cadence == AutomationCadence.SILENCE
@@ -615,6 +704,8 @@ fun TasksScreen(
                                 val cadenceValid = when (cadence) {
                                     AutomationCadence.CUSTOM,
                                     AutomationCadence.SILENCE -> recurring != null
+                                    AutomationCadence.WINDOW ->
+                                        windowStartMinuteOfDay != windowEndMinuteOfDay
                                     else -> true
                                 }
                                 val commonValid = !(
@@ -631,6 +722,12 @@ fun TasksScreen(
                                             recurringMinutes = recurring,
                                             scheduleType = scheduleType,
                                             silenceMinutes = silenceMinutes,
+                                            windowStartMinuteOfDay = windowStartMinuteOfDay.takeIf {
+                                                cadence == AutomationCadence.WINDOW
+                                            },
+                                            windowEndMinuteOfDay = windowEndMinuteOfDay.takeIf {
+                                                cadence == AutomationCadence.WINDOW
+                                            },
                                             quietHoursEnabled = chatMode && quietHoursEnabled,
                                             quietStartHour = quietStartMinuteOfDay / 60,
                                             quietStartMinute = quietStartMinuteOfDay % 60,
@@ -646,6 +743,12 @@ fun TasksScreen(
                                         mode = taskMode,
                                         scheduleType = scheduleType,
                                         silenceMinutes = silenceMinutes,
+                                        windowStartMinuteOfDay = windowStartMinuteOfDay.takeIf {
+                                            cadence == AutomationCadence.WINDOW
+                                        },
+                                        windowEndMinuteOfDay = windowEndMinuteOfDay.takeIf {
+                                            cadence == AutomationCadence.WINDOW
+                                        },
                                         quietHoursEnabled = chatMode && quietHoursEnabled,
                                         quietStartHour = quietStartMinuteOfDay / 60,
                                         quietStartMinute = quietStartMinuteOfDay % 60,
@@ -692,6 +795,8 @@ fun TasksScreen(
                                     System.currentTimeMillis() + 60_000L,
                                 )
                                 customHours = customHoursForTask(task)
+                                windowStartMinuteOfDay = task.windowStartMinuteOfDay ?: 20 * 60
+                                windowEndMinuteOfDay = task.windowEndMinuteOfDay ?: 22 * 60
                                 quietHoursEnabled = task.quietHoursEnabled
                                 quietStartMinuteOfDay =
                                     task.quietStartHour * 60 + task.quietStartMinute
@@ -937,6 +1042,11 @@ private fun TaskCard(
             stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
         }
         AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)
+        AutomationScheduleType.WINDOW -> stringResource(
+            R.string.tasks_schedule_window_value,
+            formatMinuteOfDay(task.windowStartMinuteOfDay ?: 20 * 60),
+            formatMinuteOfDay(task.windowEndMinuteOfDay ?: 22 * 60),
+        )
         AutomationScheduleType.WEEKLY -> stringResource(R.string.tasks_schedule_weekly)
         AutomationScheduleType.INTERVAL -> {
             val minutes = task.recurringMinutes ?: 0L
@@ -1160,6 +1270,7 @@ private fun cadenceForTask(task: AutomationTask): AutomationCadence =
         AutomationScheduleType.WEEKLY -> AutomationCadence.WEEKLY
         AutomationScheduleType.INTERVAL -> AutomationCadence.CUSTOM
         AutomationScheduleType.SILENCE -> AutomationCadence.SILENCE
+        AutomationScheduleType.WINDOW -> AutomationCadence.WINDOW
         AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
             null -> AutomationCadence.ONCE
             24L * 60L -> AutomationCadence.DAILY
