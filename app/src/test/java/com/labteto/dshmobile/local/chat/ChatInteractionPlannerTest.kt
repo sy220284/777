@@ -662,6 +662,41 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun continuityListsReplaceStaleAggregatesWithLatestOutcome() {
+        val previous = ChatCharacterState(
+            continuity = ChatContinuityState(
+                recurringEvents = listOf("多次讨论明日行程，目前尚未确定"),
+                decisions = listOf("暂时不定出发时间"),
+                unfinished = listOf("继续讨论明日行程"),
+            ),
+        )
+        val payload = """
+            {
+              "state":{
+                "continuity":{
+                  "recurringEvents":["多次讨论明日行程，最终确定上午出发"],
+                  "decisions":["明日上午九点去城南"],
+                  "unfinished":["城南之行尚未发生"]
+                }
+              },
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val state = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "那就定了，明天九点去城南。",
+            assistantMessage = "好，九点出发。",
+        )!!.state
+
+        assertEquals(listOf("多次讨论明日行程，最终确定上午出发"), state.continuity.recurringEvents)
+        assertEquals(listOf("明日上午九点去城南"), state.continuity.decisions)
+        assertEquals(listOf("城南之行尚未发生"), state.continuity.unfinished)
+    }
+
+    @Test
     fun omittedSceneFieldsKeepPreviousPhysicalState() {
         val previous = ChatCharacterState(
             scene = ChatSceneState(
