@@ -25,8 +25,9 @@ class DshApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        getSystemService(UiModeManager::class.java).setApplicationNightMode(
-            applicationNightModeFor(storedThemePreference(this)),
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        uiModeManager.setApplicationNightMode(
+            applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),
         )
         KeepAliveWorker.schedule(this)
         notificationObserver.start()
@@ -83,13 +84,20 @@ class DshApplication : Application() {
          * before MainActivity exists. That lets the system splash resolve the matching -night
          * resources instead of briefly following the phone's opposite scheme.
          *
-         * Matte black shares the platform's night qualifier with Dark; MainActivity applies the
+         * The System option mirrors the device's configured night policy. Matte black shares the platform's night qualifier with Dark; MainActivity applies the
          * exact matte canvas colour during the splash-to-Compose hand-off.
          */
-        fun applicationNightModeFor(themePreference: String?): Int = when (themePreference) {
-            "light" -> UiModeManager.MODE_NIGHT_NO
-            "dark", "matte_black" -> UiModeManager.MODE_NIGHT_YES
-            else -> UiModeManager.MODE_NIGHT_AUTO
-        }
+        fun applicationNightModeFor(themePreference: String?, systemNightMode: Int): Int =
+            when (themePreference) {
+                "light" -> UiModeManager.MODE_NIGHT_NO
+                "dark", "matte_black" -> UiModeManager.MODE_NIGHT_YES
+                else -> when (systemNightMode) {
+                    UiModeManager.MODE_NIGHT_AUTO,
+                    UiModeManager.MODE_NIGHT_CUSTOM,
+                    UiModeManager.MODE_NIGHT_NO,
+                    UiModeManager.MODE_NIGHT_YES -> systemNightMode
+                    else -> UiModeManager.MODE_NIGHT_AUTO
+                }
+            }
     }
 }
