@@ -352,6 +352,7 @@
     <string name="pair_subtitle">在运行 harness 的电脑上打开 /relay/pair。页面会显示一个二维码和一个八位数字码，任选其一即可，两者都会在几分钟后失效。</string>
     <string name="pair_scan">扫描二维码</string>
     <string name="pair_scan_prompt">将摄像头对准中继配对页面上的二维码</string>
+    <string name="pair_camera_permission_denied">扫码需要相机权限。可前往系统设置授权，或直接手动输入配对码。</string>
     <string name="pair_manual_title">或输入配对码</string>
     <string name="pair_url_label">中继地址</string>
     <string name="pair_url_hint">https://192.168.1.5:3443</string>
