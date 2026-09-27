@@ -294,13 +294,23 @@ data class AutomationTask(
 )
 
 internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
-    val silenceMinutes = task.silenceMinutes?.coerceAtLeast(60L)
+    val silenceMinutes = when (task.scheduleType) {
+        AutomationScheduleType.SILENCE ->
+            (task.silenceMinutes ?: task.recurringMinutes ?: 60L).coerceAtLeast(60L)
+        else -> task.silenceMinutes?.coerceAtLeast(60L)
+    }
     val recurringMinutes = when (task.scheduleType) {
-        AutomationScheduleType.SILENCE -> (silenceMinutes ?: task.recurringMinutes)?.coerceAtLeast(60L)
+        AutomationScheduleType.SILENCE -> silenceMinutes
         else -> task.recurringMinutes?.coerceAtLeast(15L)
     }
-    val windowStart = task.windowStartMinuteOfDay?.coerceIn(0, 24 * 60 - 1)
-    var windowEnd = task.windowEndMinuteOfDay?.coerceIn(0, 24 * 60 - 1)
+    val windowStart = (
+        task.windowStartMinuteOfDay
+            ?: 20 * 60.takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+        )?.coerceIn(0, 24 * 60 - 1)
+    var windowEnd = (
+        task.windowEndMinuteOfDay
+            ?: 22 * 60.takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+        )?.coerceIn(0, 24 * 60 - 1)
     if (windowStart != null && windowEnd == windowStart) {
         windowEnd = (windowStart + 120) % (24 * 60)
     }
