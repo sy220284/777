@@ -427,7 +427,7 @@
     <string name="tasks_cancelled">任务已取消</string>
     <string name="tasks_missing">任务已经不存在</string>
     <string name="tasks_run_started">任务已开始执行</string>
-    <string name="tasks_run_failed">任务当前无法立即执行</string>
+    <string name="tasks_run_now_failed">任务当前无法立即执行</string>
     <string name="tasks_background_task">后台任务</string>
     <string name="tasks_once">一次性任务</string>
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
