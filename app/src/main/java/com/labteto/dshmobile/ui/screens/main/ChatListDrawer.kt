@@ -198,7 +198,7 @@ fun ChatListDrawer(
     val historySessions = sections.history
     val visibleSessionRows = remember(currentListSession, historySessions) {
         buildList {
-            currentListSession?.let(::add)
+            currentListSession?.let { add(it) }
             addAll(historySessions)
         }
     }
@@ -208,7 +208,7 @@ fun ChatListDrawer(
             sessionsById = sessions.associateBy(SessionRow::sessionId),
         ).mapValues { (_, children) ->
             children.filterNot { it.sessionId == currentSessionId }
-        }.filterValues(List<SessionRow>::isNotEmpty)
+        }.filterValues { it.isNotEmpty() }
     }
     val nestedSubagentIds = remember(subagentTree) {
         subagentTree.values.flatten().mapTo(hashSetOf(), SessionRow::sessionId)
