@@ -6,6 +6,8 @@ import java.util.Calendar
 internal data class ChatProactiveDecision(
     val shouldSend: Boolean,
     val reason: String? = null,
+    val retryAt: Long? = null,
+    val waitingForUserReply: Boolean = false,
 )
 
 internal data class ChatSilenceDecision(
@@ -31,7 +33,8 @@ internal fun evaluateChatSilenceTrigger(
     }
 }
 
-private const val PROACTIVE_MIN_RETRY_GAP_MS = 6L * 60L * 60L * 1000L
+private const val DEFAULT_PROACTIVE_MIN_GAP_MINUTES = 6L * 60L
+private const val DEFAULT_PROACTIVE_MAX_UNANSWERED = 2
 private const val MAX_RECENT_PROACTIVE_FOR_CONTEXT = 5
 
 internal fun evaluateChatProactivePolicy(
@@ -39,20 +42,31 @@ internal fun evaluateChatProactivePolicy(
     nowMillis: Long,
     quietHoursEnabled: Boolean = false,
     quietStartHour: Int = 23,
+    quietStartMinute: Int = 0,
     quietEndHour: Int = 7,
+    quietEndMinute: Int = 0,
+    minimumGapMinutes: Long = DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+    maxUnanswered: Int = DEFAULT_PROACTIVE_MAX_UNANSWERED,
 ): ChatProactiveDecision {
+    require(minimumGapMinutes >= 0L) { "minimumGapMinutes must be non-negative" }
+    require(maxUnanswered >= 1) { "maxUnanswered must be at least 1" }
+    val clock = Calendar.getInstance().apply { timeInMillis = nowMillis }
     if (
         quietHoursEnabled &&
-        isHourInQuietWindow(
-            hour = Calendar.getInstance().apply { timeInMillis = nowMillis }
-                .get(Calendar.HOUR_OF_DAY),
-            startHour = quietStartHour,
-            endHour = quietEndHour,
+        isMinuteInQuietWindow(
+            minuteOfDay = clock.get(Calendar.HOUR_OF_DAY) * 60 + clock.get(Calendar.MINUTE),
+            startMinuteOfDay = quietStartHour * 60 + quietStartMinute,
+            endMinuteOfDay = quietEndHour * 60 + quietEndMinute,
         )
     ) {
         return ChatProactiveDecision(
             shouldSend = false,
             reason = "当前处于夜间免打扰时段，已暂缓本次互动",
+            retryAt = nextQuietHoursEndMillis(
+                nowMillis = nowMillis,
+                endHour = quietEndHour,
+                endMinute = quietEndMinute,
+            ),
         )
     }
 
@@ -64,21 +78,24 @@ internal fun evaluateChatProactivePolicy(
         it.role == "assistant" && it.proactive && it.createdAt > lastUserAt
     }
 
-    if (proactiveSinceLastUser.size >= 2) {
+    if (proactiveSinceLastUser.size >= maxUnanswered) {
         return ChatProactiveDecision(
             shouldSend = false,
-            reason = "连续两次主动互动后用户还没有回复，已进入冷却",
+            reason = "连续主动互动后用户还没有回复，等待用户下一次发言",
+            waitingForUserReply = true,
         )
     }
 
     val lastProactiveAt = proactiveSinceLastUser.lastOrNull()?.createdAt
+    val retryAt = lastProactiveAt?.plus(minimumGapMinutes * 60_000L)
     if (
-        lastProactiveAt != null &&
-        nowMillis - lastProactiveAt < PROACTIVE_MIN_RETRY_GAP_MS
+        retryAt != null &&
+        nowMillis < retryAt
     ) {
         return ChatProactiveDecision(
             shouldSend = false,
             reason = "距离上次主动互动过近，暂缓本次互动",
+            retryAt = retryAt,
         )
     }
 
@@ -170,12 +187,14 @@ private fun bigramJaccard(left: String, right: String): Double {
 internal fun nextQuietHoursEndMillis(
     nowMillis: Long,
     endHour: Int,
+    endMinute: Int = 0,
 ): Long {
     require(endHour in 0..23) { "endHour must be 0..23" }
+    require(endMinute in 0..59) { "endMinute must be 0..59" }
     val calendar = Calendar.getInstance().apply {
         timeInMillis = nowMillis
         set(Calendar.HOUR_OF_DAY, endHour)
-        set(Calendar.MINUTE, 0)
+        set(Calendar.MINUTE, endMinute)
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
         if (timeInMillis <= nowMillis) {
@@ -185,18 +204,28 @@ internal fun nextQuietHoursEndMillis(
     return calendar.timeInMillis
 }
 
+internal fun isMinuteInQuietWindow(
+    minuteOfDay: Int,
+    startMinuteOfDay: Int,
+    endMinuteOfDay: Int,
+): Boolean {
+    require(minuteOfDay in 0 until 24 * 60) { "minuteOfDay must be in one day" }
+    require(startMinuteOfDay in 0 until 24 * 60) { "startMinuteOfDay must be in one day" }
+    require(endMinuteOfDay in 0 until 24 * 60) { "endMinuteOfDay must be in one day" }
+    if (startMinuteOfDay == endMinuteOfDay) return false
+    return if (startMinuteOfDay < endMinuteOfDay) {
+        minuteOfDay in startMinuteOfDay until endMinuteOfDay
+    } else {
+        minuteOfDay >= startMinuteOfDay || minuteOfDay < endMinuteOfDay
+    }
+}
+
 internal fun isHourInQuietWindow(
     hour: Int,
     startHour: Int,
     endHour: Int,
-): Boolean {
-    require(hour in 0..23) { "hour must be 0..23" }
-    require(startHour in 0..23) { "startHour must be 0..23" }
-    require(endHour in 0..23) { "endHour must be 0..23" }
-    if (startHour == endHour) return false
-    return if (startHour < endHour) {
-        hour in startHour until endHour
-    } else {
-        hour >= startHour || hour < endHour
-    }
-}
+): Boolean = isMinuteInQuietWindow(
+    minuteOfDay = hour * 60,
+    startMinuteOfDay = startHour * 60,
+    endMinuteOfDay = endHour * 60,
+)

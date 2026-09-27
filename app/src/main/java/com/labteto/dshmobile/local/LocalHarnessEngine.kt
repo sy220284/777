@@ -1503,6 +1503,10 @@ class LocalHarnessEngine @Inject constructor(
         persistChatBranchState("user-edited")
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
+        automationScheduler.onChatUserActivity(
+            sessionId = state.sessionId,
+            userMessageAt = edited.createdAt,
+        )
 
         scope.launch(start = CoroutineStart.LAZY) {
             if (state.groupChat.enabled) {
@@ -1846,6 +1850,12 @@ class LocalHarnessEngine @Inject constructor(
             })
         }
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
+        if (before.usageMode == LocalUsageMode.CHAT && !before.groupChat.enabled) {
+            automationScheduler.onChatUserActivity(
+                sessionId = before.sessionId,
+                userMessageAt = transcriptMessage.createdAt,
+            )
+        }
         if (
             before.usageMode == LocalUsageMode.CHAT &&
             before.chatBranches.nodes.isNotEmpty() &&
@@ -2054,7 +2064,11 @@ class LocalHarnessEngine @Inject constructor(
         recoveryStartedAt: Long? = null,
         quietHoursEnabled: Boolean = false,
         quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
         quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
         minimumSilenceMinutes: Long? = null,
         silenceReferenceAt: Long? = null,
         bypassProactivePolicy: Boolean = false,
@@ -2088,7 +2102,11 @@ class LocalHarnessEngine @Inject constructor(
                 nowMillis = System.currentTimeMillis(),
                 quietHoursEnabled = quietHoursEnabled,
                 quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
                 quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                minimumGapMinutes = proactiveMinGapMinutes,
+                maxUnanswered = proactiveMaxUnanswered,
             )
         }
         if (earlyQuietDecision?.shouldSend == false) {
@@ -2104,10 +2122,7 @@ class LocalHarnessEngine @Inject constructor(
                 output = reason,
                 delivered = false,
                 skipReason = reason,
-                nextRunAtHint = nextQuietHoursEndMillis(
-                    nowMillis = System.currentTimeMillis(),
-                    endHour = quietEndHour,
-                ),
+                nextRunAtHint = earlyQuietDecision.retryAt,
             )
         }
 
@@ -2201,12 +2216,46 @@ class LocalHarnessEngine @Inject constructor(
                             .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
                             .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
                     }
+                if (!bypassProactivePolicy && minimumSilenceMinutes != null) {
+                    val silenceDecision = evaluateChatSilenceTrigger(
+                        messages = recentTranscript,
+                        nowMillis = System.currentTimeMillis(),
+                        silenceMinutes = minimumSilenceMinutes,
+                        fallbackReferenceAt = silenceReferenceAt ?: session.updatedAt,
+                    )
+                    if (!silenceDecision.ready) {
+                        val reason = "用户刚有新的互动，重新等待沉默触发时长"
+                        boundEventLog.append("chat/proactive-skipped", buildJsonObject {
+                            put("reason", reason)
+                            put("automation", true)
+                            put("proactive", true)
+                            put("silence_trigger", true)
+                            put("rechecked", true)
+                            put("persona_id", persona.id)
+                        })
+                        return@withTimeout LocalAutomationRunResult(
+                            sessionId = session.id,
+                            output = reason,
+                            delivered = false,
+                            skipReason = reason,
+                            nextRunAtHint = silenceDecision.retryAt,
+                        )
+                    }
+                }
+
                 val proactiveDecision = if (bypassProactivePolicy) {
                     null
                 } else {
                     evaluateChatProactivePolicy(
                         messages = recentTranscript,
                         nowMillis = System.currentTimeMillis(),
+                        quietHoursEnabled = quietHoursEnabled,
+                        quietStartHour = quietStartHour,
+                        quietStartMinute = quietStartMinute,
+                        quietEndHour = quietEndHour,
+                        quietEndMinute = quietEndMinute,
+                        minimumGapMinutes = proactiveMinGapMinutes,
+                        maxUnanswered = proactiveMaxUnanswered,
                     )
                 }
                 if (proactiveDecision?.shouldSend == false) {
@@ -2222,6 +2271,8 @@ class LocalHarnessEngine @Inject constructor(
                         output = reason,
                         delivered = false,
                         skipReason = reason,
+                        nextRunAtHint = proactiveDecision.retryAt,
+                        waitingForUserReply = proactiveDecision.waitingForUserReply,
                     )
                 }
                 val conversationFocus = proactiveConversationFocus(

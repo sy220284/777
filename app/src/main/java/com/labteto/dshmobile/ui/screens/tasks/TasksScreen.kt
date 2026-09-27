@@ -122,6 +122,12 @@ class TasksViewModel @Inject constructor(
         scheduleType: AutomationScheduleType,
         silenceMinutes: Long?,
         quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
     ): Boolean = runCatching {
         scheduler.updateTask(
             id = id,
@@ -131,6 +137,12 @@ class TasksViewModel @Inject constructor(
             scheduleType = scheduleType,
             silenceMinutes = silenceMinutes,
             quietHoursEnabled = quietHoursEnabled,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
         )
     }.getOrDefault(false).also {
         if (it) refresh()
@@ -144,6 +156,12 @@ class TasksViewModel @Inject constructor(
         scheduleType: AutomationScheduleType,
         silenceMinutes: Long? = null,
         quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
+        quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
@@ -177,6 +195,12 @@ class TasksViewModel @Inject constructor(
                     targetSessionId = requireNotNull(targetSessionId),
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
+                    quietStartHour = quietStartHour,
+                    quietStartMinute = quietStartMinute,
+                    quietEndHour = quietEndHour,
+                    quietEndMinute = quietEndMinute,
+                    proactiveMinGapMinutes = proactiveMinGapMinutes,
+                    proactiveMaxUnanswered = proactiveMaxUnanswered,
                 )
                 recurringMinutes == null -> scheduler.scheduleOnce(
                     id = id,
@@ -187,6 +211,12 @@ class TasksViewModel @Inject constructor(
                     targetSessionId = targetSessionId,
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
+                    quietStartHour = quietStartHour,
+                    quietStartMinute = quietStartMinute,
+                    quietEndHour = quietEndHour,
+                    quietEndMinute = quietEndMinute,
+                    proactiveMinGapMinutes = proactiveMinGapMinutes,
+                    proactiveMaxUnanswered = proactiveMaxUnanswered,
                 )
                 else -> scheduler.schedulePeriodic(
                     id = id,
@@ -198,6 +228,12 @@ class TasksViewModel @Inject constructor(
                     targetSessionId = targetSessionId,
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
+                    quietStartHour = quietStartHour,
+                    quietStartMinute = quietStartMinute,
+                    quietEndHour = quietEndHour,
+                    quietEndMinute = quietEndMinute,
+                    proactiveMinGapMinutes = proactiveMinGapMinutes,
+                    proactiveMaxUnanswered = proactiveMaxUnanswered,
                     scheduleType = if (mode == AutomationMode.CHAT) {
                         scheduleType
                     } else {
@@ -236,6 +272,10 @@ fun TasksScreen(
     var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
     var customHours by remember { mutableStateOf("6") }
     var quietHoursEnabled by remember { mutableStateOf(true) }
+    var quietStartMinuteOfDay by remember { mutableStateOf(23 * 60) }
+    var quietEndMinuteOfDay by remember { mutableStateOf(7 * 60) }
+    var proactiveMinGapHours by remember { mutableStateOf(6) }
+    var proactiveMaxUnanswered by remember { mutableStateOf(2) }
     var createError by remember { mutableStateOf<String?>(null) }
     val resetEditor = {
         showCreate = false
@@ -245,6 +285,10 @@ fun TasksScreen(
         firstRunAt = System.currentTimeMillis() + 60L * 60_000L
         customHours = "6"
         quietHoursEnabled = true
+        quietStartMinuteOfDay = 23 * 60
+        quietEndMinuteOfDay = 7 * 60
+        proactiveMinGapHours = 6
+        proactiveMaxUnanswered = 2
         createError = null
     }
     BackHandler(onBack = onClose)
@@ -279,6 +323,10 @@ fun TasksScreen(
                         firstRunAt = System.currentTimeMillis() + 60L * 60_000L
                         customHours = "6"
                         quietHoursEnabled = true
+                        quietStartMinuteOfDay = 23 * 60
+                        quietEndMinuteOfDay = 7 * 60
+                        proactiveMinGapHours = 6
+                        proactiveMaxUnanswered = 2
                         createError = null
                     }
                 },
@@ -461,6 +509,63 @@ fun TasksScreen(
                                 onCheckedChange = { quietHoursEnabled = it },
                             )
                         }
+
+                        if (quietHoursEnabled) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                DsButton(
+                                    text = stringResource(
+                                        R.string.tasks_chat_quiet_start_value,
+                                        formatMinuteOfDay(quietStartMinuteOfDay),
+                                    ),
+                                    onClick = {
+                                        showTimeOfDayPicker(
+                                            context = context,
+                                            initialMinuteOfDay = quietStartMinuteOfDay,
+                                        ) { quietStartMinuteOfDay = it }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    variant = DsButtonVariant.Outline,
+                                    size = DsButtonSize.Small,
+                                )
+                                DsButton(
+                                    text = stringResource(
+                                        R.string.tasks_chat_quiet_end_value,
+                                        formatMinuteOfDay(quietEndMinuteOfDay),
+                                    ),
+                                    onClick = {
+                                        showTimeOfDayPicker(
+                                            context = context,
+                                            initialMinuteOfDay = quietEndMinuteOfDay,
+                                        ) { quietEndMinuteOfDay = it }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    variant = DsButtonVariant.Outline,
+                                    size = DsButtonSize.Small,
+                                )
+                            }
+                        }
+
+                        Text(
+                            stringResource(R.string.tasks_chat_min_gap),
+                            style = DsType.small13Strong,
+                            color = colors.labelSecondary,
+                        )
+                        ProactiveGapRow(
+                            selectedHours = proactiveMinGapHours,
+                            onSelect = { proactiveMinGapHours = it },
+                        )
+                        Text(
+                            stringResource(R.string.tasks_chat_unanswered_limit),
+                            style = DsType.small13Strong,
+                            color = colors.labelSecondary,
+                        )
+                        ProactiveUnansweredRow(
+                            selected = proactiveMaxUnanswered,
+                            onSelect = { proactiveMaxUnanswered = it },
+                        )
                     }
 
                     createError?.let {
@@ -520,6 +625,12 @@ fun TasksScreen(
                                             scheduleType = scheduleType,
                                             silenceMinutes = silenceMinutes,
                                             quietHoursEnabled = chatMode && quietHoursEnabled,
+                                            quietStartHour = quietStartMinuteOfDay / 60,
+                                            quietStartMinute = quietStartMinuteOfDay % 60,
+                                            quietEndHour = quietEndMinuteOfDay / 60,
+                                            quietEndMinute = quietEndMinuteOfDay % 60,
+                                            proactiveMinGapMinutes = proactiveMinGapHours * 60L,
+                                            proactiveMaxUnanswered = proactiveMaxUnanswered,
                                         )
                                     } ?: viewModel.createAt(
                                         prompt = prompt,
@@ -529,6 +640,12 @@ fun TasksScreen(
                                         scheduleType = scheduleType,
                                         silenceMinutes = silenceMinutes,
                                         quietHoursEnabled = chatMode && quietHoursEnabled,
+                                        quietStartHour = quietStartMinuteOfDay / 60,
+                                        quietStartMinute = quietStartMinuteOfDay % 60,
+                                        quietEndHour = quietEndMinuteOfDay / 60,
+                                        quietEndMinute = quietEndMinuteOfDay % 60,
+                                        proactiveMinGapMinutes = proactiveMinGapHours * 60L,
+                                        proactiveMaxUnanswered = proactiveMaxUnanswered,
                                     )
                                 }
                                 if (ok) {
@@ -570,6 +687,13 @@ fun TasksScreen(
                                 )
                                 customHours = customHoursForTask(task)
                                 quietHoursEnabled = task.quietHoursEnabled
+                                quietStartMinuteOfDay =
+                                    task.quietStartHour * 60 + task.quietStartMinute
+                                quietEndMinuteOfDay =
+                                    task.quietEndHour * 60 + task.quietEndMinute
+                                proactiveMinGapHours =
+                                    maxOf(1, (task.proactiveMinGapMinutes / 60L).toInt())
+                                proactiveMaxUnanswered = task.proactiveMaxUnanswered
                                 createError = null
                                 showCreate = true
                             },
@@ -692,6 +816,68 @@ private fun CadenceRow(
     }
 }
 
+@Composable
+private fun ProactiveGapRow(
+    selectedHours: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        listOf(3, 6, 12, 24).forEach { hours ->
+            DsButton(
+                text = stringResource(R.string.tasks_chat_hours_value, hours),
+                onClick = { onSelect(hours) },
+                modifier = Modifier.weight(1f),
+                variant = if (selectedHours == hours) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProactiveUnansweredRow(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        listOf(1, 2, 3).forEach { count ->
+            DsButton(
+                text = stringResource(R.string.tasks_chat_times_value, count),
+                onClick = { onSelect(count) },
+                modifier = Modifier.weight(1f),
+                variant = if (selected == count) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
+    }
+}
+
+private fun showTimeOfDayPicker(
+    context: Context,
+    initialMinuteOfDay: Int,
+    onPicked: (Int) -> Unit,
+) {
+    TimePickerDialog(
+        context,
+        { _, hourOfDay, minute -> onPicked(hourOfDay * 60 + minute) },
+        initialMinuteOfDay / 60,
+        initialMinuteOfDay % 60,
+        AndroidDateFormat.is24HourFormat(context),
+    ).show()
+}
+
+private fun formatMinuteOfDay(minuteOfDay: Int): String {
+    val hour = (minuteOfDay / 60).toString().padStart(2, '0')
+    val minute = (minuteOfDay % 60).toString().padStart(2, '0')
+    return "$hour:$minute"
+}
+
 private fun showSchedulePicker(
     context: Context,
     initialMillis: Long,
@@ -778,10 +964,13 @@ private fun TaskCard(
     }
     val terminalOneShot = task.recurringMinutes == null &&
         task.status in setOf("completed", "failed", "blocked")
-    val timing = if (terminalOneShot && task.lastRunAt != null) {
-        stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
-    } else {
-        stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+    val timing = when {
+        task.status == "waiting_user" ->
+            stringResource(R.string.tasks_waiting_user_timing)
+        terminalOneShot && task.lastRunAt != null ->
+            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+        else ->
+            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
     }
 
     DsGroupCard {
@@ -821,7 +1010,13 @@ private fun TaskCard(
             )
             DsPill(text = scheduleLabel)
             if (task.mode == AutomationMode.CHAT && task.quietHoursEnabled) {
-                DsPill(text = stringResource(R.string.tasks_chat_quiet_hours))
+                DsPill(
+                    text = stringResource(
+                        R.string.tasks_chat_quiet_hours_value,
+                        formatMinuteOfDay(task.quietStartHour * 60 + task.quietStartMinute),
+                        formatMinuteOfDay(task.quietEndHour * 60 + task.quietEndMinute),
+                    ),
+                )
             }
         }
 
@@ -935,7 +1130,7 @@ private fun taskStatus(status: String): DsStatus = when (status) {
     "completed" -> DsStatus.Done
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
-    "paused" -> DsStatus.Neutral
+    "paused", "waiting_user" -> DsStatus.Neutral
     else -> DsStatus.Neutral
 }
 
@@ -948,6 +1143,7 @@ private fun taskStatusLabel(status: String): String = when (status) {
     "blocked" -> stringResource(R.string.tasks_run_blocked)
     "failed" -> stringResource(R.string.tasks_run_failed)
     "paused" -> stringResource(R.string.tasks_status_paused)
+    "waiting_user" -> stringResource(R.string.tasks_status_waiting_user)
     else -> stringResource(R.string.tasks_status_scheduled)
 }
 
