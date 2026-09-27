@@ -53,4 +53,24 @@ class AutomationStoreRecoveryTest {
         createdAt = 1L,
         nextRunAt = nextRunAt,
     )
+
+    @Test
+    fun writeRepairsInvalidBackupAfterCorruptPrimary() {
+        val directory = Files.createTempDirectory("automation-store-repair-backup").toFile()
+        val file = directory.resolve("automations.json")
+        val backup = directory.resolve("automations.json.bak")
+        try {
+            file.writeText("{broken-primary")
+            backup.writeText("{broken-backup")
+            val store = AutomationStore(file, json)
+
+            store.upsert(task("recovered", 3_000L))
+
+            file.writeText("{broken-again")
+            assertEquals(listOf("recovered"), AutomationStore(file, json).list().map(AutomationTask::id))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
