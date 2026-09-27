@@ -508,11 +508,12 @@ class ChatPersonaGalleryTest {
                 id = saved.entry.id,
                 storyId = storyId,
                 messageKeys = listOf(discardedReply.id, discardedFuture.id),
+                replacementChatState = ChatCharacterState(mood = "保留前缀状态", updatedAt = 1L),
             ),
         )
         val rewritten = store.list().single().story(storyId)!!
         assertEquals(listOf("m1"), rewritten.history.map { it.id })
-        assertEquals(0L, rewritten.chatState.updatedAt)
+        assertEquals("保留前缀状态", rewritten.chatState.mood)
 
         val replacement = LocalHarnessMessage("m4", "user", "新时间线", createdAt = 4L)
         val resaved = store.save(

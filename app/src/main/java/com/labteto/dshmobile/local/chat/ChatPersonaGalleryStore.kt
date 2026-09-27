@@ -809,6 +809,7 @@ class ChatPersonaGalleryStore internal constructor(
         id: String,
         storyId: String,
         messageKeys: Collection<String>,
+        replacementChatState: ChatCharacterState,
     ): Int {
         val keys = messageKeys.asSequence()
             .map(String::trim)
@@ -828,7 +829,7 @@ class ChatPersonaGalleryStore internal constructor(
                 keys.toList(),
                 MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
             ),
-            chatState = ChatCharacterState(),
+            chatState = replacementChatState,
             updatedAt = now,
         )
         val updated = current.copy(

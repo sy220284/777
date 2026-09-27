@@ -1444,6 +1444,7 @@ class LocalHarnessEngine @Inject constructor(
                     id = galleryId,
                     storyId = storyId,
                     messageKeys = discarded.map { com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it) },
+                    replacementChatState = baseState,
                 )
             }
         } else {
@@ -1451,8 +1452,7 @@ class LocalHarnessEngine @Inject constructor(
                 chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
             }
         }
-        val edited = newTranscriptMessage("user", content)
-        val rewritten = rewriteChatTranscriptFromUserEdit(
+        val edited = newTranscriptMessage("user", content); val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
             originalMessageId = messageId,
             editedMessage = edited,

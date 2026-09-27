@@ -1685,7 +1685,7 @@ private fun LocalChat(
                             chatMessageHasAttachmentContext(message)
                         ) &&
                         editingUserText.trim() != editableChatUserText(message).trim() &&
-                        !state.running,
+                        messageActionsEnabled,
                     size = DsButtonSize.Small,
                 )
             }

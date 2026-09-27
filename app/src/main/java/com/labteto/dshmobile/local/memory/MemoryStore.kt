@@ -149,11 +149,6 @@ class MemoryStore internal constructor(
     }
 
     /**
-     * A deleted conversation must not remain as a dangling provenance pointer. The memory itself
-     * is intentionally preserved because global/project/lineage memories are designed to outlive
-     * one transcript; only the deleted source reference is detached.
-     */
-    /**
      * Roll back memories created by the discarded suffix of one chat timeline.
      *
      * A replacement memory may have superseded an older valid record. When the replacement belongs
@@ -203,6 +198,11 @@ class MemoryStore internal constructor(
         return invalidIds.size
     }
 
+    /**
+     * A deleted conversation must not remain as a dangling provenance pointer. The memory itself
+     * is intentionally preserved because global/project/lineage memories are designed to outlive
+     * one transcript; only the deleted source reference is detached.
+     */
     @Synchronized
     fun detachSourceSessions(sessionIds: Set<String>): Int {
         if (sessionIds.isEmpty()) return 0
