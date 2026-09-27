@@ -76,23 +76,32 @@ internal object ChatSceneRuntime {
         events: List<ChatSceneEvent>,
     ): ChatSceneState {
         var scene = previous
+        var hardTransitionApplied = false
         events.sortedBy(ChatSceneEvent::sequence).forEach { event ->
             when (event.kind) {
                 ChatSceneEventKind.LOCATION -> {
                     val target = event.to.trim().take(120)
-                    if (target.isNotBlank()) {
+                    if (target.isNotBlank() && !sameLocation(target, scene.location)) {
                         scene = scene.copy(location = target)
+                        hardTransitionApplied = true
                     }
                 }
                 ChatSceneEventKind.TIME -> {
                     val target = event.to.trim().take(80)
-                    if (target.isNotBlank()) {
+                    if (target.isNotBlank() && target != scene.sceneTime) {
                         scene = scene.copy(sceneTime = target)
+                        hardTransitionApplied = true
                     }
                 }
             }
         }
         return scene.copy(
+            // These legacy fields have no deterministic event source yet. Once a hard transition
+            // occurs, carrying them forward would make stale positions/actions look authoritative.
+            participants = if (hardTransitionApplied) emptyList() else scene.participants,
+            positions = if (hardTransitionApplied) emptyList() else scene.positions,
+            activeActions = if (hardTransitionApplied) emptyList() else scene.activeActions,
+            keyObjects = if (hardTransitionApplied) emptyList() else scene.keyObjects,
             currentEvent = "",
             lastSceneChange = "",
         )
