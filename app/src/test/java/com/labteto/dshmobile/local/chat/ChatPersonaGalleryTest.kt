@@ -486,4 +486,47 @@ class ChatPersonaGalleryTest {
             ),
         )
     }
+
+    @Test
+    fun timelineRewriteTombstonesDiscardedArchiveAndResetsDerivedStoryState() {
+        val store = ChatPersonaGalleryStore(File(temporary.root, "timeline-gallery.json"), Json)
+        val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
+        val discardedReply = LocalHarnessMessage("m2", "assistant", "旧回答", createdAt = 2L)
+        val discardedFuture = LocalHarnessMessage("m3", "user", "旧未来", createdAt = 3L)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", identity = "剑客"),
+            sourceSessionId = "session-a",
+            history = listOf(first, discardedReply, discardedFuture),
+            chatState = ChatCharacterState(mood = "旧未来状态", updatedAt = 3L),
+            notes = "",
+        )
+        val storyId = saved.storyId!!
+
+        assertEquals(
+            2,
+            store.excludeHistoryMessages(
+                id = saved.entry.id,
+                storyId = storyId,
+                messageKeys = listOf(discardedReply.id, discardedFuture.id),
+            ),
+        )
+        val rewritten = store.list().single().story(storyId)!!
+        assertEquals(listOf("m1"), rewritten.history.map { it.id })
+        assertEquals(0L, rewritten.chatState.updatedAt)
+
+        val replacement = LocalHarnessMessage("m4", "user", "新时间线", createdAt = 4L)
+        val resaved = store.save(
+            persona = saved.entry.persona,
+            sourceSessionId = "session-a",
+            history = listOf(first, discardedReply, discardedFuture, replacement),
+            chatState = ChatCharacterState(mood = "新状态", updatedAt = 4L),
+            notes = "",
+            existingId = saved.entry.id,
+            existingStoryId = storyId,
+        ).entry.story(storyId)!!
+
+        assertEquals(listOf("m1", "m4"), resaved.history.map { it.id })
+        assertEquals("新状态", resaved.chatState.mood)
+    }
+
 }

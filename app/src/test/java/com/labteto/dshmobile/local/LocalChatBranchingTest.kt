@@ -346,4 +346,32 @@ class LocalChatBranchingTest {
         assertEquals(state, decoded)
         assertTrue(chatBranchingEligible(activeChatBranchMessages(decoded!!)))
     }
+
+    @Test
+    fun branchSnapshotFallsBackToLatestAvailableStateOnActivePath() {
+        val user = message("u1", "user", "第一句", 1)
+        val answer = message("a1", "assistant", "第一答", 2)
+        var branches = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, answer),
+            chatState = ChatCharacterState(mood = "已保存状态"),
+            replySuggestions = emptyList(),
+        )
+        val nextUser = message("u2", "user", "下一句", 3)
+        branches = upsertChatBranchNode(
+            branches,
+            LocalChatBranchNode(
+                message = nextUser,
+                parentId = answer.id,
+                chatStateAfter = null,
+            ),
+            select = true,
+        )
+
+        val snapshot = chatBranchLastSnapshot(branches)
+
+        assertNotNull(snapshot)
+        assertEquals("已保存状态", snapshot!!.first.mood)
+    }
+
 }
