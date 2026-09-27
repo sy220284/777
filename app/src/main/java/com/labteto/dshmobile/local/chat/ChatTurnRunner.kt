@@ -137,6 +137,41 @@ class ChatTurnRunner @Inject constructor(
         if (state.unresolvedThreads.isNotEmpty()) {
             appendLine("未完话题：${state.unresolvedThreads.joinToString("；")}")
         }
+        val scene = state.scene
+        if (
+            scene.sceneTime.isNotBlank() ||
+            scene.location.isNotBlank() ||
+            scene.participants.isNotEmpty() ||
+            scene.positions.isNotEmpty() ||
+            scene.activeActions.isNotEmpty() ||
+            scene.currentEvent.isNotBlank()
+        ) {
+            appendLine("【当前场景｜硬连续性】")
+            appendLine(
+                "时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
+                    "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+            )
+            if (scene.positions.isNotEmpty()) appendLine("位置：${scene.positions.joinToString("；")}")
+            if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
+            if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
+            scene.currentEvent.takeIf(String::isNotBlank)?.let { appendLine("当前事件：$it") }
+            scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
+            appendLine("没有明确移动、时间推进或场景切换时，保持以上场景不变；需要换场时先发生实际移动或明确过渡。")
+        }
+        val continuity = state.continuity
+        if (
+            continuity.recentEvents.isNotEmpty() ||
+            continuity.recurringEvents.isNotEmpty() ||
+            continuity.decisions.isNotEmpty() ||
+            continuity.unfinished.isNotEmpty()
+        ) {
+            appendLine("【剧情连续性｜事实摘要】")
+            if (continuity.recentEvents.isNotEmpty()) appendLine("近期：${continuity.recentEvents.joinToString("；")}")
+            if (continuity.recurringEvents.isNotEmpty()) appendLine("归并：${continuity.recurringEvents.joinToString("；")}")
+            if (continuity.decisions.isNotEmpty()) appendLine("已定：${continuity.decisions.joinToString("；")}")
+            if (continuity.unfinished.isNotEmpty()) appendLine("待续：${continuity.unfinished.joinToString("；")}")
+            appendLine("以上是已经发生或仍在进行的事实，只用于保持连续，不复述成台词。")
+        }
         if (state.userPattern.observedTurns >= 3) {
             appendLine(
                 "表达偏好：长度=${state.userPattern.replyLength}" +

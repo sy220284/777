@@ -36,6 +36,18 @@ class ChatTurnRunnerPromptPartitionTest {
             mood = "不高兴",
             relationshipState = "亲近",
             recentImpression = "还记得刚才的争执",
+            scene = ChatSceneState(
+                sceneTime = "夜晚",
+                location = "院子",
+                participants = listOf("用户", "阿青"),
+                positions = listOf("两人坐在石桌旁"),
+                activeActions = listOf("继续聊天"),
+                lastSceneChange = "从屋内来到院子",
+            ),
+            continuity = ChatContinuityState(
+                recurringEvents = listOf("多次表示继续留在院中，目前地点未变化"),
+                decisions = listOf("明早九点出发"),
+            ),
         )
 
         val context = runner.prepareProfile(
@@ -50,10 +62,16 @@ class ChatTurnRunnerPromptPartitionTest {
         assertFalse(context.stablePrompt.contains("对白参考"))
         assertFalse(context.stablePrompt.contains("【当前状态】"))
         assertFalse(context.stablePrompt.contains("用户纠正"))
+        assertFalse(context.stablePrompt.contains("地点=院子"))
 
         assertTrue(context.dynamicPrompt.contains("【用户纠正｜最高优先】"))
         assertTrue(context.dynamicPrompt.contains("情绪=不高兴"))
         assertTrue(context.dynamicPrompt.contains("近期印象：还记得刚才的争执"))
+        assertTrue(context.dynamicPrompt.contains("【当前场景｜硬连续性】"))
+        assertTrue(context.dynamicPrompt.contains("地点=院子"))
+        assertTrue(context.dynamicPrompt.contains("两人坐在石桌旁"))
+        assertTrue(context.dynamicPrompt.contains("多次表示继续留在院中"))
+        assertTrue(context.dynamicPrompt.contains("没有明确移动、时间推进或场景切换时"))
         assertTrue(context.prompt.contains(context.stablePrompt))
         assertTrue(context.prompt.contains(context.dynamicPrompt))
     }

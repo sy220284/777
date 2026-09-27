@@ -4,7 +4,10 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
+import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.RelationshipDynamics
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,6 +18,19 @@ class LocalChatHistoryWindowTest {
     fun continuationHandoffKeepsFactsAndUserEventsWithoutOldRoleWording() {
         val handoff = buildChatContinuationHandoff(
             state = ChatCharacterState(
+                scene = ChatSceneState(
+                    sceneTime = "夜晚",
+                    location = "院子",
+                    participants = listOf("用户", "绫华"),
+                    positions = listOf("两人坐在石桌旁"),
+                    activeActions = listOf("喝茶聊天"),
+                    keyObjects = listOf("茶壶"),
+                    lastSceneChange = "从书房来到院子",
+                ),
+                continuity = ChatContinuityState(
+                    decisions = listOf("明早九点去城南"),
+                    unfinished = listOf("城南之行尚未发生"),
+                ),
                 dynamics = RelationshipDynamics(
                     sharedMoments = listOf("一起看过日落"),
                 ),
@@ -26,6 +42,10 @@ class LocalChatHistoryWindowTest {
         )
 
         assertTrue(handoff.contains("一起看过日落"))
+        assertTrue(handoff.contains("地点=院子"))
+        assertTrue(handoff.contains("两人坐在石桌旁"))
+        assertTrue(handoff.contains("明早九点去城南"))
+        assertTrue(handoff.contains("城南之行尚未发生"))
         assertTrue(handoff.contains("明天去海边"))
         assertFalse(handoff.contains("我会一直陪着你去"))
         assertTrue(handoff.contains("角色旧回复原文省略"))
@@ -33,7 +53,66 @@ class LocalChatHistoryWindowTest {
 
 
     @Test
-    fun preservesExistingCheckpointAndSummarizesTheGapAfterIt() {
+    fun keepsHotWindowIntactUntilWholeBatchNeedsCompaction() {
+        val history28 = buildList {
+            add(message("system", "系统"))
+            repeat(14) { index ->
+                add(message("user", "用户事件$index"))
+                add(message("assistant", "角色回复$index"))
+            }
+        }
+
+        val bounded28 = boundedChatRequestHistory(
+            history28,
+            recentMessages = 20,
+            compactionBatch = 8,
+        )
+        assertEquals(history28, bounded28)
+
+        val history29 = history28 + message("user", "第29条消息")
+        val bounded29 = boundedChatRequestHistory(
+            history29,
+            recentMessages = 20,
+            compactionBatch = 8,
+        )
+        assertTrue(bounded29.any { it.toString().contains("<chat-continuity>") })
+        assertEquals(23, bounded29.size)
+        assertFalse(bounded29.joinToString("\n").contains("角色回复0"))
+        assertTrue(bounded29.joinToString("\n").contains("用户事件0"))
+
+        val history30 = history29 + message("assistant", "第30条消息")
+        val bounded30 = boundedChatRequestHistory(
+            history30,
+            recentMessages = 20,
+            compactionBatch = 8,
+        )
+        assertEquals(bounded29[1], bounded30[1])
+    }
+
+    @Test
+    fun rebuildsRequestCheckpointOnlyAtNextBatchBoundary() {
+        val base = buildList {
+            add(message("system", "系统"))
+            repeat(18) { index ->
+                add(message("user", "用户事件$index"))
+                add(message("assistant", "角色回复$index"))
+            }
+        }
+        val bounded36 = boundedChatRequestHistory(base, recentMessages = 20, compactionBatch = 8)
+        val bounded37 = boundedChatRequestHistory(
+            base + message("user", "第37条消息"),
+            recentMessages = 20,
+            compactionBatch = 8,
+        )
+
+        assertTrue(bounded36.any { it.toString().contains("<chat-continuity>") })
+        assertTrue(bounded37.any { it.toString().contains("<chat-continuity>") })
+        assertFalse(bounded36[1] == bounded37[1])
+        assertTrue(bounded37[1].toString().contains("用户事件7"))
+    }
+
+    @Test
+    fun preservesExistingCheckpointAndSummarizesOnlyWholeBatchesAfterIt() {
         val existing = message(
             "user",
             "<compacted-summary>\n更早事件：第一次见面\n</compacted-summary>",
@@ -47,18 +126,22 @@ class LocalChatHistoryWindowTest {
             }
         }
 
-        val bounded = boundedChatRequestHistory(history, recentMessages = 10)
+        val bounded = boundedChatRequestHistory(
+            history,
+            recentMessages = 10,
+            compactionBatch = 4,
+        )
         val text = bounded.joinToString("\n") { it.toString() }
 
         assertTrue(text.contains("第一次见面"))
         assertFalse(text.contains("检查点后的用户事件0"))
-        assertTrue(text.contains("检查点后的用户事件3"))
+        assertTrue(text.contains("检查点后的用户事件2"))
         assertFalse(text.contains("检查点后的角色回复0"))
         assertTrue(text.contains("检查点后的角色回复15"))
     }
 
     @Test
-    fun keepsRecentDialogueAndSynthesizesUserOnlyContinuity() {
+    fun requestCheckpointKeepsUserEventsButDropsOldRoleWording() {
         val history = buildList {
             add(message("system", "系统"))
             repeat(15) { index ->
@@ -67,16 +150,19 @@ class LocalChatHistoryWindowTest {
             }
         }
 
-        val bounded = boundedChatRequestHistory(history, recentMessages = 10)
+        val bounded = boundedChatRequestHistory(
+            history,
+            recentMessages = 10,
+            compactionBatch = 4,
+        )
         val text = bounded.joinToString("\n") { it.toString() }
 
-        assertFalse(text.contains("用户事件0"))
-        assertTrue(text.contains("用户事件2"))
+        assertTrue(text.contains("用户事件0"))
         assertFalse(text.contains("角色旧回复0"))
         assertTrue(text.contains("用户事件14"))
         assertTrue(text.contains("角色旧回复14"))
         assertTrue(text.contains("<chat-continuity>"))
-        assertTrue(bounded.size <= 12)
+        assertTrue(bounded.size <= 16)
     }
 
     @Test

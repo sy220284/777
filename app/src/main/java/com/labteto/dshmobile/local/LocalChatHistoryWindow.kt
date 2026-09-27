@@ -17,9 +17,10 @@ import kotlinx.serialization.json.put
 internal fun boundedChatRequestHistory(
     history: List<JsonObject>,
     recentMessages: Int = 20,
+    compactionBatch: Int = 8,
 ): List<JsonObject> {
     require(recentMessages >= 2) { "recentMessages must be >= 2" }
-    if (history.size <= recentMessages + 2) return history
+    require(compactionBatch >= 2) { "compactionBatch must be >= 2" }
 
     val leadingSystem = history.firstOrNull()?.takeIf {
         it["role"]?.jsonPrimitive?.contentOrNull == "system"
@@ -40,8 +41,13 @@ internal fun boundedChatRequestHistory(
         .filterNot(::isChatContinuitySummary)
         .toList()
 
-    val recent = dialogue.takeLast(recentMessages)
-    val older = dialogue.dropLast(recent.size)
+    val maximumHotMessages = recentMessages + compactionBatch
+    if (dialogue.size <= maximumHotMessages) return history
+
+    val overflow = dialogue.size - maximumHotMessages
+    val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
+    val older = dialogue.take(summarizedCount.coerceAtMost(dialogue.size - recentMessages))
+    val recent = dialogue.drop(older.size)
     val deltaContinuity = buildRequestOnlyContinuity(older)
 
     return buildList {
@@ -71,7 +77,7 @@ private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
 
     val summary = buildString {
         appendLine("<chat-continuity>")
-        appendLine("以下是较早已发生的用户表达与事件，只用于保持连续；除非用户追问，不主动复述：")
+        appendLine("以下是按固定批次归并的较早用户表达与事件，只用于保持连续；除非用户追问，不主动复述：")
         userEvents.forEach { appendLine("- ${it.take(500)}") }
         appendLine("角色旧回复措辞已省略。")
         append("</chat-continuity>")
@@ -96,6 +102,37 @@ internal fun buildChatContinuationHandoff(
     messages: List<LocalHarnessMessage>,
 ): String = buildString {
     appendLine("【聊天连续性｜已发生】")
+    val scene = state.scene
+    if (
+        scene.sceneTime.isNotBlank() ||
+        scene.location.isNotBlank() ||
+        scene.participants.isNotEmpty() ||
+        scene.positions.isNotEmpty() ||
+        scene.activeActions.isNotEmpty() ||
+        scene.currentEvent.isNotBlank()
+    ) {
+        appendLine(
+            "当前场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
+                "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+        )
+        if (scene.positions.isNotEmpty()) appendLine("人物位置：${scene.positions.joinToString("；")}")
+        if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
+        if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
+        scene.currentEvent.takeIf(String::isNotBlank)?.let { appendLine("当前事件：$it") }
+        scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
+    }
+    state.continuity.recentEvents.takeLast(6).takeIf { it.isNotEmpty() }?.let {
+        appendLine("近期关键事件：${it.joinToString("；").take(1_000)}")
+    }
+    state.continuity.recurringEvents.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("重复事项归并：${it.joinToString("；").take(800)}")
+    }
+    state.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("已定事项：${it.joinToString("；").take(800)}")
+    }
+    state.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("待续事项：${it.joinToString("；").take(800)}")
+    }
     state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
         appendLine("共同经历：${moments.joinToString("；").take(1_200)}")
     }
