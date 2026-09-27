@@ -69,4 +69,49 @@ class HarnessWorkflowRunnerTest {
             throw CancellationException("stop")
         }
     }
+
+    @Test
+    fun failedAcceptanceReassignsOnceAndPassesFeedbackToReadOnlyExecutor() = runTest {
+        val prompts = mutableListOf<String>()
+        val stages = mutableListOf<String>()
+        val result = HarnessWorkflowRunner().run(
+            tasks = listOf("核对产出"),
+            mode = HarnessWorkflowMode.PIPELINE,
+            maxAttempts = 2,
+            accept = { _, _, output -> HarnessWorkflowAcceptance(output.contains("证据"), "缺少证据") },
+            onProgress = { stages += it.stage },
+        ) { _, task, _ ->
+            prompts += task
+            if (prompts.size == 1) "初稿" else "补齐证据"
+        }
+
+        assertEquals(2, result.single().attempts)
+        assertTrue(result.single().succeeded)
+        assertTrue(prompts.last().contains("缺少证据"))
+        assertEquals(listOf("执行中", "验收中", "重新指派", "验收中", "已完成"), stages)
+    }
+
+    @Test
+    fun pipelineStopsWhenReassignedStageStillFailsAcceptance() = runTest {
+        val executed = mutableListOf<String>()
+        val results = HarnessWorkflowRunner().run(
+            tasks = listOf("一", "二"),
+            mode = HarnessWorkflowMode.PIPELINE,
+            maxAttempts = 2,
+            accept = { _, _, _ -> HarnessWorkflowAcceptance(false, "验收失败") },
+        ) { _, task, _ ->
+            executed += task
+            "有内容"
+        }
+
+        assertEquals(1, results.size)
+        assertEquals(2, executed.size)
+        assertEquals("验收失败", results.single().error)
+    }
+
+    @Test
+    fun emptyOutputDoesNotCountAsSuccessfulCompletion() = runTest {
+        val result = HarnessWorkflowRunner().run(listOf("任务"), HarnessWorkflowMode.PARALLEL) { _, _, _ -> "" }
+        assertFalse(result.single().succeeded)
+    }
 }

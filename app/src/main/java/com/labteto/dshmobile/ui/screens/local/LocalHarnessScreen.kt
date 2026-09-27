@@ -2007,6 +2007,7 @@ private fun WorkSessionStatusStrip(
 ) {
     val colors = DsTheme.colors
     val hasStatus = state.running ||
+        state.workflowProgress?.sessionId == state.sessionId ||
         state.goal != null ||
         state.todos.isNotEmpty() ||
         state.activeAgents > 0 ||
@@ -2059,6 +2060,10 @@ private fun WorkSessionStatusStrip(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                    DsPill(text = if (progress.needsUserAction) stringResource(R.string.local_workflow_waiting_user) else workflowStageLabel(progress.stage))
+                    DsPill(text = stringResource(R.string.local_workflow_processed, progress.completed, progress.total))
+                }
                 if (state.todos.isNotEmpty()) {
                     DsPill(
                         text = stringResource(
@@ -2238,6 +2243,18 @@ private fun ExecutionStatusCard(
                     Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
                     Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
                 }
+            }
+
+            state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                WorkflowProgressSection(progress)
+            }
+
+            if (state.pendingApproval != null || state.pendingQuestion != null) {
+                Text(
+                    stringResource(R.string.local_workflow_waiting_user),
+                    style = DsType.small13Strong,
+                    color = colors.error,
+                )
             }
 
             if (state.plan.isNotEmpty()) {

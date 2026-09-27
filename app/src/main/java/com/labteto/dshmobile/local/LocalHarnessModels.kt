@@ -188,6 +188,16 @@ data class LocalJobInfo(
     val status: String,
 )
 
+data class LocalWorkflowProgress(
+    val sessionId: String,
+    val stage: String,
+    val task: String,
+    val completed: Int,
+    val total: Int,
+    val blockedReason: String? = null,
+    val needsUserAction: Boolean = false,
+)
+
 data class ChatPersonaCorrectionNotice(
     val id: Long,
     val personaId: String,
@@ -241,6 +251,7 @@ data class LocalHarnessState(
     val safeAutoApprovalEnabled: Boolean = false,
     val deviceApprovalLease: Boolean = false,
     val jobs: List<LocalJobInfo> = emptyList(),
+    val workflowProgress: LocalWorkflowProgress? = null,
     val queuedInputCount: Int = 0,
     val activeModelRequests: Int = 0,
     val activeAgents: Int = 0,

@@ -46,6 +46,18 @@ class ChatTranscriptTailTest {
     private fun longHistory(): List<ChatNode> =
         (0L until 30L).flatMap { listOf(user(it * 2, "question $it"), assistant(it * 2 + 1, "answer $it")) }
 
+    @Test
+    fun thousandAndFiveThousandMessageHistoriesKeepTheTailVisible() {
+        val h = harness((0L until 1_000L).map { user(it, "message $it") })
+        compose.onNodeWithText("message 999").assertIsDisplayed()
+        compose.runOnIdle {
+            h.nodes = (0L until 5_000L).map { user(it, "message $it") }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("message 4999").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, h.listState.firstVisibleItemIndex) }
+    }
+
     private class Harness {
         var nodes by mutableStateOf<List<ChatNode>>(emptyList())
         lateinit var listState: LazyListState

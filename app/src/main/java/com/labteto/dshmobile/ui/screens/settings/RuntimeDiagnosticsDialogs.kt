@@ -18,10 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
@@ -80,8 +84,13 @@ internal fun NetworkDiagnosticDialog(
 internal fun EnvironmentInfoDialog(
     text: String,
     onDismiss: () -> Unit,
+    onExport: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    var events by remember { mutableStateOf(AppLog.snapshot()) }
+    var errorsOnly by rememberSaveable { mutableStateOf(false) }
+    val eventTime = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()) }
+    val emptyEvents = stringResource(R.string.settings_diagnostic_empty)
     DsDialog(title = stringResource(R.string.settings_runtime_environment_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
@@ -96,5 +105,24 @@ internal fun EnvironmentInfoDialog(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
+        Text(stringResource(R.string.settings_diagnostic_events, events.size), style = DsType.small13, color = colors.labelSecondary)
+        DsButton(
+            text = stringResource(if (errorsOnly) R.string.settings_diagnostic_show_all else R.string.settings_diagnostic_errors_only),
+            onClick = { errorsOnly = !errorsOnly },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SelectionContainer {
+            val visible = events.filter { !errorsOnly || it.level == "E" }.takeLast(40)
+            Text(
+                if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
+                    "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"
+                },
+                style = DsType.mdCode,
+                color = colors.labelPrimary,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
+            )
+        }
+        DsButton(text = stringResource(R.string.settings_diagnostic_refresh), onClick = { events = AppLog.snapshot() }, modifier = Modifier.fillMaxWidth())
+        DsButton(text = stringResource(R.string.settings_export_diagnostics), onClick = onExport, modifier = Modifier.fillMaxWidth())
     }
 }

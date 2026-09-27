@@ -510,6 +510,14 @@
     <string name="settings_runtime_diagnostics">Runtime &amp; diagnostics</string>
     <string name="settings_network_diagnostic">Network diagnostics</string>
     <string name="settings_environment_capabilities">Environment capabilities</string>
+    <string name="settings_export_diagnostics">Export diagnostic report</string>
+    <string name="settings_export_diagnostics_hint">Includes runtime status and log metadata; excludes messages and credentials.</string>
+    <string name="settings_export_diagnostics_failed">Could not save the diagnostic report.</string>
+    <string name="settings_diagnostic_events">Recorded events: %1$d (showing up to 40)</string>
+    <string name="settings_diagnostic_show_all">Show all events</string>
+    <string name="settings_diagnostic_errors_only">Only errors</string>
+    <string name="settings_diagnostic_empty">No matching events.</string>
+    <string name="settings_diagnostic_refresh">Refresh diagnostics</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_disabled">Disabled</string>
     <string name="common_refresh">Refresh</string>
@@ -876,6 +884,16 @@
 
 
     <string name="local_run_center">Run center</string>
+    <string name="local_workflow_stage">Current stage: %1$s</string>
+    <string name="local_workflow_executing">Running</string>
+    <string name="local_workflow_reassigning">Reassigning</string>
+    <string name="local_workflow_verifying">Checking result</string>
+    <string name="local_workflow_completed">Completed</string>
+    <string name="local_workflow_stalled">Blocked</string>
+    <string name="local_workflow_processed">Processed %1$d/%2$d</string>
+    <string name="local_workflow_blocked">Blocked: %1$s</string>
+    <string name="local_workflow_user_action">Check the result before continuing.</string>
+    <string name="local_workflow_waiting_user">Waiting for your approval or answer.</string>
     <string name="local_work_history_title">Recent tasks</string>
     <string name="local_run_current_goal">Current goal</string>
     <string name="local_run_plan">Plan</string>

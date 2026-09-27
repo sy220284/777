@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.observability.DiagnosticReport
 import android.os.Environment
 import com.labteto.dshmobile.automation.AutomationPlugin
 import com.labteto.dshmobile.automation.AutomationStore
@@ -52,8 +53,6 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
-import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -353,7 +352,6 @@ class LocalHarnessEngine @Inject constructor(
         extraSearchPaths = ::bundledRuntimeSearchPaths,
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
-    private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
@@ -2731,6 +2729,10 @@ class LocalHarnessEngine @Inject constructor(
         environmentInfo()
     }
 
+    suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
+        DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
+    }
+
     suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
     suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
@@ -3904,7 +3906,7 @@ class LocalHarnessEngine @Inject constructor(
         val foregroundSessionId = currentSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
         LocalExecutionService.holdTurn(context, foregroundSessionId)
-        _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
+        _state.update { it.copy(running = true, error = null, deviceApprovalLease = false, workflowProgress = null) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var finalChatAssistant: LocalHarnessMessage? = null
         var modelStep = 0
@@ -4742,6 +4744,7 @@ class LocalHarnessEngine @Inject constructor(
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
             .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
+            .filter { tool -> allowMutation || tool.name != "download_file" }
             .filter { tool ->
                 allowMutation ||
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
@@ -4868,6 +4871,9 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
             "http_request" -> {
+                if (!allowMutation && args.string("method").uppercase() !in setOf("GET", "HEAD")) {
+                    return "只读子任务仅允许 GET/HEAD 请求"
+                }
                 val headers = args["headers"]?.jsonObject?.mapValues { (_, value) ->
                     value.jsonPrimitive.content
                 }.orEmpty()
@@ -4881,7 +4887,9 @@ class LocalHarnessEngine @Inject constructor(
                     timeoutSeconds = FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }
-            "download_file" -> webTools.download(
+            "download_file" -> {
+                if (!allowMutation) return "只读子任务不能下载写入文件"
+                webTools.download(
                 url = args.string("url"),
                 path = args.string("path"),
                 maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
@@ -4889,6 +4897,7 @@ class LocalHarnessEngine @Inject constructor(
                     .toLong(),
                 timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
             )
+            }
             "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
@@ -4947,6 +4956,7 @@ class LocalHarnessEngine @Inject constructor(
             "workflow" -> runWorkflow(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
+                args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
             )
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
@@ -5289,35 +5299,30 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runWorkflow(tasks: List<String>, mode: String): String {
-        val workflowMode = HarnessWorkflowMode.parse(mode)
-        val results = workflowRunner.run(tasks, workflowMode) { _, task, previous ->
-            val prompt = if (workflowMode == HarnessWorkflowMode.PIPELINE && !previous.isNullOrBlank()) {
-                "上一步结果：\n" + pruneToolResult(previous) + "\n\n当前阶段：\n" + task
-            } else {
-                task
-            }
-            val result = subagents.runResult(
+    private suspend fun runWorkflow(tasks: List<String>, mode: String, requiredEvidence: List<String>): String {
+        _state.update { it.copy(workflowProgress = null) }
+        return LocalWorkflowCoordinator(
+            execute = { prompt -> subagents.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
-            )
-            result.requireCompletedOutput()
-        }
-        return results.joinToString("\n\n") { result ->
-            val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
-            if (result.succeeded) {
-                label + " " + (result.index + 1) + "：" + result.task + "\n" + result.output.orEmpty()
-            } else {
-                val suffix = if (workflowMode == HarnessWorkflowMode.PARALLEL) {
-                    "同批其他子任务不受影响。"
-                } else {
-                    "后续阶段已停止。"
-                }
-                label + " " + (result.index + 1) + " 失败：" + result.error.orEmpty() + "；" + suffix
-            }
-        }
+            ).requireCompletedOutput() },
+            pruneOutput = ::pruneToolResult,
+            onProgress = { progress -> _state.update { state ->
+                val previousBlock = state.workflowProgress?.takeIf { it.needsUserAction }
+                val blocked = progress.stage == "受阻"
+                state.copy(workflowProgress = LocalWorkflowProgress(
+                    sessionId = currentSessionId,
+                    stage = progress.stage,
+                    task = progress.task,
+                    completed = progress.completed,
+                    total = progress.total,
+                    blockedReason = if (blocked) progress.detail else previousBlock?.blockedReason,
+                    needsUserAction = blocked || previousBlock != null,
+                ))
+            } },
+        ).run(tasks, mode, requiredEvidence)
     }
 
     private fun searchSessions(query: String): String {
@@ -5896,50 +5901,17 @@ class LocalHarnessEngine @Inject constructor(
             "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
             "git", "curl", "wget", "python3", "python", "node",
         ).filter(runtimeProcess::isCommandAvailable)
-        val resources = resourceScheduler.snapshot()
-        return buildString {
-            appendLine("安卓本机 Harness 环境")
-            appendLine("工作区：${workspace.path}")
-            appendLine(
-                "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
-                    "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
-                    "终端 ${resources.activeTerminals}/${resources.budget.maxTerminals}；" +
-                    "虚拟屏 ${resources.activeVirtualDisplays}/${resources.budget.maxVirtualDisplays}；" +
-                    "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
-                    "压力 ${resources.pressure.name.lowercase()}",
-            )
-            appendLine("上下文：$modelHistoryChars/${currentHistoryBudget().maxHistoryChars} 字符")
-            appendLine("待处理补充消息：${pendingInputs.size()}/$MAX_PENDING_INPUTS")
-            appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
-            appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
-            appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
-            appendLine("限制：应用沙箱无法访问其他 App 私有目录；语言服务器等以实际检测结果为准。")
-            val recentDiagnostics = AppLog.snapshot()
-                .filter { it.level == "W" || it.level == "E" }
-                .takeLast(20)
-            if (recentDiagnostics.isNotEmpty()) {
-                appendLine("最近诊断：")
-                recentDiagnostics.forEach { entry ->
-                    append("- ")
-                    append(entry.level)
-                    append("/")
-                    append(entry.tag)
-                    append("：")
-                    append(entry.message.replace("\n", " ").take(300))
-                    entry.throwableType?.let { type ->
-                        append(" [")
-                        append(type)
-                        entry.throwableMessage?.takeIf(String::isNotBlank)?.let {
-                            append(": ")
-                            append(it.replace("\n", " ").take(160))
-                        }
-                        append("]")
-                    }
-                    appendLine()
-                }
-            }
-            append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；web_fetch 大响应会自动落盘。外部文件可从输入栏附件导入工作区。")
-        }
+        return LocalEnvironmentReport.build(
+            workspacePath = workspace.path,
+            resources = resourceScheduler.snapshot(),
+            contextChars = modelHistoryChars,
+            contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            pendingInputs = pendingInputs.size(),
+            pendingInputLimit = MAX_PENDING_INPUTS,
+            commands = commands,
+            runtimeStatuses = listOf(bundledNodeRuntime.status(), bundledPythonRuntime.status(), bundledGitRuntime.status()),
+            recentDiagnostics = AppLog.snapshot(),
+        )
     }
 
     private fun newTranscriptMessage(

@@ -534,7 +534,7 @@ object LocalToolCatalog {
         add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
             "agent_id" to string("后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("workflow", "并行执行独立子任务，或按顺序把前一步结果交给下一步", properties(
+        add(tool("workflow", "并行执行只读子任务，或按顺序传递结果；逐项验收，失败最多重新指派一次", properties(
             "tasks" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
@@ -546,6 +546,11 @@ object LocalToolCatalog {
                     add(JsonPrimitive("parallel"))
                     add(JsonPrimitive("pipeline"))
                 })
+            },
+            "required_evidence" to buildJsonObject {
+                put("type", "array")
+                put("description", "可选；与 tasks 逐项对应的产出中必须出现的可核对原文。不提供时仅检查产出非空。")
+                put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("tasks")))
         add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(
