@@ -297,6 +297,12 @@ class LocalHarnessEngine @Inject constructor(
     )
     private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val modelConfiguration = LocalModelConfigurationCoordinator(
+        preferences = preferences,
+        apiKeys = apiKeys,
+        tester = modelConnectionTester,
+        json = json,
+    )
     private val approvalPreferences = LocalApprovalPreferences(preferences)
     private val chatTurnCoordinator = LocalChatTurnCoordinator(
         runner = chatTurnRunner,
@@ -802,24 +808,16 @@ class LocalHarnessEngine @Inject constructor(
 
     suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        require(model.isNotBlank()) { "模型名称不能为空" }
-        val normalizedModel = normalizeConfiguredModel(model)
-        val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
-        val id = modelProfileId(normalizedModel, normalizedBaseUrl)
-        if (apiKey.isNotBlank()) apiKeys.putFor(id, apiKey)
-        else require(apiKeys.getFor(id) != null) { "请填写该模型的密钥" }
-        val profiles = (readModelProfiles().filterNot { it.id == id } +
-            LocalModelProfile(id, normalizedModel, normalizedBaseUrl))
-        preferences.edit()
-            .putString(KEY_MODEL, normalizedModel)
-            .putString(KEY_BASE_URL, normalizedBaseUrl)
-            .putString(KEY_MODEL_PROFILES, encodeModelProfiles(profiles))
-            .apply()
-        apiKeys.activate(id)
+        val result = modelConfiguration.save(apiKey, model, baseUrl)
         _state.update {
-            it.copy(configured = true, model = normalizedModel, baseUrl = normalizedBaseUrl,
-                configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
-                modelProfiles = profiles, error = null)
+            it.copy(
+                configured = result.configured,
+                model = result.model,
+                baseUrl = result.baseUrl,
+                configuredModels = result.configuredModels,
+                modelProfiles = result.profiles,
+                error = null,
+            )
         }
     }
 
@@ -827,50 +825,55 @@ class LocalHarnessEngine @Inject constructor(
     fun selectModel(id: String) {
         scope.launch {
             val current = _state.value
-            val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
-            if (current.loading || current.running || isRunBusy() ||
-                (selected.model == current.model && selected.baseUrl == current.baseUrl)) return@launch
-            if (apiKeys.getFor(id) == null) {
-                _state.update { it.copy(error = "该模型密钥不可用，请编辑配置重新填写") }
-                return@launch
-            }
-            if (isRunBusy()) return@launch
-            preferences.edit().putString(KEY_MODEL, selected.model)
-                .putString(KEY_BASE_URL, selected.baseUrl).apply()
-            apiKeys.activate(selected.id)
-            _state.update { state ->
-                state.copy(configured = true, model = selected.model, baseUrl = selected.baseUrl, error = null)
-            }
+            if (
+                current.loading || current.running || isRunBusy() ||
+                current.modelProfiles.none { it.id == id }
+            ) return@launch
+            runCatching { modelConfiguration.select(id, current.modelProfiles) }
+                .onSuccess { result ->
+                    if (result != null) {
+                        _state.update { state ->
+                            state.copy(
+                                configured = result.configured,
+                                model = result.model,
+                                baseUrl = result.baseUrl,
+                                modelProfiles = result.profiles,
+                                configuredModels = result.configuredModels,
+                                error = null,
+                            )
+                        }
+                    }
+                }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
 
     fun removeModelProfile(id: String) {
         if (isRunBusy() || _state.value.loading) return
         scope.launch {
-            val profiles = readModelProfiles()
-            if (profiles.none { it.id == id }) return@launch
-            apiKeys.clearFor(id)
-            val remaining = profiles.filterNot { it.id == id }
-            val next = remaining.firstOrNull { it.model == _state.value.model && it.baseUrl == _state.value.baseUrl }
-                ?: remaining.firstOrNull()
-            preferences.edit().putString(KEY_MODEL_PROFILES, encodeModelProfiles(remaining))
-                .putString(KEY_MODEL, next?.model ?: DEFAULT_MODEL)
-                .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL).apply()
-            apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-            _state.update { it.copy(configured = next != null, model = next?.model ?: DEFAULT_MODEL,
-                baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL, modelProfiles = remaining,
-                configuredModels = remaining.map(LocalModelProfile::model).distinct().sorted()) }
+            val current = _state.value
+            runCatching {
+                modelConfiguration.remove(id, current.model, current.baseUrl)
+            }.onSuccess { result ->
+                if (result != null) {
+                    _state.update {
+                        it.copy(
+                            configured = result.configured,
+                            model = result.model,
+                            baseUrl = result.baseUrl,
+                            modelProfiles = result.profiles,
+                            configuredModels = result.configuredModels,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(error = error.message) }
+            }
         }
     }
 
-    suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String {
-        if (model.isBlank()) return "请选择模型"
-        val name = normalizeConfiguredModel(model)
-        val url = runCatching { normalizeModelBaseUrl(baseUrl) }.getOrElse { return it.message ?: "地址无效" }
-        val key = apiKey.trim().takeIf(String::isNotEmpty)
-            ?: apiKeys.getFor(modelProfileId(name, url)) ?: return "请先填写该模型的密钥"
-        return modelConnectionTester.test(key, url, name)
-    }
+    suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
+        modelConfiguration.test(apiKey, model, baseUrl)
 
     /** Choose how user image attachments reach the local model. */
     fun configureImageInputMode(mode: LocalImageInputMode) {
@@ -6624,26 +6627,10 @@ class LocalHarnessEngine @Inject constructor(
         loadSession(currentSessionId, model, baseUrl)
     }
 
-    private fun readModelProfiles(): List<LocalModelProfile> = runCatching {
-        json.parseToJsonElement(preferences.getString(KEY_MODEL_PROFILES, "[]") ?: "[]")
-            .jsonArray.mapNotNull { item ->
-                val obj = item.jsonObject
-                val name = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                    ?: return@mapNotNull null
-                val url = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val id = modelProfileId(name, url)
-                LocalModelProfile(id, name, url)
-            }.distinctBy(LocalModelProfile::id)
-    }.getOrDefault(emptyList())
+    private fun readModelProfiles(): List<LocalModelProfile> = modelConfiguration.readProfiles()
 
-    private fun encodeModelProfiles(profiles: List<LocalModelProfile>): String = buildJsonArray {
-        profiles.forEach { profile ->
-            add(buildJsonObject {
-                put("model", profile.model)
-                put("baseUrl", profile.baseUrl)
-            })
-        }
-    }.toString()
+    private fun encodeModelProfiles(profiles: List<LocalModelProfile>): String =
+        modelConfiguration.encodeProfiles(profiles)
 
     private fun configuredModelNames(currentModel: String): List<String> =
         (preferences.getStringSet(KEY_CONFIGURED_MODELS, emptySet())
@@ -6653,13 +6640,8 @@ class LocalHarnessEngine @Inject constructor(
             .distinct()
             .sorted()
 
-    private fun normalizeConfiguredModel(model: String): String {
-        val value = model.trim().ifBlank { DEFAULT_MODEL }
-        return when (value.lowercase()) {
-            "deepseek-chat", "deepseek-reasoner" -> DEFAULT_MODEL
-            else -> value
-        }
-    }
+    private fun normalizeConfiguredModel(model: String): String =
+        modelConfiguration.normalizeModel(model)
 
     private suspend fun loadSession(
         sessionId: String,
