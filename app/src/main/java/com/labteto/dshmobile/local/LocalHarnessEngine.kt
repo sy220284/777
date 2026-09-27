@@ -505,11 +505,9 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             current.copy(jobs = projectExecutionJobs(current.usageMode, snapshot))
         }
-        LocalExecutionService.syncJobs(
-            context = context,
-            sessionId = currentSessionId,
-            activeJobs = snapshot.filter { it.status == "running" },
-        )
+        syncForegroundJobs(context, currentSessionId, snapshot) { message ->
+            _state.update { it.copy(error = message) }
+        }
     }
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
@@ -4879,7 +4877,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
             "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
-            "grep", "search_text" -> workspace.search(args.string("query"), args.optionalString("path") ?: ".")
+            "grep", "search_text" -> workspace.search(args.string("query"), args.optionalString("path") ?: ".", args.boolean("regex", false))
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")
@@ -4891,11 +4889,8 @@ class LocalHarnessEngine @Inject constructor(
                     1,
                     if (background) MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
                 )
-                if (background) {
-                    jobs.start(command) { _, report -> workspace.shell(command, timeout, report) }
-                } else {
-                    workspace.shell(command, timeout)
-                }
+                if (background) jobs.start("后台命令") { _, report -> workspace.shell(command, timeout, report) }
+                else workspace.shell(command, timeout)
             }
             "job_list" -> jobs.list()
             "job_output" -> jobs.output(args.string("job_id"))
