@@ -602,7 +602,7 @@ class ChatInteractionPlannerTest {
         )!!.state
 
         assertEquals("院子", state.scene.location)
-        assertEquals("两人坐在床边", state.scene.positions.single())
+        assertEquals("两人坐在石桌旁", state.scene.positions.single())
         assertTrue(state.scene.lastSceneChange.isBlank())
     }
 
