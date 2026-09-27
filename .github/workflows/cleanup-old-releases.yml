@@ -9,7 +9,7 @@ on:
     workflows: ['Release APK']
     types: [completed]
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Keep recent published releases
+      - name: Keep latest three published releases
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -36,7 +36,6 @@ jobs:
           import json
           import os
           import urllib.request
-          from datetime import datetime, timedelta, timezone
 
           token = os.environ["GH_TOKEN"]
           repo = os.environ["REPO"]
@@ -62,7 +61,6 @@ jobs:
                   release for release in batch
                   if not release.get("draft") and release.get("published_at")
               )
-
               if len(batch) < 100:
                   break
               page += 1
@@ -76,20 +74,10 @@ jobs:
               reverse=True,
           )
 
-          cutoff = datetime.now(timezone.utc) - timedelta(days=14)
-          newest_ids = {release["id"] for release in releases[:3]}
+          keep = releases[:3]
+          remove = releases[3:]
 
-          def published_at(release):
-              return datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
-
-          keep = [
-              release for release in releases
-              if release["id"] in newest_ids or published_at(release) >= cutoff
-          ]
-          keep_ids = {release["id"] for release in keep}
-          remove = [release for release in releases if release["id"] not in keep_ids]
-
-          print("保留发行版（至少最新 3 个，并保留最近 14 天）：")
+          print("保留最新 3 个已发布版本：")
           for release in keep:
               print(f"  - {release['tag_name']} ({release['published_at']})")
 
@@ -98,7 +86,6 @@ jobs:
               raise SystemExit(0)
 
           print(f"准备删除 {len(remove)} 个旧发行版；Git 标签与提交历史不会删除。")
-
           for release in remove:
               url = f"https://api.github.com/repos/{repo}/releases/{release['id']}"
               req = urllib.request.Request(url, headers=headers, method="DELETE")
@@ -112,6 +99,5 @@ jobs:
                   raise RuntimeError(
                       f"删除 {release['tag_name']} 失败：{exc}"
                   ) from exc
-
               print(f"已删除：{release['tag_name']}")
           PY
