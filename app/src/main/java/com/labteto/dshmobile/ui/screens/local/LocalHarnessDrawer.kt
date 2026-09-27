@@ -133,7 +133,6 @@ import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
@@ -155,7 +154,6 @@ import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
-import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -235,8 +233,6 @@ internal fun LocalModeDrawer(
                     modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppBrandIcon(Modifier.size(44.dp))
-                    Spacer(Modifier.size(DsSpacing.medium))
                     Text(
                         stringResource(R.string.app_name),
                         style = DsType.large20,

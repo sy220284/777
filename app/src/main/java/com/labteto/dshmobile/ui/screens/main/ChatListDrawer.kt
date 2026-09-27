@@ -54,7 +54,6 @@ import com.labteto.dshmobile.data.SessionRow
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
-import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
@@ -231,8 +230,6 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppBrandIcon(Modifier.size(44.dp))
-            Spacer(Modifier.width(DsSpacing.medium))
             Text(stringResource(R.string.app_name), style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,

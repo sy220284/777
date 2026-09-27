@@ -134,7 +134,6 @@ import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.AppBrandIcon
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
@@ -156,7 +155,6 @@ import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
-import com.labteto.dshmobile.ui.components.WhaleMark
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics

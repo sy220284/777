@@ -12,7 +12,13 @@
     <style name="Theme.DshMobile.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/window_background</item>
         <item name="android:windowBackground">@color/window_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!--
+            Deliberately blank: the system splash runs on every activity creation and animates
+            whatever icon is configured here, so a cold start (and a language/theme recreate) used
+            to flash the brand mark across the window. Omitting the attribute is not an option —
+            the launcher icon is used as the fallback — hence the invisible drawable.
+        -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
         <item name="postSplashScreenTheme">@style/Theme.DshMobile</item>
     </style>
 </resources>

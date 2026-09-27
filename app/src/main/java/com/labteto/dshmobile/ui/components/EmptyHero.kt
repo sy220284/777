@@ -1,35 +1,28 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /**
- * Centered empty state: whale mark, hero headline, optional subtitle, a mono
- * product pill, and suggestion chips.
+ * Centered empty state: hero headline, optional subtitle, a mono product pill, and suggestion
+ * chips.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -45,7 +38,6 @@ fun EmptyHero(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        WhaleMark(Modifier.size(72.dp).shadow(14.dp, CircleShape, clip = false))
         Text(
             headline,
             style = DsType.hero26,
@@ -80,22 +72,6 @@ fun EmptyHero(
                 }
             }
         }
-    }
-}
-
-/** 64dp accentTertiary disc with the DeepSeek Mobile logo mark. */
-/** The product mark on a tinted disc. Shared so a screen can use it without the whole hero. */
-@Composable
-internal fun WhaleMark(modifier: Modifier = Modifier) {
-    val colors = DsTheme.colors
-    Box(modifier.clip(CircleShape).background(colors.accentTertiary), contentAlignment = Alignment.Center) {
-        // The launcher vector keeps the mark inside the adaptive-icon safe zone
-        // (~46% of the 108dp canvas), so oversize the image to fill the disc.
-        Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = null,
-            modifier = Modifier.size(100.dp),
-        )
     }
 }
 
