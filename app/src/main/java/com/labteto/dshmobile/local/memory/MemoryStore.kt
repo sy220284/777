@@ -33,6 +33,7 @@ class MemoryStore internal constructor(
         projectId: String? = null,
         lineageId: String? = null,
         sourceSessionId: String? = null,
+        sourceMessageId: String? = null,
         subjectKey: String? = null,
         importance: Int = 50,
         pinned: Boolean = false,
@@ -59,6 +60,7 @@ class MemoryStore internal constructor(
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
                 sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
+                sourceMessageId = sourceMessageId ?: records[duplicateIndex].sourceMessageId,
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
@@ -87,6 +89,7 @@ class MemoryStore internal constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
+            sourceMessageId = sourceMessageId,
             subjectKey = subjectKey,
             importance = importance.coerceIn(0, 100),
             pinned = pinned,
@@ -158,13 +161,21 @@ class MemoryStore internal constructor(
     fun rollbackSourceSessionFrom(
         sourceSessionId: String,
         createdAtInclusive: Long,
+        discardedMessageIds: Set<String> = emptySet(),
     ): Int {
         if (sourceSessionId.isBlank()) return 0
         val records = readDocument().records.toMutableList()
         val invalidIds = records.asSequence()
             .filter { record ->
-                record.sourceSessionId == sourceSessionId &&
-                    record.createdAt >= createdAtInclusive
+                if (record.sourceSessionId != sourceSessionId) return@filter false
+                val sourceMessageId = record.sourceMessageId
+                when {
+                    sourceMessageId != null && discardedMessageIds.isNotEmpty() ->
+                        sourceMessageId in discardedMessageIds
+                    else ->
+                        // Old memories have no message provenance; retain the timestamp fallback.
+                        record.createdAt >= createdAtInclusive
+                }
             }
             .mapTo(linkedSetOf(), MemoryRecord::id)
         if (invalidIds.isEmpty()) return 0
