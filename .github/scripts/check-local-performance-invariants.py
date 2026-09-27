@@ -20,6 +20,8 @@ RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalAge
 MODEL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
+CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
+CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
 CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
@@ -59,6 +61,8 @@ run_coordinator = RUN_COORDINATOR.read_text(encoding="utf-8")
 model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
 tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
+chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
+chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
@@ -160,6 +164,12 @@ if (
     violations.append("Session snapshots must persist only a bounded transcriptWindow, never full state.messages")
 if "LocalSessionTranscriptPager(eventLog).all()" not in engine:
     violations.append("Full transcript reads must go through the Session Event pager")
+for name, source in (
+    ("LocalChatEditSupport.kt", chat_edit_support),
+    ("LocalChatContextRefreshCoordinator.kt", chat_context_refresh),
+):
+    if ".events()" in source:
+        violations.append(f"{name} must page historical events instead of scanning the full archive")
 
 if "if (!policy.toolsEnabled) return JsonArray(emptyList())" not in tool_coordinator:
     violations.append("Chat capability policy must project an empty model tool catalog through LocalToolExecutionCoordinator")
@@ -167,7 +177,7 @@ if "toolCalls = if (runPolicy.allowToolExecution)" not in engine:
     violations.append("Chat model replies must strip unexpected tool calls before AgentLoop execution")
 if "runPolicy.imageFallbackToVisionTool" not in engine:
     violations.append("Chat native-image failures must not fall back to Work vision tools")
-if "runGroupChatTurn(input)" not in engine or "runAgentTurn(input, memoryInput)" not in engine:
+if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
     violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
 if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in engine:
     violations.append("Single chat must remain a one-step primary-agent reply")
@@ -219,6 +229,13 @@ else:
         violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
     if "withChatTurnContext(" not in run_agent_body:
         violations.append("Unified Chat turns must preserve stable/dynamic context placement")
+if "chatReplyCoordinator.finalizeDirect(" not in engine:
+    violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
+if "chatReplyCoordinator.finalizeGroup(" not in engine:
+    violations.append("Group Chat replies must pass the shared-scene continuity guard")
+if "chatReplyCoordinator.guardProactive(" not in engine:
+    violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")
+
 if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
     violations.append("Chat branch continuation must only materialize after a real branch already exists")
 

@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonPrimitive
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatSceneState
@@ -43,12 +44,13 @@ class LocalChatHistoryWindowTest {
 
         assertTrue(handoff.contains("一起看过日落"))
         assertTrue(handoff.contains("地点=院子"))
-        assertTrue(handoff.contains("两人坐在石桌旁"))
+        assertFalse(handoff.contains("两人坐在石桌旁"))
+        assertTrue(handoff.contains("人物位置、动作和物件以最近原始对话为准"))
         assertTrue(handoff.contains("明早九点去城南"))
         assertTrue(handoff.contains("城南之行尚未发生"))
         assertTrue(handoff.contains("明天去海边"))
         assertFalse(handoff.contains("我会一直陪着你去"))
-        assertTrue(handoff.contains("角色旧回复原文省略"))
+        assertTrue(handoff.contains("原始聊天仍是最终事实来源"))
     }
 
 
@@ -183,6 +185,59 @@ class LocalChatHistoryWindowTest {
 
         val bounded = boundedChatRequestHistory(history, recentMessages = 10)
         assertTrue(bounded.any { it.toString().contains("新问题11") })
+    }
+
+
+    @Test
+    fun generatedCheckpointIsSystemHistoryAndDropsCanonicalDuplicates() {
+        val history = buildList {
+            add(message("system", "系统"))
+            repeat(15) { index ->
+                add(
+                    message(
+                        "user",
+                        if (index == 0) "明早九点去城南" else "旧事件$index",
+                    ),
+                )
+                add(message("assistant", "角色旧回复$index"))
+            }
+        }
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 10,
+            compactionBatch = 4,
+            currentFacts = listOf("明早九点去城南"),
+        )
+        val checkpoint = bounded.first { it.toString().contains("<chat-continuity>") }
+
+        assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
+        assertFalse(checkpoint.toString().contains("明早九点去城南"))
+    }
+
+    @Test
+    fun legacyUserCheckpointIsDemotedToSystemAtRequestTime() {
+        val legacy = message(
+            "user",
+            "<compacted-summary>\n- 旧决定\n</compacted-summary>",
+        )
+        val history = buildList {
+            add(message("system", "系统"))
+            add(legacy)
+            repeat(8) { index ->
+                add(message("user", "新问题$index"))
+                add(message("assistant", "新回答$index"))
+            }
+        }
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 6,
+            compactionBatch = 4,
+        )
+        val checkpoint = bounded.first { it.toString().contains("<compacted-summary>") }
+
+        assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
     }
 
     private fun message(role: String, content: String) = buildJsonObject {

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.Serializable
 
@@ -25,6 +26,8 @@ data class LocalGroupChatState(
     val mode: LocalChatMode = LocalChatMode.SINGLE,
     val members: List<LocalGroupChatMember> = emptyList(),
     val turnCursor: Int = 0,
+    /** Shared physical scene/continuity for the whole group conversation. */
+    val context: ChatContextState = ChatContextState(),
     /** Public scene premise shared with every group member in this conversation. */
     val announcement: String = "",
 ) {

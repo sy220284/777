@@ -51,4 +51,24 @@ class ChatContextAssemblerTest {
         assertTrue(result.text.contains("我们先去看看门外是谁"))
         assertTrue(result.repeatedSegments.isNotEmpty())
     }
+
+    @Test
+    fun recentRoleplayBeatsAreInjectedAsSemanticNoveltyGuard() {
+        val rendered = ChatContextAssembler.assemble(
+            dynamicPrompt = "【当前状态】\n情绪=自然",
+            relationshipMemory = "",
+            userInput = "继续",
+            recentAssistantReplies = listOf(
+                "她轻轻叹了口气，转头看向窗外。",
+                "她沉默片刻，又端起茶喝了一口。",
+            ),
+        )
+
+        assertTrue(rendered.contains("近期已使用互动节拍"))
+        assertTrue(rendered.contains("叹气"))
+        assertTrue(rendered.contains("看向别处"))
+        assertTrue(rendered.contains("沉默停顿"))
+        assertTrue(rendered.contains("端起饮品"))
+        assertTrue(rendered.contains("不只换同义词"))
+    }
 }

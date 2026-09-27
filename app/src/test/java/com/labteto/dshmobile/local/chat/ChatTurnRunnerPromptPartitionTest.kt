@@ -36,16 +36,17 @@ class ChatTurnRunnerPromptPartitionTest {
             mood = "不高兴",
             relationshipState = "亲近",
             recentImpression = "还记得刚才的争执",
+        )
+        val shared = ChatContextState(
             scene = ChatSceneState(
                 sceneTime = "夜晚",
                 location = "院子",
                 participants = listOf("用户", "阿青"),
                 positions = listOf("两人坐在石桌旁"),
                 activeActions = listOf("继续聊天"),
-                lastSceneChange = "从屋内来到院子",
             ),
             continuity = ChatContinuityState(
-                recurringEvents = listOf("多次表示继续留在院中，目前地点未变化"),
+                recentEvents = listOf("两人来到院中继续聊天"),
                 decisions = listOf("明早九点出发"),
             ),
         )
@@ -53,6 +54,7 @@ class ChatTurnRunnerPromptPartitionTest {
         val context = runner.prepareProfile(
             persona = persona,
             state = state,
+            context = shared,
             userInput = "你还生气吗",
         )
 
@@ -69,10 +71,31 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.dynamicPrompt.contains("近期印象：还记得刚才的争执"))
         assertTrue(context.dynamicPrompt.contains("【当前场景｜硬连续性】"))
         assertTrue(context.dynamicPrompt.contains("地点=院子"))
-        assertTrue(context.dynamicPrompt.contains("两人坐在石桌旁"))
-        assertTrue(context.dynamicPrompt.contains("多次表示继续留在院中"))
-        assertTrue(context.dynamicPrompt.contains("没有明确移动、时间推进或场景切换时"))
+        assertFalse(context.dynamicPrompt.contains("两人坐在石桌旁"))
+        assertTrue(context.dynamicPrompt.contains("两人来到院中继续聊天"))
+        assertTrue(context.dynamicPrompt.contains("人物位置、进行中动作和物件以最近原始对话为准"))
+        assertTrue(context.dynamicPrompt.contains("若没有明确移动、时间推进或合理叙事跳切"))
         assertTrue(context.prompt.contains(context.stablePrompt))
         assertTrue(context.prompt.contains(context.dynamicPrompt))
     }
+
+    @Test
+    fun continuationInputIsInjectedIntoGenerationPrompt() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "personas-continuation.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+
+        val context = runner.prepareProfile(
+            persona = PersonaProfile(name = "阿青"),
+            state = ChatCharacterState(),
+            context = ChatContextState(scene = ChatSceneState(location = "院子")),
+            userInput = "继续",
+        )
+
+        assertTrue(context.dynamicPrompt.contains("本轮承接模式｜继续当前节拍"))
+        assertTrue(context.dynamicPrompt.contains("不为“推进”凭空换场"))
+    }
+
 }

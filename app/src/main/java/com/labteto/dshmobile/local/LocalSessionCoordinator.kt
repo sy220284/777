@@ -90,8 +90,8 @@ internal class LocalSessionCoordinator(
             events = tailEvents,
             sequenceExclusive = cursor,
         ).copy(
-            // Old builds persisted a structural eligibility flag that could stay false forever.
-            // Current actions validate the active transcript/branch at the point of use.
+            // Old builds could persist false forever. Current edit/variant actions validate the
+            // actual active transcript at use time, so old storage must not disable them.
             branchingEligible = true,
         )
         return LocalSessionTranscriptRestore(
@@ -119,6 +119,7 @@ internal class LocalSessionCoordinator(
         usageMode = state.usageMode,
         personaId = state.personaId,
         chatState = state.chatState,
+        chatContext = state.chatContext,
         replySuggestions = state.replySuggestions,
         chatBranches = state.chatBranches,
         groupChat = state.groupChat,

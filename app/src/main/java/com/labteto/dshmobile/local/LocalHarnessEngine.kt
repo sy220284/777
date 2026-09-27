@@ -58,7 +58,19 @@ import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
+import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
+import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.canonicalFactLines
+import com.labteto.dshmobile.local.chat.commitProcessed
+import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.rebaseGeneration
+import com.labteto.dshmobile.local.chat.restoreBranchContext
+import com.labteto.dshmobile.local.chat.withContextForPlanner
+import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
@@ -447,6 +459,42 @@ class LocalHarnessEngine @Inject constructor(
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
 
+    private val chatContextRefreshCoordinator by lazy {
+        LocalChatContextRefreshCoordinator(
+            state = _state,
+            chatTurnCoordinator = chatTurnCoordinator,
+            requestPlanner = { snapshot, prompt, requestLog ->
+                apiKeys.get()?.let { key ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = listOf(
+                            buildJsonObject {
+                                put("role", "system")
+                                put("content", prompt)
+                            },
+                        ),
+                        step = CHAT_POST_TURN_MODEL_STEP,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        requestLog = requestLog,
+                    )
+                }
+            },
+            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            persistBranchState = ::persistChatBranchState,
+            persist = ::persist,
+        )
+    }
+
+    private val chatReplyCoordinator by lazy {
+        LocalChatReplyCoordinator(
+            chatTurnCoordinator = chatTurnCoordinator,
+            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordStyleGuardHits = ::recordStyleGuardHits,
+        )
+    }
+
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
     private val scope = CoroutineScope(
@@ -781,8 +829,8 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             runCatching {
-                seedWorkspace()
-                migrateLegacySession()
+                seedLocalWorkspaceGuide(workspace.path)
+                migrateLegacySessionFiles(root, sessionsRoot, currentSessionId)
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
@@ -1330,12 +1378,17 @@ class LocalHarnessEngine @Inject constructor(
                 applied = true
                 current.copy(
                     replySuggestions = suggestions,
-                    chatBranches = updateChatBranchNodeSnapshot(
-                        state = current.chatBranches,
-                        messageId = expectedAssistantMessageId,
-                        chatState = current.chatState,
-                        replySuggestions = suggestions,
-                    ),
+                    chatBranches = if (current.transcriptIndex.branchingEligible) {
+                        updateChatBranchNodeSnapshot(
+                            state = current.chatBranches,
+                            messageId = expectedAssistantMessageId,
+                            chatState = current.chatState,
+                            chatContext = current.chatContext,
+                            replySuggestions = suggestions,
+                        )
+                    } else {
+                        current.chatBranches
+                    },
                 )
             }
         }
@@ -1386,8 +1439,8 @@ class LocalHarnessEngine @Inject constructor(
      * Edit any historical user turn and continue from that point.
      *
      * The active transcript is rewritten destructively: the original user turn and every later
-     * message are removed from the active conversation. The edited turn becomes the new tail, and
-     * the next assistant reply is generated from the retained prefix.
+     * message are removed from the active conversation. Hard scene state is replayed from the
+     * retained prefix so deleted future locations cannot leak into the new continuation.
      */
     fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
         val requestedText = replacement.trim()
@@ -1413,12 +1466,13 @@ class LocalHarnessEngine @Inject constructor(
         cancelChatPostTurn()
 
         val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
-        val baseState = state.chatBranches.nodes
+        val branchParentState = state.chatBranches.nodes
             .firstOrNull { node -> node.message.id == messageId }
             ?.parentId
             ?.let { parentId ->
                 state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
             }
+        val baseState = branchParentState
             ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
         val baseGroupState = if (state.groupChat.enabled) {
@@ -1432,8 +1486,13 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             state.groupChat
         }
+
         val discarded = activeTranscript.drop(originalIndex)
-        memoryStore.rollbackSourceSessionFrom(state.sessionId, original.createdAt)
+        memoryStore.rollbackSourceSessionFrom(
+            sourceSessionId = state.sessionId,
+            createdAtInclusive = original.createdAt,
+            discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
+        )
         if (!state.groupChat.enabled) {
             val galleryId = state.galleryId
             val storyId = state.galleryStoryId
@@ -1450,23 +1509,58 @@ class LocalHarnessEngine @Inject constructor(
                 chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
             }
         }
-        val edited = newTranscriptMessage("user", content); val rewritten = rewriteChatTranscriptFromUserEdit(
+
+        val edited = newTranscriptMessage("user", content)
+        val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
             originalMessageId = messageId,
             editedMessage = edited,
         ) ?: return@synchronized false
-        val editedModelMessage = editedUserModelMessage(
+        val retainedPrefix = rewritten.dropLast(1)
+
+        val previousGeneration = if (state.groupChat.enabled) {
+            state.groupChat.context.generation
+        } else {
+            state.chatContext.generation
+        }
+        val replayedContext = replayHardChatContextFromTranscript(
+            messages = retainedPrefix,
+            generation = previousGeneration + 1L,
+        )
+        val baseContext = replayedContext.copy(continuity = baseState.continuity)
+
+        val editedModelMessage = editedChatUserModelMessage(
+            eventLog = eventLog,
             originalMessageId = messageId,
             content = content,
         )
-        rebuildEditedChatModelHistory(
-            messages = rewritten,
-            groupMode = state.groupChat.enabled,
-            editedMessageId = edited.id,
-            editedModelMessage = editedModelMessage,
+        resetModelHistory(
+            buildEditedChatModelHistory(
+                eventLog = eventLog,
+                messages = rewritten,
+                groupMode = state.groupChat.enabled,
+                editedMessageId = edited.id,
+                editedModelMessage = editedModelMessage,
+                systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
+            ),
+        )
+        updateContextMetrics()
+
+        val restoredGroupState = if (state.groupChat.enabled) {
+            baseGroupState.copy(context = baseContext)
+        } else {
+            baseGroupState
+        }
+        persistChatTimelineBaseline(
+            eventLog,
+            json,
+            state.copy(
+                chatState = baseState.copy(scene = baseContext.scene, continuity = baseContext.continuity),
+                chatContext = baseContext,
+                groupChat = restoredGroupState,
+            ),
         )
 
-        persistChatTimelineBaseline(eventLog, json, state.copy(chatState = baseState, groupChat = baseGroupState))
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
             put("model_message", editedModelMessage)
@@ -1475,23 +1569,32 @@ class LocalHarnessEngine @Inject constructor(
             put("transcript", encodeTranscriptMessages(listOf(edited)))
         })
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
+
         _state.update { current ->
             current.copy(
                 messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-                chatState = baseState,
+                chatState = baseState.copy(
+                    scene = if (current.groupChat.enabled) ChatSceneState() else baseContext.scene,
+                    continuity = if (current.groupChat.enabled) ChatContinuityState() else baseContext.continuity,
+                ),
+                chatContext = if (current.groupChat.enabled) current.chatContext else baseContext,
+                groupChat = restoredGroupState,
                 replySuggestions = emptyList(),
                 chatBranches = LocalChatBranchState(),
-                groupChat = baseGroupState,
                 groupActiveSpeakerName = null,
                 personaCorrectionNotice = null,
                 error = null,
             )
         }
-        persistRewrittenChatTranscript(
+        val rewrittenTranscriptSequence = persistRewrittenChatTranscript(
+            eventLog = eventLog,
             reason = "user-edited",
             activeTranscript = rewritten,
-            discardedMessageIds = discarded.map(LocalHarnessMessage::id),
+        )
+        transcriptProjectionCursor = maxOf(
+            transcriptProjectionCursor ?: -1L,
+            rewrittenTranscriptSequence,
         )
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
@@ -1506,7 +1609,8 @@ class LocalHarnessEngine @Inject constructor(
                 runGroupChatTurn(content)
             } else {
                 captureChatPersonaCorrection(requestedText)
-                runChatTurn(content)
+                hydrateNewChatStateFromRelationshipMemory()
+                runChatTurn(content, sourceMessageId = edited.id)
             }
         }.also { activeJob = it; it.start() }
         true
@@ -1521,7 +1625,8 @@ class LocalHarnessEngine @Inject constructor(
             state.loading ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
-            pendingInputs.size() != 0
+            pendingInputs.size() != 0 ||
+            !state.transcriptIndex.branchingEligible
         ) return@synchronized false
 
         val selected = selectChatBranchVariant(state.chatBranches, messageId, targetIndex)
@@ -1530,12 +1635,19 @@ class LocalHarnessEngine @Inject constructor(
         if (activeMessages.isEmpty() || !chatBranchingEligible(activeMessages)) return@synchronized false
 
         val snapshot = chatBranchLastSnapshot(selected)
-        rebuildChatModelHistoryFromTranscript(activeMessages)
+        val selectedContext = restoreBranchContext(
+            snapshot = chatBranchLastContext(selected),
+            legacyState = snapshot?.first,
+            previousGeneration = state.chatContext.generation,
+        )
+        resetModelHistory(buildChatModelHistory(activeMessages, chatSystemPrompt()))
+        updateContextMetrics()
         _state.update { current ->
             current.copy(
                 messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
-                chatState = snapshot?.first ?: ChatCharacterState(),
+                chatState = snapshot?.first ?: current.chatState,
+                chatContext = selectedContext,
                 replySuggestions = snapshot?.second.orEmpty(),
                 chatBranches = selected,
                 error = null,
@@ -1564,25 +1676,35 @@ class LocalHarnessEngine @Inject constructor(
         }
         cancelChatPostTurn()
 
-        if (state.usageMode == LocalUsageMode.CHAT) {
-            val activeMessages = transcriptForBranchMaterialization(state)
-            if (!chatBranchingEligible(activeMessages)) return@synchronized false
+        if (state.usageMode == LocalUsageMode.CHAT && state.transcriptIndex.branchingEligible) {
             val branches = if (state.chatBranches.nodes.isNotEmpty()) {
                 state.chatBranches
             } else {
                 syncChatBranchState(
                     current = LocalChatBranchState(),
-                    activeMessages = activeMessages,
+                    activeMessages = transcriptForBranchMaterialization(state),
                     chatState = state.chatState,
+                    chatContext = state.chatContext,
                     replySuggestions = state.replySuggestions,
                 )
             }
-            val baseState = chatBranchParentState(branches, messageId)
-                ?: restoreChatStateBefore(eventLog.events(), json, sourceEventSequenceForMessage(eventLog.events(), promptMessage.id), promptMessage.createdAt)
+            val branchParentState = chatBranchParentState(branches, messageId)
+            val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), promptMessage.id)
+            val baseState = branchParentState
+                ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, promptMessage.createdAt)
                 ?: ChatCharacterState()
+            val baseContext = restoreBranchContext(
+                snapshot = chatBranchParentContext(branches, messageId),
+                legacyState = baseState,
+                previousGeneration = state.chatContext.generation,
+            )
             _state.update {
                 it.copy(
-                    chatState = baseState,
+                    chatState = baseState.copy(
+                        scene = baseContext.scene,
+                        continuity = baseContext.continuity,
+                    ),
+                    chatContext = baseContext,
                     replySuggestions = emptyList(),
                     chatBranches = branches,
                 )
@@ -1596,77 +1718,6 @@ class LocalHarnessEngine @Inject constructor(
         true
     }
 
-    private fun editedUserModelMessage(
-        originalMessageId: String,
-        content: String,
-    ): JsonObject {
-        val original = eventLog.events()
-            .filter { event -> event.type == "user/message" }
-            .lastOrNull { event ->
-                decodeTranscriptMessages(event.data)
-                    .orEmpty()
-                    .any { message -> message.id == originalMessageId }
-            }
-            ?.data
-            ?.get("model_message") as? JsonObject
-        return if (original != null) {
-            replaceLocalUserModelMessageText(original, content)
-        } else {
-            buildJsonObject {
-                put("role", "user")
-                put("content", content)
-            }
-        }
-    }
-
-    private fun rebuildEditedChatModelHistory(
-        messages: List<LocalHarnessMessage>,
-        groupMode: Boolean,
-        editedMessageId: String,
-        editedModelMessage: JsonObject,
-    ) {
-        val durableUserMessages = linkedMapOf<String, JsonObject>()
-        eventLog.events()
-            .filter { event -> event.type == "user/message" }
-            .forEach { event ->
-                val structured = event.data["model_message"] as? JsonObject ?: return@forEach
-                decodeTranscriptMessages(event.data)
-                    .orEmpty()
-                    .filter { message -> message.role == "user" }
-                    .forEach { message -> durableUserMessages[message.id] = structured }
-            }
-
-        val rebuilt = buildList {
-            add(buildJsonObject {
-                put("role", "system")
-                put("content", if (groupMode) groupChatSystemPrompt() else chatSystemPrompt())
-            })
-            messages.forEach { message ->
-                when (message.role) {
-                    "user" -> add(
-                        if (message.id == editedMessageId) {
-                            editedModelMessage
-                        } else {
-                            durableUserMessages[message.id] ?: buildJsonObject {
-                                put("role", "user")
-                                put("content", message.content)
-                            }
-                        },
-                    )
-                    "assistant" -> add(buildJsonObject {
-                        put("role", "assistant")
-                        put(
-                            "content",
-                            if (groupMode) groupTranscriptLine(message) else message.content,
-                        )
-                    })
-                }
-            }
-        }
-        resetModelHistory(rebuilt)
-        updateContextMetrics()
-    }
-
     private fun transcriptForBranchMaterialization(
         state: LocalHarnessState,
     ): List<LocalHarnessMessage> {
@@ -1674,44 +1725,6 @@ class LocalHarnessEngine @Inject constructor(
         if (activeBranch.isNotEmpty()) return activeBranch
         if (state.transcriptIndex.totalMessageCount <= state.messages.size.toLong()) return state.messages
         return LocalSessionTranscriptPager(eventLog).all()
-    }
-
-    private fun rebuildChatModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
-        val rebuilt = buildList {
-            add(buildJsonObject {
-                put("role", "system")
-                put("content", chatSystemPrompt())
-            })
-            messages.forEach { message ->
-                if (message.role == "user" || message.role == "assistant") {
-                    add(buildJsonObject {
-                        put("role", message.role)
-                        put("content", message.content)
-                    })
-                }
-            }
-        }
-        resetModelHistory(rebuilt)
-        updateContextMetrics()
-    }
-
-    private fun persistRewrittenChatTranscript(
-        reason: String,
-        activeTranscript: List<LocalHarnessMessage>,
-        discardedMessageIds: List<String> = emptyList(),
-    ) {
-        val clearedBranches = LocalChatBranchState()
-        eventLog.append("chat/branch-state", JsonObject(
-            encodeChatBranchStateEvent(clearedBranches) + ("reason" to JsonPrimitive(reason)),
-        ))
-        val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
-            put("reason", reason)
-            put("transcript", encodeTranscriptMessages(activeTranscript))
-            if (discardedMessageIds.isNotEmpty()) {
-                put("discarded_message_ids", JsonArray(discardedMessageIds.map(::JsonPrimitive)))
-            }
-        })
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
     private fun persistChatBranchState(reason: String) {
@@ -1795,7 +1808,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             val accepted = pendingInputs.offer(queuedInput)
             if (!accepted) {
-                _state.update { it.copy(error = "当前执行中的补充消息已达到 $MAX_PENDING_INPUTS 条上限") }
+                _state.update { it.copy(error = "当前执行中的补充消息已达到 ${MAX_PENDING_INPUTS} 条上限") }
                 return@synchronized null
             }
             recordUserTranscript(
@@ -1829,11 +1842,12 @@ class LocalHarnessEngine @Inject constructor(
             put("role", "user")
             put("content", content)
         }
-        recordUserTranscript(content, durableMessage, queued = false)
+        val sourceMessageId = recordUserTranscript(content, durableMessage, queued = false)
         appendUserToModelHistory(durableMessage)
         persist()
-        return scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }
-            .also { activeJob = it }
+        return scope.launch(start = CoroutineStart.LAZY) {
+            runTurn(content, memoryInput, sourceMessageId)
+        }.also { activeJob = it }
     }
 
     private fun recordUserTranscript(
@@ -1841,12 +1855,18 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject?,
         queued: Boolean,
         queuedInput: QueuedAgentInput? = null,
-    ) {
+    ): String {
         val before = _state.value
         persistChatTimelineBaseline(eventLog, json, before)
-        val transcriptMessage = newTranscriptMessage("user", content)
+        val durableInput = queuedInput.takeIf { queued }
+        val transcriptMessage = newTranscriptMessage("user", content).let { message ->
+            durableInput?.id
+                ?.takeIf(String::isNotBlank)
+                ?.let { durableId -> message.copy(id = durableId) }
+                ?: message
+        }
         val userEvent = if (queued) {
-            val durableInput = requireNotNull(queuedInput) { "排队消息缺少持久编号" }
+            val durableInput = requireNotNull(durableInput) { "排队消息缺少持久编号" }
             eventLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
@@ -1873,7 +1893,8 @@ class LocalHarnessEngine @Inject constructor(
         }
         if (
             before.usageMode == LocalUsageMode.CHAT &&
-            before.chatBranches.nodes.isNotEmpty()
+            before.chatBranches.nodes.isNotEmpty() &&
+            before.transcriptIndex.branchingEligible
         ) {
             val branches = appendMaterializedChatBranchMessage(
                 current = before.chatBranches,
@@ -1881,6 +1902,7 @@ class LocalHarnessEngine @Inject constructor(
                 message = transcriptMessage,
                 parentId = before.transcriptIndex.latestDialogueMessageId,
                 chatState = before.chatState,
+                chatContext = before.chatContext,
                 replySuggestions = before.replySuggestions,
             )
             _state.update {
@@ -1892,6 +1914,7 @@ class LocalHarnessEngine @Inject constructor(
         } else if (before.usageMode == LocalUsageMode.CHAT) {
             _state.update { it.copy(replySuggestions = emptyList()) }
         }
+        return transcriptMessage.id
     }
 
     private fun appendUserToModelHistory(message: JsonObject) {
@@ -2323,6 +2346,7 @@ class LocalHarnessEngine @Inject constructor(
                 val chatContext = chatTurnCoordinator.prepareProfile(
                     persona = persona,
                     state = session.chatState,
+                    context = session.chatContext.withLegacyFallback(session.chatState),
                     userInput = conversationFocus,
                     storyContext = session.handoffSummary,
                 )
@@ -2430,6 +2454,28 @@ class LocalHarnessEngine @Inject constructor(
                     require(content.isNotEmpty()) { "角色主动消息去重重写后为空" }
                 }
 
+                val proactiveScene = session.chatContext
+                    .withLegacyFallback(session.chatState)
+                    .scene
+                reply = chatReplyCoordinator.guardProactive(
+                    snapshot = boundState,
+                    persona = persona,
+                    scene = proactiveScene,
+                    initial = reply,
+                    retryRaw = { repairHint ->
+                        completeAutomationChat(
+                            key = key,
+                            snapshot = boundState,
+                            messages = withEphemeralContext(requestMessages, repairHint),
+                        )
+                    },
+                    appendEvent = { type, data ->
+                        boundEventLog.append(type, data)
+                    },
+                )
+                content = reply.content.orEmpty().trim()
+                require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
+
                 val proactiveMessage = LocalHarnessMessage(
                     id = UUID.randomUUID().toString(),
                     role = "assistant",
@@ -2464,10 +2510,33 @@ class LocalHarnessEngine @Inject constructor(
                         clearStreamingPreview = true,
                     )
                     _state.update { current ->
-                        if (current.sessionId == session.id) current.copy(chatState = nextChatState) else current
+                        if (current.sessionId != session.id) {
+                            current
+                        } else {
+                            val baseContext = current.chatContext
+                                .withLegacyFallback(nextChatState)
+                                .applySceneTurn(
+                                    userMessage = "",
+                                    assistantMessage = content,
+                                    sequence = assistantEvent.sequence,
+                                )
+                            val pending = ChatPendingTurn(
+                                sequence = assistantEvent.sequence,
+                                assistantMessageId = proactiveMessage.id,
+                                branchHeadId = proactiveMessage.id,
+                                userMessage = "",
+                                assistantMessage = content,
+                                generation = baseContext.generation,
+                            )
+                            current.copy(
+                                chatState = nextChatState,
+                                chatContext = baseContext.enqueuePending(pending),
+                            )
+                        }
                     }
                     if (
                         pendingInputs.size() == 0 &&
+                        beforeProactive.transcriptIndex.branchingEligible &&
                         beforeProactive.chatBranches.nodes.isNotEmpty()
                     ) {
                         _state.update { current ->
@@ -2478,6 +2547,7 @@ class LocalHarnessEngine @Inject constructor(
                                     message = proactiveMessage,
                                     parentId = beforeProactive.transcriptIndex.latestDialogueMessageId,
                                     chatState = current.chatState,
+                                    chatContext = current.chatContext,
                                     replySuggestions = current.replySuggestions,
                                 ),
                             )
@@ -2502,6 +2572,22 @@ class LocalHarnessEngine @Inject constructor(
                     val latestWindow = latest.transcriptWindow.ifEmpty {
                         latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
                     }
+                    val baseContext = latest.chatContext
+                        .withLegacyFallback(nextChatState)
+                        .applySceneTurn(
+                            userMessage = "",
+                            assistantMessage = content,
+                            sequence = assistantEvent.sequence,
+                        )
+                    val pending = ChatPendingTurn(
+                        sequence = assistantEvent.sequence,
+                        assistantMessageId = proactiveMessage.id,
+                        branchHeadId = proactiveMessage.id,
+                        userMessage = "",
+                        assistantMessage = content,
+                        generation = baseContext.generation,
+                    )
+                    val nextContext = baseContext.enqueuePending(pending)
                     val nextBranches = if (
                         nextTranscriptIndex.branchingEligible &&
                         latest.chatBranches.nodes.isNotEmpty()
@@ -2512,6 +2598,7 @@ class LocalHarnessEngine @Inject constructor(
                             message = proactiveMessage,
                             parentId = latestIndex.latestDialogueMessageId,
                             chatState = nextChatState,
+                            chatContext = nextContext,
                             replySuggestions = latest.replySuggestions,
                         )
                     } else {
@@ -2525,6 +2612,7 @@ class LocalHarnessEngine @Inject constructor(
                                 .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                             transcriptIndex = nextTranscriptIndex,
                             chatState = nextChatState,
+                            chatContext = nextContext,
                             chatBranches = nextBranches,
                             transcriptProjectedThroughSequence = assistantEvent.sequence,
                         ),
@@ -2960,8 +3048,10 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun captureAutoMemoryDirective(text: String) =
-        memoryCoordinator.captureAutoMemoryDirective(text)
+    private suspend fun captureAutoMemoryDirective(
+        text: String,
+        sourceMessageId: String? = null,
+    ) = memoryCoordinator.captureAutoMemoryDirective(text, sourceMessageId)
 
     private fun chatRelationshipMemoryContext(
         query: String,
@@ -2982,7 +3072,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             appendModelHistory(durableMessage)
             durableMessages += durableMessage
-            captureAutoMemoryDirective(input.memoryInput)
+            captureAutoMemoryDirective(input.memoryInput, input.id)
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
         eventLog.append(
@@ -3018,7 +3108,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         persist()
         scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(next.content, next.memoryInput)
+            runTurn(next.content, next.memoryInput, next.id)
         }.also { activeJob = it }
     }
 
@@ -3038,18 +3128,22 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private suspend fun runTurn(input: String, memoryInput: String = input) {
+    private suspend fun runTurn(
+        input: String,
+        memoryInput: String = input,
+        sourceMessageId: String? = null,
+    ) {
         val snapshot = _state.value
         if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.groupChat.enabled) {
             captureGroupPersonaCorrections(memoryInput)
-            runGroupChatTurn(input)
+            runGroupChatTurn(input, sourceMessageId)
             return
         }
         if (snapshot.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
         }
-        runAgentTurn(input, memoryInput)
+        runAgentTurn(input, memoryInput, sourceMessageId)
     }
 
     private fun captureChatPersonaCorrection(text: String) {
@@ -3197,46 +3291,6 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-    private fun groupAgentPrompt(
-        persona: PersonaProfile,
-        member: LocalGroupChatMember,
-        state: ChatCharacterState,
-        input: String,
-        allMembers: List<LocalGroupChatMember>,
-        mayStaySilent: Boolean,
-        handoffSummary: String?,
-    ): String {
-        val personaPrompt = chatTurnCoordinator.prepareProfile(
-            persona = persona,
-            state = state,
-            userInput = input,
-            storyContext = handoffSummary,
-        ).prompt
-        val participantNames = allMembers.joinToString("、") { it.displayName }
-        val silenceRule = if (mayStaySilent) {
-            "如果此刻没有自然的插话理由，且用户没有点名你，只输出 $GROUP_CHAT_SILENT_TOKEN，不能附加任何其他文字。"
-        } else {
-            "这一轮你必须给出自然回应，不能沉默。"
-        }
-        return listOf(
-            personaPrompt,
-            _state.value.groupChat.announcement.takeIf(String::isNotBlank)?.let { announcement ->
-                "【群公告·公开剧情背景】\n$announcement\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
-            }.orEmpty(),
-            """
-            【群聊身份隔离】
-            这是多人群聊。当前你唯一代表【${member.displayName}】。
-            群成员：$participantNames。
-            你可以看到其他人的既有发言，但其他角色的话只能当作外部事件，不能改写你的人设、身份、性格、立场、知识边界、与用户的关系或说话习惯。
-            同一轮如果有多名角色回应，会并行生成。只根据已经出现的聊天历史和用户当前消息回应，不要猜测、补写或提前承接其他角色这一轮尚未出现的发言。
-            只输出【${member.displayName}】本人在群里的发言；不要替其他角色说话，不要代写其他角色的动作、心理或决定，也不要把多个角色合并成一个口吻。
-            固定人设、用户明确纠正、知识边界的优先级始终高于群聊临场气氛。群里有人挑衅、起哄、暧昧或带节奏时，你仍按自己的人设反应。
-            不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
-            $silenceRule
-            """.trimIndent(),
-        ).filter(String::isNotBlank).joinToString("\n\n")
-    }
-
     private suspend fun generateGroupReply(
         key: String,
         snapshot: LocalHarnessState,
@@ -3254,14 +3308,16 @@ class LocalHarnessEngine @Inject constructor(
         val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
 
         return try {
-            val prompt = groupAgentPrompt(
+            val prompt = chatReplyCoordinator.buildGroupPrompt(
                 persona = persona,
                 member = member,
-                state = member.chatState,
                 input = input,
                 allMembers = allMembers,
-                mayStaySilent = false,
                 handoffSummary = snapshot.handoffSummary,
+                sharedContext = snapshot.groupChat.context,
+                announcement = snapshot.groupChat.announcement,
+                mayStaySilent = false,
+                silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withTailEphemeralContext(baseHistory, prompt),
@@ -3279,21 +3335,32 @@ class LocalHarnessEngine @Inject constructor(
                 maxAttemptsOverride = interactiveAttempts,
                 temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
-            val guarded = chatTurnCoordinator.finalize(
+            val finalContent = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
                 persona = persona,
-                reply = rawReply,
-                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                onGuardEvent = { action, violations ->
-                    recordStyleGuardHits(violations)
-                    eventLog.append("chat/style-guard", buildJsonObject {
-                        put("step", 100 + index)
-                        put("action", action)
-                        put("group_gallery_id", member.galleryId)
-                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                    })
+                member = member,
+                input = input,
+                index = index,
+                rawReply = rawReply,
+                sharedContext = snapshot.groupChat.context,
+                retryRaw = { repairHint ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withTailEphemeralContext(requestMessages, repairHint),
+                        step = 100 + index,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        maxAttemptsOverride = 1,
+                        allowContextOverflowRecovery = false,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                    )
+                },
+                appendEvent = { type, data ->
+                    eventLog.append(type, data)
                 },
             )
+
             eventLog.append("group/agent-latency", buildJsonObject {
                 put("gallery_id", member.galleryId)
                 put("index", index)
@@ -3303,11 +3370,7 @@ class LocalHarnessEngine @Inject constructor(
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
-                content = stripGroupSpeakerPrefix(
-                    guarded.content.orEmpty(),
-                    member.displayName,
-                    persona.name,
-                ),
+                content = finalContent,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -3335,9 +3398,11 @@ class LocalHarnessEngine @Inject constructor(
     ): ChatCharacterState {
         val snapshot = _state.value
         val key = apiKeys.get() ?: return member.chatState
+        val sharedContext = _state.value.groupChat.context.withLegacyFallback(member.chatState)
+        val plannerState = member.chatState.withContextForPlanner(sharedContext)
         val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
-            state = member.chatState,
+            state = plannerState,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
@@ -3359,7 +3424,7 @@ class LocalHarnessEngine @Inject constructor(
             usageTracker.record(snapshot.model, plannerReply.usage)
             chatTurnCoordinator.parsePostTurn(
                 plannerReply.content.orEmpty(),
-                previous = member.chatState,
+                previous = plannerState,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
             )?.state ?: member.chatState
@@ -3403,7 +3468,9 @@ class LocalHarnessEngine @Inject constructor(
             replies.forEach { reply ->
                 val memberPrompt = chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
-                    state = reply.member.chatState,
+                    state = reply.member.chatState.withContextForPlanner(
+                        snapshot.groupChat.context.withLegacyFallback(reply.member.chatState),
+                    ),
                     userMessage = userMessage,
                     assistantMessage = reply.content,
                 ).replace(
@@ -3442,7 +3509,9 @@ class LocalHarnessEngine @Inject constructor(
                 val plan = item["plan"] ?: return@forEach
                 val parsed = chatTurnCoordinator.parsePostTurn(
                     text = plan.toString(),
-                    previous = source.member.chatState,
+                    previous = source.member.chatState.withContextForPlanner(
+                        snapshot.groupChat.context.withLegacyFallback(source.member.chatState),
+                    ),
                     userMessage = userMessage,
                     assistantMessage = source.content,
                 ) ?: return@forEach
@@ -3468,7 +3537,10 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runGroupChatTurn(input: String) {
+    private suspend fun runGroupChatTurn(
+        input: String,
+        sourceMessageId: String? = null,
+    ) {
         _state.update {
             it.copy(
                 running = true,
@@ -3486,7 +3558,7 @@ class LocalHarnessEngine @Inject constructor(
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
             }
             ensureSystemMessage()
-            captureAutoMemoryDirective(input)
+            captureAutoMemoryDirective(input, sourceMessageId)
 
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val members = snapshot.groupChat.members
@@ -3500,14 +3572,16 @@ class LocalHarnessEngine @Inject constructor(
                         member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
                 } ?: chatPersonaStore.get(member.personaId)
                 estimateModelTokens(
-                    groupAgentPrompt(
+                    chatReplyCoordinator.buildGroupPrompt(
                         persona = persona,
                         member = member,
-                        state = member.chatState,
                         input = input,
                         allMembers = members,
-                        mayStaySilent = false,
                         handoffSummary = snapshot.handoffSummary,
+                        sharedContext = snapshot.groupChat.context,
+                        announcement = snapshot.groupChat.announcement,
+                        mayStaySilent = false,
+                        silentToken = GROUP_CHAT_SILENT_TOKEN,
                     ),
                 )
             } ?: 0
@@ -3601,8 +3675,33 @@ class LocalHarnessEngine @Inject constructor(
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
+                    val pendingContext = currentGroup.context
+                        .applySceneTurn(
+                            userMessage = input,
+                            assistantMessage = content,
+                            sequence = assistantEvent.sequence,
+                        )
+                        .enqueuePending(
+                        ChatPendingTurn(
+                            sequence = assistantEvent.sequence,
+                            assistantMessageId = transcript.id,
+                            branchHeadId = transcript.id,
+                            userMessage = input,
+                            assistantMessage = content,
+                            generation = currentGroup.context.generation,
+                        ),
+                    )
+                    currentGroup = currentGroup.copy(context = pendingContext)
+                    _state.update { current ->
+                        if (current.sessionId == snapshot.sessionId) {
+                            current.copy(groupChat = currentGroup)
+                        } else {
+                            current
+                        }
+                    }
                     if (
-                        beforeAssistant.chatBranches.nodes.isNotEmpty()
+                        beforeAssistant.chatBranches.nodes.isNotEmpty() &&
+                        beforeAssistant.transcriptIndex.branchingEligible
                     ) {
                         _state.update { current ->
                             current.copy(
@@ -3612,6 +3711,7 @@ class LocalHarnessEngine @Inject constructor(
                                     message = transcript,
                                     parentId = beforeAssistant.transcriptIndex.latestDialogueMessageId,
                                     chatState = current.chatState,
+                                    chatContext = current.groupChat.context,
                                     replySuggestions = emptyList(),
                                 ),
                             )
@@ -3632,20 +3732,45 @@ class LocalHarnessEngine @Inject constructor(
                 replies = repliesForStateUpdate,
                 userMessage = input,
             )
+            val refreshedInReplyOrder = repliesForStateUpdate
+                .mapNotNull { reply -> refreshedStates[reply.member.galleryId] }
+            // Shared hard scene is already advanced deterministically from the durable replies.
+            // Planner output may enrich soft continuity but never rewrites physical state.
+            val nextSharedScene = currentGroup.context.scene
+            val nextSharedContinuity = refreshedInReplyOrder
+                .lastOrNull { it.continuity != currentGroup.context.continuity }
+                ?.continuity
+                ?: currentGroup.context.continuity
+            val through = currentGroup.context.pendingTurns
+                .filter { it.generation == currentGroup.context.generation }
+                .maxOfOrNull(ChatPendingTurn::sequence)
+                ?: currentGroup.context.processedThroughSequence
             currentGroup = currentGroup.copy(
+                context = currentGroup.context.commitProcessed(
+                    scene = nextSharedScene,
+                    continuity = nextSharedContinuity,
+                    throughSequence = through,
+                ),
                 members = currentGroup.members.map { existing ->
                     val nextState = refreshedStates[existing.galleryId] ?: return@map existing
                     val source = repliesForStateUpdate.firstOrNull { it.member.galleryId == existing.galleryId }
                     existing.copy(
                         displayName = source?.persona?.name ?: existing.displayName,
-                        chatState = nextState,
+                        chatState = nextState.copy(
+                            scene = ChatSceneState(),
+                            continuity = ChatContinuityState(),
+                        ),
                     )
                 },
             )
             repliesForStateUpdate.forEach { reply ->
                 val nextState = refreshedStates[reply.member.galleryId] ?: return@forEach
+                val privateState = nextState.copy(
+                    scene = ChatSceneState(),
+                    continuity = ChatContinuityState(),
+                )
                 runCatching {
-                    chatPersonaGalleryStore.updateGroupChatState(reply.member.galleryId, nextState)
+                    chatPersonaGalleryStore.updateGroupChatState(reply.member.galleryId, privateState)
                 }.onFailure { error ->
                     eventLog.append("group/state-persist", buildJsonObject {
                         put("gallery_id", reply.member.galleryId)
@@ -3669,9 +3794,6 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
 
-            eventLog.append("group/state", buildJsonObject {
-                put("state", json.encodeToJsonElement(LocalGroupChatState.serializer(), currentGroup))
-            })
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "completed")
                 put("mode", "group-chat")
@@ -3721,7 +3843,11 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
+    private suspend fun runChatTurn(
+        input: String,
+        replacingMessageId: String? = null,
+        sourceMessageId: String? = null,
+    ) {
         cancelChatPostTurn()
         _state.update {
             it.copy(
@@ -3735,10 +3861,10 @@ class LocalHarnessEngine @Inject constructor(
         try {
             ensureSystemMessage()
             val snapshot = _state.value
-            val branchBase = snapshot.chatBranches
-            val branchEligible = branchBase.nodes.isEmpty() || chatBranchingEligible(activeChatBranchMessages(branchBase))
+            val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
-            captureAutoMemoryDirective(input)
+            val branchBase = snapshot.chatBranches
+            captureAutoMemoryDirective(input, sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
             val preparedChat = chatTurnCoordinator.prepare(
                 snapshot = snapshot,
@@ -3757,6 +3883,9 @@ class LocalHarnessEngine @Inject constructor(
                     history = boundedChatRequestHistory(
                         if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
                         recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                        currentFacts = snapshot.chatContext
+                            .withLegacyFallback(snapshot.chatState)
+                            .canonicalFactLines(),
                     ),
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
@@ -3778,24 +3907,33 @@ class LocalHarnessEngine @Inject constructor(
                 messages = requestMessages,
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
-                publishPreview = true,
+                // Chat candidates must pass style/repetition/scene guards before anything is shown.
+                publishPreview = false,
                 streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
                 persistOverflowHistory = true,
                 temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
 
-            val reply = chatTurnCoordinator.finalize(
+            val reply = chatReplyCoordinator.finalizeDirect(
                 snapshot = snapshot,
-                persona = chatContext.persona,
                 reply = rawReply,
-                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                onGuardEvent = { action, violations ->
-                    recordStyleGuardHits(violations)
-                    eventLog.append("chat/style-guard", buildJsonObject {
-                        put("step", 1)
-                        put("action", action)
-                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                    })
+                userMessage = input,
+                step = 1,
+                retryRaw = { repairHint ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withEphemeralContext(requestMessages, repairHint),
+                        step = 1,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        maxAttemptsOverride = 1,
+                        allowContextOverflowRecovery = false,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                    )
+                },
+                appendEvent = { type, data ->
+                    eventLog.append(type, data)
                 },
             )
 
@@ -3907,6 +4045,11 @@ class LocalHarnessEngine @Inject constructor(
                     _state.update { current ->
                         current.copy(
                             chatState = restoredState,
+                            chatContext = restoreBranchContext(
+                                snapshot = oldNode.chatContextAfter,
+                                legacyState = oldNode.chatStateAfter,
+                                previousGeneration = current.chatContext.generation,
+                            ),
                             replySuggestions = oldNode.replySuggestionsAfter,
                         )
                     }
@@ -3941,7 +4084,11 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
+    private suspend fun runAgentTurn(
+        input: String,
+        memoryInput: String = input,
+        sourceMessageId: String? = null,
+    ) {
         val runPolicy = localAgentRunPolicy(_state.value.usageMode)
         toolExecutionCoordinator.clearTurnCapabilities()
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
@@ -4038,7 +4185,7 @@ class LocalHarnessEngine @Inject constructor(
                     ensureSystemMessage()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        captureAutoMemoryDirective(memoryInput)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
                         val preparedChat = chatTurnCoordinator.prepare(
                             snapshot = snapshot,
@@ -4057,7 +4204,7 @@ class LocalHarnessEngine @Inject constructor(
                                 handoffSummary = snapshot.handoffSummary,
                             ),
                         )
-                        captureAutoMemoryDirective(memoryInput)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
                     }
                     requestPrepared = true
                 }
@@ -4080,6 +4227,9 @@ class LocalHarnessEngine @Inject constructor(
                         history = boundedChatRequestHistory(
                             modelHistory.toList(),
                             recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                            currentFacts = snapshot.chatContext
+                                .withLegacyFallback(snapshot.chatState)
+                                .canonicalFactLines(),
                         ),
                         stableContext = chatStableContext,
                         dynamicContext = chatDynamicContext,
@@ -4113,7 +4263,7 @@ class LocalHarnessEngine @Inject constructor(
                         messages = requestMessages,
                         step = modelStep + 1,
                         toolsOverride = tools,
-                        publishPreview = true,
+                        publishPreview = snapshot.usageMode != LocalUsageMode.CHAT,
                         streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                         persistOverflowHistory = true,
                         temperature = CHAT_ROLEPLAY_TEMPERATURE.takeIf {
@@ -4154,8 +4304,8 @@ class LocalHarnessEngine @Inject constructor(
                             ),
                             step = modelStep + 1,
                             toolsOverride = tools,
-                            publishPreview = true,
-                        streamFilterPhrases = chatStreamFilterPhrases(snapshot),
+                            publishPreview = snapshot.usageMode != LocalUsageMode.CHAT,
+                            streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                             persistOverflowHistory = true,
                         )
                     } else if (!runPolicy.imageFallbackToVisionTool && nativeImageRejected) {
@@ -4173,6 +4323,7 @@ class LocalHarnessEngine @Inject constructor(
                     messages = requestMessages,
                     step = modelStep + 1,
                     reply = rawReply,
+                    userMessage = memoryInput,
                 )
                 val effectiveReply = if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
                     eventLog.append("chat/tool-call-blocked", buildJsonObject {
@@ -4287,6 +4438,31 @@ class LocalHarnessEngine @Inject constructor(
                                 message.role == "assistant" && message.content.isNotBlank()
                             }
                         }
+                        if (
+                            beforeAssistant.usageMode == LocalUsageMode.CHAT &&
+                            !beforeAssistant.groupChat.enabled &&
+                            event.toolCalls.isEmpty()
+                        ) {
+                            val assistantTranscript = transcriptMessages.lastOrNull { message ->
+                                message.role == "assistant" && message.content.isNotBlank()
+                            }
+                            if (assistantTranscript != null) {
+                                val hardContext = beforeAssistant.chatContext
+                                    .withLegacyFallback(beforeAssistant.chatState)
+                                    .applySceneTurn(
+                                        userMessage = memoryInput,
+                                        assistantMessage = assistantTranscript.content,
+                                        sequence = assistantEvent.sequence,
+                                    )
+                                _state.update { current ->
+                                    if (current.sessionId == beforeAssistant.sessionId) {
+                                        current.copy(chatContext = hardContext)
+                                    } else {
+                                        current
+                                    }
+                                }
+                            }
+                        }
                         appendModelHistory(reply.message)
                         updateContextMetrics()
                         applyTranscriptMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
@@ -4294,7 +4470,8 @@ class LocalHarnessEngine @Inject constructor(
                             beforeAssistant.usageMode == LocalUsageMode.CHAT &&
                             !beforeAssistant.groupChat.enabled &&
                             event.toolCalls.isEmpty() &&
-                            beforeAssistant.chatBranches.nodes.isNotEmpty()
+                            beforeAssistant.chatBranches.nodes.isNotEmpty() &&
+                            beforeAssistant.transcriptIndex.branchingEligible
                         ) {
                             val assistantTranscript = transcriptMessages.lastOrNull { message ->
                                 message.role == "assistant"
@@ -4306,6 +4483,7 @@ class LocalHarnessEngine @Inject constructor(
                                     message = assistantTranscript,
                                     parentId = beforeAssistant.transcriptIndex.latestUserMessageId,
                                     chatState = beforeAssistant.chatState,
+                                    chatContext = _state.value.chatContext,
                                     replySuggestions = beforeAssistant.replySuggestions,
                                 )
                                 _state.update { current -> current.copy(chatBranches = branches) }
@@ -4877,7 +5055,11 @@ class LocalHarnessEngine @Inject constructor(
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
             "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
-            "grep", "search_text" -> workspace.search(args.string("query"), args.optionalString("path") ?: ".", args.boolean("regex", false))
+            "grep", "search_text" -> workspace.search(
+                args.string("query"),
+                args.optionalString("path") ?: ".",
+                args.boolean("regex", false),
+            )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")
@@ -5440,24 +5622,21 @@ class LocalHarnessEngine @Inject constructor(
         expectedBaseState: ChatCharacterState,
     ) {
         cancelChatPostTurn()
-        val current = _state.value
-        val latestDialogueId = current.transcriptIndex.latestDialogueMessageId
-        if (
-            current.sessionId != expectedSessionId ||
-            latestDialogueId != expectedAssistantMessageId ||
-            current.chatState != expectedBaseState
-        ) {
-            return
-        }
         val boundEventLog = eventLogFor(expectedSessionId)
+        val generation = chatContextRefreshCoordinator.enqueue(
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            expectedSessionId = expectedSessionId,
+            expectedAssistantMessageId = expectedAssistantMessageId,
+            boundEventLog = boundEventLog,
+        ) ?: return
+
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            refreshChatPostTurn(
-                userMessage = userMessage,
-                assistantMessage = assistantMessage,
+            chatContextRefreshCoordinator.refresh(
                 persona = persona,
                 expectedSessionId = expectedSessionId,
-                expectedAssistantMessageId = expectedAssistantMessageId,
                 expectedBaseState = expectedBaseState,
+                expectedGeneration = generation,
                 boundEventLog = boundEventLog,
             )
         }
@@ -5470,133 +5649,35 @@ class LocalHarnessEngine @Inject constructor(
         job.start()
     }
 
-    private suspend fun refreshChatPostTurn(
-        userMessage: String,
-        assistantMessage: String,
-        persona: PersonaProfile,
-        expectedSessionId: String,
-        expectedAssistantMessageId: String,
-        expectedBaseState: ChatCharacterState,
-        boundEventLog: LocalSessionEventLog,
-    ) {
-        val before = _state.value
-        if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
-        val key = apiKeys.get() ?: return
-        val prompt = chatTurnCoordinator.postTurnPrompt(
-            persona = persona,
-            state = expectedBaseState,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
-        val plannerReply = try {
-            completeWithRetry(
-                key = key,
-                snapshot = before,
-                messages = listOf(
-                    buildJsonObject {
-                        put("role", "system")
-                        put("content", prompt)
-                    },
-                ),
-                step = CHAT_POST_TURN_MODEL_STEP,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
-                requestLog = boundEventLog,
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            boundEventLog.append("chat/post-turn", buildJsonObject {
-                put("status", "failed")
-                put("detail", error.message.orEmpty().take(1_000))
-            })
-            return
-        }
-        usageTracker.record(before.model, plannerReply.usage)
-        val plan = chatTurnCoordinator.parsePostTurn(
-            text = plannerReply.content.orEmpty(),
-            previous = expectedBaseState,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
-        if (plan == null) {
-            boundEventLog.append("chat/post-turn", buildJsonObject {
-                put("status", "parse-failed")
-                put("content", plannerReply.content.orEmpty().take(2_000))
-            })
-            return
-        }
-
-        var applied = false
-        _state.update { current ->
-            val latestDialogueId = current.transcriptIndex.latestDialogueMessageId
-            if (
-                current.sessionId != expectedSessionId ||
-                latestDialogueId != expectedAssistantMessageId ||
-                current.chatState != expectedBaseState
-            ) {
-                current
-            } else {
-                applied = true
-                current.copy(
-                    chatState = plan.state,
-                    chatBranches = updateChatBranchNodeSnapshot(
-                        state = current.chatBranches,
-                        messageId = expectedAssistantMessageId,
-                        chatState = plan.state,
-                        replySuggestions = current.replySuggestions,
-                    ),
-                )
-            }
-        }
-        if (!applied) {
-            boundEventLog.append("chat/post-turn", buildJsonObject {
-                put("status", "stale-discarded")
-                put("assistant_message_id", expectedAssistantMessageId)
-            })
-            return
-        }
-
-        boundEventLog.append("chat/post-turn", buildJsonObject {
-            put("status", "updated")
-            put("mood", plan.state.mood)
-            put("relationship_state", plan.state.relationshipState)
-            put("suggestion_count", 0)
-            put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), plan.state))
-        })
-        if (hasChatBranchAlternatives(_state.value.chatBranches)) {
-            persistChatBranchState("chat/post-turn-updated")
-        }
-        persist()
-    }
-
     private suspend fun enforceChatStyle(
         key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
         reply: LocalModelReply,
-    ): LocalModelReply {
-        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
-            usageTracker.record(snapshot.model, reply.usage)
-            return reply
-        }
-        val persona = chatTurnCoordinator.persona(snapshot)
-        return chatTurnCoordinator.finalize(
-            snapshot = snapshot,
-            persona = persona,
-            reply = reply,
-            recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-            onGuardEvent = { action, violations ->
-                recordStyleGuardHits(violations)
-                eventLog.append("chat/style-guard", buildJsonObject {
-                    put("step", step)
-                    put("action", action)
-                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                })
-            },
-        )
-    }
+        userMessage: String,
+    ): LocalModelReply = chatReplyCoordinator.finalizeDirect(
+        snapshot = snapshot,
+        reply = reply,
+        userMessage = userMessage,
+        step = step,
+        retryRaw = { repairHint ->
+            completeWithRetry(
+                key = key,
+                snapshot = snapshot,
+                messages = withEphemeralContext(messages, repairHint),
+                step = step,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+                maxAttemptsOverride = 1,
+                allowContextOverflowRecovery = false,
+                temperature = CHAT_ROLEPLAY_TEMPERATURE,
+            )
+        },
+        appendEvent = { type, data ->
+            eventLog.append(type, data)
+        },
+    )
 
     private suspend fun completeWithRetry(
         key: String,
@@ -6091,12 +6172,12 @@ class LocalHarnessEngine @Inject constructor(
         )
         transcriptProjectionCursor = restoredTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
-            events = modelHistoryReplayEvents(stored.legacyModelHistory),
+            events = loadModelHistoryReplayEvents(eventLog, modelHistoryCheckpointCodec, stored.legacyModelHistory),
             legacyFallback = stored.legacyModelHistory,
             codec = modelHistoryCheckpointCodec,
         )
         resetModelHistory(restoredHistory.messages)
-        applyRecoveredToolResults(recovery)
+        buildRecoveredToolResultMessages(modelHistory, recovery).forEach { appendModelHistory(it) }
         val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
@@ -6163,6 +6244,7 @@ class LocalHarnessEngine @Inject constructor(
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState,
+            chatContext = stored.chatContext.withLegacyFallback(stored.chatState),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
@@ -6267,79 +6349,10 @@ class LocalHarnessEngine @Inject constructor(
         val now = System.currentTimeMillis()
         val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
         if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
-        runCatching { cleanupUnreferencedLocalImages() }
+        runCatching { cleanupUnreferencedLocalImagesNow(sessionsRoot, currentSessionId, ::eventLogFor, modelHistory.toList(), workspace.path, eventLog) }
             .onSuccess {
                 preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
             }
-    }
-
-    private fun cleanupUnreferencedLocalImages() {
-        val sessionIds = sessionsRoot.listFiles().orEmpty()
-            .asSequence()
-            .filter(File::isFile)
-            .map(File::getName)
-            .filter { name -> ".events.jsonl" in name }
-            .map { name -> name.substringBefore(".events.jsonl") }
-            .filter { id -> id.matches(Regex("[A-Za-z0-9._-]{1,128}")) }
-            .plus(currentSessionId)
-            .distinct()
-            .toList()
-        val references = mergeLocalImageAttachmentReferences(
-            sessionIds.map { id ->
-                collectLocalImageAttachmentReferences(
-                    events = eventLogFor(id).events(),
-                    extraMessages = if (id == currentSessionId) modelHistory.toList() else emptyList(),
-                )
-            },
-        )
-        val result = cleanupLocalImageAttachments(
-            workspaceRoot = File(workspace.path),
-            references = references,
-        )
-        if (result.deletedFiles > 0) {
-            eventLog.append("attachment/gc", buildJsonObject {
-                put("status", "completed")
-                put("deleted_files", result.deletedFiles)
-                put("deleted_bytes", result.deletedBytes)
-                put("retained_image_bytes", result.retainedImageBytes)
-            })
-        }
-    }
-
-    private fun modelHistoryReplayEvents(
-        legacyFallback: List<JsonObject>,
-    ): List<LocalSessionEventLog.Event> {
-        var beforeSequence = Long.MAX_VALUE
-        while (true) {
-            val checkpoint = eventLog.latest(
-                ModelHistoryCheckpointCodec.EVENT_TYPE,
-                beforeSequenceExclusive = beforeSequence,
-            ) ?: break
-            if (modelHistoryCheckpointCodec.decode(checkpoint.data) != null) {
-                return eventLog.snapshotAfter(checkpoint.sequence - 1L)
-            }
-            beforeSequence = checkpoint.sequence
-        }
-        return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
-    }
-
-    private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
-        if (recovery.toolResults.isEmpty()) return
-        recovery.toolResults.forEach { recovered ->
-            val alreadyPresent = modelHistory.any { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
-                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
-            }
-            if (!alreadyPresent) {
-                appendModelHistory(
-                    buildJsonObject {
-                        put("role", "tool")
-                        put("tool_call_id", recovered.callId)
-                        put("content", recovered.modelContent)
-                    },
-                )
-            }
-        }
     }
 
     private fun checkpointModelHistory(reason: String) {
@@ -6381,29 +6394,7 @@ class LocalHarnessEngine @Inject constructor(
         emptyList()
     }
 
-    private fun migrateLegacySession() {
-        val legacy = File(root, "session.json")
-        if (!legacy.isFile || sessionFileFor(currentSessionId).exists()) return
-        legacy.copyTo(sessionFileFor(currentSessionId), overwrite = false)
-        File(root, "session.events.jsonl").takeIf(File::isFile)
-            ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
-    }
 
-    private fun seedWorkspace() {
-        val skill = File(workspace.path, ".dsh/skills/workspace-guide/SKILL.md")
-        if (!skill.exists()) {
-            skill.parentFile?.mkdirs()
-            skill.writeText(
-                """
-                # 工作区指南
-
-                - 所有文件操作限定在当前应用的本机工作区。
-                - 修改前先读取原文件，完成后重新读取或搜索关键内容复核。
-                - shell 使用安卓 `/system/bin/sh`，只依赖系统现有命令。
-                """.trimIndent() + "\n",
-            )
-        }
-    }
 
     private companion object {
         const val KEY_MODEL = "model"
@@ -6484,4 +6475,5 @@ class LocalHarnessEngine @Inject constructor(
             完成决策充分的计划后，必须把完整计划作为 exit_plan_mode 的唯一工具调用提交给用户审批。
         """.trimIndent()
     }
+
 }

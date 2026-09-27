@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -81,24 +83,6 @@ class LocalChatBranchingTest {
     }
 
     @Test
-    fun firstUserMessageCanBeEditedAndReplacesTheEntireFollowingConversation() {
-        val firstUser = message("u1", "user", "第一条", 1)
-        val firstAnswer = message("a1", "assistant", "第一答", 2)
-        val secondUser = message("u2", "user", "第二条", 3)
-        val secondAnswer = message("a2", "assistant", "第二答", 4)
-        val edited = message("edited-u1", "user", "修改后的第一条", 5)
-
-        val rewritten = rewriteChatTranscriptFromUserEdit(
-            activeMessages = listOf(firstUser, firstAnswer, secondUser, secondAnswer),
-            originalMessageId = firstUser.id,
-            editedMessage = edited,
-        )!!
-
-        assertEquals(listOf("edited-u1"), rewritten.map { it.id })
-        assertEquals("修改后的第一条", rewritten.single().content)
-    }
-
-    @Test
     fun historicalUserEditDropsOriginalTurnAndEveryLaterMessage() {
         val transcript = (1..100).map { index ->
             message(
@@ -120,6 +104,31 @@ class LocalChatBranchingTest {
         assertEquals((1..49).map { "m$it" } + "edited-50", rewritten.map { it.id })
         assertTrue(rewritten.none { it.id == "m50" })
         assertTrue(rewritten.none { it.id in (51..100).map { n -> "m$n" }.toSet() })
+    }
+
+    @Test
+    fun historicalEditReplayDoesNotKeepDeletedFutureLocation() {
+        val retained = listOf(
+            message("u1", "user", "进去说吧。", 1),
+            message("a1", "assistant", "她和你一起走进房间。", 2),
+        )
+        val deletedFuture = retained + listOf(
+            message("u2", "user", "出去走走。", 3),
+            message("a2", "assistant", "两人一起走到院子。", 4),
+        )
+
+        val beforeEdit = replayHardChatContextFromTranscript(
+            messages = deletedFuture,
+            generation = 1L,
+        )
+        val afterEdit = replayHardChatContextFromTranscript(
+            messages = retained,
+            generation = 2L,
+        )
+
+        assertEquals("院子", beforeEdit.scene.location)
+        assertEquals("房间", afterEdit.scene.location)
+        assertTrue(afterEdit.sceneEvents.none { it.to == "院子" })
     }
 
     @Test
@@ -331,6 +340,35 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun switchingBranchRestoresItsOwnSceneContext() {
+        val user = message("u1", "user", "去哪边", 1)
+        val courtyard = message("a1", "assistant", "留在院子。", 2)
+        var branches = syncChatBranchState(
+            current = LocalChatBranchState(),
+            activeMessages = listOf(user, courtyard),
+            chatState = ChatCharacterState(),
+            replySuggestions = emptyList(),
+            chatContext = ChatContextState(scene = ChatSceneState(location = "院子")),
+        )
+        val room = message("a2", "assistant", "回到房间。", 3)
+        branches = upsertChatBranchNode(
+            branches,
+            LocalChatBranchNode(
+                message = room,
+                parentId = user.id,
+                chatStateAfter = ChatCharacterState(),
+                chatContextAfter = ChatContextState(scene = ChatSceneState(location = "房间")),
+            ),
+            select = true,
+        )
+
+        assertEquals("房间", chatBranchLastContext(branches)!!.scene.location)
+
+        val oldSelected = selectChatBranchVariant(branches, "a2", 0)!!
+        assertEquals("院子", chatBranchLastContext(oldSelected)!!.scene.location)
+    }
+
+    @Test
     fun branchStateRoundTripsThroughEventPayload() {
         val user = message("u1", "user", "你好", 1)
         val state = upsertChatBranchNode(
@@ -346,32 +384,4 @@ class LocalChatBranchingTest {
         assertEquals(state, decoded)
         assertTrue(chatBranchingEligible(activeChatBranchMessages(decoded!!)))
     }
-
-    @Test
-    fun branchSnapshotFallsBackToLatestAvailableStateOnActivePath() {
-        val user = message("u1", "user", "第一句", 1)
-        val answer = message("a1", "assistant", "第一答", 2)
-        var branches = syncChatBranchState(
-            current = LocalChatBranchState(),
-            activeMessages = listOf(user, answer),
-            chatState = ChatCharacterState(mood = "已保存状态"),
-            replySuggestions = emptyList(),
-        )
-        val nextUser = message("u2", "user", "下一句", 3)
-        branches = upsertChatBranchNode(
-            branches,
-            LocalChatBranchNode(
-                message = nextUser,
-                parentId = answer.id,
-                chatStateAfter = null,
-            ),
-            select = true,
-        )
-
-        val snapshot = chatBranchLastSnapshot(branches)
-
-        assertNotNull(snapshot)
-        assertEquals("已保存状态", snapshot!!.first.mood)
-    }
-
 }

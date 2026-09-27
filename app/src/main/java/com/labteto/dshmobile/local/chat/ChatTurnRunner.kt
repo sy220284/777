@@ -26,11 +26,13 @@ class ChatTurnRunner @Inject constructor(
     fun prepare(
         personaId: String,
         state: ChatCharacterState = ChatCharacterState(),
+        context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext = prepareProfile(
         persona = personaStore.get(personaId),
         state = state,
+        context = context,
         userInput = userInput,
         storyContext = storyContext,
     )
@@ -38,9 +40,11 @@ class ChatTurnRunner @Inject constructor(
     fun prepareProfile(
         persona: PersonaProfile,
         state: ChatCharacterState = ChatCharacterState(),
+        context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext {
+        val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val lorePrompt = loreEngine.prompt(persona, userInput)
         val backgroundPrompt = composeRelevantBackgroundPrompt(persona, userInput)
         val storyPrompt = storyContext?.takeIf { it.isNotBlank() }?.let {
@@ -54,11 +58,14 @@ class ChatTurnRunner @Inject constructor(
             persona = persona,
             stablePrompt = composeStablePersonaPrompt(persona),
             dynamicPrompt = listOf(
-                composeDynamicPersonaPrompt(persona, state),
+                composeDynamicPersonaPrompt(persona, privateState),
+                renderChatContextForModel(context),
+                renderChatTurnModeForModel(userInput),
+                composeRoleplayNoveltyPrompt(privateState),
                 backgroundPrompt,
                 storyPrompt,
                 lorePrompt,
-                relationshipEngine.prompt(userInput, state),
+                relationshipEngine.prompt(userInput, privateState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }
@@ -180,6 +187,33 @@ class ChatTurnRunner @Inject constructor(
         }
         append("状态用于决定本轮反应；已经结束或无关的旧事件不要重新提起。")
     }.trim()
+
+    private fun composeRoleplayNoveltyPrompt(state: ChatCharacterState): String {
+        val cooling = state.interactionCooldowns
+            .filterValues { it > 0 }
+            .entries
+            .sortedByDescending { it.value }
+            .take(10)
+        if (
+            state.recentActionTags.isEmpty() &&
+            state.recentPoseTags.isEmpty() &&
+            state.recentVerbalTags.isEmpty() &&
+            state.recentAddressTerms.isEmpty() &&
+            cooling.isEmpty()
+        ) return ""
+
+        return buildString {
+            appendLine("【近期表现去重】以下行为已经在最近几轮使用过，只作为去重记录，不要求复述。")
+            if (state.recentActionTags.isNotEmpty()) appendLine("动作：${state.recentActionTags.joinToString("、")}")
+            if (state.recentPoseTags.isNotEmpty()) appendLine("姿态：${state.recentPoseTags.joinToString("、")}")
+            if (state.recentVerbalTags.isNotEmpty()) appendLine("话术：${state.recentVerbalTags.joinToString("、")}")
+            if (state.recentAddressTerms.isNotEmpty()) appendLine("称呼：${state.recentAddressTerms.joinToString("、")}")
+            if (cooling.isNotEmpty()) {
+                appendLine("仍在冷却：${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}")
+            }
+            append("除非用户明确要求重复，本轮优先换新的动作、姿态、表达策略或信息推进；不要只换同义词重复同一个互动节拍。")
+        }.trim()
+    }
 
     private fun composeRelevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
         if (userInput.isBlank()) return ""

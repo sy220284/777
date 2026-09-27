@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextAssembler
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.pendingForRequest
+import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -18,6 +22,7 @@ internal fun boundedChatRequestHistory(
     history: List<JsonObject>,
     recentMessages: Int = 20,
     compactionBatch: Int = 8,
+    currentFacts: List<String> = emptyList(),
 ): List<JsonObject> {
     require(recentMessages >= 2) { "recentMessages must be >= 2" }
     require(compactionBatch >= 2) { "compactionBatch must be >= 2" }
@@ -28,6 +33,7 @@ internal fun boundedChatRequestHistory(
     val body = if (leadingSystem == null) history else history.drop(1)
     val existingSummaryIndex = body.indexOfLast(::isChatContinuitySummary)
     val existingSummary = body.getOrNull(existingSummaryIndex)
+        ?.let { summary -> pruneChatContinuitySummary(summary, currentFacts) }
     val dialogueSource = if (existingSummaryIndex >= 0) {
         body.drop(existingSummaryIndex + 1)
     } else {
@@ -48,7 +54,7 @@ internal fun boundedChatRequestHistory(
     val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
     val older = dialogue.take(summarizedCount.coerceAtMost(dialogue.size - recentMessages))
     val recent = dialogue.drop(older.size)
-    val deltaContinuity = buildRequestOnlyContinuity(older)
+    val deltaContinuity = buildRequestOnlyContinuity(older, currentFacts)
 
     return buildList {
         leadingSystem?.let(::add)
@@ -59,17 +65,42 @@ internal fun boundedChatRequestHistory(
 }
 
 private fun isChatContinuitySummary(message: JsonObject): Boolean {
-    if (message["role"]?.jsonPrimitive?.contentOrNull != "user") return false
+    val role = message["role"]?.jsonPrimitive?.contentOrNull
+    if (role != "user" && role != "system") return false
     val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
     return "<compacted-summary>" in content || "<chat-continuity>" in content
 }
 
-private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
+private fun pruneChatContinuitySummary(
+    message: JsonObject,
+    currentFacts: List<String>,
+): JsonObject {
+    val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return message
+    val pruned = content.lineSequence().filter { raw ->
+        val line = raw.trim()
+        if (!line.startsWith("- ")) return@filter true
+        val factLine = line.removePrefix("- ").trim()
+        currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(factLine, fact) }
+    }.joinToString("\n")
+    return JsonObject(
+        message +
+            ("role" to JsonPrimitive("system")) +
+            ("content" to JsonPrimitive(pruned)),
+    )
+}
+
+private fun buildRequestOnlyContinuity(
+    older: List<JsonObject>,
+    currentFacts: List<String>,
+): JsonObject? {
     val userEvents = older.asSequence()
         .filter { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
         .mapNotNull { (it["content"] as? JsonPrimitive)?.contentOrNull }
         .map(::normalizeChatContinuityText)
         .filter(String::isNotBlank)
+        .filter { event ->
+            currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(event, fact) }
+        }
         .distinct()
         .toList()
         .takeLast(8)
@@ -83,7 +114,7 @@ private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
         append("</chat-continuity>")
     }
     return buildJsonObject {
-        put("role", "user")
+        put("role", "system")
         put("content", summary)
     }
 }
@@ -100,51 +131,47 @@ private fun normalizeChatContinuityText(text: String): String =
 internal fun buildChatContinuationHandoff(
     state: ChatCharacterState,
     messages: List<LocalHarnessMessage>,
+    context: ChatContextState = ChatContextState(),
 ): String = buildString {
     appendLine("【聊天连续性｜已发生】")
-    val scene = state.scene
-    if (
-        scene.sceneTime.isNotBlank() ||
-        scene.location.isNotBlank() ||
-        scene.participants.isNotEmpty() ||
-        scene.positions.isNotEmpty() ||
-        scene.activeActions.isNotEmpty() ||
-        scene.currentEvent.isNotBlank()
-    ) {
+    val shared = context.withLegacyFallback(state)
+    val scene = shared.scene
+    if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
         appendLine(
-            "当前场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
-                "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+            "当前硬场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
         )
-        if (scene.positions.isNotEmpty()) appendLine("人物位置：${scene.positions.joinToString("；")}")
-        if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
-        if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
-        scene.currentEvent.takeIf(String::isNotBlank)?.let { appendLine("当前事件：$it") }
-        scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
+        appendLine("人物位置、动作和物件以最近原始对话为准，不从旧场景快照继承。")
     }
-    state.continuity.recentEvents.takeLast(6).takeIf { it.isNotEmpty() }?.let {
-        appendLine("近期关键事件：${it.joinToString("；").take(1_000)}")
+    shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
+        appendLine("近期关键事件：${it.joinToString("；").take(900)}")
     }
-    state.continuity.recurringEvents.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("重复事项归并：${it.joinToString("；").take(800)}")
+    shared.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("当前有效决定：${it.joinToString("；").take(720)}")
     }
-    state.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("已定事项：${it.joinToString("；").take(800)}")
+    shared.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("待续事项：${it.joinToString("；").take(720)}")
     }
-    state.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("待续事项：${it.joinToString("；").take(800)}")
+    val pending = shared.pendingForRequest()
+    if (pending.isNotEmpty()) {
+        appendLine("尚未归并的最新事实：")
+        pending.forEach { turn ->
+            if (turn.userMessage.isNotBlank()) appendLine("- 用户：${normalizeChatContinuityText(turn.userMessage).take(320)}")
+            if (turn.assistantMessage.isNotBlank()) appendLine("- 角色：${normalizeChatContinuityText(turn.assistantMessage).take(360)}")
+        }
     }
     state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
-        appendLine("共同经历：${moments.joinToString("；").take(1_200)}")
+        appendLine("共同经历：${moments.joinToString("；").take(1_000)}")
     }
     val recentUserEvents = messages.asSequence()
         .filter { it.role == "user" }
         .map { normalizeChatContinuityText(it.content) }
         .filter(String::isNotBlank)
         .toList()
-        .takeLast(6)
+        .takeLast(4)
     if (recentUserEvents.isNotEmpty()) {
         appendLine("近期用户表达与事件：")
-        recentUserEvents.forEach { appendLine("- ${it.take(500)}") }
+        recentUserEvents.forEach { appendLine("- ${it.take(420)}") }
     }
-    append("角色旧回复原文省略；当前关系、情绪、目标和开放线索由实时状态提供。")
+    append("原始聊天仍是最终事实来源；本摘要只保留当前有效状态与待续线索。")
 }.trim().take(3_500)
+

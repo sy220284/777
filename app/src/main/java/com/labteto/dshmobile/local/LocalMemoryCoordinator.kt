@@ -21,9 +21,15 @@ internal class LocalMemoryCoordinator(
     private val eventLog: () -> LocalSessionEventLog,
     private val persist: () -> Unit,
 ) {
-    suspend fun captureAutoMemoryDirective(text: String) {
+    suspend fun captureAutoMemoryDirective(
+        text: String,
+        explicitSourceMessageId: String? = null,
+    ) {
         val snapshot = state.value
         if (!snapshot.autoMemory || text.isBlank()) return
+        val sourceMessageId = explicitSourceMessageId
+            ?.takeIf(String::isNotBlank)
+            ?: snapshot.transcriptIndex.latestUserMessageId
 
         val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
             if (snapshot.groupChat.enabled) {
@@ -34,6 +40,7 @@ internal class LocalMemoryCoordinator(
                         text = text,
                         lineageId = snapshot.lineageId,
                         sourceSessionId = currentSessionId(),
+                        sourceMessageId = sourceMessageId,
                         subjectLabel = snapshot.chatPersona.name
                             .takeUnless {
                                 it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色"
@@ -53,6 +60,7 @@ internal class LocalMemoryCoordinator(
                     projectId = snapshot.projectId,
                     lineageId = snapshot.lineageId,
                     sourceSessionId = currentSessionId(),
+                    sourceMessageId = sourceMessageId,
                 )
             }.getOrNull()
         }
@@ -62,6 +70,9 @@ internal class LocalMemoryCoordinator(
                 put("id", it.id)
                 put("scope", it.scope.name.lowercase())
                 put("kind", it.kind.name.lowercase())
+                it.sourceMessages.lastOrNull()?.let { source ->
+                    put("source_message_id", source.messageId)
+                }
                 put(
                     "source",
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {

@@ -597,8 +597,8 @@ class ChatInteractionPlannerTest {
         val state = planner.parse(
             payload,
             previous = previous,
-            userMessage = "继续说刚才的事",
-            assistantMessage = "嗯，我还听着。",
+            userMessage = "你还记得那间卧室吗？继续说刚才的事。",
+            assistantMessage = "记得，不过我们现在还坐在这里。",
         )!!.state
 
         assertEquals("院子", state.scene.location)
@@ -607,7 +607,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun explicitMovementUpdatesSceneAndContinuitySummary() {
+    fun plannerCannotOverwriteHardSceneButCanUpdateContinuitySummary() {
         val previous = ChatCharacterState(
             scene = ChatSceneState(
                 sceneTime = "夜晚",
@@ -653,12 +653,149 @@ class ChatInteractionPlannerTest {
             assistantMessage = "她起身推门，和你一起走进屋内。九点可以。",
         )!!.state
 
-        assertEquals("屋内", state.scene.location)
-        assertTrue(state.scene.lastSceneChange.contains("院子"))
+        assertEquals("院子", state.scene.location)
+        assertTrue(state.scene.lastSceneChange.isBlank())
+        assertTrue(state.scene.currentEvent.isBlank())
         assertTrue(state.continuity.recentEvents.any { it.contains("进入屋内") })
-        assertTrue(state.continuity.recurringEvents.any { it.contains("最终确定上午出发") })
+        assertTrue(state.continuity.recurringEvents.isEmpty())
         assertTrue(state.continuity.decisions.any { it.contains("九点去城南") })
         assertEquals(listOf("城南之行尚未发生"), state.continuity.unfinished)
+    }
+
+    @Test
+    fun locationMentionDoesNotBorrowMovementEvidenceFromAnotherPlace() {
+        val previous = ChatCharacterState(scene = ChatSceneState(location = "院子"))
+        val payload = """
+            {
+              "state":{"scene":{"location":"卧室"}},
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val state = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "你还记得卧室吗？刚才我们是从屋里走进院子的。",
+            assistantMessage = "记得，我们现在还在院子。",
+        )!!.state
+
+        assertEquals("院子", state.scene.location)
+    }
+
+    @Test
+    fun questionedOrNegatedMovementDoesNotChangeHardLocation() {
+        val previous = ChatCharacterState(scene = ChatSceneState(location = "院子"))
+        val payload = """
+            {
+              "state":{"scene":{"location":"卧室"}},
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val question = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "你现在在卧室吗？",
+            assistantMessage = "没有，我还在院子。",
+        )!!.state
+        assertEquals("院子", question.scene.location)
+
+        val negated = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "别去卧室，我们继续待在院子。",
+            assistantMessage = "好，不过去。",
+        )!!.state
+        assertEquals("院子", negated.scene.location)
+    }
+
+    @Test
+    fun historicalOrPlannedPlaceDoesNotReplaceCurrentScene() {
+        val previous = ChatCharacterState(scene = ChatSceneState(location = "院子"))
+        val payload = """
+            {
+              "state":{"scene":{"location":"卧室"}},
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val historical = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "昨天我在卧室待过一会儿。",
+            assistantMessage = "嗯，那是昨天的事。",
+        )!!.state
+        assertEquals("院子", historical.scene.location)
+
+        val planned = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "等会我们去卧室吧。",
+            assistantMessage = "好，先把这里的话说完。",
+        )!!.state
+        assertEquals("院子", planned.scene.location)
+    }
+
+    @Test
+    fun plannerCannotAdvanceHardTimeEvenWhenItsPayloadContainsANarrativeJump() {
+        val previous = ChatCharacterState(
+            scene = ChatSceneState(sceneTime = "夜晚", location = "院子"),
+        )
+        val payload = """
+            {
+              "state":{"scene":{"sceneTime":"早上","location":"院子"}},
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val planned = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "明天早上再说吧。",
+            assistantMessage = "好，今晚先聊到这里。",
+        )!!.state
+        assertEquals("夜晚", planned.scene.sceneTime)
+
+        val jumped = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "继续。",
+            assistantMessage = "第二天早上，天已经亮了，她仍站在院中。",
+        )!!.state
+        assertEquals("夜晚", jumped.scene.sceneTime)
+    }
+
+    @Test
+    fun plannerCannotApplyNarrativeCutToHardLocation() {
+        val previous = ChatCharacterState(
+            scene = ChatSceneState(location = "院子"),
+        )
+        val payload = """
+            {
+              "state":{
+                "scene":{
+                  "location":"房间",
+                  "participants":["用户","绫华"],
+                  "positions":["绫华把外套搭在椅背上"]
+                }
+              },
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val state = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "回去吧。",
+            assistantMessage = "回到房间后，她把外套搭在椅背上，回头看你。",
+        )!!.state
+
+        assertEquals("院子", state.scene.location)
     }
 
     @Test
@@ -691,7 +828,7 @@ class ChatInteractionPlannerTest {
             assistantMessage = "好，九点出发。",
         )!!.state
 
-        assertEquals(listOf("多次讨论明日行程，最终确定上午出发"), state.continuity.recurringEvents)
+        assertTrue(state.continuity.recurringEvents.isEmpty())
         assertEquals(listOf("明日上午九点去城南"), state.continuity.decisions)
         assertEquals(listOf("城南之行尚未发生"), state.continuity.unfinished)
     }
@@ -732,9 +869,10 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("\"suggestions\":[]"))
         assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
         assertTrue(prompt.contains("由系统根据真实对话维护"))
-        assertTrue(prompt.contains("scene(sceneTime,location"))
-        assertTrue(prompt.contains("禁止让人物无理由瞬移"))
-        assertTrue(prompt.contains("重复或同类事项合并"))
+        assertTrue(prompt.contains("scene 由系统事件归约器维护"))
+        assertTrue(prompt.contains("不要在 state 中重写 scene"))
+        assertTrue(prompt.contains("纯场景移动由系统事件层独立记录"))
+        assertTrue(prompt.contains("重复/同类事项直接归并"))
     }
 
     @Test

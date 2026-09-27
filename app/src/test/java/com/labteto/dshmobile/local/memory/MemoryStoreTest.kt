@@ -208,4 +208,100 @@ class MemoryStoreTest {
         assertEquals("关系状态：我和阿青｜熟悉", restored.single().content)
     }
 
+
+    @Test fun messageProvenanceRollsBackOnlyDiscardedTurnEvenWithBroadTimeBoundary() {
+        val memoryStore = store()
+        val kept = memoryStore.remember(
+            "用户喜欢安静散步",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u-kept",
+        )
+        val discarded = memoryStore.remember(
+            "用户喜欢夜游",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u-discarded",
+        )
+
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u-discarded"),
+            ),
+        )
+
+        val remaining = all(memoryStore)
+        assertEquals(listOf(kept.id), remaining.map { it.id })
+        assertTrue(remaining.none { it.id == discarded.id })
+    }
+
+    @Test fun duplicateFactSurvivesWhenOnlyOneOfItsSourceTurnsIsDiscarded() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u1",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u2",
+        )
+
+        assertEquals(first.id, repeated.id)
+        assertEquals(
+            setOf("u1", "u2"),
+            all(memoryStore).single().sourceMessages.map { it.messageId }.toSet(),
+        )
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(first.id, remaining.id)
+        assertEquals(listOf("u1"), remaining.sourceMessages.map { it.messageId })
+    }
+
+
+    @Test fun laterExactConfirmationDoesNotEraseOlderUnboundFact() {
+        val memoryStore = store()
+        val legacy = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u2",
+        )
+
+        assertEquals(legacy.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(legacy.id, remaining.id)
+        assertTrue(remaining.sourceMessages.isEmpty())
+        assertTrue(remaining.hasUnboundSource)
+    }
+
 }
