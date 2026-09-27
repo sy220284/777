@@ -829,8 +829,8 @@ class LocalHarnessEngine @Inject constructor(
         }
         scope.launch {
             runCatching {
-                seedWorkspace()
-                migrateLegacySession()
+                seedLocalWorkspaceGuide(workspace.path)
+                migrateLegacySessionFiles(root, sessionsRoot, currentSessionId)
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
@@ -6147,12 +6147,12 @@ class LocalHarnessEngine @Inject constructor(
         )
         transcriptProjectionCursor = restoredTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
-            events = modelHistoryReplayEvents(stored.legacyModelHistory),
+            events = loadModelHistoryReplayEvents(eventLog, modelHistoryCheckpointCodec, stored.legacyModelHistory),
             legacyFallback = stored.legacyModelHistory,
             codec = modelHistoryCheckpointCodec,
         )
         resetModelHistory(restoredHistory.messages)
-        applyRecoveredToolResults(recovery)
+        buildRecoveredToolResultMessages(modelHistory, recovery).forEach { appendModelHistory(it) }
         val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
@@ -6363,42 +6363,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun modelHistoryReplayEvents(
-        legacyFallback: List<JsonObject>,
-    ): List<LocalSessionEventLog.Event> {
-        var beforeSequence = Long.MAX_VALUE
-        while (true) {
-            val checkpoint = eventLog.latest(
-                ModelHistoryCheckpointCodec.EVENT_TYPE,
-                beforeSequenceExclusive = beforeSequence,
-            ) ?: break
-            if (modelHistoryCheckpointCodec.decode(checkpoint.data) != null) {
-                return eventLog.snapshotAfter(checkpoint.sequence - 1L)
-            }
-            beforeSequence = checkpoint.sequence
-        }
-        return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
-    }
-
-    private fun applyRecoveredToolResults(recovery: com.labteto.dshmobile.harness.session.SessionRepairResult) {
-        if (recovery.toolResults.isEmpty()) return
-        recovery.toolResults.forEach { recovered ->
-            val alreadyPresent = modelHistory.any { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
-                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == recovered.callId
-            }
-            if (!alreadyPresent) {
-                appendModelHistory(
-                    buildJsonObject {
-                        put("role", "tool")
-                        put("tool_call_id", recovered.callId)
-                        put("content", recovered.modelContent)
-                    },
-                )
-            }
-        }
-    }
-
     private fun checkpointModelHistory(reason: String) {
         eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
@@ -6436,30 +6400,6 @@ class LocalHarnessEngine @Inject constructor(
     } catch (future: FutureSessionVersionException) {
         _state.update { it.copy(error = future.message) }
         emptyList()
-    }
-
-    private fun migrateLegacySession() {
-        val legacy = File(root, "session.json")
-        if (!legacy.isFile || sessionFileFor(currentSessionId).exists()) return
-        legacy.copyTo(sessionFileFor(currentSessionId), overwrite = false)
-        File(root, "session.events.jsonl").takeIf(File::isFile)
-            ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
-    }
-
-    private fun seedWorkspace() {
-        val skill = File(workspace.path, ".dsh/skills/workspace-guide/SKILL.md")
-        if (!skill.exists()) {
-            skill.parentFile?.mkdirs()
-            skill.writeText(
-                """
-                # 工作区指南
-
-                - 所有文件操作限定在当前应用的本机工作区。
-                - 修改前先读取原文件，完成后重新读取或搜索关键内容复核。
-                - shell 使用安卓 `/system/bin/sh`，只依赖系统现有命令。
-                """.trimIndent() + "\n",
-            )
-        }
     }
 
     private fun JsonObject.string(key: String): String =
