@@ -1002,7 +1002,7 @@ private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                         )
                         .border(
                             width = if (selected) 1.5.dp else 1.dp,
-                            color = if (selected) palette.lightAccent else colors.borderL2,
+                            color = if (selected) colors.accent else colors.borderL2,
                             shape = DsShapes.cube,
                         )
                         .selectable(
