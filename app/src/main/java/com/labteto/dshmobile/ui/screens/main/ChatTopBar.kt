@@ -153,7 +153,9 @@ private fun ModelChip(
 ) {
     val colors = DsTheme.colors
     val current = models?.current
-    val group = current?.let { selected -> models.groups.firstOrNull { it.id == selected.provider } }
+    val group = models?.let { catalog ->
+        current?.let { selected -> catalog.groups.firstOrNull { it.id == selected.provider } }
+    }
     val model = current?.let { selected -> group?.models?.firstOrNull { it.id == selected.model } }
     val effort = current?.let { selected ->
         model?.reasoning?.efforts?.firstOrNull { it.id == selected.reasoningEffort }
