@@ -714,6 +714,41 @@ class LocalHarnessEngine @Inject constructor(
     private var chatPostTurnJob: Job? = null
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
+    private val sessionLifecycle by lazy {
+        LocalSessionLifecycleCoordinator(
+            scope = scope,
+            state = _state,
+            transitionMutex = sessionTransitionMutex,
+            jobs = jobs,
+            sessionCoordinator = sessionCoordinator,
+            chatPersonaStore = chatPersonaStore,
+            approvalPreferences = approvalPreferences,
+            resourceScheduler = resourceScheduler,
+            handoffBuilder = handoffBuilder,
+            toolOutputStore = toolOutputStore,
+            sessionsRoot = sessionsRoot,
+            conversationFilesCoordinator = conversationFilesCoordinator,
+            memoryStore = memoryStore,
+            currentSessionId = { currentSessionId },
+            activateSession = { id, transcriptCursor ->
+                currentSessionId = id
+                preferences.edit().putString(KEY_SESSION_ID, id).apply()
+                eventLog = eventLogFor(id)
+                transcriptProjectionCursor = transcriptCursor
+            },
+            beginTransition = ::beginSessionTransition,
+            endTransition = ::endSessionTransition,
+            runBusy = ::isRunBusy,
+            cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
+            resetModelHistory = { resetModelHistory() },
+            persist = ::persist,
+            loadSession = { id -> loadSession(id) },
+            restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
+            startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
+            sessionSummaries = ::sessionSummaries,
+            localProjectId = LOCAL_PROJECT_ID,
+        )
+    }
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
@@ -2807,7 +2842,7 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
     fun createSession(mode: LocalConversationMode) =
-        createSession(mode, _state.value.usageMode)
+        sessionLifecycle.createSession(mode)
 
     fun createSession(
         mode: LocalConversationMode,
@@ -2816,334 +2851,31 @@ class LocalHarnessEngine @Inject constructor(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
-    ) {
-        if (!beginSessionTransition()) return
-        val sourceId = currentSessionId
-        val sourceState = _state.value
-        val resolvedChatMode = when {
-            usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
-            galleryEntry != null -> LocalChatMode.SINGLE
-            chatMode != null -> chatMode
-            sourceState.usageMode == LocalUsageMode.CHAT -> sourceState.groupChat.mode
-            else -> LocalChatMode.SINGLE
-        }
-        _state.update {
-            it.copy(
-                loading = true,
-                running = false,
-                pendingApproval = null,
-                pendingQuestion = null,
-            )
-        }
-        scope.launch {
-            sessionTransitionMutex.withLock {
-                try {
-                    cancelActiveRunAndJoin()
-                    jobs.stopNonPersistentAndJoin()
-                    persist()
-
-                    currentSessionId = UUID.randomUUID().toString()
-                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
-                    eventLog = eventLogFor(currentSessionId)
-                    transcriptProjectionCursor = -1L
-                    resetModelHistory()
-
-                    val lineageId = when (mode) {
-                        LocalConversationMode.CONTINUATION ->
-                            sourceState.lineageId.ifBlank { sourceId }
-                        LocalConversationMode.INDEPENDENT,
-                        LocalConversationMode.PROJECT -> UUID.randomUUID().toString()
-                    }
-                    val projectId = when (mode) {
-                        LocalConversationMode.INDEPENDENT -> null
-                        LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
-                        LocalConversationMode.CONTINUATION -> sourceState.projectId
-                    }
-                    val selectedGalleryStory = galleryEntry?.story(galleryStoryId)
-                    val handoff = if (galleryEntry != null && !freshGalleryStory) {
-                        selectedGalleryStory?.context(galleryEntry.persona.name).orEmpty()
-                    } else if (mode == LocalConversationMode.CONTINUATION) {
-                        if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
-                            buildChatContinuationHandoff(
-                                state = sourceState.chatState,
-                                messages = sourceState.messages,
-                            )
-                        } else {
-                            buildHandoffSummary(sourceState)
-                        }
-                    } else {
-                        null
-                    }
-                    val personaId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        PersonaProfile.DEFAULT_PERSONA_ID
-                    } else if (galleryEntry != null) {
-                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}")).id
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                        !sourceState.groupChat.enabled
-                    ) {
-                        sourceState.personaId
-                    } else {
-                        PersonaProfile.DEFAULT_PERSONA_ID
-                    }
-                    val chatPersona = chatPersonaStore.get(personaId)
-                    val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        ChatCharacterState()
-                    } else if (
-                        galleryEntry != null &&
-                        usageMode == LocalUsageMode.CHAT &&
-                        !freshGalleryStory
-                    ) {
-                        selectedGalleryStory?.chatState ?: ChatCharacterState()
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        mode == LocalConversationMode.CONTINUATION &&
-                        sourceState.usageMode == LocalUsageMode.CHAT
-                    ) {
-                        sourceState.chatState
-                    } else {
-                        ChatCharacterState()
-                    }
-
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            sessionId = currentSessionId,
-                            usageMode = usageMode,
-                            personaId = personaId,
-                            galleryId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                null
-                            } else {
-                                galleryEntry?.id ?: sourceState.galleryId.takeIf {
-                                    usageMode == LocalUsageMode.CHAT &&
-                                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                                        !sourceState.groupChat.enabled
-                                }
-                            },
-                            galleryStoryId = when {
-                                resolvedChatMode == LocalChatMode.GROUP -> null
-                                galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
-                                galleryEntry != null -> null
-                                usageMode == LocalUsageMode.CHAT &&
-                                    sourceState.usageMode == LocalUsageMode.CHAT &&
-                                    mode == LocalConversationMode.CONTINUATION -> sourceState.galleryStoryId
-                                else -> null
-                            },
-                            gallerySaveSuppressedThrough = 0L,
-                            chatPersona = chatPersona,
-                            chatState = chatState,
-                            replySuggestions = emptyList(),
-                            chatBranches = LocalChatBranchState(),
-                            groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                if (
-                                    mode == LocalConversationMode.CONTINUATION &&
-                                    sourceState.usageMode == LocalUsageMode.CHAT &&
-                                    sourceState.groupChat.enabled
-                                ) {
-                                    sourceState.groupChat
-                                } else {
-                                    LocalGroupChatState(mode = LocalChatMode.GROUP)
-                                }
-                            } else {
-                                LocalGroupChatState()
-                            },
-                            groupActiveSpeakerName = null,
-                            personaCorrectionNotice = null,
-                            conversationMode = mode,
-                            parentSessionId = sourceId.takeIf {
-                                mode == LocalConversationMode.CONTINUATION
-                            },
-                            lineageId = lineageId,
-                            projectId = projectId,
-                            handoffSummary = handoff,
-                            messages = emptyList(),
-                            transcriptIndex = LocalTranscriptRuntimeIndex(),
-                            plan = emptyList(),
-                            todos = emptyList(),
-                            goal = null,
-                            planMode = false,
-                            safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
-                            deviceApprovalLease = false,
-                            jobs = projectExecutionJobs(usageMode, jobs.snapshotInfos()),
-                            activeAgents = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeAgents,
-                            ),
-                            activeTerminals = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeTerminals,
-                            ),
-                            activeVirtualDisplays = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeVirtualDisplays,
-                            ),
-                            activeLanguageServers = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeLanguageServers,
-                            ),
-                            error = null,
-                        )
-                    }
-                    persist()
-                    restartInterruptedSafeJobs()
-                } finally {
-                    endSessionTransition()
-                    _state.update { it.copy(loading = false) }
-                }
-            }
-        }
-    }
+    ) = sessionLifecycle.createSession(
+        mode = mode,
+        usageMode = usageMode,
+        galleryEntry = galleryEntry,
+        galleryStoryId = galleryStoryId,
+        freshGalleryStory = freshGalleryStory,
+        chatMode = chatMode,
+    )
 
     /** Backward-compatible entry point: a plain new session is fully independent. */
-    fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
+    fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
 
-    fun switchChatMode(mode: LocalChatMode) {
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.running) return
-        if (
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            snapshot.groupChat.mode == mode
-        ) return
-
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
-        }
-        if (target != null) {
-            switchSession(target.id)
-        } else {
-            createSession(
-                mode = LocalConversationMode.INDEPENDENT,
-                usageMode = LocalUsageMode.CHAT,
-                chatMode = mode,
-            )
-        }
-    }
+    fun switchChatMode(mode: LocalChatMode) =
+        sessionLifecycle.switchChatMode(mode)
 
     /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
-    fun switchUsageMode(mode: LocalUsageMode) {
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.running) return
-        if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
-            if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
-            return
-        }
-        if (snapshot.usageMode == mode) return
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE) &&
-                !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
-        }
-        if (target != null) {
-            switchSession(target.id)
-        } else {
-            createSession(
-                mode = LocalConversationMode.INDEPENDENT,
-                usageMode = mode,
-                chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
-            )
-        }
-    }
+    fun switchUsageMode(mode: LocalUsageMode) =
+        sessionLifecycle.switchUsageMode(mode)
 
-    private fun buildHandoffSummary(state: LocalHarnessState): String =
-        handoffBuilder.build(
-            HandoffState(
-                goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
-                plan = state.plan,
-                todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
-                messages = state.messages.map { message ->
-                    HandoffMessage(
-                        message.role,
-                        if (state.groupChat.enabled && message.role == "assistant") {
-                            groupTranscriptLine(message)
-                        } else {
-                            message.content
-                        },
-                    )
-                },
-            ),
-        )
-
-    fun switchSession(sessionId: String) {
-        if (sessionId == currentSessionId) return
-        synchronized(runStateLock) {
-            if (activeJob?.isCompleted == false) return
-        }
-        if (!beginSessionTransition()) return
-        _state.update { it.copy(loading = true) }
-        scope.launch {
-            sessionTransitionMutex.withLock {
-                try {
-                    persist()
-                    jobs.stopNonPersistentAndJoin()
-                    currentSessionId = sessionId
-                    preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
-                    eventLog = eventLogFor(sessionId)
-                    transcriptProjectionCursor = null
-                    loadSession(sessionId)
-                    restartInterruptedSafeJobs()
-                } finally {
-                    endSessionTransition()
-                    _state.update { it.copy(loading = false) }
-                }
-            }
-            startNextQueuedTurnIfIdle()?.start()
-        }
-    }
+    fun switchSession(sessionId: String) =
+        sessionLifecycle.switchSession(sessionId)
 
     /** Permanently remove selected local sessions and their durable event segments. */
-    suspend fun deleteSessions(requestedIds: Set<String>): Int {
-        if (requestedIds.isEmpty() || !beginSessionTransition()) return 0
-        _state.update { it.copy(loading = true) }
-        return try {
-            sessionTransitionMutex.withLock {
-                cancelActiveRunAndJoin()
-                jobs.stopNonPersistentAndJoin()
-                persist()
-                val available = sessionCoordinator.summaries()
-                val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
-                if (currentSessionId in ids) {
-                    val previous = _state.value
-                    val replacement = available.firstOrNull { it.id !in ids && it.usageMode == previous.usageMode }
-                        ?: available.firstOrNull { it.id !in ids }
-                    currentSessionId = replacement?.id ?: UUID.randomUUID().toString()
-                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
-                    eventLog = eventLogFor(currentSessionId)
-                    transcriptProjectionCursor = null
-                    loadSession(currentSessionId)
-                    if (replacement == null) {
-                        _state.update { it.copy(
-                            usageMode = previous.usageMode,
-                            personaId = previous.personaId,
-                            chatPersona = previous.chatPersona,
-                        ) }
-                    }
-                }
-                withContext(Dispatchers.IO) {
-                    ids.forEach { id ->
-                        sessionCoordinator.delete(id)
-                        toolOutputStore.deleteSession(id)
-                        sessionsRoot.listFiles().orEmpty()
-                            .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
-                            .forEach(File::delete)
-                    }
-                }
-                conversationFilesCoordinator.invalidate(ids)
-                memoryStore.detachSourceSessions(ids)
-                _state.update { it.copy(sessions = sessionSummaries()) }
-                persist()
-                ids.size
-            }
-        } finally {
-            endSessionTransition()
-            _state.update { it.copy(loading = false) }
-        }
-    }
+    suspend fun deleteSessions(requestedIds: Set<String>): Int =
+        sessionLifecycle.deleteSessions(requestedIds)
 
     /** Remove the local API key after an in-flight turn has finished cancelling. */
     fun clearCredential() {
