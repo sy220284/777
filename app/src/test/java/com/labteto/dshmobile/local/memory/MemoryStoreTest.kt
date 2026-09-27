@@ -176,4 +176,36 @@ class MemoryStoreTest {
         assertTrue(all(store()).isEmpty())
         assertFalse(store().forget(original.id))
     }
+
+    @Test fun timelineRollbackDropsNewMemoriesAndReactivatesSupersededValidState() {
+        val memoryStore = store()
+        val valid = memoryStore.remember(
+            "关系状态：我和阿青｜熟悉",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            sourceSessionId = "older-session",
+        )
+        val discarded = memoryStore.remember(
+            "关系状态：我和阿青｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            sourceSessionId = "edited-session",
+            replaceIds = setOf(valid.id),
+        )
+
+        assertEquals(discarded.id, all(memoryStore).single().id)
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "edited-session",
+                createdAtInclusive = discarded.createdAt,
+            ),
+        )
+
+        val restored = all(store())
+        assertEquals(1, restored.size)
+        assertEquals(valid.id, restored.single().id)
+        assertEquals("关系状态：我和阿青｜熟悉", restored.single().content)
+    }
+
 }
