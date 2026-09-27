@@ -43,7 +43,8 @@ class LocalChatHistoryWindowTest {
 
         assertTrue(handoff.contains("一起看过日落"))
         assertTrue(handoff.contains("地点=院子"))
-        assertTrue(handoff.contains("两人坐在石桌旁"))
+        assertFalse(handoff.contains("两人坐在石桌旁"))
+        assertTrue(handoff.contains("人物位置、动作和物件以最近原始对话为准"))
         assertTrue(handoff.contains("明早九点去城南"))
         assertTrue(handoff.contains("城南之行尚未发生"))
         assertTrue(handoff.contains("明天去海边"))
