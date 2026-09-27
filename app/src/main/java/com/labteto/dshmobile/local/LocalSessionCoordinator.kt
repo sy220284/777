@@ -89,6 +89,10 @@ internal class LocalSessionCoordinator(
             snapshot = indexBase,
             events = tailEvents,
             sequenceExclusive = cursor,
+        ).copy(
+            // Old builds persisted a structural eligibility flag that could stay false forever.
+            // Current actions validate the active transcript/branch at the point of use.
+            branchingEligible = true,
         )
         return LocalSessionTranscriptRestore(
             messages = projected.messages,

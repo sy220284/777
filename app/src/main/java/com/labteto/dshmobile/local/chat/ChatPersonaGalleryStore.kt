@@ -246,7 +246,7 @@ internal fun mergeGalleryStories(
     base: PersonaGalleryStory,
     incoming: PersonaGalleryStory,
 ): PersonaGalleryStory {
-    val excluded = mergePersonaLines(base.excludedMessageKeys, incoming.excludedMessageKeys, 200)
+    val excluded = mergePersonaLines(base.excludedMessageKeys, incoming.excludedMessageKeys, MAX_GALLERY_EXCLUDED_MESSAGE_KEYS)
     return base.copy(
         title = incoming.title.ifBlank { base.title },
         notes = mergePersonaText(base.notes, incoming.notes, 4_000),
@@ -357,7 +357,7 @@ internal fun removeArchivedGalleryMessage(
     if (remaining.size == story.history.size) return null
     return story.copy(
         history = remaining,
-        excludedMessageKeys = mergePersonaLines(story.excludedMessageKeys, listOf(messageKey), 200),
+        excludedMessageKeys = mergePersonaLines(story.excludedMessageKeys, listOf(messageKey), MAX_GALLERY_EXCLUDED_MESSAGE_KEYS),
     )
 }
 
@@ -538,6 +538,7 @@ private fun normalizePersonaText(text: String): String =
         .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】—_-]+"""), "")
 
 private const val MAX_PERSONA_IMPORT_CHARS = 64_000
+private const val MAX_GALLERY_EXCLUDED_MESSAGE_KEYS = 10_000
 
 private val DEFAULT_PERSONA_NAMES = setOf(
     normalizePersonaText("默认角色"),
@@ -793,6 +794,60 @@ class ChatPersonaGalleryStore internal constructor(
         val updated = current.copy(
             portraitPath = clean,
             updatedAt = now,
+        )
+        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        return updated
+    }
+
+    /**
+     * Permanently exclude messages removed by an active-chat timeline rewrite.
+     *
+     * The story state is reset as well because it may summarize facts from the discarded suffix.
+     */
+    @Synchronized
+    fun excludeHistoryMessages(
+        id: String,
+        storyId: String,
+        messageKeys: Collection<String>,
+    ): Int {
+        val keys = messageKeys.asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .toCollection(linkedSetOf())
+        if (keys.isEmpty()) return 0
+
+        val doc = readNormalized()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return 0
+        val story = current.stories.firstOrNull { it.id == storyId } ?: return 0
+        val removed = story.history.count { galleryMessageArchiveKey(it) in keys }
+        val now = System.currentTimeMillis()
+        val updatedStory = story.copy(
+            history = story.history.filterNot { galleryMessageArchiveKey(it) in keys },
+            excludedMessageKeys = mergePersonaLines(
+                story.excludedMessageKeys,
+                keys.toList(),
+                MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
+            ),
+            chatState = ChatCharacterState(),
+            updatedAt = now,
+        )
+        val updated = current.copy(
+            stories = current.stories.map { if (it.id == storyId) updatedStory else it },
+            updatedAt = now,
+        )
+        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        return removed
+    }
+
+    /** Replace, rather than merge, a group state when an old timeline is explicitly rewritten. */
+    @Synchronized
+    fun replaceGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
+        val doc = readNormalized()
+        val current = doc.entries.firstOrNull { it.id == id } ?: return null
+        val now = System.currentTimeMillis()
+        val updated = current.copy(
+            groupChatState = chatState,
+            updatedAt = maxOf(current.updatedAt, now),
         )
         write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated

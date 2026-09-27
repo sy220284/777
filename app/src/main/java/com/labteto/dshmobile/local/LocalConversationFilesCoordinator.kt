@@ -72,6 +72,7 @@ internal class LocalConversationFilesCoordinator(
             "user/message",
             "tool/call",
             "tool/result",
+            "chat/active-transcript",
         )
     }
 }
