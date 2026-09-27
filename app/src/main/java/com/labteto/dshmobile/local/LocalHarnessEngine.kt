@@ -714,6 +714,15 @@ class LocalHarnessEngine @Inject constructor(
     private var chatPostTurnJob: Job? = null
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
+    private val approvalCoordinator by lazy {
+        LocalApprovalCoordinator(
+            state = _state,
+            approvalPreferences = approvalPreferences,
+            interactions = interactions,
+            eventLog = { eventLog },
+            persist = ::persist,
+        )
+    }
     private val sessionLifecycle by lazy {
         LocalSessionLifecycleCoordinator(
             scope = scope,
@@ -2743,76 +2752,31 @@ class LocalHarnessEngine @Inject constructor(
     fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
 
     /** Resolve the current write or shell approval. */
-    fun answerApproval(callId: String, approved: Boolean) {
-        interactions.answerApproval(callId, approved)
-    }
+    fun answerApproval(callId: String, approved: Boolean) =
+        approvalCoordinator.answerApproval(callId, approved)
 
-    /**
-     * Persist safe automatic approval across sessions.
-     *
-     * Enabling the mode from a high-impact dialog does not approve that current operation;
-     * it only suppresses future prompts for path-confined workspace writes and read-only tools.
-     */
-    fun enableAutoApproval() {
-        enableAutoApprovalInternal(expectedCallId = null)
-    }
+    fun enableAutoApproval() =
+        approvalCoordinator.enableAutoApproval()
 
-    fun enableAutoApprovalForPending(callId: String) {
-        enableAutoApprovalInternal(expectedCallId = callId)
-    }
+    fun enableAutoApprovalForPending(callId: String) =
+        approvalCoordinator.enableAutoApprovalForPending(callId)
 
-    private fun enableAutoApprovalInternal(expectedCallId: String?) {
-        val pending = _state.value.pendingApproval
-        if (expectedCallId != null && pending?.callId != expectedCallId) return
-        approvalPreferences.setSafeAutoApprovalEnabled(true)
-        _state.update { it.copy(safeAutoApprovalEnabled = true) }
-        eventLog.append("approval/mode", buildJsonObject {
-            put("mode", "safe-global")
-            pending?.toolName?.let { put("tool", it) }
-        })
-        persist()
-        if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
-            pending?.callId?.let { interactions.answerApproval(it, true) }
-        }
-    }
+    fun enableDeviceApprovalLease(callId: String) =
+        approvalCoordinator.enableDeviceApprovalLease(callId)
 
-    /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
-    fun enableDeviceApprovalLease(callId: String) {
-        val pending = _state.value.pendingApproval?.takeIf { it.callId == callId }
-        if (pending?.canApproveDeviceTurn != true) {
-            eventLog.append("approval/device-lease-rejected", buildJsonObject {
-                put("reason", "pending-tool-requires-explicit-approval")
-                pending?.toolName?.let { put("tool", it) }
-            })
-            return
-        }
-        _state.update { it.copy(deviceApprovalLease = true) }
-        eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
-        interactions.answerApproval(pending.callId, true)
-    }
+    fun disableDeviceApprovalLease() =
+        approvalCoordinator.disableDeviceApprovalLease()
 
-    fun disableDeviceApprovalLease() {
-        _state.update { it.copy(deviceApprovalLease = false) }
-        eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
-    }
-
-    /** Return safe operations to per-operation approval for all local sessions. */
-    fun disableAutoApproval() {
-        approvalPreferences.setSafeAutoApprovalEnabled(false)
-        _state.update { it.copy(safeAutoApprovalEnabled = false) }
-        eventLog.append("approval/mode", buildJsonObject { put("mode", "ask") })
-        persist()
-    }
+    fun disableAutoApproval() =
+        approvalCoordinator.disableAutoApproval()
 
     /** Resolve the current model-authored question. */
-    fun answerQuestion(callId: String, answer: String) {
-        interactions.answerQuestion(callId, answer)
-    }
+    fun answerQuestion(callId: String, answer: String) =
+        approvalCoordinator.answerQuestion(callId, answer)
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    fun cancelQuestion(callId: String) {
-        interactions.cancelQuestion(callId)
-    }
+    fun cancelQuestion(callId: String) =
+        approvalCoordinator.cancelQuestion(callId)
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
