@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Tune
@@ -21,10 +23,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -44,6 +49,7 @@ import com.labteto.dshmobile.local.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImageInputMode
+import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
@@ -79,6 +85,7 @@ import kotlinx.serialization.json.contentOrNull
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private data class DynamicSettingField(
     val path: List<String>,
@@ -426,80 +433,86 @@ internal fun LocalModelSettingsCard(
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
-    val modelKeyRequiredMessage = stringResource(R.string.advanced_model_key_required)
-    val modelSavedMessage = stringResource(R.string.advanced_model_saved)
-    val modelKeyClearedMessage = stringResource(R.string.advanced_model_key_cleared)
     val colors = DsTheme.colors
-    var model by remember(local.model) { mutableStateOf(local.model) }
-    var baseUrl by remember(local.baseUrl) { mutableStateOf(local.baseUrl) }
-    var apiKey by remember { mutableStateOf("") }
+    val modelSavedMessage = stringResource(R.string.advanced_model_saved)
+    val scope = rememberCoroutineScope()
     var showEditor by remember { mutableStateOf(false) }
-
-    val openEditor = {
-        model = local.model
-        baseUrl = local.baseUrl
+    var model by remember { mutableStateOf(LocalModelPresets.entries.first().model) }
+    var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
+    var custom by remember { mutableStateOf(false) }
+    var apiKey by remember { mutableStateOf("") }
+    var testStatus by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var pendingRemoveId by remember { mutableStateOf<String?>(null) }
+    val savedRoute = local.modelProfiles.any {
+        it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
+    }
+    val editRoute: (String, String) -> Unit = { name, url ->
+        model = name
+        baseUrl = url
         apiKey = ""
-        showEditor = true
+        testStatus = null
     }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
-        // 状态英雄行：配置现状先于一切可编辑项
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            DsStatusPill(
-                state = if (local.configured) DsStatus.Done else DsStatus.Neutral,
-                label = stringResource(
-                    if (local.configured) R.string.advanced_model_configured
-                    else R.string.advanced_model_unconfigured,
-                ),
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            Column {
-                Text(local.model, style = DsType.std14Strong, color = colors.labelPrimary)
-                Text(local.baseUrl, style = DsType.caption11, color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13,
+            color = colors.labelSecondary)
+        if (local.modelProfiles.isEmpty()) {
+            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13,
+                color = colors.labelTertiary)
+        }
+        local.error?.let { Text(it, style = DsType.small13, color = colors.error) }
+        local.modelProfiles.forEach { profile ->
+            Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                            Text(profile.model, style = DsType.std14Strong, color = colors.labelPrimary,
+                                modifier = Modifier.weight(1f, fill = false), maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                            if (profile.model == local.model && profile.baseUrl == local.baseUrl) {
+                                DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
+                            }
+                        }
+                        Text(profile.baseUrl.substringAfter("://").substringBefore('/'),
+                            style = DsType.caption11, color = colors.labelTertiary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DsMenu(
+                        anchor = { Text("⋯", style = DsType.large20, color = colors.labelSecondary,
+                            modifier = Modifier.padding(horizontal = DsSpacing.small)) },
+                        items = listOfNotNull(
+                            if (profile.model != local.model || profile.baseUrl != local.baseUrl)
+                                MenuItem(text = stringResource(R.string.local_model_use),
+                                    onClick = { viewModel.selectLocalModel(profile.id) }) else null,
+                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                                editRoute(profile.model, profile.baseUrl)
+                                custom = LocalModelPresets.entries.none {
+                                    it.model == profile.model && it.baseUrl == profile.baseUrl
+                                }
+                                showEditor = true
+                            }),
+                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                                onClick = { pendingRemoveId = profile.id }),
+                        ),
+                    )
+                }
             }
         }
-        if (local.configured && local.configuredModels.isNotEmpty()) {
-            Text(
-                stringResource(R.string.local_saved_models, local.configuredModels.joinToString("、")),
-                style = DsType.caption11,
-                color = colors.labelSecondary,
-            )
-        }
-        Text(
-            stringResource(R.string.local_saved_models_hint),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-
-        DsValueRow(
-            label = stringResource(R.string.advanced_default_model),
-            value = local.model,
-            configured = local.configured,
-            onClick = openEditor,
-        )
-        DsValueRow(
-            label = stringResource(R.string.advanced_endpoint),
-            value = local.baseUrl,
-            configured = local.configured,
-            onClick = openEditor,
-        )
-        DsValueRow(
-            label = stringResource(R.string.advanced_model_key),
-            value = if (local.configured) "••••" else null,
-            configured = local.configured,
-            onClick = openEditor,
-        )
-
-        Text(
-            stringResource(R.string.advanced_image_input_mode),
-            style = DsType.small13Strong,
-            color = colors.labelPrimary,
-        )
-        Text(
-            stringResource(R.string.advanced_image_input_hint),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
+        DsButton(stringResource(R.string.local_model_add), onClick = {
+            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl)
+            custom = false
+            showEditor = true
+        }, modifier = Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
+        Text(stringResource(R.string.advanced_image_input_mode), style = DsType.small13Strong,
+            color = colors.labelPrimary)
+        Text(stringResource(R.string.advanced_image_input_hint), style = DsType.caption11,
+            color = colors.labelTertiary)
         DsSegmented(
             segments = listOf(
                 DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.advanced_image_mode_auto)),
@@ -507,82 +520,114 @@ internal fun LocalModelSettingsCard(
                 DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.advanced_image_mode_tool)),
             ),
             selectedKey = local.imageInputMode.name,
-            onSelect = { key ->
-                viewModel.configureLocalImageInputMode(LocalImageInputMode.valueOf(key))
-            },
+            onSelect = { viewModel.configureLocalImageInputMode(LocalImageInputMode.valueOf(it)) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
 
     if (showEditor) {
         DsBottomSheet(
-            title = stringResource(R.string.advanced_model_settings),
-            subtitle = if (local.configured) {
-                stringResource(R.string.advanced_model_configured)
-            } else {
-                stringResource(R.string.advanced_model_unconfigured)
-            },
+            title = stringResource(R.string.local_model_add),
+            subtitle = stringResource(R.string.local_model_preset_hint),
             onDismiss = { showEditor = false },
         ) {
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_default_model)) },
-            )
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.advanced_endpoint)) },
-            )
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = {
-                    Text(
-                        stringResource(
-                            if (local.configured) {
-                                R.string.advanced_replace_model_key
-                            } else {
-                                R.string.advanced_model_key
-                            },
-                        ),
-                    )
-                },
-                visualTransformation = PasswordVisualTransformation(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(
-                    text = stringResource(R.string.advanced_save_model_settings),
-                    onClick = {
-                        if (!local.configured && apiKey.isBlank()) {
-                            report(modelKeyRequiredMessage)
-                            return@DsButton
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong,
+                    color = colors.labelPrimary)
+                DsMenu(
+                    anchor = {
+                        Surface(shape = DsShapes.row,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (custom) stringResource(R.string.local_model_custom)
+                                    else LocalModelPresets.entries.firstOrNull {
+                                        it.model == model && it.baseUrl == baseUrl
+                                    }?.let { "${it.provider} · ${it.model}" } ?: model,
+                                    style = DsType.std14Strong, color = colors.labelPrimary,
+                                    modifier = Modifier.weight(1f))
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                            }
                         }
-                        viewModel.configureLocalModel(apiKey, model, baseUrl)
-                        apiKey = ""
-                        showEditor = false
-                        report(modelSavedMessage)
                     },
-                    variant = DsButtonVariant.Outline,
+                    items = LocalModelPresets.entries.map { preset ->
+                        MenuItem("${preset.provider} · ${preset.model}") {
+                            custom = false
+                            editRoute(preset.model, preset.baseUrl)
+                        }
+                    } + MenuItem(stringResource(R.string.local_model_custom)) {
+                        custom = true
+                        editRoute("", "")
+                    },
                 )
-                if (local.configured) {
-                    DsButton(
-                        text = stringResource(R.string.advanced_clear_key),
-                        onClick = {
-                            viewModel.clearLocalCredential()
-                            apiKey = ""
-                            showEditor = false
-                            report(modelKeyClearedMessage)
-                        },
-                        variant = DsButtonVariant.Ghost,
-                    )
+                if (custom) {
+                    OutlinedTextField(model, onValueChange = { model = it.take(160); testStatus = null },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.advanced_default_model)) })
+                    OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); testStatus = null },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.advanced_endpoint)) })
+                } else {
+                    Text(baseUrl, style = DsType.caption11, color = colors.labelTertiary)
                 }
+                OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); testStatus = null },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
+                        else R.string.advanced_model_key)) },
+                    supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
+                    visualTransformation = PasswordVisualTransformation())
+                testStatus?.let { Text(it, style = DsType.small13,
+                    color = if (it.startsWith("连接成功")) colors.labelSecondary else colors.error) }
+                DsButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
+                    onClick = {
+                        testing = true
+                        testStatus = null
+                        val testedModel = model
+                        val testedUrl = baseUrl
+                        val testedKey = apiKey
+                        scope.launch {
+                            val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl)
+                            if (model == testedModel && baseUrl == testedUrl && apiKey == testedKey) {
+                                testStatus = result
+                            }
+                            testing = false
+                        }
+                    }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(), variant = DsButtonVariant.Outline)
+                DsButton(stringResource(R.string.advanced_save_model_settings), onClick = {
+                    if (!savedRoute && apiKey.isBlank()) {
+                        testStatus = "请填写该模型的密钥"
+                    } else {
+                        saving = true
+                        scope.launch {
+                            val result = runCatching { viewModel.saveLocalModel(apiKey, model, baseUrl) }
+                            saving = false
+                            result.onSuccess {
+                                apiKey = ""
+                                showEditor = false
+                                report(modelSavedMessage)
+                            }.onFailure { testStatus = it.message ?: "保存失败" }
+                        }
+                    }
+                }, modifier = Modifier.fillMaxWidth(),
+                    enabled = !testing && !saving && model.isNotBlank() && baseUrl.isNotBlank() &&
+                        (savedRoute || apiKey.isNotBlank()))
+            }
+        }
+    }
+    pendingRemoveId?.let { id ->
+        DsBottomSheet(title = stringResource(R.string.local_model_remove),
+            subtitle = stringResource(R.string.local_model_remove_confirm),
+            onDismiss = { pendingRemoveId = null }) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                DsButton(stringResource(R.string.common_cancel), onClick = { pendingRemoveId = null },
+                    modifier = Modifier.weight(1f), variant = DsButtonVariant.Ghost)
+                DsButton(stringResource(R.string.local_model_remove), onClick = {
+                    viewModel.removeLocalModel(id)
+                    pendingRemoveId = null
+                }, modifier = Modifier.weight(1f), variant = DsButtonVariant.Danger)
             }
         }
     }

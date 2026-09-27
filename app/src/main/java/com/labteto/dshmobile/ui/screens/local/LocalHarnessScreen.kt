@@ -2219,15 +2219,16 @@ private fun LocalChat(
     }
     if (showModelPicker) {
         DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
-            state.configuredModels.forEach { model ->
+            state.modelProfiles.forEach { profile ->
                 DsButton(
-                    text = model,
+                    text = "${profile.model}  ·  ${profile.baseUrl.substringAfter("://").substringBefore('/')}" ,
                     onClick = {
-                        onSelectModel(model)
+                        onSelectModel(profile.id)
                         showModelPicker = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = if (model == state.model) DsButtonVariant.Info else DsButtonVariant.Ghost,
+                    variant = if (profile.model == state.model && profile.baseUrl == state.baseUrl)
+                        DsButtonVariant.Info else DsButtonVariant.Ghost,
                 )
             }
             DsButton(
