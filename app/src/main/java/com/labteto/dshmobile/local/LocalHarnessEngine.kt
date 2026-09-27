@@ -5914,6 +5914,32 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
             appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
             appendLine("限制：应用沙箱无法访问其他 App 私有目录；语言服务器等以实际检测结果为准。")
+            val recentDiagnostics = AppLog.snapshot()
+                .asSequence()
+                .filter { it.level == "W" || it.level == "E" }
+                .takeLast(20)
+                .toList()
+            if (recentDiagnostics.isNotEmpty()) {
+                appendLine("最近诊断：")
+                recentDiagnostics.forEach { entry ->
+                    append("- ")
+                    append(entry.level)
+                    append("/")
+                    append(entry.tag)
+                    append("：")
+                    append(entry.message.replace("\n", " ").take(300))
+                    entry.throwableType?.let { type ->
+                        append(" [")
+                        append(type)
+                        entry.throwableMessage?.takeIf(String::isNotBlank)?.let {
+                            append(": ")
+                            append(it.replace("\n", " ").take(160))
+                        }
+                        append("]")
+                    }
+                    appendLine()
+                }
+            }
             append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；web_fetch 大响应会自动落盘。外部文件可从输入栏附件导入工作区。")
         }
     }
