@@ -160,7 +160,11 @@ data class AutomationTask(
     val actorName: String? = null,
     val quietHoursEnabled: Boolean = false,
     val quietStartHour: Int = 23,
+    val quietStartMinute: Int = 0,
     val quietEndHour: Int = 7,
+    val quietEndMinute: Int = 0,
+    val proactiveMinGapMinutes: Long = 6L * 60L,
+    val proactiveMaxUnanswered: Int = 2,
     val failureStreak: Int = 0,
     /** Dedicated Work-mode session that owns this task's run history and artifacts. */
     val workSessionId: String? = null,
@@ -266,10 +270,23 @@ class HarnessAutomationScheduler @Inject constructor(
         actorName: String? = null,
         quietHoursEnabled: Boolean = false,
         quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
         quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
+        validateChatPolicy(
+            mode = mode,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
         val now = System.currentTimeMillis()
         val runAt = triggerAtMillis.coerceAtLeast(now)
         store.upsert(
@@ -286,7 +303,11 @@ class HarnessAutomationScheduler @Inject constructor(
                 actorName = actorName,
                 quietHoursEnabled = quietHoursEnabled,
                 quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
                 quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                proactiveMinGapMinutes = proactiveMinGapMinutes,
+                proactiveMaxUnanswered = proactiveMaxUnanswered,
             ),
         )
         enqueueOneTime(id, runAt)
@@ -303,7 +324,11 @@ class HarnessAutomationScheduler @Inject constructor(
         actorName: String? = null,
         quietHoursEnabled: Boolean = false,
         quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
         quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
         scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     ) {
         validateId(id)
@@ -312,6 +337,15 @@ class HarnessAutomationScheduler @Inject constructor(
         require(scheduleType != AutomationScheduleType.SILENCE) {
             "沉默触发请使用 scheduleSilence"
         }
+        validateChatPolicy(
+            mode = mode,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
         val now = System.currentTimeMillis()
         val firstRun = firstRunAtMillis.coerceAtLeast(now)
         val task = AutomationTask(
@@ -328,7 +362,11 @@ class HarnessAutomationScheduler @Inject constructor(
             actorName = actorName,
             quietHoursEnabled = quietHoursEnabled,
             quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
             quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
         )
         store.upsert(task)
         if (usesChainedChatScheduling(task)) {
@@ -347,11 +385,24 @@ class HarnessAutomationScheduler @Inject constructor(
         actorName: String? = null,
         quietHoursEnabled: Boolean = true,
         quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
         quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
         require(silenceMinutes >= 60L) { "聊天沉默触发最短为 1 小时" }
+        validateChatPolicy(
+            mode = AutomationMode.CHAT,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
         val now = System.currentTimeMillis()
         // Run one lightweight transcript check immediately so an already-silent conversation
         // does not restart its silence clock from task creation.
@@ -372,7 +423,11 @@ class HarnessAutomationScheduler @Inject constructor(
                 actorName = actorName,
                 quietHoursEnabled = quietHoursEnabled,
                 quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
                 quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                proactiveMinGapMinutes = proactiveMinGapMinutes,
+                proactiveMaxUnanswered = proactiveMaxUnanswered,
             ),
         )
         enqueueOneTime(id, firstRun)
@@ -444,10 +499,23 @@ class HarnessAutomationScheduler @Inject constructor(
         silenceMinutes: Long? = null,
         quietHoursEnabled: Boolean,
         quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
         quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
     ): Boolean {
         val current = store.get(id) ?: return false
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
+        validateChatPolicy(
+            mode = current.mode,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
         val now = System.currentTimeMillis()
         val recurring = when (scheduleType) {
             AutomationScheduleType.SILENCE -> {
@@ -489,7 +557,11 @@ class HarnessAutomationScheduler @Inject constructor(
             silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
             quietHoursEnabled = quietHoursEnabled,
             quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
             quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
             status = if (wasPaused) "paused" else "scheduled",
             lastError = null,
             failureStreak = 0,
@@ -504,6 +576,42 @@ class HarnessAutomationScheduler @Inject constructor(
             }
         }
         return true
+    }
+
+    fun onChatUserActivity(sessionId: String, userMessageAt: Long) {
+        store.list()
+            .filter {
+                it.mode == AutomationMode.CHAT &&
+                    it.targetSessionId == sessionId &&
+                    it.status == "waiting_user"
+            }
+            .forEach { task ->
+                val runAt = when {
+                    task.scheduleType == AutomationScheduleType.SILENCE ->
+                        userMessageAt + requireNotNull(task.silenceMinutes) * 60_000L
+                    usesChainedChatScheduling(task) ->
+                        nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
+                    task.recurringMinutes != null ->
+                        maxOf(task.nextRunAt, userMessageAt)
+                    else -> userMessageAt
+                }
+                val resumed = store.update(task.id) {
+                    it.copy(
+                        status = "scheduled",
+                        nextRunAt = runAt,
+                        lastError = null,
+                    )
+                } ?: return@forEach
+                if (usesChainedChatScheduling(resumed) || resumed.recurringMinutes == null) {
+                    enqueueOneTime(resumed.id, runAt)
+                } else {
+                    enqueuePeriodic(
+                        resumed.id,
+                        requireNotNull(resumed.recurringMinutes),
+                        runAt,
+                    )
+                }
+            }
     }
 
     fun cancelTask(id: String): Boolean {
@@ -557,6 +665,22 @@ class HarnessAutomationScheduler @Inject constructor(
             ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
+    }
+
+    private fun validateChatPolicy(
+        mode: AutomationMode,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+    ) {
+        if (mode != AutomationMode.CHAT) return
+        require(quietStartHour in 0..23 && quietEndHour in 0..23) { "免打扰小时无效" }
+        require(quietStartMinute in 0..59 && quietEndMinute in 0..59) { "免打扰分钟无效" }
+        require(proactiveMinGapMinutes >= 60L) { "主动互动最低间隔至少 1 小时" }
+        require(proactiveMaxUnanswered in 1..5) { "连续未回复上限必须为 1 到 5 次" }
     }
 
     private fun validateId(id: String) {
@@ -650,7 +774,11 @@ class HarnessAutomationWorker(
                     recoveryStartedAt = started,
                     quietHoursEnabled = task.quietHoursEnabled && !manualRun,
                     quietStartHour = task.quietStartHour,
+                    quietStartMinute = task.quietStartMinute,
                     quietEndHour = task.quietEndHour,
+                    quietEndMinute = task.quietEndMinute,
+                    proactiveMinGapMinutes = task.proactiveMinGapMinutes,
+                    proactiveMaxUnanswered = task.proactiveMaxUnanswered,
                     minimumSilenceMinutes = if (
                         !manualRun &&
                         task.scheduleType == AutomationScheduleType.SILENCE
@@ -665,11 +793,16 @@ class HarnessAutomationWorker(
             }
             val finished = System.currentTimeMillis()
             val chained = !manualRun && usesChainedChatScheduling(task)
+            val waitingForUserReply = !manualRun &&
+                run.waitingForUserReply &&
+                task.mode == AutomationMode.CHAT &&
+                task.recurringMinutes != null
             val deferredOneShot = !manualRun &&
                 task.recurringMinutes == null &&
                 !run.delivered &&
                 run.nextRunAtHint != null
             val next = when {
+                waitingForUserReply -> null
                 chained -> nextAnchoredAutomationRun(
                     task = task,
                     afterMillis = finished,
@@ -685,6 +818,7 @@ class HarnessAutomationWorker(
             val updated = store.update(id) { current ->
                 val nextStatus = when {
                     manualRun -> current.status
+                    waitingForUserReply -> "waiting_user"
                     chained || deferredOneShot || current.recurringMinutes != null -> "scheduled"
                     else -> "completed"
                 }
@@ -729,6 +863,10 @@ class HarnessAutomationWorker(
                 updated?.status == "scheduled"
             ) {
                 scheduler.enqueueNextChained(id, next)
+            }
+            if (waitingForUserReply) {
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
             }
             Result.success()
         } catch (cancelled: CancellationException) {
