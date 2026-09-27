@@ -27,9 +27,7 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.ServerSocket
 import java.net.Socket
 import java.security.GeneralSecurityException
 import java.security.KeyStore
