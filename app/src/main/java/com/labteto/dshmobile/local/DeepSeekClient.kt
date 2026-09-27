@@ -389,7 +389,7 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
-        add(tool("edit", "唯一字面量替换；修改前必须先读取文件", properties(
+        add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
@@ -414,8 +414,8 @@ object LocalToolCatalog {
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
-            "timeout_seconds" to integer("超时秒数；前台默认 30/最大 120，后台默认 300/最大 900"),
-            "run_in_background" to boolean("是否转为后台任务，默认 false"),
+            "timeout_seconds" to integer("进程执行超时秒数；前台默认 30/最大 120，后台默认 300/最大 900；会话切换等主动取消不受该值约束"),
+            "run_in_background" to boolean("是否转为后台任务，默认 false；普通后台 shell 属当前会话非持久任务，创建、切换或删除会话时会取消"),
         ), listOf("command")))
         add(tool("job_list", "列出本机会话创建的后台任务", properties()))
         add(tool("job_output", "读取后台任务状态和输出", properties(
@@ -553,9 +553,11 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("tasks")))
-        add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(
+        add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),
             "session_id" to string("可选；留空使用当前会话"),
+            "limit" to integer("单页最多返回条数，默认 50，最大 100"),
+            "after_sequence" to integer("可选分页游标；继续上一页时传结果末尾提示的事件序号"),
         ), listOf("query")))
         add(tool("session_search", "跨本机历史会话搜索事件", properties(
             "query" to string("搜索内容"),

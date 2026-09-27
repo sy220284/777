@@ -5008,7 +5008,11 @@ class LocalHarnessEngine @Inject constructor(
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools.execute(call.name, args, allowMutation)
-            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(args.string("query"))
+            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(
+                query = args.string("query"),
+                limit = args.int("limit", 50),
+                afterSequence = args.long("after_sequence", -1L),
+            )
             "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
             "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
                 .read(args.int("seq", -1).toLong(), before = 1, after = 1)
@@ -6412,6 +6416,9 @@ class LocalHarnessEngine @Inject constructor(
     private fun JsonObject.optionalString(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     private fun JsonObject.int(key: String, default: Int): Int = this[key]?.jsonPrimitive?.intOrNull ?: default
+
+    private fun JsonObject.long(key: String, default: Long): Long =
+        optionalString(key)?.toLongOrNull() ?: default
 
     private fun JsonObject.boolean(key: String, default: Boolean): Boolean =
         this[key]?.jsonPrimitive?.booleanOrNull ?: default
