@@ -272,4 +272,36 @@ class MemoryStoreTest {
         assertEquals(listOf("u1"), remaining.sourceMessages.map { it.messageId })
     }
 
+
+    @Test fun laterExactConfirmationDoesNotEraseOlderUnboundFact() {
+        val memoryStore = store()
+        val legacy = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u2",
+        )
+
+        assertEquals(legacy.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(legacy.id, remaining.id)
+        assertTrue(remaining.sourceMessages.isEmpty())
+        assertTrue(remaining.hasUnboundSource)
+    }
+
 }
