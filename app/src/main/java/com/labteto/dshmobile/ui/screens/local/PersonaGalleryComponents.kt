@@ -132,7 +132,7 @@ internal fun personaExportFileName(
     return "$safe.persona.${format.extension}"
 }
 
-private data class PersonaImportDocument(
+internal data class PersonaImportDocument(
     val bytes: ByteArray,
     val fileName: String?,
     val mimeType: String?,
@@ -581,7 +581,7 @@ internal fun GalleryPersonaCard(
 }
 
 @Composable
-private fun SpatialPortraitStandee(
+internal fun SpatialPortraitStandee(
     entry: PersonaGalleryEntry,
     modifier: Modifier = Modifier,
 ) {
