@@ -30,6 +30,22 @@ internal fun localConversationFiles(
     }
 
     for (event in events) {
+        if (event.type == "chat/active-transcript") {
+            // A destructive edit/branch materialization defines the only active chat timeline.
+            // Old tool/file events after the retained prefix must not leak back into the UI.
+            artifactSeq.clear()
+            involvedSeq.clear()
+            decodeTranscriptMessages(event.data)
+                .orEmpty()
+                .asSequence()
+                .filter { message -> message.role == "user" }
+                .forEach { message ->
+                    ATTACHMENT_PATH.findAll(message.content).forEach { match ->
+                        remember(match.groupValues[1], false, event.sequence)
+                    }
+                }
+            continue
+        }
         when (event.type) {
             "user/message" -> {
                 val text = event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty()
