@@ -10,8 +10,7 @@ ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngin
 LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
 PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
-LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
-PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
+LIFECYCLE_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
@@ -29,9 +28,9 @@ violations: list[str] = []
 engine = ENGINE.read_text(encoding="utf-8")
 
 engine_lines = len(engine.splitlines())
-if engine_lines > 6_650:
+if engine_lines > 6_500:
     violations.append(
-        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6650); extract new logic behind a coordinator"
+        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6500); extract new logic behind a coordinator"
     )
 
 local_screen_lines = len(LOCAL_SCREEN.read_text(encoding="utf-8").splitlines())
@@ -45,6 +44,12 @@ if persona_gallery_lines > 1_160:
     violations.append(
         f"PersonaGalleryDialog.kt grew to {persona_gallery_lines} lines (budget: 1160); keep gallery features in extracted components"
     )
+
+session_store_lines = len(SESSION_STORE.read_text(encoding="utf-8").splitlines())
+if session_store_lines > 2_050:
+    violations.append(
+        f"SessionStore.kt grew to {session_store_lines} lines (budget: 2050); extract protocol/state models or coordinators"
+    )
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
@@ -55,6 +60,7 @@ model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
 tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
+lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
 if "cron: '*/30 * * * *'" not in cleanup_workflow:
@@ -134,7 +140,11 @@ if 'eventLog.append("user/queue"' in engine:
     violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
 if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
     violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
-if engine.count("startNextQueuedTurnIfIdle()?.start()") < 5:
+wake_path_count = (
+    engine.count("startNextQueuedTurnIfIdle()?.start()") +
+    lifecycle_coordinator.count("startNextQueuedTurnIfIdle()?.start()")
+)
+if wake_path_count < 5:
     violations.append("Recovered durable Agent inbox must keep startup/session-switch wake paths")
 
 if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
