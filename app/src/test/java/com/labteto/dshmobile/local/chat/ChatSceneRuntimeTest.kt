@@ -117,6 +117,31 @@ class ChatSceneRuntimeTest {
     }
 
     @Test
+    fun hardTransitionDropsLegacySoftSceneDetails() {
+        val previous = ChatSceneState(
+            location = "院子",
+            participants = listOf("用户", "阿青"),
+            positions = listOf("阿青靠着院墙"),
+            activeActions = listOf("喝茶"),
+            keyObjects = listOf("石桌"),
+        )
+
+        val events = ChatSceneRuntime.extractTurnEvents(
+            previous = previous,
+            userMessage = "进去吧。",
+            assistantMessage = "她和你一起走进房间。",
+            sequence = 29L,
+        )
+        val next = ChatSceneRuntime.reduce(previous, events)
+
+        assertEquals("房间", next.location)
+        assertTrue(next.participants.isEmpty())
+        assertTrue(next.positions.isEmpty())
+        assertTrue(next.activeActions.isEmpty())
+        assertTrue(next.keyObjects.isEmpty())
+    }
+
+    @Test
     fun applyingSameDurableTurnTwiceIsIdempotent() {
         val context = ChatContextState(scene = ChatSceneState(location = "院子"))
         val once = context.applySceneTurn(
