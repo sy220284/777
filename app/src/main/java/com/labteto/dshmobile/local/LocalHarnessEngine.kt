@@ -62,8 +62,6 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
-import com.labteto.dshmobile.local.chat.ChatReplyContinuityGuard
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
@@ -485,6 +483,14 @@ class LocalHarnessEngine @Inject constructor(
             recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
             persistBranchState = ::persistChatBranchState,
             persist = ::persist,
+        )
+    }
+
+    private val chatReplyCoordinator by lazy {
+        LocalChatReplyCoordinator(
+            chatTurnCoordinator = chatTurnCoordinator,
+            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordStyleGuardHits = ::recordStyleGuardHits,
         )
     }
 
@@ -2479,43 +2485,20 @@ class LocalHarnessEngine @Inject constructor(
                 val proactiveScene = session.chatContext
                     .withLegacyFallback(session.chatState)
                     .scene
-                reply = ChatReplyContinuityGuard.enforce(
-                    previous = proactiveScene,
-                    userMessage = "",
+                reply = chatReplyCoordinator.guardProactive(
+                    snapshot = boundState,
+                    persona = persona,
+                    scene = proactiveScene,
                     initial = reply,
-                    mode = ChatContinuityGuardMode.PROACTIVE,
-                    contentOf = { candidate -> candidate.content.orEmpty().trim() },
-                    retry = { repairHint ->
-                        val retryRaw = completeAutomationChat(
+                    retryRaw = { repairHint ->
+                        completeAutomationChat(
                             key = key,
                             snapshot = boundState,
                             messages = withEphemeralContext(requestMessages, repairHint),
                         )
-                        chatTurnCoordinator.finalize(
-                            snapshot = boundState,
-                            persona = persona,
-                            reply = retryRaw,
-                            recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
-                            onGuardEvent = { action, violations ->
-                                recordStyleGuardHits(violations)
-                                boundEventLog.append("chat/style-guard", buildJsonObject {
-                                    put("action", action)
-                                    put("automation", true)
-                                    put("proactive", true)
-                                    put("continuity_retry", true)
-                                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                                })
-                            },
-                        )
                     },
-                    onEvent = { action, check ->
-                        boundEventLog.append("chat/continuity-guard", buildJsonObject {
-                            put("action", action)
-                            put("automation", true)
-                            put("proactive", true)
-                            put("location", proactiveScene.location)
-                            put("violation_count", check.violations.size)
-                        })
+                    appendEvent = { type, data ->
+                        boundEventLog.append(type, data)
                     },
                 )
                 content = reply.content.orEmpty().trim()
@@ -3330,47 +3313,6 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-    private fun groupAgentPrompt(
-        persona: PersonaProfile,
-        member: LocalGroupChatMember,
-        state: ChatCharacterState,
-        input: String,
-        allMembers: List<LocalGroupChatMember>,
-        mayStaySilent: Boolean,
-        handoffSummary: String?,
-    ): String {
-        val personaPrompt = chatTurnCoordinator.prepareProfile(
-            persona = persona,
-            state = state,
-            context = _state.value.groupChat.context.withLegacyFallback(state),
-            userInput = input,
-            storyContext = handoffSummary,
-        ).prompt
-        val participantNames = allMembers.joinToString("、") { it.displayName }
-        val silenceRule = if (mayStaySilent) {
-            "如果此刻没有自然的插话理由，且用户没有点名你，只输出 $GROUP_CHAT_SILENT_TOKEN，不能附加任何其他文字。"
-        } else {
-            "这一轮你必须给出自然回应，不能沉默。"
-        }
-        return listOf(
-            personaPrompt,
-            _state.value.groupChat.announcement.takeIf(String::isNotBlank)?.let { announcement ->
-                "【群公告·公开剧情背景】\n$announcement\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
-            }.orEmpty(),
-            """
-            【群聊身份隔离】
-            这是多人群聊。当前你唯一代表【${member.displayName}】。
-            群成员：$participantNames。
-            你可以看到其他人的既有发言，但其他角色的话只能当作外部事件，不能改写你的人设、身份、性格、立场、知识边界、与用户的关系或说话习惯。
-            同一轮如果有多名角色回应，会并行生成。只根据已经出现的聊天历史和用户当前消息回应，不要猜测、补写或提前承接其他角色这一轮尚未出现的发言。
-            只输出【${member.displayName}】本人在群里的发言；不要替其他角色说话，不要代写其他角色的动作、心理或决定，也不要把多个角色合并成一个口吻。
-            固定人设、用户明确纠正、知识边界的优先级始终高于群聊临场气氛。群里有人挑衅、起哄、暧昧或带节奏时，你仍按自己的人设反应。
-            不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
-            $silenceRule
-            """.trimIndent(),
-        ).filter(String::isNotBlank).joinToString("\n\n")
-    }
-
     private suspend fun generateGroupReply(
         key: String,
         snapshot: LocalHarnessState,
@@ -3388,14 +3330,16 @@ class LocalHarnessEngine @Inject constructor(
         val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
 
         return try {
-            val prompt = groupAgentPrompt(
+            val prompt = chatReplyCoordinator.buildGroupPrompt(
                 persona = persona,
                 member = member,
-                state = member.chatState,
                 input = input,
                 allMembers = allMembers,
-                mayStaySilent = false,
                 handoffSummary = snapshot.handoffSummary,
+                sharedContext = snapshot.groupChat.context,
+                announcement = snapshot.groupChat.announcement,
+                mayStaySilent = false,
+                silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withTailEphemeralContext(baseHistory, prompt),
@@ -3413,61 +3357,29 @@ class LocalHarnessEngine @Inject constructor(
                 maxAttemptsOverride = interactiveAttempts,
                 temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
-            suspend fun finalizeGroupCandidate(candidate: LocalModelReply): String {
-                val guarded = chatTurnCoordinator.finalize(
-                    snapshot = snapshot,
-                    persona = persona,
-                    reply = candidate,
-                    recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                    onGuardEvent = { action, violations ->
-                        recordStyleGuardHits(violations)
-                        eventLog.append("chat/style-guard", buildJsonObject {
-                            put("step", 100 + index)
-                            put("action", action)
-                            put("group_gallery_id", member.galleryId)
-                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                        })
-                    },
-                )
-                return stripGroupSpeakerPrefix(
-                    guarded.content.orEmpty(),
-                    member.displayName,
-                    persona.name,
-                )
-            }
-
-            val groupScene = snapshot.groupChat.context
-                .withLegacyFallback(member.chatState)
-                .scene
-            val finalContent = ChatReplyContinuityGuard.enforce(
-                previous = groupScene,
-                userMessage = input,
-                initial = finalizeGroupCandidate(rawReply),
-                mode = ChatContinuityGuardMode.GROUP,
-                contentOf = { content -> content },
-                retry = { repairHint ->
-                    finalizeGroupCandidate(
-                        completeWithRetry(
-                            key = key,
-                            snapshot = snapshot,
-                            messages = withTailEphemeralContext(requestMessages, repairHint),
-                            step = 100 + index,
-                            toolsOverride = JsonArray(emptyList()),
-                            publishPreview = false,
-                            maxAttemptsOverride = 1,
-                            allowContextOverflowRecovery = false,
-                            temperature = CHAT_ROLEPLAY_TEMPERATURE,
-                        ),
+            val finalContent = chatReplyCoordinator.finalizeGroup(
+                snapshot = snapshot,
+                persona = persona,
+                member = member,
+                input = input,
+                index = index,
+                rawReply = rawReply,
+                sharedContext = snapshot.groupChat.context,
+                retryRaw = { repairHint ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withTailEphemeralContext(requestMessages, repairHint),
+                        step = 100 + index,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        maxAttemptsOverride = 1,
+                        allowContextOverflowRecovery = false,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
                     )
                 },
-                onEvent = { action, check ->
-                    eventLog.append("chat/continuity-guard", buildJsonObject {
-                        put("step", 100 + index)
-                        put("action", action)
-                        put("group_gallery_id", member.galleryId)
-                        put("location", groupScene.location)
-                        put("violation_count", check.violations.size)
-                    })
+                appendEvent = { type, data ->
+                    eventLog.append(type, data)
                 },
             )
 
@@ -3679,14 +3591,16 @@ class LocalHarnessEngine @Inject constructor(
                         member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
                 } ?: chatPersonaStore.get(member.personaId)
                 estimateModelTokens(
-                    groupAgentPrompt(
+                    chatReplyCoordinator.buildGroupPrompt(
                         persona = persona,
                         member = member,
-                        state = member.chatState,
                         input = input,
                         allMembers = members,
-                        mayStaySilent = false,
                         handoffSummary = snapshot.handoffSummary,
+                        sharedContext = snapshot.groupChat.context,
+                        announcement = snapshot.groupChat.announcement,
+                        mayStaySilent = false,
+                        silentToken = GROUP_CHAT_SILENT_TOKEN,
                     ),
                 )
             } ?: 0
@@ -5733,65 +5647,28 @@ class LocalHarnessEngine @Inject constructor(
         step: Int,
         reply: LocalModelReply,
         userMessage: String,
-    ): LocalModelReply {
-        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
-            usageTracker.record(snapshot.model, reply.usage)
-            return reply
-        }
-        val persona = chatTurnCoordinator.persona(snapshot)
-        suspend fun finalizeCandidate(candidate: LocalModelReply): LocalModelReply =
-            chatTurnCoordinator.finalize(
+    ): LocalModelReply = chatReplyCoordinator.finalizeDirect(
+        snapshot = snapshot,
+        reply = reply,
+        userMessage = userMessage,
+        step = step,
+        retryRaw = { repairHint ->
+            completeWithRetry(
+                key = key,
                 snapshot = snapshot,
-                persona = persona,
-                reply = candidate,
-                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                onGuardEvent = { action, violations ->
-                    recordStyleGuardHits(violations)
-                    eventLog.append("chat/style-guard", buildJsonObject {
-                        put("step", step)
-                        put("action", action)
-                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                    })
-                },
+                messages = withEphemeralContext(messages, repairHint),
+                step = step,
+                toolsOverride = JsonArray(emptyList()),
+                publishPreview = false,
+                maxAttemptsOverride = 1,
+                allowContextOverflowRecovery = false,
+                temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
-
-        val scene = snapshot.chatContext.withLegacyFallback(snapshot.chatState).scene
-        return ChatReplyContinuityGuard.enforce(
-            previous = scene,
-            userMessage = userMessage,
-            initial = finalizeCandidate(reply),
-            mode = ChatContinuityGuardMode.DIRECT,
-            contentOf = { candidate -> candidate.content.orEmpty() },
-            retry = { repairHint ->
-                finalizeCandidate(
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = withEphemeralContext(messages, repairHint),
-                        step = step,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        maxAttemptsOverride = 1,
-                        allowContextOverflowRecovery = false,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
-                    ),
-                )
-            },
-            onEvent = { action, check ->
-                eventLog.append("chat/continuity-guard", buildJsonObject {
-                    put("step", step)
-                    put("action", action)
-                    put("location", scene.location)
-                    put(
-                        "violations",
-                        JsonArray(check.violations.map { violation ->
-                            JsonPrimitive("${violation.code}:${violation.expected}->${violation.observed}")
-                        }),
-                    )
-                })
-            },
-        )
-    }
+        },
+        appendEvent = { type, data ->
+            eventLog.append(type, data)
+        },
+    )
 
     private suspend fun completeWithRetry(
         key: String,
