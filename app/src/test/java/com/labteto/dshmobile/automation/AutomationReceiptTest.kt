@@ -174,6 +174,42 @@ class AutomationReceiptTest {
     }
 
     @Test
+    fun deferredRetryStaysInsideRandomWindow() {
+        val previous = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.SEPTEMBER, 27, 21, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val suggested = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.SEPTEMBER, 28, 23, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val task = AutomationTask(
+            id = "window",
+            prompt = "来找我",
+            createdAt = 0L,
+            nextRunAt = previous.timeInMillis,
+            recurringMinutes = 24L * 60L,
+            scheduleType = AutomationScheduleType.WINDOW,
+            windowStartMinuteOfDay = 20 * 60,
+            windowEndMinuteOfDay = 22 * 60,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session",
+        )
+
+        val next = nextAnchoredAutomationRun(
+            task = task,
+            afterMillis = previous.timeInMillis + 5L * 60_000L,
+            suggestedRunAt = suggested.timeInMillis,
+        )!!
+        val result = java.util.Calendar.getInstance().apply { timeInMillis = next }
+        val minuteOfDay = result.get(java.util.Calendar.HOUR_OF_DAY) * 60 +
+            result.get(java.util.Calendar.MINUTE)
+
+        assertEquals(29, result.get(java.util.Calendar.DAY_OF_MONTH))
+        assertTrue(minuteOfDay in 20 * 60 until 22 * 60)
+    }
+
+    @Test
     fun chatTaskKeepsProactivePolicyDefaults() {
         val task = AutomationTask(
             id = "chat-policy",
