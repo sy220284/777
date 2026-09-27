@@ -569,6 +569,123 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun sceneLocationDoesNotJumpWithoutMovementEvidence() {
+        val previous = ChatCharacterState(
+            scene = ChatSceneState(
+                sceneTime = "夜晚",
+                location = "院子",
+                participants = listOf("用户", "绫华"),
+                positions = listOf("两人坐在石桌旁"),
+            ),
+        )
+        val payload = """
+            {
+              "state":{
+                "scene":{
+                  "sceneTime":"夜晚",
+                  "location":"卧室",
+                  "participants":["用户","绫华"],
+                  "positions":["两人坐在床边"],
+                  "lastSceneChange":"院子进入卧室"
+                }
+              },
+              "suggestions":[],
+              "turnSignificance":"NONE"
+            }
+        """.trimIndent()
+
+        val state = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "继续说刚才的事",
+            assistantMessage = "嗯，我还听着。",
+        )!!.state
+
+        assertEquals("院子", state.scene.location)
+        assertEquals("两人坐在床边", state.scene.positions.single())
+        assertTrue(state.scene.lastSceneChange.isBlank())
+    }
+
+    @Test
+    fun explicitMovementUpdatesSceneAndContinuitySummary() {
+        val previous = ChatCharacterState(
+            scene = ChatSceneState(
+                sceneTime = "夜晚",
+                location = "院子",
+                participants = listOf("用户", "绫华"),
+                positions = listOf("两人坐在石桌旁"),
+                activeActions = listOf("喝茶聊天"),
+            ),
+            continuity = ChatContinuityState(
+                recentEvents = listOf("两人在院中聊天"),
+                unfinished = listOf("明日行程还没定"),
+            ),
+        )
+        val payload = """
+            {
+              "state":{
+                "scene":{
+                  "sceneTime":"夜晚",
+                  "location":"屋内",
+                  "participants":["用户","绫华"],
+                  "positions":["两人站在门边"],
+                  "activeActions":["刚进屋"],
+                  "keyObjects":["茶壶"],
+                  "currentEvent":"继续讨论明日行程",
+                  "lastSceneChange":"从院子进入屋内"
+                },
+                "continuity":{
+                  "recentEvents":["两人从院子进入屋内"],
+                  "recurringEvents":["多次讨论明日行程，最终确定上午出发"],
+                  "decisions":["明日上午九点去城南"],
+                  "unfinished":["城南之行尚未发生"]
+                }
+              },
+              "suggestions":[],
+              "turnSignificance":"MINOR"
+            }
+        """.trimIndent()
+
+        val state = planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "坐久了，我们进屋吧，明天九点去城南怎么样？",
+            assistantMessage = "她起身推门，和你一起走进屋内。九点可以。",
+        )!!.state
+
+        assertEquals("屋内", state.scene.location)
+        assertTrue(state.scene.lastSceneChange.contains("院子"))
+        assertTrue(state.continuity.recentEvents.any { it.contains("进入屋内") })
+        assertTrue(state.continuity.recurringEvents.any { it.contains("最终确定上午出发") })
+        assertTrue(state.continuity.decisions.any { it.contains("九点去城南") })
+        assertEquals(listOf("城南之行尚未发生"), state.continuity.unfinished)
+    }
+
+    @Test
+    fun omittedSceneFieldsKeepPreviousPhysicalState() {
+        val previous = ChatCharacterState(
+            scene = ChatSceneState(
+                sceneTime = "傍晚",
+                location = "院子",
+                positions = listOf("坐在石桌旁"),
+                activeActions = listOf("喝茶"),
+            ),
+            continuity = ChatContinuityState(
+                decisions = listOf("明早出发"),
+            ),
+        )
+        val state = planner.parse(
+            """{"state":{"mood":"放松"},"suggestions":[],"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "嗯",
+            assistantMessage = "她点了点头。",
+        )!!.state
+
+        assertEquals(previous.scene, state.scene)
+        assertEquals(previous.continuity, state.continuity)
+    }
+
+    @Test
     fun automaticPostTurnPromptDoesNotRequestReplySuggestions() {
         val prompt = planner.prompt(
             persona = PersonaProfile(name = "测试角色"),
@@ -580,6 +697,9 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("\"suggestions\":[]"))
         assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
         assertTrue(prompt.contains("由系统根据真实对话维护"))
+        assertTrue(prompt.contains("scene(sceneTime,location"))
+        assertTrue(prompt.contains("禁止让人物无理由瞬移"))
+        assertTrue(prompt.contains("重复或同类事项合并"))
     }
 
     @Test
