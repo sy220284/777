@@ -218,8 +218,9 @@ internal class LocalChatReplyCoordinator(
         snapshot = snapshot,
         persona = persona,
         reply = reply,
-        recordUsage = { usage ->
-            recordUsage(snapshot, reply.copy(usage = usage))
+        recordUsage = {
+            // The finalized candidate owns the same request usage passed by ChatTurnCoordinator.
+            recordUsage(snapshot, reply)
         },
         onGuardEvent = { action, violations ->
             recordStyleGuardHits(violations)
