@@ -1,0 +1,79 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRepairResult
+import java.io.File
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+internal fun loadModelHistoryReplayEvents(
+    eventLog: LocalSessionEventLog,
+    codec: ModelHistoryCheckpointCodec,
+    legacyFallback: List<JsonObject>,
+): List<LocalSessionEventLog.Event> {
+    var beforeSequence = Long.MAX_VALUE
+    while (true) {
+        val checkpoint = eventLog.latest(
+            ModelHistoryCheckpointCodec.EVENT_TYPE,
+            beforeSequenceExclusive = beforeSequence,
+        ) ?: break
+        if (codec.decode(checkpoint.data) != null) {
+            return eventLog.snapshotAfter(checkpoint.sequence - 1L)
+        }
+        beforeSequence = checkpoint.sequence
+    }
+    return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
+}
+
+internal fun buildRecoveredToolResultMessages(
+    modelHistory: List<JsonObject>,
+    recovery: SessionRepairResult,
+): List<JsonObject> {
+    if (recovery.toolResults.isEmpty()) return emptyList()
+    val seenCallIds = modelHistory.asSequence()
+        .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "tool" }
+        .mapNotNull { message -> message["tool_call_id"]?.jsonPrimitive?.contentOrNull }
+        .toMutableSet()
+    return buildList {
+        recovery.toolResults.forEach { recovered ->
+            if (seenCallIds.add(recovered.callId)) {
+                add(buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", recovered.callId)
+                    put("content", recovered.modelContent)
+                })
+            }
+        }
+    }
+}
+
+internal fun migrateLegacySessionFiles(
+    root: File,
+    sessionsRoot: File,
+    currentSessionId: String,
+) {
+    val legacy = File(root, "session.json")
+    val destination = File(sessionsRoot, "$currentSessionId.json")
+    if (!legacy.isFile || destination.exists()) return
+    legacy.copyTo(destination, overwrite = false)
+    File(root, "session.events.jsonl").takeIf(File::isFile)
+        ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
+}
+
+internal fun seedLocalWorkspaceGuide(workspacePath: String) {
+    val skill = File(workspacePath, ".dsh/skills/workspace-guide/SKILL.md")
+    if (skill.exists()) return
+    skill.parentFile?.mkdirs()
+    skill.writeText(
+        """
+        # 工作区指南
+
+        - 所有文件操作限定在当前应用的本机工作区。
+        - 修改前先读取原文件，完成后重新读取或搜索关键内容复核。
+        - shell 使用安卓 `/system/bin/sh`，只依赖系统现有命令。
+        """.trimIndent() + "\n",
+    )
+}
