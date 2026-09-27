@@ -202,11 +202,30 @@ fun LocalHarnessScreen(
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
+    var hasRenderedHarnessSurface by rememberSaveable { mutableStateOf(false) }
+    var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
 
     LaunchedEffect(modeIntro) {
         if (modeIntro != null) {
             delay(6_000)
             modeIntro = null
+        }
+    }
+
+    LaunchedEffect(state.loading) {
+        if (!state.loading) hasRenderedHarnessSurface = true
+    }
+
+    LaunchedEffect(pendingUsageMode, state.loading, state.usageMode) {
+        val pending = pendingUsageMode ?: return@LaunchedEffect
+        when {
+            state.usageMode == pending -> pendingUsageMode = null
+            !state.loading -> {
+                // A rejected/no-op transition should not leave the sidebar showing a phantom mode.
+                // Give the engine one frame window to publish loading=true before rolling back.
+                delay(250)
+                if (!state.loading && state.usageMode != pending) pendingUsageMode = null
+            }
         }
     }
 
@@ -227,6 +246,7 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
+        pendingUsageMode = target
         viewModel.switchUsageMode(target)
     }
 
@@ -260,8 +280,8 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
-                usageMode = state.usageMode,
-                modeSwitchEnabled = !state.running,
+                usageMode = pendingUsageMode ?: state.usageMode,
+                modeSwitchEnabled = !state.running && !state.loading,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -320,7 +340,7 @@ fun LocalHarnessScreen(
         },
     ) {
         when {
-            state.loading -> LoadingScreen()
+            state.loading && !hasRenderedHarnessSurface -> LoadingScreen()
             showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
                 entries = gallery,
                 presets = viewModel.personaPresets,
