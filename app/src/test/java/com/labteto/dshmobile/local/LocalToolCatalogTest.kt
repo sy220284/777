@@ -47,19 +47,6 @@ class LocalToolCatalogTest {
         assertTrue("model" in subagentProperties)
         assertTrue("max_steps" in subagentProperties)
     } 
-    @Test
-    fun webFetchExposesBoundedLargeResponseControls() {
-        val functions = LocalToolCatalog.specs.associateBy {
-            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
-        }
-        val properties = functions.getValue("web_fetch").jsonObject["function"]!!
-            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
-
-        assertTrue("max_bytes" in properties)
-        assertTrue("format" in properties)
-        assertTrue("run_in_background" in properties)
-    }
-
 
     @Test
     fun sessionEventSearchExposesPagingControls() {
@@ -74,5 +61,17 @@ class LocalToolCatalogTest {
     }
 
 
+    @Test
+    fun webFetchExposesBoundedLargeResponseControls() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val properties = functions.getValue("web_fetch").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertTrue("max_bytes" in properties)
+        assertTrue("format" in properties)
+        assertTrue("run_in_background" in properties)
+    }
 
 }
