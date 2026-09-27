@@ -1493,16 +1493,22 @@ class LocalHarnessEngine @Inject constructor(
             generation = previousGeneration + 1L,
         )
 
-        val editedModelMessage = editedUserModelMessage(
+        val editedModelMessage = editedChatUserModelMessage(
+            eventLog = eventLog,
             originalMessageId = messageId,
             content = content,
         )
-        rebuildEditedChatModelHistory(
-            messages = rewritten,
-            groupMode = state.groupChat.enabled,
-            editedMessageId = edited.id,
-            editedModelMessage = editedModelMessage,
+        resetModelHistory(
+            buildEditedChatModelHistory(
+                eventLog = eventLog,
+                messages = rewritten,
+                groupMode = state.groupChat.enabled,
+                editedMessageId = edited.id,
+                editedModelMessage = editedModelMessage,
+                systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
+            ),
         )
+        updateContextMetrics()
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
             put("model_message", editedModelMessage)
@@ -1532,9 +1538,14 @@ class LocalHarnessEngine @Inject constructor(
                 error = null,
             )
         }
-        persistRewrittenChatTranscript(
+        val rewrittenTranscriptSequence = persistRewrittenChatTranscript(
+            eventLog = eventLog,
             reason = "user-edited",
             activeTranscript = rewritten,
+        )
+        transcriptProjectionCursor = maxOf(
+            transcriptProjectionCursor ?: -1L,
+            rewrittenTranscriptSequence,
         )
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
@@ -1580,7 +1591,8 @@ class LocalHarnessEngine @Inject constructor(
             legacyState = snapshot?.first,
             previousGeneration = state.chatContext.generation,
         )
-        rebuildChatModelHistoryFromTranscript(activeMessages)
+        resetModelHistory(buildChatModelHistory(activeMessages, chatSystemPrompt()))
+        updateContextMetrics()
         _state.update { current ->
             current.copy(
                 messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
@@ -1648,120 +1660,6 @@ class LocalHarnessEngine @Inject constructor(
         }
             .also { activeJob = it; it.start() }
         true
-    }
-
-    private fun editedUserModelMessage(
-        originalMessageId: String,
-        content: String,
-    ): JsonObject {
-        val original = eventLog.events()
-            .filter { event -> event.type == "user/message" }
-            .lastOrNull { event ->
-                decodeTranscriptMessages(event.data)
-                    .orEmpty()
-                    .any { message -> message.id == originalMessageId }
-            }
-            ?.data
-            ?.get("model_message") as? JsonObject
-        return if (original != null) {
-            replaceLocalUserModelMessageText(original, content)
-        } else {
-            buildJsonObject {
-                put("role", "user")
-                put("content", content)
-            }
-        }
-    }
-
-    private fun rebuildEditedChatModelHistory(
-        messages: List<LocalHarnessMessage>,
-        groupMode: Boolean,
-        editedMessageId: String,
-        editedModelMessage: JsonObject,
-    ) {
-        val durableUserMessages = linkedMapOf<String, JsonObject>()
-        eventLog.events()
-            .filter { event -> event.type == "user/message" }
-            .forEach { event ->
-                val structured = event.data["model_message"] as? JsonObject ?: return@forEach
-                decodeTranscriptMessages(event.data)
-                    .orEmpty()
-                    .filter { message -> message.role == "user" }
-                    .forEach { message -> durableUserMessages[message.id] = structured }
-            }
-
-        val rebuilt = buildList {
-            add(buildJsonObject {
-                put("role", "system")
-                put("content", if (groupMode) groupChatSystemPrompt() else chatSystemPrompt())
-            })
-            messages.forEach { message ->
-                when (message.role) {
-                    "user" -> add(
-                        if (message.id == editedMessageId) {
-                            editedModelMessage
-                        } else {
-                            durableUserMessages[message.id] ?: buildJsonObject {
-                                put("role", "user")
-                                put("content", message.content)
-                            }
-                        },
-                    )
-                    "assistant" -> add(buildJsonObject {
-                        put("role", "assistant")
-                        put(
-                            "content",
-                            if (groupMode) groupTranscriptLine(message) else message.content,
-                        )
-                    })
-                }
-            }
-        }
-        resetModelHistory(rebuilt)
-        updateContextMetrics()
-    }
-
-    private fun transcriptForBranchMaterialization(
-        state: LocalHarnessState,
-    ): List<LocalHarnessMessage> {
-        val activeBranch = activeChatBranchMessages(state.chatBranches)
-        if (activeBranch.isNotEmpty()) return activeBranch
-        if (state.transcriptIndex.totalMessageCount <= state.messages.size.toLong()) return state.messages
-        return LocalSessionTranscriptPager(eventLog).all()
-    }
-
-    private fun rebuildChatModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
-        val rebuilt = buildList {
-            add(buildJsonObject {
-                put("role", "system")
-                put("content", chatSystemPrompt())
-            })
-            messages.forEach { message ->
-                if (message.role == "user" || message.role == "assistant") {
-                    add(buildJsonObject {
-                        put("role", message.role)
-                        put("content", message.content)
-                    })
-                }
-            }
-        }
-        resetModelHistory(rebuilt)
-        updateContextMetrics()
-    }
-
-    private fun persistRewrittenChatTranscript(
-        reason: String,
-        activeTranscript: List<LocalHarnessMessage>,
-    ) {
-        val clearedBranches = LocalChatBranchState()
-        eventLog.append("chat/branch-state", JsonObject(
-            encodeChatBranchStateEvent(clearedBranches) + ("reason" to JsonPrimitive(reason)),
-        ))
-        val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
-            put("reason", reason)
-            put("transcript", encodeTranscriptMessages(activeTranscript))
-        })
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
     private fun persistChatBranchState(reason: String) {
