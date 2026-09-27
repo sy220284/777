@@ -65,7 +65,9 @@ internal class LocalMemoryCoordinator(
                 put("id", it.id)
                 put("scope", it.scope.name.lowercase())
                 put("kind", it.kind.name.lowercase())
-                it.sourceMessageId?.let { messageId -> put("source_message_id", messageId) }
+                it.sourceMessages.lastOrNull()?.let { source ->
+                    put("source_message_id", source.messageId)
+                }
                 put(
                     "source",
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
