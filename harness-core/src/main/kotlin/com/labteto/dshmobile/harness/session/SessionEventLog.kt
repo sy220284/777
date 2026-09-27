@@ -153,9 +153,10 @@ class SessionEventLog(
                     val separatorChars = if (result.isEmpty()) 0 else 1
                     if (usedChars + separatorChars + row.length > budget) {
                         if (result.isEmpty()) {
-                            val hint = "\n[事件过长；用 session_event_read(seq=${event.sequence}) 读取完整事件]"
-                            val allowed = (budget - "${event.sequence}: ".length - hint.length).coerceAtLeast(0)
-                            result += "${event.sequence}: " + line.take(allowed) + hint
+                            val hint = "[事件过长；用 session_event_read(seq=${event.sequence}) 读取完整事件]\n"
+                            val prefix = "${event.sequence}: $hint"
+                            val allowed = (budget - prefix.length).coerceAtLeast(0)
+                            result += prefix + line.take(allowed)
                             lastSequence = event.sequence
                         }
                         paginated = true
