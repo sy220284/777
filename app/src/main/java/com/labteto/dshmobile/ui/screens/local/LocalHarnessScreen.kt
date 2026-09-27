@@ -118,6 +118,7 @@ import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
+import com.labteto.dshmobile.local.editableChatUserText
 import com.labteto.dshmobile.local.groupMessageVisibleContent
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
