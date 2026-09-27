@@ -32,6 +32,7 @@ import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -58,6 +59,7 @@ enum class AutomationScheduleType {
     DAILY,
     WEEKLY,
     SILENCE,
+    WINDOW,
 }
 
 @Serializable
@@ -90,6 +92,7 @@ internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
             AutomationScheduleType.DAILY,
             AutomationScheduleType.WEEKLY,
             AutomationScheduleType.SILENCE,
+            AutomationScheduleType.WINDOW,
         )
 
 internal fun nextAnchoredAutomationRun(
@@ -97,6 +100,19 @@ internal fun nextAnchoredAutomationRun(
     afterMillis: Long,
     suggestedRunAt: Long? = null,
 ): Long? {
+    if (task.scheduleType == AutomationScheduleType.WINDOW) {
+        val constrainedAfter = maxOf(
+            afterMillis,
+            suggestedRunAt?.minus(60_000L) ?: afterMillis,
+        )
+        return nextDailyWindowRun(
+            previousScheduledAt = task.nextRunAt,
+            afterMillis = constrainedAfter,
+            startMinuteOfDay = task.windowStartMinuteOfDay ?: return null,
+            endMinuteOfDay = task.windowEndMinuteOfDay ?: return null,
+        )
+    }
+
     suggestedRunAt?.takeIf { it > afterMillis }?.let { return it }
 
     if (task.scheduleType == AutomationScheduleType.SILENCE) {
@@ -115,6 +131,106 @@ internal fun nextAnchoredAutomationRun(
         }
         else -> task.recurringMinutes?.let { afterMillis + it * 60_000L }
     }
+}
+
+internal fun firstDailyWindowRun(
+    afterMillis: Long,
+    startMinuteOfDay: Int,
+    endMinuteOfDay: Int,
+    randomFraction: Double = Random.Default.nextDouble(),
+): Long {
+    validateWindowMinutes(startMinuteOfDay, endMinuteOfDay)
+    require(randomFraction in 0.0..1.0) { "randomFraction must be within 0..1" }
+
+    val reference = Calendar.getInstance().apply { timeInMillis = afterMillis }
+    val candidates = (-1..2).map { dayOffset ->
+        dailyWindowBounds(
+            reference = reference,
+            dayOffset = dayOffset,
+            startMinuteOfDay = startMinuteOfDay,
+            endMinuteOfDay = endMinuteOfDay,
+        )
+    }
+
+    val window = candidates.firstOrNull { (_, end) -> end > afterMillis }
+        ?: error("Unable to resolve next daily window")
+    val lower = maxOf(window.first, afterMillis + 60_000L)
+    if (lower >= window.second) {
+        return firstDailyWindowRun(
+            afterMillis = window.second,
+            startMinuteOfDay = startMinuteOfDay,
+            endMinuteOfDay = endMinuteOfDay,
+            randomFraction = randomFraction,
+        )
+    }
+    return interpolateWindow(lower, window.second, randomFraction)
+}
+
+internal fun nextDailyWindowRun(
+    previousScheduledAt: Long,
+    afterMillis: Long,
+    startMinuteOfDay: Int,
+    endMinuteOfDay: Int,
+    randomFraction: Double = Random.Default.nextDouble(),
+): Long {
+    validateWindowMinutes(startMinuteOfDay, endMinuteOfDay)
+    require(randomFraction in 0.0..1.0) { "randomFraction must be within 0..1" }
+
+    val previous = Calendar.getInstance().apply { timeInMillis = previousScheduledAt }
+    val previousMinute = previous.get(Calendar.HOUR_OF_DAY) * 60 + previous.get(Calendar.MINUTE)
+    if (startMinuteOfDay > endMinuteOfDay && previousMinute < endMinuteOfDay) {
+        previous.add(Calendar.DAY_OF_YEAR, -1)
+    }
+    previous.add(Calendar.DAY_OF_YEAR, 1)
+
+    repeat(370) {
+        val bounds = dailyWindowBounds(
+            reference = previous,
+            dayOffset = 0,
+            startMinuteOfDay = startMinuteOfDay,
+            endMinuteOfDay = endMinuteOfDay,
+        )
+        if (bounds.second > afterMillis) {
+            val lower = maxOf(bounds.first, afterMillis + 60_000L)
+            if (lower < bounds.second) {
+                return interpolateWindow(lower, bounds.second, randomFraction)
+            }
+        }
+        previous.add(Calendar.DAY_OF_YEAR, 1)
+    }
+    error("Unable to resolve future daily window")
+}
+
+private fun validateWindowMinutes(startMinuteOfDay: Int, endMinuteOfDay: Int) {
+    require(startMinuteOfDay in 0 until 24 * 60) { "window start must be within a day" }
+    require(endMinuteOfDay in 0 until 24 * 60) { "window end must be within a day" }
+    require(startMinuteOfDay != endMinuteOfDay) { "window start and end must differ" }
+}
+
+private fun dailyWindowBounds(
+    reference: Calendar,
+    dayOffset: Int,
+    startMinuteOfDay: Int,
+    endMinuteOfDay: Int,
+): Pair<Long, Long> {
+    val start = (reference.clone() as Calendar).apply {
+        add(Calendar.DAY_OF_YEAR, dayOffset)
+        set(Calendar.HOUR_OF_DAY, startMinuteOfDay / 60)
+        set(Calendar.MINUTE, startMinuteOfDay % 60)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    val end = (start.clone() as Calendar).apply {
+        set(Calendar.HOUR_OF_DAY, endMinuteOfDay / 60)
+        set(Calendar.MINUTE, endMinuteOfDay % 60)
+        if (timeInMillis <= start.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
+    }
+    return start.timeInMillis to end.timeInMillis
+}
+
+private fun interpolateWindow(startMillis: Long, endMillis: Long, fraction: Double): Long {
+    val clamped = fraction.coerceIn(0.0, 0.999999999)
+    return startMillis + ((endMillis - startMillis) * clamped).toLong()
 }
 
 internal fun nextIntervalAnchoredRun(
@@ -153,6 +269,8 @@ data class AutomationTask(
     val scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     val scheduleAnchorAt: Long? = null,
     val silenceMinutes: Long? = null,
+    val windowStartMinuteOfDay: Int? = null,
+    val windowEndMinuteOfDay: Int? = null,
     val notify: Boolean = true,
     /** Existing tasks decode as WORK; chat interactions explicitly bind to a durable chat session. */
     val mode: AutomationMode = AutomationMode.WORK,
@@ -376,6 +494,66 @@ class HarnessAutomationScheduler @Inject constructor(
         }
     }
 
+    fun scheduleWindow(
+        id: String,
+        prompt: String,
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int,
+        notify: Boolean,
+        targetSessionId: String,
+        actorName: String? = null,
+        quietHoursEnabled: Boolean = true,
+        quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
+        quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
+    ) {
+        validateId(id)
+        require(prompt.isNotBlank()) { "任务提示词不能为空" }
+        validateWindowMinutes(startMinuteOfDay, endMinuteOfDay)
+        validateChatPolicy(
+            mode = AutomationMode.CHAT,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
+        val now = System.currentTimeMillis()
+        val firstRun = firstDailyWindowRun(
+            afterMillis = now,
+            startMinuteOfDay = startMinuteOfDay,
+            endMinuteOfDay = endMinuteOfDay,
+        )
+        val task = AutomationTask(
+            id = id,
+            prompt = prompt,
+            createdAt = now,
+            nextRunAt = firstRun,
+            recurringMinutes = 24L * 60L,
+            scheduleType = AutomationScheduleType.WINDOW,
+            scheduleAnchorAt = firstRun,
+            windowStartMinuteOfDay = startMinuteOfDay,
+            windowEndMinuteOfDay = endMinuteOfDay,
+            notify = notify,
+            mode = AutomationMode.CHAT,
+            targetSessionId = targetSessionId,
+            actorName = actorName,
+            quietHoursEnabled = quietHoursEnabled,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
+        store.upsert(task)
+        enqueueOneTime(id, firstRun)
+    }
+
     fun scheduleSilence(
         id: String,
         prompt: String,
@@ -497,6 +675,8 @@ class HarnessAutomationScheduler @Inject constructor(
         recurringMinutes: Long?,
         scheduleType: AutomationScheduleType,
         silenceMinutes: Long? = null,
+        windowStartMinuteOfDay: Int? = null,
+        windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean,
         quietStartHour: Int = 23,
         quietStartMinute: Int = 0,
@@ -523,6 +703,14 @@ class HarnessAutomationScheduler @Inject constructor(
                 require((silenceMinutes ?: 0L) >= 60L) { "聊天沉默触发最短为 1 小时" }
                 silenceMinutes
             }
+            AutomationScheduleType.WINDOW -> {
+                require(current.mode == AutomationMode.CHAT) { "随机时间窗仅支持聊天模式" }
+                validateWindowMinutes(
+                    requireNotNull(windowStartMinuteOfDay),
+                    requireNotNull(windowEndMinuteOfDay),
+                )
+                24L * 60L
+            }
             AutomationScheduleType.ONCE -> null
             AutomationScheduleType.DAILY -> {
                 require(recurringMinutes == 24L * 60L) { "每日任务周期必须为 24 小时" }
@@ -542,10 +730,14 @@ class HarnessAutomationScheduler @Inject constructor(
             val minimum = if (current.mode == AutomationMode.CHAT) 60L else 15L
             require(recurring >= minimum) { "任务周期过短" }
         }
-        val nextRun = if (scheduleType == AutomationScheduleType.SILENCE) {
-            now
-        } else {
-            firstRunAtMillis.coerceAtLeast(now)
+        val nextRun = when (scheduleType) {
+            AutomationScheduleType.SILENCE -> now
+            AutomationScheduleType.WINDOW -> firstDailyWindowRun(
+                afterMillis = now,
+                startMinuteOfDay = requireNotNull(windowStartMinuteOfDay),
+                endMinuteOfDay = requireNotNull(windowEndMinuteOfDay),
+            )
+            else -> firstRunAtMillis.coerceAtLeast(now)
         }
         val wasPaused = current.status == "paused"
         val updated = current.copy(
@@ -555,6 +747,12 @@ class HarnessAutomationScheduler @Inject constructor(
             scheduleType = scheduleType,
             scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
             silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
+            windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
+                windowStartMinuteOfDay
+            } else null,
+            windowEndMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
+                windowEndMinuteOfDay
+            } else null,
             quietHoursEnabled = quietHoursEnabled,
             quietStartHour = quietStartHour,
             quietStartMinute = quietStartMinute,

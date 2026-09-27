@@ -1009,6 +1009,11 @@
 <string name="tasks_schedule_custom">Custom</string>
 <string name="tasks_schedule_silence">After silence</string>
 <string name="tasks_schedule_silence_value">Silent for %1$d h</string>
+<string name="tasks_schedule_window">Random window</string>
+<string name="tasks_schedule_window_value">Daily random %1$s–%2$s</string>
+<string name="tasks_chat_window_hint">Send once at a random time inside this daily window.</string>
+<string name="tasks_chat_window_start_value">Window start %1$s</string>
+<string name="tasks_chat_window_end_value">Window end %1$s</string>
 <string name="tasks_chat_silence_hours">Silence threshold (hours)</string>
 <string name="tasks_chat_silence_hours_hint">Send only after the user has been inactive for this long; minimum 1 hour.</string>
 <string name="tasks_first_run_value">First run: %1$s</string>
