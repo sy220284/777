@@ -37,7 +37,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
+import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -49,7 +51,6 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -79,12 +80,14 @@ data class ToolsUiState(
     val loading: Boolean = false,
     val servers: List<McpServerSnapshot> = emptyList(),
     val localPlugins: List<String> = emptyList(),
+    val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
 )
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val engine: LocalHarnessEngine,
+    private val sessionStore: SessionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
@@ -97,11 +100,13 @@ class ToolsViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
+                sessionStore.refreshPlugins()
                 val (servers, plugins) = engine.mcpServersForUi() to engine.installedPluginIdsForUi()
                 _state.value = ToolsUiState(
                     loading = false,
                     servers = servers,
                     localPlugins = plugins,
+                    remotePlugins = sessionStore.plugins.value,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -119,7 +124,7 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 engine.connectMcpHttpForUi(serverId, endpoint)
-                _state.value = ToolsUiState(
+                _state.value = _state.value.copy(
                     loading = false,
                     servers = engine.mcpServersForUi(),
                     localPlugins = engine.installedPluginIdsForUi(),
@@ -140,7 +145,8 @@ class ToolsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 engine.disconnectMcpForUi(serverId)
-                _state.value = ToolsUiState(
+                _state.value = _state.value.copy(
+                    loading = false,
                     servers = engine.mcpServersForUi(),
                     localPlugins = engine.installedPluginIdsForUi(),
                     notice = ToolsNotice.DISCONNECTED,
@@ -162,17 +168,12 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val store = rememberSessionStore()
-    val remotePlugins by store.plugins.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
     var showExternalConfig by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onClose)
-    LaunchedEffect(Unit) {
-        runCatching { store.refreshPlugins() }
-    }
     LaunchedEffect(state.notice) {
         if (state.notice == ToolsNotice.CONNECTED) {
             serverId = ""
@@ -319,7 +320,7 @@ fun ToolsScreen(
                 }
             }
 
-            remotePlugins?.let { inventory ->
+            state.remotePlugins?.let { inventory ->
                 Text(stringResource(R.string.tools_remote_extensions), style = DsType.std14, color = colors.labelTertiary)
                 DsGroupCard {
                     Text(
