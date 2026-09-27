@@ -604,6 +604,7 @@ fun SettingsScreen(
         EnvironmentInfoDialog(
             text = environmentInfo ?: stringResource(R.string.common_loading),
             onDismiss = { showEnvironment = false },
+            onExport = { diagnosticExporter.launch("777-diagnostics.txt") },
         )
     }
 

@@ -513,6 +513,11 @@
     <string name="settings_export_diagnostics">Export diagnostic report</string>
     <string name="settings_export_diagnostics_hint">Includes runtime status and log metadata; excludes messages and credentials.</string>
     <string name="settings_export_diagnostics_failed">Could not save the diagnostic report.</string>
+    <string name="settings_diagnostic_events">Recorded events: %1$d (showing up to 40)</string>
+    <string name="settings_diagnostic_show_all">Show all events</string>
+    <string name="settings_diagnostic_errors_only">Only errors</string>
+    <string name="settings_diagnostic_empty">No matching events.</string>
+    <string name="settings_diagnostic_refresh">Refresh diagnostics</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_disabled">Disabled</string>
     <string name="common_refresh">Refresh</string>
