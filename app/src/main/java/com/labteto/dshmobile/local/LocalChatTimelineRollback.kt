@@ -3,8 +3,30 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+/**
+ * Persist the state that existed before the first user turn.
+ *
+ * This gives future historical edits an exact rollback target even when the session started from a
+ * saved story/continuation whose initial relationship state was already non-empty.
+ */
+internal fun persistChatTimelineBaselineIfNeeded(
+    eventLog: LocalSessionEventLog,
+    json: Json,
+    state: LocalHarnessState,
+) {
+    if (state.usageMode != LocalUsageMode.CHAT || state.transcriptIndex.hasDialogue) return
+    eventLog.append("chat/state-baseline", buildJsonObject {
+        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chatState))
+        if (state.groupChat.enabled) {
+            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.groupChat))
+        }
+    })
+}
 
 /**
  * Resolve the durable event that originally carried one user message.
@@ -41,8 +63,11 @@ internal fun restoreChatStateBefore(
         }
     }
     .filter { event ->
-        event.type == "chat/post-turn" &&
-            event.data["status"]?.jsonPrimitive?.contentOrNull == "updated"
+        event.type == "chat/state-baseline" ||
+            (
+                event.type == "chat/post-turn" &&
+                    event.data["status"]?.jsonPrimitive?.contentOrNull == "updated"
+            )
     }
     .sortedBy(LocalSessionEventLog.Event::sequence)
     .mapNotNull { event ->
@@ -82,10 +107,11 @@ internal fun restoreGroupStateBefore(
             event.createdAt < createdAtExclusive
         }
     }
-    .filter { event -> event.type == "group/state" }
+    .filter { event -> event.type == "group/state" || event.type == "chat/state-baseline" }
     .sortedBy(LocalSessionEventLog.Event::sequence)
     .mapNotNull { event ->
-        val encoded = event.data["state"] as? JsonObject ?: return@mapNotNull null
+        val key = if (event.type == "chat/state-baseline") "group_state" else "state"
+        val encoded = event.data[key] as? JsonObject ?: return@mapNotNull null
         runCatching {
             json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
         }.getOrNull()
