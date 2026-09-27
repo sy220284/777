@@ -1,0 +1,119 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+/**
+ * Persist the state that exists immediately before a user message is durably recorded.
+ *
+ * One baseline per user event makes historical edits deterministic even after relationship changes,
+ * proactive messages, direction changes, or a non-empty saved-story/continuation start state.
+ */
+internal fun persistChatTimelineBaseline(
+    eventLog: LocalSessionEventLog,
+    json: Json,
+    state: LocalHarnessState,
+) {
+    if (state.usageMode != LocalUsageMode.CHAT) return
+    eventLog.append("chat/state-baseline", buildJsonObject {
+        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chatState))
+        if (state.groupChat.enabled) {
+            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.groupChat))
+        }
+    })
+}
+
+/**
+ * Resolve the durable event that originally carried one user message.
+ *
+ * Historical edit uses the event sequence as the rollback boundary so old future state cannot
+ * leak into the replacement timeline even when timestamps are equal or reordered.
+ */
+internal fun sourceEventSequenceForMessage(
+    events: Sequence<LocalSessionEventLog.Event>,
+    messageId: String,
+): Long? = events
+    .filter { event ->
+        event.type == "user/message" || event.type == LOCAL_AGENT_INBOX_EVENT_TYPE
+    }
+    .filter { event ->
+        decodeTranscriptMessages(event.data)
+            .orEmpty()
+            .any { message -> message.id == messageId }
+    }
+    .maxOfOrNull(LocalSessionEventLog.Event::sequence)
+
+/** Recover the newest single-chat state strictly before a timeline rewrite boundary. */
+internal fun restoreChatStateBefore(
+    events: Sequence<LocalSessionEventLog.Event>,
+    json: Json,
+    sequenceExclusive: Long?,
+    createdAtExclusive: Long,
+): ChatCharacterState? = events
+    .filter { event ->
+        if (sequenceExclusive != null) {
+            event.sequence < sequenceExclusive
+        } else {
+            event.createdAt < createdAtExclusive
+        }
+    }
+    .filter { event ->
+        event.type == "chat/state-baseline" ||
+            (
+                event.type == "chat/post-turn" &&
+                    event.data["status"]?.jsonPrimitive?.contentOrNull == "updated"
+            )
+    }
+    .sortedBy(LocalSessionEventLog.Event::sequence)
+    .mapNotNull { event ->
+        val encoded = event.data["state"] as? JsonObject
+        if (encoded != null) {
+            runCatching {
+                json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
+            }.getOrNull()
+        } else {
+            // Compatibility with old post-turn events that only persisted these two fields.
+            val mood = event.data["mood"]?.jsonPrimitive?.contentOrNull
+            val relationship = event.data["relationship_state"]?.jsonPrimitive?.contentOrNull
+            if (mood == null && relationship == null) {
+                null
+            } else {
+                ChatCharacterState(
+                    mood = mood ?: "自然",
+                    relationshipState = relationship ?: "熟悉中",
+                    updatedAt = event.createdAt,
+                )
+            }
+        }
+    }
+    .lastOrNull()
+
+/** Recover the newest group-chat state strictly before a timeline rewrite boundary. */
+internal fun restoreGroupStateBefore(
+    events: Sequence<LocalSessionEventLog.Event>,
+    json: Json,
+    sequenceExclusive: Long?,
+    createdAtExclusive: Long,
+): LocalGroupChatState? = events
+    .filter { event ->
+        if (sequenceExclusive != null) {
+            event.sequence < sequenceExclusive
+        } else {
+            event.createdAt < createdAtExclusive
+        }
+    }
+    .filter { event -> event.type == "group/state" || event.type == "chat/state-baseline" }
+    .sortedBy(LocalSessionEventLog.Event::sequence)
+    .mapNotNull { event ->
+        val key = if (event.type == "chat/state-baseline") "group_state" else "state"
+        val encoded = event.data[key] as? JsonObject ?: return@mapNotNull null
+        runCatching {
+            json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
+        }.getOrNull()
+    }
+    .lastOrNull()
