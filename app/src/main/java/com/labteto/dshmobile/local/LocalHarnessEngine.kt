@@ -2041,11 +2041,7 @@ class LocalHarnessEngine @Inject constructor(
                 output = reason,
                 delivered = false,
                 skipReason = reason,
-                nextRunAtHint = nextQuietHoursEndMillis(
-                    nowMillis = System.currentTimeMillis(),
-                    endHour = quietEndHour,
-                    endMinute = quietEndMinute,
-                ),
+                nextRunAtHint = earlyQuietDecision.retryAt,
             )
         }
 
@@ -2172,6 +2168,11 @@ class LocalHarnessEngine @Inject constructor(
                     evaluateChatProactivePolicy(
                         messages = recentTranscript,
                         nowMillis = System.currentTimeMillis(),
+                        quietHoursEnabled = quietHoursEnabled,
+                        quietStartHour = quietStartHour,
+                        quietStartMinute = quietStartMinute,
+                        quietEndHour = quietEndHour,
+                        quietEndMinute = quietEndMinute,
                         minimumGapMinutes = proactiveMinGapMinutes,
                         maxUnanswered = proactiveMaxUnanswered,
                     )
