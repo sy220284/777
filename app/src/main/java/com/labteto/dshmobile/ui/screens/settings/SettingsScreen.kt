@@ -115,6 +115,19 @@ enum class SettingsDestination {
     ADVANCED,
 }
 
+private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
+    SettingsDestination.ROOT -> null
+    SettingsDestination.GENERAL,
+    SettingsDestination.MODELS,
+    SettingsDestination.MEMORY,
+    SettingsDestination.PERMISSIONS,
+    SettingsDestination.NOTIFICATIONS,
+    SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.CHAT -> SettingsDestination.GENERAL
+    SettingsDestination.PRICING,
+    SettingsDestination.USAGE -> SettingsDestination.MODELS
+}
+
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
@@ -139,9 +152,10 @@ fun SettingsScreen(
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
+    val scrollState = rememberScrollState()
 
     BackHandler {
-        if (page == SettingsDestination.ROOT) onClose() else page = SettingsDestination.ROOT
+        page.parentDestination()?.let { page = it } ?: onClose()
     }
     LaunchedEffect(initialDestination) {
         page = initialDestination
@@ -150,6 +164,7 @@ fun SettingsScreen(
         viewModel.refreshRemoteSettings()
     }
     LaunchedEffect(page) {
+        scrollState.scrollTo(0)
         if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
     }
     LaunchedEffect(showEnvironment) {
@@ -179,14 +194,14 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .safeDrawingPadding()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
             ) {
                 DsTopBar(
                     title = title,
                     onBack = {
-                        if (page == SettingsDestination.ROOT) onClose() else page = SettingsDestination.ROOT
+                        page.parentDestination()?.let { page = it } ?: onClose()
                     },
                     backContentDescription = stringResource(R.string.common_back),
                 )
