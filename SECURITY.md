@@ -5,14 +5,12 @@ harness to your network.
 
 ## Reporting a vulnerability
 
-Two private channels, either is fine — please do not open a public issue:
+Please use this repository's private GitHub Security Advisory form — do not open a public issue:
 
-- **[Report a vulnerability](https://github.com/sorsama/deepseek-harness-mobile/security/advisories/new)**
-  on the Security tab, which keeps the report and the discussion private on GitHub.
-- Email **sor@zyphite.com**.
+- **[Report a vulnerability](https://github.com/sy220284/777/security/advisories/new)**
 
 Useful things to include: what an attacker can do, the steps to reproduce it, the app version and
-the harness version, and how the app was connected (LAN, `adb reverse`, or same device).
+the harness version, and how the app was connected.
 
 ## Already known, and not a vulnerability in this app
 
