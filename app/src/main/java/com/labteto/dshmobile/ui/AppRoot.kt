@@ -94,7 +94,9 @@ fun AppRoot(
         LaunchedEffect(requestedSessionId, connection.phase) {
             val target = requestedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
             showSettings = false
+            settingsReturnUtilitySurface = null
             utilitySurface = null
+            utilityReturnSurface = null
             showPair = false
             surface = "remote"
             relayClaimed = true
