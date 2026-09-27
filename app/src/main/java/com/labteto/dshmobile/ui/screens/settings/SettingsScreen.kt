@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -926,7 +928,11 @@ private fun ThemePreviewBlock(
                 color = if (selected) colors.accent else colors.borderL2,
                 shape = DsShapes.cube,
             )
-            .clickable(onClick = onClick),
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            ),
     ) {
         Box(
             Modifier
@@ -948,6 +954,17 @@ private fun ThemePreviewBlock(
                     .size(width = 64.dp, height = 16.dp)
                     .background(card, RoundedCornerShape(5.dp)),
             )
+            if (selected) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(16.dp),
+                )
+            }
         }
         Text(
             label,
@@ -979,12 +996,20 @@ private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     modifier = Modifier
                         .width(68.dp)
                         .clip(DsShapes.cube)
+                        .background(
+                            if (selected) colors.accentTertiary else Color.Transparent,
+                            DsShapes.cube,
+                        )
                         .border(
                             width = if (selected) 1.5.dp else 1.dp,
                             color = if (selected) palette.lightAccent else colors.borderL2,
                             shape = DsShapes.cube,
                         )
-                        .clickable { onSelect(palette.key) }
+                        .selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(palette.key) },
+                        )
                         .padding(8.dp),
                 ) {
                     // 色卡本体：亮档/暗档/浅衬 三段色条
@@ -1002,8 +1027,16 @@ private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     Text(
                         palette.cnName,
                         style = DsType.caption11,
-                        color = if (selected) colors.labelPrimary else colors.labelTertiary,
+                        color = if (selected) colors.accent else colors.labelTertiary,
                     )
+                    if (selected) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
         }
