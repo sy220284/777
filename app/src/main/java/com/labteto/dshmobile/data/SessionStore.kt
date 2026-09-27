@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.data
 
 import android.util.Base64
-import android.util.Log
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.connection.ConnectionManager
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.HostsStore
@@ -89,6 +89,7 @@ import com.labteto.dshmobile.core.wire.newPromptRequestId
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicBoolean
 import com.labteto.dshmobile.core.wire.dto.PermissionCatalog
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -261,6 +262,7 @@ class SessionStore @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
     private val baselineMutex = Mutex()
+    private val baselineDirty = AtomicBoolean(false)
     val connectionState = connectionManager.state
     val activeHostKey: String? get() = connectionManager.state.value.host?.let { "${it.baseUrl}|${it.id}" }
     internal val panels = com.labteto.dshmobile.ui.screens.main.PanelRepository()
@@ -548,14 +550,23 @@ class SessionStore @Inject constructor(
         runCatching { decodeFromJsonElement(serializer, item) }.getOrNull()
 
     private fun triggerBaseline() {
+        baselineDirty.set(true)
         scope.launch {
             if (!baselineMutex.tryLock()) return@launch
             try {
-                baseline()
-            } catch (e: Exception) {
-                log("baseline failed", e)
+                while (baselineDirty.getAndSet(false)) {
+                    try {
+                        baseline()
+                    } catch (e: Exception) {
+                        log("baseline failed", e)
+                    }
+                }
             } finally {
                 baselineMutex.unlock()
+                // Close the narrow race where a new trigger lands after the loop's last dirty read
+                // but before the mutex is released. The new pass will either acquire immediately or
+                // mark dirty for the current owner again.
+                if (baselineDirty.get()) triggerBaseline()
             }
         }
     }
@@ -2092,7 +2103,7 @@ class SessionStore @Inject constructor(
     }
 
     private fun log(message: String, throwable: Throwable? = null) {
-        if (throwable != null) Log.w(TAG, message, throwable) else Log.w(TAG, message)
+        AppLog.warn(TAG, message, throwable)
     }
 
     private companion object {
