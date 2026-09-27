@@ -7,6 +7,7 @@ import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,9 +24,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +43,7 @@ import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -303,22 +306,49 @@ fun TasksScreen(
     }
     val chatMode = taskMode == AutomationMode.CHAT
     val visibleTasks = state.tasks.filter { it.mode == taskMode }
-    val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
-    var showCreate by remember { mutableStateOf(false) }
-    var editingTaskId by remember { mutableStateOf<String?>(null) }
-    var prompt by remember { mutableStateOf("") }
-    var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
-    var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
-    var customHours by remember { mutableStateOf("6") }
-    var windowStartMinuteOfDay by remember { mutableStateOf(20 * 60) }
-    var windowEndMinuteOfDay by remember { mutableStateOf(22 * 60) }
-    var quietHoursEnabled by remember { mutableStateOf(true) }
-    var quietStartMinuteOfDay by remember { mutableStateOf(23 * 60) }
-    var quietEndMinuteOfDay by remember { mutableStateOf(7 * 60) }
-    var proactiveMinGapHours by remember { mutableStateOf(6) }
-    var proactiveMaxUnanswered by remember { mutableStateOf(2) }
-    var createError by remember { mutableStateOf<String?>(null) }
+    var showCreate by rememberSaveable { mutableStateOf(false) }
+    val editingTaskIdState = rememberSaveable { mutableStateOf<String?>(null) }
+    var editingTaskId by editingTaskIdState
+    val promptState = rememberSaveable { mutableStateOf("") }
+    var prompt by promptState
+    val cadenceState = rememberSaveable { mutableStateOf(AutomationCadence.ONCE) }
+    var cadence by cadenceState
+    val firstRunAtState = rememberSaveable { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
+    var firstRunAt by firstRunAtState
+    val customHoursState = rememberSaveable { mutableStateOf("6") }
+    var customHours by customHoursState
+    val windowStartMinuteOfDayState = rememberSaveable { mutableStateOf(20 * 60) }
+    var windowStartMinuteOfDay by windowStartMinuteOfDayState
+    val windowEndMinuteOfDayState = rememberSaveable { mutableStateOf(22 * 60) }
+    var windowEndMinuteOfDay by windowEndMinuteOfDayState
+    val quietHoursEnabledState = rememberSaveable { mutableStateOf(true) }
+    var quietHoursEnabled by quietHoursEnabledState
+    val quietStartMinuteOfDayState = rememberSaveable { mutableStateOf(23 * 60) }
+    var quietStartMinuteOfDay by quietStartMinuteOfDayState
+    val quietEndMinuteOfDayState = rememberSaveable { mutableStateOf(7 * 60) }
+    var quietEndMinuteOfDay by quietEndMinuteOfDayState
+    val proactiveMinGapHoursState = rememberSaveable { mutableStateOf(6) }
+    var proactiveMinGapHours by proactiveMinGapHoursState
+    val proactiveMaxUnansweredState = rememberSaveable { mutableStateOf(2) }
+    var proactiveMaxUnanswered by proactiveMaxUnansweredState
+    val createErrorState = rememberSaveable { mutableStateOf<String?>(null) }
+    var createError by createErrorState
+    val editorStateRefs = TaskEditorStateRefs(
+        editingTaskId = editingTaskIdState,
+        prompt = promptState,
+        cadence = cadenceState,
+        firstRunAt = firstRunAtState,
+        customHours = customHoursState,
+        windowStartMinuteOfDay = windowStartMinuteOfDayState,
+        windowEndMinuteOfDay = windowEndMinuteOfDayState,
+        quietHoursEnabled = quietHoursEnabledState,
+        quietStartMinuteOfDay = quietStartMinuteOfDayState,
+        quietEndMinuteOfDay = quietEndMinuteOfDayState,
+        proactiveMinGapHours = proactiveMinGapHoursState,
+        proactiveMaxUnanswered = proactiveMaxUnansweredState,
+        createError = createErrorState,
+    )
     val resetEditor = {
         showCreate = false
         editingTaskId = null
@@ -381,10 +411,124 @@ fun TasksScreen(
             )
 
             if (showCreate) {
-                Column(
-                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                TaskEditorPane(
+                    state = editorStateRefs,
+                    chatMode = chatMode,
+                    taskMode = taskMode,
+                    harnessState = harnessState,
+                    viewModel = viewModel,
+                    createInvalidMessage = createInvalidMessage,
+                    onReset = resetEditor,
+                )
+            } else if (visibleTasks.isEmpty()) {
+                EmptyHero(
+                    headline = stringResource(R.string.tasks_empty_title),
+                    subtitle = stringResource(R.string.tasks_empty_subtitle),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                DsGroupCard {
+                    items(visibleTasks, key = AutomationTask::id) { task ->
+                        TaskCard(
+                            task = task,
+                            onCancel = { viewModel.cancel(task.id) },
+                            onPause = { viewModel.pause(task.id) },
+                            onResume = { viewModel.resume(task.id) },
+                            onRunNow = { viewModel.runNow(task.id) },
+                            onEdit = {
+                                editingTaskId = task.id
+                                prompt = task.prompt
+                                cadence = cadenceForTask(task)
+                                firstRunAt = maxOf(
+                                    task.nextRunAt,
+                                    System.currentTimeMillis() + 60_000L,
+                                )
+                                customHours = customHoursForTask(task)
+                                windowStartMinuteOfDay = task.windowStartMinuteOfDay ?: 20 * 60
+                                windowEndMinuteOfDay = task.windowEndMinuteOfDay ?: 22 * 60
+                                quietHoursEnabled = task.quietHoursEnabled
+                                quietStartMinuteOfDay =
+                                    task.quietStartHour * 60 + task.quietStartMinute
+                                quietEndMinuteOfDay =
+                                    task.quietEndHour * 60 + task.quietEndMinute
+                                proactiveMinGapHours =
+                                    maxOf(1, (task.proactiveMinGapMinutes / 60L).toInt())
+                                proactiveMaxUnanswered = task.proactiveMaxUnanswered
+                                createError = null
+                                showCreate = true
+                            },
+                            onOpenSession = onOpenSession,
+                        )
+                    }
+                }
+            }
+
+            state.notice?.let { notice ->
+                Text(
+                    stringResource(
+                        when (notice) {
+                            TasksNotice.CANCELLED -> R.string.tasks_cancelled
+                            TasksNotice.MISSING -> R.string.tasks_missing
+                        },
+                    ),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                )
+            }
+        }
+    }
+}
+
+
+private data class TaskEditorStateRefs(
+    val editingTaskId: MutableState<String?>,
+    val prompt: MutableState<String>,
+    val cadence: MutableState<AutomationCadence>,
+    val firstRunAt: MutableState<Long>,
+    val customHours: MutableState<String>,
+    val windowStartMinuteOfDay: MutableState<Int>,
+    val windowEndMinuteOfDay: MutableState<Int>,
+    val quietHoursEnabled: MutableState<Boolean>,
+    val quietStartMinuteOfDay: MutableState<Int>,
+    val quietEndMinuteOfDay: MutableState<Int>,
+    val proactiveMinGapHours: MutableState<Int>,
+    val proactiveMaxUnanswered: MutableState<Int>,
+    val createError: MutableState<String?>,
+)
+
+@Composable
+private fun ColumnScope.TaskEditorPane(
+    state: TaskEditorStateRefs,
+    chatMode: Boolean,
+    taskMode: AutomationMode,
+    harnessState: LocalHarnessState,
+    viewModel: TasksViewModel,
+    createInvalidMessage: String,
+    onReset: () -> Unit,
+) {
+    var editingTaskId by state.editingTaskId
+    var prompt by state.prompt
+    var cadence by state.cadence
+    var firstRunAt by state.firstRunAt
+    var customHours by state.customHours
+    var windowStartMinuteOfDay by state.windowStartMinuteOfDay
+    var windowEndMinuteOfDay by state.windowEndMinuteOfDay
+    var quietHoursEnabled by state.quietHoursEnabled
+    var quietStartMinuteOfDay by state.quietStartMinuteOfDay
+    var quietEndMinuteOfDay by state.quietEndMinuteOfDay
+    var proactiveMinGapHours by state.proactiveMinGapHours
+    var proactiveMaxUnanswered by state.proactiveMaxUnanswered
+    var createError by state.createError
+    val context = LocalContext.current
+    val colors = DsTheme.colors
+    val resetEditor = onReset
+
+    Column(
+        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+    ) {
+        DsGroupCard {
                     Text(
                         stringResource(
                             if (editingTaskId != null) R.string.tasks_edit
@@ -767,65 +911,6 @@ fun TasksScreen(
                             size = DsButtonSize.Small,
                         )
                     }
-                }
-                }
-            } else if (visibleTasks.isEmpty()) {
-                EmptyHero(
-                    headline = stringResource(R.string.tasks_empty_title),
-                    subtitle = stringResource(R.string.tasks_empty_subtitle),
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    items(visibleTasks, key = AutomationTask::id) { task ->
-                        TaskCard(
-                            task = task,
-                            onCancel = { viewModel.cancel(task.id) },
-                            onPause = { viewModel.pause(task.id) },
-                            onResume = { viewModel.resume(task.id) },
-                            onRunNow = { viewModel.runNow(task.id) },
-                            onEdit = {
-                                editingTaskId = task.id
-                                prompt = task.prompt
-                                cadence = cadenceForTask(task)
-                                firstRunAt = maxOf(
-                                    task.nextRunAt,
-                                    System.currentTimeMillis() + 60_000L,
-                                )
-                                customHours = customHoursForTask(task)
-                                windowStartMinuteOfDay = task.windowStartMinuteOfDay ?: 20 * 60
-                                windowEndMinuteOfDay = task.windowEndMinuteOfDay ?: 22 * 60
-                                quietHoursEnabled = task.quietHoursEnabled
-                                quietStartMinuteOfDay =
-                                    task.quietStartHour * 60 + task.quietStartMinute
-                                quietEndMinuteOfDay =
-                                    task.quietEndHour * 60 + task.quietEndMinute
-                                proactiveMinGapHours =
-                                    maxOf(1, (task.proactiveMinGapMinutes / 60L).toInt())
-                                proactiveMaxUnanswered = task.proactiveMaxUnanswered
-                                createError = null
-                                showCreate = true
-                            },
-                            onOpenSession = onOpenSession,
-                        )
-                    }
-                }
-            }
-
-            state.notice?.let { notice ->
-                Text(
-                    stringResource(
-                        when (notice) {
-                            TasksNotice.CANCELLED -> R.string.tasks_cancelled
-                            TasksNotice.MISSING -> R.string.tasks_missing
-                        },
-                    ),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                )
-            }
         }
     }
 }

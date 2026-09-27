@@ -728,7 +728,7 @@ class LocalWebProvider @Inject constructor(
     }
     private companion object {
         const val SEARCH_ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"
-        const val SEARCH_MODEL = "deepseek-v4-flash"
+        const val SEARCH_MODEL = "deepseek-flash"
         const val USER_AGENT = "DSH-Mobile-Android16/0.12.0"
         const val MAX_REDIRECTS = 5
         const val MIN_FETCH_BYTES = 16 * 1024

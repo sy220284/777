@@ -2,11 +2,9 @@ package com.labteto.dshmobile.local
 
 import android.app.ActivityManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
+import com.labteto.dshmobile.observability.AppLog
 import android.os.Environment
-import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
 import com.labteto.dshmobile.automation.AutomationStore
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
@@ -62,7 +60,6 @@ import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
-import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
@@ -74,11 +71,7 @@ import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
-import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
-import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
-import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -87,7 +80,6 @@ import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -276,14 +268,6 @@ class LocalHarnessEngine @Inject constructor(
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
-    // P0 修复（审计 2026-09-27）：SupervisorJob 之下未捕获的 launch 异常会走进程崩溃。
-    // 挂上 handler 后引擎内部失败降级为日志 + 状态可见，不再炸穿整个应用。
-    private val scope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO +
-            CoroutineExceptionHandler { _, throwable ->
-                Log.e("LocalHarnessEngine", "engine coroutine failure", throwable)
-            },
-    )
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
@@ -300,11 +284,22 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val fileInspector = LocalFileInspector(File(workspace.path))
+    private val attachmentImporter = LocalAttachmentImporter(
+        context = context,
+        workspace = workspace,
+        maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
+    )
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
     private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val modelConfiguration = LocalModelConfigurationCoordinator(
+        preferences = preferences,
+        apiKeys = apiKeys,
+        tester = modelConnectionTester,
+        json = json,
+    )
     private val approvalPreferences = LocalApprovalPreferences(preferences)
     private val chatTurnCoordinator = LocalChatTurnCoordinator(
         runner = chatTurnRunner,
@@ -426,13 +421,14 @@ class LocalHarnessEngine @Inject constructor(
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
     // legacy migration, before the loading screen admits session actions.
     @Volatile private lateinit var eventLog: LocalSessionEventLog
-    private data class ConversationFilesCacheEntry(
-        val eventStamp: Long,
-        val workspaceStamp: Long,
-        val value: LocalConversationFiles,
-    )
-    private val conversationFilesCacheLock = Any()
-    private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
+    private val conversationFilesCoordinator by lazy {
+        LocalConversationFilesCoordinator(
+            workspace = workspace,
+            eventLogFor = ::eventLogFor,
+            currentSessionId = { currentSessionId },
+            currentEventLog = { eventLog },
+        )
+    }
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     @Volatile private var modelHistoryChars = 0
@@ -443,11 +439,40 @@ class LocalHarnessEngine @Inject constructor(
             workspacePath = workspace.path,
             sessionId = currentSessionId,
             usage = usageTracker.state.value,
-            chatStyleGuardEnabled = preferences.getBoolean(KEY_CHAT_STYLE_GUARD, true),
-            chatStyleGuardCustomPhrases = loadChatStyleGuardCustomPhrases(),
+            chatStyleGuardEnabled = preferences.getBoolean(
+                LocalHarnessSettingsCoordinator.KEY_CHAT_STYLE_GUARD,
+                true,
+            ),
+            chatStyleGuardCustomPhrases =
+                LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+
+    // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
+    // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, throwable ->
+                AppLog.error("LocalHarnessEngine", "engine coroutine failure", throwable)
+                _state.update { current ->
+                    current.copy(
+                        error = throwable.message?.takeIf(String::isNotBlank)
+                            ?: "本机 Harness 后台任务失败：${throwable::class.java.simpleName}",
+                    )
+                }
+            },
+    )
+    private val settingsCoordinator by lazy {
+        LocalHarnessSettingsCoordinator(
+            preferences = preferences,
+            userProfileStore = userProfileStore,
+            scope = scope,
+            state = { _state.value },
+            updateState = { transform -> _state.update(transform) },
+        )
+    }
+
     private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     private val imageCapabilities = LocalImageCapabilityRegistry()
     private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
@@ -684,6 +709,60 @@ class LocalHarnessEngine @Inject constructor(
     private var chatPostTurnJob: Job? = null
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
+    private val memoryCoordinator by lazy {
+        LocalMemoryCoordinator(
+            state = _state,
+            memoryStore = memoryStore,
+            memoryManager = memoryManager,
+            currentSessionId = { currentSessionId },
+            eventLog = { eventLog },
+            persist = ::persist,
+        )
+    }
+    private val approvalCoordinator by lazy {
+        LocalApprovalCoordinator(
+            state = _state,
+            approvalPreferences = approvalPreferences,
+            interactions = interactions,
+            eventLog = { eventLog },
+            persist = ::persist,
+        )
+    }
+    private val sessionLifecycle by lazy {
+        LocalSessionLifecycleCoordinator(
+            scope = scope,
+            state = _state,
+            transitionMutex = sessionTransitionMutex,
+            jobs = jobs,
+            sessionCoordinator = sessionCoordinator,
+            chatPersonaStore = chatPersonaStore,
+            approvalPreferences = approvalPreferences,
+            resourceScheduler = resourceScheduler,
+            handoffBuilder = handoffBuilder,
+            toolOutputStore = toolOutputStore,
+            sessionsRoot = sessionsRoot,
+            conversationFilesCoordinator = conversationFilesCoordinator,
+            memoryStore = memoryStore,
+            currentSessionId = { currentSessionId },
+            activateSession = { id, transcriptCursor ->
+                currentSessionId = id
+                preferences.edit().putString(KEY_SESSION_ID, id).apply()
+                eventLog = eventLogFor(id)
+                transcriptProjectionCursor = transcriptCursor
+            },
+            beginTransition = ::beginSessionTransition,
+            endTransition = ::endSessionTransition,
+            runBusy = ::isRunBusy,
+            cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
+            resetModelHistory = { resetModelHistory() },
+            persist = ::persist,
+            loadSession = { id -> loadSession(id) },
+            restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
+            startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
+            sessionSummaries = ::sessionSummaries,
+            localProjectId = LOCAL_PROJECT_ID,
+        )
+    }
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
@@ -739,51 +818,18 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Read-only file views used by the local Harness UI. Heavy filesystem work stays off main. */
     suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
-        workspace.files()
+        conversationFilesCoordinator.workspaceFiles()
     }
 
     suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
-            val files = workspace.files()
-            val log = if (sessionId == currentSessionId) eventLog else eventLogFor(sessionId)
-            val eventStamp = log.latestOf(CONVERSATION_FILE_EVENT_TYPES)?.sequence ?: -1L
-            val workspaceStamp = workspaceFilesStamp(files)
-            synchronized(conversationFilesCacheLock) {
-                conversationFilesCache[sessionId]
-                    ?.takeIf { it.eventStamp == eventStamp && it.workspaceStamp == workspaceStamp }
-                    ?.value
-            }?.let { return@withContext it }
-
-            val projected = localConversationFiles(log.events(), files)
-            synchronized(conversationFilesCacheLock) {
-                conversationFilesCache[sessionId] = ConversationFilesCacheEntry(
-                    eventStamp = eventStamp,
-                    workspaceStamp = workspaceStamp,
-                    value = projected,
-                )
-                while (conversationFilesCache.size > MAX_CONVERSATION_FILES_CACHE) {
-                    val eldest = conversationFilesCache.entries.firstOrNull()?.key ?: break
-                    conversationFilesCache.remove(eldest)
-                }
-            }
-            projected
+            conversationFilesCoordinator.conversationFiles(sessionId)
         }
-
-    private fun workspaceFilesStamp(files: List<LocalWorkspaceFile>): Long {
-        var stamp = 1_469_598_103_934_665_603L
-        files.forEach { file ->
-            stamp = stamp xor file.path.hashCode().toLong()
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor file.bytes
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor file.modifiedAt
-            stamp *= 1_099_511_628_211L
-        }
-        return stamp
-    }
 
     suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
-        withContext(Dispatchers.IO) { workspace.preview(path) }
+        withContext(Dispatchers.IO) {
+            conversationFilesCoordinator.preview(path)
+        }
 
     /** Save the local model route and its encrypted credential. */
     fun configure(apiKey: String, model: String, baseUrl: String) {
@@ -795,24 +841,16 @@ class LocalHarnessEngine @Inject constructor(
 
     suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        require(model.isNotBlank()) { "模型名称不能为空" }
-        val normalizedModel = normalizeConfiguredModel(model)
-        val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
-        val id = modelProfileId(normalizedModel, normalizedBaseUrl)
-        if (apiKey.isNotBlank()) apiKeys.putFor(id, apiKey)
-        else require(apiKeys.getFor(id) != null) { "请填写该模型的密钥" }
-        val profiles = (readModelProfiles().filterNot { it.id == id } +
-            LocalModelProfile(id, normalizedModel, normalizedBaseUrl))
-        preferences.edit()
-            .putString(KEY_MODEL, normalizedModel)
-            .putString(KEY_BASE_URL, normalizedBaseUrl)
-            .putString(KEY_MODEL_PROFILES, encodeModelProfiles(profiles))
-            .apply()
-        apiKeys.activate(id)
+        val result = modelConfiguration.save(apiKey, model, baseUrl)
         _state.update {
-            it.copy(configured = true, model = normalizedModel, baseUrl = normalizedBaseUrl,
-                configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
-                modelProfiles = profiles, error = null)
+            it.copy(
+                configured = result.configured,
+                model = result.model,
+                baseUrl = result.baseUrl,
+                configuredModels = result.configuredModels,
+                modelProfiles = result.profiles,
+                error = null,
+            )
         }
     }
 
@@ -821,164 +859,88 @@ class LocalHarnessEngine @Inject constructor(
         scope.launch {
             val current = _state.value
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
-            if (current.loading || current.running || isRunBusy() ||
-                (selected.model == current.model && selected.baseUrl == current.baseUrl)) return@launch
-            if (apiKeys.getFor(id) == null) {
-                _state.update { it.copy(error = "该模型密钥不可用，请编辑配置重新填写") }
-                return@launch
-            }
-            if (isRunBusy()) return@launch
-            preferences.edit().putString(KEY_MODEL, selected.model)
-                .putString(KEY_BASE_URL, selected.baseUrl).apply()
-            apiKeys.activate(selected.id)
-            _state.update { state ->
-                state.copy(configured = true, model = selected.model, baseUrl = selected.baseUrl, error = null)
-            }
+            if (
+                current.loading || current.running || isRunBusy() ||
+                (selected.model == current.model && selected.baseUrl == current.baseUrl)
+            ) return@launch
+            runCatching { modelConfiguration.select(id, current.modelProfiles) }
+                .onSuccess { result ->
+                    if (result != null) {
+                        _state.update { state ->
+                            state.copy(
+                                configured = result.configured,
+                                model = result.model,
+                                baseUrl = result.baseUrl,
+                                modelProfiles = result.profiles,
+                                configuredModels = result.configuredModels,
+                                error = null,
+                            )
+                        }
+                    }
+                }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
 
     fun removeModelProfile(id: String) {
         if (isRunBusy() || _state.value.loading) return
         scope.launch {
-            val profiles = readModelProfiles()
-            if (profiles.none { it.id == id }) return@launch
-            apiKeys.clearFor(id)
-            val remaining = profiles.filterNot { it.id == id }
-            val next = remaining.firstOrNull { it.model == _state.value.model && it.baseUrl == _state.value.baseUrl }
-                ?: remaining.firstOrNull()
-            preferences.edit().putString(KEY_MODEL_PROFILES, encodeModelProfiles(remaining))
-                .putString(KEY_MODEL, next?.model ?: DEFAULT_MODEL)
-                .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL).apply()
-            apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-            _state.update { it.copy(configured = next != null, model = next?.model ?: DEFAULT_MODEL,
-                baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL, modelProfiles = remaining,
-                configuredModels = remaining.map(LocalModelProfile::model).distinct().sorted()) }
+            val current = _state.value
+            runCatching {
+                modelConfiguration.remove(id, current.model, current.baseUrl)
+            }.onSuccess { result ->
+                if (result != null) {
+                    _state.update {
+                        it.copy(
+                            configured = result.configured,
+                            model = result.model,
+                            baseUrl = result.baseUrl,
+                            modelProfiles = result.profiles,
+                            configuredModels = result.configuredModels,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(error = error.message) }
+            }
         }
     }
 
-    suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String {
-        if (model.isBlank()) return "请选择模型"
-        val name = normalizeConfiguredModel(model)
-        val url = runCatching { normalizeModelBaseUrl(baseUrl) }.getOrElse { return it.message ?: "地址无效" }
-        val key = apiKey.trim().takeIf(String::isNotEmpty)
-            ?: apiKeys.getFor(modelProfileId(name, url)) ?: return "请先填写该模型的密钥"
-        return modelConnectionTester.test(key, url, name)
-    }
+    suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
+        modelConfiguration.test(apiKey, model, baseUrl)
 
     /** Choose how user image attachments reach the local model. */
-    fun configureImageInputMode(mode: LocalImageInputMode) {
-        preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        _state.update { it.copy(imageInputMode = mode) }
-    }
+    fun configureImageInputMode(mode: LocalImageInputMode) =
+        settingsCoordinator.configureImageInputMode(mode)
 
     /** Persist execution limits exposed from Settings. */
-    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
-        val main = mainMaxSteps.coerceIn(4, 128)
-        val subagent = subagentMaxSteps.coerceIn(1, 128)
-        val attempts = modelAttempts.coerceIn(1, 5)
-        preferences.edit()
-            .putInt(KEY_MAIN_MAX_STEPS, main)
-            .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
-            .putInt(KEY_MODEL_ATTEMPTS, attempts)
-            .apply()
-        _state.update {
-            it.copy(
-                mainMaxSteps = main,
-                subagentMaxSteps = subagent,
-                modelAttempts = attempts,
-            )
-        }
-    }
+    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
+        settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
 
     /** Persist user-authored behavioral rules and memory recall preference. */
-    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) {
-        val profile = UserProfile(
-            customRules = customRules.trim().take(6_000),
-            autoRecall = autoRecall,
-            autoMemory = autoMemory,
-        )
-        _state.update {
-            it.copy(
-                userRules = profile.customRules,
-                autoRecall = profile.autoRecall,
-                autoMemory = profile.autoMemory,
-            )
-        }
-        scope.launch {
-            userProfileStore.write(profile)
-        }
-    }
+    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
+        settingsCoordinator.configurePersonalization(customRules, autoRecall, autoMemory)
 
-    /** Master switch for local chat output filtering. Off means the model stream is shown as-is. */
-    fun configureChatStyleGuard(enabled: Boolean) {
-        preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
-        _state.update { it.copy(chatStyleGuardEnabled = enabled) }
-    }
+    /** Master switch for local chat output filtering. */
+    fun configureChatStyleGuard(enabled: Boolean) =
+        settingsCoordinator.configureChatStyleGuard(enabled)
 
-    fun addChatStyleGuardPhrase(value: String): Boolean {
-        val phrase = normalizeChatStyleGuardPhrase(value) ?: return false
-        val current = _state.value.chatStyleGuardCustomPhrases
-        if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
-        val updated = current + phrase
-        preferences.edit()
-            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
-            .apply()
-        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
-        return true
-    }
+    fun addChatStyleGuardPhrase(value: String): Boolean =
+        settingsCoordinator.addChatStyleGuardPhrase(value)
 
-    fun removeChatStyleGuardPhrase(value: String) {
-        val phrase = value.trim()
-        if (phrase.isEmpty()) return
-        val current = _state.value.chatStyleGuardCustomPhrases
-        val updated = current.filterNot { it == phrase }
-        if (updated == current) return
-        preferences.edit()
-            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
-            .apply()
-        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
-    }
+    fun removeChatStyleGuardPhrase(value: String) =
+        settingsCoordinator.removeChatStyleGuardPhrase(value)
 
-    fun clearChatStyleGuardHits() {
-        _state.update { it.copy(styleGuardHits = emptyList()) }
-    }
-
-    private fun loadChatStyleGuardCustomPhrases(): List<String> =
-        preferences.getString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, "")
-            .orEmpty()
-            .lineSequence()
-            .mapNotNull(::normalizeChatStyleGuardPhrase)
-            .distinct()
-            .take(MAX_CUSTOM_CHAT_FILTERS)
-            .toList()
-
-    private fun normalizeChatStyleGuardPhrase(value: String): String? =
-        value.replace('\n', ' ')
-            .trim()
-            .takeIf(String::isNotBlank)
-            ?.take(MAX_CUSTOM_CHAT_FILTER_CHARS)
+    fun clearChatStyleGuardHits() =
+        settingsCoordinator.clearChatStyleGuardHits()
 
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
         persona: PersonaProfile = snapshot.chatPersona,
-    ): List<String> = ChatStyleGuard.activePhrases(
-        customPhrases = snapshot.chatStyleGuardCustomPhrases,
-        personaPhrases = persona.bannedPhrases,
-        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
-    )
+    ): List<String> = settingsCoordinator.chatStreamFilterPhrases(snapshot, persona)
 
-    private fun recordStyleGuardHits(violations: List<String>) {
-        if (violations.isEmpty()) return
-        _state.update { state ->
-            state.copy(
-                styleGuardHits = (state.styleGuardHits + violations)
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(MAX_STYLE_GUARD_HITS),
-            )
-        }
-    }
+    private fun recordStyleGuardHits(violations: List<String>) =
+        settingsCoordinator.recordStyleGuardHits(violations)
 
     fun configureChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
@@ -2760,103 +2722,8 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = withContext(Dispatchers.IO) {
-        val resolver = context.contentResolver
-        var displayName: String? = null
-        var declaredSize: Long? = null
-        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (nameIndex >= 0) displayName = cursor.getString(nameIndex)
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) declaredSize = cursor.getLong(sizeIndex)
-            }
-        }
-        if ((declaredSize ?: 0L) > MAX_ATTACHMENT_BYTES) {
-            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
-        }
-        val safeName = (displayName ?: "attachment-${System.currentTimeMillis()}")
-            .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
-            .take(120)
-            .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
-        val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
-        val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
-        val digest = MessageDigest.getInstance("SHA-256")
-        val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
-        try {
-            input.use { source ->
-                incoming.outputStream().use { output ->
-                    val buffer = ByteArray(32 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        total += read
-                        if (total > MAX_ATTACHMENT_BYTES) {
-                            error("附件超过 ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB 上限")
-                        }
-                        digest.update(buffer, 0, read)
-                        output.write(buffer, 0, read)
-                    }
-                }
-            }
-        } catch (error: Throwable) {
-            incoming.delete()
-            throw error
-        }
-        val imageMetadata = inspectImportedImage(incoming)
-        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
-            incoming.delete()
-            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
-        }
-        if (imageMetadata != null) {
-            try {
-                validateLocalImageMetadata(imageMetadata)
-            } catch (error: Throwable) {
-                incoming.delete()
-                throw error
-            }
-        }
-        val mediaType = imageMetadata?.mediaType ?: declaredMediaType
-        val attachmentId = digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val extension = when (mediaType) {
-            "image/png" -> "png"
-            "image/jpeg" -> "jpg"
-            "image/webp" -> "webp"
-            "image/gif" -> "gif"
-            else -> safeName.substringAfterLast('.', "")
-                .lowercase()
-                .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
-        }
-        val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
-        if (target.exists()) {
-            incoming.delete()
-        } else if (!incoming.renameTo(target)) {
-            incoming.copyTo(target, overwrite = false)
-            incoming.delete()
-        }
-        LocalImportedAttachment(
-            name = displayName ?: safeName,
-            relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
-            mediaType = mediaType,
-            bytes = target.length(),
-            attachmentId = attachmentId,
-            width = imageMetadata?.width,
-            height = imageMetadata?.height,
-        )
-    }
-
-    private fun inspectImportedImage(file: File): LocalImageMetadata? {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, options)
-        val mediaType = options.outMimeType?.lowercase()?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
-            ?: return null
-        val width = options.outWidth
-        val height = options.outHeight
-        if (width <= 0 || height <= 0) return null
-        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
-    }
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
+        withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
@@ -2890,76 +2757,31 @@ class LocalHarnessEngine @Inject constructor(
     fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
 
     /** Resolve the current write or shell approval. */
-    fun answerApproval(callId: String, approved: Boolean) {
-        interactions.answerApproval(callId, approved)
-    }
+    fun answerApproval(callId: String, approved: Boolean) =
+        approvalCoordinator.answerApproval(callId, approved)
 
-    /**
-     * Persist safe automatic approval across sessions.
-     *
-     * Enabling the mode from a high-impact dialog does not approve that current operation;
-     * it only suppresses future prompts for path-confined workspace writes and read-only tools.
-     */
-    fun enableAutoApproval() {
-        enableAutoApprovalInternal(expectedCallId = null)
-    }
+    fun enableAutoApproval() =
+        approvalCoordinator.enableAutoApproval()
 
-    fun enableAutoApprovalForPending(callId: String) {
-        enableAutoApprovalInternal(expectedCallId = callId)
-    }
+    fun enableAutoApprovalForPending(callId: String) =
+        approvalCoordinator.enableAutoApprovalForPending(callId)
 
-    private fun enableAutoApprovalInternal(expectedCallId: String?) {
-        val pending = _state.value.pendingApproval
-        if (expectedCallId != null && pending?.callId != expectedCallId) return
-        approvalPreferences.setSafeAutoApprovalEnabled(true)
-        _state.update { it.copy(safeAutoApprovalEnabled = true) }
-        eventLog.append("approval/mode", buildJsonObject {
-            put("mode", "safe-global")
-            pending?.toolName?.let { put("tool", it) }
-        })
-        persist()
-        if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
-            pending?.callId?.let { interactions.answerApproval(it, true) }
-        }
-    }
+    fun enableDeviceApprovalLease(callId: String) =
+        approvalCoordinator.enableDeviceApprovalLease(callId)
 
-    /** Approve ordinary DEVICE mutation actions for the remainder of the current agent turn only. */
-    fun enableDeviceApprovalLease(callId: String) {
-        val pending = _state.value.pendingApproval?.takeIf { it.callId == callId }
-        if (pending?.canApproveDeviceTurn != true) {
-            eventLog.append("approval/device-lease-rejected", buildJsonObject {
-                put("reason", "pending-tool-requires-explicit-approval")
-                pending?.toolName?.let { put("tool", it) }
-            })
-            return
-        }
-        _state.update { it.copy(deviceApprovalLease = true) }
-        eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
-        interactions.answerApproval(pending.callId, true)
-    }
+    fun disableDeviceApprovalLease() =
+        approvalCoordinator.disableDeviceApprovalLease()
 
-    fun disableDeviceApprovalLease() {
-        _state.update { it.copy(deviceApprovalLease = false) }
-        eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
-    }
-
-    /** Return safe operations to per-operation approval for all local sessions. */
-    fun disableAutoApproval() {
-        approvalPreferences.setSafeAutoApprovalEnabled(false)
-        _state.update { it.copy(safeAutoApprovalEnabled = false) }
-        eventLog.append("approval/mode", buildJsonObject { put("mode", "ask") })
-        persist()
-    }
+    fun disableAutoApproval() =
+        approvalCoordinator.disableAutoApproval()
 
     /** Resolve the current model-authored question. */
-    fun answerQuestion(callId: String, answer: String) {
-        interactions.answerQuestion(callId, answer)
-    }
+    fun answerQuestion(callId: String, answer: String) =
+        approvalCoordinator.answerQuestion(callId, answer)
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    fun cancelQuestion(callId: String) {
-        interactions.cancelQuestion(callId)
-    }
+    fun cancelQuestion(callId: String) =
+        approvalCoordinator.cancelQuestion(callId)
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
     fun stop() {
@@ -2989,7 +2811,7 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
     fun createSession(mode: LocalConversationMode) =
-        createSession(mode, _state.value.usageMode)
+        sessionLifecycle.createSession(mode)
 
     fun createSession(
         mode: LocalConversationMode,
@@ -2998,334 +2820,31 @@ class LocalHarnessEngine @Inject constructor(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
-    ) {
-        if (!beginSessionTransition()) return
-        val sourceId = currentSessionId
-        val sourceState = _state.value
-        val resolvedChatMode = when {
-            usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
-            galleryEntry != null -> LocalChatMode.SINGLE
-            chatMode != null -> chatMode
-            sourceState.usageMode == LocalUsageMode.CHAT -> sourceState.groupChat.mode
-            else -> LocalChatMode.SINGLE
-        }
-        _state.update {
-            it.copy(
-                loading = true,
-                running = false,
-                pendingApproval = null,
-                pendingQuestion = null,
-            )
-        }
-        scope.launch {
-            sessionTransitionMutex.withLock {
-                try {
-                    cancelActiveRunAndJoin()
-                    jobs.stopNonPersistentAndJoin()
-                    persist()
-
-                    currentSessionId = UUID.randomUUID().toString()
-                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
-                    eventLog = eventLogFor(currentSessionId)
-                    transcriptProjectionCursor = -1L
-                    resetModelHistory()
-
-                    val lineageId = when (mode) {
-                        LocalConversationMode.CONTINUATION ->
-                            sourceState.lineageId.ifBlank { sourceId }
-                        LocalConversationMode.INDEPENDENT,
-                        LocalConversationMode.PROJECT -> UUID.randomUUID().toString()
-                    }
-                    val projectId = when (mode) {
-                        LocalConversationMode.INDEPENDENT -> null
-                        LocalConversationMode.PROJECT -> sourceState.projectId ?: LOCAL_PROJECT_ID
-                        LocalConversationMode.CONTINUATION -> sourceState.projectId
-                    }
-                    val selectedGalleryStory = galleryEntry?.story(galleryStoryId)
-                    val handoff = if (galleryEntry != null && !freshGalleryStory) {
-                        selectedGalleryStory?.context(galleryEntry.persona.name).orEmpty()
-                    } else if (mode == LocalConversationMode.CONTINUATION) {
-                        if (usageMode == LocalUsageMode.CHAT && sourceState.usageMode == LocalUsageMode.CHAT) {
-                            buildChatContinuationHandoff(
-                                state = sourceState.chatState,
-                                messages = sourceState.messages,
-                            )
-                        } else {
-                            buildHandoffSummary(sourceState)
-                        }
-                    } else {
-                        null
-                    }
-                    val personaId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        PersonaProfile.DEFAULT_PERSONA_ID
-                    } else if (galleryEntry != null) {
-                        chatPersonaStore.upsert(galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}")).id
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                        !sourceState.groupChat.enabled
-                    ) {
-                        sourceState.personaId
-                    } else {
-                        PersonaProfile.DEFAULT_PERSONA_ID
-                    }
-                    val chatPersona = chatPersonaStore.get(personaId)
-                    val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        ChatCharacterState()
-                    } else if (
-                        galleryEntry != null &&
-                        usageMode == LocalUsageMode.CHAT &&
-                        !freshGalleryStory
-                    ) {
-                        selectedGalleryStory?.chatState ?: ChatCharacterState()
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        mode == LocalConversationMode.CONTINUATION &&
-                        sourceState.usageMode == LocalUsageMode.CHAT
-                    ) {
-                        sourceState.chatState
-                    } else {
-                        ChatCharacterState()
-                    }
-
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            sessionId = currentSessionId,
-                            usageMode = usageMode,
-                            personaId = personaId,
-                            galleryId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                null
-                            } else {
-                                galleryEntry?.id ?: sourceState.galleryId.takeIf {
-                                    usageMode == LocalUsageMode.CHAT &&
-                                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                                        !sourceState.groupChat.enabled
-                                }
-                            },
-                            galleryStoryId = when {
-                                resolvedChatMode == LocalChatMode.GROUP -> null
-                                galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
-                                galleryEntry != null -> null
-                                usageMode == LocalUsageMode.CHAT &&
-                                    sourceState.usageMode == LocalUsageMode.CHAT &&
-                                    mode == LocalConversationMode.CONTINUATION -> sourceState.galleryStoryId
-                                else -> null
-                            },
-                            gallerySaveSuppressedThrough = 0L,
-                            chatPersona = chatPersona,
-                            chatState = chatState,
-                            replySuggestions = emptyList(),
-                            chatBranches = LocalChatBranchState(),
-                            groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                if (
-                                    mode == LocalConversationMode.CONTINUATION &&
-                                    sourceState.usageMode == LocalUsageMode.CHAT &&
-                                    sourceState.groupChat.enabled
-                                ) {
-                                    sourceState.groupChat
-                                } else {
-                                    LocalGroupChatState(mode = LocalChatMode.GROUP)
-                                }
-                            } else {
-                                LocalGroupChatState()
-                            },
-                            groupActiveSpeakerName = null,
-                            personaCorrectionNotice = null,
-                            conversationMode = mode,
-                            parentSessionId = sourceId.takeIf {
-                                mode == LocalConversationMode.CONTINUATION
-                            },
-                            lineageId = lineageId,
-                            projectId = projectId,
-                            handoffSummary = handoff,
-                            messages = emptyList(),
-                            transcriptIndex = LocalTranscriptRuntimeIndex(),
-                            plan = emptyList(),
-                            todos = emptyList(),
-                            goal = null,
-                            planMode = false,
-                            safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
-                            deviceApprovalLease = false,
-                            jobs = projectExecutionJobs(usageMode, jobs.snapshotInfos()),
-                            activeAgents = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeAgents,
-                            ),
-                            activeTerminals = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeTerminals,
-                            ),
-                            activeVirtualDisplays = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeVirtualDisplays,
-                            ),
-                            activeLanguageServers = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeLanguageServers,
-                            ),
-                            error = null,
-                        )
-                    }
-                    persist()
-                    restartInterruptedSafeJobs()
-                } finally {
-                    endSessionTransition()
-                    _state.update { it.copy(loading = false) }
-                }
-            }
-        }
-    }
+    ) = sessionLifecycle.createSession(
+        mode = mode,
+        usageMode = usageMode,
+        galleryEntry = galleryEntry,
+        galleryStoryId = galleryStoryId,
+        freshGalleryStory = freshGalleryStory,
+        chatMode = chatMode,
+    )
 
     /** Backward-compatible entry point: a plain new session is fully independent. */
-    fun newSession() = createSession(LocalConversationMode.INDEPENDENT)
+    fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
 
-    fun switchChatMode(mode: LocalChatMode) {
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.running) return
-        if (
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            snapshot.groupChat.mode == mode
-        ) return
-
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
-        }
-        if (target != null) {
-            switchSession(target.id)
-        } else {
-            createSession(
-                mode = LocalConversationMode.INDEPENDENT,
-                usageMode = LocalUsageMode.CHAT,
-                chatMode = mode,
-            )
-        }
-    }
+    fun switchChatMode(mode: LocalChatMode) =
+        sessionLifecycle.switchChatMode(mode)
 
     /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
-    fun switchUsageMode(mode: LocalUsageMode) {
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.running) return
-        if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
-            if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
-            return
-        }
-        if (snapshot.usageMode == mode) return
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE) &&
-                !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
-        }
-        if (target != null) {
-            switchSession(target.id)
-        } else {
-            createSession(
-                mode = LocalConversationMode.INDEPENDENT,
-                usageMode = mode,
-                chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
-            )
-        }
-    }
+    fun switchUsageMode(mode: LocalUsageMode) =
+        sessionLifecycle.switchUsageMode(mode)
 
-    private fun buildHandoffSummary(state: LocalHarnessState): String =
-        handoffBuilder.build(
-            HandoffState(
-                goal = state.goal?.let { goal -> HandoffGoal(goal.status, goal.description) },
-                plan = state.plan,
-                todos = state.todos.map { todo -> HandoffTodo(todo.status, todo.content) },
-                messages = state.messages.map { message ->
-                    HandoffMessage(
-                        message.role,
-                        if (state.groupChat.enabled && message.role == "assistant") {
-                            groupTranscriptLine(message)
-                        } else {
-                            message.content
-                        },
-                    )
-                },
-            ),
-        )
-
-    fun switchSession(sessionId: String) {
-        if (sessionId == currentSessionId) return
-        synchronized(runStateLock) {
-            if (activeJob?.isCompleted == false) return
-        }
-        if (!beginSessionTransition()) return
-        _state.update { it.copy(loading = true) }
-        scope.launch {
-            sessionTransitionMutex.withLock {
-                try {
-                    persist()
-                    jobs.stopNonPersistentAndJoin()
-                    currentSessionId = sessionId
-                    preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
-                    eventLog = eventLogFor(sessionId)
-                    transcriptProjectionCursor = null
-                    loadSession(sessionId)
-                    restartInterruptedSafeJobs()
-                } finally {
-                    endSessionTransition()
-                    _state.update { it.copy(loading = false) }
-                }
-            }
-            startNextQueuedTurnIfIdle()?.start()
-        }
-    }
+    fun switchSession(sessionId: String) =
+        sessionLifecycle.switchSession(sessionId)
 
     /** Permanently remove selected local sessions and their durable event segments. */
-    suspend fun deleteSessions(requestedIds: Set<String>): Int {
-        if (requestedIds.isEmpty() || !beginSessionTransition()) return 0
-        _state.update { it.copy(loading = true) }
-        return try {
-            sessionTransitionMutex.withLock {
-                cancelActiveRunAndJoin()
-                jobs.stopNonPersistentAndJoin()
-                persist()
-                val available = sessionCoordinator.summaries()
-                val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
-                if (currentSessionId in ids) {
-                    val previous = _state.value
-                    val replacement = available.firstOrNull { it.id !in ids && it.usageMode == previous.usageMode }
-                        ?: available.firstOrNull { it.id !in ids }
-                    currentSessionId = replacement?.id ?: UUID.randomUUID().toString()
-                    preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
-                    eventLog = eventLogFor(currentSessionId)
-                    transcriptProjectionCursor = null
-                    loadSession(currentSessionId)
-                    if (replacement == null) {
-                        _state.update { it.copy(
-                            usageMode = previous.usageMode,
-                            personaId = previous.personaId,
-                            chatPersona = previous.chatPersona,
-                        ) }
-                    }
-                }
-                withContext(Dispatchers.IO) {
-                    ids.forEach { id ->
-                        sessionCoordinator.delete(id)
-                        toolOutputStore.deleteSession(id)
-                        sessionsRoot.listFiles().orEmpty()
-                            .filter { it.name == "$id.events.jsonl" || it.name.startsWith("$id.events.jsonl.part-") }
-                            .forEach(File::delete)
-                    }
-                }
-                synchronized(conversationFilesCacheLock) { ids.forEach(conversationFilesCache::remove) }
-                memoryStore.detachSourceSessions(ids)
-                _state.update { it.copy(sessions = sessionSummaries()) }
-                persist()
-                ids.size
-            }
-        } finally {
-            endSessionTransition()
-            _state.update { it.copy(loading = false) }
-        }
-    }
+    suspend fun deleteSessions(requestedIds: Set<String>): Int =
+        sessionLifecycle.deleteSessions(requestedIds)
 
     /** Remove the local API key after an in-flight turn has finished cancelling. */
     fun clearCredential() {
@@ -3336,19 +2855,16 @@ class LocalHarnessEngine @Inject constructor(
                 try {
                     cancelActiveRunAndJoin()
                     val current = _state.value
-                    val id = modelProfileId(current.model, current.baseUrl)
-                    apiKeys.clearFor(id)
-                    val remaining = readModelProfiles().filterNot { it.id == id }
-                    val next = remaining.firstOrNull()
-                    preferences.edit().putString(KEY_MODEL_PROFILES, encodeModelProfiles(remaining))
-                        .putString(KEY_MODEL, next?.model ?: DEFAULT_MODEL)
-                        .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL).apply()
-                    apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-                    _state.update { it.copy(configured = next != null,
-                        model = next?.model ?: DEFAULT_MODEL,
-                        baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
-                        modelProfiles = remaining,
-                        configuredModels = remaining.map(LocalModelProfile::model).distinct().sorted()) }
+                    val result = modelConfiguration.clearActive(current.model, current.baseUrl)
+                    _state.update {
+                        it.copy(
+                            configured = result.configured,
+                            model = result.model,
+                            baseUrl = result.baseUrl,
+                            modelProfiles = result.profiles,
+                            configuredModels = result.configuredModels,
+                        )
+                    }
                 } finally {
                     endSessionTransition()
                     _state.update { it.copy(loading = false) }
@@ -3398,158 +2914,16 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun captureAutoMemoryDirective(text: String) {
-        val snapshot = _state.value
-        if (!snapshot.autoMemory || text.isBlank()) return
-
-        val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-            if (snapshot.groupChat.enabled) {
-                null
-            } else {
-                runCatching {
-                    memoryManager.captureChatRelationshipFact(
-                        text = text,
-                        lineageId = snapshot.lineageId,
-                        sourceSessionId = currentSessionId,
-                        subjectLabel = snapshot.chatPersona.name
-                            .takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色" },
-                        subjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
-                    )
-                }.getOrNull()
-            }
-        } else {
-            runCatching {
-                memoryManager.captureExplicitUserDirective(
-                    text = text,
-                    mode = snapshot.conversationMode,
-                    projectId = snapshot.projectId,
-                    lineageId = snapshot.lineageId,
-                    sourceSessionId = currentSessionId,
-                )
-            }.getOrNull()
-        }
-
-        remembered?.let {
-            eventLog.append("memory/auto", buildJsonObject {
-                put("id", it.id)
-                put("scope", it.scope.name.lowercase())
-                put("kind", it.kind.name.lowercase())
-                put("source", if (snapshot.usageMode == LocalUsageMode.CHAT) "chat-relationship" else "directive")
-            })
-        }
-    }
+    private suspend fun captureAutoMemoryDirective(text: String) =
+        memoryCoordinator.captureAutoMemoryDirective(text)
 
     private fun chatRelationshipMemoryContext(
         query: String,
         snapshot: LocalHarnessState,
-    ): String {
-        if (!snapshot.autoRecall || !ChatMemorySelector.shouldRecall(query)) return ""
-        val relationshipKinds = setOf(
-            MemoryKind.RELATIONSHIP_FACT,
-            MemoryKind.RELATIONSHIP_STATE,
-            MemoryKind.RELATIONSHIP_PREFERENCE,
-        )
-        val recalled = memoryStore.search(
-            query = ChatMemorySelector.semanticQuery(query, snapshot.chatPersona.name),
-            allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
-            projectId = null,
-            lineageId = snapshot.lineageId,
-            allowedKinds = relationshipKinds,
-            maxItems = 12,
-            maxChars = 4_000,
-        ).filter {
-            relationshipMemoryMatchesSubject(
-                memory = it,
-                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
-                currentLineageId = snapshot.lineageId,
-                subjectLabel = snapshot.chatPersona.name,
-            )
-        }
-            .distinctBy { it.id }
-            .take(4)
-        if (recalled.isEmpty()) return ""
+    ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
 
-        return buildString {
-            appendLine("【本轮相关长期记忆】仅用于补足当前输入缺失的信息；已在当前状态出现的内容忽略。")
-            recalled.forEach { appendLine("- ${it.content}") }
-            append("与本轮冲突时以本轮为准；除非用户追问，不主动回顾。")
-        }
-    }
-
-    private fun hydrateNewChatStateFromRelationshipMemory() {
-        val snapshot = _state.value
-        if (
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.autoRecall ||
-            snapshot.chatState.updatedAt != 0L
-        ) return
-
-        val subject = snapshot.chatPersona.name.trim()
-            .takeIf { it.isNotBlank() && it != "默认角色" }
-            ?: return
-        val prefix = "关系状态：我和$subject｜"
-        val latest = memoryStore.listActive(
-            allowedScopes = setOf(MemoryScope.GLOBAL),
-            projectId = null,
-            lineageId = null,
-            limit = 200,
-        ).asSequence()
-            .filter {
-                it.kind == MemoryKind.RELATIONSHIP_STATE &&
-                    relationshipMemoryMatchesSubject(
-                memory = it,
-                currentSubjectKey = chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId),
-                currentLineageId = snapshot.lineageId,
-                subjectLabel = snapshot.chatPersona.name,
-            ) &&
-                    it.content.startsWith(prefix)
-            }
-            .maxByOrNull { it.updatedAt }
-            ?: return
-
-        val stored = latest.content.substringAfter("｜", "").trim()
-        val stage = when (stored) {
-            "暧昧" -> "AMBIGUOUS"
-            "在一起", "确定关系", "异地", "订婚", "结婚", "同居" -> "COMMITTED"
-            "冷战" -> "CONFLICT"
-            "分手", "离婚" -> "SEPARATED"
-            "复合" -> "REPAIRING"
-            else -> return
-        }
-        val label = when (stage) {
-            "AMBIGUOUS" -> "暧昧期"
-            "COMMITTED" -> "稳定关系"
-            "CONFLICT" -> "矛盾期"
-            "SEPARATED" -> "已分开"
-            "REPAIRING" -> "修复中"
-            else -> snapshot.chatState.relationshipState
-        }
-        if (
-            snapshot.chatState.dynamics.stage == stage &&
-            snapshot.chatState.relationshipState == label
-        ) return
-
-        _state.update { current ->
-            if (current.sessionId != snapshot.sessionId || current.chatState.updatedAt != 0L) {
-                current
-            } else {
-                current.copy(
-                    chatState = current.chatState.copy(
-                        relationshipState = label,
-                        dynamics = current.chatState.dynamics.copy(stage = stage),
-                    ),
-                )
-            }
-        }
-        eventLog.append("chat/relationship-hydrate", buildJsonObject {
-            put("subject", subject)
-            put("subject_key", chatRelationshipSubjectKey(snapshot.galleryId, snapshot.personaId).orEmpty())
-            put("state", stored)
-            put("stage", stage)
-            put("memory_id", latest.id)
-        })
-        persist()
-    }
+    private fun hydrateNewChatStateFromRelationshipMemory() =
+        memoryCoordinator.hydrateNewChatStateFromRelationshipMemory()
 
     private suspend fun drainPendingInputsIntoHistory() {
         val queued = pendingInputs.drain()
@@ -6540,6 +5914,30 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("内置运行时：${bundledNodeRuntime.status()}；${bundledPythonRuntime.status()}；${bundledGitRuntime.status()}")
             appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
             appendLine("限制：应用沙箱无法访问其他 App 私有目录；语言服务器等以实际检测结果为准。")
+            val recentDiagnostics = AppLog.snapshot()
+                .filter { it.level == "W" || it.level == "E" }
+                .takeLast(20)
+            if (recentDiagnostics.isNotEmpty()) {
+                appendLine("最近诊断：")
+                recentDiagnostics.forEach { entry ->
+                    append("- ")
+                    append(entry.level)
+                    append("/")
+                    append(entry.tag)
+                    append("：")
+                    append(entry.message.replace("\n", " ").take(300))
+                    entry.throwableType?.let { type ->
+                        append(" [")
+                        append(type)
+                        entry.throwableMessage?.takeIf(String::isNotBlank)?.let {
+                            append(": ")
+                            append(it.replace("\n", " ").take(160))
+                        }
+                        append("]")
+                    }
+                    appendLine()
+                }
+            }
             append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；web_fetch 大响应会自动落盘。外部文件可从输入栏附件导入工作区。")
         }
     }
@@ -6617,26 +6015,10 @@ class LocalHarnessEngine @Inject constructor(
         loadSession(currentSessionId, model, baseUrl)
     }
 
-    private fun readModelProfiles(): List<LocalModelProfile> = runCatching {
-        json.parseToJsonElement(preferences.getString(KEY_MODEL_PROFILES, "[]") ?: "[]")
-            .jsonArray.mapNotNull { item ->
-                val obj = item.jsonObject
-                val name = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                    ?: return@mapNotNull null
-                val url = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val id = modelProfileId(name, url)
-                LocalModelProfile(id, name, url)
-            }.distinctBy(LocalModelProfile::id)
-    }.getOrDefault(emptyList())
+    private fun readModelProfiles(): List<LocalModelProfile> = modelConfiguration.readProfiles()
 
-    private fun encodeModelProfiles(profiles: List<LocalModelProfile>): String = buildJsonArray {
-        profiles.forEach { profile ->
-            add(buildJsonObject {
-                put("model", profile.model)
-                put("baseUrl", profile.baseUrl)
-            })
-        }
-    }.toString()
+    private fun encodeModelProfiles(profiles: List<LocalModelProfile>): String =
+        modelConfiguration.encodeProfiles(profiles)
 
     private fun configuredModelNames(currentModel: String): List<String> =
         (preferences.getStringSet(KEY_CONFIGURED_MODELS, emptySet())
@@ -6646,13 +6028,8 @@ class LocalHarnessEngine @Inject constructor(
             .distinct()
             .sorted()
 
-    private fun normalizeConfiguredModel(model: String): String {
-        val value = model.trim().ifBlank { DEFAULT_MODEL }
-        return when (value.lowercase()) {
-            "deepseek-chat", "deepseek-reasoner" -> DEFAULT_MODEL
-            else -> value
-        }
-    }
+    private fun normalizeConfiguredModel(model: String): String =
+        modelConfiguration.normalizeModel(model)
 
     private suspend fun loadSession(
         sessionId: String,
@@ -6753,12 +6130,12 @@ class LocalHarnessEngine @Inject constructor(
             baseUrl = baseUrl,
             configuredModels = readModelProfiles().map(LocalModelProfile::model).distinct().sorted(),
             modelProfiles = readModelProfiles(),
-            mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
-            modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
+            mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
+            subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
+            modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
-                    preferences.getString(KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
+                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
                         ?: LocalImageInputMode.AUTO.name,
                 )
             }.getOrDefault(LocalImageInputMode.AUTO),
@@ -7029,13 +6406,7 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MODEL_PROFILES = "model_profiles_v2"
         const val KEY_BASE_URL = "base_url"
         const val KEY_SESSION_ID = "session_id"
-        const val KEY_MAIN_MAX_STEPS = "main_max_steps"
-        const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
-        const val KEY_MODEL_ATTEMPTS = "model_attempts"
-        const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
-        const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
-        const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
@@ -7057,7 +6428,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
-        const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
         const val CHAT_RECENT_HISTORY_MESSAGES = 20
@@ -7067,9 +6437,6 @@ class LocalHarnessEngine @Inject constructor(
         const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
         const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
-        const val MAX_STYLE_GUARD_HITS = 20
-        const val MAX_CUSTOM_CHAT_FILTERS = 50
-        const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
@@ -7078,12 +6445,6 @@ class LocalHarnessEngine @Inject constructor(
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
 
-
-        val CONVERSATION_FILE_EVENT_TYPES = setOf(
-            "user/message",
-            "tool/call",
-            "tool/result",
-        )
 
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",

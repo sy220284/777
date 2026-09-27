@@ -241,4 +241,94 @@ class AutomationReceiptTest {
         assertEquals(2, history.size)
         assertEquals(day, history.first().finishedAt)
     }
+    @Test
+    fun normalizesCorruptPersistedChatPolicyValues() {
+        val restored = normalizeAutomationTask(
+            AutomationTask(
+                id = "corrupt-chat",
+                prompt = "来找我",
+                createdAt = 0L,
+                nextRunAt = 1L,
+                recurringMinutes = -5L,
+                scheduleType = AutomationScheduleType.SILENCE,
+                silenceMinutes = 0L,
+                windowStartMinuteOfDay = -20,
+                windowEndMinuteOfDay = 2_000,
+                mode = AutomationMode.CHAT,
+                targetSessionId = "session",
+                quietStartHour = -1,
+                quietStartMinute = 99,
+                quietEndHour = 88,
+                quietEndMinute = -4,
+                proactiveMinGapMinutes = -1L,
+                proactiveMaxUnanswered = 0,
+                failureStreak = -3,
+            ),
+        )
+
+        assertEquals(60L, restored.recurringMinutes)
+        assertEquals(60L, restored.silenceMinutes)
+        assertEquals(0, restored.windowStartMinuteOfDay)
+        assertEquals(1_439, restored.windowEndMinuteOfDay)
+        assertEquals(0, restored.quietStartHour)
+        assertEquals(59, restored.quietStartMinute)
+        assertEquals(23, restored.quietEndHour)
+        assertEquals(0, restored.quietEndMinute)
+        assertEquals(60L, restored.proactiveMinGapMinutes)
+        assertEquals(1, restored.proactiveMaxUnanswered)
+        assertEquals(0, restored.failureStreak)
+    }
+
+    @Test
+    fun separatesEqualRestoredWindowBounds() {
+        val restored = normalizeAutomationTask(
+            AutomationTask(
+                id = "window",
+                prompt = "来找我",
+                createdAt = 0L,
+                nextRunAt = 1L,
+                recurringMinutes = 24L * 60L,
+                scheduleType = AutomationScheduleType.WINDOW,
+                windowStartMinuteOfDay = 20 * 60,
+                windowEndMinuteOfDay = 20 * 60,
+                mode = AutomationMode.CHAT,
+                targetSessionId = "session",
+            ),
+        )
+
+        assertEquals(20 * 60, restored.windowStartMinuteOfDay)
+        assertEquals(22 * 60, restored.windowEndMinuteOfDay)
+    }
+
+    @Test
+    fun restoresMissingSilenceAndWindowFields() {
+        val silence = normalizeAutomationTask(
+            AutomationTask(
+                id = "silence-missing",
+                prompt = "来找我",
+                createdAt = 0L,
+                nextRunAt = 1L,
+                scheduleType = AutomationScheduleType.SILENCE,
+                mode = AutomationMode.CHAT,
+                targetSessionId = "session",
+            ),
+        )
+        val window = normalizeAutomationTask(
+            AutomationTask(
+                id = "window-missing",
+                prompt = "来找我",
+                createdAt = 0L,
+                nextRunAt = 1L,
+                scheduleType = AutomationScheduleType.WINDOW,
+                mode = AutomationMode.CHAT,
+                targetSessionId = "session",
+            ),
+        )
+
+        assertEquals(60L, silence.silenceMinutes)
+        assertEquals(60L, silence.recurringMinutes)
+        assertEquals(20 * 60, window.windowStartMinuteOfDay)
+        assertEquals(22 * 60, window.windowEndMinuteOfDay)
+    }
+
 }

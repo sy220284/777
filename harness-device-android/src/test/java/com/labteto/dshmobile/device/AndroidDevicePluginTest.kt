@@ -57,6 +57,50 @@ class AndroidDevicePluginTest {
     }
 
     @Test
+    fun exposesCompleteCatalogAndUninstallsWithoutLeakingTools() = runTest {
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
+
+        val names = registry.context.tools.names()
+        assertEquals(36, names.size)
+        assertEquals(36, names.toSet().size)
+        assertTrue(registry.isInstalled("android-device"))
+
+        assertTrue(registry.uninstall("android-device"))
+        assertFalse(registry.isInstalled("android-device"))
+        assertTrue(registry.context.tools.names().isEmpty())
+    }
+
+    @Test
+    fun readOnlyScopeAllowsInfoButBlocksDeviceMutation() = runTest {
+        val provider = RecordingProvider()
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+
+        val info = registry.context.tools.execute(
+            name = "android_device_info",
+            input = buildJsonObject { },
+            context = ToolContext(allowMutation = false),
+        )
+        val tap = registry.context.tools.execute(
+            name = "android_tap",
+            input = buildJsonObject {
+                put("x", 12)
+                put("y", 34)
+            },
+            context = ToolContext(
+                allowMutation = false,
+                approval = { true },
+            ),
+        )
+
+        assertFalse(info.isError)
+        assertEquals("ok:device_info", info.content)
+        assertTrue(tap.isError)
+        assertEquals(listOf("device_info"), provider.calls.map { it.first })
+    }
+
+    @Test
     fun privilegedToolCannotReachProviderWithoutApproval() = runTest {
         val provider = RecordingProvider()
         val registry = PluginRegistry()

@@ -293,6 +293,51 @@ data class AutomationTask(
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
 )
 
+internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
+    val silenceMinutes = when (task.scheduleType) {
+        AutomationScheduleType.SILENCE ->
+            (task.silenceMinutes ?: task.recurringMinutes ?: 60L).coerceAtLeast(60L)
+        else -> task.silenceMinutes?.coerceAtLeast(60L)
+    }
+    val recurringMinutes = when (task.scheduleType) {
+        AutomationScheduleType.SILENCE -> silenceMinutes
+        else -> task.recurringMinutes?.coerceAtLeast(15L)
+    }
+    val windowStart = (
+        task.windowStartMinuteOfDay
+            ?: (20 * 60).takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+        )?.coerceIn(0, 24 * 60 - 1)
+    var windowEnd = (
+        task.windowEndMinuteOfDay
+            ?: (22 * 60).takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+        )?.coerceIn(0, 24 * 60 - 1)
+    if (windowStart != null && windowEnd == windowStart) {
+        windowEnd = (windowStart + 120) % (24 * 60)
+    }
+
+    return task.copy(
+        recurringMinutes = recurringMinutes,
+        silenceMinutes = silenceMinutes,
+        windowStartMinuteOfDay = windowStart,
+        windowEndMinuteOfDay = windowEnd,
+        quietStartHour = task.quietStartHour.coerceIn(0, 23),
+        quietStartMinute = task.quietStartMinute.coerceIn(0, 59),
+        quietEndHour = task.quietEndHour.coerceIn(0, 23),
+        quietEndMinute = task.quietEndMinute.coerceIn(0, 59),
+        proactiveMinGapMinutes = if (task.mode == AutomationMode.CHAT) {
+            task.proactiveMinGapMinutes.coerceAtLeast(60L)
+        } else {
+            task.proactiveMinGapMinutes.coerceAtLeast(0L)
+        },
+        proactiveMaxUnanswered = if (task.mode == AutomationMode.CHAT) {
+            task.proactiveMaxUnanswered.coerceIn(1, 5)
+        } else {
+            task.proactiveMaxUnanswered.coerceAtLeast(1)
+        },
+        failureStreak = task.failureStreak.coerceAtLeast(0),
+    )
+}
+
 @Serializable
 private data class AutomationDocument(
     val version: Int = 1,
@@ -339,7 +384,8 @@ class AutomationStore @Inject constructor(
     private fun read(): AutomationDocument {
         if (!file.isFile) return AutomationDocument()
         return runCatching {
-            json.decodeFromString(AutomationDocument.serializer(), file.readText())
+            val decoded = json.decodeFromString(AutomationDocument.serializer(), file.readText())
+            decoded.copy(tasks = decoded.tasks.map(::normalizeAutomationTask))
         }.getOrElse {
             val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
             runCatching { file.copyTo(corrupt, overwrite = true) }

@@ -24,6 +24,9 @@ THREAD_SLEEP_ALLOW = {
     "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt",
     "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ManagedProcess.kt",
 }
+ANDROID_LOG_ALLOW = {
+    "app/src/main/java/com/labteto/dshmobile/observability/AppLog.kt",
+}
 
 violations: list[str] = []
 
@@ -39,6 +42,9 @@ for path in SOURCES:
 
     if "Thread.sleep(" in text and rel not in THREAD_SLEEP_ALLOW:
         violations.append(f"{rel}: Thread.sleep is not allowlisted")
+
+    if "android.util.Log" in text and rel not in ANDROID_LOG_ALLOW:
+        violations.append(f"{rel}: route production logging through AppLog")
 
 shizuku = ROOT / "harness-device-android/src/main/java/com/labteto/dshmobile/device/shizuku/ShizukuBridge.kt"
 if shizuku.is_file():

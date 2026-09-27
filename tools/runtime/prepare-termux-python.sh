@@ -6,6 +6,11 @@ RUNTIME_ABIS="${DSH_RUNTIME_ABIS:-arm64-v8a}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CACHE_DIR="${TERMUX_RUNTIME_CACHE:-$ROOT_DIR/.gradle/runtime-cache/termux-python}"
 TERMUX_REPO="${TERMUX_REPO:-https://packages-cf.termux.dev/apt/termux-main}"
+TERMUX_REPO_FALLBACK="${TERMUX_REPO_FALLBACK:-https://packages.termux.dev/apt/termux-main}"
+TERMUX_REPOS=("$TERMUX_REPO")
+if [ "$TERMUX_REPO_FALLBACK" != "$TERMUX_REPO" ]; then
+  TERMUX_REPOS+=("$TERMUX_REPO_FALLBACK")
+fi
 TERMUX_KEY_COMMIT="93c8e0b136bf39e2eb1735f9187f43d7e029bb2e"
 TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 PYTHON_PACKAGE="python"
@@ -46,13 +51,32 @@ if ! gpg --batch --homedir "$GNUPGHOME" --with-colons --fingerprint \
   exit 1
 fi
 
-fetch() {
-  local url="$1"
+fetch_repo_path() {
+  local relative="$1"
   local dest="$2"
+  local expected_sha256="$3"
   mkdir -p "$(dirname "$dest")"
-  if [ ! -s "$dest" ]; then
-    curl -fL --retry 3 --connect-timeout 20 "$url" -o "$dest"
+
+  if [ -s "$dest" ] &&
+    printf '%s  %s\n' "$expected_sha256" "$dest" | sha256sum -c - >/dev/null 2>&1; then
+    return 0
   fi
+  rm -f "$dest"
+
+  local tmp="${dest}.part"
+  local repo
+  for repo in "${TERMUX_REPOS[@]}"; do
+    rm -f "$tmp"
+    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/$relative" -o "$tmp" &&
+      printf '%s  %s\n' "$expected_sha256" "$tmp" | sha256sum -c - >/dev/null 2>&1; then
+      mv "$tmp" "$dest"
+      return 0
+    fi
+    echo "Termux 包镜像不可用或 SHA256 不匹配，切换备用源：$repo" >&2
+  done
+  rm -f "$tmp"
+  echo "所有 Termux 镜像均无法提供已校验包：$relative" >&2
+  return 1
 }
 
 package_field() {
@@ -120,6 +144,37 @@ raise SystemExit(f"SHA256 entry not found: {wanted}")
 PY
 )"
   printf '%s  %s\n' "$expected" "$packages" | sha256sum -c - >/dev/null
+}
+
+fetch_verified_repo_index() {
+  local packages_file="$1"
+  local inrelease_file="$2"
+  local apt_arch="$3"
+
+  if [ -s "$packages_file" ] && [ -s "$inrelease_file" ] &&
+    (verify_packages_index "$inrelease_file" "$packages_file" "$apt_arch"); then
+    return 0
+  fi
+
+  rm -f "$packages_file" "$inrelease_file"
+  local packages_tmp="${packages_file}.part"
+  local inrelease_tmp="${inrelease_file}.part"
+  local repo
+  for repo in "${TERMUX_REPOS[@]}"; do
+    rm -f "$packages_tmp" "$inrelease_tmp"
+    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/main/binary-$apt_arch/Packages" -o "$packages_tmp" &&
+      curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/InRelease" -o "$inrelease_tmp" &&
+      (verify_packages_index "$inrelease_tmp" "$packages_tmp" "$apt_arch"); then
+      mv "$packages_tmp" "$packages_file"
+      mv "$inrelease_tmp" "$inrelease_file"
+      return 0
+    fi
+    echo "Termux 索引镜像不可用或校验失败，切换备用源：$repo" >&2
+  done
+
+  rm -f "$packages_tmp" "$inrelease_tmp"
+  echo "所有 Termux 镜像的索引均不可用：$apt_arch" >&2
+  return 1
 }
 
 resolve_runtime_packages() {
@@ -281,16 +336,12 @@ prepare_arch() {
   local apt_arch="$1"
   local android_abi="$2"
   local index_dir="$CACHE_DIR/index-$apt_arch"
-  local packages_url="$TERMUX_REPO/dists/stable/main/binary-$apt_arch/Packages"
-  local inrelease_url="$TERMUX_REPO/dists/stable/InRelease"
   local packages_file="$index_dir/Packages"
   local inrelease_file="$index_dir/InRelease"
 
   rm -rf "$index_dir"
   mkdir -p "$index_dir"
-  curl -fL --retry 3 --connect-timeout 20 "$packages_url" -o "$packages_file"
-  curl -fL --retry 3 --connect-timeout 20 "$inrelease_url" -o "$inrelease_file"
-  verify_packages_index "$inrelease_file" "$packages_file" "$apt_arch"
+  fetch_verified_repo_index "$packages_file" "$inrelease_file" "$apt_arch"
 
   local actual_python_version
   actual_python_version="$(package_field "$packages_file" "$PYTHON_PACKAGE" Version)"
@@ -330,8 +381,7 @@ prepare_arch() {
     }
 
     local deb="$CACHE_DIR/debs/$apt_arch/$(basename "$filename")"
-    fetch "$TERMUX_REPO/$filename" "$deb"
-    printf '%s  %s\n' "$digest" "$deb" | sha256sum -c - >/dev/null
+    fetch_repo_path "$filename" "$deb" "$digest"
 
     local extracted="$WORK_DIR/$apt_arch/$pkg"
     rm -rf "$extracted"
