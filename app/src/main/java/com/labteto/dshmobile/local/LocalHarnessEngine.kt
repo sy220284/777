@@ -3882,7 +3882,8 @@ class LocalHarnessEngine @Inject constructor(
                 messages = requestMessages,
                 step = 1,
                 toolsOverride = JsonArray(emptyList()),
-                publishPreview = true,
+                // Chat candidates must pass style/repetition/scene guards before anything is shown.
+                publishPreview = false,
                 streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
                 persistOverflowHistory = true,
                 temperature = CHAT_ROLEPLAY_TEMPERATURE,
