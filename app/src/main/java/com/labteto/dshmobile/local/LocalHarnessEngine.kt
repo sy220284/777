@@ -6410,19 +6410,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun JsonObject.string(key: String): String =
-        optionalString(key)?.takeIf { it.isNotBlank() } ?: error("缺少参数：$key")
-
-    private fun JsonObject.optionalString(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
-
-    private fun JsonObject.int(key: String, default: Int): Int = this[key]?.jsonPrimitive?.intOrNull ?: default
-
-    private fun JsonObject.long(key: String, default: Long): Long =
-        optionalString(key)?.toLongOrNull() ?: default
-
-    private fun JsonObject.boolean(key: String, default: Boolean): Boolean =
-        this[key]?.jsonPrimitive?.booleanOrNull ?: default
-
     private companion object {
         const val KEY_MODEL = "model"
         const val KEY_CONFIGURED_MODELS = "configured_models"
