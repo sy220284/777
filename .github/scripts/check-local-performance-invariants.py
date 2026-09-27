@@ -229,6 +229,13 @@ else:
         violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
     if "withChatTurnContext(" not in run_agent_body:
         violations.append("Unified Chat turns must preserve stable/dynamic context placement")
+if "chatReplyCoordinator.finalizeDirect(" not in engine:
+    violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
+if "chatReplyCoordinator.finalizeGroup(" not in engine:
+    violations.append("Group Chat replies must pass the shared-scene continuity guard")
+if "chatReplyCoordinator.guardProactive(" not in engine:
+    violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")
+
 if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
     violations.append("Chat branch continuation must only materialize after a real branch already exists")
 
