@@ -354,6 +354,7 @@
     <string name="pair_subtitle">On the computer running the harness, open /relay/pair. It shows a QR code and an eight-digit code; either one works, and both expire after a few minutes.</string>
     <string name="pair_scan">Scan QR code</string>
     <string name="pair_scan_prompt">Point the camera at the code on the relay\'s pairing page</string>
+    <string name="pair_camera_permission_denied">Camera permission is required to scan. You can grant it in system settings or enter the pairing code manually.</string>
     <string name="pair_manual_title">Or type the code</string>
     <string name="pair_url_label">Relay address</string>
     <string name="pair_url_hint">https://192.168.1.5:3443</string>
