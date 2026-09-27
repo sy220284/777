@@ -84,6 +84,26 @@ internal fun withEditedChatUserText(
     }
 }
 
+/**
+ * Rewrites the active conversation from one historical user turn.
+ *
+ * Everything from the original turn onward is discarded from the active transcript. The edited
+ * user message becomes the new tail; the next generated assistant reply continues from there.
+ */
+internal fun rewriteChatTranscriptFromUserEdit(
+    activeMessages: List<LocalHarnessMessage>,
+    originalMessageId: String,
+    editedMessage: LocalHarnessMessage,
+): List<LocalHarnessMessage>? {
+    if (editedMessage.role != "user") return null
+    val index = activeMessages.indexOfFirst { message -> message.id == originalMessageId }
+    if (index < 0 || activeMessages[index].role != "user") return null
+    return buildList(index + 1) {
+        addAll(activeMessages.subList(0, index))
+        add(editedMessage)
+    }
+}
+
 internal fun syncChatBranchState(
     current: LocalChatBranchState,
     activeMessages: List<LocalHarnessMessage>,
