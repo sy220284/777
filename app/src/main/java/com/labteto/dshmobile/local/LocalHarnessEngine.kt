@@ -3888,18 +3888,26 @@ class LocalHarnessEngine @Inject constructor(
                 temperature = CHAT_ROLEPLAY_TEMPERATURE,
             )
 
-            val reply = chatTurnCoordinator.finalize(
+            val reply = chatReplyCoordinator.finalizeDirect(
                 snapshot = snapshot,
-                persona = chatContext.persona,
                 reply = rawReply,
-                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                onGuardEvent = { action, violations ->
-                    recordStyleGuardHits(violations)
-                    eventLog.append("chat/style-guard", buildJsonObject {
-                        put("step", 1)
-                        put("action", action)
-                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                    })
+                userMessage = input,
+                step = 1,
+                retryRaw = { repairHint ->
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withEphemeralContext(requestMessages, repairHint),
+                        step = 1,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        maxAttemptsOverride = 1,
+                        allowContextOverflowRecovery = false,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                    )
+                },
+                appendEvent = { type, data ->
+                    eventLog.append(type, data)
                 },
             )
 
