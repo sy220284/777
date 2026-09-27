@@ -472,7 +472,7 @@ fun TasksScreen(
                             TasksNotice.CANCELLED -> R.string.tasks_cancelled
                             TasksNotice.MISSING -> R.string.tasks_missing
                             TasksNotice.RUN_STARTED -> R.string.tasks_run_started
-                            TasksNotice.RUN_FAILED -> R.string.tasks_run_failed
+                            TasksNotice.RUN_FAILED -> R.string.tasks_run_now_failed
                         },
                     ),
                     style = DsType.small13,
