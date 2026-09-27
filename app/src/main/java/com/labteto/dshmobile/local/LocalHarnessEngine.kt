@@ -276,14 +276,6 @@ class LocalHarnessEngine @Inject constructor(
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
-    // P0 修复（审计 2026-09-27）：SupervisorJob 之下未捕获的 launch 异常会走进程崩溃。
-    // 挂上 handler 后引擎内部失败降级为日志 + 状态可见，不再炸穿整个应用。
-    private val scope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO +
-            CoroutineExceptionHandler { _, throwable ->
-                Log.e("LocalHarnessEngine", "engine coroutine failure", throwable)
-            },
-    )
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
@@ -448,6 +440,21 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+
+    // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
+    // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, throwable ->
+                Log.e("LocalHarnessEngine", "engine coroutine failure", throwable)
+                _state.update { current ->
+                    current.copy(
+                        error = throwable.message?.takeIf(String::isNotBlank)
+                            ?: "本机 Harness 后台任务失败：${throwable::class.java.simpleName}",
+                    )
+                }
+            },
+    )
     private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     private val imageCapabilities = LocalImageCapabilityRegistry()
     private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
