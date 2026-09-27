@@ -389,7 +389,7 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
-        add(tool("edit", "唯一字面量替换；修改前必须先读取文件", properties(
+        add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
@@ -553,9 +553,11 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("tasks")))
-        add(tool("session_event_search", "搜索当前会话的追加式事件日志", properties(
+        add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),
             "session_id" to string("可选；留空使用当前会话"),
+            "limit" to integer("单页最多返回条数，默认 50，最大 100"),
+            "after_sequence" to integer("可选分页游标；继续上一页时传结果末尾提示的事件序号"),
         ), listOf("query")))
         add(tool("session_search", "跨本机历史会话搜索事件", properties(
             "query" to string("搜索内容"),
