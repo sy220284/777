@@ -102,6 +102,37 @@ internal fun buildChatContinuationHandoff(
     messages: List<LocalHarnessMessage>,
 ): String = buildString {
     appendLine("【聊天连续性｜已发生】")
+    val scene = state.scene
+    if (
+        scene.sceneTime.isNotBlank() ||
+        scene.location.isNotBlank() ||
+        scene.participants.isNotEmpty() ||
+        scene.positions.isNotEmpty() ||
+        scene.activeActions.isNotEmpty() ||
+        scene.currentEvent.isNotBlank()
+    ) {
+        appendLine(
+            "当前场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
+                "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+        )
+        if (scene.positions.isNotEmpty()) appendLine("人物位置：${scene.positions.joinToString("；")}")
+        if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
+        if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
+        scene.currentEvent.takeIf(String::isNotBlank)?.let { appendLine("当前事件：$it") }
+        scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
+    }
+    state.continuity.recentEvents.takeLast(6).takeIf { it.isNotEmpty() }?.let {
+        appendLine("近期关键事件：${it.joinToString("；").take(1_000)}")
+    }
+    state.continuity.recurringEvents.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("重复事项归并：${it.joinToString("；").take(800)}")
+    }
+    state.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("已定事项：${it.joinToString("；").take(800)}")
+    }
+    state.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+        appendLine("待续事项：${it.joinToString("；").take(800)}")
+    }
     state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
         appendLine("共同经历：${moments.joinToString("；").take(1_200)}")
     }
