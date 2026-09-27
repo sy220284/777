@@ -184,6 +184,52 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun chineseInnuendoScoreSeparatesTeasingFromLiteralChallenges() {
+        assertTrue(chineseSuggestiveFlirtingScore("你行不行啊，别光说") >= 6)
+        assertTrue(chineseSuggestiveFlirtingScore("想更深入了解一下你") >= 3)
+        assertEquals(0, chineseSuggestiveFlirtingScore("今晚别走，项目还没做完"))
+        assertTrue(chineseSuggestiveFlirtingScore("你敢不敢吃辣") < 3)
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("你敢不敢吃辣"),
+        )
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            classifyExplicitInteractionIntent("你敢不敢过来点"),
+        )
+    }
+
+    @Test
+    fun interactionIntensityRisesContinuesAndResets() {
+        assertEquals(2, nextInteractionIntensity("想更深入了解一下你"))
+        assertEquals(4, nextInteractionIntensity("你行不行啊，别光说"))
+        assertEquals(5, nextInteractionIntensity("我们都是成年人，过来亲我一下"))
+
+        val flirting = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+        )
+        assertEquals(2, nextInteractionIntensity("继续", flirting))
+        assertEquals(0, nextInteractionIntensity("换个话题，说正事", flirting))
+    }
+
+    @Test
+    fun interactionPerformanceSignalsExtractActionsPosesVerbalPatternsAndAddressTerms() {
+        val signals = extractInteractionPerformanceSignals(
+            "宝贝，我坐到你身边，凑近耳边笑了一声：这可是你说的……现在怕了？",
+        )
+
+        assertTrue("靠近" in signals.actionTags)
+        assertTrue("贴耳" in signals.actionTags)
+        assertTrue("坐近" in signals.poseTags)
+        assertTrue("反问激将" in signals.verbalTags)
+        assertTrue("反撩接梗" in signals.verbalTags)
+        assertTrue("半句留白" in signals.verbalTags)
+        assertTrue("宝贝" in signals.addressTerms)
+    }
+
+    @Test
     fun chineseInnuendoAvoidsNeutralContextFalsePositives() {
         assertFalse(hasChineseSuggestiveFlirtingIntent("这个项目需要深入了解一下"))
         assertFalse(hasChineseSuggestiveFlirtingIntent("产品需求还要深入了解"))
@@ -217,6 +263,34 @@ class ChatRelationshipEngineTest {
             ChatInteractionIntent.INTIMATE,
             resolveChatInteractionIntent("你行不行啊，别光说", previous),
         )
+    }
+
+    @Test
+    fun flirtPromptExposesRecentPerformanceAndCooldowns() {
+        val prompt = engine.prompt(
+            "你敢不敢过来点",
+            ChatCharacterState(
+                interactionIntent = ChatInteractionIntent.FLIRTING.name,
+                interactionIntentStrength = 2,
+                interactionIntensity = 3,
+                recentActionTags = listOf("靠近", "贴耳"),
+                recentPoseTags = listOf("坐近"),
+                recentVerbalTags = listOf("反问激将"),
+                recentAddressTerms = listOf("宝贝"),
+                interactionCooldowns = mapOf(
+                    "动作:靠近" to 2,
+                    "话术:反问激将" to 3,
+                ),
+            ),
+        )
+
+        assertTrue(prompt.contains("互动强度"))
+        assertTrue(prompt.contains("近期互动表现"))
+        assertTrue(prompt.contains("动作=靠近、贴耳"))
+        assertTrue(prompt.contains("话术=反问激将"))
+        assertTrue(prompt.contains("互动冷却"))
+        assertTrue(prompt.contains("动作:靠近=2轮"))
+        assertTrue(prompt.contains("话术:反问激将=3轮"))
     }
 
     @Test
@@ -282,6 +356,39 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("主动靠近、发起或承接"))
         assertTrue(prompt.contains("身体反应"))
         assertTrue(prompt.contains("含糊跳过或突然转场"))
+    }
+
+    @Test
+    fun intimateContextDoesNotStickToUnrelatedNewTopic() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("今天天气怎么样", previous),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("今天天气怎么样", previous),
+        )
+        assertEquals(0, nextInteractionIntensity("今天天气怎么样", previous))
+    }
+
+    @Test
+    fun flirtingContinuationExpiresInsteadOfStickingForever() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 1,
+            interactionIntensity = 2,
+        )
+
+        assertEquals(
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("继续", previous),
+        )
     }
 
     @Test
