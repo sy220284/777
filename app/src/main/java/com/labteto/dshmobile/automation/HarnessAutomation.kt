@@ -419,7 +419,7 @@ class AutomationStore internal constructor(
             atomicWrite(backup, json.encodeToString(AutomationDocument.serializer(), current))
         }
         atomicWrite(file, encoded)
-        if (!backup.isFile) atomicWrite(backup, encoded)
+        if (readValid(backup) == null) atomicWrite(backup, encoded)
     }
 
     private fun restoreBackup() {
