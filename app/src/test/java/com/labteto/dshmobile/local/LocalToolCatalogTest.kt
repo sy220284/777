@@ -60,4 +60,19 @@ class LocalToolCatalogTest {
         assertTrue("run_in_background" in properties)
     }
 
+
+    @Test
+    fun sessionEventSearchExposesPagingControls() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val properties = functions.getValue("session_event_search").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertTrue("limit" in properties)
+        assertTrue("after_sequence" in properties)
+    }
+
+
+
 }
