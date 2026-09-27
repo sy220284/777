@@ -23,9 +23,9 @@ violations: list[str] = []
 engine = ENGINE.read_text(encoding="utf-8")
 
 engine_lines = len(engine.splitlines())
-if engine_lines > 7_010:
+if engine_lines > 6_920:
     violations.append(
-        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 7010); extract new logic behind a coordinator"
+        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6920); extract new logic behind a coordinator"
     )
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
