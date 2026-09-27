@@ -110,6 +110,7 @@
     <string name="chat_queue_remove">Remove</string>
     <string name="chat_queue_steer">Steer into running turn</string>
     <string name="chat_context_title">Context</string>
+    <string name="chat_context_empty">No context statistics yet</string>
     <string name="chat_context_system">System</string>
     <string name="chat_context_tools">Tools</string>
     <string name="chat_context_messages">Messages</string>
@@ -232,8 +233,10 @@
     <string name="workflow_running">Running</string>
     <string name="workflow_completed">Completed</string>
     <string name="workflow_failed">Failed</string>
+    <string name="workflow_empty">No workflow runs</string>
     <string name="skills_title">Skills</string>
     <string name="skills_user_only">User only</string>
+    <string name="skills_empty">No skills in this session</string>
     <string name="models_title">Models</string>
     <string name="models_current">Current model</string>
     <string name="models_reasoning_effort">Reasoning effort</string>

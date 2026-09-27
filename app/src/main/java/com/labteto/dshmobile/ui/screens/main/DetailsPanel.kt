@@ -124,8 +124,10 @@ fun DetailsPanel(
     val breakdown by store.contextBreakdown.collectAsState()
     val pressure by store.contextPressure.collectAsState()
     val models by store.models.collectAsState()
+    val modelsLoading by store.modelsLoading.collectAsState()
     val agentPresets by store.agentPresets.collectAsState()
     val current = sessions.firstOrNull { it.sessionId == currentSessionId }
+    val conversationLoading = currentSessionId != null && conversation == null
 
     // This panel owns its own sheets rather than reaching back into ChatScreen's: it is reachable
     // on its own on a phone, where the chat surface is not even composed behind it.
@@ -168,6 +170,7 @@ fun DetailsPanel(
                 SessionCard(
                     session = current,
                     models = models,
+                    modelsLoading = modelsLoading,
                     presets = agentPresets,
                     onRename = { title ->
                         scope.launch { currentSessionId?.let { store.renameSession(it, title) } }
@@ -208,23 +211,23 @@ fun DetailsPanel(
                 }
 
                 val conv = conversation
-                if (conv == null) {
-                    Text(
-                        stringResource(R.string.chat_details_empty),
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                } else {
-                    ContextCard(breakdown, pressure, usage, stats)
-                    GoalCard(conv, store)
-                    PlanCard(conv) { next ->
-                        scope.launch { store.runCommand(if (next) "/plan" else "/plan off") }
-                    }
-                    JobsCard(jobs)
-                    QueueCard(conv.queue, store)
-                    SubagentsCard(subagents) { id -> scope.launch { store.openSubagentTranscript(id) } }
-                    WorkflowCard(conv.nodes)
+                ContextCard(
+                    breakdown = breakdown,
+                    pressure = pressure,
+                    usage = usage,
+                    stats = stats,
+                    loading = conversationLoading,
+                )
+                GoalCard(conv, store, loading = conversationLoading)
+                PlanCard(conv, loading = conversationLoading) { next ->
+                    scope.launch { store.runCommand(if (next) "/plan" else "/plan off") }
                 }
+                JobsCard(jobs, loading = conversationLoading)
+                QueueCard(conv?.queue.orEmpty(), store, loading = conversationLoading)
+                SubagentsCard(subagents, loading = conversationLoading) { id ->
+                    scope.launch { store.openSubagentTranscript(id) }
+                }
+                WorkflowCard(conv?.nodes.orEmpty(), loading = conversationLoading)
 
                 HostCard(hostInfo)
             }
@@ -299,6 +302,7 @@ private fun Card(
 private fun SessionCard(
     session: SessionRow?,
     models: SessionModelsValue?,
+    modelsLoading: Boolean,
     presets: AgentPresetListValue?,
     onRename: (String) -> Unit,
     onFork: () -> Unit,
@@ -319,11 +323,13 @@ private fun SessionCard(
         // to check, and until now this panel could show only one of them and could change neither.
         // Both pills carry an onClick, which is also what makes them look pressable.
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
-            models?.let { value ->
+            val modelLabel = models?.let { value ->
                 val group = value.groups.firstOrNull { it.id == value.current.provider }
-                val name = group?.models?.firstOrNull { it.id == value.current.model }?.name
-                DsPill(text = name ?: value.current.model, onClick = onOpenModels)
-            }
+                group?.models?.firstOrNull { it.id == value.current.model }?.name ?: value.current.model
+            } ?: stringResource(
+                if (modelsLoading) R.string.common_loading else R.string.models_title,
+            )
+            DsPill(text = modelLabel, onClick = onOpenModels)
             session.agentPreset?.let {
                 DsPill(text = agentPresetLabel(it, presets), onClick = onOpenPresets)
             }
@@ -379,14 +385,22 @@ private fun ContextCard(
     pressure: ContextPressureView?,
     usage: TokenUsageView?,
     stats: SessionStatsView?,
+    loading: Boolean,
 ) {
     val colors = DsTheme.colors
-    if (breakdown == null && pressure == null && usage == null && stats == null) return
     Card(
         title = stringResource(R.string.chat_context_title),
         summary = pressure?.usedRatio?.let { "${(it * 100).toInt()}%" },
         initiallyExpanded = true,
     ) {
+        if (breakdown == null && pressure == null && usage == null && stats == null) {
+            Text(
+                stringResource(if (loading) R.string.common_loading else R.string.chat_context_empty),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            return@Card
+        }
         ContextMeterDetail(breakdown, pressure)
         usage?.let {
             Text(
@@ -421,15 +435,23 @@ private fun ContextCard(
 }
 
 @Composable
-private fun GoalCard(conversation: ConversationSnapshot, store: com.labteto.dshmobile.data.SessionStore) {
+private fun GoalCard(
+    conversation: ConversationSnapshot?,
+    store: com.labteto.dshmobile.data.SessionStore,
+    loading: Boolean,
+) {
     val colors = DsTheme.colors
-    val goal = parseGoal(conversation.projections["goal"])
+    val goal = conversation?.let { parseGoal(it.projections["goal"]) }
     Card(
         title = stringResource(R.string.goal_title),
         summary = goal?.let { stringResource(goalPhaseLabelRes(it.phase)) },
     ) {
         if (goal == null) {
-            Text(stringResource(R.string.goal_none), style = DsType.caption11, color = colors.labelTertiary)
+            Text(
+                stringResource(if (loading) R.string.common_loading else R.string.goal_none),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
             return@Card
         }
         if (goal.maxGoalRounds > 0) {
@@ -455,32 +477,49 @@ private fun GoalCard(conversation: ConversationSnapshot, store: com.labteto.dshm
  * as this did, meant the control could turn plan mode on and never off again.
  */
 @Composable
-private fun PlanCard(conversation: ConversationSnapshot, onTogglePlan: (active: Boolean) -> Unit) {
-    val active = parsePlanActive(conversation) ?: return
+private fun PlanCard(
+    conversation: ConversationSnapshot?,
+    loading: Boolean,
+    onTogglePlan: (active: Boolean) -> Unit,
+) {
+    val colors = DsTheme.colors
+    val active = conversation?.let(::parsePlanActive) ?: false
     Card(
         title = stringResource(R.string.plan_mode_title),
-        summary = stringResource(if (active) R.string.plan_mode_state_on else R.string.plan_mode_state_off),
-        // Open by default: unlike the other cards this one is a control, and a control you have to
-        // expand before you can reach is most of the way back to not having it.
+        summary = stringResource(
+            when {
+                loading -> R.string.common_loading
+                active -> R.string.plan_mode_state_on
+                else -> R.string.plan_mode_state_off
+            },
+        ),
         initiallyExpanded = true,
     ) {
-        ToggleRow(
-            label = stringResource(R.string.plan_mode_hint),
-            checked = active,
-            onChange = { onTogglePlan(!active) },
-        )
+        if (loading) {
+            Text(stringResource(R.string.common_loading), style = DsType.caption11, color = colors.labelTertiary)
+        } else {
+            ToggleRow(
+                label = stringResource(R.string.plan_mode_hint),
+                checked = active,
+                onChange = { onTogglePlan(!active) },
+            )
+        }
     }
 }
 
 @Composable
-private fun JobsCard(jobs: List<JobView>) {
+private fun JobsCard(jobs: List<JobView>, loading: Boolean) {
     val colors = DsTheme.colors
     Card(
         title = stringResource(R.string.jobs_title),
         summary = jobs.size.takeIf { it > 0 }?.toString(),
     ) {
         if (jobs.isEmpty()) {
-            Text(stringResource(R.string.jobs_empty), style = DsType.caption11, color = colors.labelTertiary)
+            Text(
+                stringResource(if (loading) R.string.common_loading else R.string.jobs_empty),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
             return@Card
         }
         // A running job's elapsed time has to be driven by a ticker; reading the clock inside a
@@ -527,7 +566,11 @@ private fun JobsCard(jobs: List<JobView>) {
 }
 
 @Composable
-private fun QueueCard(queue: List<QueueItem>, store: com.labteto.dshmobile.data.SessionStore) {
+private fun QueueCard(
+    queue: List<QueueItem>,
+    store: com.labteto.dshmobile.data.SessionStore,
+    loading: Boolean,
+) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
     Card(
@@ -536,7 +579,7 @@ private fun QueueCard(queue: List<QueueItem>, store: com.labteto.dshmobile.data.
     ) {
         if (queue.isEmpty()) {
             Text(
-                stringResource(R.string.chat_queue_empty),
+                stringResource(if (loading) R.string.common_loading else R.string.chat_queue_empty),
                 style = DsType.caption11,
                 color = colors.labelTertiary,
             )
@@ -566,7 +609,11 @@ private fun QueueCard(queue: List<QueueItem>, store: com.labteto.dshmobile.data.
 }
 
 @Composable
-private fun SubagentsCard(subagents: List<SubagentListEntry>, onOpen: (String) -> Unit) {
+private fun SubagentsCard(
+    subagents: List<SubagentListEntry>,
+    loading: Boolean,
+    onOpen: (String) -> Unit,
+) {
     val colors = DsTheme.colors
     Card(
         title = stringResource(R.string.subagents_title),
@@ -574,7 +621,7 @@ private fun SubagentsCard(subagents: List<SubagentListEntry>, onOpen: (String) -
     ) {
         if (subagents.isEmpty()) {
             Text(
-                stringResource(R.string.subagents_empty),
+                stringResource(if (loading) R.string.common_loading else R.string.subagents_empty),
                 style = DsType.caption11,
                 color = colors.labelTertiary,
             )
@@ -613,11 +660,21 @@ private fun SubagentsCard(subagents: List<SubagentListEntry>, onOpen: (String) -
 }
 
 @Composable
-private fun WorkflowCard(nodes: List<ChatNode>) {
+private fun WorkflowCard(nodes: List<ChatNode>, loading: Boolean) {
     val colors = DsTheme.colors
     val workflows = remember(nodes) { parseWorkflows(nodes) }
-    if (workflows.isEmpty()) return
-    Card(title = stringResource(R.string.workflow_title), summary = workflows.size.toString()) {
+    Card(
+        title = stringResource(R.string.workflow_title),
+        summary = workflows.size.takeIf { it > 0 }?.toString(),
+    ) {
+        if (workflows.isEmpty()) {
+            Text(
+                stringResource(if (loading) R.string.common_loading else R.string.workflow_empty),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            return@Card
+        }
         workflows.forEach { workflow ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

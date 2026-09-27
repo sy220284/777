@@ -101,7 +101,9 @@ fun ChatScreen(
     val currentSessionId by store.currentSessionId.collectAsStateWithLifecycle()
     val sessions by store.sessions.collectAsStateWithLifecycle()
     val models by store.models.collectAsStateWithLifecycle()
+    val modelsLoading by store.modelsLoading.collectAsStateWithLifecycle()
     val skills by store.skills.collectAsStateWithLifecycle()
+    val skillsLoading by store.skillsLoading.collectAsStateWithLifecycle()
     val commands by store.commands.collectAsStateWithLifecycle()
     val commandsAvailable by store.commandsAvailable.collectAsStateWithLifecycle()
     val subagents by store.subagents.collectAsStateWithLifecycle()
@@ -392,6 +394,7 @@ fun ChatScreen(
                 title = title,
                 running = conversation?.running == true,
                 models = models,
+                modelsLoading = modelsLoading,
                 detailsOpen = detailsOpen,
                 onOpenDrawer = onOpenDrawer,
                 onOpenModels = { sheet = ChatSheet.Models },
@@ -665,6 +668,7 @@ fun ChatScreen(
             commands = commands,
             commandsAvailable = commandsAvailable,
             skills = skills,
+            skillsLoading = skillsLoading,
             mode = mode,
             running = conversation?.running == true,
             currentTab = tab,

@@ -90,6 +90,7 @@ internal fun CommandSheet(
     commands: List<CommandDescriptor>,
     commandsAvailable: Boolean,
     skills: List<SkillEntry>,
+    skillsLoading: Boolean,
     mode: String,
     running: Boolean,
     currentTab: ChatTab,
@@ -241,9 +242,19 @@ internal fun CommandSheet(
         }
 
         // Skills ------------------------------------------------------------
-        if (filteredSkills.isNotEmpty()) {
-            SectionHeader(stringResource(R.string.skills_title))
-            Column {
+        SectionHeader(stringResource(R.string.skills_title))
+        when {
+            skillsLoading -> Text(
+                stringResource(R.string.common_loading),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            filteredSkills.isEmpty() -> Text(
+                stringResource(R.string.skills_empty),
+                style = DsType.caption11,
+                color = colors.labelTertiary,
+            )
+            else -> Column {
                 filteredSkills.forEach { skill ->
                     SheetRow(
                         title = "/${skill.name}",
