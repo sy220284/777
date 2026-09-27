@@ -9,7 +9,7 @@ on:
     workflows: ['Release APK']
     types: [completed]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Keep latest three published releases
+      - name: Keep recent published releases
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -36,6 +36,7 @@ jobs:
           import json
           import os
           import urllib.request
+          from datetime import datetime, timedelta, timezone
 
           token = os.environ["GH_TOKEN"]
           repo = os.environ["REPO"]
@@ -75,10 +76,20 @@ jobs:
               reverse=True,
           )
 
-          keep = releases[:3]
-          remove = releases[3:]
+          cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+          newest_ids = {release["id"] for release in releases[:3]}
 
-          print("保留发行版：")
+          def published_at(release):
+              return datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
+
+          keep = [
+              release for release in releases
+              if release["id"] in newest_ids or published_at(release) >= cutoff
+          ]
+          keep_ids = {release["id"] for release in keep}
+          remove = [release for release in releases if release["id"] not in keep_ids]
+
+          print("保留发行版（至少最新 3 个，并保留最近 14 天）：")
           for release in keep:
               print(f"  - {release['tag_name']} ({release['published_at']})")
 
