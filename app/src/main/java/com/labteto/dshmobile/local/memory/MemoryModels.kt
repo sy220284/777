@@ -24,6 +24,12 @@ enum class MemoryKind {
 }
 
 @Serializable
+data class MemorySourceRef(
+    val sessionId: String,
+    val messageId: String,
+)
+
+@Serializable
 data class MemoryRecord(
     val id: String,
     val scope: MemoryScope,
@@ -32,8 +38,8 @@ data class MemoryRecord(
     val projectId: String? = null,
     val lineageId: String? = null,
     val sourceSessionId: String? = null,
-    /** User message that directly produced this memory when the source is known. */
-    val sourceMessageId: String? = null,
+    /** Exact user-message sources. Multiple confirmations can keep one memory alive independently. */
+    val sourceMessages: List<MemorySourceRef> = emptyList(),
     /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
     val subjectKey: String? = null,
     val importance: Int = 50,
