@@ -32,8 +32,6 @@ data class MemoryRecord(
     val projectId: String? = null,
     val lineageId: String? = null,
     val sourceSessionId: String? = null,
-    /** Durable user message that produced this memory when available. */
-    val sourceMessageId: String? = null,
     /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
     val subjectKey: String? = null,
     val importance: Int = 50,
