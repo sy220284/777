@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -173,6 +174,16 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun localHarnessDrawerUsageMode(
+    current: LocalUsageMode,
+    pending: LocalUsageMode?,
+): LocalUsageMode = pending ?: current
+
+internal fun localHarnessShowsBlockingLoading(
+    loading: Boolean,
+    hasRenderedSurface: Boolean,
+): Boolean = loading && !hasRenderedSurface
+
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
@@ -202,11 +213,30 @@ fun LocalHarnessScreen(
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
+    var hasRenderedHarnessSurface by rememberSaveable { mutableStateOf(false) }
+    var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
 
     LaunchedEffect(modeIntro) {
         if (modeIntro != null) {
             delay(6_000)
             modeIntro = null
+        }
+    }
+
+    LaunchedEffect(state.loading) {
+        if (!state.loading) hasRenderedHarnessSurface = true
+    }
+
+    LaunchedEffect(pendingUsageMode, state.loading, state.usageMode) {
+        val pending = pendingUsageMode ?: return@LaunchedEffect
+        when {
+            state.usageMode == pending -> pendingUsageMode = null
+            !state.loading -> {
+                // A rejected/no-op transition should not leave the sidebar showing a phantom mode.
+                // Give the engine one frame window to publish loading=true before rolling back.
+                delay(250)
+                if (!state.loading && state.usageMode != pending) pendingUsageMode = null
+            }
         }
     }
 
@@ -227,6 +257,7 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
+        pendingUsageMode = target
         viewModel.switchUsageMode(target)
     }
 
@@ -260,8 +291,8 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
-                usageMode = state.usageMode,
-                modeSwitchEnabled = !state.running,
+                usageMode = localHarnessDrawerUsageMode(state.usageMode, pendingUsageMode),
+                modeSwitchEnabled = !state.running && !state.loading,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -319,8 +350,9 @@ fun LocalHarnessScreen(
             )
         },
     ) {
-        when {
-            state.loading -> LoadingScreen()
+        Box(Modifier.fillMaxSize()) {
+            when {
+                localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
             showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
                 entries = gallery,
                 presets = viewModel.personaPresets,
@@ -385,6 +417,27 @@ fun LocalHarnessScreen(
                 onAnswerQuestion = viewModel::answerQuestion,
                 onCancelQuestion = viewModel::cancelQuestion,
             )
+            }
+            if (state.loading && hasRenderedHarnessSurface) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(top = DsSpacing.large)
+                            .size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = DsTheme.colors.accent,
+                    )
+                }
+            }
         }
     }
 
