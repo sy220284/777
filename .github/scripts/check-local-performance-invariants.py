@@ -17,6 +17,7 @@ MODEL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalM
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
+CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
 violations: list[str] = []
 
@@ -37,6 +38,12 @@ model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
 tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
+cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
+
+if "timedelta(days=14)" not in cleanup_workflow:
+    violations.append("Release retention must keep a 14-day rollback window")
+if "cron: '17 3 * * *'" not in cleanup_workflow:
+    violations.append("Release cleanup must stay on the daily 03:17 UTC schedule")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
