@@ -97,18 +97,23 @@ internal class LocalChatContextRefreshCoordinator(
             .toList()
         if (pending.isEmpty()) return
 
-        val userBatch = pending.joinToString("\n") { turn ->
-            "#${turn.sequence} 用户：${turn.userMessage}"
-        }
-        val assistantBatch = pending.joinToString("\n") { turn ->
-            "#${turn.sequence} 角色：${turn.assistantMessage}"
+        val orderedBatch = pending.joinToString("\n\n") { turn ->
+            buildString {
+                appendLine("#${turn.sequence}")
+                appendLine("用户：${turn.userMessage}")
+                append("角色：${turn.assistantMessage}")
+            }
         }
         val plannerState = before.chatState.withContextForPlanner(baseContext)
         val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = plannerState,
-            userMessage = userBatch,
-            assistantMessage = assistantBatch,
+            userMessage = buildString {
+                appendLine("【待归并回合｜严格按真实顺序】")
+                appendLine(orderedBatch)
+                append("按上述 用户→角色 的逐回合顺序理解状态变化；后面的回合可以纠正、结束或覆盖前面的临时状态。")
+            },
+            assistantMessage = "",
         )
         val plannerReply = try {
             requestPlanner(before, prompt, boundEventLog) ?: return
