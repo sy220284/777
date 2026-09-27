@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.pendingForRequest
 import com.labteto.dshmobile.local.chat.withLegacyFallback
@@ -21,6 +22,7 @@ internal fun boundedChatRequestHistory(
     history: List<JsonObject>,
     recentMessages: Int = 20,
     compactionBatch: Int = 8,
+    currentFacts: List<String> = emptyList(),
 ): List<JsonObject> {
     require(recentMessages >= 2) { "recentMessages must be >= 2" }
     require(compactionBatch >= 2) { "compactionBatch must be >= 2" }
@@ -31,6 +33,7 @@ internal fun boundedChatRequestHistory(
     val body = if (leadingSystem == null) history else history.drop(1)
     val existingSummaryIndex = body.indexOfLast(::isChatContinuitySummary)
     val existingSummary = body.getOrNull(existingSummaryIndex)
+        ?.let { summary -> pruneChatContinuitySummary(summary, currentFacts) }
     val dialogueSource = if (existingSummaryIndex >= 0) {
         body.drop(existingSummaryIndex + 1)
     } else {
@@ -51,7 +54,7 @@ internal fun boundedChatRequestHistory(
     val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
     val older = dialogue.take(summarizedCount.coerceAtMost(dialogue.size - recentMessages))
     val recent = dialogue.drop(older.size)
-    val deltaContinuity = buildRequestOnlyContinuity(older)
+    val deltaContinuity = buildRequestOnlyContinuity(older, currentFacts)
 
     return buildList {
         leadingSystem?.let(::add)
@@ -62,17 +65,39 @@ internal fun boundedChatRequestHistory(
 }
 
 private fun isChatContinuitySummary(message: JsonObject): Boolean {
-    if (message["role"]?.jsonPrimitive?.contentOrNull != "user") return false
+    val role = message["role"]?.jsonPrimitive?.contentOrNull
+    if (role != "user" && role != "system") return false
     val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
     return "<compacted-summary>" in content || "<chat-continuity>" in content
 }
 
-private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
+private fun pruneChatContinuitySummary(
+    message: JsonObject,
+    currentFacts: List<String>,
+): JsonObject {
+    if (currentFacts.isEmpty()) return message
+    val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return message
+    val pruned = content.lineSequence().filter { raw ->
+        val line = raw.trim()
+        if (!line.startsWith("- ")) return@filter true
+        val factLine = line.removePrefix("- ").trim()
+        currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(factLine, fact) }
+    }.joinToString("\n")
+    return JsonObject(message + ("content" to JsonPrimitive(pruned)))
+}
+
+private fun buildRequestOnlyContinuity(
+    older: List<JsonObject>,
+    currentFacts: List<String>,
+): JsonObject? {
     val userEvents = older.asSequence()
         .filter { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
         .mapNotNull { (it["content"] as? JsonPrimitive)?.contentOrNull }
         .map(::normalizeChatContinuityText)
         .filter(String::isNotBlank)
+        .filter { event ->
+            currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(event, fact) }
+        }
         .distinct()
         .toList()
         .takeLast(8)
@@ -86,7 +111,7 @@ private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
         append("</chat-continuity>")
     }
     return buildJsonObject {
-        put("role", "user")
+        put("role", "system")
         put("content", summary)
     }
 }
