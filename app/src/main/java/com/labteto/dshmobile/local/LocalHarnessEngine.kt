@@ -1392,7 +1392,8 @@ class LocalHarnessEngine @Inject constructor(
      * the next assistant reply is generated from the retained prefix.
      */
     fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
-        val requestedText = replacement.trim(); val state = _state.value
+        val requestedText = replacement.trim()
+        val state = _state.value
         if (
             state.usageMode != LocalUsageMode.CHAT ||
             !state.configured ||
@@ -1467,6 +1468,7 @@ class LocalHarnessEngine @Inject constructor(
             editedModelMessage = editedModelMessage,
         )
 
+        persistChatTimelineBaseline(eventLog, json, state.copy(chatState = baseState, groupChat = baseGroupState))
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
             put("model_message", editedModelMessage)
@@ -1843,7 +1845,7 @@ class LocalHarnessEngine @Inject constructor(
         queuedInput: QueuedAgentInput? = null,
     ) {
         val before = _state.value
-        persistChatTimelineBaselineIfNeeded(eventLog, json, before)
+        persistChatTimelineBaseline(eventLog, json, before)
         val transcriptMessage = newTranscriptMessage("user", content)
         val userEvent = if (queued) {
             val durableInput = requireNotNull(queuedInput) { "排队消息缺少持久编号" }

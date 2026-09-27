@@ -9,17 +9,17 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * Persist the state that existed before the first user turn.
+ * Persist the state that exists immediately before a user message is durably recorded.
  *
- * This gives future historical edits an exact rollback target even when the session started from a
- * saved story/continuation whose initial relationship state was already non-empty.
+ * One baseline per user event makes historical edits deterministic even after relationship changes,
+ * proactive messages, direction changes, or a non-empty saved-story/continuation start state.
  */
-internal fun persistChatTimelineBaselineIfNeeded(
+internal fun persistChatTimelineBaseline(
     eventLog: LocalSessionEventLog,
     json: Json,
     state: LocalHarnessState,
 ) {
-    if (state.usageMode != LocalUsageMode.CHAT || state.transcriptIndex.hasDialogue) return
+    if (state.usageMode != LocalUsageMode.CHAT) return
     eventLog.append("chat/state-baseline", buildJsonObject {
         put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chatState))
         if (state.groupChat.enabled) {
