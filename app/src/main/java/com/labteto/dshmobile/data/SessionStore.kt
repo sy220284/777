@@ -89,7 +89,6 @@ import com.labteto.dshmobile.core.wire.newPromptRequestId
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.TimeZone
-import java.util.concurrent.atomic.AtomicBoolean
 import com.labteto.dshmobile.core.wire.dto.PermissionCatalog
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -106,7 +105,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
@@ -261,8 +259,7 @@ class SessionStore @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
-    private val baselineMutex = Mutex()
-    private val baselineDirty = AtomicBoolean(false)
+    private val baselineRefreshGate = ConflatedRefreshGate()
     val connectionState = connectionManager.state
     val activeHostKey: String? get() = connectionManager.state.value.host?.let { "${it.baseUrl}|${it.id}" }
     internal val panels = com.labteto.dshmobile.ui.screens.main.PanelRepository()
@@ -550,23 +547,13 @@ class SessionStore @Inject constructor(
         runCatching { decodeFromJsonElement(serializer, item) }.getOrNull()
 
     private fun triggerBaseline() {
-        baselineDirty.set(true)
         scope.launch {
-            if (!baselineMutex.tryLock()) return@launch
-            try {
-                while (baselineDirty.getAndSet(false)) {
-                    try {
-                        baseline()
-                    } catch (e: Exception) {
-                        log("baseline failed", e)
-                    }
+            baselineRefreshGate.request {
+                try {
+                    baseline()
+                } catch (e: Exception) {
+                    log("baseline failed", e)
                 }
-            } finally {
-                baselineMutex.unlock()
-                // Close the narrow race where a new trigger lands after the loop's last dirty read
-                // but before the mutex is released. The new pass will either acquire immediately or
-                // mark dirty for the current owner again.
-                if (baselineDirty.get()) triggerBaseline()
             }
         }
     }
