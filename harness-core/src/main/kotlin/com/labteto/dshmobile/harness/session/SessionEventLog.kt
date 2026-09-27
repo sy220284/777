@@ -412,35 +412,62 @@ class SessionEventLog(
         }
         if (sourceIndex < 0) return emptyList()
 
-        fun readSource(index: Int): List<SessionEvent> {
-            val events = mutableListOf<SessionEvent>()
-            sources[index].forEachEventLine { line ->
-                decodeEventOrNull(line)?.let(events::add)
+        // Keep only the requested prefix while scanning the target segment. A point read with
+        // before/after <= MAX_CONTEXT_LINES must not materialize an entire 8 MiB segment.
+        val localBefore = ArrayDeque<SessionEvent>(before.coerceAtLeast(1))
+        val window = mutableListOf<SessionEvent>()
+        var found = false
+        var afterRemaining = after
+        sources[sourceIndex].eventReader().useLines { lines ->
+            val iterator = lines.iterator()
+            while (iterator.hasNext()) {
+                val event = decodeEventOrNull(iterator.next()) ?: continue
+                if (!found) {
+                    if (event.sequence == sequence) {
+                        found = true
+                        window.addAll(localBefore)
+                        window += event
+                    } else if (before > 0) {
+                        if (localBefore.size >= before) localBefore.removeFirst()
+                        localBefore.addLast(event)
+                    }
+                } else if (afterRemaining > 0) {
+                    window += event
+                    afterRemaining -= 1
+                } else {
+                    break
+                }
             }
-            return events
         }
+        if (!found) return emptyList()
 
-        val events = readSource(sourceIndex).toMutableList()
-        var target = events.indexOfFirst { it.sequence == sequence }
-        if (target < 0) return emptyList()
-
+        var beforeMissing = (before - localBefore.size).coerceAtLeast(0)
         var left = sourceIndex - 1
-        while (target < before && left >= 0) {
-            val previous = readSource(left)
-            events.addAll(0, previous)
-            target += previous.size
+        while (beforeMissing > 0 && left >= 0) {
+            val tail = ArrayDeque<SessionEvent>(beforeMissing)
+            sources[left].forEachEventLine { line ->
+                val event = decodeEventOrNull(line) ?: return@forEachEventLine
+                if (tail.size >= beforeMissing) tail.removeFirst()
+                tail.addLast(event)
+            }
+            window.addAll(0, tail)
+            beforeMissing -= tail.size
             left -= 1
         }
 
         var right = sourceIndex + 1
-        while (events.size - target - 1 < after && right < sources.size) {
-            events.addAll(readSource(right))
+        while (afterRemaining > 0 && right < sources.size) {
+            sources[right].eventReader().useLines { lines ->
+                val iterator = lines.iterator()
+                while (afterRemaining > 0 && iterator.hasNext()) {
+                    val event = decodeEventOrNull(iterator.next()) ?: continue
+                    window += event
+                    afterRemaining -= 1
+                }
+            }
             right += 1
         }
-
-        val from = (target - before).coerceAtLeast(0)
-        val to = (target + after + 1).coerceAtMost(events.size)
-        return events.subList(from, to).toList()
+        return window
     }
 
     private inline fun forEachAfterUnsafe(
