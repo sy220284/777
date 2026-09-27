@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.pair
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
@@ -25,14 +27,19 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.labteto.dshmobile.R
@@ -71,6 +78,8 @@ fun PairScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
+    val context = LocalContext.current
+    var cameraPermissionDenied by rememberSaveable { mutableStateOf(false) }
     BackHandler(onBack = onClose)
 
     LaunchedEffect(prefillUrl) { prefillUrl?.let(viewModel::prefill) }
@@ -99,8 +108,25 @@ fun PairScreen(
             .setCaptureActivity(PortraitCaptureActivity::class.java)
             .setOrientationLocked(true)
     }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        cameraPermissionDenied = !granted
+        if (granted) scanner.launch(scanOptions)
+    }
+    fun launchScanner() {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            cameraPermissionDenied = false
+            scanner.launch(scanOptions)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
     LaunchedEffect(autoScanOnOpen) {
-        if (autoScanOnOpen) scanner.launch(scanOptions)
+        if (autoScanOnOpen) launchScanner()
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -138,13 +164,19 @@ fun PairScreen(
 
             DsButton(
                 text = stringResource(R.string.pair_scan),
-                onClick = {
-                    scanner.launch(scanOptions)
-                },
+                onClick = { launchScanner() },
                 enabled = !state.busy,
                 variant = DsButtonVariant.Info,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (cameraPermissionDenied) {
+                Text(
+                    stringResource(R.string.pair_camera_permission_denied),
+                    style = DsType.small13,
+                    color = colors.warnLabel,
+                )
+            }
 
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 SectionHeader(stringResource(R.string.pair_manual_title))
