@@ -54,21 +54,28 @@ fi
 fetch_repo_path() {
   local relative="$1"
   local dest="$2"
+  local expected_sha256="$3"
   mkdir -p "$(dirname "$dest")"
-  [ -s "$dest" ] && return 0
+
+  if [ -s "$dest" ] &&
+    printf '%s  %s\n' "$expected_sha256" "$dest" | sha256sum -c - >/dev/null 2>&1; then
+    return 0
+  fi
+  rm -f "$dest"
 
   local tmp="${dest}.part"
   local repo
   for repo in "${TERMUX_REPOS[@]}"; do
     rm -f "$tmp"
-    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20       "$repo/$relative" -o "$tmp"; then
+    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/$relative" -o "$tmp" &&
+      printf '%s  %s\n' "$expected_sha256" "$tmp" | sha256sum -c - >/dev/null 2>&1; then
       mv "$tmp" "$dest"
       return 0
     fi
-    echo "Termux 镜像不可用，切换备用源：$repo" >&2
+    echo "Termux 包镜像不可用或 SHA256 不匹配，切换备用源：$repo" >&2
   done
   rm -f "$tmp"
-  echo "所有 Termux 镜像均不可用：$relative" >&2
+  echo "所有 Termux 镜像均无法提供已校验包：$relative" >&2
   return 1
 }
 
@@ -374,8 +381,7 @@ prepare_arch() {
     }
 
     local deb="$CACHE_DIR/debs/$apt_arch/$(basename "$filename")"
-    fetch_repo_path "$filename" "$deb"
-    printf '%s  %s\n' "$digest" "$deb" | sha256sum -c - >/dev/null
+    fetch_repo_path "$filename" "$deb" "$digest"
 
     local extracted="$WORK_DIR/$apt_arch/$pkg"
     rm -rf "$extracted"
