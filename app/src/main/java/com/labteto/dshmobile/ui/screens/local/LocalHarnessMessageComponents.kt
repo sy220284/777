@@ -102,6 +102,7 @@ internal fun LocalMessageRow(
     groupMode: Boolean,
     canEdit: Boolean,
     canRegenerate: Boolean,
+    canSelectVariant: Boolean,
     branchInfo: LocalChatBranchInfo?,
     onEdit: (LocalHarnessMessage) -> Unit,
     onSelectVariant: (String, Int) -> Boolean,
@@ -113,6 +114,14 @@ internal fun LocalMessageRow(
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.chat_copy_success)
     val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
+    val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
+    val selectVariantWithFeedback: (String, Int) -> Boolean = { id, index ->
+        val selected = onSelectVariant(id, index)
+        if (!selected) {
+            Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+        }
+        selected
+    }
 
     when (message.role) {
         "user" -> Column(
@@ -129,7 +138,8 @@ internal fun LocalMessageRow(
                     MessageVariantControls(
                         messageId = message.id,
                         branchInfo = branchInfo,
-                        onSelectVariant = onSelectVariant,
+                        enabled = canSelectVariant,
+                        onSelectVariant = selectVariantWithFeedback,
                     )
                     editableChatUserText(message).takeIf(String::isNotBlank)?.let { copyText ->
                         DsIconButton(
@@ -198,7 +208,8 @@ internal fun LocalMessageRow(
                         MessageVariantControls(
                             messageId = message.id,
                             branchInfo = branchInfo,
-                            onSelectVariant = onSelectVariant,
+                            enabled = canSelectVariant,
+                            onSelectVariant = selectVariantWithFeedback,
                         )
                     }
                     DsIconButton(
@@ -230,6 +241,7 @@ internal fun LocalMessageRow(
 private fun MessageVariantControls(
     messageId: String,
     branchInfo: LocalChatBranchInfo?,
+    enabled: Boolean,
     onSelectVariant: (String, Int) -> Boolean,
 ) {
     val info = branchInfo ?: return
@@ -238,7 +250,7 @@ private fun MessageVariantControls(
         icon = Icons.Filled.KeyboardArrowLeft,
         contentDescription = stringResource(R.string.local_previous_variant),
         onClick = { onSelectVariant(messageId, info.index - 1) },
-        enabled = info.hasPrevious,
+        enabled = enabled && info.hasPrevious,
         tint = colors.labelTertiary.copy(alpha = 0.78f),
     )
     Text(
@@ -250,7 +262,7 @@ private fun MessageVariantControls(
         icon = Icons.Filled.KeyboardArrowRight,
         contentDescription = stringResource(R.string.local_next_variant),
         onClick = { onSelectVariant(messageId, info.index + 1) },
-        enabled = info.hasNext,
+        enabled = enabled && info.hasNext,
         tint = colors.labelTertiary.copy(alpha = 0.78f),
     )
 }
