@@ -27,6 +27,13 @@ internal class LocalConversationFilesCoordinator(
         }
     }
 
+    fun invalidate(sessionIds: Collection<String>) {
+        if (sessionIds.isEmpty()) return
+        synchronized(lock) {
+            sessionIds.forEach(cache::remove)
+        }
+    }
+
     fun conversationFiles(sessionId: String): LocalConversationFiles {
         val files = workspace.files()
         val log = if (sessionId == currentSessionId()) currentEventLog() else eventLogFor(sessionId)
