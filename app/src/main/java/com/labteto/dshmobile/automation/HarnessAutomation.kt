@@ -100,6 +100,19 @@ internal fun nextAnchoredAutomationRun(
     afterMillis: Long,
     suggestedRunAt: Long? = null,
 ): Long? {
+    if (task.scheduleType == AutomationScheduleType.WINDOW) {
+        val constrainedAfter = maxOf(
+            afterMillis,
+            suggestedRunAt?.minus(60_000L) ?: afterMillis,
+        )
+        return nextDailyWindowRun(
+            previousScheduledAt = task.nextRunAt,
+            afterMillis = constrainedAfter,
+            startMinuteOfDay = task.windowStartMinuteOfDay ?: return null,
+            endMinuteOfDay = task.windowEndMinuteOfDay ?: return null,
+        )
+    }
+
     suggestedRunAt?.takeIf { it > afterMillis }?.let { return it }
 
     if (task.scheduleType == AutomationScheduleType.SILENCE) {
@@ -116,12 +129,6 @@ internal fun nextAnchoredAutomationRun(
             val minutes = task.recurringMinutes ?: return null
             nextIntervalAnchoredRun(anchor, afterMillis, minutes)
         }
-        AutomationScheduleType.WINDOW -> nextDailyWindowRun(
-            previousScheduledAt = task.nextRunAt,
-            afterMillis = afterMillis,
-            startMinuteOfDay = task.windowStartMinuteOfDay ?: return null,
-            endMinuteOfDay = task.windowEndMinuteOfDay ?: return null,
-        )
         else -> task.recurringMinutes?.let { afterMillis + it * 60_000L }
     }
 }
