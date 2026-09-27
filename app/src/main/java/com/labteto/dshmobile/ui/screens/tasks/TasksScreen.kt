@@ -872,8 +872,11 @@ private fun showTimeOfDayPicker(
     ).show()
 }
 
-private fun formatMinuteOfDay(minuteOfDay: Int): String =
-    String.format("%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
+private fun formatMinuteOfDay(minuteOfDay: Int): String {
+    val hour = (minuteOfDay / 60).toString().padStart(2, '0')
+    val minute = (minuteOfDay % 60).toString().padStart(2, '0')
+    return "$hour:$minute"
+}
 
 private fun showSchedulePicker(
     context: Context,
@@ -961,10 +964,13 @@ private fun TaskCard(
     }
     val terminalOneShot = task.recurringMinutes == null &&
         task.status in setOf("completed", "failed", "blocked")
-    val timing = if (terminalOneShot && task.lastRunAt != null) {
-        stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
-    } else {
-        stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+    val timing = when {
+        task.status == "waiting_user" ->
+            stringResource(R.string.tasks_waiting_user_timing)
+        terminalOneShot && task.lastRunAt != null ->
+            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+        else ->
+            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
     }
 
     DsGroupCard {
