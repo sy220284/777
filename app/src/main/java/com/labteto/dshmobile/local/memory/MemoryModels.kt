@@ -40,6 +40,11 @@ data class MemoryRecord(
     val sourceSessionId: String? = null,
     /** Exact user-message sources. Multiple confirmations can keep one memory alive independently. */
     val sourceMessages: List<MemorySourceRef> = emptyList(),
+    /**
+     * True when this fact also has provenance that predates message-level binding or was written
+     * outside a user-message turn. Default true keeps old persisted records migration-safe.
+     */
+    val hasUnboundSource: Boolean = true,
     /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
     val subjectKey: String? = null,
     val importance: Int = 50,
