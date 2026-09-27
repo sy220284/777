@@ -17,6 +17,7 @@
     <string name="local_delete_session">Delete conversation</string>
     <string name="local_selected_count">Selected: %1$d</string>
     <string name="local_regenerate_reply">Regenerate reply</string>
+    <string name="local_regenerate_reply_failed">This reply cannot be regenerated right now.</string>
     <string name="local_edit_user_message">Edit message</string>
     <string name="local_edit_user_message_hint">Resending continues the conversation again from this message and regenerates the replies that follow.</string>
     <string name="local_edit_user_message_resend">Resend</string>
@@ -426,6 +427,8 @@
     <string name="tasks_empty_subtitle">Ask the agent in chat to “remind me tomorrow…” or “run this every week…”. Tasks will appear here.</string>
     <string name="tasks_cancelled">Task cancelled</string>
     <string name="tasks_missing">That task no longer exists</string>
+    <string name="tasks_run_started">Task started</string>
+    <string name="tasks_run_failed">Task could not be started</string>
     <string name="tasks_background_task">Background task</string>
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
