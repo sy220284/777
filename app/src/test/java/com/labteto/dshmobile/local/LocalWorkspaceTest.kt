@@ -107,6 +107,16 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun literalAndRegexSearchAreExplicitAndBounded() {
+        workspace.write("notes.md", "## 规范\n铁律\n")
+        assertEquals("未找到匹配内容", workspace.search("^##"))
+        assertTrue(workspace.search("^##", regex = true).contains("notes.md:1:"))
+        assertTrue(workspace.search("铁律|规范", regex = true).contains("notes.md:2:"))
+        assertEquals("未找到匹配内容", workspace.search("铁律|规范"))
+        assertThrows(IllegalArgumentException::class.java) { workspace.search("[", regex = true) }
+    }
+
+    @Test
     fun recursiveDiscoveryDoesNotFollowSymlinksOutsideWorkspace() {
         external = Files.createTempDirectory("local-harness-external").toFile().apply {
             resolve("secret.txt").writeText("outside-secret")

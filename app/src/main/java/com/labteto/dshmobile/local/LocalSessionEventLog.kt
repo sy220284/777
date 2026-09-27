@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.io.File
+import java.util.zip.GZIPInputStream
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -51,7 +52,8 @@ class LocalSessionEventLog(
      */
     fun events(): Sequence<Event> = sequence {
         for (source in orderedFiles()) {
-            source.bufferedReader().use { reader ->
+            (if (source.name.endsWith(".gz")) GZIPInputStream(source.inputStream().buffered()).bufferedReader()
+            else source.bufferedReader()).use { reader ->
                 while (true) {
                     val line = reader.readLine() ?: break
                     val event = runCatching {
@@ -95,8 +97,15 @@ class LocalSessionEventLog(
         val parent = file.parentFile ?: return listOfNotNull(file.takeIf(File::isFile))
         val prefix = "${file.name}.part-"
         val segments = parent.listFiles().orEmpty()
-            .filter { it.isFile && it.name.startsWith(prefix) }
-            .sortedBy { it.name.removePrefix(prefix).toIntOrNull() ?: Int.MAX_VALUE }
+            .filter { it.isFile && it.name.startsWith(prefix) &&
+                Regex("[0-9]+(?:\\.gz)?").matches(it.name.removePrefix(prefix)) }
+            .mapNotNull { candidate ->
+                candidate.name.removePrefix(prefix).removeSuffix(".gz").toIntOrNull()
+                    ?.let { it to candidate }
+            }
+            .groupBy({ it.first }, { it.second })
+            .toSortedMap()
+            .values.map { copies -> copies.firstOrNull { !it.name.endsWith(".gz") } ?: copies.first() }
         return segments + listOfNotNull(file.takeIf(File::isFile))
     }
 

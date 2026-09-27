@@ -8,6 +8,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -24,8 +26,8 @@ data class SessionEvent(
  * Append-only source of truth for model-visible session facts.
  *
  * [maxBytes] is a segment bound, not a retention bound. Once the active JSONL file reaches the
- * bound it is moved to an immutable numbered segment and a fresh active file is opened. Historical
- * rows are never discarded merely to make room for newer rows.
+ * bound it is moved to a compressed immutable numbered segment and a fresh active file is opened.
+ * Historical rows are never discarded merely to make room for newer rows.
  */
 class SessionEventLog(
     private val file: File,
@@ -55,6 +57,8 @@ class SessionEventLog(
         if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
         file.appendText(encoded)
         nextSequence.incrementAndGet()
+        // Archive maintenance must not turn a committed append into an apparent failure.
+        runCatching { compressOneLegacySegmentUnsafe() }
         event
     }
 
@@ -152,7 +156,7 @@ class SessionEventLog(
             var retainedCount = 0
             for (source in orderedFilesUnsafe().asReversed()) {
                 val segmentTail = ArrayDeque<String>(wanted)
-                source.forEachLine { line ->
+                source.forEachEventLine { line ->
                     if (line.isBlank()) return@forEachLine
                     if (segmentTail.size >= wanted) segmentTail.removeFirst()
                     segmentTail.addLast(line)
@@ -190,7 +194,7 @@ class SessionEventLog(
         require(type.isNotBlank()) { "事件类型不能为空" }
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
-            source.forEachLine { line ->
+            source.forEachEventLine { line ->
                 val event = decodeEventOrNull(line) ?: return@forEachLine
                 if (
                     event.sequence < beforeSequenceExclusive &&
@@ -209,7 +213,7 @@ class SessionEventLog(
         require(types.isNotEmpty()) { "事件类型集合不能为空" }
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
-            source.forEachLine { line ->
+            source.forEachEventLine { line ->
                 val event = decodeEventOrNull(line) ?: return@forEachLine
                 if (
                     event.type in types &&
@@ -225,7 +229,10 @@ class SessionEventLog(
 
     fun clear() {
         synchronized(lock) {
-            segmentFilesUnsafe().forEach { it.delete() }
+            val prefix = "${file.name}.part-"
+            file.parentFile?.listFiles().orEmpty()
+                .filter { it.isFile && it.name.startsWith(prefix) }
+                .forEach { it.delete() }
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
@@ -250,7 +257,7 @@ class SessionEventLog(
 
     private fun readFirstValidEventUnsafe(source: File): SessionEvent? {
         if (!source.isFile || source.length() == 0L) return null
-        source.bufferedReader().useLines { lines ->
+        source.eventReader().useLines { lines ->
             lines.forEach { line ->
                 decodeEventOrNull(line)?.let { return it }
             }
@@ -260,6 +267,13 @@ class SessionEventLog(
 
     private fun readLastValidEventUnsafe(source: File): SessionEvent? {
         if (!source.isFile || source.length() == 0L) return null
+        if (source.name.endsWith(COMPRESSED_SUFFIX)) {
+            var latest: SessionEvent? = null
+            source.forEachEventLine { line ->
+                decodeEventOrNull(line)?.let { latest = it }
+            }
+            return latest
+        }
         RandomAccessFile(source, "r").use { input ->
             var cursor = input.length()
             val reversed = ByteArrayOutputStream()
@@ -304,6 +318,15 @@ class SessionEventLog(
         visitor: (SessionEvent) -> Boolean,
     ): Boolean {
         if (!source.isFile || source.length() == 0L) return true
+        if (source.name.endsWith(COMPRESSED_SUFFIX)) {
+            // One decoded segment is bounded by maxBytes (8 MiB in production).
+            val lines = source.eventReader().useLines { it.toList() }
+            for (line in lines.asReversed()) {
+                val event = decodeEventOrNull(line) ?: continue
+                if (!visitor(event)) return false
+            }
+            return true
+        }
         RandomAccessFile(source, "r").use { input ->
             var cursor = input.length()
             val reversed = ByteArrayOutputStream()
@@ -354,7 +377,7 @@ class SessionEventLog(
 
         fun readSource(index: Int): List<SessionEvent> {
             val events = mutableListOf<SessionEvent>()
-            sources[index].forEachLine { line ->
+            sources[index].forEachEventLine { line ->
                 decodeEventOrNull(line)?.let(events::add)
             }
             return events
@@ -400,7 +423,7 @@ class SessionEventLog(
         }
 
         relevant.forEach { source ->
-            source.forEachLine { line ->
+            source.forEachEventLine { line ->
                 val event = decodeEventOrNull(line) ?: return@forEachLine
                 if (event.sequence > sequenceExclusive) visitor(event)
             }
@@ -413,7 +436,7 @@ class SessionEventLog(
     private fun readEventsUnsafe(): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()
         for (source in orderedFilesUnsafe()) {
-            source.forEachLine { line ->
+            source.forEachEventLine { line ->
                 runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
                     .getOrNull()
                     ?.let(events::add)
@@ -429,8 +452,14 @@ class SessionEventLog(
         val parent = file.parentFile ?: return emptyList()
         val prefix = "${file.name}.part-"
         return parent.listFiles().orEmpty()
-            .filter { it.isFile && it.name.startsWith(prefix) }
-            .sortedBy { it.name.removePrefix(prefix).toIntOrNull() ?: Int.MAX_VALUE }
+            .filter { it.isFile && it.name.startsWith(prefix) && SEGMENT_NAME.matches(it.name.removePrefix(prefix)) }
+            .mapNotNull { candidate ->
+                candidate.name.removePrefix(prefix).removeSuffix(COMPRESSED_SUFFIX).toIntOrNull()
+                    ?.let { it to candidate }
+            }
+            .groupBy({ it.first }, { it.second })
+            .toSortedMap()
+            .values.map { copies -> copies.firstOrNull { !it.name.endsWith(COMPRESSED_SUFFIX) } ?: copies.first() }
     }
 
     private fun rotateActiveSegment() {
@@ -439,7 +468,7 @@ class SessionEventLog(
         parent.mkdirs()
         val prefix = "${file.name}.part-"
         val nextIndex = segmentFilesUnsafe()
-            .mapNotNull { it.name.removePrefix(prefix).toIntOrNull() }
+            .mapNotNull { it.name.removePrefix(prefix).removeSuffix(COMPRESSED_SUFFIX).toIntOrNull() }
             .maxOrNull()
             ?.plus(1)
             ?: 1
@@ -449,6 +478,50 @@ class SessionEventLog(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(file.toPath(), target.toPath())
         }
+        runCatching { compressSegmentUnsafe(target) }
+    }
+
+    private fun compressOneLegacySegmentUnsafe() {
+        segmentFilesUnsafe().firstOrNull { !it.name.endsWith(COMPRESSED_SUFFIX) }
+            ?.let(::compressSegmentUnsafe)
+    }
+
+    /** Publish the archive before deleting the original; an interrupted migration keeps the raw segment. */
+    private fun compressSegmentUnsafe(source: File) {
+        val compressed = File(source.path + COMPRESSED_SUFFIX)
+        val temporary = File(source.path + ".gz.tmp")
+        try {
+            source.inputStream().buffered().use { input ->
+                GZIPOutputStream(temporary.outputStream().buffered()).use { output -> input.copyTo(output) }
+            }
+            // Verify the whole stream and CRC before dropping the durable source.
+            var decodedBytes = 0L
+            GZIPInputStream(temporary.inputStream().buffered()).use { input ->
+                val buffer = ByteArray(8_192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    decodedBytes += count
+                }
+            }
+            check(decodedBytes == source.length()) { "事件归档校验失败" }
+            try {
+                Files.move(temporary.toPath(), compressed.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), compressed.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+            check(source.delete()) { "事件原分片删除失败" }
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    private fun File.eventReader() =
+        if (name.endsWith(COMPRESSED_SUFFIX)) GZIPInputStream(inputStream().buffered()).bufferedReader()
+        else bufferedReader()
+
+    private inline fun File.forEachEventLine(block: (String) -> Unit) {
+        eventReader().useLines { lines -> lines.forEach(block) }
     }
 
     private companion object {
@@ -462,5 +535,7 @@ class SessionEventLog(
         const val DEFAULT_PAGE_EVENTS = 80
         const val MAX_PAGE_EVENTS = 200
         const val REVERSE_READ_BUFFER_BYTES = 8 * 1024
+        const val COMPRESSED_SUFFIX = ".gz"
+        val SEGMENT_NAME = Regex("[0-9]+(?:\\.gz)?")
     }
 }

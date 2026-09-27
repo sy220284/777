@@ -505,11 +505,14 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             current.copy(jobs = projectExecutionJobs(current.usageMode, snapshot))
         }
-        LocalExecutionService.syncJobs(
+        val foregroundReady = LocalExecutionService.syncJobs(
             context = context,
             sessionId = currentSessionId,
             activeJobs = snapshot.filter { it.status == "running" },
         )
+        if (!foregroundReady && snapshot.any { it.status == "running" }) {
+            _state.update { it.copy(error = "后台执行服务启动失败；长任务可能被系统中断，请保持应用在前台并查看系统日志") }
+        }
     }
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
@@ -4842,7 +4845,9 @@ class LocalHarnessEngine @Inject constructor(
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
             "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
-            "grep", "search_text" -> workspace.search(args.string("query"), args.optionalString("path") ?: ".")
+            "grep", "search_text" -> workspace.search(
+                args.string("query"), args.optionalString("path") ?: ".", args.boolean("regex", false),
+            )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val command = args.string("command")

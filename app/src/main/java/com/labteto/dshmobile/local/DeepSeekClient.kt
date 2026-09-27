@@ -408,9 +408,10 @@ object LocalToolCatalog {
             "pattern" to string("例如 **/*.kt"),
             "path" to string("相对路径，默认 ."),
         ), listOf("pattern")))
-        add(tool("grep", "在工作区文件中按字面量搜索文字；不支持正则表达式", properties(
-            "query" to string("字面量搜索内容，不解析 |、^ 等正则符号"),
+        add(tool("grep", "在工作区文件中搜索文字；默认字面量，可指定正则表达式", properties(
+            "query" to string("搜索内容；regex=true 时按正则表达式解析"),
             "path" to string("相对路径，默认 ."),
+            "regex" to boolean("是否按正则表达式搜索，默认 false"),
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),

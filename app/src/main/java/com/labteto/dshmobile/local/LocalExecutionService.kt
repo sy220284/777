@@ -13,6 +13,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.notify.NotificationArtwork
+import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -231,10 +232,10 @@ class LocalExecutionService : Service() {
             )
         }
 
-        fun syncJobs(context: Context, sessionId: String, activeJobs: List<LocalJobInfo>) {
-            if (activeJobs.isEmpty() && !dispatchedActive) return
+        fun syncJobs(context: Context, sessionId: String, activeJobs: List<LocalJobInfo>): Boolean {
+            if (activeJobs.isEmpty() && !dispatchedActive) return true
             if (activeJobs.isNotEmpty()) dispatchedActive = true
-            dispatch(
+            return dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_SYNC_JOBS)
@@ -244,10 +245,10 @@ class LocalExecutionService : Service() {
             )
         }
 
-        private fun dispatch(context: Context, intent: Intent) {
+        private fun dispatch(context: Context, intent: Intent): Boolean =
             runCatching {
                 ContextCompat.startForegroundService(context.applicationContext, intent)
-            }
-        }
+            }.onFailure { AppLog.error("LocalExecutionService", "前台执行服务启动失败", it) }
+                .isSuccess
     }
 }
