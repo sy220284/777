@@ -5915,10 +5915,8 @@ class LocalHarnessEngine @Inject constructor(
             appendLine("Shell 与 process_exec 共享内置运行时 PATH/环境；Git hooks 默认禁用。")
             appendLine("限制：应用沙箱无法访问其他 App 私有目录；语言服务器等以实际检测结果为准。")
             val recentDiagnostics = AppLog.snapshot()
-                .asSequence()
                 .filter { it.level == "W" || it.level == "E" }
                 .takeLast(20)
-                .toList()
             if (recentDiagnostics.isNotEmpty()) {
                 appendLine("最近诊断：")
                 recentDiagnostics.forEach { entry ->
