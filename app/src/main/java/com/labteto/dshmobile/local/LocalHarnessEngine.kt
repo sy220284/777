@@ -3226,7 +3226,7 @@ class LocalHarnessEngine @Inject constructor(
                             .forEach(File::delete)
                     }
                 }
-                synchronized(conversationFilesCacheLock) { ids.forEach(conversationFilesCache::remove) }
+                conversationFilesCoordinator.invalidate(ids)
                 memoryStore.detachSourceSessions(ids)
                 _state.update { it.copy(sessions = sessionSummaries()) }
                 persist()
