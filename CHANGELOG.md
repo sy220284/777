@@ -15,6 +15,17 @@ All notable changes to DSH Mobile are documented here. Format based on
   restart and does not vanish when a picker grant lapses. Picking another image replaces the stored
   one; removing it returns the plain theme colour.
 
+### Fixed
+
+- Notifications now use the supplied red/black portrait as the full-colour notification artwork,
+  with a matching monochrome butterfly for the Android status bar. All notification builders,
+  including the Harness Webhook foreground service, use the same artwork.
+- Launch/window colours now match the Light and Dark Compose canvases exactly, Matte black gets its
+  exact hand-off colour, and Android 16's app-local night mode API is used so the platform splash
+  resolves the matching day/night resources before MainActivity draws.
+- Removed copied unused imports left by the local-screen split and deleted obsolete notification/
+  launcher foreground vectors that no longer have runtime references.
+
 ## [0.11.4] - 2026-09-19
 
 ### Fixed

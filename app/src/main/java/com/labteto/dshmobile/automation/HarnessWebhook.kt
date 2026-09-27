@@ -15,6 +15,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -23,11 +24,10 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.ServerSocket
 import java.net.Socket
 import java.security.GeneralSecurityException
 import java.security.KeyStore
@@ -298,7 +298,8 @@ class HarnessWebhookService : Service() {
             ),
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setSmallIcon(R.drawable.ic_notification_butterfly)
+            .setLargeIcon(NotificationArtwork.largeIcon(this))
             .setContentTitle("777 Harness Webhook")
             .setContentText("本机自动化回调服务正在运行")
             .setOngoing(true)
