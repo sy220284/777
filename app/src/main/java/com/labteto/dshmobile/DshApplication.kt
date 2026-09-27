@@ -59,7 +59,7 @@ class DshApplication : Application() {
          * A synchronously-readable copy of the Appearance preference.
          *
          * The preference itself lives in DataStore, which is only readable from a coroutine — and
-         * the scheme has to be known before any activity exists (see [nightModeFor]). Reading
+         * the scheme has to be known before any activity exists (see [applicationNightModeFor]). Reading
          * DataStore with `runBlocking` here deadlocked startup and left the app on its splash
          * screen, so this mirror exists purely to be readable at that moment.
          * [com.labteto.dshmobile.connection.HostsStore] writes it whenever the preference changes;
