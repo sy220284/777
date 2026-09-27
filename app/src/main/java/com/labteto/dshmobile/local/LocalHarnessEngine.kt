@@ -4,7 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
+import com.labteto.dshmobile.observability.AppLog
 import android.os.Environment
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.automation.AutomationPlugin
@@ -452,7 +452,7 @@ class LocalHarnessEngine @Inject constructor(
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
             CoroutineExceptionHandler { _, throwable ->
-                Log.e("LocalHarnessEngine", "engine coroutine failure", throwable)
+                AppLog.error("LocalHarnessEngine", "engine coroutine failure", throwable)
                 _state.update { current ->
                     current.copy(
                         error = throwable.message?.takeIf(String::isNotBlank)
