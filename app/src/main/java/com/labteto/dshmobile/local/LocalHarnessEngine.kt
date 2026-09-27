@@ -60,7 +60,6 @@ import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
-import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
@@ -72,11 +71,7 @@ import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
-import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
-import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
-import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
