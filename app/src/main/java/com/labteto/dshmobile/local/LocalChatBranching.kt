@@ -50,8 +50,7 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
     if (turnDialogue.first().role != "user") return false
     // Group chat may legitimately produce several assistant messages for one user turn, while
     // queued/steering input can legitimately leave several user messages next to each other.
-    // Once the run is idle, either shape can be edited safely because the new sibling branch starts
-    // at the selected human message and does not inherit the old downstream path.
+    // Either shape remains valid for branch navigation and historical-edit eligibility once idle.
     return true
 }
 
@@ -81,6 +80,26 @@ internal fun withEditedChatUserText(
             append("\n\n")
         }
         append(attachmentContext)
+    }
+}
+
+/**
+ * Rewrites the active conversation from one historical user turn.
+ *
+ * Everything from the original turn onward is discarded from the active transcript. The edited
+ * user message becomes the new tail; the next generated assistant reply continues from there.
+ */
+internal fun rewriteChatTranscriptFromUserEdit(
+    activeMessages: List<LocalHarnessMessage>,
+    originalMessageId: String,
+    editedMessage: LocalHarnessMessage,
+): List<LocalHarnessMessage>? {
+    if (editedMessage.role != "user") return null
+    val index = activeMessages.indexOfFirst { message -> message.id == originalMessageId }
+    if (index < 0 || activeMessages[index].role != "user") return null
+    return buildList(index + 1) {
+        addAll(activeMessages.subList(0, index))
+        add(editedMessage)
     }
 }
 

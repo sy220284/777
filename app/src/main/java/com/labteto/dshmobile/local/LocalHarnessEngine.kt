@@ -1389,11 +1389,11 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /**
-     * Edit one user turn and resend from that point.
+     * Edit any historical user turn and continue from that point.
      *
-     * Chat mode keeps the old branch in [LocalChatBranchState]. The edited message becomes a sibling
-     * of the original user turn, so switching back later restores the old downstream conversation
-     * instead of destroying it.
+     * The active transcript is rewritten destructively: the original user turn and every later
+     * message are removed from the active conversation. The edited turn becomes the new tail, and
+     * the next assistant reply is generated from the retained prefix.
      */
     fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
         val requestedText = replacement.trim()
@@ -1404,52 +1404,44 @@ class LocalHarnessEngine @Inject constructor(
             state.loading ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
-            pendingInputs.size() != 0 ||
-            !state.transcriptIndex.branchingEligible
+            pendingInputs.size() != 0
         ) return@synchronized false
 
-        val branchTranscript = transcriptForBranchMaterialization(state)
-        var branches = if (state.chatBranches.nodes.isNotEmpty()) {
-            state.chatBranches
-        } else {
-            syncChatBranchState(
-                current = LocalChatBranchState(),
-                activeMessages = branchTranscript,
-                chatState = state.chatState,
-                replySuggestions = state.replySuggestions,
-            )
-        }
-        val original = branches.nodes.firstOrNull { it.message.id == messageId } ?: return@synchronized false
-        if (original.message.role != "user") return@synchronized false
-        val content = withEditedChatUserText(original.message, requestedText)
+        val activeTranscript = transcriptForBranchMaterialization(state)
+        val original = activeTranscript.firstOrNull { message -> message.id == messageId }
+            ?: return@synchronized false
+        if (original.role != "user") return@synchronized false
+
+        val content = withEditedChatUserText(original, requestedText)
         if (content.isBlank()) return@synchronized false
-        if (editableChatUserText(original.message).trim() == requestedText) return@synchronized false
+        if (editableChatUserText(original).trim() == requestedText) return@synchronized false
         cancelChatPostTurn()
 
-        val baseState = original.parentId
-            ?.let { parentId -> branches.nodes.firstOrNull { it.message.id == parentId }?.chatStateAfter }
+        val baseState = state.chatBranches.nodes
+            .firstOrNull { node -> node.message.id == messageId }
+            ?.parentId
+            ?.let { parentId ->
+                state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
+            }
             ?: ChatCharacterState()
+
         val edited = newTranscriptMessage("user", content)
-        branches = upsertChatBranchNode(
-            branches,
-            LocalChatBranchNode(
-                message = edited,
-                parentId = original.parentId,
-                chatStateAfter = baseState,
-            ),
-            select = true,
-        )
-        val activeMessages = activeChatBranchMessages(branches)
+        val rewritten = rewriteChatTranscriptFromUserEdit(
+            activeMessages = activeTranscript,
+            originalMessageId = messageId,
+            editedMessage = edited,
+        ) ?: return@synchronized false
         val editedModelMessage = editedUserModelMessage(
             originalMessageId = messageId,
             content = content,
         )
         rebuildEditedChatModelHistory(
-            messages = activeMessages,
+            messages = rewritten,
             groupMode = state.groupChat.enabled,
             editedMessageId = edited.id,
             editedModelMessage = editedModelMessage,
         )
+
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
             put("model_message", editedModelMessage)
@@ -1460,16 +1452,19 @@ class LocalHarnessEngine @Inject constructor(
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
         _state.update { current ->
             current.copy(
-                messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-                transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
+                messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
                 chatState = baseState,
                 replySuggestions = emptyList(),
-                chatBranches = branches,
+                chatBranches = LocalChatBranchState(),
                 groupActiveSpeakerName = null,
                 error = null,
             )
         }
-        persistChatBranchState("user-edited")
+        persistRewrittenChatTranscript(
+            reason = "user-edited",
+            activeTranscript = rewritten,
+        )
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
         automationScheduler.onChatUserActivity(
@@ -1667,6 +1662,21 @@ class LocalHarnessEngine @Inject constructor(
         }
         resetModelHistory(rebuilt)
         updateContextMetrics()
+    }
+
+    private fun persistRewrittenChatTranscript(
+        reason: String,
+        activeTranscript: List<LocalHarnessMessage>,
+    ) {
+        val clearedBranches = LocalChatBranchState()
+        eventLog.append("chat/branch-state", JsonObject(
+            encodeChatBranchStateEvent(clearedBranches) + ("reason" to JsonPrimitive(reason)),
+        ))
+        val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
+            put("reason", reason)
+            put("transcript", encodeTranscriptMessages(activeTranscript))
+        })
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
     private fun persistChatBranchState(reason: String) {

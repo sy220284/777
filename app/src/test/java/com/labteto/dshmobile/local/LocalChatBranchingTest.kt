@@ -46,7 +46,7 @@ class LocalChatBranchingTest {
     }
 
     @Test
-    fun editedUserCreatesSiblingAndOriginalDownstreamBranchStaysIntact() {
+    fun legacyBranchGraphCanStillRepresentSiblingUserTurns() {
         val firstUser = message("u1", "user", "第一句", 1)
         val firstAnswer = message("a1", "assistant", "第一答", 2)
         val originalUser = message("u2", "user", "原消息", 3)
@@ -78,6 +78,30 @@ class LocalChatBranchingTest {
             listOf("u1", "a1", "u2", "a2"),
             activeChatBranchMessages(originalSelected).map { it.id },
         )
+    }
+
+    @Test
+    fun historicalUserEditDropsOriginalTurnAndEveryLaterMessage() {
+        val transcript = (1..100).map { index ->
+            message(
+                id = "m$index",
+                role = "user",
+                content = "消息$index",
+                at = index.toLong(),
+            )
+        }
+        val edited = message("edited-50", "user", "修改后的第50条", 101)
+
+        val rewritten = rewriteChatTranscriptFromUserEdit(
+            activeMessages = transcript,
+            originalMessageId = "m50",
+            editedMessage = edited,
+        )!!
+
+        assertEquals(50, rewritten.size)
+        assertEquals((1..49).map { "m$it" } + "edited-50", rewritten.map { it.id })
+        assertTrue(rewritten.none { it.id == "m50" })
+        assertTrue(rewritten.none { it.id in (51..100).map { n -> "m$n" }.toSet() })
     }
 
     @Test

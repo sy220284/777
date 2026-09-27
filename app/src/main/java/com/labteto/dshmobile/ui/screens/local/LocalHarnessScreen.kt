@@ -744,7 +744,8 @@ private fun LocalChat(
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
-    val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT &&
+    val messageEditingEnabled = state.usageMode == LocalUsageMode.CHAT
+    val messageBranchingEnabled = messageEditingEnabled &&
         state.transcriptIndex.branchingEligible
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val currentGalleryEntry = remember(gallery, state.galleryId) {
@@ -1186,7 +1187,7 @@ private fun LocalChat(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
                             groupMode = state.groupChat.enabled,
-                            canEdit = messageBranchingEnabled &&
+                            canEdit = messageEditingEnabled &&
                                 !state.running &&
                                 transcriptItem.message.role == "user",
                             canRegenerate = !state.groupChat.enabled &&
