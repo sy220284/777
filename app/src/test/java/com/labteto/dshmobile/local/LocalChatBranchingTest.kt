@@ -85,23 +85,23 @@ class LocalChatBranchingTest {
         val transcript = (1..100).map { index ->
             message(
                 id = "m$index",
-                role = if (index % 2 == 0) "assistant" else "user",
+                role = "user",
                 content = "消息$index",
                 at = index.toLong(),
             )
         }
-        val edited = message("edited-49", "user", "修改后的第49条", 101)
+        val edited = message("edited-50", "user", "修改后的第50条", 101)
 
         val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = transcript,
-            originalMessageId = "m49",
+            originalMessageId = "m50",
             editedMessage = edited,
         )!!
 
-        assertEquals(49, rewritten.size)
-        assertEquals((1..48).map { "m$it" } + "edited-49", rewritten.map { it.id })
-        assertTrue(rewritten.none { it.id == "m49" })
-        assertTrue(rewritten.none { it.id in (50..100).map { n -> "m$n" }.toSet() })
+        assertEquals(50, rewritten.size)
+        assertEquals((1..49).map { "m$it" } + "edited-50", rewritten.map { it.id })
+        assertTrue(rewritten.none { it.id == "m50" })
+        assertTrue(rewritten.none { it.id in (51..100).map { n -> "m$n" }.toSet() })
     }
 
     @Test
