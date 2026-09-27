@@ -7,6 +7,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
+LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
@@ -24,9 +26,21 @@ violations: list[str] = []
 engine = ENGINE.read_text(encoding="utf-8")
 
 engine_lines = len(engine.splitlines())
-if engine_lines > 6_920:
+if engine_lines > 6_700:
     violations.append(
-        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6920); extract new logic behind a coordinator"
+        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6700); extract new logic behind a coordinator"
+    )
+
+local_screen_lines = len(LOCAL_SCREEN.read_text(encoding="utf-8").splitlines())
+if local_screen_lines > 2_920:
+    violations.append(
+        f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2920); extract UI/state into focused components"
+    )
+
+persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
+if persona_gallery_lines > 1_160:
+    violations.append(
+        f"PersonaGalleryDialog.kt grew to {persona_gallery_lines} lines (budget: 1160); keep gallery features in extracted components"
     )
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
@@ -40,10 +54,12 @@ chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
-if "timedelta(days=14)" not in cleanup_workflow:
-    violations.append("Release retention must keep a 14-day rollback window")
-if "cron: '17 3 * * *'" not in cleanup_workflow:
-    violations.append("Release cleanup must stay on the daily 03:17 UTC schedule")
+if "cron: '*/30 * * * *'" not in cleanup_workflow:
+    violations.append("Release cleanup must stay on the 30-minute schedule")
+if "keep = releases[:3]" not in cleanup_workflow or "remove = releases[3:]" not in cleanup_workflow:
+    violations.append("Release retention must keep exactly the latest three published releases")
+if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
+    violations.append("Release retention must not add an age-based retention window")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
