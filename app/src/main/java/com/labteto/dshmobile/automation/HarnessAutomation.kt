@@ -30,6 +30,11 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
+import java.nio.file.StandardCopyOption
+import java.nio.file.Files
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.charset.StandardCharsets
+import java.io.FileOutputStream
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
@@ -345,11 +350,16 @@ private data class AutomationDocument(
 )
 
 @Singleton
-class AutomationStore @Inject constructor(
-    @ApplicationContext context: Context,
+class AutomationStore internal constructor(
+    private val file: File,
     private val json: Json,
 ) {
-    private val file = File(context.filesDir, "local-harness/automations.json")
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        json: Json,
+    ) : this(File(context.filesDir, "local-harness/automations.json"), json)
+
+    private val backup = File(file.parentFile, file.name + ".bak")
 
     @Synchronized
     fun list(): List<AutomationTask> = read().tasks.sortedBy { it.nextRunAt }
@@ -382,23 +392,60 @@ class AutomationStore @Inject constructor(
     }
 
     private fun read(): AutomationDocument {
-        if (!file.isFile) return AutomationDocument()
-        return runCatching {
-            val decoded = json.decodeFromString(AutomationDocument.serializer(), file.readText())
-            decoded.copy(tasks = decoded.tasks.map(::normalizeAutomationTask))
-        }.getOrElse {
-            val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
-            runCatching { file.copyTo(corrupt, overwrite = true) }
-            AutomationDocument()
+        if (!file.isFile) {
+            return readValid(backup)?.also { restoreBackup() } ?: AutomationDocument()
         }
+        readValid(file)?.let { return it }
+
+        val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
+        runCatching { file.copyTo(corrupt, overwrite = true) }
+        val recovered = readValid(backup) ?: return AutomationDocument()
+        restoreBackup()
+        return recovered
+    }
+
+    private fun readValid(source: File): AutomationDocument? {
+        if (!source.isFile) return null
+        return runCatching {
+            val decoded = json.decodeFromString(AutomationDocument.serializer(), source.readText())
+            decoded.copy(tasks = decoded.tasks.map(::normalizeAutomationTask))
+        }.getOrNull()
     }
 
     private fun write(document: AutomationDocument) {
         file.parentFile?.mkdirs()
-        val temp = File(file.parentFile, file.name + ".tmp")
-        temp.writeText(json.encodeToString(AutomationDocument.serializer(), document))
-        if (!temp.renameTo(file)) {
-            file.writeText(temp.readText())
+        val encoded = json.encodeToString(AutomationDocument.serializer(), document)
+        readValid(file)?.let { current ->
+            atomicWrite(backup, json.encodeToString(AutomationDocument.serializer(), current))
+        }
+        atomicWrite(file, encoded)
+        if (!backup.isFile) atomicWrite(backup, encoded)
+    }
+
+    private fun restoreBackup() {
+        if (!backup.isFile) return
+        atomicWrite(file, backup.readText())
+    }
+
+    private fun atomicWrite(target: File, content: String) {
+        target.parentFile?.mkdirs()
+        val temp = File(target.parentFile, target.name + ".tmp")
+        val bytes = content.toByteArray(StandardCharsets.UTF_8)
+        FileOutputStream(temp).use { output ->
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+        }
+        try {
+            Files.move(
+                temp.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
             temp.delete()
         }
     }
