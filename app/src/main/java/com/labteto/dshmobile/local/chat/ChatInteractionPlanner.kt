@@ -691,8 +691,7 @@ class ChatInteractionPlanner @Inject constructor(
         val timeChanged = candidateTime.isNotBlank() && candidateTime != previous.sceneTime
         val acceptLocationChange = !locationChanged ||
             previous.location.isBlank() ||
-            sceneValueGrounded(candidateLocation, dialogue) ||
-            MOVEMENT_SIGNAL.containsMatchIn(dialogue)
+            sceneValueGrounded(candidateLocation, dialogue)
         val acceptTimeChange = !timeChanged ||
             previous.sceneTime.isBlank() ||
             sceneValueGrounded(candidateTime, dialogue) ||
@@ -704,23 +703,24 @@ class ChatInteractionPlanner @Inject constructor(
             candidateTime.ifBlank { previous.sceneTime }
         } else previous.sceneTime
         val acceptedSceneChange = nextLocation != previous.location || nextTime != previous.sceneTime
+        val rejectedSpatialTransition = locationChanged && !acceptLocationChange
 
         return ChatSceneState(
             sceneTime = nextTime,
             location = nextLocation,
-            participants = if (raw.containsKey("participants")) {
+            participants = if (raw.containsKey("participants") && !rejectedSpatialTransition) {
                 sanitizeCurrentStrings(value.participants, limit = 8, maxChars = 80)
             } else previous.participants,
-            positions = if (raw.containsKey("positions")) {
+            positions = if (raw.containsKey("positions") && !rejectedSpatialTransition) {
                 sanitizeCurrentStrings(value.positions, limit = 8, maxChars = 120)
             } else previous.positions,
-            activeActions = if (raw.containsKey("activeActions")) {
+            activeActions = if (raw.containsKey("activeActions") && !rejectedSpatialTransition) {
                 sanitizeCurrentStrings(value.activeActions, limit = 6, maxChars = 120)
             } else previous.activeActions,
-            keyObjects = if (raw.containsKey("keyObjects")) {
+            keyObjects = if (raw.containsKey("keyObjects") && !rejectedSpatialTransition) {
                 sanitizeCurrentStrings(value.keyObjects, limit = 8, maxChars = 80)
             } else previous.keyObjects,
-            currentEvent = if (raw.containsKey("currentEvent")) {
+            currentEvent = if (raw.containsKey("currentEvent") && !rejectedSpatialTransition) {
                 value.currentEvent.trim().take(180)
             } else previous.currentEvent,
             lastSceneChange = if (raw.containsKey("lastSceneChange") && acceptedSceneChange) {
@@ -734,6 +734,7 @@ class ChatInteractionPlanner @Inject constructor(
         val source = normalize(dialogue)
         if (candidate.isBlank() || source.isBlank()) return false
         if (source.contains(candidate)) return true
+        if (PLACE_ANCHORS.any { anchor -> candidate.contains(anchor) && source.contains(anchor) }) return true
         val candidatePairs = bigrams(candidate)
         val sourcePairs = bigrams(source)
         if (candidatePairs.isEmpty() || sourcePairs.isEmpty()) return false
@@ -1090,7 +1091,7 @@ class ChatInteractionPlanner @Inject constructor(
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
         const val RECENT_ADDRESS_LIMIT = 4
-        val MOVEMENT_SIGNAL = Regex("""(?:走|进|出|回|离开|来到|过去|过来|移到|搬到|上楼|下楼|进门|出门|推门|穿过|起身)""")
+        val PLACE_ANCHORS = setOf("屋", "房", "院", "厅", "室", "廊", "楼", "街", "门", "庭", "车", "店", "馆", "校", "桥", "路")
         val TIME_CHANGE_SIGNAL = Regex("""(?:天亮|天黑|入夜|夜里|夜晚|清晨|早上|上午|中午|下午|傍晚|晚上|深夜|翌日|次日|第二天|过了.+(?:分钟|小时|天))""")
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
