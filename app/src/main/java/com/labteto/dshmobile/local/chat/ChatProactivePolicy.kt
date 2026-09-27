@@ -62,6 +62,11 @@ internal fun evaluateChatProactivePolicy(
         return ChatProactiveDecision(
             shouldSend = false,
             reason = "当前处于夜间免打扰时段，已暂缓本次互动",
+            retryAt = nextQuietHoursEndMillis(
+                nowMillis = nowMillis,
+                endHour = quietEndHour,
+                endMinute = quietEndMinute,
+            ),
         )
     }
 
