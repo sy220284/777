@@ -231,11 +231,38 @@ class LocalChatBranchingTest {
     }
 
     @Test
-    fun consecutiveUserTurnsAreNotEligibleForBranchEditing() {
+    fun consecutiveUserTurnsRemainEligibleOnceTheConversationIsIdle() {
         val first = message("u1", "user", "第一条", 1)
         val queued = message("u2", "user", "排队补充", 2)
 
-        assertTrue(!chatBranchingEligible(listOf(first, queued)))
+        assertTrue(chatBranchingEligible(listOf(first, queued)))
+    }
+
+    @Test
+    fun groupChatWithSeveralAssistantRepliesRemainsEditable() {
+        val user = message("u1", "user", "你们都说说", 1)
+        val firstReply = message("a1", "assistant", "我先来。", 2)
+        val secondReply = message("a2", "assistant", "那我接着说。", 3)
+        val nextUser = message("u2", "user", "继续", 4)
+
+        assertTrue(chatBranchingEligible(listOf(user, firstReply, secondReply, nextUser)))
+    }
+
+    @Test
+    fun editingAttachmentMessageChangesOnlyUserTextAndKeepsAttachmentContext() {
+        val original = message(
+            "u1",
+            "user",
+            "看看这个\n\n本次附件已导入本机工作区：\n- 图片：a.png → .dsh/attachments/a.png（12 B）",
+            1,
+        )
+
+        assertEquals("看看这个", editableChatUserText(original))
+        val edited = withEditedChatUserText(original, "重新看一下重点")
+        assertTrue(edited.startsWith("重新看一下重点"))
+        assertTrue(edited.contains("本次附件已导入本机工作区："))
+        assertTrue(edited.contains(".dsh/attachments/a.png"))
+        assertTrue(chatBranchingEligible(listOf(original)))
     }
 
     @Test

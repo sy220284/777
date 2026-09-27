@@ -1427,12 +1427,10 @@ class LocalHarnessEngine @Inject constructor(
      * instead of destroying it.
      */
     fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
-        val content = replacement.trim()
+        val requestedText = replacement.trim()
         val state = _state.value
         if (
-            content.isEmpty() ||
             state.usageMode != LocalUsageMode.CHAT ||
-            state.groupChat.enabled ||
             !state.configured ||
             state.loading ||
             sessionTransitioning ||
@@ -1454,7 +1452,9 @@ class LocalHarnessEngine @Inject constructor(
         }
         val original = branches.nodes.firstOrNull { it.message.id == messageId } ?: return@synchronized false
         if (original.message.role != "user") return@synchronized false
-        if (original.message.content.trim() == content) return@synchronized false
+        val content = withEditedChatUserText(original.message, requestedText)
+        if (content.isBlank()) return@synchronized false
+        if (editableChatUserText(original.message).trim() == requestedText) return@synchronized false
         cancelChatPostTurn()
 
         val baseState = original.parentId
@@ -1471,14 +1471,19 @@ class LocalHarnessEngine @Inject constructor(
             select = true,
         )
         val activeMessages = activeChatBranchMessages(branches)
-        rebuildChatModelHistoryFromTranscript(activeMessages)
-
+        val editedModelMessage = editedUserModelMessage(
+            originalMessageId = messageId,
+            content = content,
+        )
+        rebuildEditedChatModelHistory(
+            messages = activeMessages,
+            groupMode = state.groupChat.enabled,
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
+        )
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
-            put("model_message", buildJsonObject {
-                put("role", "user")
-                put("content", content)
-            })
+            put("model_message", editedModelMessage)
             put("edited_from", messageId)
             put("queued", false)
             put("transcript", encodeTranscriptMessages(listOf(edited)))
@@ -1491,17 +1496,23 @@ class LocalHarnessEngine @Inject constructor(
                 chatState = baseState,
                 replySuggestions = emptyList(),
                 chatBranches = branches,
+                groupActiveSpeakerName = null,
                 error = null,
             )
         }
         persistChatBranchState("user-edited")
-        checkpointModelHistory("chat/user-edited")
+        checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
 
         scope.launch(start = CoroutineStart.LAZY) {
-            captureChatPersonaCorrection(content)
-            hydrateNewChatStateFromRelationshipMemory()
-            runChatTurn(content)
+            if (state.groupChat.enabled) {
+                captureGroupPersonaCorrections(requestedText)
+                runGroupChatTurn(content)
+            } else {
+                captureChatPersonaCorrection(requestedText)
+                hydrateNewChatStateFromRelationshipMemory()
+                runChatTurn(content)
+            }
         }.also { activeJob = it; it.start() }
         true
     }
@@ -1584,6 +1595,77 @@ class LocalHarnessEngine @Inject constructor(
         }
             .also { activeJob = it; it.start() }
         true
+    }
+
+    private fun editedUserModelMessage(
+        originalMessageId: String,
+        content: String,
+    ): JsonObject {
+        val original = eventLog.events()
+            .filter { event -> event.type == "user/message" }
+            .lastOrNull { event ->
+                decodeTranscriptMessages(event.data)
+                    .orEmpty()
+                    .any { message -> message.id == originalMessageId }
+            }
+            ?.data
+            ?.get("model_message") as? JsonObject
+        return if (original != null) {
+            replaceLocalUserModelMessageText(original, content)
+        } else {
+            buildJsonObject {
+                put("role", "user")
+                put("content", content)
+            }
+        }
+    }
+
+    private fun rebuildEditedChatModelHistory(
+        messages: List<LocalHarnessMessage>,
+        groupMode: Boolean,
+        editedMessageId: String,
+        editedModelMessage: JsonObject,
+    ) {
+        val durableUserMessages = linkedMapOf<String, JsonObject>()
+        eventLog.events()
+            .filter { event -> event.type == "user/message" }
+            .forEach { event ->
+                val structured = event.data["model_message"] as? JsonObject ?: return@forEach
+                decodeTranscriptMessages(event.data)
+                    .orEmpty()
+                    .filter { message -> message.role == "user" }
+                    .forEach { message -> durableUserMessages[message.id] = structured }
+            }
+
+        val rebuilt = buildList {
+            add(buildJsonObject {
+                put("role", "system")
+                put("content", if (groupMode) groupChatSystemPrompt() else chatSystemPrompt())
+            })
+            messages.forEach { message ->
+                when (message.role) {
+                    "user" -> add(
+                        if (message.id == editedMessageId) {
+                            editedModelMessage
+                        } else {
+                            durableUserMessages[message.id] ?: buildJsonObject {
+                                put("role", "user")
+                                put("content", message.content)
+                            }
+                        },
+                    )
+                    "assistant" -> add(buildJsonObject {
+                        put("role", "assistant")
+                        put(
+                            "content",
+                            if (groupMode) groupTranscriptLine(message) else message.content,
+                        )
+                    })
+                }
+            }
+        }
+        resetModelHistory(rebuilt)
+        updateContextMetrics()
     }
 
     private fun transcriptForBranchMaterialization(
@@ -1766,7 +1848,6 @@ class LocalHarnessEngine @Inject constructor(
         applyTranscriptMessages(listOf(transcriptMessage), userEvent.sequence)
         if (
             before.usageMode == LocalUsageMode.CHAT &&
-            !before.groupChat.enabled &&
             before.chatBranches.nodes.isNotEmpty() &&
             before.transcriptIndex.branchingEligible
         ) {
@@ -4034,11 +4115,29 @@ class LocalHarnessEngine @Inject constructor(
                         },
                     )
                     updateContextMetrics()
+                    val beforeAssistant = _state.value
                     applyTranscriptMessages(
                         listOf(transcript),
                         assistantEvent.sequence,
                         clearStreamingPreview = true,
                     )
+                    if (
+                        beforeAssistant.chatBranches.nodes.isNotEmpty() &&
+                        beforeAssistant.transcriptIndex.branchingEligible
+                    ) {
+                        _state.update { current ->
+                            current.copy(
+                                chatBranches = appendMaterializedChatBranchMessage(
+                                    current = current.chatBranches,
+                                    activeMessages = beforeAssistant.messages,
+                                    message = transcript,
+                                    parentId = beforeAssistant.transcriptIndex.latestDialogueMessageId,
+                                    chatState = current.chatState,
+                                    replySuggestions = emptyList(),
+                                ),
+                            )
+                        }
+                    }
                     deliveredReplies += 1
                     repliesForStateUpdate += GroupReplyForStateUpdate(
                         member = generated.member,
@@ -4096,6 +4195,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("mode", "group-chat")
                 put("replies", deliveredReplies)
             })
+            if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+                persistChatBranchState("group/branch-completed")
+            }
             checkpointModelHistory("group/completed")
             persist()
         } catch (cancelled: CancellationException) {

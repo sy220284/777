@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -129,6 +130,34 @@ internal fun buildLocalUserModelMessage(
             })
         }
     }
+}
+
+internal fun replaceLocalUserModelMessageText(
+    message: JsonObject,
+    visibleText: String,
+): JsonObject {
+    val clean = visibleText.trim()
+    val content = message["content"]
+    val nextContent = if (content is JsonArray) {
+        buildJsonArray {
+            if (clean.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", clean)
+                })
+            }
+            content.forEach { part ->
+                val obj = part as? JsonObject
+                if (obj?.get("type")?.jsonPrimitive?.contentOrNull != "text") add(part)
+            }
+        }
+    } else {
+        JsonPrimitive(clean)
+    }
+    return JsonObject(message.toMutableMap().apply {
+        put("role", JsonPrimitive("user"))
+        put("content", nextContent)
+    })
 }
 
 internal fun hasLocalImageRefs(messages: List<JsonObject>): Boolean =

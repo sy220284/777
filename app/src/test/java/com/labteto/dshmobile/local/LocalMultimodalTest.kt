@@ -50,6 +50,29 @@ class LocalMultimodalTest {
     }
 
     @Test
+    fun editedUserTextKeepsDurableImageReferences() {
+        val durable = buildLocalUserModelMessage(
+            visibleText = "原问题",
+            attachments = listOf(
+                LocalImportedAttachment(
+                    name = "a.png",
+                    relativePath = ".dsh/attachments/a.png",
+                    mediaType = "image/png",
+                    bytes = 12,
+                    attachmentId = "a",
+                ),
+            ),
+        )
+
+        val edited = replaceLocalUserModelMessageText(durable, "修改后的问题")
+        val content = edited["content"] as JsonArray
+
+        assertEquals("修改后的问题", content.first().jsonObject["text"]!!.jsonPrimitive.content)
+        assertEquals(LOCAL_IMAGE_REF, content.last().jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals(".dsh/attachments/a.png", content.last().jsonObject["path"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun oldImagesStayAsReferencesAndOnlyNewestImageMessageReactivatesPixels() = runTest {
         val root = createTempDir(prefix = "multimodal-history-")
         val first = imageMessage(root, "first.png", "first")
