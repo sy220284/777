@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -339,8 +340,9 @@ fun LocalHarnessScreen(
             )
         },
     ) {
-        when {
-            state.loading && !hasRenderedHarnessSurface -> LoadingScreen()
+        Box(Modifier.fillMaxSize()) {
+            when {
+                state.loading && !hasRenderedHarnessSurface -> LoadingScreen()
             showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
                 entries = gallery,
                 presets = viewModel.personaPresets,
@@ -405,6 +407,27 @@ fun LocalHarnessScreen(
                 onAnswerQuestion = viewModel::answerQuestion,
                 onCancelQuestion = viewModel::cancelQuestion,
             )
+            }
+            if (state.loading && hasRenderedHarnessSurface) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(top = DsSpacing.large)
+                            .size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = DsTheme.colors.accent,
+                    )
+                }
+            }
         }
     }
 
