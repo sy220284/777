@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.sp
  */
 object DsType {
     val uiFont = FontFamily.SansSerif
+    /** Android's CJK-aware serif family; centralised so a packaged subset can replace it later. */
+    val titleFont = FontFamily.Serif
     val codeFont = FontFamily.Monospace
 
     // Markdown roles
@@ -27,6 +29,7 @@ object DsType {
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp)
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp)
+    val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp)
     val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
     val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 22.sp)
