@@ -49,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -92,6 +94,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -146,6 +149,23 @@ fun SettingsScreen(
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
+    val diagnosticExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val report = viewModel.diagnosticReport()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(report.toByteArray(Charsets.UTF_8))
+                    } ?: error("无法打开导出文件")
+                }
+            } catch (error: Exception) {
+                toast.second(exportFailed)
+            }
+        }
+    }
     var page by rememberSaveable { mutableStateOf(initialDestination) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
@@ -554,6 +574,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_environment_capabilities),
                                 iconFamily = DsIconFamily.Neutral,
                                 onClick = { showEnvironment = true },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Info,
+                                title = stringResource(R.string.settings_export_diagnostics),
+                                subtitle = stringResource(R.string.settings_export_diagnostics_hint),
+                                onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
                             )
                         }
                     }

@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.observability.DiagnosticReport
 import android.os.Environment
 import com.labteto.dshmobile.automation.AutomationPlugin
 import com.labteto.dshmobile.automation.AutomationStore
@@ -52,8 +53,6 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
-import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -353,7 +352,6 @@ class LocalHarnessEngine @Inject constructor(
         extraSearchPaths = ::bundledRuntimeSearchPaths,
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
-    private val workflowRunner = HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 4)
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
@@ -2731,6 +2729,10 @@ class LocalHarnessEngine @Inject constructor(
         environmentInfo()
     }
 
+    suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
+        DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
+    }
+
     suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
     suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
@@ -4947,6 +4949,7 @@ class LocalHarnessEngine @Inject constructor(
             "workflow" -> runWorkflow(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
+                args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
             )
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
@@ -5289,35 +5292,30 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runWorkflow(tasks: List<String>, mode: String): String {
-        val workflowMode = HarnessWorkflowMode.parse(mode)
-        val results = workflowRunner.run(tasks, workflowMode) { _, task, previous ->
-            val prompt = if (workflowMode == HarnessWorkflowMode.PIPELINE && !previous.isNullOrBlank()) {
-                "上一步结果：\n" + pruneToolResult(previous) + "\n\n当前阶段：\n" + task
-            } else {
-                task
-            }
-            val result = subagents.runResult(
+    private suspend fun runWorkflow(tasks: List<String>, mode: String, requiredEvidence: List<String>): String {
+        _state.update { it.copy(workflowProgress = null) }
+        return LocalWorkflowCoordinator(
+            execute = { prompt -> subagents.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
                 maxSteps = _state.value.subagentMaxSteps,
-            )
-            result.requireCompletedOutput()
-        }
-        return results.joinToString("\n\n") { result ->
-            val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
-            if (result.succeeded) {
-                label + " " + (result.index + 1) + "：" + result.task + "\n" + result.output.orEmpty()
-            } else {
-                val suffix = if (workflowMode == HarnessWorkflowMode.PARALLEL) {
-                    "同批其他子任务不受影响。"
-                } else {
-                    "后续阶段已停止。"
-                }
-                label + " " + (result.index + 1) + " 失败：" + result.error.orEmpty() + "；" + suffix
-            }
-        }
+            ).requireCompletedOutput() },
+            pruneOutput = ::pruneToolResult,
+            onProgress = { progress -> _state.update { state ->
+                val previousBlock = state.workflowProgress?.takeIf { it.needsUserAction }
+                val blocked = progress.stage == "受阻"
+                state.copy(workflowProgress = LocalWorkflowProgress(
+                    sessionId = currentSessionId,
+                    stage = progress.stage,
+                    task = progress.task,
+                    completed = progress.completed,
+                    total = progress.total,
+                    blockedReason = if (blocked) progress.detail else previousBlock?.blockedReason,
+                    needsUserAction = blocked || previousBlock != null,
+                ))
+            } },
+        ).run(tasks, mode, requiredEvidence)
     }
 
     private fun searchSessions(query: String): String {

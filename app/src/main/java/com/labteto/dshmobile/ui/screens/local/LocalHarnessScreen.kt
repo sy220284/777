@@ -2007,6 +2007,7 @@ private fun WorkSessionStatusStrip(
 ) {
     val colors = DsTheme.colors
     val hasStatus = state.running ||
+        state.workflowProgress?.sessionId == state.sessionId ||
         state.goal != null ||
         state.todos.isNotEmpty() ||
         state.activeAgents > 0 ||
@@ -2059,6 +2060,10 @@ private fun WorkSessionStatusStrip(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                    DsPill(text = if (progress.needsUserAction) stringResource(R.string.local_workflow_waiting_user) else progress.stage)
+                    DsPill(text = stringResource(R.string.local_workflow_processed, progress.completed, progress.total))
+                }
                 if (state.todos.isNotEmpty()) {
                     DsPill(
                         text = stringResource(
@@ -2238,6 +2243,26 @@ private fun ExecutionStatusCard(
                     Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
                     Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
                 }
+            }
+
+            state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(stringResource(R.string.local_workflow_stage, progress.stage), style = DsType.caption11Strong, color = colors.labelTertiary)
+                    Text(progress.task, style = DsType.small13, color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11, color = colors.labelSecondary)
+                    progress.blockedReason?.let { reason ->
+                        Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13, color = colors.error)
+                        if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11, color = colors.error)
+                    }
+                }
+            }
+
+            if (state.pendingApproval != null || state.pendingQuestion != null) {
+                Text(
+                    stringResource(R.string.local_workflow_waiting_user),
+                    style = DsType.small13Strong,
+                    color = colors.error,
+                )
             }
 
             if (state.plan.isNotEmpty()) {
