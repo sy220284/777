@@ -1610,7 +1610,7 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 captureChatPersonaCorrection(requestedText)
                 hydrateNewChatStateFromRelationshipMemory()
-                runChatTurn(content)
+                runChatTurn(content, sourceMessageId = edited.id)
             }
         }.also { activeJob = it; it.start() }
         true
@@ -1842,11 +1842,12 @@ class LocalHarnessEngine @Inject constructor(
             put("role", "user")
             put("content", content)
         }
-        recordUserTranscript(content, durableMessage, queued = false)
+        val sourceMessageId = recordUserTranscript(content, durableMessage, queued = false)
         appendUserToModelHistory(durableMessage)
         persist()
-        return scope.launch(start = CoroutineStart.LAZY) { runTurn(content, memoryInput) }
-            .also { activeJob = it }
+        return scope.launch(start = CoroutineStart.LAZY) {
+            runTurn(content, memoryInput, sourceMessageId)
+        }.also { activeJob = it }
     }
 
     private fun recordUserTranscript(
@@ -1854,12 +1855,18 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject?,
         queued: Boolean,
         queuedInput: QueuedAgentInput? = null,
-    ) {
+    ): String {
         val before = _state.value
         persistChatTimelineBaseline(eventLog, json, before)
-        val transcriptMessage = newTranscriptMessage("user", content)
+        val durableInput = queuedInput.takeIf { queued }
+        val transcriptMessage = newTranscriptMessage("user", content).let { message ->
+            durableInput?.id
+                ?.takeIf(String::isNotBlank)
+                ?.let { durableId -> message.copy(id = durableId) }
+                ?: message
+        }
         val userEvent = if (queued) {
-            val durableInput = requireNotNull(queuedInput) { "排队消息缺少持久编号" }
+            val durableInput = requireNotNull(durableInput) { "排队消息缺少持久编号" }
             eventLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
@@ -1907,6 +1914,7 @@ class LocalHarnessEngine @Inject constructor(
         } else if (before.usageMode == LocalUsageMode.CHAT) {
             _state.update { it.copy(replySuggestions = emptyList()) }
         }
+        return transcriptMessage.id
     }
 
     private fun appendUserToModelHistory(message: JsonObject) {
@@ -3040,8 +3048,10 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun captureAutoMemoryDirective(text: String) =
-        memoryCoordinator.captureAutoMemoryDirective(text)
+    private suspend fun captureAutoMemoryDirective(
+        text: String,
+        sourceMessageId: String? = null,
+    ) = memoryCoordinator.captureAutoMemoryDirective(text, sourceMessageId)
 
     private fun chatRelationshipMemoryContext(
         query: String,
@@ -3062,7 +3072,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             appendModelHistory(durableMessage)
             durableMessages += durableMessage
-            captureAutoMemoryDirective(input.memoryInput)
+            captureAutoMemoryDirective(input.memoryInput, input.id)
         }
         _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
         eventLog.append(
@@ -3098,7 +3108,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         persist()
         scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(next.content, next.memoryInput)
+            runTurn(next.content, next.memoryInput, next.id)
         }.also { activeJob = it }
     }
 
@@ -3118,18 +3128,22 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private suspend fun runTurn(input: String, memoryInput: String = input) {
+    private suspend fun runTurn(
+        input: String,
+        memoryInput: String = input,
+        sourceMessageId: String? = null,
+    ) {
         val snapshot = _state.value
         if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.groupChat.enabled) {
             captureGroupPersonaCorrections(memoryInput)
-            runGroupChatTurn(input)
+            runGroupChatTurn(input, sourceMessageId)
             return
         }
         if (snapshot.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
         }
-        runAgentTurn(input, memoryInput)
+        runAgentTurn(input, memoryInput, sourceMessageId)
     }
 
     private fun captureChatPersonaCorrection(text: String) {
@@ -3523,7 +3537,10 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runGroupChatTurn(input: String) {
+    private suspend fun runGroupChatTurn(
+        input: String,
+        sourceMessageId: String? = null,
+    ) {
         _state.update {
             it.copy(
                 running = true,
@@ -3541,7 +3558,7 @@ class LocalHarnessEngine @Inject constructor(
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
             }
             ensureSystemMessage()
-            captureAutoMemoryDirective(input)
+            captureAutoMemoryDirective(input, sourceMessageId)
 
             val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
             val members = snapshot.groupChat.members
@@ -3826,7 +3843,11 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runChatTurn(input: String, replacingMessageId: String? = null) {
+    private suspend fun runChatTurn(
+        input: String,
+        replacingMessageId: String? = null,
+        sourceMessageId: String? = null,
+    ) {
         cancelChatPostTurn()
         _state.update {
             it.copy(
@@ -3843,7 +3864,7 @@ class LocalHarnessEngine @Inject constructor(
             val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = snapshot.chatBranches
-            captureAutoMemoryDirective(input)
+            captureAutoMemoryDirective(input, sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
             val preparedChat = chatTurnCoordinator.prepare(
                 snapshot = snapshot,
@@ -4063,7 +4084,11 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun runAgentTurn(input: String, memoryInput: String = input) {
+    private suspend fun runAgentTurn(
+        input: String,
+        memoryInput: String = input,
+        sourceMessageId: String? = null,
+    ) {
         val runPolicy = localAgentRunPolicy(_state.value.usageMode)
         toolExecutionCoordinator.clearTurnCapabilities()
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
@@ -4160,7 +4185,7 @@ class LocalHarnessEngine @Inject constructor(
                     ensureSystemMessage()
                     val snapshot = _state.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        captureAutoMemoryDirective(memoryInput)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
                         val preparedChat = chatTurnCoordinator.prepare(
                             snapshot = snapshot,
@@ -4179,7 +4204,7 @@ class LocalHarnessEngine @Inject constructor(
                                 handoffSummary = snapshot.handoffSummary,
                             ),
                         )
-                        captureAutoMemoryDirective(memoryInput)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
                     }
                     requestPrepared = true
                 }
