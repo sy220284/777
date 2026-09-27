@@ -60,7 +60,9 @@ class MemoryStore internal constructor(
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
                 sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
-                sourceMessageId = sourceMessageId ?: records[duplicateIndex].sourceMessageId,
+                // Keep the original provenance for exact duplicates. A later repeated statement
+                // must not make an older valid fact disappear when only the later turn is edited.
+                sourceMessageId = records[duplicateIndex].sourceMessageId,
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
