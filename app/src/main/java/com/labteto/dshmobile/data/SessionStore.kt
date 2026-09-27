@@ -120,6 +120,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
+internal fun InputStream.readBytesAtMost(maxBytes: Int): ByteArray {
+    require(maxBytes >= 0) { "maxBytes 必须大于等于 0" }
+    val bytes = readNBytes(maxBytes + 1)
+    check(bytes.size <= maxBytes) { "附件实际大小超过 $maxBytes 字节回退上传上限" }
+    return bytes
+}
+
 /**
  * Single source of truth for the connected harness's live state. All public surface is
  * [StateFlow]; every RPC error becomes [connectionError] and never throws. The store survives
@@ -1207,8 +1214,13 @@ class SessionStore @Inject constructor(
         if (streamed !is RpcResult.Err || streamed.error.code != "capability-unavailable") return@withContext streamed
         if (size !in 0..MAX_ENCODED_UPLOAD_BYTES) return@withContext streamed
         log("upload route unavailable; falling back to fileUploads/upload for ${size}B")
-        val bytes = open()?.use { it.readBytes() }
-            ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
+        val bytes = try {
+            open()?.use { it.readBytesAtMost(MAX_ENCODED_UPLOAD_BYTES.toInt()) }
+        } catch (tooLarge: IllegalStateException) {
+            return@withContext RpcResult.Err(
+                RpcError(ATTACHMENT_INVALID, tooLarge.message ?: "attachment exceeds fallback upload limit"),
+            )
+        } ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
         api.fileUploadEncoded(
             sid,
             EncodedFileUploadRequest(data = Base64.encodeToString(bytes, Base64.NO_WRAP), name = name),
