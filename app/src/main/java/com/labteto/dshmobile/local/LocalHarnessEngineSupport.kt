@@ -77,3 +77,44 @@ internal fun seedLocalWorkspaceGuide(workspacePath: String) {
         """.trimIndent() + "\n",
     )
 }
+
+internal fun cleanupUnreferencedLocalImagesNow(
+    sessionsRoot: File,
+    currentSessionId: String,
+    eventLogFor: (String) -> LocalSessionEventLog,
+    modelHistory: List<JsonObject>,
+    workspacePath: String,
+    eventLog: LocalSessionEventLog,
+) {
+    val sessionIds = sessionsRoot.listFiles().orEmpty()
+        .asSequence()
+        .filter(File::isFile)
+        .map(File::getName)
+        .filter { name -> ".events.jsonl" in name }
+        .map { name -> name.substringBefore(".events.jsonl") }
+        .filter { id -> id.matches(Regex("[A-Za-z0-9._-]{1,128}")) }
+        .plus(currentSessionId)
+        .distinct()
+        .toList()
+    val references = mergeLocalImageAttachmentReferences(
+        sessionIds.map { id ->
+            collectLocalImageAttachmentReferences(
+                events = eventLogFor(id).events(),
+                extraMessages = if (id == currentSessionId) modelHistory else emptyList(),
+            )
+        },
+    )
+    val result = cleanupLocalImageAttachments(
+        workspaceRoot = File(workspacePath),
+        references = references,
+    )
+    if (result.deletedFiles > 0) {
+        eventLog.append("attachment/gc", buildJsonObject {
+            put("status", "completed")
+            put("deleted_files", result.deletedFiles)
+            put("deleted_bytes", result.deletedBytes)
+            put("retained_image_bytes", result.retainedImageBytes)
+        })
+    }
+}
+
