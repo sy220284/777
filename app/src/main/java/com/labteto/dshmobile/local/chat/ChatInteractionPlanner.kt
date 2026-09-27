@@ -235,7 +235,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("5. 用户实际发言和明确纠正优先；不虚构事实、不替用户作重大不可逆决定。现实关系军师场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
         appendLine("6. activeGoal/currentAgenda/internalConflict/immediateConcern 只写角色当下真实驱动，不凭空制造阴谋、爱意或分析腔。")
         appendLine("7. scene 只记录本轮对话明确建立的物理场景事实。没有明确移动、时间推进或场景切换时，继承上一场景，禁止让人物无理由瞬移；发生移动时更新 location 与 lastSceneChange。")
-        appendLine("8. continuity 用事件事实概括剧情：recentEvents 只留近期关键变化；recurringEvents 把重复或同类事项合并成一条并写最终状态；decisions 记录已经定下的结果；unfinished 只列仍未完成的事项。禁止复制旧台词。")
+        appendLine("8. continuity 用事件事实概括剧情：recentEvents 只留近期关键变化；recurringEvents 把重复或同类事项合并成一条并写最终状态；decisions 记录已经定下的结果；unfinished 只列仍未完成的事项。任一列表一旦输出，必须给出该列表当前最新完整值，用新结论覆盖已经失效的旧表述；禁止复制旧台词。")
         appendLine("9. 只要地点、时间、人物位置、进行中动作或连续性事件发生变化，turnSignificance 至少为 MINOR，不能标 NONE。")
     }.trim()
 
@@ -748,13 +748,13 @@ class ChatInteractionPlanner @Inject constructor(
         raw: JsonObject,
     ): ChatContinuityState = ChatContinuityState(
         recentEvents = if (raw.containsKey("recentEvents")) {
-            mergeStrings(previous.recentEvents, value.recentEvents, limit = 6, maxChars = 180)
+            sanitizeCurrentStrings(value.recentEvents, limit = 6, maxChars = 180)
         } else previous.recentEvents,
         recurringEvents = if (raw.containsKey("recurringEvents")) {
-            mergeStrings(previous.recurringEvents, value.recurringEvents, limit = 4, maxChars = 220)
+            sanitizeCurrentStrings(value.recurringEvents, limit = 4, maxChars = 220)
         } else previous.recurringEvents,
         decisions = if (raw.containsKey("decisions")) {
-            mergeStrings(previous.decisions, value.decisions, limit = 4, maxChars = 180)
+            sanitizeCurrentStrings(value.decisions, limit = 4, maxChars = 180)
         } else previous.decisions,
         unfinished = if (raw.containsKey("unfinished")) {
             sanitizeCurrentStrings(value.unfinished, limit = 4, maxChars = 180)
