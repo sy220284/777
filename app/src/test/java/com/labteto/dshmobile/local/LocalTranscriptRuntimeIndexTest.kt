@@ -211,4 +211,21 @@ class LocalTranscriptRuntimeIndexTest {
         createdAt = createdAt,
         proactive = proactive,
     )
+
+    @Test
+    fun appendingNewTranscriptFactsRepairsLegacyFalseBranchFlag() {
+        val legacy = LocalTranscriptRuntimeIndex(
+            totalMessageCount = 2L,
+            hasDialogue = true,
+            branchingEligible = false,
+        )
+
+        val repaired = appendLocalTranscriptRuntimeIndex(
+            legacy,
+            listOf(message("u2", "user", "继续", 3L)),
+        )
+
+        assertTrue(repaired.branchingEligible)
+    }
+
 }
