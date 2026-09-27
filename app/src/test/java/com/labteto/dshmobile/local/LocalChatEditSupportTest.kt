@@ -50,7 +50,12 @@ class LocalChatEditSupportTest {
                 eventLog = log,
                 messages = listOf(
                     message("u1", "第一问"),
-                    LocalHarnessMessage("a1", "assistant", "第一答", 2L),
+                    LocalHarnessMessage(
+                        id = "a1",
+                        role = "assistant",
+                        content = "第一答",
+                        createdAt = 2L,
+                    ),
                     message("u2", "第二问"),
                 ),
                 groupMode = false,
