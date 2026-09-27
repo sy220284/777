@@ -26,9 +26,9 @@ violations: list[str] = []
 engine = ENGINE.read_text(encoding="utf-8")
 
 engine_lines = len(engine.splitlines())
-if engine_lines > 6_700:
+if engine_lines > 6_650:
     violations.append(
-        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6700); extract new logic behind a coordinator"
+        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6650); extract new logic behind a coordinator"
     )
 
 local_screen_lines = len(LOCAL_SCREEN.read_text(encoding="utf-8").splitlines())
@@ -54,12 +54,12 @@ chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
-if "cron: '*/30 * * * *'" not in cleanup_workflow:
-    violations.append("Release cleanup must stay on the 30-minute schedule")
-if "keep = releases[:3]" not in cleanup_workflow or "remove = releases[3:]" not in cleanup_workflow:
-    violations.append("Release retention must keep exactly the latest three published releases")
-if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
-    violations.append("Release retention must not add an age-based retention window")
+if "cron: '17 3 * * *'" not in cleanup_workflow:
+    violations.append("Release cleanup must stay on the daily 03:17 UTC schedule")
+if "releases[:3]" not in cleanup_workflow:
+    violations.append("Release retention must keep at least the latest three published releases")
+if "timedelta(days=14)" not in cleanup_workflow or "cutoff =" not in cleanup_workflow:
+    violations.append("Release retention must keep a 14-day rollback window")
 
 def constant(name: str) -> int | None:
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
