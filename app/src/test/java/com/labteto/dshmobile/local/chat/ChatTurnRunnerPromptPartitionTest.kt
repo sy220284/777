@@ -78,4 +78,24 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.prompt.contains(context.stablePrompt))
         assertTrue(context.prompt.contains(context.dynamicPrompt))
     }
+
+    @Test
+    fun continuationInputIsInjectedIntoGenerationPrompt() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "personas-continuation.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+
+        val context = runner.prepareProfile(
+            persona = PersonaProfile(name = "阿青"),
+            state = ChatCharacterState(),
+            context = ChatContextState(scene = ChatSceneState(location = "院子")),
+            userInput = "继续",
+        )
+
+        assertTrue(context.dynamicPrompt.contains("本轮承接模式｜继续当前节拍"))
+        assertTrue(context.dynamicPrompt.contains("不为“推进”凭空换场"))
+    }
+
 }
