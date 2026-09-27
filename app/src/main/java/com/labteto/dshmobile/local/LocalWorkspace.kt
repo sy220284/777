@@ -178,11 +178,14 @@ class LocalWorkspace(
             if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) return@forEach
             runCatching { file.useLines { lines ->
                 lines.forEachIndexed { index, line ->
-                    if (matches.size < MAX_SEARCH_ROWS && outputChars < MAX_SEARCH_CHARS &&
-                        (expression?.containsMatchIn(line) ?: line.contains(query, ignoreCase = true))) {
+                    val matchStart = expression?.find(line)?.range?.first
+                        ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
+                    if (matches.size < MAX_SEARCH_ROWS && outputChars < MAX_SEARCH_CHARS && matchStart >= 0) {
+                        val previewStart = (matchStart - 100).coerceAtLeast(0)
                         val row = "${file.relativeTo(canonicalRoot).invariantSeparatorsPath}:${index + 1}: " +
-                            line.take(MAX_SEARCH_PREVIEW_CHARS) +
-                            if (line.length > MAX_SEARCH_PREVIEW_CHARS) "…" else ""
+                            (if (previewStart > 0) "…" else "") +
+                            line.substring(previewStart, minOf(line.length, previewStart + MAX_SEARCH_PREVIEW_CHARS)) +
+                            if (line.length > previewStart + MAX_SEARCH_PREVIEW_CHARS) "…" else ""
                         matches += row
                         outputChars += row.length
                     }
