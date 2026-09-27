@@ -38,7 +38,9 @@ class MainActivity : AppCompatActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         val storedTheme = DshApplication.storedThemePreference(this)
-        appliedApplicationNightMode = DshApplication.applicationNightModeFor(storedTheme)
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        appliedApplicationNightMode =
+            DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
         applyWindowBackground(storedTheme)
         requestedSession.value = savedInstanceState?.getString("pending_session")
             ?: notificationSession(intent)
@@ -111,10 +113,11 @@ class MainActivity : AppCompatActivity() {
 
     /** Persist the app-local qualifier so the platform splash uses the same day/night scheme. */
     private fun applyNightMode(themePreference: String) {
-        val mode = DshApplication.applicationNightModeFor(themePreference)
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        val mode = DshApplication.applicationNightModeFor(themePreference, uiModeManager.nightMode)
         if (appliedApplicationNightMode == mode) return
         appliedApplicationNightMode = mode
-        getSystemService(UiModeManager::class.java).setApplicationNightMode(mode)
+        uiModeManager.setApplicationNightMode(mode)
     }
 
     /** Match the post-splash window to the exact Compose canvas, including Matte black. */
