@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.harness.session
 
+import java.io.File
 import java.nio.file.Files
+import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -75,7 +77,9 @@ class SessionEventLogTest {
                 .filter { it.name.startsWith("session.events.jsonl.part-") }
                 .maxByOrNull { it.name }
                 ?: error("expected at least one rotated segment")
-            val previousSequence = newestSegment.readLines()
+            val previousSequence = (if (newestSegment.name.endsWith(".gz"))
+                GZIPInputStream(newestSegment.inputStream()).bufferedReader().readLines()
+            else newestSegment.readLines())
                 .mapNotNull { line ->
                     runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
                 }
@@ -103,6 +107,32 @@ class SessionEventLogTest {
             }
             val accepted = log.append("accepted", buildJsonObject { put("value", "ok") })
             assertEquals(0L, accepted.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun archivedSegmentsPreserveHistoryAndMigrateOldRawSegments() {
+        val directory = Files.createTempDirectory("harness-event-archive").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 700)
+            repeat(28) { index ->
+                log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(6) + index) })
+            }
+            val archive = directory.listFiles().orEmpty().first { it.name.endsWith(".gz") }
+            val raw = File(archive.path.removeSuffix(".gz"))
+            GZIPInputStream(archive.inputStream()).use { input -> raw.writeBytes(input.readBytes()) }
+            assertTrue(archive.delete()) // Simulate a pre-migration app version.
+
+            val restarted = SessionEventLog(file, json, maxBytes = 700)
+            assertEquals(28, restarted.snapshot().size)
+            restarted.append("test", buildJsonObject { put("value", "new") })
+            assertTrue(!raw.exists())
+            assertTrue(File(raw.path + ".gz").isFile)
+            assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
+            assertEquals(listOf(26L, 27L, 28L), restarted.pageBefore(limit = 3).map(SessionEvent::sequence))
         } finally {
             directory.deleteRecursively()
         }
@@ -182,29 +212,6 @@ class SessionEventLogTest {
         }
     }
 
-    @Test
-    fun latestOfReturnsNewestMatchingRelevantType() {
-        val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
-        val file = directory.resolve("session.events.jsonl")
-        try {
-            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
-            repeat(16) { index ->
-                val type = when (index) {
-                    3 -> "tool/call"
-                    11 -> "user/message"
-                    else -> "checkpoint"
-                }
-                log.append(type, buildJsonObject { put("value", index) })
-            }
-
-            val latest = requireNotNull(log.latestOf(setOf("user/message", "tool/call", "tool/result")))
-            assertEquals(11L, latest.sequence)
-            assertEquals("user/message", latest.type)
-        } finally {
-            directory.deleteRecursively()
-        }
-    }
-
 
     @Test
     fun searchIsBoundedAndPaginatesBySequence() {
@@ -231,8 +238,6 @@ class SessionEventLogTest {
         }
     }
 
-
-
     @Test
     fun searchHardCapsOversizedMatchingEvents() {
         val directory = Files.createTempDirectory("harness-event-search-bound").toFile()
@@ -254,5 +259,60 @@ class SessionEventLogTest {
         }
     }
 
+    @Test
+    fun latestOfReturnsNewestMatchingRelevantType() {
+        val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(16) { index ->
+                val type = when (index) {
+                    3 -> "tool/call"
+                    11 -> "user/message"
+                    else -> "checkpoint"
+                }
+                log.append(type, buildJsonObject { put("value", index) })
+            }
+
+            val latest = requireNotNull(log.latestOf(setOf("user/message", "tool/call", "tool/result")))
+            assertEquals(11L, latest.sequence)
+            assertEquals("user/message", latest.type)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+
+    @Test
+    fun pointReadCrossesCompressedSegmentBoundary() {
+        val directory = Files.createTempDirectory("harness-event-compressed-window").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(40) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) },
+                )
+            }
+            val archived = directory.listFiles().orEmpty()
+                .filter { it.name.startsWith("session.events.jsonl.part-") && it.name.endsWith(".gz") }
+                .minByOrNull(File::getName)
+                ?: error("expected compressed event segment")
+            val archivedSequences = GZIPInputStream(archived.inputStream()).bufferedReader().useLines { lines ->
+                lines.mapNotNull { line ->
+                    runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
+                }.toList()
+            }
+            val target = archivedSequences.last()
+            val window = log.read(sequence = target, before = 2, after = 2).lineSequence()
+                .map { json.decodeFromString(SessionEvent.serializer(), it).sequence }
+                .toList()
+
+            assertEquals((target - 2L..target + 2L).toList(), window)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 
 }

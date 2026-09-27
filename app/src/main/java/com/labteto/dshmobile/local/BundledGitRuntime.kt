@@ -103,6 +103,8 @@ class BundledGitRuntime @Inject constructor(
             ?.filter { it.isDirectory && it.name != version }
             ?.forEach { it.deleteRecursively() }
 
+        RuntimeLibraryDeduplicator.deduplicate(File(context.noBackupFilesDir, "runtime"), abi)
+
         activeLibraryDir = libraryDir
         activeHelperDir = helperDir
         activeTemplateDir = templateDir

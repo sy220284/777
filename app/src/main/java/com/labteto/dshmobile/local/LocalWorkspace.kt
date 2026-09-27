@@ -164,18 +164,30 @@ class LocalWorkspace(
     }
 
     /** Plain-text recursive search with deterministic, bounded output. */
-    fun search(query: String, relativePath: String = "."): String {
+    fun search(query: String, relativePath: String = ".", regex: Boolean = false): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
+        val expression = if (regex) runCatching { Regex(query, RegexOption.IGNORE_CASE) }
+            .getOrElse { throw IllegalArgumentException("正则表达式无效：${it.message}") }
+        else null
         val directory = resolve(relativePath)
         require(directory.exists()) { "路径不存在：$relativePath" }
         val files = if (directory.isFile) sequenceOf(directory) else safeWalk(directory)
         val matches = mutableListOf<String>()
+        var outputChars = 0
         files.filter { it.isFile && isInsideWorkspace(it) && it.length() <= MAX_TEXT_BYTES }.forEach { file ->
-            if (matches.size >= MAX_SEARCH_ROWS) return@forEach
+            if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) return@forEach
             runCatching { file.useLines { lines ->
                 lines.forEachIndexed { index, line ->
-                    if (matches.size < MAX_SEARCH_ROWS && line.contains(query, ignoreCase = true)) {
-                        matches += "${file.relativeTo(canonicalRoot).invariantSeparatorsPath}:${index + 1}: $line"
+                    val matchStart = expression?.find(line)?.range?.first
+                        ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
+                    if (matches.size < MAX_SEARCH_ROWS && outputChars < MAX_SEARCH_CHARS && matchStart >= 0) {
+                        val previewStart = (matchStart - 100).coerceAtLeast(0)
+                        val row = "${file.relativeTo(canonicalRoot).invariantSeparatorsPath}:${index + 1}: " +
+                            (if (previewStart > 0) "…" else "") +
+                            line.substring(previewStart, minOf(line.length, previewStart + MAX_SEARCH_PREVIEW_CHARS)) +
+                            if (line.length > previewStart + MAX_SEARCH_PREVIEW_CHARS) "…" else ""
+                        matches += row
+                        outputChars += row.length
                     }
                 }
             } }
@@ -421,6 +433,8 @@ class LocalWorkspace(
         const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024
         const val MAX_LIST_ROWS = 400
         const val MAX_SEARCH_ROWS = 200
+        const val MAX_SEARCH_CHARS = 32_000
+        const val MAX_SEARCH_PREVIEW_CHARS = 1_200
         const val MAX_SHELL_CHARS = 65_536
         const val MAX_SHELL_TIMEOUT_SECONDS = 900
     }
