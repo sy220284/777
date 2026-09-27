@@ -72,6 +72,8 @@ class BundledPythonRuntime @Inject constructor(
             ?.filter { it.isDirectory && it.name != version }
             ?.forEach { it.deleteRecursively() }
 
+        RuntimeLibraryDeduplicator.deduplicate(File(context.noBackupFilesDir, "runtime"), abi)
+
         activeHomeDir = homeDir
         activeLibraryDir = libraryDir
         runtimeVersion = version

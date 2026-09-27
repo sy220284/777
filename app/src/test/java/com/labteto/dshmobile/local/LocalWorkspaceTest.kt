@@ -72,6 +72,7 @@ class LocalWorkspaceTest {
 
     @Test
     fun editRequiresUniqueObservationAndGlobFindsFiles() {
+        workspace.write("AGENT_GUARDRAILS.md", "top level\n")
         workspace.write("src/one.kt", "val before = 1\n")
         workspace.write("src/two.txt", "before before\n")
         workspace.read("src/one.kt")
@@ -80,6 +81,8 @@ class LocalWorkspaceTest {
         assertEquals("已编辑 src/one.kt", workspace.edit("src/one.kt", "before", "after"))
         assertTrue(workspace.read("src/one.kt").contains("after"))
         assertTrue(workspace.glob("**/*.kt").contains("src/one.kt"))
+        assertTrue(workspace.glob("**/AGENT_GUARDRAILS.md").contains("AGENT_GUARDRAILS.md"))
+        assertTrue(workspace.glob("**/*.md").contains("AGENT_GUARDRAILS.md"))
         assertThrows(IllegalArgumentException::class.java) {
             workspace.edit("src/two.txt", "before", "after")
         }
@@ -124,6 +127,16 @@ class LocalWorkspaceTest {
 
         workspace.read("src/fresh.txt")
         assertEquals("已编辑 src/fresh.txt", workspace.edit("src/fresh.txt", "changed", "after"))
+    }
+
+    @Test
+    fun literalAndRegexSearchAreExplicitAndBounded() {
+        workspace.write("notes.md", "## 规范\n铁律\n")
+        assertEquals("未找到匹配内容", workspace.search("^##"))
+        assertTrue(workspace.search("^##", regex = true).contains("notes.md:1:"))
+        assertTrue(workspace.search("铁律|规范", regex = true).contains("notes.md:2:"))
+        assertEquals("未找到匹配内容", workspace.search("铁律|规范"))
+        assertThrows(IllegalArgumentException::class.java) { workspace.search("[", regex = true) }
     }
 
     @Test

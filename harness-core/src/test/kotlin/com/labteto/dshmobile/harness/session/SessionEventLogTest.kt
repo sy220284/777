@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.harness.session
 
+import java.io.File
 import java.nio.file.Files
+import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -75,7 +77,9 @@ class SessionEventLogTest {
                 .filter { it.name.startsWith("session.events.jsonl.part-") }
                 .maxByOrNull { it.name }
                 ?: error("expected at least one rotated segment")
-            val previousSequence = newestSegment.readLines()
+            val previousSequence = (if (newestSegment.name.endsWith(".gz"))
+                GZIPInputStream(newestSegment.inputStream()).bufferedReader().readLines()
+            else newestSegment.readLines())
                 .mapNotNull { line ->
                     runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
                 }
@@ -103,6 +107,32 @@ class SessionEventLogTest {
             }
             val accepted = log.append("accepted", buildJsonObject { put("value", "ok") })
             assertEquals(0L, accepted.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun archivedSegmentsPreserveHistoryAndMigrateOldRawSegments() {
+        val directory = Files.createTempDirectory("harness-event-archive").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 700)
+            repeat(28) { index ->
+                log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(6) + index) })
+            }
+            val archive = directory.listFiles().orEmpty().first { it.name.endsWith(".gz") }
+            val raw = File(archive.path.removeSuffix(".gz"))
+            GZIPInputStream(archive.inputStream()).use { input -> raw.writeBytes(input.readBytes()) }
+            assertTrue(archive.delete()) // Simulate a pre-migration app version.
+
+            val restarted = SessionEventLog(file, json, maxBytes = 700)
+            assertEquals(28, restarted.snapshot().size)
+            restarted.append("test", buildJsonObject { put("value", "new") })
+            assertTrue(!raw.exists())
+            assertTrue(File(raw.path + ".gz").isFile)
+            assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
+            assertEquals(listOf(26L, 27L, 28L), restarted.pageBefore(limit = 3).map(SessionEvent::sequence))
         } finally {
             directory.deleteRecursively()
         }

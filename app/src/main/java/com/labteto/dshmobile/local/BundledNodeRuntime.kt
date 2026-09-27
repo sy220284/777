@@ -63,6 +63,8 @@ class BundledNodeRuntime @Inject constructor(
             ?.filter { it.isDirectory && it.name != version }
             ?.forEach { it.deleteRecursively() }
 
+        RuntimeLibraryDeduplicator.deduplicate(File(context.noBackupFilesDir, "runtime"), abi)
+
         activeLibraryDir = libraryDir
         runtimeVersion = version
         prepared = true
