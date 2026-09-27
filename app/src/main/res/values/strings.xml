@@ -17,6 +17,7 @@
     <string name="local_delete_session">Delete conversation</string>
     <string name="local_selected_count">Selected: %1$d</string>
     <string name="local_regenerate_reply">Regenerate reply</string>
+    <string name="local_regenerate_reply_failed">This reply cannot be regenerated right now.</string>
     <string name="local_edit_user_message">Edit message</string>
     <string name="local_edit_user_message_hint">Resending continues the conversation again from this message and regenerates the replies that follow.</string>
     <string name="local_edit_user_message_resend">Resend</string>
@@ -353,6 +354,7 @@
     <string name="pair_subtitle">On the computer running the harness, open /relay/pair. It shows a QR code and an eight-digit code; either one works, and both expire after a few minutes.</string>
     <string name="pair_scan">Scan QR code</string>
     <string name="pair_scan_prompt">Point the camera at the code on the relay\'s pairing page</string>
+    <string name="pair_camera_permission_denied">Camera permission is required to scan. You can grant it in system settings or enter the pairing code manually.</string>
     <string name="pair_manual_title">Or type the code</string>
     <string name="pair_url_label">Relay address</string>
     <string name="pair_url_hint">https://192.168.1.5:3443</string>
@@ -426,6 +428,8 @@
     <string name="tasks_empty_subtitle">Ask the agent in chat to “remind me tomorrow…” or “run this every week…”. Tasks will appear here.</string>
     <string name="tasks_cancelled">Task cancelled</string>
     <string name="tasks_missing">That task no longer exists</string>
+    <string name="tasks_run_started">Task started</string>
+    <string name="tasks_run_now_failed">Task could not be started</string>
     <string name="tasks_background_task">Background task</string>
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
@@ -877,7 +881,7 @@
     <string name="persona_gallery_long_press_delete_hint">Long-press a character card to delete a saved archive.</string>
     <string name="persona_gallery_delete_saved_confirm">Delete the saved archive for %1$s (%2$d dialogue lines)?</string>
     <string name="persona_gallery_delete_saved_hint">This removes only the gallery archive and does not delete existing chats.</string>
-    <string name="persona_gallery_history_long_press_hint">Long-press any archived dialogue line to remove it from the gallery.</string>
+    <string name="persona_gallery_history_long_press_hint">Tap or long-press an archived dialogue line to remove it from the gallery.</string>
     <string name="persona_gallery_delete_dialogue_confirm">Delete this archived dialogue line?</string>
     <string name="persona_gallery_delete_dialogue_hint">Only the gallery copy is removed; the original chat stays unchanged.</string>
     <string name="persona_gallery_archive_deleted">Archived dialogue removed</string>

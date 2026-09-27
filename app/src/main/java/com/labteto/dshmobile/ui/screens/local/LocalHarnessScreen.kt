@@ -272,18 +272,6 @@ fun LocalHarnessScreen(
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
-    val pendingApprovalCallId = state.pendingApproval
-        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-        ?.callId
-    val pendingQuestionCallId = state.pendingQuestion
-        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-        ?.callId
-    BackHandler(enabled = pendingApprovalCallId != null) {
-        pendingApprovalCallId?.let(viewModel::deny)
-    }
-    BackHandler(enabled = pendingQuestionCallId != null) {
-        pendingQuestionCallId?.let(viewModel::cancelQuestion)
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

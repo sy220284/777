@@ -62,6 +62,16 @@ class ConnectionPersistenceAndroidTest {
     }
 
     @Test
+    fun accentThemePersistsAcrossStoreReads() = withStore { dataStore, _ ->
+        val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
+        assertEquals("celadon", store.settingsOnce().accentTheme)
+
+        store.setSetting { it.copy(accentTheme = "zhusha") }
+
+        assertEquals("zhusha", store.settingsOnce().accentTheme)
+    }
+
+    @Test
     fun adaptiveBackgroundContrastDefaultsOnAndPersists() = withStore { dataStore, _ ->
         val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
         assertEquals(true, store.settingsOnce().backgroundAdaptiveContrast)

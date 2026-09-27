@@ -37,6 +37,7 @@ class HostsStore @Inject constructor(
         val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
         val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
         val THEME = stringPreferencesKey("theme")
+        val ACCENT_THEME = stringPreferencesKey("accent_theme")
         val LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
         val SESSION_SORT = stringPreferencesKey("session_sort")
@@ -214,6 +215,7 @@ class HostsStore @Inject constructor(
             notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             notifyLocalJobs = prefs[Keys.NOTIFY_LOCAL_JOBS] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
+            accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
             localeOverride = when (val tag = prefs[Keys.LOCALE]) {
@@ -252,6 +254,7 @@ class HostsStore @Inject constructor(
             prefs[Keys.NOTIFY_ACTION] = next.notifyNeedsAction
             prefs[Keys.NOTIFY_LOCAL_JOBS] = next.notifyLocalJobs
             prefs[Keys.THEME] = next.themePreference
+            prefs[Keys.ACCENT_THEME] = next.accentTheme
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }
                 ?: prefs.remove(Keys.BACKGROUND_IMAGE)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast

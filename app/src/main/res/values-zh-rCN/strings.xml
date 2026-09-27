@@ -16,6 +16,7 @@
     <string name="local_delete_session">删除会话</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
     <string name="local_regenerate_reply">重新生成回复</string>
+    <string name="local_regenerate_reply_failed">当前状态无法重新生成这条回复。</string>
     <string name="local_edit_user_message">修改消息</string>
     <string name="local_edit_user_message_hint">修改后会从这条消息重新继续对话，并重新生成后续回复。</string>
     <string name="local_edit_user_message_resend">重新发送</string>
@@ -351,6 +352,7 @@
     <string name="pair_subtitle">在运行 harness 的电脑上打开 /relay/pair。页面会显示一个二维码和一个八位数字码，任选其一即可，两者都会在几分钟后失效。</string>
     <string name="pair_scan">扫描二维码</string>
     <string name="pair_scan_prompt">将摄像头对准中继配对页面上的二维码</string>
+    <string name="pair_camera_permission_denied">扫码需要相机权限。可前往系统设置授权，或直接手动输入配对码。</string>
     <string name="pair_manual_title">或输入配对码</string>
     <string name="pair_url_label">中继地址</string>
     <string name="pair_url_hint">https://192.168.1.5:3443</string>
@@ -424,6 +426,8 @@
     <string name="tasks_empty_subtitle">直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。</string>
     <string name="tasks_cancelled">任务已取消</string>
     <string name="tasks_missing">任务已经不存在</string>
+    <string name="tasks_run_started">任务已开始执行</string>
+    <string name="tasks_run_now_failed">任务当前无法立即执行</string>
     <string name="tasks_background_task">后台任务</string>
     <string name="tasks_once">一次性任务</string>
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
@@ -875,7 +879,7 @@
     <string name="persona_gallery_long_press_delete_hint">长按人物卡可删除已保存的图集档案。</string>
     <string name="persona_gallery_delete_saved_confirm">删除“%1$s”的这份保存档案（%2$d 条对白）？</string>
     <string name="persona_gallery_delete_saved_hint">这里只删除人设图集里的保存档案，不会删除已有会话。</string>
-    <string name="persona_gallery_history_long_press_hint">长按任意一条归档对白，可从人设图集中删除。</string>
+    <string name="persona_gallery_history_long_press_hint">点按或长按任意一条归档对白，可从人设图集中删除。</string>
     <string name="persona_gallery_delete_dialogue_confirm">删除这条归档对白？</string>
     <string name="persona_gallery_delete_dialogue_hint">只删除人设图集里的副本，原会话内容保持不变。</string>
     <string name="persona_gallery_archive_deleted">归档对白已删除</string>
