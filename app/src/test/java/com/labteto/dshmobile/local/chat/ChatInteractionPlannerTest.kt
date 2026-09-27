@@ -869,8 +869,9 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("\"suggestions\":[]"))
         assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
         assertTrue(prompt.contains("由系统根据真实对话维护"))
-        assertTrue(prompt.contains("scene(sceneTime,location"))
-        assertTrue(prompt.contains("仅仅提到某个地点不能改 location"))
+        assertTrue(prompt.contains("scene 由系统事件归约器维护"))
+        assertTrue(prompt.contains("不要在 state 中重写 scene"))
+        assertTrue(prompt.contains("纯场景移动由系统事件层独立记录"))
         assertTrue(prompt.contains("重复/同类事项直接归并"))
     }
 
