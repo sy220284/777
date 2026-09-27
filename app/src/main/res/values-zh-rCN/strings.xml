@@ -1007,6 +1007,11 @@
 <string name="tasks_schedule_custom">自定义</string>
 <string name="tasks_schedule_silence">沉默后触发</string>
 <string name="tasks_schedule_silence_value">沉默 %1$d 小时</string>
+<string name="tasks_schedule_window">随机时间窗</string>
+<string name="tasks_schedule_window_value">每天随机 %1$s–%2$s</string>
+<string name="tasks_chat_window_hint">每天在这个时间段内随机主动一次，减少固定闹钟感。</string>
+<string name="tasks_chat_window_start_value">窗口开始 %1$s</string>
+<string name="tasks_chat_window_end_value">窗口结束 %1$s</string>
 <string name="tasks_chat_silence_hours">沉默阈值（小时）</string>
 <string name="tasks_chat_silence_hours_hint">用户连续这么久没有发言后才允许主动联系，至少 1 小时。</string>
 <string name="tasks_first_run_value">首次执行：%1$s</string>
