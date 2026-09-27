@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -164,6 +165,7 @@ fun ChatListDrawer(
     var workspaceRenameTarget by remember { mutableStateOf<WorkspaceRow?>(null) }
     var workspaceDeleteTarget by remember { mutableStateOf<WorkspaceRow?>(null) }
     var workspacePanelKey by remember { mutableStateOf<ComposerKey?>(null) }
+    var expandedSubagentParents by remember { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(query) {
         delay(250)
@@ -194,6 +196,26 @@ fun ChatListDrawer(
     }
     val currentListSession = sections.current
     val historySessions = sections.history
+    val visibleSessionRows = remember(currentListSession, historySessions) {
+        buildList {
+            currentListSession?.let(::add)
+            addAll(historySessions)
+        }
+    }
+    val subagentTree = remember(visibleSessionRows, sessions, currentSessionId) {
+        indexSubagents(
+            listable = visibleSessionRows,
+            sessionsById = sessions.associateBy(SessionRow::sessionId),
+        ).mapValues { (_, children) ->
+            children.filterNot { it.sessionId == currentSessionId }
+        }.filterValues(List<SessionRow>::isNotEmpty)
+    }
+    val nestedSubagentIds = remember(subagentTree) {
+        subagentTree.values.flatten().mapTo(hashSetOf(), SessionRow::sessionId)
+    }
+    val historyRootSessions = remember(historySessions, nestedSubagentIds) {
+        historySessions.filterNot { it.sessionId in nestedSubagentIds }
+    }
     val archivedSessions = sessions.filter { it.sessionId in archivedIds && !it.blank }
     val hasVisibleSessions =
         currentListSession != null || historySessions.isNotEmpty() || archivedSessions.isNotEmpty()
@@ -302,29 +324,41 @@ fun ChatListDrawer(
             }
 
             currentListSession?.let { current ->
-                item(key = "current-session-" + current.sessionId) {
-                    SessionRowItem(
-                        session = current,
-                        isCurrent = true,
-                        store = store,
-                        scope = scope,
-                        onClose = onClose,
-                    )
-                }
+                sessionTreeItem(
+                    session = current,
+                    currentSessionId = currentSessionId,
+                    tree = subagentTree,
+                    expandedIds = expandedSubagentParents,
+                    onToggle = { id ->
+                        expandedSubagentParents = if (id in expandedSubagentParents) {
+                            expandedSubagentParents - id
+                        } else {
+                            expandedSubagentParents + id
+                        }
+                    },
+                    store = store,
+                    scope = scope,
+                    onClose = onClose,
+                )
             }
 
-            if (historySessions.isNotEmpty()) {
-                items(historySessions, key = { it.sessionId }) { session ->
-                    Box(Modifier.animateItem()) {
-                        SessionRowItem(
-                            session = session,
-                            isCurrent = false,
-                            store = store,
-                            scope = scope,
-                            onClose = onClose,
-                        )
-                    }
-                }
+            historyRootSessions.forEach { session ->
+                sessionTreeItem(
+                    session = session,
+                    currentSessionId = currentSessionId,
+                    tree = subagentTree,
+                    expandedIds = expandedSubagentParents,
+                    onToggle = { id ->
+                        expandedSubagentParents = if (id in expandedSubagentParents) {
+                            expandedSubagentParents - id
+                        } else {
+                            expandedSubagentParents + id
+                        }
+                    },
+                    store = store,
+                    scope = scope,
+                    onClose = onClose,
+                )
             }
 
             if (archivedSessions.isNotEmpty()) {
@@ -611,6 +645,50 @@ private fun WorkspaceMenu(
  * "Subagents" heading per workspace, which said nothing about which run produced which — with a
  * dozen of them from three sessions it was a wall of near-identical rows.
  */
+private fun LazyListScope.sessionTreeItem(
+    session: SessionRow,
+    currentSessionId: String?,
+    tree: Map<String, List<SessionRow>>,
+    expandedIds: Set<String>,
+    onToggle: (String) -> Unit,
+    store: SessionStore,
+    scope: CoroutineScope,
+    onClose: () -> Unit,
+    depth: Int = 0,
+) {
+    val children = tree[session.sessionId].orEmpty()
+    item(key = "session-tree:" + session.sessionId) {
+        Box(Modifier.animateItem()) {
+            SessionRowItem(
+                session = session,
+                isCurrent = session.sessionId == currentSessionId,
+                store = store,
+                scope = scope,
+                onClose = onClose,
+                depth = depth,
+                childCount = children.size,
+                childrenExpanded = session.sessionId in expandedIds,
+                onToggleChildren = { onToggle(session.sessionId) },
+            )
+        }
+    }
+    if (session.sessionId in expandedIds) {
+        children.forEach { child ->
+            sessionTreeItem(
+                session = child,
+                currentSessionId = currentSessionId,
+                tree = tree,
+                expandedIds = expandedIds,
+                onToggle = onToggle,
+                store = store,
+                scope = scope,
+                onClose = onClose,
+                depth = depth + 1,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionRowItem(
