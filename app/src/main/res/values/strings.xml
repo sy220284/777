@@ -429,7 +429,7 @@
     <string name="tasks_cancelled">Task cancelled</string>
     <string name="tasks_missing">That task no longer exists</string>
     <string name="tasks_run_started">Task started</string>
-    <string name="tasks_run_failed">Task could not be started</string>
+    <string name="tasks_run_now_failed">Task could not be started</string>
     <string name="tasks_background_task">Background task</string>
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
