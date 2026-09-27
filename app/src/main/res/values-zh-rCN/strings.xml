@@ -888,7 +888,10 @@
     <string name="tasks_prompt_label">要执行的任务</string>
     <string name="tasks_prompt_hint">例如：总结当前项目今天的变化</string>
     <string name="tasks_create">创建</string>
-    <string name="tasks_create_invalid">请填写任务并选择未来的执行时间；自定义周期至少 1 小时。</string>
+    <string name="tasks_edit">编辑</string>
+    <string name="tasks_save">保存</string>
+    <string name="tasks_try_now">立即试一次</string>
+    <string name="tasks_create_invalid">请填写有效任务和时间；自定义周期与沉默触发至少 1 小时。</string>
     <string name="tools_external_services_hint">需要时再连接 HTTP 工具服务</string>
     <string name="tools_capability_group">可用能力</string>
     <string name="tools_connection_group">外部连接</string>
@@ -998,6 +1001,10 @@
 <string name="tasks_schedule_daily">每天</string>
 <string name="tasks_schedule_weekly">每周</string>
 <string name="tasks_schedule_custom">自定义</string>
+<string name="tasks_schedule_silence">沉默后触发</string>
+<string name="tasks_schedule_silence_value">沉默 %1$d 小时</string>
+<string name="tasks_chat_silence_hours">沉默阈值（小时）</string>
+<string name="tasks_chat_silence_hours_hint">用户连续这么久没有发言后才允许主动联系，至少 1 小时。</string>
 <string name="tasks_first_run_value">首次执行：%1$s</string>
 <string name="tasks_custom_hours">重复间隔（小时）</string>
 <string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>

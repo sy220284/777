@@ -77,6 +77,46 @@ class AutomationReceiptTest {
     }
 
     @Test
+    fun anchoredIntervalDoesNotDriftFromCompletionTime() {
+        val minute = 60_000L
+        val anchor = 100L * minute
+
+        val next = nextIntervalAnchoredRun(
+            anchorMillis = anchor,
+            afterMillis = anchor + 67L * minute,
+            intervalMinutes = 60L,
+        )
+
+        assertEquals(anchor + 120L * minute, next)
+    }
+
+    @Test
+    fun silenceSchedulePrefersSuggestedUserActivityDeadline() {
+        val task = AutomationTask(
+            id = "silence",
+            prompt = "来找我",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            recurringMinutes = 360L,
+            scheduleType = AutomationScheduleType.SILENCE,
+            scheduleAnchorAt = 0L,
+            silenceMinutes = 360L,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session",
+        )
+
+        assertTrue(usesChainedChatScheduling(task))
+        assertEquals(
+            99_000L,
+            nextAnchoredAutomationRun(
+                task = task,
+                afterMillis = 10_000L,
+                suggestedRunAt = 99_000L,
+            ),
+        )
+    }
+
+    @Test
     fun keepsReceiptExactlyAtThirtyDayCutoff() {
         val day = 24L * 60L * 60L * 1000L
         val atCutoff = AutomationRunReceipt(day, day, "completed")

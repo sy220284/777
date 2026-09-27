@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import java.util.Calendar
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,6 +32,46 @@ class ChatProactivePolicyTest {
         val decision = evaluateChatProactivePolicy(messages, nowMillis = 21L)
 
         assertTrue(decision.shouldSend)
+    }
+
+    @Test
+    fun silenceTriggerUsesLatestUserMessageAndReturnsExactRetryTime() {
+        val hour = 60L * 60L * 1000L
+        val messages = listOf(
+            message("u1", "user", "刚忙完", 2L * hour),
+            message("a1", "assistant", "好", 2L * hour + 1L),
+        )
+
+        val waiting = evaluateChatSilenceTrigger(
+            messages = messages,
+            nowMillis = 5L * hour,
+            silenceMinutes = 6L * 60L,
+            fallbackReferenceAt = 0L,
+        )
+        assertFalse(waiting.ready)
+        assertEquals(8L * hour, waiting.retryAt)
+
+        val ready = evaluateChatSilenceTrigger(
+            messages = messages,
+            nowMillis = 8L * hour,
+            silenceMinutes = 6L * 60L,
+            fallbackReferenceAt = 0L,
+        )
+        assertTrue(ready.ready)
+    }
+
+    @Test
+    fun quietHoursRetryMovesToNextEndBoundary() {
+        val now = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 2, 23, 30, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val expected = Calendar.getInstance().apply {
+            set(2026, Calendar.JANUARY, 3, 7, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        assertEquals(expected, nextQuietHoursEndMillis(now, endHour = 7))
     }
 
     @Test

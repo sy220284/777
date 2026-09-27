@@ -126,6 +126,7 @@ data class LocalAutomationRunResult(
     val output: String,
     val delivered: Boolean = true,
     val skipReason: String? = null,
+    val nextRunAtHint: Long? = null,
 )
 
 

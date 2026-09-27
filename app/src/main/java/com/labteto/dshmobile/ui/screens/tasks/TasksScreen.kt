@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationRunReceipt
+import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.LocalHarnessEngine
@@ -65,7 +66,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class TasksNotice { CANCELLED, MISSING }
 
-private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
+private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE }
 
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
@@ -107,16 +108,52 @@ class TasksViewModel @Inject constructor(
         refresh()
     }
 
+    fun runNow(id: String): Boolean {
+        val started = scheduler.runTaskNow(id)
+        refresh()
+        return started
+    }
+
+    fun updateTask(
+        id: String,
+        prompt: String,
+        firstRunAt: Long,
+        recurringMinutes: Long?,
+        scheduleType: AutomationScheduleType,
+        silenceMinutes: Long?,
+        quietHoursEnabled: Boolean,
+    ): Boolean = runCatching {
+        scheduler.updateTask(
+            id = id,
+            prompt = prompt,
+            firstRunAtMillis = firstRunAt,
+            recurringMinutes = recurringMinutes,
+            scheduleType = scheduleType,
+            silenceMinutes = silenceMinutes,
+            quietHoursEnabled = quietHoursEnabled,
+        )
+    }.getOrDefault(false).also {
+        if (it) refresh()
+    }
+
     fun createAt(
         prompt: String,
         firstRunAt: Long,
         recurringMinutes: Long?,
         mode: AutomationMode,
+        scheduleType: AutomationScheduleType,
+        silenceMinutes: Long? = null,
         quietHoursEnabled: Boolean = false,
     ): Boolean {
-        if (prompt.isBlank() || firstRunAt <= System.currentTimeMillis()) return false
+        val now = System.currentTimeMillis()
+        if (prompt.isBlank()) return false
+        if (scheduleType != AutomationScheduleType.SILENCE && firstRunAt <= now) return false
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
+        if (
+            scheduleType == AutomationScheduleType.SILENCE &&
+            (silenceMinutes == null || silenceMinutes < 60L)
+        ) return false
         val snapshot = engine.state.value
         if (mode == AutomationMode.CHAT) {
             if (
@@ -131,8 +168,17 @@ class TasksViewModel @Inject constructor(
             val actorName = snapshot.chatPersona.name.takeIf {
                 mode == AutomationMode.CHAT && it.isNotBlank()
             }
-            if (recurringMinutes == null) {
-                scheduler.scheduleOnce(
+            when {
+                scheduleType == AutomationScheduleType.SILENCE -> scheduler.scheduleSilence(
+                    id = id,
+                    prompt = prompt.trim(),
+                    silenceMinutes = requireNotNull(silenceMinutes),
+                    notify = true,
+                    targetSessionId = requireNotNull(targetSessionId),
+                    actorName = actorName,
+                    quietHoursEnabled = quietHoursEnabled,
+                )
+                recurringMinutes == null -> scheduler.scheduleOnce(
                     id = id,
                     prompt = prompt.trim(),
                     triggerAtMillis = firstRunAt,
@@ -142,8 +188,7 @@ class TasksViewModel @Inject constructor(
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
                 )
-            } else {
-                scheduler.schedulePeriodic(
+                else -> scheduler.schedulePeriodic(
                     id = id,
                     prompt = prompt.trim(),
                     intervalMinutes = recurringMinutes,
@@ -153,11 +198,17 @@ class TasksViewModel @Inject constructor(
                     targetSessionId = targetSessionId,
                     actorName = actorName,
                     quietHoursEnabled = quietHoursEnabled,
+                    scheduleType = if (mode == AutomationMode.CHAT) {
+                        scheduleType
+                    } else {
+                        AutomationScheduleType.LEGACY
+                    },
                 )
             }
             refresh()
         }.isSuccess
     }
+
 }
 
 @Composable
@@ -179,12 +230,23 @@ fun TasksScreen(
     val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by remember { mutableStateOf(false) }
+    var editingTaskId by remember { mutableStateOf<String?>(null) }
     var prompt by remember { mutableStateOf("") }
     var cadence by remember { mutableStateOf(AutomationCadence.ONCE) }
     var firstRunAt by remember { mutableStateOf(System.currentTimeMillis() + 60L * 60_000L) }
     var customHours by remember { mutableStateOf("6") }
     var quietHoursEnabled by remember { mutableStateOf(true) }
     var createError by remember { mutableStateOf<String?>(null) }
+    val resetEditor = {
+        showCreate = false
+        editingTaskId = null
+        prompt = ""
+        cadence = AutomationCadence.ONCE
+        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+        customHours = "6"
+        quietHoursEnabled = true
+        createError = null
+    }
     BackHandler(onBack = onClose)
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -207,15 +269,29 @@ fun TasksScreen(
                     if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
                 ),
                 onAction = {
-                    showCreate = !showCreate
-                    createError = null
+                    if (showCreate && editingTaskId == null) {
+                        resetEditor()
+                    } else {
+                        showCreate = true
+                        editingTaskId = null
+                        prompt = ""
+                        cadence = AutomationCadence.ONCE
+                        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+                        customHours = "6"
+                        quietHoursEnabled = true
+                        createError = null
+                    }
                 },
             )
 
             if (showCreate) {
                 DsGroupCard {
                     Text(
-                        stringResource(if (chatMode) R.string.tasks_chat_new else R.string.tasks_new),
+                        stringResource(
+                            if (editingTaskId != null) R.string.tasks_edit
+                            else if (chatMode) R.string.tasks_chat_new
+                            else R.string.tasks_new,
+                        ),
                         style = DsType.base16Strong,
                         color = colors.labelPrimary,
                     )
@@ -277,39 +353,86 @@ fun TasksScreen(
                         selected = cadence,
                         onSelect = { cadence = it },
                     )
-                    CadenceRow(
-                        first = AutomationCadence.WEEKLY,
-                        firstLabel = stringResource(R.string.tasks_schedule_weekly),
-                        second = AutomationCadence.CUSTOM,
-                        secondLabel = stringResource(R.string.tasks_schedule_custom),
-                        selected = cadence,
-                        onSelect = { cadence = it },
-                    )
+                    if (chatMode) {
+                        CadenceRow(
+                            first = AutomationCadence.WEEKLY,
+                            firstLabel = stringResource(R.string.tasks_schedule_weekly),
+                            second = AutomationCadence.SILENCE,
+                            secondLabel = stringResource(R.string.tasks_schedule_silence),
+                            selected = cadence,
+                            onSelect = { cadence = it },
+                        )
+                        DsButton(
+                            text = stringResource(R.string.tasks_schedule_custom),
+                            onClick = { cadence = AutomationCadence.CUSTOM },
+                            variant = if (cadence == AutomationCadence.CUSTOM) {
+                                DsButtonVariant.Info
+                            } else {
+                                DsButtonVariant.Ghost
+                            },
+                            size = DsButtonSize.Small,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        CadenceRow(
+                            first = AutomationCadence.WEEKLY,
+                            firstLabel = stringResource(R.string.tasks_schedule_weekly),
+                            second = AutomationCadence.CUSTOM,
+                            secondLabel = stringResource(R.string.tasks_schedule_custom),
+                            selected = cadence,
+                            onSelect = { cadence = it },
+                        )
+                    }
 
-                    DsButton(
-                        text = stringResource(
-                            R.string.tasks_first_run_value,
-                            DateFormat.getDateTimeInstance(
-                                DateFormat.MEDIUM,
-                                DateFormat.SHORT,
-                            ).format(Date(firstRunAt)),
-                        ),
-                        onClick = {
-                            showSchedulePicker(context, firstRunAt) { picked ->
-                                firstRunAt = picked
-                                createError = null
-                            }
-                        },
-                        variant = DsButtonVariant.Outline,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (cadence != AutomationCadence.SILENCE) {
+                        DsButton(
+                            text = stringResource(
+                                R.string.tasks_first_run_value,
+                                DateFormat.getDateTimeInstance(
+                                    DateFormat.MEDIUM,
+                                    DateFormat.SHORT,
+                                ).format(Date(firstRunAt)),
+                            ),
+                            onClick = {
+                                showSchedulePicker(context, firstRunAt) { picked ->
+                                    firstRunAt = picked
+                                    createError = null
+                                }
+                            },
+                            variant = DsButtonVariant.Outline,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
 
-                    if (cadence == AutomationCadence.CUSTOM) {
+                    if (
+                        cadence == AutomationCadence.CUSTOM ||
+                        cadence == AutomationCadence.SILENCE
+                    ) {
                         OutlinedTextField(
                             value = customHours,
                             onValueChange = { customHours = it.filter(Char::isDigit).take(5) },
-                            label = { Text(stringResource(R.string.tasks_custom_hours)) },
-                            supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (cadence == AutomationCadence.SILENCE) {
+                                            R.string.tasks_chat_silence_hours
+                                        } else {
+                                            R.string.tasks_custom_hours
+                                        },
+                                    ),
+                                )
+                            },
+                            supportingText = {
+                                Text(
+                                    stringResource(
+                                        if (cadence == AutomationCadence.SILENCE) {
+                                            R.string.tasks_chat_silence_hours_hint
+                                        } else {
+                                            R.string.tasks_custom_hours_hint
+                                        },
+                                    ),
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -349,38 +472,67 @@ fun TasksScreen(
                     ) {
                         DsButton(
                             text = stringResource(R.string.common_cancel),
-                            onClick = { showCreate = false; createError = null },
+                            onClick = resetEditor,
                             variant = DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                         )
                         DsButton(
-                            text = stringResource(R.string.tasks_create),
+                            text = stringResource(
+                                if (editingTaskId != null) R.string.tasks_save
+                                else R.string.tasks_create,
+                            ),
                             onClick = {
+                                val customMinutes = customHours.toLongOrNull()?.times(60L)
                                 val recurring = when (cadence) {
                                     AutomationCadence.ONCE -> null
                                     AutomationCadence.DAILY -> 24L * 60L
                                     AutomationCadence.WEEKLY -> 7L * 24L * 60L
-                                    AutomationCadence.CUSTOM -> customHours.toLongOrNull()?.times(60L)
+                                    AutomationCadence.CUSTOM -> customMinutes
+                                    AutomationCadence.SILENCE -> customMinutes
                                 }
-                                val ok = !(
+                                val scheduleType = when (cadence) {
+                                    AutomationCadence.ONCE -> AutomationScheduleType.ONCE
+                                    AutomationCadence.DAILY -> AutomationScheduleType.DAILY
+                                    AutomationCadence.WEEKLY -> AutomationScheduleType.WEEKLY
+                                    AutomationCadence.CUSTOM -> AutomationScheduleType.INTERVAL
+                                    AutomationCadence.SILENCE -> AutomationScheduleType.SILENCE
+                                }
+                                val silenceMinutes = recurring.takeIf {
+                                    cadence == AutomationCadence.SILENCE
+                                }
+                                val cadenceValid = when (cadence) {
+                                    AutomationCadence.CUSTOM,
+                                    AutomationCadence.SILENCE -> recurring != null
+                                    else -> true
+                                }
+                                val commonValid = !(
                                     chatMode && harnessState.groupChat.enabled
-                                ) &&
-                                    (cadence != AutomationCadence.CUSTOM || recurring != null) &&
-                                    viewModel.createAt(
+                                ) && cadenceValid
+                                val ok = if (!commonValid) {
+                                    false
+                                } else {
+                                    editingTaskId?.let { id ->
+                                        viewModel.updateTask(
+                                            id = id,
+                                            prompt = prompt,
+                                            firstRunAt = firstRunAt,
+                                            recurringMinutes = recurring,
+                                            scheduleType = scheduleType,
+                                            silenceMinutes = silenceMinutes,
+                                            quietHoursEnabled = chatMode && quietHoursEnabled,
+                                        )
+                                    } ?: viewModel.createAt(
                                         prompt = prompt,
                                         firstRunAt = firstRunAt,
                                         recurringMinutes = recurring,
                                         mode = taskMode,
+                                        scheduleType = scheduleType,
+                                        silenceMinutes = silenceMinutes,
                                         quietHoursEnabled = chatMode && quietHoursEnabled,
                                     )
+                                }
                                 if (ok) {
-                                    showCreate = false
-                                    prompt = ""
-                                    cadence = AutomationCadence.ONCE
-                                    firstRunAt = System.currentTimeMillis() + 60L * 60_000L
-                                    customHours = "6"
-                                    quietHoursEnabled = true
-                                    createError = null
+                                    resetEditor()
                                 } else {
                                     createError = createInvalidMessage
                                 }
@@ -407,6 +559,20 @@ fun TasksScreen(
                             onCancel = { viewModel.cancel(task.id) },
                             onPause = { viewModel.pause(task.id) },
                             onResume = { viewModel.resume(task.id) },
+                            onRunNow = { viewModel.runNow(task.id) },
+                            onEdit = {
+                                editingTaskId = task.id
+                                prompt = task.prompt
+                                cadence = cadenceForTask(task)
+                                firstRunAt = maxOf(
+                                    task.nextRunAt,
+                                    System.currentTimeMillis() + 60_000L,
+                                )
+                                customHours = customHoursForTask(task)
+                                quietHoursEnabled = task.quietHoursEnabled
+                                createError = null
+                                showCreate = true
+                            },
                             onOpenSession = onOpenSession,
                         )
                     }
@@ -566,21 +732,40 @@ private fun TaskCard(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onRunNow: () -> Unit,
+    onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
-    val scheduleLabel = when (task.recurringMinutes) {
-        null -> stringResource(R.string.tasks_once)
-        24L * 60L -> stringResource(R.string.tasks_schedule_daily)
-        7L * 24L * 60L -> stringResource(R.string.tasks_schedule_weekly)
-        else -> {
+    val scheduleLabel = when (task.scheduleType) {
+        AutomationScheduleType.SILENCE -> {
+            val minutes = task.silenceMinutes ?: task.recurringMinutes ?: 60L
+            stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
+        }
+        AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)
+        AutomationScheduleType.WEEKLY -> stringResource(R.string.tasks_schedule_weekly)
+        AutomationScheduleType.INTERVAL -> {
             val minutes = task.recurringMinutes ?: 0L
             if (minutes % 60L == 0L) {
                 stringResource(R.string.tasks_every_hours, minutes / 60L)
             } else {
                 stringResource(R.string.tasks_every_minutes, minutes)
+            }
+        }
+        AutomationScheduleType.ONCE -> stringResource(R.string.tasks_once)
+        AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
+            null -> stringResource(R.string.tasks_once)
+            24L * 60L -> stringResource(R.string.tasks_schedule_daily)
+            7L * 24L * 60L -> stringResource(R.string.tasks_schedule_weekly)
+            else -> {
+                val minutes = task.recurringMinutes ?: 0L
+                if (minutes % 60L == 0L) {
+                    stringResource(R.string.tasks_every_hours, minutes / 60L)
+                } else {
+                    stringResource(R.string.tasks_every_minutes, minutes)
+                }
             }
         }
     }
@@ -676,6 +861,26 @@ private fun TaskCard(
             DsTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
         }
 
+        if (task.mode == AutomationMode.CHAT) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.tasks_try_now),
+                    onClick = onRunNow,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.tasks_edit),
+                    onClick = onEdit,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+
         (task.targetSessionId ?: task.workSessionId)?.takeIf(String::isNotBlank)?.let { sessionId ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -744,6 +949,30 @@ private fun taskStatusLabel(status: String): String = when (status) {
     "failed" -> stringResource(R.string.tasks_run_failed)
     "paused" -> stringResource(R.string.tasks_status_paused)
     else -> stringResource(R.string.tasks_status_scheduled)
+}
+
+private fun cadenceForTask(task: AutomationTask): AutomationCadence =
+    when (task.scheduleType) {
+        AutomationScheduleType.ONCE -> AutomationCadence.ONCE
+        AutomationScheduleType.DAILY -> AutomationCadence.DAILY
+        AutomationScheduleType.WEEKLY -> AutomationCadence.WEEKLY
+        AutomationScheduleType.INTERVAL -> AutomationCadence.CUSTOM
+        AutomationScheduleType.SILENCE -> AutomationCadence.SILENCE
+        AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
+            null -> AutomationCadence.ONCE
+            24L * 60L -> AutomationCadence.DAILY
+            7L * 24L * 60L -> AutomationCadence.WEEKLY
+            else -> AutomationCadence.CUSTOM
+        }
+    }
+
+private fun customHoursForTask(task: AutomationTask): String {
+    val minutes = if (task.scheduleType == AutomationScheduleType.SILENCE) {
+        task.silenceMinutes
+    } else {
+        task.recurringMinutes
+    } ?: return "6"
+    return maxOf(1L, minutes / 60L).toString()
 }
 
 private fun formatTime(time: Long): String =

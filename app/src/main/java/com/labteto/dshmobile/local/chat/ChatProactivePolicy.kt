@@ -8,6 +8,29 @@ internal data class ChatProactiveDecision(
     val reason: String? = null,
 )
 
+internal data class ChatSilenceDecision(
+    val ready: Boolean,
+    val retryAt: Long? = null,
+)
+
+internal fun evaluateChatSilenceTrigger(
+    messages: List<LocalHarnessMessage>,
+    nowMillis: Long,
+    silenceMinutes: Long?,
+    fallbackReferenceAt: Long,
+): ChatSilenceDecision {
+    if (silenceMinutes == null) return ChatSilenceDecision(ready = true)
+    require(silenceMinutes > 0L) { "silenceMinutes must be positive" }
+    val referenceAt = messages.lastOrNull { it.role == "user" }?.createdAt
+        ?: fallbackReferenceAt
+    val dueAt = referenceAt + silenceMinutes * 60_000L
+    return if (nowMillis >= dueAt) {
+        ChatSilenceDecision(ready = true)
+    } else {
+        ChatSilenceDecision(ready = false, retryAt = dueAt)
+    }
+}
+
 private const val PROACTIVE_MIN_RETRY_GAP_MS = 6L * 60L * 60L * 1000L
 private const val MAX_RECENT_PROACTIVE_FOR_CONTEXT = 5
 
@@ -143,6 +166,24 @@ private fun bigramJaccard(left: String, right: String): Double {
     return (leftSet intersect rightSet).size.toDouble() / union.size.toDouble()
 }
 
+
+internal fun nextQuietHoursEndMillis(
+    nowMillis: Long,
+    endHour: Int,
+): Long {
+    require(endHour in 0..23) { "endHour must be 0..23" }
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = nowMillis
+        set(Calendar.HOUR_OF_DAY, endHour)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= nowMillis) {
+            add(Calendar.DAY_OF_YEAR, 1)
+        }
+    }
+    return calendar.timeInMillis
+}
 
 internal fun isHourInQuietWindow(
     hour: Int,
