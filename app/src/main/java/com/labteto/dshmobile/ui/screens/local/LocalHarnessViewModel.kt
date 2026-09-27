@@ -554,8 +554,19 @@ class LocalHarnessViewModel @Inject constructor(
             current = snapshot.groupChat.announcement,
         )
     }
-    fun editAndResendUserMessage(messageId: String, text: String): Boolean =
-        engine.editAndResendUserMessage(messageId, text)
+    fun editAndResendUserMessage(messageId: String, text: String): Boolean {
+        val edited = engine.editAndResendUserMessage(messageId, text)
+        if (!edited) return false
+
+        val sessionId = state.value.sessionId
+        transcriptHistoryCursor = null
+        transcriptHistoryInitializedSessionId = null
+        _transcriptHistory.value = LocalTranscriptHistoryState(sessionId = sessionId)
+        viewModelScope.launch {
+            prepareTranscriptHistory(sessionId, force = true)
+        }
+        return true
+    }
     fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         engine.selectChatMessageVariant(messageId, targetIndex)
     fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
