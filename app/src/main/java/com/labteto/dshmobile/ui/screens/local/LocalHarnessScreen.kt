@@ -291,6 +291,7 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
+                gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(state.usageMode, pendingUsageMode),
                 modeSwitchEnabled = !state.running && !state.loading,
                 onUsageModeChange = ::switchUsageMode,
@@ -555,6 +556,7 @@ private fun GroupChatMemberAvatar(
 private fun LocalModeDrawer(
     currentSessionId: String,
     sessions: List<LocalSessionSummary>,
+    gallery: List<PersonaGalleryEntry>,
     usageMode: LocalUsageMode,
     modeSwitchEnabled: Boolean,
     onUsageModeChange: (LocalUsageMode) -> Unit,
@@ -761,10 +763,16 @@ private fun LocalModeDrawer(
                     }
                 }
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
+                    val galleryEntry = session.galleryId?.let { id ->
+                        gallery.firstOrNull { it.id == id }
+                    }
                     LocalSessionDrawerRow(
                         title = session.title,
                         summaryPreview = session.summaryPreview,
                         updatedAt = session.updatedAt,
+                        usageMode = session.usageMode,
+                        avatarName = galleryEntry?.persona?.name ?: session.title,
+                        portraitPath = galleryEntry?.portraitPath.orEmpty(),
                         groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
                         selected = session.id in selectedIds,
@@ -943,6 +951,9 @@ private fun LocalSessionDrawerRow(
     title: String,
     summaryPreview: String?,
     updatedAt: Long,
+    usageMode: LocalUsageMode,
+    avatarName: String,
+    portraitPath: String,
     groupChat: Boolean,
     current: Boolean,
     selected: Boolean,
@@ -984,6 +995,11 @@ private fun LocalSessionDrawerRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selectionOpen) Checkbox(checked = selected, onCheckedChange = { onClick() })
+        LocalPersonaHeaderAvatar(
+            name = avatarName,
+            portraitPath = portraitPath,
+        )
+        Spacer(Modifier.width(DsSpacing.small))
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1013,6 +1029,12 @@ private fun LocalSessionDrawerRow(
                     style = DsType.caption11,
                     color = colors.labelCaption,
                     maxLines = 1,
+                )
+                DsPill(
+                    text = stringResource(
+                        if (usageMode == LocalUsageMode.CHAT) R.string.local_usage_chat
+                        else R.string.local_usage_work,
+                    ),
                 )
                 if (groupChat) {
                     DsPill(text = stringResource(R.string.local_group_chat_title))
