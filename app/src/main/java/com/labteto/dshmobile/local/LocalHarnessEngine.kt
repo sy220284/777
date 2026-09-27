@@ -64,6 +64,7 @@ import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.canonicalFactLines
 import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePending
 import com.labteto.dshmobile.local.chat.rebaseGeneration
@@ -3861,6 +3862,9 @@ class LocalHarnessEngine @Inject constructor(
                     history = boundedChatRequestHistory(
                         if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
                         recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                        currentFacts = snapshot.chatContext
+                            .withLegacyFallback(snapshot.chatState)
+                            .canonicalFactLines(),
                     ),
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
@@ -4198,6 +4202,9 @@ class LocalHarnessEngine @Inject constructor(
                         history = boundedChatRequestHistory(
                             modelHistory.toList(),
                             recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                            currentFacts = snapshot.chatContext
+                                .withLegacyFallback(snapshot.chatState)
+                                .canonicalFactLines(),
                         ),
                         stableContext = chatStableContext,
                         dynamicContext = chatDynamicContext,
