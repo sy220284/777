@@ -69,7 +69,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class TasksNotice { CANCELLED, MISSING }
+enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
 
 private enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE, WINDOW }
 
@@ -115,7 +115,10 @@ class TasksViewModel @Inject constructor(
 
     fun runNow(id: String): Boolean {
         val started = scheduler.runTaskNow(id)
-        refresh()
+        _state.value = TasksUiState(
+            tasks = scheduler.list(),
+            notice = if (started) TasksNotice.RUN_STARTED else TasksNotice.RUN_FAILED,
+        )
         return started
     }
 
@@ -365,9 +368,10 @@ fun TasksScreen(
         proactiveMaxUnanswered = 2
         createError = null
     }
-    BackHandler {
+    val navigateBack = {
         if (showCreate) resetEditor() else onClose()
     }
+    BackHandler { navigateBack() }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
@@ -382,31 +386,27 @@ fun TasksScreen(
                 subtitle = stringResource(
                     if (chatMode) R.string.tasks_chat_subtitle else R.string.tasks_subtitle,
                 ),
-                onBack = onClose,
+                onBack = navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
-                actionIcon = Icons.Filled.Add,
+                actionIcon = if (showCreate) null else Icons.Filled.Add,
                 actionContentDescription = stringResource(
                     if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
                 ),
                 onAction = {
-                    if (showCreate && editingTaskId == null) {
-                        resetEditor()
-                    } else {
-                        showCreate = true
-                        editingTaskId = null
-                        prompt = ""
-                        cadence = AutomationCadence.ONCE
-                        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
-                        customHours = "6"
-                        windowStartMinuteOfDay = 20 * 60
-                        windowEndMinuteOfDay = 22 * 60
-                        quietHoursEnabled = true
-                        quietStartMinuteOfDay = 23 * 60
-                        quietEndMinuteOfDay = 7 * 60
-                        proactiveMinGapHours = 6
-                        proactiveMaxUnanswered = 2
-                        createError = null
-                    }
+                    showCreate = true
+                    editingTaskId = null
+                    prompt = ""
+                    cadence = AutomationCadence.ONCE
+                    firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+                    customHours = "6"
+                    windowStartMinuteOfDay = 20 * 60
+                    windowEndMinuteOfDay = 22 * 60
+                    quietHoursEnabled = true
+                    quietStartMinuteOfDay = 23 * 60
+                    quietEndMinuteOfDay = 7 * 60
+                    proactiveMinGapHours = 6
+                    proactiveMaxUnanswered = 2
+                    createError = null
                 },
             )
 
@@ -471,6 +471,8 @@ fun TasksScreen(
                         when (notice) {
                             TasksNotice.CANCELLED -> R.string.tasks_cancelled
                             TasksNotice.MISSING -> R.string.tasks_missing
+                            TasksNotice.RUN_STARTED -> R.string.tasks_run_started
+                            TasksNotice.RUN_FAILED -> R.string.tasks_run_failed
                         },
                     ),
                     style = DsType.small13,
