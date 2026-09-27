@@ -135,4 +135,29 @@ class ChatContextStateTest {
         assertTrue(rendered.contains("旧事实1"))
         assertTrue(!rendered.contains("旧事实11"))
     }
+
+    @Test
+    fun plannerReceivesOnlyEventBackedHardSceneFields() {
+        val state = ChatCharacterState()
+        val context = ChatContextState(
+            scene = ChatSceneState(
+                sceneTime = "夜晚",
+                location = "房间",
+                participants = listOf("旧人物"),
+                positions = listOf("靠着院墙"),
+                activeActions = listOf("喝茶"),
+                keyObjects = listOf("石桌"),
+            ),
+        )
+
+        val planner = state.withContextForPlanner(context)
+
+        assertEquals("夜晚", planner.scene.sceneTime)
+        assertEquals("房间", planner.scene.location)
+        assertTrue(planner.scene.participants.isEmpty())
+        assertTrue(planner.scene.positions.isEmpty())
+        assertTrue(planner.scene.activeActions.isEmpty())
+        assertTrue(planner.scene.keyObjects.isEmpty())
+    }
+
 }
