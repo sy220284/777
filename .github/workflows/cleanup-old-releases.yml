@@ -1,6 +1,10 @@
 name: Cleanup Old Releases
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-old-releases.yml'
   workflow_run:
     workflows: ['Release APK']
     types: [completed]
