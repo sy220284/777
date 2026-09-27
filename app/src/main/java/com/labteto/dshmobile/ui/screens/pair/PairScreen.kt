@@ -95,8 +95,8 @@ fun PairScreen(
     }
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        // A null payload is a cancel or a denied camera. Both leave the typed form on screen, which
-        // is the fallback, so there is nothing to announce.
+        // Permission is handled before launch. A null payload here is an ordinary scanner cancel,
+        // so the typed form remains available without turning cancellation into an error.
         result.contents?.let(viewModel::onScanned)
     }
     val scanPrompt = stringResource(R.string.pair_scan_prompt)
