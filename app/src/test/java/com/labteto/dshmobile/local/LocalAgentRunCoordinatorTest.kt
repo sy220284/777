@@ -266,6 +266,100 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun queuedRecoveryCheckpointSurvivesRestart() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "继续任务",
+                memoryInput = "原始任务",
+            )
+            coordinator.markRecoveryQueued("s1", context.runId)
+
+            val decision = coordinator.recoveryDecision("s1", SessionRepairResult())
+
+            assertNotNull(decision)
+            assertEquals("run-recovery:" + context.runId, decision!!.queuedInput?.id)
+            assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun blockedRecoveryCheckpointPreservesReason() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "修改外部状态",
+                memoryInput = "修改外部状态",
+            )
+            coordinator.markRecoveryBlocked("s1", context.runId, "需要人工确认")
+
+            val decision = coordinator.recoveryDecision("s1", SessionRepairResult())
+
+            assertNotNull(decision)
+            assertEquals("需要人工确认", decision!!.blockedReason)
+            assertNull(decision.queuedInput)
+        }
+    }
+
+    @Test
+    fun incompatibleCheckpointVersionIsIgnored() {
+        withCoordinator { coordinator, log ->
+            log.append(
+                LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+                buildJsonObject {
+                    put("version", 999)
+                    put("status", "running")
+                    put("run_id", "future-run")
+                },
+            )
+
+            assertNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+        }
+    }
+
+    @Test
+    fun failedCancelledAndStepLimitRunsNeverReplay() {
+        val terminalEvents: List<(String) -> AgentEvent> = listOf(
+            { runId -> AgentEvent.TurnFailed(runId, "boom") },
+            { runId -> AgentEvent.TurnCancelled(runId) },
+            { runId -> AgentEvent.TurnStepLimit(runId, 8) },
+        )
+        terminalEvents.forEach { terminal ->
+            withCoordinator { coordinator, _ ->
+                val context = coordinator.start(
+                    sessionId = "s1",
+                    usageMode = LocalUsageMode.WORK,
+                    model = "deepseek-flash",
+                    baseUrl = "https://api.deepseek.com",
+                    planMode = false,
+                    policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                    safeAutoApprovalEnabled = false,
+                    maxSteps = 8,
+                    input = "任务",
+                    memoryInput = "任务",
+                )
+                coordinator.recordEvent(context, terminal(context.runId))
+
+                assertNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+            }
+        }
+    }
+
+    @Test
     fun durableFinalAssistantEventWinsEvenBeforeAssistantCheckpoint() {
         withCoordinator { coordinator, log ->
             val context = coordinator.start(
