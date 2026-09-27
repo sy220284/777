@@ -1454,8 +1454,9 @@ class LocalHarnessEngine @Inject constructor(
         ) return@synchronized false
 
         val activeTranscript = transcriptForBranchMaterialization(state)
-        val original = activeTranscript.firstOrNull { message -> message.id == messageId }
-            ?: return@synchronized false
+        val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
+        if (originalIndex < 0) return@synchronized false
+        val original = activeTranscript[originalIndex]
         if (original.role != "user") return@synchronized false
 
         val content = withEditedChatUserText(original, requestedText)
@@ -1463,33 +1464,65 @@ class LocalHarnessEngine @Inject constructor(
         if (editableChatUserText(original).trim() == requestedText) return@synchronized false
         cancelChatPostTurn()
 
+        val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
+        val branchParentState = state.chatBranches.nodes
+            .firstOrNull { node -> node.message.id == messageId }
+            ?.parentId
+            ?.let { parentId ->
+                state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
+            }
+        val baseState = branchParentState
+            ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
+            ?: ChatCharacterState()
+        val baseGroupState = if (state.groupChat.enabled) {
+            restoreGroupStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
+                ?: state.groupChat.copy(
+                    members = state.groupChat.members.map { member ->
+                        member.copy(chatState = ChatCharacterState())
+                    },
+                    turnCursor = 0,
+                )
+        } else {
+            state.groupChat
+        }
+
+        val discarded = activeTranscript.drop(originalIndex)
+        memoryStore.rollbackSourceSessionFrom(state.sessionId, original.createdAt)
+        if (!state.groupChat.enabled) {
+            val galleryId = state.galleryId
+            val storyId = state.galleryStoryId
+            if (galleryId != null && storyId != null) {
+                chatPersonaGalleryStore.excludeHistoryMessages(
+                    id = galleryId,
+                    storyId = storyId,
+                    messageKeys = discarded.map { com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it) },
+                    replacementChatState = baseState,
+                )
+            }
+        } else {
+            baseGroupState.members.forEach { member ->
+                chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
+            }
+        }
+
         val edited = newTranscriptMessage("user", content)
         val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
             originalMessageId = messageId,
             editedMessage = edited,
         ) ?: return@synchronized false
-
         val retainedPrefix = rewritten.dropLast(1)
-        val baseState = retainedPrefix.asReversed()
-            .asSequence()
-            .mapNotNull { message ->
-                state.chatBranches.nodes
-                    .firstOrNull { node -> node.message.id == message.id }
-                    ?.chatStateAfter
-            }
-            .firstOrNull()
-            ?: ChatCharacterState()
 
         val previousGeneration = if (state.groupChat.enabled) {
             state.groupChat.context.generation
         } else {
             state.chatContext.generation
         }
-        val baseContext = replayHardChatContextFromTranscript(
+        val replayedContext = replayHardChatContextFromTranscript(
             messages = retainedPrefix,
             generation = previousGeneration + 1L,
         )
+        val baseContext = replayedContext.copy(continuity = baseState.continuity)
 
         val editedModelMessage = editedChatUserModelMessage(
             eventLog = eventLog,
@@ -1507,6 +1540,22 @@ class LocalHarnessEngine @Inject constructor(
             ),
         )
         updateContextMetrics()
+
+        val restoredGroupState = if (state.groupChat.enabled) {
+            baseGroupState.copy(context = baseContext)
+        } else {
+            baseGroupState
+        }
+        persistChatTimelineBaseline(
+            eventLog,
+            json,
+            state.copy(
+                chatState = baseState.copy(scene = baseContext.scene, continuity = baseContext.continuity),
+                chatContext = baseContext,
+                groupChat = restoredGroupState,
+            ),
+        )
+
         val userEvent = eventLog.append("user/message", buildJsonObject {
             put("content", content)
             put("model_message", editedModelMessage)
@@ -1522,17 +1571,14 @@ class LocalHarnessEngine @Inject constructor(
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
                 chatState = baseState.copy(
                     scene = if (current.groupChat.enabled) ChatSceneState() else baseContext.scene,
-                    continuity = ChatContinuityState(),
+                    continuity = if (current.groupChat.enabled) ChatContinuityState() else baseContext.continuity,
                 ),
                 chatContext = if (current.groupChat.enabled) current.chatContext else baseContext,
-                groupChat = if (current.groupChat.enabled) {
-                    current.groupChat.copy(context = baseContext)
-                } else {
-                    current.groupChat
-                },
+                groupChat = restoredGroupState,
                 replySuggestions = emptyList(),
                 chatBranches = LocalChatBranchState(),
                 groupActiveSpeakerName = null,
+                personaCorrectionNotice = null,
                 error = null,
             )
         }
@@ -1617,8 +1663,9 @@ class LocalHarnessEngine @Inject constructor(
         ) return@synchronized false
         val last = state.messages.lastOrNull() ?: return@synchronized false
         if (last.id != messageId || last.role != "assistant") return@synchronized false
-        val prompt = state.messages.dropLast(1).lastOrNull { it.role == "user" }?.content
+        val promptMessage = state.messages.dropLast(1).lastOrNull { it.role == "user" }
             ?: return@synchronized false
+        val prompt = promptMessage.content
         if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
             return@synchronized false
         }
@@ -1637,15 +1684,21 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             val branchParentState = chatBranchParentState(branches, messageId)
-            val baseState = branchParentState ?: state.chatState
+            val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), promptMessage.id)
+            val baseState = branchParentState
+                ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, promptMessage.createdAt)
+                ?: ChatCharacterState()
             val baseContext = restoreBranchContext(
                 snapshot = chatBranchParentContext(branches, messageId),
-                legacyState = branchParentState,
+                legacyState = baseState,
                 previousGeneration = state.chatContext.generation,
             )
             _state.update {
                 it.copy(
-                    chatState = baseState,
+                    chatState = baseState.copy(
+                        scene = baseContext.scene,
+                        continuity = baseContext.continuity,
+                    ),
                     chatContext = baseContext,
                     replySuggestions = emptyList(),
                     chatBranches = branches,
@@ -1798,6 +1851,7 @@ class LocalHarnessEngine @Inject constructor(
         queuedInput: QueuedAgentInput? = null,
     ) {
         val before = _state.value
+        persistChatTimelineBaseline(eventLog, json, before)
         val transcriptMessage = newTranscriptMessage("user", content)
         val userEvent = if (queued) {
             val durableInput = requireNotNull(queuedInput) { "排队消息缺少持久编号" }
