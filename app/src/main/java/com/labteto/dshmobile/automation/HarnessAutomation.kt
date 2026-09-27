@@ -305,11 +305,11 @@ internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
     }
     val windowStart = (
         task.windowStartMinuteOfDay
-            ?: 20 * 60.takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+            ?: (20 * 60).takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
         )?.coerceIn(0, 24 * 60 - 1)
     var windowEnd = (
         task.windowEndMinuteOfDay
-            ?: 22 * 60.takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
+            ?: (22 * 60).takeIf { task.scheduleType == AutomationScheduleType.WINDOW }
         )?.coerceIn(0, 24 * 60 - 1)
     if (windowStart != null && windowEnd == windowStart) {
         windowEnd = (windowStart + 120) % (24 * 60)
