@@ -755,7 +755,7 @@ private fun ArchivedDialogueRow(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = {},
+                onClick = onLongClick,
                 onLongClick = onLongClick,
             ),
         shape = RoundedCornerShape(10.dp),
