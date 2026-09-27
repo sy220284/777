@@ -76,7 +76,9 @@ internal fun appendLocalTranscriptRuntimeIndex(
     var latestMessageRole = current.latestMessageRole
     var totalMessageCount = current.totalMessageCount
     var hasDialogue = current.hasDialogue
-    var branchingEligible = current.branchingEligible
+    // Legacy snapshots may contain a stale false value from older structural checks.
+    // Runtime actions validate the active branch directly, so never keep that value sticky.
+    val branchingEligible = true
     var lastTurnDialogueRole = current.lastTurnDialogueRole
 
     messages.forEach { message ->

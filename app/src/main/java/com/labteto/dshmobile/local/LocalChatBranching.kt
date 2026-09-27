@@ -296,11 +296,17 @@ internal fun chatBranchParentState(
 internal fun chatBranchLastSnapshot(
     state: LocalChatBranchState,
 ): Pair<ChatCharacterState, List<ChatReplySuggestion>>? {
-    val active = activeChatBranchMessages(state)
-    val last = active.lastOrNull() ?: return null
-    val node = state.nodes.firstOrNull { it.message.id == last.id } ?: return null
-    val chatState = node.chatStateAfter ?: return null
-    return chatState to node.replySuggestionsAfter
+    val activeIds = activeChatBranchMessages(state).mapTo(hashSetOf(), LocalHarnessMessage::id)
+    if (activeIds.isEmpty()) return null
+    return state.nodes.asReversed()
+        .asSequence()
+        .filter { node -> node.message.id in activeIds }
+        .mapNotNull { node ->
+            node.chatStateAfter?.let { chatState ->
+                chatState to node.replySuggestionsAfter
+            }
+        }
+        .firstOrNull()
 }
 
 internal fun encodeChatBranchStateEvent(state: LocalChatBranchState): JsonObject =

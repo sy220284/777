@@ -18,6 +18,7 @@
     <string name="local_selected_count">Selected: %1$d</string>
     <string name="local_regenerate_reply">Regenerate reply</string>
     <string name="local_regenerate_reply_failed">This reply cannot be regenerated right now.</string>
+    <string name="local_select_variant_failed">Unable to switch reply version right now. Wait for the current turn to finish and try again.</string>
     <string name="local_edit_user_message">Edit message</string>
     <string name="local_edit_user_message_hint">Resending restarts the conversation from this message. All later conversation history is cleared and replaced by the new continuation.</string>
     <string name="local_edit_user_message_resend">Resend</string>

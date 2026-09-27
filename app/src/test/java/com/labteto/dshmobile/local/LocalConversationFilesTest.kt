@@ -99,4 +99,47 @@ class LocalConversationFilesTest {
         bytes = 12,
         modifiedAt = 1,
     )
+
+    @Test
+    fun activeTranscriptBoundaryDropsFilesFromDiscardedFuture() {
+        val files = listOf(
+            file(".dsh/uploads/old.txt"),
+            file(".dsh/uploads/kept.txt"),
+            file("out/old-report.md"),
+            file("src/After.kt"),
+        )
+        val keptMessage = LocalHarnessMessage(
+            id = "u-kept",
+            role = "user",
+            content = "- 文件：kept.txt → .dsh/uploads/kept.txt（10 B）",
+            createdAt = 3L,
+        )
+        val events = listOf(
+            event(
+                1,
+                "user/message",
+                buildJsonObject {
+                    put("content", "- 文件：old.txt → .dsh/uploads/old.txt（10 B）")
+                },
+            ),
+            toolCall(2, "present", buildJsonObject { put("path", "out/old-report.md") }),
+            event(
+                3,
+                "chat/active-transcript",
+                buildJsonObject {
+                    put("reason", "user-edited")
+                    put("transcript", encodeTranscriptMessages(listOf(keptMessage)))
+                },
+            ),
+            toolCall(4, "read", buildJsonObject { put("path", "src/After.kt") }),
+        )
+
+        val index = localConversationFiles(events.asSequence(), files)
+
+        assertEquals(setOf(".dsh/uploads/kept.txt", "src/After.kt"), index.involved.map { it.path }.toSet())
+        assertTrue(index.artifacts.isEmpty())
+        assertFalse(index.involved.any { it.path == ".dsh/uploads/old.txt" })
+        assertFalse(index.artifacts.any { it.path == "out/old-report.md" })
+    }
+
 }
