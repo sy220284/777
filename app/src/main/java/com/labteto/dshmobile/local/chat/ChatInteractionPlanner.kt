@@ -360,6 +360,8 @@ class ChatInteractionPlanner @Inject constructor(
             value = decoded.state,
             previous = baseState,
             rawState = rawState,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
         )
         return decoded.copy(
             state = applyInteractionPerformance(
@@ -644,13 +646,25 @@ class ChatInteractionPlanner @Inject constructor(
         value: ChatCharacterState,
         previous: ChatCharacterState,
         rawState: JsonObject?,
+        userMessage: String,
+        assistantMessage: String,
     ): ChatCharacterState {
         if (rawState == null) return previous
         val rawScene = rawState["scene"]?.let { runCatching { it.jsonObject }.getOrNull() }
         val rawContinuity = rawState["continuity"]?.let { runCatching { it.jsonObject }.getOrNull() }
         if (rawScene == null && rawContinuity == null) return previous
 
-        val scene = if (rawScene == null) previous.scene else sanitizeScene(value.scene, previous.scene, rawScene)
+        val scene = if (rawScene == null) {
+            previous.scene
+        } else {
+            sanitizeScene(
+                value = value.scene,
+                previous = previous.scene,
+                raw = rawScene,
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+            )
+        }
         val continuity = if (rawContinuity == null) {
             previous.continuity
         } else {
@@ -667,32 +681,65 @@ class ChatInteractionPlanner @Inject constructor(
         value: ChatSceneState,
         previous: ChatSceneState,
         raw: JsonObject,
-    ): ChatSceneState = ChatSceneState(
-        sceneTime = if (raw.containsKey("sceneTime")) {
-            value.sceneTime.trim().take(80).ifBlank { previous.sceneTime }
-        } else previous.sceneTime,
-        location = if (raw.containsKey("location")) {
-            value.location.trim().take(120).ifBlank { previous.location }
-        } else previous.location,
-        participants = if (raw.containsKey("participants")) {
-            sanitizeCurrentStrings(value.participants, limit = 8, maxChars = 80)
-        } else previous.participants,
-        positions = if (raw.containsKey("positions")) {
-            sanitizeCurrentStrings(value.positions, limit = 8, maxChars = 120)
-        } else previous.positions,
-        activeActions = if (raw.containsKey("activeActions")) {
-            sanitizeCurrentStrings(value.activeActions, limit = 6, maxChars = 120)
-        } else previous.activeActions,
-        keyObjects = if (raw.containsKey("keyObjects")) {
-            sanitizeCurrentStrings(value.keyObjects, limit = 8, maxChars = 80)
-        } else previous.keyObjects,
-        currentEvent = if (raw.containsKey("currentEvent")) {
-            value.currentEvent.trim().take(180)
-        } else previous.currentEvent,
-        lastSceneChange = if (raw.containsKey("lastSceneChange")) {
-            value.lastSceneChange.trim().take(200).ifBlank { previous.lastSceneChange }
-        } else previous.lastSceneChange,
-    )
+        userMessage: String,
+        assistantMessage: String,
+    ): ChatSceneState {
+        val dialogue = "$userMessage\n$assistantMessage"
+        val candidateLocation = value.location.trim().take(120)
+        val candidateTime = value.sceneTime.trim().take(80)
+        val locationChanged = candidateLocation.isNotBlank() && candidateLocation != previous.location
+        val timeChanged = candidateTime.isNotBlank() && candidateTime != previous.sceneTime
+        val acceptLocationChange = !locationChanged ||
+            previous.location.isBlank() ||
+            sceneValueGrounded(candidateLocation, dialogue) ||
+            MOVEMENT_SIGNAL.containsMatchIn(dialogue)
+        val acceptTimeChange = !timeChanged ||
+            previous.sceneTime.isBlank() ||
+            sceneValueGrounded(candidateTime, dialogue) ||
+            TIME_CHANGE_SIGNAL.containsMatchIn(dialogue)
+        val nextLocation = if (raw.containsKey("location") && acceptLocationChange) {
+            candidateLocation.ifBlank { previous.location }
+        } else previous.location
+        val nextTime = if (raw.containsKey("sceneTime") && acceptTimeChange) {
+            candidateTime.ifBlank { previous.sceneTime }
+        } else previous.sceneTime
+        val acceptedSceneChange = nextLocation != previous.location || nextTime != previous.sceneTime
+
+        return ChatSceneState(
+            sceneTime = nextTime,
+            location = nextLocation,
+            participants = if (raw.containsKey("participants")) {
+                sanitizeCurrentStrings(value.participants, limit = 8, maxChars = 80)
+            } else previous.participants,
+            positions = if (raw.containsKey("positions")) {
+                sanitizeCurrentStrings(value.positions, limit = 8, maxChars = 120)
+            } else previous.positions,
+            activeActions = if (raw.containsKey("activeActions")) {
+                sanitizeCurrentStrings(value.activeActions, limit = 6, maxChars = 120)
+            } else previous.activeActions,
+            keyObjects = if (raw.containsKey("keyObjects")) {
+                sanitizeCurrentStrings(value.keyObjects, limit = 8, maxChars = 80)
+            } else previous.keyObjects,
+            currentEvent = if (raw.containsKey("currentEvent")) {
+                value.currentEvent.trim().take(180)
+            } else previous.currentEvent,
+            lastSceneChange = if (raw.containsKey("lastSceneChange") && acceptedSceneChange) {
+                value.lastSceneChange.trim().take(200).ifBlank { previous.lastSceneChange }
+            } else previous.lastSceneChange,
+        )
+    }
+
+    private fun sceneValueGrounded(value: String, dialogue: String): Boolean {
+        val candidate = normalize(value)
+        val source = normalize(dialogue)
+        if (candidate.isBlank() || source.isBlank()) return false
+        if (source.contains(candidate)) return true
+        val candidatePairs = bigrams(candidate)
+        val sourcePairs = bigrams(source)
+        if (candidatePairs.isEmpty() || sourcePairs.isEmpty()) return false
+        val shared = candidatePairs.count(sourcePairs::contains)
+        return shared >= 1 && shared.toDouble() / candidatePairs.size >= 0.5
+    }
 
     private fun sanitizeContinuity(
         value: ChatContinuityState,
@@ -1043,6 +1090,8 @@ class ChatInteractionPlanner @Inject constructor(
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
         const val RECENT_ADDRESS_LIMIT = 4
+        val MOVEMENT_SIGNAL = Regex("""(?:走|进|出|回|离开|来到|过去|过来|移到|搬到|上楼|下楼|进门|出门|推门|穿过|起身)""")
+        val TIME_CHANGE_SIGNAL = Regex("""(?:天亮|天黑|入夜|夜里|夜晚|清晨|早上|上午|中午|下午|傍晚|晚上|深夜|翌日|次日|第二天|过了.+(?:分钟|小时|天))""")
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
