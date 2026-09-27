@@ -1000,6 +1000,7 @@
 <string name="tasks_status_queued">等待执行</string>
 <string name="tasks_status_scheduled">已排期</string>
 <string name="tasks_status_paused">已暂停</string>
+<string name="tasks_status_waiting_user">等待你回复</string>
 <string name="tasks_schedule_once">一次</string>
 <string name="tasks_schedule_daily">每天</string>
 <string name="tasks_schedule_weekly">每周</string>
@@ -1017,6 +1018,14 @@
 <string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
 <string name="chat_composer_add_attachment">添加附件</string>
 
+    <string name="tasks_chat_quiet_start_value">开始 %1$s</string>
+    <string name="tasks_chat_quiet_end_value">结束 %1$s</string>
+    <string name="tasks_chat_quiet_hours_value">免打扰 %1$s–%2$s</string>
+    <string name="tasks_chat_min_gap">最低主动间隔</string>
+    <string name="tasks_chat_unanswered_limit">连续未回复后暂停主动</string>
+    <string name="tasks_chat_hours_value">%1$d 小时</string>
+    <string name="tasks_chat_times_value">%1$d 次</string>
+    <string name="tasks_waiting_user_timing">等待你下一次回复后恢复</string>
     <string name="tasks_chat_title">定时互动</string>
     <string name="tasks_chat_subtitle">让当前角色在约定时间主动来找你，继续这段关系和当前故事。</string>
     <string name="tasks_chat_new">新建定时互动</string>
@@ -1037,7 +1046,7 @@
     <string name="tasks_chat_preset_story_prompt">从当前故事线继续，让角色主动带来一个符合世界设定和人设的小事件、消息、邀约或状况，推动剧情往前走。</string>
     <string name="tasks_chat_preset_promise_prompt">以角色自己的口吻，自然提起现有聊天里真实存在的约定、计划或重要事项；如果上下文没有明确约定，不要编造。</string>
     <string name="tasks_chat_quiet_hours">夜间免打扰</string>
-    <string name="tasks_chat_quiet_hours_hint">设备当地时间 23:00–07:00 暂缓主动消息。</string>
+    <string name="tasks_chat_quiet_hours_hint">在你设置的时段内暂缓主动消息，不占聊天回合，也不调用模型。</string>
     <string name="tasks_chat_notification_title">%1$s 发来一条消息</string>
 
     <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
