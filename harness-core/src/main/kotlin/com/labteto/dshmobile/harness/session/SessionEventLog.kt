@@ -157,7 +157,7 @@ class SessionEventLog(
             for (source in orderedFilesUnsafe().asReversed()) {
                 val segmentTail = ArrayDeque<String>(wanted)
                 source.forEachEventLine { line ->
-                    if (line.isBlank()) return@forEachLine
+                    if (line.isBlank()) return@forEachEventLine
                     if (segmentTail.size >= wanted) segmentTail.removeFirst()
                     segmentTail.addLast(line)
                 }
@@ -195,7 +195,7 @@ class SessionEventLog(
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
             source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachLine
+                val event = decodeEventOrNull(line) ?: return@forEachEventLine
                 if (
                     event.sequence < beforeSequenceExclusive &&
                     event.type == type &&
@@ -214,7 +214,7 @@ class SessionEventLog(
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
             source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachLine
+                val event = decodeEventOrNull(line) ?: return@forEachEventLine
                 if (
                     event.type in types &&
                     (found == null || event.sequence > requireNotNull(found).sequence)
@@ -424,7 +424,7 @@ class SessionEventLog(
 
         relevant.forEach { source ->
             source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachLine
+                val event = decodeEventOrNull(line) ?: return@forEachEventLine
                 if (event.sequence > sequenceExclusive) visitor(event)
             }
         }
