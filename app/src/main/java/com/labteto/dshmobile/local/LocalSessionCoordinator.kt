@@ -89,6 +89,10 @@ internal class LocalSessionCoordinator(
             snapshot = indexBase,
             events = tailEvents,
             sequenceExclusive = cursor,
+        ).copy(
+            // Old builds could persist false forever. Current edit/variant actions validate the
+            // actual active transcript at use time, so old storage must not disable them.
+            branchingEligible = true,
         )
         return LocalSessionTranscriptRestore(
             messages = projected.messages,
