@@ -75,7 +75,6 @@ private fun pruneChatContinuitySummary(
     message: JsonObject,
     currentFacts: List<String>,
 ): JsonObject {
-    if (currentFacts.isEmpty()) return message
     val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return message
     val pruned = content.lineSequence().filter { raw ->
         val line = raw.trim()
@@ -83,7 +82,11 @@ private fun pruneChatContinuitySummary(
         val factLine = line.removePrefix("- ").trim()
         currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(factLine, fact) }
     }.joinToString("\n")
-    return JsonObject(message + ("content" to JsonPrimitive(pruned)))
+    return JsonObject(
+        message +
+            ("role" to JsonPrimitive("system")) +
+            ("content" to JsonPrimitive(pruned)),
+    )
 }
 
 private fun buildRequestOnlyContinuity(
