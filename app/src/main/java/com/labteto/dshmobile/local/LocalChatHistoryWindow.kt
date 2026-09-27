@@ -17,9 +17,10 @@ import kotlinx.serialization.json.put
 internal fun boundedChatRequestHistory(
     history: List<JsonObject>,
     recentMessages: Int = 20,
+    compactionBatch: Int = 8,
 ): List<JsonObject> {
     require(recentMessages >= 2) { "recentMessages must be >= 2" }
-    if (history.size <= recentMessages + 2) return history
+    require(compactionBatch >= 2) { "compactionBatch must be >= 2" }
 
     val leadingSystem = history.firstOrNull()?.takeIf {
         it["role"]?.jsonPrimitive?.contentOrNull == "system"
@@ -40,8 +41,13 @@ internal fun boundedChatRequestHistory(
         .filterNot(::isChatContinuitySummary)
         .toList()
 
-    val recent = dialogue.takeLast(recentMessages)
-    val older = dialogue.dropLast(recent.size)
+    val maximumHotMessages = recentMessages + compactionBatch
+    if (dialogue.size <= maximumHotMessages) return history
+
+    val overflow = dialogue.size - maximumHotMessages
+    val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
+    val older = dialogue.take(summarizedCount.coerceAtMost(dialogue.size - recentMessages))
+    val recent = dialogue.drop(older.size)
     val deltaContinuity = buildRequestOnlyContinuity(older)
 
     return buildList {
@@ -71,7 +77,7 @@ private fun buildRequestOnlyContinuity(older: List<JsonObject>): JsonObject? {
 
     val summary = buildString {
         appendLine("<chat-continuity>")
-        appendLine("以下是较早已发生的用户表达与事件，只用于保持连续；除非用户追问，不主动复述：")
+        appendLine("以下是按固定批次归并的较早用户表达与事件，只用于保持连续；除非用户追问，不主动复述：")
         userEvents.forEach { appendLine("- ${it.take(500)}") }
         appendLine("角色旧回复措辞已省略。")
         append("</chat-continuity>")
