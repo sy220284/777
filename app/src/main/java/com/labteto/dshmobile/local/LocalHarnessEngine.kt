@@ -298,7 +298,7 @@ class LocalHarnessEngine @Inject constructor(
     private val attachmentImporter = LocalAttachmentImporter(
         context = context,
         workspace = workspace,
-        maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
+        maxAttachmentBytes = LocalHarnessEngineConfig.MAX_ATTACHMENT_BYTES,
     )
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
@@ -327,7 +327,7 @@ class LocalHarnessEngine @Inject constructor(
         LocalSessionCoordinator(
             repository = sessionRepository,
             eventLogFor = ::eventLogFor,
-            runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+            runtimeWindowMessages = LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         )
     }
     private val agentRunCoordinator by lazy {
@@ -364,7 +364,7 @@ class LocalHarnessEngine @Inject constructor(
         extraSearchPaths = ::bundledRuntimeSearchPaths,
         baseEnvironment = ::bundledRuntimeEnvironment,
     )
-    private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
+    private val handoffBuilder = ConversationHandoffBuilder(LocalHarnessEngineConfig.MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
     private val modelRequestCoordinator by lazy {
@@ -381,8 +381,8 @@ class LocalHarnessEngine @Inject constructor(
                 _state.update { it.copy(streamingAssistant = preview) }
             },
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
-            maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
-            streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
+            maxStreamPreviewChars = LocalHarnessEngineConfig.MAX_STREAM_PREVIEW_CHARS,
+            streamPreviewIntervalMs = LocalHarnessEngineConfig.STREAM_PREVIEW_INTERVAL_MS,
         )
     }
     private val runtimePlugin by lazy {
@@ -426,7 +426,7 @@ class LocalHarnessEngine @Inject constructor(
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
     private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
-    private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
+    private var currentSessionId = preferences.getString(LocalHarnessEngineConfig.KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
     // legacy migration, before the loading screen admits session actions.
@@ -474,7 +474,7 @@ class LocalHarnessEngine @Inject constructor(
                                 put("content", prompt)
                             },
                         ),
-                        step = CHAT_POST_TURN_MODEL_STEP,
+                        step = LocalHarnessEngineConfig.CHAT_POST_TURN_MODEL_STEP,
                         toolsOverride = JsonArray(emptyList()),
                         publishPreview = false,
                         requestLog = requestLog,
@@ -745,7 +745,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private val runStateLock = Any()
-    private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
+    private val pendingInputs = AgentInputQueue(LocalHarnessEngineConfig.MAX_PENDING_INPUTS)
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
@@ -790,7 +790,7 @@ class LocalHarnessEngine @Inject constructor(
             currentSessionId = { currentSessionId },
             activateSession = { id, transcriptCursor ->
                 currentSessionId = id
-                preferences.edit().putString(KEY_SESSION_ID, id).apply()
+                preferences.edit().putString(LocalHarnessEngineConfig.KEY_SESSION_ID, id).apply()
                 eventLog = eventLogFor(id)
                 transcriptProjectionCursor = transcriptCursor
             },
@@ -804,12 +804,12 @@ class LocalHarnessEngine @Inject constructor(
             restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
             startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
             sessionSummaries = ::sessionSummaries,
-            localProjectId = LOCAL_PROJECT_ID,
+            localProjectId = LocalHarnessEngineConfig.LOCAL_PROJECT_ID,
         )
     }
 
     init {
-        preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
+        preferences.edit().putString(LocalHarnessEngineConfig.KEY_SESSION_ID, currentSessionId).apply()
         val initialResources = resourceScheduler.snapshot()
         _state.update {
             it.copy(
@@ -1341,7 +1341,7 @@ class LocalHarnessEngine @Inject constructor(
                         put("content", prompt)
                     },
                 ),
-                step = CHAT_POST_TURN_MODEL_STEP + 1,
+                step = LocalHarnessEngineConfig.CHAT_POST_TURN_MODEL_STEP + 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 requestLog = boundEventLog,
@@ -1572,7 +1572,7 @@ class LocalHarnessEngine @Inject constructor(
 
         _state.update { current ->
             current.copy(
-                messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                messages = rewritten.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
                 chatState = baseState.copy(
                     scene = if (current.groupChat.enabled) ChatSceneState() else baseContext.scene,
@@ -1644,7 +1644,7 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
         _state.update { current ->
             current.copy(
-                messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                messages = activeMessages.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                 chatState = snapshot?.first ?: current.chatState,
                 chatContext = selectedContext,
@@ -1808,7 +1808,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             val accepted = pendingInputs.offer(queuedInput)
             if (!accepted) {
-                _state.update { it.copy(error = "当前执行中的补充消息已达到 $MAX_PENDING_INPUTS 条上限") }
+                _state.update { it.copy(error = "当前执行中的补充消息已达到 $LocalHarnessEngineConfig.MAX_PENDING_INPUTS 条上限") }
                 return@synchronized null
             }
             recordUserTranscript(
@@ -2166,16 +2166,16 @@ class LocalHarnessEngine @Inject constructor(
         if (!bypassProactivePolicy && minimumSilenceMinutes != null) {
             val earlyEventLog = eventLogFor(targetSessionId)
             val earlyTranscript = LocalSessionTranscriptPager(earlyEventLog)
-                .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                .page(limit = LocalHarnessEngineConfig.AUTOMATION_CHAT_HISTORY_MESSAGES)
                 .messages
                 .ifEmpty {
                     initialSession.transcriptWindow
                         .ifEmpty {
                             initialSession.messages.takeLast(
-                                LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+                                LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
                             )
                         }
-                        .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
+                        .takeLast(LocalHarnessEngineConfig.AUTOMATION_CHAT_HISTORY_MESSAGES)
                 }
             val silenceDecision = evaluateChatSilenceTrigger(
                 messages = earlyTranscript,
@@ -2246,12 +2246,12 @@ class LocalHarnessEngine @Inject constructor(
                 val persona = chatPersonaStore.get(session.personaId)
                 val boundEventLog = eventLogFor(session.id)
                 val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
-                    .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    .page(limit = LocalHarnessEngineConfig.AUTOMATION_CHAT_HISTORY_MESSAGES)
                     .messages
                     .ifEmpty {
                         session.transcriptWindow
-                            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
-                            .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
+                            .ifEmpty { session.messages.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+                            .takeLast(LocalHarnessEngineConfig.AUTOMATION_CHAT_HISTORY_MESSAGES)
                     }
                 if (!bypassProactivePolicy && minimumSilenceMinutes != null) {
                     val silenceDecision = evaluateChatSilenceTrigger(
@@ -2570,7 +2570,7 @@ class LocalHarnessEngine @Inject constructor(
                         listOf(proactiveMessage),
                     )
                     val latestWindow = latest.transcriptWindow.ifEmpty {
-                        latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+                        latest.messages.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
                     }
                     val baseContext = latest.chatContext
                         .withLegacyFallback(nextChatState)
@@ -2609,7 +2609,7 @@ class LocalHarnessEngine @Inject constructor(
                             updatedAt = System.currentTimeMillis(),
                             messages = emptyList(),
                             transcriptWindow = (latestWindow + proactiveMessage)
-                                .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                                .takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                             transcriptIndex = nextTranscriptIndex,
                             chatState = nextChatState,
                             chatContext = nextContext,
@@ -2660,14 +2660,14 @@ class LocalHarnessEngine @Inject constructor(
         key = key,
         snapshot = snapshot,
         messages = messages,
-        step = CHAT_POST_TURN_MODEL_STEP + 200,
+        step = LocalHarnessEngineConfig.CHAT_POST_TURN_MODEL_STEP + 200,
         toolsOverride = JsonArray(emptyList()),
         publishPreviewEnabled = false,
         maxAttemptsOverride = snapshot.modelAttempts.coerceIn(1, 3),
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
-        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+        temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
     )
 
     private fun resolveAutomationWorkSession(
@@ -2691,7 +2691,7 @@ class LocalHarnessEngine @Inject constructor(
             usageMode = LocalUsageMode.WORK,
             conversationMode = LocalConversationMode.PROJECT,
             lineageId = id,
-            projectId = LOCAL_PROJECT_ID,
+            projectId = LocalHarnessEngineConfig.LOCAL_PROJECT_ID,
         )
         sessionCoordinator.enqueue(session)
         return session
@@ -2700,11 +2700,11 @@ class LocalHarnessEngine @Inject constructor(
     private fun automationBoundState(session: LocalHarnessSession): LocalHarnessState {
         val runtime = _state.value
         val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
-            .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+            .page(limit = LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
             .messages
             .ifEmpty {
                 session.transcriptWindow
-                    .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+                    .ifEmpty { session.messages.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
             }
         return runtime.copy(
             sessionId = session.id,
@@ -2718,7 +2718,7 @@ class LocalHarnessEngine @Inject constructor(
             conversationMode = session.conversationMode,
             parentSessionId = session.parentSessionId,
             lineageId = session.lineageId.ifBlank { session.id },
-            projectId = session.projectId ?: LOCAL_PROJECT_ID,
+            projectId = session.projectId ?: LocalHarnessEngineConfig.LOCAL_PROJECT_ID,
             handoffSummary = session.handoffSummary,
             messages = recentTranscript,
             transcriptIndex = transcriptIndexForSession(session),
@@ -2819,7 +2819,7 @@ class LocalHarnessEngine @Inject constructor(
         val finalMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
             role = finalRole,
-            content = truncateWithoutSplittingSurrogatePair(finalContent, MAX_EVENT_CHARS),
+            content = truncateWithoutSplittingSurrogatePair(finalContent, LocalHarnessEngineConfig.MAX_EVENT_CHARS),
             createdAt = System.currentTimeMillis(),
         )
         val event = eventLog.append(
@@ -2833,7 +2833,7 @@ class LocalHarnessEngine @Inject constructor(
         val latest = sessionCoordinator.read(session.id) ?: session
         val appendedTranscript = messages + finalMessage
         val latestWindow = latest.transcriptWindow.ifEmpty {
-            latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+            latest.messages.takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
         }
         sessionCoordinator.enqueue(
             latest.copy(
@@ -2841,7 +2841,7 @@ class LocalHarnessEngine @Inject constructor(
                 updatedAt = System.currentTimeMillis(),
                 messages = emptyList(),
                 transcriptWindow = (latestWindow + appendedTranscript)
-                    .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                    .takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = appendLocalTranscriptRuntimeIndex(
                     transcriptIndexForSession(latest),
                     appendedTranscript,
@@ -3172,7 +3172,7 @@ class LocalHarnessEngine @Inject constructor(
         })
         persist()
         scope.launch {
-            delay(PERSONA_CORRECTION_UNDO_MILLIS)
+            delay(LocalHarnessEngineConfig.PERSONA_CORRECTION_UNDO_MILLIS)
             _state.update { current ->
                 if (current.personaCorrectionNotice?.id == notice.id) {
                     current.copy(personaCorrectionNotice = null)
@@ -3333,7 +3333,7 @@ class LocalHarnessEngine @Inject constructor(
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
             )
             val finalContent = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
@@ -3353,7 +3353,7 @@ class LocalHarnessEngine @Inject constructor(
                         publishPreview = false,
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                        temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
                     )
                 },
                 appendEvent = { type, data ->
@@ -3453,7 +3453,7 @@ class LocalHarnessEngine @Inject constructor(
                     persona = reply.persona,
                     userMessage = userMessage,
                     assistantMessage = reply.content,
-                    step = CHAT_POST_TURN_MODEL_STEP + 100,
+                    step = LocalHarnessEngineConfig.CHAT_POST_TURN_MODEL_STEP + 100,
                 ),
             )
         }
@@ -3493,7 +3493,7 @@ class LocalHarnessEngine @Inject constructor(
                         put("content", prompt)
                     },
                 ),
-                step = CHAT_POST_TURN_MODEL_STEP + 100,
+                step = LocalHarnessEngineConfig.CHAT_POST_TURN_MODEL_STEP + 100,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 maxAttemptsOverride = 1,
@@ -3882,7 +3882,7 @@ class LocalHarnessEngine @Inject constructor(
                 messages = withChatTurnContext(
                     history = boundedChatRequestHistory(
                         if (replacingMessageId == null) modelHistory.toList() else modelHistory.dropLast(1),
-                        recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                        recentMessages = LocalHarnessEngineConfig.CHAT_RECENT_HISTORY_MESSAGES,
                         currentFacts = snapshot.chatContext
                             .withLegacyFallback(snapshot.chatState)
                             .canonicalFactLines(),
@@ -3911,7 +3911,7 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = false,
                 streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
                 persistOverflowHistory = true,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
             )
 
             val reply = chatReplyCoordinator.finalizeDirect(
@@ -3929,7 +3929,7 @@ class LocalHarnessEngine @Inject constructor(
                         publishPreview = false,
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                        temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
                     )
                 },
                 appendEvent = { type, data ->
@@ -4226,7 +4226,7 @@ class LocalHarnessEngine @Inject constructor(
                     withChatTurnContext(
                         history = boundedChatRequestHistory(
                             modelHistory.toList(),
-                            recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                            recentMessages = LocalHarnessEngineConfig.CHAT_RECENT_HISTORY_MESSAGES,
                             currentFacts = snapshot.chatContext
                                 .withLegacyFallback(snapshot.chatState)
                                 .canonicalFactLines(),
@@ -4266,7 +4266,7 @@ class LocalHarnessEngine @Inject constructor(
                         publishPreview = snapshot.usageMode != LocalUsageMode.CHAT,
                         streamFilterPhrases = chatStreamFilterPhrases(snapshot),
                         persistOverflowHistory = true,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE.takeIf {
+                        temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE.takeIf {
                             snapshot.usageMode == LocalUsageMode.CHAT
                         },
                     ).also {
@@ -4388,7 +4388,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             isParallelTool = { call ->
-                runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
+                runPolicy.allowToolExecution && call.name in LocalHarnessEngineConfig.PARALLEL_SUBAGENT_TOOLS
             },
             eventSink = AgentEventSink { event ->
                 when (event) {
@@ -4529,7 +4529,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("name", event.call.name)
                             put(
                                 "content",
-                                truncateWithoutSplittingSurrogatePair(event.output, MAX_EVENT_CHARS),
+                                truncateWithoutSplittingSurrogatePair(event.output, LocalHarnessEngineConfig.MAX_EVENT_CHARS),
                             )
                             put("model_content", modelOutput)
                             put("is_error", event.isError)
@@ -4671,7 +4671,7 @@ class LocalHarnessEngine @Inject constructor(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
     ): List<Pair<LocalToolCall, AgentToolResult>> {
-        val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
+        val parallelSubagents = calls.size > 1 && calls.all { it.name in LocalHarnessEngineConfig.PARALLEL_SUBAGENT_TOOLS }
         if (!parallelSubagents) {
             return calls.map { call -> call to executeSafely(call, allowMutation) }
         }
@@ -4735,15 +4735,15 @@ class LocalHarnessEngine @Inject constructor(
                         executePersistentRegistered(canonical, allowMutation, sessionId)
                     } else {
                         val input = canonical.arguments.string("url")
-                        val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
-                            .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
+                        val maxBytes = canonical.arguments.int("max_bytes", LocalHarnessEngineConfig.DEFAULT_WEB_FETCH_BYTES)
+                            .coerceIn(16 * 1024, LocalHarnessEngineConfig.MAX_WEB_FETCH_BYTES)
                         val format = canonical.arguments.optionalString("format") ?: "text"
                         AgentToolResult(
                             startPersistentWebFetch(
                                 url = input,
                                 maxBytes = maxBytes,
                                 format = format,
-                                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
+                                timeoutSeconds = LocalHarnessEngineConfig.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                                 sessionId = sessionId,
                             ),
                         )
@@ -4848,7 +4848,7 @@ class LocalHarnessEngine @Inject constructor(
         log.append("tool/result", buildJsonObject {
             put("id", normalized.id)
             put("name", normalized.name)
-            put("content", truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(result.content, LocalHarnessEngineConfig.MAX_EVENT_CHARS))
             put("is_error", result.isError)
             result.errorCode?.let { put("error_code", it) }
             put("retryable", result.retryable)
@@ -4962,16 +4962,16 @@ class LocalHarnessEngine @Inject constructor(
         enabledOptional: Set<String>,
     ): JsonArray {
         val enabled = enabledOptional +
-            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
+            if (allowVirtualScreen) LocalHarnessEngineConfig.SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = toolRegistry.names()
             .mapNotNull(toolRegistry::get)
-            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
-            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
+            .filter { tool -> tool.name !in LocalHarnessEngineConfig.SUBAGENT_EXCLUDED_TOOLS }
+            .filter { tool -> tool.name !in LocalHarnessEngineConfig.SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
             .filter { tool -> allowMutation || tool.name != "download_file" }
             .filter { tool ->
                 allowMutation ||
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
-                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
+                    (allowVirtualScreen && tool.name in LocalHarnessEngineConfig.SUBAGENT_VIRTUAL_SCREEN_TOOLS)
             }
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
@@ -4987,7 +4987,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun executeBuiltin(call: LocalToolCall, allowMutation: Boolean): String {
         val args = call.arguments
-        if (_state.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
+        if (_state.value.planMode && call.name in LocalHarnessEngineConfig.PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
         return when (call.name) {
@@ -5017,7 +5017,7 @@ class LocalHarnessEngine @Inject constructor(
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val patch = args.string("patch")
-                require(patch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                require(patch.length <= LocalHarnessEngineConfig.MAX_PATCH_CHARS) { "补丁超过 ${LocalHarnessEngineConfig.MAX_PATCH_CHARS} 字符上限" }
                 validateWorkspacePatchPaths(patch)
                 val check = runtimeProcess.execute(
                     ProcessRequest(
@@ -5066,10 +5066,10 @@ class LocalHarnessEngine @Inject constructor(
                 val background = args.boolean("run_in_background", false)
                 val timeout = args.int(
                     "timeout_seconds",
-                    if (background) DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS else DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS,
+                    if (background) LocalHarnessEngineConfig.DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS else LocalHarnessEngineConfig.DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS,
                 ).coerceIn(
                     1,
-                    if (background) MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
+                    if (background) LocalHarnessEngineConfig.MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else LocalHarnessEngineConfig.MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
                 )
                 if (background) jobs.start("后台命令") { _, report -> workspace.shell(command, timeout, report) }
                 else workspace.shell(command, timeout)
@@ -5084,10 +5084,10 @@ class LocalHarnessEngine @Inject constructor(
             }
             "web_fetch" -> {
                 val input = args.string("url")
-                val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
+                val maxBytes = args.int("max_bytes", LocalHarnessEngineConfig.DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, LocalHarnessEngineConfig.MAX_WEB_FETCH_BYTES)
                 val format = args.optionalString("format") ?: "text"
                 val background = args.boolean("run_in_background", false)
-                val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
+                val timeout = if (background) LocalHarnessEngineConfig.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else LocalHarnessEngineConfig.FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 if (background) {
                     startPersistentWebFetch(input, maxBytes, format, timeout)
                 } else {
@@ -5106,9 +5106,9 @@ class LocalHarnessEngine @Inject constructor(
                     url = args.string("url"),
                     headers = headers,
                     body = args.optionalString("body"),
-                    maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
-                        .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
-                    timeoutSeconds = FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS,
+                    maxBytes = args.int("max_bytes", LocalHarnessEngineConfig.DEFAULT_WEB_FETCH_BYTES)
+                        .coerceIn(16 * 1024, LocalHarnessEngineConfig.MAX_WEB_FETCH_BYTES),
+                    timeoutSeconds = LocalHarnessEngineConfig.FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }
             "download_file" -> {
@@ -5116,10 +5116,10 @@ class LocalHarnessEngine @Inject constructor(
                 webTools.download(
                 url = args.string("url"),
                 path = args.string("path"),
-                maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
-                    .coerceIn(1_024, MAX_DOWNLOAD_BYTES)
+                maxBytes = args.int("max_bytes", LocalHarnessEngineConfig.DEFAULT_DOWNLOAD_BYTES)
+                    .coerceIn(1_024, LocalHarnessEngineConfig.MAX_DOWNLOAD_BYTES)
                     .toLong(),
-                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
+                timeoutSeconds = LocalHarnessEngineConfig.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
             )
             }
             "json_query" -> webTools.jsonQuery(
@@ -5281,7 +5281,7 @@ class LocalHarnessEngine @Inject constructor(
                             interruptedJobSessionId(snapshot, targetSession) == targetSession
                         }
                         if (!remaining) break
-                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
+                        delay(LocalHarnessEngineConfig.PERSISTENT_RECOVERY_RETRY_MILLIS)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
@@ -5317,17 +5317,17 @@ class LocalHarnessEngine @Inject constructor(
                         val url = payload["url"]?.jsonPrimitive?.contentOrNull
                             ?: error("恢复任务缺少 url")
                         val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull
-                            ?: DEFAULT_WEB_FETCH_BYTES
+                            ?: LocalHarnessEngineConfig.DEFAULT_WEB_FETCH_BYTES
                         val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
                         val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
-                            ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
+                            ?.toLongOrNull() ?: LocalHarnessEngineConfig.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
                         jobs.resumePersistent(snapshot.id) { _, report ->
                             report("正在恢复网页抓取：$url")
                             webTools.fetch(
                                 url,
-                                maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
+                                maxBytes.coerceIn(16 * 1024, LocalHarnessEngineConfig.MAX_WEB_FETCH_BYTES),
                                 format,
-                                timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
+                                timeoutSeconds.coerceIn(30L, LocalHarnessEngineConfig.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
                             )
                         }
                     }
@@ -5671,7 +5671,7 @@ class LocalHarnessEngine @Inject constructor(
                 publishPreview = false,
                 maxAttemptsOverride = 1,
                 allowContextOverflowRecovery = false,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                temperature = LocalHarnessEngineConfig.CHAT_ROLEPLAY_TEMPERATURE,
             )
         },
         appendEvent = { type, data ->
@@ -5890,7 +5890,7 @@ class LocalHarnessEngine @Inject constructor(
         联网异常先诊断网络；缺失命令或运行时就说明限制，并改用现有能力完成可行部分。
         计划、任务、目标用于组织长期工作；记忆只保存稳定长期信息，禁止保存密钥、验证码等敏感或一次性内容。
         结果用清晰中文，完成后复核关键结果。
-        ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
+        ${if (_state.value.planMode) LocalHarnessEngineConfig.PLAN_MODE_PROMPT else ""}
     """.trimIndent()
 
     private fun withChatTurnContext(
@@ -5900,10 +5900,10 @@ class LocalHarnessEngine @Inject constructor(
     ): List<JsonObject> {
         if (stableContext.isBlank() && dynamicContext.isBlank()) return history
 
-        val dynamicReserve = minOf(CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
-        val stableBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
+        val dynamicReserve = minOf(LocalHarnessEngineConfig.CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
+        val stableBudget = (LocalHarnessEngineConfig.MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
         val stable = truncateWithoutSplittingSurrogatePair(stableContext, stableBudget)
-        val dynamicBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - stable.length).coerceAtLeast(0)
+        val dynamicBudget = (LocalHarnessEngineConfig.MAX_EPHEMERAL_CONTEXT_CHARS - stable.length).coerceAtLeast(0)
         val dynamic = truncateWithoutSplittingSurrogatePair(dynamicContext, dynamicBudget)
         val result = history.toMutableList()
 
@@ -5937,7 +5937,7 @@ class LocalHarnessEngine @Inject constructor(
         if (context.isBlank()) return history
         val insertion = buildJsonObject {
             put("role", "system")
-            put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(context, LocalHarnessEngineConfig.MAX_EPHEMERAL_CONTEXT_CHARS))
         }
         val result = history.toMutableList()
         val currentUserIndex = result.lastIndex.takeIf { index ->
@@ -5961,7 +5961,7 @@ class LocalHarnessEngine @Inject constructor(
         ) {
             selected += messages[1]
         }
-        messages.takeLast(CHAT_GUARD_REWRITE_TAIL_MESSAGES).forEach { message ->
+        messages.takeLast(LocalHarnessEngineConfig.CHAT_GUARD_REWRITE_TAIL_MESSAGES).forEach { message ->
             if (message !in selected) selected += message
         }
         return withTailEphemeralContext(selected, repairPrompt)
@@ -5974,7 +5974,7 @@ class LocalHarnessEngine @Inject constructor(
         if (context.isBlank()) return history
         val insertion = buildJsonObject {
             put("role", "system")
-            put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
+            put("content", truncateWithoutSplittingSurrogatePair(context, LocalHarnessEngineConfig.MAX_EPHEMERAL_CONTEXT_CHARS))
         }
         val index = if (
             history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
@@ -6031,7 +6031,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = modelHistoryChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             pendingInputs = pendingInputs.size(),
-            pendingInputLimit = MAX_PENDING_INPUTS,
+            pendingInputLimit = LocalHarnessEngineConfig.MAX_PENDING_INPUTS,
             commands = commands,
             runtimeStatuses = listOf(bundledNodeRuntime.status(), bundledPythonRuntime.status(), bundledGitRuntime.status()),
             recentDiagnostics = AppLog.snapshot(),
@@ -6073,7 +6073,7 @@ class LocalHarnessEngine @Inject constructor(
                     messages = if (messages.isEmpty()) {
                         state.messages
                     } else {
-                        (state.messages + messages).takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+                        (state.messages + messages).takeLast(LocalHarnessEngineConfig.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
                     },
                     transcriptIndex = if (messages.isEmpty()) {
                         state.transcriptIndex
@@ -6089,19 +6089,19 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun load() {
-        val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
+        val storedModel = preferences.getString(LocalHarnessEngineConfig.KEY_MODEL, LocalHarnessEngineConfig.DEFAULT_MODEL) ?: LocalHarnessEngineConfig.DEFAULT_MODEL
         val model = normalizeConfiguredModel(storedModel)
         if (model != storedModel) {
-            preferences.edit().putString(KEY_MODEL, model).apply()
+            preferences.edit().putString(LocalHarnessEngineConfig.KEY_MODEL, model).apply()
         }
-        val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
-        if (!preferences.contains(KEY_MODEL_PROFILES)) {
+        val baseUrl = preferences.getString(LocalHarnessEngineConfig.KEY_BASE_URL, LocalHarnessEngineConfig.DEFAULT_BASE_URL) ?: LocalHarnessEngineConfig.DEFAULT_BASE_URL
+        if (!preferences.contains(LocalHarnessEngineConfig.KEY_MODEL_PROFILES)) {
             val oldModels = if (apiKeys.hasLegacyCredential()) configuredModelNames(model) else emptyList()
             val profiles = oldModels.map { name ->
                 LocalModelProfile(modelProfileId(name, baseUrl), name, baseUrl)
             }
             // Save the routes before moving the legacy secret so interrupted migration can retry.
-            preferences.edit().putString(KEY_MODEL_PROFILES, encodeModelProfiles(profiles)).apply()
+            preferences.edit().putString(LocalHarnessEngineConfig.KEY_MODEL_PROFILES, encodeModelProfiles(profiles)).apply()
             apiKeys.migrate(profiles.map(LocalModelProfile::id))
         } else {
             apiKeys.migrate(readModelProfiles().filter { it.baseUrl == baseUrl }
@@ -6117,7 +6117,7 @@ class LocalHarnessEngine @Inject constructor(
         modelConfiguration.encodeProfiles(profiles)
 
     private fun configuredModelNames(currentModel: String): List<String> =
-        (preferences.getStringSet(KEY_CONFIGURED_MODELS, emptySet())
+        (preferences.getStringSet(LocalHarnessEngineConfig.KEY_CONFIGURED_MODELS, emptySet())
             .orEmpty() + currentModel)
             .map(String::trim)
             .filter(String::isNotBlank)
@@ -6129,8 +6129,8 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun loadSession(
         sessionId: String,
-        model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
-        baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
+        model: String = preferences.getString(LocalHarnessEngineConfig.KEY_MODEL, LocalHarnessEngineConfig.DEFAULT_MODEL) ?: LocalHarnessEngineConfig.DEFAULT_MODEL,
+        baseUrl: String = preferences.getString(LocalHarnessEngineConfig.KEY_BASE_URL, LocalHarnessEngineConfig.DEFAULT_BASE_URL) ?: LocalHarnessEngineConfig.DEFAULT_BASE_URL,
     ) {
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
@@ -6149,8 +6149,8 @@ class LocalHarnessEngine @Inject constructor(
         val recovery = eventLog.repairInterruptedTail()
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
-            eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
-                PROJECTION_BASELINE_EVENT,
+            eventLog.latest(LocalHarnessEngineConfig.PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
+                LocalHarnessEngineConfig.PROJECTION_BASELINE_EVENT,
                 buildJsonObject { put("source", "legacy-session-snapshot") },
             ).sequence
         } else {
@@ -6217,7 +6217,7 @@ class LocalHarnessEngine @Inject constructor(
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
             LocalConversationMode.INDEPENDENT -> null
             LocalConversationMode.PROJECT,
-            LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
+            LocalConversationMode.CONTINUATION -> LocalHarnessEngineConfig.LOCAL_PROJECT_ID
         }
         _state.value = LocalHarnessState(
             loading = false,
@@ -6226,9 +6226,9 @@ class LocalHarnessEngine @Inject constructor(
             baseUrl = baseUrl,
             configuredModels = readModelProfiles().map(LocalModelProfile::model).distinct().sorted(),
             modelProfiles = readModelProfiles(),
-            mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
-            modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
+            mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, LocalHarnessEngineConfig.DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
+            subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, LocalHarnessEngineConfig.DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
+            modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, LocalHarnessEngineConfig.DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
                     preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
@@ -6347,11 +6347,11 @@ class LocalHarnessEngine @Inject constructor(
      */
     private fun maybeCleanupUnreferencedLocalImages() {
         val now = System.currentTimeMillis()
-        val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
-        if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
+        val last = preferences.getLong(LocalHarnessEngineConfig.KEY_ATTACHMENT_GC_AT, 0L)
+        if (now - last < LocalHarnessEngineConfig.ATTACHMENT_GC_INTERVAL_MILLIS) return
         runCatching { cleanupUnreferencedLocalImages() }
             .onSuccess {
-                preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
+                preferences.edit().putLong(LocalHarnessEngineConfig.KEY_ATTACHMENT_GC_AT, now).apply()
             }
     }
 
@@ -6398,7 +6398,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun checkpointModelHistoryAtTurnBoundary(reason: String) {
         turnsSinceModelHistoryCheckpoint += 1
-        if (turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+        if (turnsSinceModelHistoryCheckpoint >= LocalHarnessEngineConfig.MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
             checkpointModelHistory(reason)
         }
     }
@@ -6440,83 +6440,5 @@ class LocalHarnessEngine @Inject constructor(
     private fun JsonObject.boolean(key: String, default: Boolean): Boolean =
         this[key]?.jsonPrimitive?.booleanOrNull ?: default
 
-    private companion object {
-        const val KEY_MODEL = "model"
-        const val KEY_CONFIGURED_MODELS = "configured_models"
-        const val KEY_MODEL_PROFILES = "model_profiles_v2"
-        const val KEY_BASE_URL = "base_url"
-        const val KEY_SESSION_ID = "session_id"
-        const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
-        const val DEFAULT_MODEL = "deepseek-flash"
-        const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-        const val DEFAULT_MAIN_MAX_STEPS = 16
-        const val DEFAULT_SUBAGENT_MAX_STEPS = 20
-        const val DEFAULT_MODEL_ATTEMPTS = 3
-        const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
-        const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
-        const val PERSISTENT_RECOVERY_RETRY_MILLIS = 500L
-        const val DEFAULT_DOWNLOAD_BYTES = 20 * 1024 * 1024
-        const val MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
-        const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
-        const val BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS = 240L
-        const val DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS = 30
-        const val DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS = 300
-        const val MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS = 120
-        const val MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS = 900
-        const val MAX_PATCH_CHARS = 512_000
-        const val MAX_TOOL_RESULT_CHARS = 50_000
-        const val MAX_EVENT_CHARS = 65_536
-        const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
-        const val MAX_HANDOFF_CHARS = 3_500
-        const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
-        const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
-        const val CHAT_RECENT_HISTORY_MESSAGES = 20
-        const val CHAT_ROLEPLAY_TEMPERATURE = 0.85
-        const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
-        const val MAX_PENDING_INPUTS = 16
-        const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
-        const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
-        const val MAX_STREAM_PREVIEW_CHARS = 4_096
-        const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
-        const val STREAM_PREVIEW_INTERVAL_MS = 50L
-        const val CHAT_POST_TURN_MODEL_STEP = 10_000
-        const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
-        const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
-        const val LOCAL_PROJECT_ID = "local-workspace"
-        const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
 
-
-        val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
-            "android_vscreen_status",
-            "android_vscreen_launch",
-            "android_vscreen_tap",
-            "android_vscreen_swipe",
-            "android_vscreen_screenshot",
-            "vision_analyze_vscreen",
-        )
-        val SUBAGENT_EXCLUDED_TOOLS = setOf(
-            "subagent", "subagent_fork", "workflow", "ask_user_question",
-            "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
-            "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
-            "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
-            "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
-            "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
-            "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
-            "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
-        )
-
-        val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
-
-        val PLAN_MODE_BLOCKED_TOOLS = setOf(
-            "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",
-            "bash", "run_shell", "job_kill", "todo_write",
-            "create_goal", "update_goal", "subagent", "spawn_subagent", "subagent_fork", "fork_subagent",
-            "workflow", "present", "send_message", "interrupt_agent",
-        )
-
-        val PLAN_MODE_PROMPT = """
-            当前处于规划模式。只允许读取、搜索和分析；禁止修改文件、执行命令、启动会改变状态的子任务或交付成果。
-            完成决策充分的计划后，必须把完整计划作为 exit_plan_mode 的唯一工具调用提交给用户审批。
-        """.trimIndent()
-    }
 }
