@@ -178,7 +178,7 @@ class LocalTranscriptRuntimeIndexTest {
             ),
         )
 
-        assertFalse(index.branchingEligible)
+        assertTrue(index.branchingEligible)
     }
 
     @Test
