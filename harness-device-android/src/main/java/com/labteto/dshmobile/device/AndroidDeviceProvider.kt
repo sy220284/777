@@ -76,8 +76,16 @@ class AndroidDeviceProvider(
             "device_info" -> deviceInfo()
             "shizuku_status" -> shizukuStatus()
             "shizuku_request_permission" -> {
-                shizuku.requestPermission(arguments["request_code"]?.toIntOrNull() ?: 771)
-                "已请求 Shizuku 权限"
+                val status = shizuku.state()
+                require(status.binderAlive) {
+                    "Shizuku 服务未运行。请先打开 Shizuku 并启动服务（无线调试或 ADB），确认 android_privilege_status 返回 binder_alive=true 后再请求权限"
+                }
+                if (status.permissionGranted) {
+                    "Shizuku 权限已就绪，无需重复请求"
+                } else {
+                    shizuku.requestPermission(arguments["request_code"]?.toIntOrNull() ?: 771)
+                    "已请求 Shizuku 权限；请完成系统授权弹窗后再次调用 android_privilege_status 确认 permission=true"
+                }
             }
             "app_list" -> appList()
             "app_info" -> appInfo(arguments.required("package"))
@@ -235,7 +243,12 @@ class AndroidDeviceProvider(
 
     private fun shizukuStatus(): String {
         val state = shizuku.state()
-        return "binder_alive=${state.binderAlive}\npermission=${state.permissionGranted}\nuid=${state.uid ?: -1}"
+        val nextAction = when {
+            !state.binderAlive -> "请先打开 Shizuku 并启动服务（无线调试或 ADB），然后重试"
+            !state.permissionGranted -> "调用 android_privilege_request，并完成系统授权弹窗"
+            else -> "ready"
+        }
+        return "binder_alive=${state.binderAlive}\npermission=${state.permissionGranted}\nuid=${state.uid ?: -1}\nnext_action=$nextAction"
     }
 
     private suspend fun appList(): String = withContext(Dispatchers.IO) {
@@ -402,7 +415,9 @@ class AndroidDeviceProvider(
 
     private fun accessibility(): HarnessAccessibilityService =
         HarnessAccessibilityService.active()
-            ?: error("无障碍服务未授权或未连接")
+            ?: error(
+                "无障碍服务未授权或未连接。请在 Android 系统设置的无障碍页面启用 777 服务，返回应用后重试；若已启用仍不可用，请关闭后重新启用一次",
+            )
 
     private fun Map<String, String>.required(key: String): String =
         this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
