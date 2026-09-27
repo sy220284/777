@@ -81,6 +81,24 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun firstUserMessageCanBeEditedAndReplacesTheEntireFollowingConversation() {
+        val firstUser = message("u1", "user", "第一条", 1)
+        val firstAnswer = message("a1", "assistant", "第一答", 2)
+        val secondUser = message("u2", "user", "第二条", 3)
+        val secondAnswer = message("a2", "assistant", "第二答", 4)
+        val edited = message("edited-u1", "user", "修改后的第一条", 5)
+
+        val rewritten = rewriteChatTranscriptFromUserEdit(
+            activeMessages = listOf(firstUser, firstAnswer, secondUser, secondAnswer),
+            originalMessageId = firstUser.id,
+            editedMessage = edited,
+        )!!
+
+        assertEquals(listOf("edited-u1"), rewritten.map { it.id })
+        assertEquals("修改后的第一条", rewritten.single().content)
+    }
+
+    @Test
     fun historicalUserEditDropsOriginalTurnAndEveryLaterMessage() {
         val transcript = (1..100).map { index ->
             message(
