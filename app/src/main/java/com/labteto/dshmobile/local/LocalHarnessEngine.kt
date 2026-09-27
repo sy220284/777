@@ -62,7 +62,8 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.ChatSceneRuntime
+import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
+import com.labteto.dshmobile.local.chat.ChatReplyContinuityGuard
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
@@ -2510,67 +2511,47 @@ class LocalHarnessEngine @Inject constructor(
                 val proactiveScene = session.chatContext
                     .withLegacyFallback(session.chatState)
                     .scene
-                var proactiveCheck = ChatSceneRuntime.inspectReply(
+                reply = ChatReplyContinuityGuard.enforce(
                     previous = proactiveScene,
                     userMessage = "",
-                    assistantMessage = content,
-                )
-                if (!proactiveCheck.accepted) {
-                    boundEventLog.append("chat/continuity-guard", buildJsonObject {
-                        put("action", "proactive-retry")
-                        put("automation", true)
-                        put("proactive", true)
-                        put("location", proactiveScene.location)
-                    })
-                    val continuityRetry = completeAutomationChat(
-                        key = key,
-                        snapshot = boundState,
-                        messages = withEphemeralContext(
-                            requestMessages,
-                            buildString {
-                                appendLine("【主动互动场景连续性修复】")
-                                appendLine("刚才候选消息无过渡改变了当前场景，因此未展示。")
-                                if (proactiveScene.location.isNotBlank()) {
-                                    appendLine("当前已确认地点：${proactiveScene.location}")
-                                }
-                                if (proactiveScene.sceneTime.isNotBlank()) {
-                                    appendLine("当前已确认时间：${proactiveScene.sceneTime}")
-                                }
-                                appendLine("重新生成主动消息；若确实需要换地点，先自然写出实际移动、进入、返回或明确时间/场景过渡。")
-                                append("只输出角色最终消息。")
+                    initial = reply,
+                    mode = ChatContinuityGuardMode.PROACTIVE,
+                    contentOf = { candidate -> candidate.content.orEmpty().trim() },
+                    retry = { repairHint ->
+                        val retryRaw = completeAutomationChat(
+                            key = key,
+                            snapshot = boundState,
+                            messages = withEphemeralContext(requestMessages, repairHint),
+                        )
+                        chatTurnCoordinator.finalize(
+                            snapshot = boundState,
+                            persona = persona,
+                            reply = retryRaw,
+                            recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                            onGuardEvent = { action, violations ->
+                                recordStyleGuardHits(violations)
+                                boundEventLog.append("chat/style-guard", buildJsonObject {
+                                    put("action", action)
+                                    put("automation", true)
+                                    put("proactive", true)
+                                    put("continuity_retry", true)
+                                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                                })
                             },
-                        ),
-                    )
-                    reply = chatTurnCoordinator.finalize(
-                        snapshot = boundState,
-                        persona = persona,
-                        reply = continuityRetry,
-                        recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
-                        onGuardEvent = { action, violations ->
-                            recordStyleGuardHits(violations)
-                            boundEventLog.append("chat/style-guard", buildJsonObject {
-                                put("action", action)
-                                put("automation", true)
-                                put("proactive", true)
-                                put("continuity_retry", true)
-                                put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                            })
-                        },
-                    )
-                    content = reply.content.orEmpty().trim()
-                    require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
-                    proactiveCheck = ChatSceneRuntime.inspectReply(
-                        previous = proactiveScene,
-                        userMessage = "",
-                        assistantMessage = content,
-                    )
-                    require(proactiveCheck.accepted) { "角色主动消息连续两次违反当前场景连续性" }
-                    boundEventLog.append("chat/continuity-guard", buildJsonObject {
-                        put("action", "proactive-repaired")
-                        put("automation", true)
-                        put("proactive", true)
-                    })
-                }
+                        )
+                    },
+                    onEvent = { action, check ->
+                        boundEventLog.append("chat/continuity-guard", buildJsonObject {
+                            put("action", action)
+                            put("automation", true)
+                            put("proactive", true)
+                            put("location", proactiveScene.location)
+                            put("violation_count", check.violations.size)
+                        })
+                    },
+                )
+                content = reply.content.orEmpty().trim()
+                require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
 
                 val proactiveMessage = LocalHarnessMessage(
                     id = UUID.randomUUID().toString(),
@@ -3487,50 +3468,40 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
 
-            var finalContent = finalizeGroupCandidate(rawReply)
             val groupScene = snapshot.groupChat.context
                 .withLegacyFallback(member.chatState)
                 .scene
-            var continuityCheck = ChatSceneRuntime.inspectReply(
+            val finalContent = ChatReplyContinuityGuard.enforce(
                 previous = groupScene,
                 userMessage = input,
-                assistantMessage = finalContent,
+                initial = finalizeGroupCandidate(rawReply),
+                mode = ChatContinuityGuardMode.GROUP,
+                contentOf = { content -> content },
+                retry = { repairHint ->
+                    finalizeGroupCandidate(
+                        completeWithRetry(
+                            key = key,
+                            snapshot = snapshot,
+                            messages = withTailEphemeralContext(requestMessages, repairHint),
+                            step = 100 + index,
+                            toolsOverride = JsonArray(emptyList()),
+                            publishPreview = false,
+                            maxAttemptsOverride = 1,
+                            allowContextOverflowRecovery = false,
+                            temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                        ),
+                    )
+                },
+                onEvent = { action, check ->
+                    eventLog.append("chat/continuity-guard", buildJsonObject {
+                        put("step", 100 + index)
+                        put("action", action)
+                        put("group_gallery_id", member.galleryId)
+                        put("location", groupScene.location)
+                        put("violation_count", check.violations.size)
+                    })
+                },
             )
-            if (!continuityCheck.accepted) {
-                eventLog.append("chat/continuity-guard", buildJsonObject {
-                    put("step", 100 + index)
-                    put("action", "group-retry")
-                    put("group_gallery_id", member.galleryId)
-                    put("location", groupScene.location)
-                })
-                val repairHint = buildString {
-                    appendLine("【群聊场景连续性修复】")
-                    appendLine("刚才候选回复无过渡改变了人物所在场景，因此未展示。")
-                    if (groupScene.location.isNotBlank()) appendLine("当前共享地点：${groupScene.location}")
-                    appendLine("重新生成该角色本轮发言；若要换地点，必须自然写出实际移动或明确场景过渡。")
-                    append("只输出该角色最终发言。")
-                }
-                val retryRaw = completeWithRetry(
-                    key = key,
-                    snapshot = snapshot,
-                    messages = withTailEphemeralContext(requestMessages, repairHint),
-                    step = 100 + index,
-                    toolsOverride = JsonArray(emptyList()),
-                    publishPreview = false,
-                    maxAttemptsOverride = 1,
-                    allowContextOverflowRecovery = false,
-                    temperature = CHAT_ROLEPLAY_TEMPERATURE,
-                )
-                finalContent = finalizeGroupCandidate(retryRaw)
-                continuityCheck = ChatSceneRuntime.inspectReply(
-                    previous = groupScene,
-                    userMessage = input,
-                    assistantMessage = finalContent,
-                )
-                if (!continuityCheck.accepted) {
-                    throw IllegalStateException("群聊角色回复连续两次违反当前场景连续性")
-                }
-            }
 
             eventLog.append("group/agent-latency", buildJsonObject {
                 put("gallery_id", member.galleryId)
@@ -5802,84 +5773,56 @@ class LocalHarnessEngine @Inject constructor(
         val persona = chatTurnCoordinator.persona(snapshot)
         suspend fun finalizeCandidate(candidate: LocalModelReply): LocalModelReply =
             chatTurnCoordinator.finalize(
-                    snapshot = snapshot,
-                    persona = persona,
-                    reply = candidate,
-                    recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
-                    onGuardEvent = { action, violations ->
-                        recordStyleGuardHits(violations)
-                        eventLog.append("chat/style-guard", buildJsonObject {
-                            put("step", step)
-                            put("action", action)
-                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                        })
-                    },
-                )
-
-        val first = finalizeCandidate(reply)
-        val scene = snapshot.chatContext.withLegacyFallback(snapshot.chatState).scene
-        val firstCheck = ChatSceneRuntime.inspectReply(
-            previous = scene,
-            userMessage = userMessage,
-            assistantMessage = first.content.orEmpty(),
-        )
-        if (firstCheck.accepted) return first
-
-        eventLog.append("chat/continuity-guard", buildJsonObject {
-            put("step", step)
-            put("action", "retry")
-            put("location", scene.location)
-            put(
-                "violations",
-                JsonArray(firstCheck.violations.map { violation ->
-                    JsonPrimitive("${violation.code}:${violation.expected}->${violation.observed}")
-                }),
+                snapshot = snapshot,
+                persona = persona,
+                reply = candidate,
+                recordUsage = { usage -> usageTracker.record(snapshot.model, usage) },
+                onGuardEvent = { action, violations ->
+                    recordStyleGuardHits(violations)
+                    eventLog.append("chat/style-guard", buildJsonObject {
+                        put("step", step)
+                        put("action", action)
+                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                    })
+                },
             )
-        })
 
-        val repairHint = buildString {
-            appendLine("【场景连续性修复】")
-            appendLine("上一条候选回复出现了没有移动过程的场景跳转，因此未展示。")
-            if (scene.location.isNotBlank()) appendLine("当前已确认地点：${scene.location}")
-            if (scene.sceneTime.isNotBlank()) appendLine("当前已确认时间：${scene.sceneTime}")
-            appendLine("重新生成本轮角色回复。若确实要换地点，请在回复中自然写出实际移动、进入、返回或明确的时间/场景过渡；若无需换场，继续留在当前地点。")
-            append("只输出角色最终回复，不解释修复过程。")
-        }
-        val retryRaw = completeWithRetry(
-            key = key,
-            snapshot = snapshot,
-            messages = withEphemeralContext(messages, repairHint),
-            step = step,
-            toolsOverride = JsonArray(emptyList()),
-            publishPreview = false,
-            maxAttemptsOverride = 1,
-            allowContextOverflowRecovery = false,
-            temperature = CHAT_ROLEPLAY_TEMPERATURE,
-        )
-        val retry = finalizeCandidate(retryRaw)
-        val retryCheck = ChatSceneRuntime.inspectReply(
+        val scene = snapshot.chatContext.withLegacyFallback(snapshot.chatState).scene
+        return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = userMessage,
-            assistantMessage = retry.content.orEmpty(),
-        )
-        if (!retryCheck.accepted) {
-            eventLog.append("chat/continuity-guard", buildJsonObject {
-                put("step", step)
-                put("action", "rejected")
-                put(
-                    "violations",
-                    JsonArray(retryCheck.violations.map { violation ->
-                        JsonPrimitive("${violation.code}:${violation.expected}->${violation.observed}")
-                    }),
+            initial = finalizeCandidate(reply),
+            mode = ChatContinuityGuardMode.DIRECT,
+            contentOf = { candidate -> candidate.content.orEmpty() },
+            retry = { repairHint ->
+                finalizeCandidate(
+                    completeWithRetry(
+                        key = key,
+                        snapshot = snapshot,
+                        messages = withEphemeralContext(messages, repairHint),
+                        step = step,
+                        toolsOverride = JsonArray(emptyList()),
+                        publishPreview = false,
+                        maxAttemptsOverride = 1,
+                        allowContextOverflowRecovery = false,
+                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                    ),
                 )
-            })
-            throw IllegalStateException("角色回复连续两次违反当前场景连续性，请重试本轮。")
-        }
-        eventLog.append("chat/continuity-guard", buildJsonObject {
-            put("step", step)
-            put("action", "repaired")
-        })
-        return retry
+            },
+            onEvent = { action, check ->
+                eventLog.append("chat/continuity-guard", buildJsonObject {
+                    put("step", step)
+                    put("action", action)
+                    put("location", scene.location)
+                    put(
+                        "violations",
+                        JsonArray(check.violations.map { violation ->
+                            JsonPrimitive("${violation.code}:${violation.expected}->${violation.observed}")
+                        }),
+                    )
+                })
+            },
+        )
     }
 
     private suspend fun completeWithRetry(
