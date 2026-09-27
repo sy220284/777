@@ -107,6 +107,31 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun historicalEditReplayDoesNotKeepDeletedFutureLocation() {
+        val retained = listOf(
+            message("u1", "user", "进去说吧。", 1),
+            message("a1", "assistant", "她和你一起走进房间。", 2),
+        )
+        val deletedFuture = retained + listOf(
+            message("u2", "user", "出去走走。", 3),
+            message("a2", "assistant", "两人一起走到院子。", 4),
+        )
+
+        val beforeEdit = replayHardChatContextFromTranscript(
+            messages = deletedFuture,
+            generation = 1L,
+        )
+        val afterEdit = replayHardChatContextFromTranscript(
+            messages = retained,
+            generation = 2L,
+        )
+
+        assertEquals("院子", beforeEdit.scene.location)
+        assertEquals("房间", afterEdit.scene.location)
+        assertTrue(afterEdit.sceneEvents.none { it.to == "院子" })
+    }
+
+    @Test
     fun linearChatDoesNotMaterializeDuplicateBranchHistory() {
         val user = message("u1", "user", "你好", 1)
         val reply = message("a1", "assistant", "你好。", 2)
