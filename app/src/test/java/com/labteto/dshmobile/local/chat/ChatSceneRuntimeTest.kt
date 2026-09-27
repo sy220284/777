@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -158,4 +159,43 @@ class ChatSceneRuntimeTest {
         assertEquals("房间", twice.scene.location)
         assertEquals(once.sceneEvents, twice.sceneEvents)
     }
+
+    @Test
+    fun continuityGuardRetriesOnceAndReturnsRepairedReply() = runBlocking {
+        var retries = 0
+        val result = ChatReplyContinuityGuard.enforce(
+            previous = ChatSceneState(location = "院子"),
+            userMessage = "继续。",
+            initial = "她坐在卧室床边看着你。",
+            mode = ChatContinuityGuardMode.DIRECT,
+            contentOf = { it },
+            retry = {
+                retries += 1
+                "她仍站在院子里，顺着刚才的话继续说下去。"
+            },
+        )
+
+        assertEquals(1, retries)
+        assertEquals("她仍站在院子里，顺着刚才的话继续说下去。", result)
+    }
+
+    @Test
+    fun continuityGuardRejectsSecondUnbridgedSceneJump() = runBlocking {
+        var rejected = false
+        try {
+            ChatReplyContinuityGuard.enforce(
+                previous = ChatSceneState(location = "院子"),
+                userMessage = "继续。",
+                initial = "她坐在卧室床边看着你。",
+                mode = ChatContinuityGuardMode.DIRECT,
+                contentOf = { it },
+                retry = { "她躺在书房沙发上继续说。" },
+            )
+        } catch (_: IllegalStateException) {
+            rejected = true
+        }
+
+        assertTrue(rejected)
+    }
+
 }
