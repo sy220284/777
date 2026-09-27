@@ -239,15 +239,17 @@ internal fun LocalMessageRow(
                         branchInfo = branchInfo,
                         onSelectVariant = onSelectVariant,
                     )
-                    DsIconButton(
-                        icon = Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.common_copy),
-                        onClick = {
-                            clipboard.setText(AnnotatedString(editableChatUserText(message)))
-                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                        },
-                        tint = colors.labelTertiary.copy(alpha = 0.78f),
-                    )
+                    editableChatUserText(message).takeIf(String::isNotBlank)?.let { copyText ->
+                        DsIconButton(
+                            icon = Icons.Outlined.ContentCopy,
+                            contentDescription = stringResource(R.string.common_copy),
+                            onClick = {
+                                clipboard.setText(AnnotatedString(copyText))
+                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                            },
+                            tint = colors.labelTertiary.copy(alpha = 0.78f),
+                        )
+                    }
                     DsIconButton(
                         icon = FeatherIcons.Edit3,
                         contentDescription = stringResource(R.string.local_edit_user_message),
