@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import java.io.File
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -217,6 +218,9 @@ internal fun LocalMessageRow(
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copiedMessage = stringResource(R.string.chat_copy_success)
+    val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
 
     when (message.role) {
         "user" -> Column(
@@ -234,6 +238,15 @@ internal fun LocalMessageRow(
                         messageId = message.id,
                         branchInfo = branchInfo,
                         onSelectVariant = onSelectVariant,
+                    )
+                    DsIconButton(
+                        icon = Icons.Outlined.ContentCopy,
+                        contentDescription = stringResource(R.string.common_copy),
+                        onClick = {
+                            clipboard.setText(AnnotatedString(editableChatUserText(message)))
+                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        },
+                        tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
                     DsIconButton(
                         icon = FeatherIcons.Edit3,
@@ -297,13 +310,20 @@ internal fun LocalMessageRow(
                     DsIconButton(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.chat_copy_answer),
-                        onClick = { clipboard.setText(AnnotatedString(visibleContent)) },
+                        onClick = {
+                            clipboard.setText(AnnotatedString(visibleContent))
+                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        },
                         tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
                     if (canRegenerate) DsIconButton(
                         icon = Icons.Outlined.Refresh,
                         contentDescription = stringResource(R.string.local_regenerate_reply),
-                        onClick = { onRegenerate(message.id) },
+                        onClick = {
+                            if (!onRegenerate(message.id)) {
+                                Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
                 }
