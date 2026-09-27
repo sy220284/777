@@ -148,7 +148,16 @@ internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): Cha
 
 internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState): ChatCharacterState =
     copy(
-        scene = context.scene,
+        scene = context.scene.copy(
+            // Planner may read hard time/location, but legacy soft scene details have no
+            // deterministic provenance and must not leak back into continuity summaries.
+            participants = emptyList(),
+            positions = emptyList(),
+            activeActions = emptyList(),
+            keyObjects = emptyList(),
+            currentEvent = "",
+            lastSceneChange = "",
+        ),
         continuity = context.continuity,
     )
 
