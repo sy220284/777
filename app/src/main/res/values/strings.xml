@@ -223,6 +223,7 @@
     <string name="workflow_failed">Failed</string>
     <string name="skills_title">Skills</string>
     <string name="skills_user_only">User only</string>
+    <string name="skills_empty">No skills in this session</string>
     <string name="models_title">Models</string>
     <string name="models_current">Current model</string>
     <string name="models_reasoning_effort">Reasoning effort</string>
