@@ -1808,7 +1808,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             val accepted = pendingInputs.offer(queuedInput)
             if (!accepted) {
-                _state.update { it.copy(error = "当前执行中的补充消息已达到 $LocalHarnessEngineConfig.MAX_PENDING_INPUTS 条上限") }
+                _state.update { it.copy(error = "当前执行中的补充消息已达到 ${LocalHarnessEngineConfig.MAX_PENDING_INPUTS} 条上限") }
                 return@synchronized null
             }
             recordUserTranscript(
