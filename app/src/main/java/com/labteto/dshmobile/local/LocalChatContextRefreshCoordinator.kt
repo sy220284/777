@@ -41,14 +41,11 @@ internal class LocalChatContextRefreshCoordinator(
         boundEventLog: LocalSessionEventLog,
     ): Long? {
         if (state.value.sessionId != expectedSessionId) return null
-        val sequence = boundEventLog.events().toList().asReversed()
-            .firstOrNull { event ->
-                event.type == "assistant/message" &&
-                    decodeTranscriptMessages(event.data).orEmpty()
-                        .any { message -> message.id == expectedAssistantMessageId }
-            }
-            ?.sequence
-            ?: return null
+        val sequence = findTranscriptEventSequence(
+            eventLog = boundEventLog,
+            type = "assistant/message",
+            messageId = expectedAssistantMessageId,
+        ) ?: return null
 
         var generation: Long? = null
         state.update { current ->
@@ -204,7 +201,32 @@ internal class LocalChatContextRefreshCoordinator(
         persist()
     }
 
+    private fun findTranscriptEventSequence(
+        eventLog: LocalSessionEventLog,
+        type: String,
+        messageId: String,
+    ): Long? {
+        var beforeSequenceExclusive = Long.MAX_VALUE
+        while (true) {
+            val page = eventLog.pageBefore(
+                sequenceExclusive = beforeSequenceExclusive,
+                limit = EVENT_SCAN_PAGE_SIZE,
+            )
+            if (page.isEmpty()) return null
+            page.asReversed().firstOrNull { event ->
+                event.type == type &&
+                    decodeTranscriptMessages(event.data).orEmpty()
+                        .any { message -> message.id == messageId }
+            }?.let { return it.sequence }
+
+            val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+            if (page.size < EVENT_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
+            beforeSequenceExclusive = oldestSequence
+        }
+    }
+
     private companion object {
         const val PENDING_BATCH = 8
+        const val EVENT_SCAN_PAGE_SIZE = 200
     }
 }
