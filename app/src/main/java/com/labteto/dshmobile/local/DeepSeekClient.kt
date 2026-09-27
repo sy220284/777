@@ -414,8 +414,8 @@ object LocalToolCatalog {
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
-            "timeout_seconds" to integer("超时秒数；前台默认 30/最大 120，后台默认 300/最大 900"),
-            "run_in_background" to boolean("是否转为后台任务，默认 false"),
+            "timeout_seconds" to integer("进程执行超时秒数；前台默认 30/最大 120，后台默认 300/最大 900；会话切换等主动取消不受该值约束"),
+            "run_in_background" to boolean("是否转为后台任务，默认 false；普通后台 shell 属当前会话非持久任务，创建、切换或删除会话时会取消"),
         ), listOf("command")))
         add(tool("job_list", "列出本机会话创建的后台任务", properties()))
         add(tool("job_output", "读取后台任务状态和输出", properties(
