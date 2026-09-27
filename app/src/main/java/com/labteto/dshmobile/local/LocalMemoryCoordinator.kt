@@ -21,10 +21,15 @@ internal class LocalMemoryCoordinator(
     private val eventLog: () -> LocalSessionEventLog,
     private val persist: () -> Unit,
 ) {
-    suspend fun captureAutoMemoryDirective(text: String) {
+    suspend fun captureAutoMemoryDirective(
+        text: String,
+        explicitSourceMessageId: String? = null,
+    ) {
         val snapshot = state.value
         if (!snapshot.autoMemory || text.isBlank()) return
-        val sourceMessageId = snapshot.transcriptIndex.latestUserMessageId
+        val sourceMessageId = explicitSourceMessageId
+            ?.takeIf(String::isNotBlank)
+            ?: snapshot.transcriptIndex.latestUserMessageId
 
         val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
             if (snapshot.groupChat.enabled) {
