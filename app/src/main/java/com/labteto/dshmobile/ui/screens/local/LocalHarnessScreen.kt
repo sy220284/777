@@ -615,75 +615,6 @@ private fun LocalModeDrawer(
                         shape = DsShapes.block,
                     )
                 }
-
-                DsGroupCard {
-                    if (usageMode == LocalUsageMode.CHAT) {
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.PersonSearch,
-                            title = stringResource(R.string.local_group_chat),
-                            trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
-                            iconFamily = DsIconFamily.Purple,
-                            onClick = onOpenGroupChat,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Image,
-                            title = stringResource(R.string.persona_gallery_title),
-                            trailing = galleryCount.toString(),
-                            iconFamily = DsIconFamily.Purple,
-                            onClick = onOpenPersonaGallery,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Filled.Add,
-                            title = stringResource(R.string.local_persona_picker_new),
-                            iconFamily = DsIconFamily.Green,
-                            onClick = onNewPersona,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Schedule,
-                            title = stringResource(R.string.tasks_chat_title),
-                            iconFamily = DsIconFamily.Amber,
-                            onClick = onTasks,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Extension,
-                            title = stringResource(R.string.tools_title),
-                            iconFamily = DsIconFamily.Neutral,
-                            onClick = onTools,
-                        )
-                    } else {
-                        DrawerPrimaryAction(
-                            icon = FeatherIcons.FileText,
-                            title = stringResource(R.string.chatlist_workspace_files),
-                            iconFamily = DsIconFamily.Cyan,
-                            onClick = onWorkspaceFiles,
-                        )
-                        DrawerPrimaryAction(
-                            icon = FeatherIcons.CheckSquare,
-                            title = stringResource(R.string.local_run_center),
-                            iconFamily = DsIconFamily.Green,
-                            onClick = onOpenRunCenter,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Schedule,
-                            title = stringResource(R.string.tasks_title),
-                            iconFamily = DsIconFamily.Amber,
-                            onClick = onTasks,
-                        )
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Extension,
-                            title = stringResource(R.string.tools_title),
-                            iconFamily = DsIconFamily.Neutral,
-                            onClick = onTools,
-                        )
-                    }
-                }
-                DrawerSectionTitle(
-                    title = stringResource(
-                        if (usageMode == LocalUsageMode.CHAT) R.string.chatlist_title
-                        else R.string.local_work_history_title,
-                    ),
-                    count = filteredSessions.size,
-                )
             }
 
             LazyColumn(
@@ -694,6 +625,78 @@ private fun LocalModeDrawer(
                 contentPadding = PaddingValues(bottom = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
+                item(key = "drawer-actions") {
+                    DsGroupCard {
+                        if (usageMode == LocalUsageMode.CHAT) {
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.PersonSearch,
+                                title = stringResource(R.string.local_group_chat),
+                                trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
+                                iconFamily = DsIconFamily.Purple,
+                                onClick = onOpenGroupChat,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Image,
+                                title = stringResource(R.string.persona_gallery_title),
+                                trailing = galleryCount.toString(),
+                                iconFamily = DsIconFamily.Purple,
+                                onClick = onOpenPersonaGallery,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Filled.Add,
+                                title = stringResource(R.string.local_persona_picker_new),
+                                iconFamily = DsIconFamily.Green,
+                                onClick = onNewPersona,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_chat_title),
+                                iconFamily = DsIconFamily.Amber,
+                                onClick = onTasks,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Extension,
+                                title = stringResource(R.string.tools_title),
+                                iconFamily = DsIconFamily.Neutral,
+                                onClick = onTools,
+                            )
+                        } else {
+                            DrawerPrimaryAction(
+                                icon = FeatherIcons.FileText,
+                                title = stringResource(R.string.chatlist_workspace_files),
+                                iconFamily = DsIconFamily.Cyan,
+                                onClick = onWorkspaceFiles,
+                            )
+                            DrawerPrimaryAction(
+                                icon = FeatherIcons.CheckSquare,
+                                title = stringResource(R.string.local_run_center),
+                                iconFamily = DsIconFamily.Green,
+                                onClick = onOpenRunCenter,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_title),
+                                iconFamily = DsIconFamily.Amber,
+                                onClick = onTasks,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Extension,
+                                title = stringResource(R.string.tools_title),
+                                iconFamily = DsIconFamily.Neutral,
+                                onClick = onTools,
+                            )
+                        }
+                    }
+                }
+                item(key = "drawer-history-heading") {
+                    DrawerSectionTitle(
+                        title = stringResource(
+                            if (usageMode == LocalUsageMode.CHAT) R.string.chatlist_title
+                            else R.string.local_work_history_title,
+                        ),
+                        count = filteredSessions.size,
+                    )
+                }
                 if (visibleSessions.isNotEmpty() && filteredSessions.isEmpty()) {
                     item(key = "drawer-no-sessions") {
                         Text(
