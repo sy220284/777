@@ -182,6 +182,53 @@ class SessionEventLogTest {
         }
     }
 
+
+    @Test
+    fun searchIsBoundedAndPaginatesBySequence() {
+        val directory = Files.createTempDirectory("harness-event-search-page").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })
+            repeat(5) { index ->
+                log.append("test/event", buildJsonObject { put("value", "needle-$index") })
+            }
+
+            val first = log.search("needle", limit = 2)
+            assertTrue(first.contains("0: "))
+            assertTrue(first.contains("1: "))
+            assertTrue(!first.contains("2: "))
+            assertTrue(first.contains("after_sequence=1"))
+
+            val second = log.search("needle", limit = 2, afterSequence = 1L)
+            assertTrue(second.contains("2: "))
+            assertTrue(second.contains("3: "))
+            assertTrue(!second.contains("0: "))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun searchHardCapsOversizedMatchingEvents() {
+        val directory = Files.createTempDirectory("harness-event-search-bound").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 100_000, clock = { 1L })
+            log.append(
+                "test/event",
+                buildJsonObject { put("value", "needle-" + "x".repeat(20_000)) },
+            )
+
+            val result = log.search("needle", maxChars = 4_096)
+
+            assertTrue(result.length <= 4_096)
+            assertTrue(result.contains("session_event_read"))
+            assertTrue(result.contains("after_sequence=0"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test
     fun latestOfReturnsNewestMatchingRelevantType() {
         val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
