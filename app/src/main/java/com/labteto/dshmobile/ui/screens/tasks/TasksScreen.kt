@@ -306,7 +306,6 @@ fun TasksScreen(
     }
     val chatMode = taskMode == AutomationMode.CHAT
     val visibleTasks = state.tasks.filter { it.mode == taskMode }
-    val context = LocalContext.current
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by rememberSaveable { mutableStateOf(false) }
     val editingTaskIdState = rememberSaveable { mutableStateOf<String?>(null) }
@@ -380,7 +379,38 @@ fun TasksScreen(
                 title = stringResource(
                     if (chatMode) R.string.tasks_chat_title else R.string.tasks_title,
                 ),
-                subtitle = stringReso            if (showCreate) {
+                subtitle = stringResource(
+                    if (chatMode) R.string.tasks_chat_subtitle else R.string.tasks_subtitle,
+                ),
+                onBack = onClose,
+                backContentDescription = stringResource(R.string.common_back),
+                actionIcon = Icons.Filled.Add,
+                actionContentDescription = stringResource(
+                    if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
+                ),
+                onAction = {
+                    if (showCreate && editingTaskId == null) {
+                        resetEditor()
+                    } else {
+                        showCreate = true
+                        editingTaskId = null
+                        prompt = ""
+                        cadence = AutomationCadence.ONCE
+                        firstRunAt = System.currentTimeMillis() + 60L * 60_000L
+                        customHours = "6"
+                        windowStartMinuteOfDay = 20 * 60
+                        windowEndMinuteOfDay = 22 * 60
+                        quietHoursEnabled = true
+                        quietStartMinuteOfDay = 23 * 60
+                        quietEndMinuteOfDay = 7 * 60
+                        proactiveMinGapHours = 6
+                        proactiveMaxUnanswered = 2
+                        createError = null
+                    }
+                },
+            )
+
+            if (showCreate) {
                 TaskEditorPane(
                     state = editorStateRefs,
                     chatMode = chatMode,
@@ -390,31 +420,6 @@ fun TasksScreen(
                     createInvalidMessage = createInvalidMessage,
                     onReset = resetEditor,
                 )
-            }.WINDOW
-                                        },
-                                        windowEndMinuteOfDay = windowEndMinuteOfDay.takeIf {
-                                            cadence == AutomationCadence.WINDOW
-                                        },
-                                        quietHoursEnabled = chatMode && quietHoursEnabled,
-                                        quietStartHour = quietStartMinuteOfDay / 60,
-                                        quietStartMinute = quietStartMinuteOfDay % 60,
-                                        quietEndHour = quietEndMinuteOfDay / 60,
-                                        quietEndMinute = quietEndMinuteOfDay % 60,
-                                        proactiveMinGapMinutes = proactiveMinGapHours * 60L,
-                                        proactiveMaxUnanswered = proactiveMaxUnanswered,
-                                    )
-                                }
-                                if (ok) {
-                                    resetEditor()
-                                } else {
-                                    createError = createInvalidMessage
-                                }
-                            },
-                            size = DsButtonSize.Small,
-                        )
-                    }
-                }
-                }
             } else if (visibleTasks.isEmpty()) {
                 EmptyHero(
                     headline = stringResource(R.string.tasks_empty_title),
