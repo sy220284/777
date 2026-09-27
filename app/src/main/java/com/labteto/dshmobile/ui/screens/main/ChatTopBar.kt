@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +33,6 @@ import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.skeleton
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -58,6 +56,7 @@ internal fun ChatTopBar(
     title: String,
     running: Boolean,
     models: SessionModelsValue?,
+    modelsLoading: Boolean,
     detailsOpen: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenModels: () -> Unit,
@@ -123,6 +122,7 @@ internal fun ChatTopBar(
         ) {
             ModelChip(
                 models = models,
+                loading = modelsLoading,
                 onClick = onOpenModels,
                 modifier = Modifier.weight(1f, fill = false),
             )
@@ -147,24 +147,22 @@ internal fun ChatTopBar(
 @Composable
 private fun ModelChip(
     models: SessionModelsValue?,
+    loading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    if (models == null) {
-        Box(
-            modifier
-                .width(96.dp)
-                .height(12.dp)
-                .skeleton(colors.bgLayer2, colors.hover),
-        )
-        return
+    val current = models?.current
+    val group = current?.let { selected -> models.groups.firstOrNull { it.id == selected.provider } }
+    val model = current?.let { selected -> group?.models?.firstOrNull { it.id == selected.model } }
+    val effort = current?.let { selected ->
+        model?.reasoning?.efforts?.firstOrNull { it.id == selected.reasoningEffort }
     }
-    val current = models.current
-    val group = models.groups.firstOrNull { it.id == current.provider }
-    val model = group?.models?.firstOrNull { it.id == current.model }
-    val effort = model?.reasoning?.efforts?.firstOrNull { it.id == current.reasoningEffort }
-    val modelLabel = model?.name ?: current.model
+    val modelLabel = when {
+        models != null && current != null -> model?.name ?: current.model
+        loading -> stringResource(R.string.common_loading)
+        else -> stringResource(R.string.models_title)
+    }
 
     Row(
         modifier = modifier
@@ -178,11 +176,11 @@ private fun ModelChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {
-        if (!models.routable) StateDot(StateDotState.Warning, size = 6.dp)
+        if (models != null && !models.routable) StateDot(StateDotState.Warning, size = 6.dp)
         Text(
             modelLabel,
             style = DsType.small13,
-            color = colors.labelSecondary,
+            color = if (loading && models == null) colors.labelTertiary else colors.labelSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
@@ -198,3 +196,4 @@ private fun ModelChip(
         )
     }
 }
+
