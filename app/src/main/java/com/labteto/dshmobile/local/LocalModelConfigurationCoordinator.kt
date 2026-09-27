@@ -92,6 +92,28 @@ internal class LocalModelConfigurationCoordinator(
         )
     }
 
+    suspend fun clearActive(
+        currentModel: String,
+        currentBaseUrl: String,
+    ): LocalModelConfigurationResult {
+        val id = modelProfileId(currentModel, currentBaseUrl)
+        apiKeys.clearFor(id)
+        val remaining = readProfiles().filterNot { it.id == id }
+        val next = remaining.firstOrNull()
+        preferences.edit()
+            .putString(KEY_MODEL_PROFILES, encodeProfiles(remaining))
+            .putString(KEY_MODEL, next?.model ?: DEFAULT_MODEL)
+            .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL)
+            .apply()
+        apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
+        return LocalModelConfigurationResult(
+            configured = next != null,
+            model = next?.model ?: DEFAULT_MODEL,
+            baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
+            profiles = remaining,
+        )
+    }
+
     suspend fun test(apiKey: String, model: String, baseUrl: String): String {
         if (model.isBlank()) return "请选择模型"
         val name = normalizeModel(model)
