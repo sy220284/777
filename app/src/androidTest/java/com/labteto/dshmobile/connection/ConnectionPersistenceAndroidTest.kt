@@ -66,9 +66,9 @@ class ConnectionPersistenceAndroidTest {
         val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
         assertEquals("celadon", store.settingsOnce().accentTheme)
 
-        store.setSetting { it.copy(accentTheme = "vermilion") }
+        store.setSetting { it.copy(accentTheme = "zhusha") }
 
-        assertEquals("vermilion", store.settingsOnce().accentTheme)
+        assertEquals("zhusha", store.settingsOnce().accentTheme)
     }
 
     @Test
