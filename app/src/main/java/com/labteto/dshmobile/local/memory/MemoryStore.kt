@@ -149,6 +149,56 @@ class MemoryStore internal constructor(
     }
 
     /**
+     * Roll back memories created by the discarded suffix of one chat timeline.
+     *
+     * A replacement memory may have superseded an older valid record. When the replacement belongs
+     * to the discarded suffix, reactivate the predecessor instead of leaving a ghost tombstone.
+     */
+    @Synchronized
+    fun rollbackSourceSessionFrom(
+        sourceSessionId: String,
+        createdAtInclusive: Long,
+    ): Int {
+        if (sourceSessionId.isBlank()) return 0
+        val records = readDocument().records.toMutableList()
+        val invalidIds = records.asSequence()
+            .filter { record ->
+                record.sourceSessionId == sourceSessionId &&
+                    record.createdAt >= createdAtInclusive
+            }
+            .mapTo(linkedSetOf(), MemoryRecord::id)
+        if (invalidIds.isEmpty()) return 0
+
+        val now = System.currentTimeMillis()
+        var changed = false
+        records.indices.forEach { index ->
+            val current = records[index]
+            when {
+                current.id in invalidIds -> {
+                    if (current.active || current.supersededBy != null) {
+                        records[index] = current.copy(
+                            active = false,
+                            supersededBy = null,
+                            updatedAt = now,
+                        )
+                        changed = true
+                    }
+                }
+                current.supersededBy in invalidIds -> {
+                    records[index] = current.copy(
+                        active = true,
+                        supersededBy = null,
+                        updatedAt = now,
+                    )
+                    changed = true
+                }
+            }
+        }
+        if (changed) writeDocument(MemoryDocument(records = records))
+        return invalidIds.size
+    }
+
+    /**
      * A deleted conversation must not remain as a dangling provenance pointer. The memory itself
      * is intentionally preserved because global/project/lineage memories are designed to outlive
      * one transcript; only the deleted source reference is detached.
