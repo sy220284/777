@@ -60,9 +60,10 @@ class MemoryStore internal constructor(
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
                 sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
-                // Keep the original provenance for exact duplicates. A later repeated statement
-                // must not make an older valid fact disappear when only the later turn is edited.
-                sourceMessageId = records[duplicateIndex].sourceMessageId,
+                sourceMessages = mergeSourceMessages(
+                    records[duplicateIndex].sourceMessages,
+                    sourceRef(sourceSessionId, sourceMessageId),
+                ),
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
@@ -91,7 +92,7 @@ class MemoryStore internal constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
-            sourceMessageId = sourceMessageId,
+            sourceMessages = sourceRef(sourceSessionId, sourceMessageId)?.let(::listOf).orEmpty(),
             subjectKey = subjectKey,
             importance = importance.coerceIn(0, 100),
             pinned = pinned,
@@ -167,23 +168,45 @@ class MemoryStore internal constructor(
     ): Int {
         if (sourceSessionId.isBlank()) return 0
         val records = readDocument().records.toMutableList()
-        val invalidIds = records.asSequence()
-            .filter { record ->
-                if (record.sourceSessionId != sourceSessionId) return@filter false
-                val sourceMessageId = record.sourceMessageId
-                when {
-                    sourceMessageId != null && discardedMessageIds.isNotEmpty() ->
-                        sourceMessageId in discardedMessageIds
-                    else ->
-                        // Old memories have no message provenance; retain the timestamp fallback.
-                        record.createdAt >= createdAtInclusive
-                }
-            }
-            .mapTo(linkedSetOf(), MemoryRecord::id)
-        if (invalidIds.isEmpty()) return 0
-
+        val invalidIds = linkedSetOf<String>()
         val now = System.currentTimeMillis()
         var changed = false
+
+        records.indices.forEach { index ->
+            val current = records[index]
+            if (current.sourceMessages.isNotEmpty() && discardedMessageIds.isNotEmpty()) {
+                val remaining = current.sourceMessages.filterNot { source ->
+                    source.sessionId == sourceSessionId && source.messageId in discardedMessageIds
+                }
+                if (remaining.size != current.sourceMessages.size) {
+                    if (remaining.isEmpty()) {
+                        invalidIds += current.id
+                    } else {
+                        records[index] = current.copy(
+                            sourceMessages = remaining,
+                            sourceSessionId = if (current.sourceSessionId == sourceSessionId) {
+                                remaining.last().sessionId
+                            } else {
+                                current.sourceSessionId
+                            },
+                            updatedAt = now,
+                        )
+                        changed = true
+                    }
+                }
+            } else if (
+                current.sourceSessionId == sourceSessionId &&
+                current.createdAt >= createdAtInclusive
+            ) {
+                // Backward compatibility for memories written before message-level provenance.
+                invalidIds += current.id
+            }
+        }
+        if (invalidIds.isEmpty()) {
+            if (changed) writeDocument(MemoryDocument(records = records))
+            return 0
+        }
+
         records.indices.forEach { index ->
             val current = records[index]
             when {
@@ -192,6 +215,7 @@ class MemoryStore internal constructor(
                         records[index] = current.copy(
                             active = false,
                             supersededBy = null,
+                            sourceMessages = emptyList(),
                             updatedAt = now,
                         )
                         changed = true
@@ -223,9 +247,12 @@ class MemoryStore internal constructor(
         val now = System.currentTimeMillis()
         var changed = 0
         records.indices.forEach { index ->
-            if (records[index].sourceSessionId in sessionIds) {
-                records[index] = records[index].copy(
-                    sourceSessionId = null,
+            val current = records[index]
+            val remainingSources = current.sourceMessages.filterNot { it.sessionId in sessionIds }
+            if (current.sourceSessionId in sessionIds || remainingSources.size != current.sourceMessages.size) {
+                records[index] = current.copy(
+                    sourceSessionId = current.sourceSessionId.takeUnless { it in sessionIds },
+                    sourceMessages = remainingSources,
                     updatedAt = now,
                 )
                 changed++
@@ -324,6 +351,18 @@ class MemoryStore internal constructor(
         return words
     }
 
+    private fun sourceRef(sessionId: String?, messageId: String?): MemorySourceRef? =
+        if (sessionId.isNullOrBlank() || messageId.isNullOrBlank()) null
+        else MemorySourceRef(sessionId = sessionId, messageId = messageId)
+
+    private fun mergeSourceMessages(
+        current: List<MemorySourceRef>,
+        incoming: MemorySourceRef?,
+    ): List<MemorySourceRef> =
+        (current + listOfNotNull(incoming))
+            .distinct()
+            .takeLast(MAX_SOURCE_MESSAGES)
+
     private fun readDocument(): MemoryDocument {
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
@@ -399,5 +438,6 @@ class MemoryStore internal constructor(
         const val MAX_RECORDS = 2_000
         const val DEFAULT_MAX_ITEMS = 6
         const val DEFAULT_MAX_CHARS = 3_500
+        const val MAX_SOURCE_MESSAGES = 16
     }
 }
