@@ -93,6 +93,7 @@ class MemoryStore internal constructor(
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
             sourceMessages = sourceRef(sourceSessionId, sourceMessageId)?.let(::listOf).orEmpty(),
+            hasUnboundSource = sourceMessageId.isNullOrBlank(),
             subjectKey = subjectKey,
             importance = importance.coerceIn(0, 100),
             pinned = pinned,
@@ -179,12 +180,15 @@ class MemoryStore internal constructor(
                     source.sessionId == sourceSessionId && source.messageId in discardedMessageIds
                 }
                 if (remaining.size != current.sourceMessages.size) {
-                    if (remaining.isEmpty()) {
+                    if (remaining.isEmpty() && !current.hasUnboundSource) {
                         invalidIds += current.id
                     } else {
                         records[index] = current.copy(
                             sourceMessages = remaining,
-                            sourceSessionId = if (current.sourceSessionId == sourceSessionId) {
+                            sourceSessionId = if (
+                                current.sourceSessionId == sourceSessionId &&
+                                remaining.isNotEmpty()
+                            ) {
                                 remaining.last().sessionId
                             } else {
                                 current.sourceSessionId
