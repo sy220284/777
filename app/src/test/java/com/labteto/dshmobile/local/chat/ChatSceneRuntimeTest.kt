@@ -87,6 +87,36 @@ class ChatSceneRuntimeTest {
     }
 
     @Test
+    fun movementTransitionSuffixIsNotPartOfLocation() {
+        val events = ChatSceneRuntime.extractTurnEvents(
+            previous = ChatSceneState(location = "院子"),
+            userMessage = "继续。",
+            assistantMessage = "她回到房间后，顺手关上了门。",
+            sequence = 25L,
+        )
+
+        assertEquals(
+            "房间",
+            ChatSceneRuntime.reduce(ChatSceneState(location = "院子"), events).location,
+        )
+    }
+
+    @Test
+    fun locationEndingWithNeiKeepsItsCanonicalName() {
+        val events = ChatSceneRuntime.extractTurnEvents(
+            previous = ChatSceneState(location = ""),
+            userMessage = "继续。",
+            assistantMessage = "她此刻待在屋内，安静地看着窗外。",
+            sequence = 26L,
+        )
+
+        assertEquals(
+            "屋内",
+            ChatSceneRuntime.reduce(ChatSceneState(), events).location,
+        )
+    }
+
+    @Test
     fun applyingSameDurableTurnTwiceIsIdempotent() {
         val context = ChatContextState(scene = ChatSceneState(location = "院子"))
         val once = context.applySceneTurn(
