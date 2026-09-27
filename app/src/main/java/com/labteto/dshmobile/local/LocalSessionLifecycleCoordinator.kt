@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local
 
-import android.content.SharedPreferences
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.HandoffGoal
@@ -28,7 +27,6 @@ internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<LocalHarnessState>,
     private val transitionMutex: Mutex,
-    private val preferences: SharedPreferences,
     private val jobs: LocalJobManager,
     private val sessionCoordinator: LocalSessionCoordinator,
     private val chatPersonaStore: ChatPersonaStore,
