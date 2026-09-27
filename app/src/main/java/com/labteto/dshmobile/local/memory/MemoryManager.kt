@@ -16,6 +16,7 @@ class MemoryManager @Inject constructor(
         projectId: String?,
         lineageId: String?,
         sourceSessionId: String,
+        sourceMessageId: String? = null,
     ): MemoryRecord? {
         val candidate = policy.extractExplicitUserDirective(text, mode, projectId) ?: return null
         return remember(
@@ -25,6 +26,7 @@ class MemoryManager @Inject constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
+            sourceMessageId = sourceMessageId,
             subjectKey = candidate.subjectKey,
             importance = candidate.importance,
         )
@@ -34,6 +36,7 @@ class MemoryManager @Inject constructor(
         text: String,
         lineageId: String?,
         sourceSessionId: String,
+        sourceMessageId: String? = null,
         subjectLabel: String? = null,
         subjectKey: String? = null,
     ): MemoryRecord? {
@@ -54,6 +57,7 @@ class MemoryManager @Inject constructor(
             projectId = null,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
+            sourceMessageId = sourceMessageId,
             importance = candidate.importance,
             subjectKey = candidate.subjectKey,
         )
@@ -87,6 +91,7 @@ class MemoryManager @Inject constructor(
         sourceSessionId: String,
         importance: Int,
         subjectKey: String? = null,
+        sourceMessageId: String? = null,
     ): MemoryRecord {
         val clean = content.trim()
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
@@ -112,6 +117,7 @@ class MemoryManager @Inject constructor(
             projectId = projectId.takeIf { candidate.scope == MemoryScope.PROJECT },
             lineageId = lineageId.takeIf { candidate.scope == MemoryScope.LINEAGE },
             sourceSessionId = sourceSessionId,
+            sourceMessageId = sourceMessageId,
             subjectKey = candidate.subjectKey,
             importance = candidate.importance,
             replaceIds = replaced?.let { setOf(it.id) }.orEmpty(),
