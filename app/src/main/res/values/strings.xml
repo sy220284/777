@@ -880,6 +880,11 @@
 
     <string name="local_run_center">Run center</string>
     <string name="local_workflow_stage">Current stage: %1$s</string>
+    <string name="local_workflow_executing">Running</string>
+    <string name="local_workflow_reassigning">Reassigning</string>
+    <string name="local_workflow_verifying">Checking result</string>
+    <string name="local_workflow_completed">Completed</string>
+    <string name="local_workflow_stalled">Blocked</string>
     <string name="local_workflow_processed">Processed %1$d/%2$d</string>
     <string name="local_workflow_blocked">Blocked: %1$s</string>
     <string name="local_workflow_user_action">Check the result before continuing.</string>

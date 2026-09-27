@@ -3906,7 +3906,7 @@ class LocalHarnessEngine @Inject constructor(
         val foregroundSessionId = currentSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
         LocalExecutionService.holdTurn(context, foregroundSessionId)
-        _state.update { it.copy(running = true, error = null, deviceApprovalLease = false) }
+        _state.update { it.copy(running = true, error = null, deviceApprovalLease = false, workflowProgress = null) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var finalChatAssistant: LocalHarnessMessage? = null
         var modelStep = 0
@@ -4744,6 +4744,7 @@ class LocalHarnessEngine @Inject constructor(
             .mapNotNull(toolRegistry::get)
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
             .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
+            .filter { tool -> allowMutation || tool.name != "download_file" }
             .filter { tool ->
                 allowMutation ||
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
@@ -4870,6 +4871,9 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }
             "http_request" -> {
+                if (!allowMutation && args.string("method").uppercase() !in setOf("GET", "HEAD")) {
+                    return "只读子任务仅允许 GET/HEAD 请求"
+                }
                 val headers = args["headers"]?.jsonObject?.mapValues { (_, value) ->
                     value.jsonPrimitive.content
                 }.orEmpty()
@@ -4883,7 +4887,9 @@ class LocalHarnessEngine @Inject constructor(
                     timeoutSeconds = FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }
-            "download_file" -> webTools.download(
+            "download_file" -> {
+                if (!allowMutation) return "只读子任务不能下载写入文件"
+                webTools.download(
                 url = args.string("url"),
                 path = args.string("path"),
                 maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
@@ -4891,6 +4897,7 @@ class LocalHarnessEngine @Inject constructor(
                     .toLong(),
                 timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
             )
+            }
             "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),

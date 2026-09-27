@@ -2061,7 +2061,7 @@ private fun WorkSessionStatusStrip(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
-                    DsPill(text = if (progress.needsUserAction) stringResource(R.string.local_workflow_waiting_user) else progress.stage)
+                    DsPill(text = if (progress.needsUserAction) stringResource(R.string.local_workflow_waiting_user) else workflowStageLabel(progress.stage))
                     DsPill(text = stringResource(R.string.local_workflow_processed, progress.completed, progress.total))
                 }
                 if (state.todos.isNotEmpty()) {
@@ -2246,15 +2246,7 @@ private fun ExecutionStatusCard(
             }
 
             state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                    Text(stringResource(R.string.local_workflow_stage, progress.stage), style = DsType.caption11Strong, color = colors.labelTertiary)
-                    Text(progress.task, style = DsType.small13, color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11, color = colors.labelSecondary)
-                    progress.blockedReason?.let { reason ->
-                        Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13, color = colors.error)
-                        if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11, color = colors.error)
-                    }
-                }
+                WorkflowProgressSection(progress)
             }
 
             if (state.pendingApproval != null || state.pendingQuestion != null) {
