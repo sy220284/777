@@ -1234,6 +1234,7 @@ private fun LocalChat(
                             groupMode = false,
                             canEdit = false,
                             canRegenerate = false,
+                            canSelectVariant = false,
                             branchInfo = null,
                             onEdit = { },
                             onSelectVariant = { _, _ -> false },
