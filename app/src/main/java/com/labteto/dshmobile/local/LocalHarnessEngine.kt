@@ -1424,7 +1424,7 @@ class LocalHarnessEngine @Inject constructor(
             ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
         val baseGroupState = if (state.groupChat.enabled) {
-            restoreGroupStateBefore(sourceSequence, original.createdAt)
+            restoreGroupStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
                 ?: state.groupChat.copy(
                     members = state.groupChat.members.map { member ->
                         member.copy(chatState = ChatCharacterState())
@@ -1434,7 +1434,6 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             state.groupChat
         }
-
         val discarded = activeTranscript.drop(originalIndex)
         memoryStore.rollbackSourceSessionFrom(state.sessionId, original.createdAt)
         if (!state.groupChat.enabled) {
@@ -1444,9 +1443,7 @@ class LocalHarnessEngine @Inject constructor(
                 chatPersonaGalleryStore.excludeHistoryMessages(
                     id = galleryId,
                     storyId = storyId,
-                    messageKeys = discarded.map { message ->
-                        com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(message)
-                    },
+                    messageKeys = discarded.map { com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it) },
                 )
             }
         } else {
@@ -1454,7 +1451,6 @@ class LocalHarnessEngine @Inject constructor(
                 chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
             }
         }
-
         val edited = newTranscriptMessage("user", content)
         val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
@@ -1583,12 +1579,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             val baseState = chatBranchParentState(branches, messageId)
-                ?: restoreChatStateBefore(
-                    eventLog.events(),
-                    json,
-                    sourceEventSequenceForMessage(eventLog.events(), promptMessage.id),
-                    promptMessage.createdAt,
-                )
+                ?: restoreChatStateBefore(eventLog.events(), json, sourceEventSequenceForMessage(eventLog.events(), promptMessage.id), promptMessage.createdAt)
                 ?: ChatCharacterState()
             _state.update {
                 it.copy(
@@ -3745,8 +3736,7 @@ class LocalHarnessEngine @Inject constructor(
             ensureSystemMessage()
             val snapshot = _state.value
             val branchBase = snapshot.chatBranches
-            val branchEligible = branchBase.nodes.isEmpty() ||
-                chatBranchingEligible(activeChatBranchMessages(branchBase))
+            val branchEligible = branchBase.nodes.isEmpty() || chatBranchingEligible(activeChatBranchMessages(branchBase))
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             captureAutoMemoryDirective(input)
             val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
