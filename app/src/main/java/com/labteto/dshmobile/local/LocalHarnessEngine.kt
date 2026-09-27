@@ -68,7 +68,6 @@ import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePending
-import com.labteto.dshmobile.local.chat.normalized
 import com.labteto.dshmobile.local.chat.rebaseGeneration
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.withContextForPlanner
@@ -1483,7 +1482,7 @@ class LocalHarnessEngine @Inject constructor(
         } else {
             state.chatContext.generation
         }
-        val baseContext = rebuildHardChatContextFromTranscript(
+        val baseContext = replayHardChatContextFromTranscript(
             messages = retainedPrefix,
             generation = previousGeneration + 1L,
         )
@@ -1742,37 +1741,6 @@ class LocalHarnessEngine @Inject constructor(
         }
         resetModelHistory(rebuilt)
         updateContextMetrics()
-    }
-
-    private fun rebuildHardChatContextFromTranscript(
-        messages: List<LocalHarnessMessage>,
-        generation: Long,
-    ): ChatContextState {
-        var context = ChatContextState(generation = generation)
-        val pendingUsers = mutableListOf<String>()
-        var syntheticSequence = 1L
-
-        messages.forEach { message ->
-            when (message.role) {
-                "user" -> {
-                    if (message.content.isNotBlank()) pendingUsers += message.content
-                }
-                "assistant" -> {
-                    context = context.applySceneTurn(
-                        userMessage = pendingUsers.joinToString("\n"),
-                        assistantMessage = message.content,
-                        sequence = syntheticSequence++,
-                    )
-                    pendingUsers.clear()
-                }
-            }
-        }
-        return context.copy(
-            continuity = ChatContinuityState(),
-            pendingTurns = emptyList(),
-            processedThroughSequence = 0L,
-            generation = generation,
-        ).normalized()
     }
 
     private fun persistRewrittenChatTranscript(
