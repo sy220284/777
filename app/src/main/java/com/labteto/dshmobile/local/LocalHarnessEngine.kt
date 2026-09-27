@@ -442,8 +442,12 @@ class LocalHarnessEngine @Inject constructor(
             workspacePath = workspace.path,
             sessionId = currentSessionId,
             usage = usageTracker.state.value,
-            chatStyleGuardEnabled = preferences.getBoolean(KEY_CHAT_STYLE_GUARD, true),
-            chatStyleGuardCustomPhrases = loadChatStyleGuardCustomPhrases(),
+            chatStyleGuardEnabled = preferences.getBoolean(
+                LocalHarnessSettingsCoordinator.KEY_CHAT_STYLE_GUARD,
+                true,
+            ),
+            chatStyleGuardCustomPhrases =
+                LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
     val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
@@ -462,6 +466,16 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
     )
+    private val settingsCoordinator by lazy {
+        LocalHarnessSettingsCoordinator(
+            preferences = preferences,
+            userProfileStore = userProfileStore,
+            scope = scope,
+            state = { _state.value },
+            updateState = { transform -> _state.update(transform) },
+        )
+    }
+
     private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     private val imageCapabilities = LocalImageCapabilityRegistry()
     private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
@@ -845,119 +859,37 @@ class LocalHarnessEngine @Inject constructor(
         modelConfiguration.test(apiKey, model, baseUrl)
 
     /** Choose how user image attachments reach the local model. */
-    fun configureImageInputMode(mode: LocalImageInputMode) {
-        preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        _state.update { it.copy(imageInputMode = mode) }
-    }
+    fun configureImageInputMode(mode: LocalImageInputMode) =
+        settingsCoordinator.configureImageInputMode(mode)
 
     /** Persist execution limits exposed from Settings. */
-    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
-        val main = mainMaxSteps.coerceIn(4, 128)
-        val subagent = subagentMaxSteps.coerceIn(1, 128)
-        val attempts = modelAttempts.coerceIn(1, 5)
-        preferences.edit()
-            .putInt(KEY_MAIN_MAX_STEPS, main)
-            .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
-            .putInt(KEY_MODEL_ATTEMPTS, attempts)
-            .apply()
-        _state.update {
-            it.copy(
-                mainMaxSteps = main,
-                subagentMaxSteps = subagent,
-                modelAttempts = attempts,
-            )
-        }
-    }
+    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
+        settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
 
     /** Persist user-authored behavioral rules and memory recall preference. */
-    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) {
-        val profile = UserProfile(
-            customRules = customRules.trim().take(6_000),
-            autoRecall = autoRecall,
-            autoMemory = autoMemory,
-        )
-        _state.update {
-            it.copy(
-                userRules = profile.customRules,
-                autoRecall = profile.autoRecall,
-                autoMemory = profile.autoMemory,
-            )
-        }
-        scope.launch {
-            userProfileStore.write(profile)
-        }
-    }
+    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
+        settingsCoordinator.configurePersonalization(customRules, autoRecall, autoMemory)
 
-    /** Master switch for local chat output filtering. Off means the model stream is shown as-is. */
-    fun configureChatStyleGuard(enabled: Boolean) {
-        preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
-        _state.update { it.copy(chatStyleGuardEnabled = enabled) }
-    }
+    /** Master switch for local chat output filtering. */
+    fun configureChatStyleGuard(enabled: Boolean) =
+        settingsCoordinator.configureChatStyleGuard(enabled)
 
-    fun addChatStyleGuardPhrase(value: String): Boolean {
-        val phrase = normalizeChatStyleGuardPhrase(value) ?: return false
-        val current = _state.value.chatStyleGuardCustomPhrases
-        if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
-        val updated = current + phrase
-        preferences.edit()
-            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
-            .apply()
-        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
-        return true
-    }
+    fun addChatStyleGuardPhrase(value: String): Boolean =
+        settingsCoordinator.addChatStyleGuardPhrase(value)
 
-    fun removeChatStyleGuardPhrase(value: String) {
-        val phrase = value.trim()
-        if (phrase.isEmpty()) return
-        val current = _state.value.chatStyleGuardCustomPhrases
-        val updated = current.filterNot { it == phrase }
-        if (updated == current) return
-        preferences.edit()
-            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, updated.joinToString("\n"))
-            .apply()
-        _state.update { it.copy(chatStyleGuardCustomPhrases = updated) }
-    }
+    fun removeChatStyleGuardPhrase(value: String) =
+        settingsCoordinator.removeChatStyleGuardPhrase(value)
 
-    fun clearChatStyleGuardHits() {
-        _state.update { it.copy(styleGuardHits = emptyList()) }
-    }
-
-    private fun loadChatStyleGuardCustomPhrases(): List<String> =
-        preferences.getString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, "")
-            .orEmpty()
-            .lineSequence()
-            .mapNotNull(::normalizeChatStyleGuardPhrase)
-            .distinct()
-            .take(MAX_CUSTOM_CHAT_FILTERS)
-            .toList()
-
-    private fun normalizeChatStyleGuardPhrase(value: String): String? =
-        value.replace('\n', ' ')
-            .trim()
-            .takeIf(String::isNotBlank)
-            ?.take(MAX_CUSTOM_CHAT_FILTER_CHARS)
+    fun clearChatStyleGuardHits() =
+        settingsCoordinator.clearChatStyleGuardHits()
 
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
         persona: PersonaProfile = snapshot.chatPersona,
-    ): List<String> = ChatStyleGuard.activePhrases(
-        customPhrases = snapshot.chatStyleGuardCustomPhrases,
-        personaPhrases = persona.bannedPhrases,
-        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
-    )
+    ): List<String> = settingsCoordinator.chatStreamFilterPhrases(snapshot, persona)
 
-    private fun recordStyleGuardHits(violations: List<String>) {
-        if (violations.isEmpty()) return
-        _state.update { state ->
-            state.copy(
-                styleGuardHits = (state.styleGuardHits + violations)
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(MAX_STYLE_GUARD_HITS),
-            )
-        }
-    }
+    private fun recordStyleGuardHits(violations: List<String>) =
+        settingsCoordinator.recordStyleGuardHits(violations)
 
     fun configureChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
@@ -6711,12 +6643,12 @@ class LocalHarnessEngine @Inject constructor(
             baseUrl = baseUrl,
             configuredModels = readModelProfiles().map(LocalModelProfile::model).distinct().sorted(),
             modelProfiles = readModelProfiles(),
-            mainMaxSteps = preferences.getInt(KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
-            modelAttempts = preferences.getInt(KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
+            mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
+            subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
+            modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
-                    preferences.getString(KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
+                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
                         ?: LocalImageInputMode.AUTO.name,
                 )
             }.getOrDefault(LocalImageInputMode.AUTO),
@@ -6987,13 +6919,11 @@ class LocalHarnessEngine @Inject constructor(
         const val KEY_MODEL_PROFILES = "model_profiles_v2"
         const val KEY_BASE_URL = "base_url"
         const val KEY_SESSION_ID = "session_id"
-        const val KEY_MAIN_MAX_STEPS = "main_max_steps"
-        const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
-        const val KEY_MODEL_ATTEMPTS = "model_attempts"
-        const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
+        const val LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS = "main_max_steps"
+        const val LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
+        const val LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS = "model_attempts"
+        const val LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
-        const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
-        const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
         const val DEFAULT_MAIN_MAX_STEPS = 16
@@ -7024,9 +6954,6 @@ class LocalHarnessEngine @Inject constructor(
         const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
         const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
         const val MAX_STREAM_PREVIEW_CHARS = 4_096
-        const val MAX_STYLE_GUARD_HITS = 20
-        const val MAX_CUSTOM_CHAT_FILTERS = 50
-        const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
