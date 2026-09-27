@@ -424,13 +424,14 @@ class LocalHarnessEngine @Inject constructor(
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
     // legacy migration, before the loading screen admits session actions.
     @Volatile private lateinit var eventLog: LocalSessionEventLog
-    private data class ConversationFilesCacheEntry(
-        val eventStamp: Long,
-        val workspaceStamp: Long,
-        val value: LocalConversationFiles,
-    )
-    private val conversationFilesCacheLock = Any()
-    private val conversationFilesCache = LinkedHashMap<String, ConversationFilesCacheEntry>(16, 0.75f, true)
+    private val conversationFilesCoordinator by lazy {
+        LocalConversationFilesCoordinator(
+            workspace = workspace,
+            eventLogFor = ::eventLogFor,
+            currentSessionId = { currentSessionId },
+            currentEventLog = { eventLog },
+        )
+    }
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = mutableListOf<JsonObject>()
     @Volatile private var modelHistoryChars = 0
@@ -752,51 +753,18 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Read-only file views used by the local Harness UI. Heavy filesystem work stays off main. */
     suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
-        workspace.files()
+        conversationFilesCoordinator.workspaceFiles()
     }
 
     suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
-            val files = workspace.files()
-            val log = if (sessionId == currentSessionId) eventLog else eventLogFor(sessionId)
-            val eventStamp = log.latestOf(CONVERSATION_FILE_EVENT_TYPES)?.sequence ?: -1L
-            val workspaceStamp = workspaceFilesStamp(files)
-            synchronized(conversationFilesCacheLock) {
-                conversationFilesCache[sessionId]
-                    ?.takeIf { it.eventStamp == eventStamp && it.workspaceStamp == workspaceStamp }
-                    ?.value
-            }?.let { return@withContext it }
-
-            val projected = localConversationFiles(log.events(), files)
-            synchronized(conversationFilesCacheLock) {
-                conversationFilesCache[sessionId] = ConversationFilesCacheEntry(
-                    eventStamp = eventStamp,
-                    workspaceStamp = workspaceStamp,
-                    value = projected,
-                )
-                while (conversationFilesCache.size > MAX_CONVERSATION_FILES_CACHE) {
-                    val eldest = conversationFilesCache.entries.firstOrNull()?.key ?: break
-                    conversationFilesCache.remove(eldest)
-                }
-            }
-            projected
+            conversationFilesCoordinator.conversationFiles(sessionId)
         }
-
-    private fun workspaceFilesStamp(files: List<LocalWorkspaceFile>): Long {
-        var stamp = 1_469_598_103_934_665_603L
-        files.forEach { file ->
-            stamp = stamp xor file.path.hashCode().toLong()
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor file.bytes
-            stamp *= 1_099_511_628_211L
-            stamp = stamp xor file.modifiedAt
-            stamp *= 1_099_511_628_211L
-        }
-        return stamp
-    }
 
     suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
-        withContext(Dispatchers.IO) { workspace.preview(path) }
+        withContext(Dispatchers.IO) {
+            conversationFilesCoordinator.preview(path)
+        }
 
     /** Save the local model route and its encrypted credential. */
     fun configure(apiKey: String, model: String, baseUrl: String) {
@@ -7047,7 +7015,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_EVENT_CHARS = 65_536
         const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
         const val MAX_HANDOFF_CHARS = 3_500
-        const val MAX_CONVERSATION_FILES_CACHE = 12
         const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
         const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
         const val CHAT_RECENT_HISTORY_MESSAGES = 20
@@ -7068,12 +7035,6 @@ class LocalHarnessEngine @Inject constructor(
         const val LOCAL_PROJECT_ID = "local-workspace"
         const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
 
-
-        val CONVERSATION_FILE_EVENT_TYPES = setOf(
-            "user/message",
-            "tool/call",
-            "tool/result",
-        )
 
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",
