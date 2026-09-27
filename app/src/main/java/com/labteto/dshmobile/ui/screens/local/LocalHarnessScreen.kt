@@ -745,8 +745,12 @@ private fun LocalChat(
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
     val messageEditingEnabled = state.usageMode == LocalUsageMode.CHAT
-    val messageBranchingEnabled = messageEditingEnabled &&
-        state.transcriptIndex.branchingEligible
+    val messageBranchingEnabled = messageEditingEnabled
+    val messageActionsEnabled =
+        state.configured &&
+            !state.loading &&
+            !state.running &&
+            state.queuedInputCount == 0
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val currentGalleryEntry = remember(gallery, state.galleryId) {
         state.galleryId?.let { id -> gallery.firstOrNull { it.id == id } }
@@ -1188,12 +1192,15 @@ private fun LocalChat(
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
                             groupMode = state.groupChat.enabled,
                             canEdit = messageEditingEnabled &&
-                                !state.running &&
+                                messageActionsEnabled &&
                                 transcriptItem.message.role == "user",
                             canRegenerate = !state.groupChat.enabled &&
-                                !state.running &&
+                                messageActionsEnabled &&
                                 !transcriptItem.message.proactive &&
                                 state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                            canSelectVariant = messageBranchingEnabled &&
+                                messageActionsEnabled &&
+                                !state.groupChat.enabled,
                             branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
                                 chatBranchInfo(state.chatBranches, transcriptItem.message.id)
                             } else {
@@ -1227,6 +1234,7 @@ private fun LocalChat(
                             groupMode = false,
                             canEdit = false,
                             canRegenerate = false,
+                            canSelectVariant = false,
                             branchInfo = null,
                             onEdit = { },
                             onSelectVariant = { _, _ -> false },
@@ -1678,7 +1686,7 @@ private fun LocalChat(
                             chatMessageHasAttachmentContext(message)
                         ) &&
                         editingUserText.trim() != editableChatUserText(message).trim() &&
-                        !state.running,
+                        messageActionsEnabled,
                     size = DsButtonSize.Small,
                 )
             }
