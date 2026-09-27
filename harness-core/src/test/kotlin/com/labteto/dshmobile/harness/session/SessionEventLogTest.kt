@@ -282,4 +282,37 @@ class SessionEventLogTest {
         }
     }
 
+
+    @Test
+    fun pointReadCrossesCompressedSegmentBoundary() {
+        val directory = Files.createTempDirectory("harness-event-compressed-window").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(40) { index ->
+                log.append(
+                    "test/event",
+                    buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) },
+                )
+            }
+            val archived = directory.listFiles().orEmpty()
+                .filter { it.name.startsWith("session.events.jsonl.part-") && it.name.endsWith(".gz") }
+                .minByOrNull(File::getName)
+                ?: error("expected compressed event segment")
+            val archivedSequences = GZIPInputStream(archived.inputStream()).bufferedReader().useLines { lines ->
+                lines.mapNotNull { line ->
+                    runCatching { json.decodeFromString(SessionEvent.serializer(), line).sequence }.getOrNull()
+                }.toList()
+            }
+            val target = archivedSequences.last()
+            val window = log.read(sequence = target, before = 2, after = 2).lineSequence()
+                .map { json.decodeFromString(SessionEvent.serializer(), it).sequence }
+                .toList()
+
+            assertEquals((target - 2L..target + 2L).toList(), window)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
