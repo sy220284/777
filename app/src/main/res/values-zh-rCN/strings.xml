@@ -16,6 +16,7 @@
     <string name="local_delete_session">删除会话</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
     <string name="local_regenerate_reply">重新生成回复</string>
+    <string name="local_regenerate_reply_failed">当前状态无法重新生成这条回复。</string>
     <string name="local_edit_user_message">修改消息</string>
     <string name="local_edit_user_message_hint">修改后会从这条消息重新继续对话，并重新生成后续回复。</string>
     <string name="local_edit_user_message_resend">重新发送</string>
@@ -424,6 +425,8 @@
     <string name="tasks_empty_subtitle">直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。</string>
     <string name="tasks_cancelled">任务已取消</string>
     <string name="tasks_missing">任务已经不存在</string>
+    <string name="tasks_run_started">任务已开始执行</string>
+    <string name="tasks_run_failed">任务当前无法立即执行</string>
     <string name="tasks_background_task">后台任务</string>
     <string name="tasks_once">一次性任务</string>
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
