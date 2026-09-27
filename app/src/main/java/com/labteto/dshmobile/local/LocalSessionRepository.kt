@@ -190,6 +190,8 @@ internal class LocalSessionRepository(
         updatedAt = updatedAt,
         usageMode = usageMode,
         chatMode = groupChat.mode,
+        personaId = personaId,
+        galleryId = galleryId,
         blank = transcriptIndex.totalMessageCount == 0L &&
             transcriptWindow.none { it.content.isNotBlank() } &&
             messages.none { it.content.isNotBlank() },
