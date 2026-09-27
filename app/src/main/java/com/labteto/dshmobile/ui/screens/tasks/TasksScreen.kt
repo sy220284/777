@@ -525,10 +525,10 @@ private fun ColumnScope.TaskEditorPane(
     val colors = DsTheme.colors
     val resetEditor = onReset
 
-                Column(
-                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                ) {
-                DsGroupCard {
+    Column(
+        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+    ) {
+        DsGroupCard {
                     Text(
                         stringResource(
                             if (editingTaskId != null) R.string.tasks_edit
@@ -911,9 +911,8 @@ private fun ColumnScope.TaskEditorPane(
                             size = DsButtonSize.Small,
                         )
                     }
-                }
-                }
-            
+        }
+    }
 }
 
 @Composable
