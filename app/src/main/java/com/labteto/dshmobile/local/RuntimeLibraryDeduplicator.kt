@@ -23,7 +23,7 @@ internal object RuntimeLibraryDeduplicator {
         val checksum by lazy { canonical.sha256() }
         for (other in libraries.drop(1)) {
             if (Files.isSameFile(canonical.toPath(), other.toPath())) continue
-            if (other.length() != canonical.length() || other.sha256() != checksum) continue
+            if (other.length() != canonical.length() || !other.sha256().contentEquals(checksum)) continue
             val temporary = File(other.parentFile, "${other.name}.dedup-tmp")
             try {
                 Files.deleteIfExists(temporary.toPath())
