@@ -6,6 +6,11 @@ RUNTIME_ABIS="${DSH_RUNTIME_ABIS:-arm64-v8a}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CACHE_DIR="${TERMUX_RUNTIME_CACHE:-$ROOT_DIR/.gradle/runtime-cache/termux-python}"
 TERMUX_REPO="${TERMUX_REPO:-https://packages-cf.termux.dev/apt/termux-main}"
+TERMUX_REPO_FALLBACK="${TERMUX_REPO_FALLBACK:-https://packages.termux.dev/apt/termux-main}"
+TERMUX_REPOS=("$TERMUX_REPO")
+if [ "$TERMUX_REPO_FALLBACK" != "$TERMUX_REPO" ]; then
+  TERMUX_REPOS+=("$TERMUX_REPO_FALLBACK")
+fi
 TERMUX_KEY_COMMIT="93c8e0b136bf39e2eb1735f9187f43d7e029bb2e"
 TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 PYTHON_PACKAGE="python"
@@ -46,13 +51,25 @@ if ! gpg --batch --homedir "$GNUPGHOME" --with-colons --fingerprint \
   exit 1
 fi
 
-fetch() {
-  local url="$1"
+fetch_repo_path() {
+  local relative="$1"
   local dest="$2"
   mkdir -p "$(dirname "$dest")"
-  if [ ! -s "$dest" ]; then
-    curl -fL --retry 3 --connect-timeout 20 "$url" -o "$dest"
-  fi
+  [ -s "$dest" ] && return 0
+
+  local tmp="${dest}.part"
+  local repo
+  for repo in "${TERMUX_REPOS[@]}"; do
+    rm -f "$tmp"
+    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20       "$repo/$relative" -o "$tmp"; then
+      mv "$tmp" "$dest"
+      return 0
+    fi
+    echo "Termux 镜像不可用，切换备用源：$repo" >&2
+  done
+  rm -f "$tmp"
+  echo "所有 Termux 镜像均不可用：$relative" >&2
+  return 1
 }
 
 package_field() {
@@ -281,15 +298,13 @@ prepare_arch() {
   local apt_arch="$1"
   local android_abi="$2"
   local index_dir="$CACHE_DIR/index-$apt_arch"
-  local packages_url="$TERMUX_REPO/dists/stable/main/binary-$apt_arch/Packages"
-  local inrelease_url="$TERMUX_REPO/dists/stable/InRelease"
   local packages_file="$index_dir/Packages"
   local inrelease_file="$index_dir/InRelease"
 
   rm -rf "$index_dir"
   mkdir -p "$index_dir"
-  curl -fL --retry 3 --connect-timeout 20 "$packages_url" -o "$packages_file"
-  curl -fL --retry 3 --connect-timeout 20 "$inrelease_url" -o "$inrelease_file"
+  fetch_repo_path "dists/stable/main/binary-$apt_arch/Packages" "$packages_file"
+  fetch_repo_path "dists/stable/InRelease" "$inrelease_file"
   verify_packages_index "$inrelease_file" "$packages_file" "$apt_arch"
 
   local actual_python_version
@@ -330,7 +345,7 @@ prepare_arch() {
     }
 
     local deb="$CACHE_DIR/debs/$apt_arch/$(basename "$filename")"
-    fetch "$TERMUX_REPO/$filename" "$deb"
+    fetch_repo_path "$filename" "$deb"
     printf '%s  %s\n' "$digest" "$deb" | sha256sum -c - >/dev/null
 
     local extracted="$WORK_DIR/$apt_arch/$pkg"
