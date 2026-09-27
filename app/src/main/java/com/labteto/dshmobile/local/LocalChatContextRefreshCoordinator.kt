@@ -109,10 +109,13 @@ internal class LocalChatContextRefreshCoordinator(
         if (pending.isEmpty()) return
 
         val plannerState = before.chatState.withContextForPlanner(baseContext)
+        val orderedTranscript = renderPendingTurnsForPlanner(pending)
+        val userEvidenceBatch = pending.joinToString("\n") { turn -> turn.userMessage }
+        val assistantEvidenceBatch = pending.joinToString("\n") { turn -> turn.assistantMessage }
         val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = plannerState,
-            userMessage = renderPendingTurnsForPlanner(pending),
+            userMessage = orderedTranscript,
             assistantMessage = "",
         )
         val plannerReply = try {
@@ -132,8 +135,8 @@ internal class LocalChatContextRefreshCoordinator(
         val plan = chatTurnCoordinator.parsePostTurn(
             text = plannerReply.content.orEmpty(),
             previous = plannerState,
-            userMessage = userBatch,
-            assistantMessage = assistantBatch,
+            userMessage = userEvidenceBatch,
+            assistantMessage = assistantEvidenceBatch,
         )
         if (plan == null) {
             boundEventLog.append("chat/post-turn", buildJsonObject {
