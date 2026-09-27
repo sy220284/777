@@ -1662,6 +1662,15 @@ class LocalHarnessEngine @Inject constructor(
         true
     }
 
+    private fun transcriptForBranchMaterialization(
+        state: LocalHarnessState,
+    ): List<LocalHarnessMessage> {
+        val activeBranch = activeChatBranchMessages(state.chatBranches)
+        if (activeBranch.isNotEmpty()) return activeBranch
+        if (state.transcriptIndex.totalMessageCount <= state.messages.size.toLong()) return state.messages
+        return LocalSessionTranscriptPager(eventLog).all()
+    }
+
     private fun persistChatBranchState(reason: String) {
         val state = _state.value
         eventLog.append("chat/branch-state", JsonObject(
