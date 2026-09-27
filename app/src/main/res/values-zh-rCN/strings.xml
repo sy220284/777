@@ -18,7 +18,7 @@
     <string name="local_regenerate_reply">重新生成回复</string>
     <string name="local_regenerate_reply_failed">当前状态无法重新生成这条回复。</string>
     <string name="local_edit_user_message">修改消息</string>
-    <string name="local_edit_user_message_hint">修改后会从这条消息重新继续对话，并重新生成后续回复。</string>
+    <string name="local_edit_user_message_hint">修改后会从这条消息重新继续；这条消息之后的对话记录会被清除，并由新的回复重新开始。</string>
     <string name="local_edit_user_message_resend">重新发送</string>
     <string name="local_edit_user_message_failed">当前状态无法重新发送，请确认聊天已停止且消息内容确实有修改。</string>
     <string name="local_previous_variant">上一版本</string>
