@@ -174,6 +174,17 @@ private fun List<String>.cleanContextLines(limit: Int, maxChars: Int): List<Stri
         .take(limit)
         .toList()
 
+internal fun ChatContextState.canonicalFactLines(): List<String> {
+    val normalized = normalized()
+    return buildList {
+        normalized.scene.sceneTime.takeIf(String::isNotBlank)?.let { add("时间=$it") }
+        normalized.scene.location.takeIf(String::isNotBlank)?.let { add("地点=$it") }
+        addAll(normalized.continuity.recentEvents)
+        addAll(normalized.continuity.decisions)
+        addAll(normalized.continuity.unfinished)
+    }.distinct()
+}
+
 internal fun renderChatContextForModel(context: ChatContextState): String {
     val normalized = context.normalized()
     if (!normalized.hasUsefulFacts()) return ""
