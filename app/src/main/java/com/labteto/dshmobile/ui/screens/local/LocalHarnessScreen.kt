@@ -174,6 +174,16 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun localHarnessDrawerUsageMode(
+    current: LocalUsageMode,
+    pending: LocalUsageMode?,
+): LocalUsageMode = pending ?: current
+
+internal fun localHarnessShowsBlockingLoading(
+    loading: Boolean,
+    hasRenderedSurface: Boolean,
+): Boolean = loading && !hasRenderedSurface
+
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
@@ -281,7 +291,7 @@ fun LocalHarnessScreen(
             LocalModeDrawer(
                 currentSessionId = state.sessionId,
                 sessions = state.sessions,
-                usageMode = pendingUsageMode ?: state.usageMode,
+                usageMode = localHarnessDrawerUsageMode(state.usageMode, pendingUsageMode),
                 modeSwitchEnabled = !state.running && !state.loading,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
@@ -342,7 +352,7 @@ fun LocalHarnessScreen(
     ) {
         Box(Modifier.fillMaxSize()) {
             when {
-                state.loading && !hasRenderedHarnessSurface -> LoadingScreen()
+                localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
             showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
                 entries = gallery,
                 presets = viewModel.personaPresets,
