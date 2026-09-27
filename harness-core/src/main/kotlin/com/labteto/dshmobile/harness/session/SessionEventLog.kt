@@ -114,24 +114,71 @@ class SessionEventLog(
         forEachAfterUnsafe(sequenceExclusive, visitor)
     }
 
-    fun search(query: String, limit: Int = 50): String {
+    fun search(
+        query: String,
+        limit: Int = 50,
+        afterSequence: Long = -1L,
+        maxChars: Int = DEFAULT_SEARCH_RESULT_CHARS,
+    ): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
-        val wanted = limit.coerceIn(1, MAX_READ_LINES)
-        val matches = synchronized(lock) {
+        val wanted = limit.coerceIn(1, MAX_SEARCH_RESULTS)
+        val budget = maxChars.coerceIn(MIN_SEARCH_RESULT_CHARS, MAX_SEARCH_RESULT_CHARS)
+        val page = synchronized(lock) {
             val result = mutableListOf<String>()
-            var row = 0
-            for (source in orderedFilesUnsafe()) {
+            var usedChars = 0
+            var lastSequence: Long? = null
+            var paginated = false
+
+            scan@ for (source in orderedFilesUnsafe()) {
                 source.forEachLine { line ->
-                    row += 1
-                    if (result.size < wanted && line.contains(query, ignoreCase = true)) {
-                        result += "$row: $line"
+                    if (paginated) return@forEachLine
+                    val event = decodeEventOrNull(line) ?: return@forEachLine
+                    if (event.sequence <= afterSequence || !line.contains(query, ignoreCase = true)) {
+                        return@forEachLine
                     }
+                    if (result.size >= wanted) {
+                        paginated = true
+                        return@forEachLine
+                    }
+
+                    val previewSuffix = if (line.length > MAX_SEARCH_EVENT_CHARS) {
+                        "… [事件内容已截断；用 session_event_read(seq=${event.sequence}) 读取完整事件]"
+                    } else {
+                        ""
+                    }
+                    val preview = if (previewSuffix.isEmpty()) line else {
+                        line.take((MAX_SEARCH_EVENT_CHARS - previewSuffix.length).coerceAtLeast(0)) + previewSuffix
+                    }
+                    val row = "${event.sequence}: $preview"
+                    val separatorChars = if (result.isEmpty()) 0 else 1
+                    if (usedChars + separatorChars + row.length > budget) {
+                        if (result.isEmpty()) {
+                            val hint = "\n[事件过长；用 session_event_read(seq=${event.sequence}) 读取完整事件]"
+                            val allowed = (budget - "${event.sequence}: ".length - hint.length).coerceAtLeast(0)
+                            result += "${event.sequence}: " + line.take(allowed) + hint
+                            lastSequence = event.sequence
+                        }
+                        paginated = true
+                        return@forEachLine
+                    }
+
+                    result += row
+                    usedChars += separatorChars + row.length
+                    lastSequence = event.sequence
                 }
-                if (result.size >= wanted) break
+                if (paginated) break@scan
             }
-            result
+            Triple(result, lastSequence, paginated)
         }
-        return if (matches.isEmpty()) "未找到会话事件" else matches.joinToString("\n")
+
+        val matches = page.first
+        if (matches.isEmpty()) return "未找到会话事件"
+        val body = matches.joinToString("\n")
+        if (!page.third) return body
+
+        val cursor = page.second ?: afterSequence
+        val footer = "\n[结果已分页；继续调用 session_event_search，并传 after_sequence=$cursor]"
+        return body.take((budget - footer.length).coerceAtLeast(0)) + footer
     }
 
     fun tail(limit: Int = 40): String {
@@ -444,6 +491,11 @@ class SessionEventLog(
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
+        const val MAX_SEARCH_RESULTS = 100
+        const val MIN_SEARCH_RESULT_CHARS = 4_096
+        const val DEFAULT_SEARCH_RESULT_CHARS = 48_000
+        const val MAX_SEARCH_RESULT_CHARS = 48_000
+        const val MAX_SEARCH_EVENT_CHARS = 8_192
         const val MAX_CONTEXT_LINES = 20
         const val DEFAULT_PAGE_EVENTS = 80
         const val MAX_PAGE_EVENTS = 200
