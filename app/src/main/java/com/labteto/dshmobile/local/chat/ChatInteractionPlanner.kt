@@ -43,6 +43,26 @@ data class UserChatPattern(
 )
 
 @Serializable
+data class ChatSceneState(
+    val sceneTime: String = "",
+    val location: String = "",
+    val participants: List<String> = emptyList(),
+    val positions: List<String> = emptyList(),
+    val activeActions: List<String> = emptyList(),
+    val keyObjects: List<String> = emptyList(),
+    val currentEvent: String = "",
+    val lastSceneChange: String = "",
+)
+
+@Serializable
+data class ChatContinuityState(
+    val recentEvents: List<String> = emptyList(),
+    val recurringEvents: List<String> = emptyList(),
+    val decisions: List<String> = emptyList(),
+    val unfinished: List<String> = emptyList(),
+)
+
+@Serializable
 data class ChatCharacterState(
     val mood: String = "自然",
     val relationshipState: String = "熟悉中",
@@ -57,6 +77,8 @@ data class ChatCharacterState(
     val shareDesire: Int = 50,
     val dynamics: RelationshipDynamics = RelationshipDynamics(),
     val userPattern: UserChatPattern = UserChatPattern(),
+    val scene: ChatSceneState = ChatSceneState(),
+    val continuity: ChatContinuityState = ChatContinuityState(),
     val narrativeDirection: ChatNarrativeDirection? = null,
     val interactionIntent: String = ChatInteractionIntent.NORMAL.name,
     val interactionIntentStrength: Int = 0,
@@ -157,6 +179,38 @@ class ChatInteractionPlanner @Inject constructor(
         if (state.dynamics.sharedMoments.isNotEmpty()) {
             appendLine("共同经历：${state.dynamics.sharedMoments.joinToString("；")}")
         }
+        if (
+            state.scene.sceneTime.isNotBlank() ||
+            state.scene.location.isNotBlank() ||
+            state.scene.participants.isNotEmpty() ||
+            state.scene.positions.isNotEmpty() ||
+            state.scene.activeActions.isNotEmpty() ||
+            state.scene.currentEvent.isNotBlank()
+        ) {
+            appendLine(
+                "当前场景：时间=${state.scene.sceneTime.ifBlank { "未知" }}｜地点=${state.scene.location.ifBlank { "未知" }}｜" +
+                    "人物=${state.scene.participants.joinToString("、").ifBlank { "未记录" }}｜" +
+                    "位置=${state.scene.positions.joinToString("；").ifBlank { "未记录" }}｜" +
+                    "动作=${state.scene.activeActions.joinToString("；").ifBlank { "无" }}｜" +
+                    "事件=${state.scene.currentEvent.ifBlank { "无" }}",
+            )
+            if (state.scene.keyObjects.isNotEmpty()) {
+                appendLine("场景物件：${state.scene.keyObjects.joinToString("、")}")
+            }
+            state.scene.lastSceneChange.takeIf(String::isNotBlank)?.let { appendLine("最近场景变化：$it") }
+        }
+        if (state.continuity.recentEvents.isNotEmpty()) {
+            appendLine("近期事件：${state.continuity.recentEvents.joinToString("；")}")
+        }
+        if (state.continuity.recurringEvents.isNotEmpty()) {
+            appendLine("重复事项归并：${state.continuity.recurringEvents.joinToString("；")}")
+        }
+        if (state.continuity.decisions.isNotEmpty()) {
+            appendLine("已定事项：${state.continuity.decisions.joinToString("；")}")
+        }
+        if (state.continuity.unfinished.isNotEmpty()) {
+            appendLine("待续事项：${state.continuity.unfinished.joinToString("；")}")
+        }
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
@@ -171,7 +225,7 @@ class ChatInteractionPlanner @Inject constructor(
         }
 
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
-        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
+        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；scene(sceneTime,location,participants,positions,activeActions,keyObjects,currentEvent,lastSceneChange)；continuity(recentEvents,recurringEvents,decisions,unfinished)。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
         appendLine("interactionIntent、interactionIntensity、recentActionTags、recentPoseTags、recentVerbalTags、recentAddressTerms、interactionCooldowns 由系统根据真实对话维护，不要在 JSON 中输出或猜测。")
         appendLine("规则：")
         appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
@@ -180,6 +234,9 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("4. suggestions 固定输出空数组；回复建议只在用户主动点击时另行生成。")
         appendLine("5. 用户实际发言和明确纠正优先；不虚构事实、不替用户作重大不可逆决定。现实关系军师场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
         appendLine("6. activeGoal/currentAgenda/internalConflict/immediateConcern 只写角色当下真实驱动，不凭空制造阴谋、爱意或分析腔。")
+        appendLine("7. scene 只记录本轮对话明确建立的物理场景事实。没有明确移动、时间推进或场景切换时，继承上一场景，禁止让人物无理由瞬移；发生移动时更新 location 与 lastSceneChange。")
+        appendLine("8. continuity 用事件事实概括剧情：recentEvents 只留近期关键变化；recurringEvents 把重复或同类事项合并成一条并写最终状态；decisions 记录已经定下的结果；unfinished 只列仍未完成的事项。禁止复制旧台词。")
+        appendLine("9. 只要地点、时间、人物位置、进行中动作或连续性事件发生变化，turnSignificance 至少为 MINOR，不能标 NONE。")
     }.trim()
 
     fun suggestionsPrompt(
@@ -284,24 +341,30 @@ class ChatInteractionPlanner @Inject constructor(
         val significance = normalizeSignificance(decoded.turnSignificance)
 
         val agedPrevious = ageTransientState(previous, userMessage)
+        val baseState = if (significance == "NONE") {
+            applyExplicitTransientClears(
+                value = decoded.state,
+                previous = agedPrevious,
+                rawState = rawState,
+            )
+        } else {
+            sanitizeState(
+                value = decoded.state,
+                previous = agedPrevious,
+                userMessage = userMessage,
+                assistantMessage = assistantMessage,
+                rawState = rawState,
+            )
+        }
+        val continuityState = mergeSceneAndContinuity(
+            value = decoded.state,
+            previous = baseState,
+            rawState = rawState,
+        )
         return decoded.copy(
             state = applyInteractionPerformance(
                 state = applyInteractionIntent(
-                    state = if (significance == "NONE") {
-                        applyExplicitTransientClears(
-                            value = decoded.state,
-                            previous = agedPrevious,
-                            rawState = rawState,
-                        )
-                    } else {
-                        sanitizeState(
-                            value = decoded.state,
-                            previous = agedPrevious,
-                            userMessage = userMessage,
-                            assistantMessage = assistantMessage,
-                            rawState = rawState,
-                        )
-                    },
+                    state = continuityState,
                     previous = agedPrevious,
                     userMessage = userMessage,
                 ),
@@ -559,6 +622,8 @@ class ChatInteractionPlanner @Inject constructor(
             } else previous.shareDesire,
             dynamics = dynamics,
             userPattern = pattern,
+            scene = previous.scene,
+            continuity = previous.continuity,
             narrativeDirection = null,
             interactionIntent = previous.interactionIntent,
             interactionIntentStrength = previous.interactionIntentStrength,
@@ -574,6 +639,91 @@ class ChatInteractionPlanner @Inject constructor(
         )
         return resetUpdatedAges(merged, rawState)
     }
+
+    private fun mergeSceneAndContinuity(
+        value: ChatCharacterState,
+        previous: ChatCharacterState,
+        rawState: JsonObject?,
+    ): ChatCharacterState {
+        if (rawState == null) return previous
+        val rawScene = rawState["scene"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val rawContinuity = rawState["continuity"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        if (rawScene == null && rawContinuity == null) return previous
+
+        val scene = if (rawScene == null) previous.scene else sanitizeScene(value.scene, previous.scene, rawScene)
+        val continuity = if (rawContinuity == null) {
+            previous.continuity
+        } else {
+            sanitizeContinuity(value.continuity, previous.continuity, rawContinuity)
+        }
+        return previous.copy(
+            scene = scene,
+            continuity = continuity,
+            updatedAt = System.currentTimeMillis(),
+        )
+    }
+
+    private fun sanitizeScene(
+        value: ChatSceneState,
+        previous: ChatSceneState,
+        raw: JsonObject,
+    ): ChatSceneState = ChatSceneState(
+        sceneTime = if (raw.containsKey("sceneTime")) {
+            value.sceneTime.trim().take(80).ifBlank { previous.sceneTime }
+        } else previous.sceneTime,
+        location = if (raw.containsKey("location")) {
+            value.location.trim().take(120).ifBlank { previous.location }
+        } else previous.location,
+        participants = if (raw.containsKey("participants")) {
+            sanitizeCurrentStrings(value.participants, limit = 8, maxChars = 80)
+        } else previous.participants,
+        positions = if (raw.containsKey("positions")) {
+            sanitizeCurrentStrings(value.positions, limit = 8, maxChars = 120)
+        } else previous.positions,
+        activeActions = if (raw.containsKey("activeActions")) {
+            sanitizeCurrentStrings(value.activeActions, limit = 6, maxChars = 120)
+        } else previous.activeActions,
+        keyObjects = if (raw.containsKey("keyObjects")) {
+            sanitizeCurrentStrings(value.keyObjects, limit = 8, maxChars = 80)
+        } else previous.keyObjects,
+        currentEvent = if (raw.containsKey("currentEvent")) {
+            value.currentEvent.trim().take(180)
+        } else previous.currentEvent,
+        lastSceneChange = if (raw.containsKey("lastSceneChange")) {
+            value.lastSceneChange.trim().take(200).ifBlank { previous.lastSceneChange }
+        } else previous.lastSceneChange,
+    )
+
+    private fun sanitizeContinuity(
+        value: ChatContinuityState,
+        previous: ChatContinuityState,
+        raw: JsonObject,
+    ): ChatContinuityState = ChatContinuityState(
+        recentEvents = if (raw.containsKey("recentEvents")) {
+            mergeStrings(previous.recentEvents, value.recentEvents, limit = 6, maxChars = 180)
+        } else previous.recentEvents,
+        recurringEvents = if (raw.containsKey("recurringEvents")) {
+            mergeStrings(previous.recurringEvents, value.recurringEvents, limit = 4, maxChars = 220)
+        } else previous.recurringEvents,
+        decisions = if (raw.containsKey("decisions")) {
+            mergeStrings(previous.decisions, value.decisions, limit = 4, maxChars = 180)
+        } else previous.decisions,
+        unfinished = if (raw.containsKey("unfinished")) {
+            sanitizeCurrentStrings(value.unfinished, limit = 4, maxChars = 180)
+        } else previous.unfinished,
+    )
+
+    private fun sanitizeCurrentStrings(
+        values: List<String>,
+        limit: Int,
+        maxChars: Int,
+    ): List<String> = values.asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .map { it.take(maxChars) }
+        .distinctBy(::normalize)
+        .take(limit)
+        .toList()
 
     private fun ageTransientState(
         previous: ChatCharacterState,
