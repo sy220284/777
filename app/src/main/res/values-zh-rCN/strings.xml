@@ -499,9 +499,9 @@
     <string name="settings_group_experience">体验</string>
     <string name="settings_group_system">系统</string>
     <string name="settings_group_maintenance">维护</string>
-    <string name="settings_models_subtitle">文字模型、视觉模型与模型服务</string>
+    <string name="settings_models_subtitle">模型、连通性测试、价格与用量</string>
     <string name="settings_memory_subtitle">长期规则、自动记忆与召回</string>
-    <string name="settings_general_subtitle">语言、主题与会话排序</string>
+    <string name="settings_general_subtitle">外观、会话与聊天风格</string>
     <string name="settings_permissions_subtitle">远程连接、后台连接与设备授权</string>
     <string name="settings_notifications_subtitle">完成、目标与需要处理的提醒</string>
     <string name="settings_advanced_subtitle">智能体执行、项目配置与诊断</string>

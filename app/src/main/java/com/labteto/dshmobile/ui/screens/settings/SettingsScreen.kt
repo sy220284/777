@@ -193,10 +193,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                    .safeDrawingPadding(),
             ) {
                 DsTopBar(
                     title = title,
@@ -204,8 +201,16 @@ fun SettingsScreen(
                         page.parentDestination()?.let { page = it } ?: onClose()
                     },
                     backContentDescription = stringResource(R.string.common_back),
+                    modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                 )
 
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = DsSpacing.large),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
                         Text(stringResource(R.string.settings_group_experience), style = DsType.std14, color = colors.labelTertiary)
@@ -447,9 +452,6 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODELS -> {
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
-                        ModelServicesCard(modelServices, viewModel)
-                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
@@ -466,6 +468,9 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        ModelServicesCard(modelServices, viewModel)
+                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
                     }
 
                     SettingsDestination.PRICING -> {
@@ -556,6 +561,7 @@ fun SettingsScreen(
                 }
 
                 Spacer(Modifier.height(DsSpacing.xlarge))
+                }
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
         }

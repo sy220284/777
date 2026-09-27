@@ -173,13 +173,16 @@ fun ToolsScreen(
     LaunchedEffect(Unit) {
         runCatching { store.refreshPlugins() }
     }
+    LaunchedEffect(state.notice) {
+        if (state.notice == ToolsNotice.CONNECTED) {
+            serverId = ""
+            endpoint = ""
+        }
+    }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+            Modifier.fillMaxSize().safeDrawingPadding(),
         ) {
             DsTopBar(
                 title = stringResource(R.string.tools_title),
@@ -189,8 +192,14 @@ fun ToolsScreen(
                 actionIcon = Icons.Outlined.Refresh,
                 actionContentDescription = stringResource(R.string.tools_refresh),
                 onAction = viewModel::refresh,
+                modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
             )
 
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
+                    .padding(horizontal = DsSpacing.large),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+            ) {
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                 Text(stringResource(R.string.tools_capability_group), style = DsType.std14, color = colors.labelTertiary)
                 Text(stringResource(R.string.tools_capability_group_hint), style = DsType.caption11, color = colors.labelTertiary)
@@ -285,6 +294,7 @@ fun ToolsScreen(
                         onValueChange = { serverId = it.take(24) },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.tools_server_name)) },
+                        enabled = !state.loading,
                         singleLine = true,
                     )
                     OutlinedTextField(
@@ -293,14 +303,13 @@ fun ToolsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.tools_endpoint)) },
                         supportingText = { Text(stringResource(R.string.tools_endpoint_hint)) },
+                        enabled = !state.loading,
                         singleLine = true,
                     )
                     DsButton(
                         text = stringResource(if (state.loading) R.string.tools_processing else R.string.tools_connect),
                         onClick = {
                             viewModel.connectHttp(serverId.trim(), endpoint.trim())
-                            serverId = ""
-                            endpoint = ""
                         },
                         enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                         variant = DsButtonVariant.Outline,
@@ -355,6 +364,7 @@ fun ToolsScreen(
                     ToolsNotice.DISCONNECT_FAILED -> R.string.tools_disconnect_failed
                 }
                 Text(stringResource(message), style = DsType.small13, color = colors.labelSecondary)
+            }
             }
         }
     }

@@ -501,9 +501,9 @@
     <string name="settings_group_experience">Experience</string>
     <string name="settings_group_system">System</string>
     <string name="settings_group_maintenance">Maintenance</string>
-    <string name="settings_models_subtitle">Text, vision, and model services</string>
+    <string name="settings_models_subtitle">Models, connection tests, pricing, and usage</string>
     <string name="settings_memory_subtitle">Long-term rules, automatic memory, and recall</string>
-    <string name="settings_general_subtitle">Language, theme, and session ordering</string>
+    <string name="settings_general_subtitle">Appearance, sessions, and chat style</string>
     <string name="settings_permissions_subtitle">Remote connection, background connection, and device access</string>
     <string name="settings_notifications_subtitle">Completion, goal, and action-needed alerts</string>
     <string name="settings_advanced_subtitle">Agent execution, project configuration, and diagnostics</string>
