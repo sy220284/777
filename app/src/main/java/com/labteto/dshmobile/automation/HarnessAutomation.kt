@@ -729,7 +729,10 @@ class HarnessAutomationWorker(
         val store = entry.automationStore()
         val scheduler = entry.automationScheduler()
         var task = store.get(id) ?: return Result.success()
-        if (task.status == "paused" && !manualRun) return Result.success()
+        if (
+            task.status in setOf("paused", "waiting_user") &&
+            !manualRun
+        ) return Result.success()
 
         val recovering = !manualRun && task.status == "running" && task.lastRunAt != null
         val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
