@@ -21,6 +21,17 @@ import kotlinx.serialization.json.put
  * persisted and injected near the request tail. This coordinator only folds those facts into the
  * small Scene/Continuity checkpoint and advances processedThroughSequence.
  */
+internal fun renderPendingTurnsForPlanner(pending: List<ChatPendingTurn>): String = buildString {
+    appendLine("【待归并回合｜严格按真实顺序】")
+    pending.sortedBy(ChatPendingTurn::sequence).forEachIndexed { index, turn ->
+        if (index > 0) appendLine()
+        appendLine("#${turn.sequence}")
+        appendLine("用户：${turn.userMessage}")
+        appendLine("角色：${turn.assistantMessage}")
+    }
+    append("按上述 用户→角色 的逐回合顺序理解状态变化；后面的回合可以纠正、结束或覆盖前面的临时状态。")
+}.trim()
+
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
@@ -97,22 +108,11 @@ internal class LocalChatContextRefreshCoordinator(
             .toList()
         if (pending.isEmpty()) return
 
-        val orderedBatch = pending.joinToString("\n\n") { turn ->
-            buildString {
-                appendLine("#${turn.sequence}")
-                appendLine("用户：${turn.userMessage}")
-                append("角色：${turn.assistantMessage}")
-            }
-        }
         val plannerState = before.chatState.withContextForPlanner(baseContext)
         val prompt = chatTurnCoordinator.postTurnPrompt(
             persona = persona,
             state = plannerState,
-            userMessage = buildString {
-                appendLine("【待归并回合｜严格按真实顺序】")
-                appendLine(orderedBatch)
-                append("按上述 用户→角色 的逐回合顺序理解状态变化；后面的回合可以纠正、结束或覆盖前面的临时状态。")
-            },
+            userMessage = renderPendingTurnsForPlanner(pending),
             assistantMessage = "",
         )
         val plannerReply = try {
