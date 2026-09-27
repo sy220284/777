@@ -119,7 +119,7 @@ class ChatProactivePolicyTest {
 
         assertFalse(decision.shouldSend)
         assertTrue(decision.waitingForUserReply)
-        assertEquals(null, decision.retryAt)
+        assertTrue(decision.retryAt == null)
     }
 
     @Test
