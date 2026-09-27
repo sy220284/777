@@ -139,6 +139,37 @@ PY
   printf '%s  %s\n' "$expected" "$packages" | sha256sum -c - >/dev/null
 }
 
+fetch_verified_repo_index() {
+  local packages_file="$1"
+  local inrelease_file="$2"
+  local apt_arch="$3"
+
+  if [ -s "$packages_file" ] && [ -s "$inrelease_file" ] &&
+    (verify_packages_index "$inrelease_file" "$packages_file" "$apt_arch"); then
+    return 0
+  fi
+
+  rm -f "$packages_file" "$inrelease_file"
+  local packages_tmp="${packages_file}.part"
+  local inrelease_tmp="${inrelease_file}.part"
+  local repo
+  for repo in "${TERMUX_REPOS[@]}"; do
+    rm -f "$packages_tmp" "$inrelease_tmp"
+    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/main/binary-$apt_arch/Packages" -o "$packages_tmp" &&
+      curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/InRelease" -o "$inrelease_tmp" &&
+      (verify_packages_index "$inrelease_tmp" "$packages_tmp" "$apt_arch"); then
+      mv "$packages_tmp" "$packages_file"
+      mv "$inrelease_tmp" "$inrelease_file"
+      return 0
+    fi
+    echo "Termux 索引镜像不可用或校验失败，切换备用源：$repo" >&2
+  done
+
+  rm -f "$packages_tmp" "$inrelease_tmp"
+  echo "所有 Termux 镜像的索引均不可用：$apt_arch" >&2
+  return 1
+}
+
 resolve_runtime_packages() {
   local packages_file="$1"
   shift
@@ -303,9 +334,7 @@ prepare_arch() {
 
   rm -rf "$index_dir"
   mkdir -p "$index_dir"
-  fetch_repo_path "dists/stable/main/binary-$apt_arch/Packages" "$packages_file"
-  fetch_repo_path "dists/stable/InRelease" "$inrelease_file"
-  verify_packages_index "$inrelease_file" "$packages_file" "$apt_arch"
+  fetch_verified_repo_index "$packages_file" "$inrelease_file" "$apt_arch"
 
   local actual_python_version
   actual_python_version="$(package_field "$packages_file" "$PYTHON_PACKAGE" Version)"
