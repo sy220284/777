@@ -150,7 +150,7 @@
     <string name="local_device_approval_on">Device actions approved for this turn</string>
     <string name="local_approval_scope_show">View permission scope</string>
     <string name="local_approval_scope_hide">Hide permission scope</string>
-    <string name="local_device_approval_scope">Ordinary taps, typing, and swipes can run during this agent turn. Shizuku, elevated access, external tools, credentials, and commands still need approval.</string>
+    <string name="local_device_approval_scope">Ordinary taps, typing, and swipes can run during this agent turn. Elevated access, external tools, credentials, and commands still need approval.</string>
     <string name="local_welcome_title">What would you like to do?</string>
     <string name="local_welcome_hint">Describe your goal to begin. I’ll ask before changing files or controlling your device.</string>
     <string name="local_suggestions_title">Try one of these</string>
@@ -569,8 +569,6 @@
     <string name="advanced_device_status_ready">Device capabilities ready</string>
     <string name="advanced_device_status_needs_setup">Some capabilities need setup</string>
     <string name="advanced_device_status_error">Capability check failed</string>
-    <string name="advanced_shizuku_service_hint">Checks whether the Shizuku service is running on this device.</string>
-    <string name="advanced_shizuku_permission_hint">Authorizes privileged device operations through Shizuku.</string>
     <string name="advanced_accessibility_hint">Lets the agent click, type, and navigate ordinary device UI.</string>
     <string name="advanced_notification_access_hint">Lets the agent read notifications when a task needs that context.</string>
     <string name="advanced_virtual_display_hint">Allows isolated device work to continue on a virtual display.</string>
@@ -652,7 +650,6 @@
     <string name="advanced_project_unavailable">Project configuration unavailable: %1$s</string>
     <string name="advanced_provider_config">Configuration: %1$s/%2$s</string>
     <string name="advanced_replace_model_key">Replace model key (optional)</string>
-    <string name="advanced_request_shizuku">Request Shizuku permission</string>
     <string name="advanced_restore_default">Restore default</string>
     <string name="advanced_restored_field">Restored %1$s</string>
     <string name="advanced_save_agent_settings">Save agent settings</string>
@@ -665,8 +662,6 @@
     <string name="advanced_secret_replace_hint">Already set; enter a new value to replace it</string>
     <string name="advanced_secret_unset">Not set</string>
     <string name="advanced_select">Select…</string>
-    <string name="advanced_shizuku_permission">Shizuku permission</string>
-    <string name="advanced_shizuku_service">Shizuku service</string>
     <string name="advanced_subagent_steps">Subagent steps</string>
     <string name="advanced_updated_field">Updated %1$s</string>
     <string name="advanced_user_rules">Long-term user rules</string>
