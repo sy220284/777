@@ -299,15 +299,16 @@ class GitHubConnectorPlugin(
                 url.port == baseUrl.port
         ) { "GitHub 连接器只允许访问已配置的 GitHub API 主机" }
 
-        val encodedPath = url.encodedPath
+        val normalizedPath = ("/" + url.pathSegments.joinToString("/")).lowercase()
         if (mutation) {
-            require(encodedPath.startsWith("/repos/")) { "GitHub 写请求只允许 /repos/... 仓库范围 API" }
-            require(FORBIDDEN_MUTATION_PATHS.none(encodedPath::contains)) {
+            require(normalizedPath.startsWith("/repos/")) { "GitHub 写请求只允许 /repos/... 仓库范围 API" }
+            require(FORBIDDEN_MUTATION_PATHS.none(normalizedPath::contains)) {
                 "该 GitHub 管理接口未向 Agent 开放"
             }
         } else {
             require(READ_PATH_PREFIXES.any { prefix ->
-                encodedPath == prefix || encodedPath.startsWith(if (prefix.endsWith('/')) prefix else "$prefix/")
+                normalizedPath == prefix ||
+                    normalizedPath.startsWith(if (prefix.endsWith('/')) prefix else "$prefix/")
             }) { "该 GitHub GET API 路径未向 Agent 开放" }
         }
         return url
