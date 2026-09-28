@@ -33,15 +33,13 @@ import kotlinx.coroutines.launch
  *  - swipe right from the LEFT edge (or anywhere on the content) opens the chat-list drawer
  *    (ModalNavigationDrawer's built-in gesture; swipe left on the drawer
  *    content closes it, scrim tap and Back also work)
- *  - swipe left from the RIGHT edge opens the session Details panel
- *  - swipe right anywhere on the open Details panel closes it
+ *  - the explicit top-bar affordance opens the session Details panel
+ *  - swipe right on the open Details panel closes it
  *
- * The details gesture detector only claims the drags it owns (leftward from the right edge
- * band, or any drag on the details area while it is open) and leaves every other horizontal
- * drag unconsumed. ModalNavigationDrawer puts an anchoredDraggable(Horizontal) on the whole
- * surface, so an always-consuming detector here would starve the drawer's open gesture.
- * Horizontal edge drags are axis-orthogonal to the chat list's vertical scroll, so the two
- * never conflict.
+ * Opening Details deliberately avoids a right-edge gesture: Android reserves both screen edges
+ * for system back navigation, so claiming that band makes a core app action compete with the OS.
+ * The detector below exists only while Details is open and only claims rightward drags that start
+ * inside the panel.
  */
 @Composable
 fun MainScreen(
@@ -79,28 +77,16 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(detailsOpen) {
+                    if (!detailsOpen) return@pointerInput
                     val width = size.width.toFloat()
-                    val edgeBandPx = 28.dp.toPx()
                     val detailsAreaPx = detailsWidth.toPx() * 0.9f
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        val startX = down.position.x
-                        // Claim only gestures this screen handles: leftward drags starting in
-                        // the right edge band open details; drags starting on the open details
-                        // panel close it. Everything else (notably left-to-right swipes) must
-                        // stay unconsumed for the drawer's built-in open gesture.
-                        val owned = if (!detailsOpen) {
-                            startX >= width - edgeBandPx
-                        } else {
-                            startX <= detailsAreaPx
-                        }
-                        if (!owned) return@awaitEachGesture
+                        if (down.position.x > detailsAreaPx) return@awaitEachGesture
 
                         var claimed = false
                         awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
-                            // While closed, only a leftward drag belongs to this screen; a
-                            // rightward drag from the edge is the drawer's to open with.
-                            claimed = detailsOpen || overSlop < 0f
+                            claimed = overSlop > 0f
                             if (claimed) change.consume()
                         } ?: return@awaitEachGesture
                         if (!claimed) return@awaitEachGesture
@@ -110,16 +96,10 @@ fun MainScreen(
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (change.changedToUpIgnoreConsumed()) break
-                            // A deeper scrollable claimed the drag; let it keep it.
                             if (change.isConsumed) break
                             totalX += change.positionChange().x
                             change.consume()
-                            val threshold = width * 0.12f
-                            if (!detailsOpen && totalX <= -threshold) {
-                                detailsOpen = true
-                                break
-                            }
-                            if (detailsOpen && totalX >= threshold) {
+                            if (totalX >= width * 0.12f) {
                                 detailsOpen = false
                                 break
                             }
