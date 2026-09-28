@@ -93,4 +93,60 @@ class ChatContextAssemblerTest {
         assertTrue(rendered.contains("端起饮品"))
         assertTrue(rendered.contains("不只换同义词"))
     }
+
+    @Test
+    fun assemblerKeepsCurrentScheduleAndDropsStaleStorySchedule() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【剧情连续性｜当前有效】
+                已定：明早十点去城南
+
+                【连续性摘要｜已发生】
+                当前有效决定：明早九点去城南
+            """.trimIndent(),
+            relationshipMemory = "",
+            userInput = "继续",
+        )
+
+        assertTrue(context.contains("明早十点去城南"))
+        assertFalse(context.contains("明早九点去城南"))
+    }
+
+    @Test
+    fun assemblerDropsStaleSceneAndRelationshipCopiesFromLaterBlocks() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【当前状态】情绪=自然｜关系=稳定关系｜阶段=COMMITTED
+                【当前场景｜硬连续性】
+                时间=夜晚｜地点=房间
+
+                【连续性摘要｜已发生】
+                保存时的关系：熟悉中
+                当前硬场景：时间=夜晚｜地点=院子
+            """.trimIndent(),
+            relationshipMemory = "",
+            userInput = "继续",
+        )
+
+        assertTrue(context.contains("关系=稳定关系"))
+        assertFalse(context.contains("保存时的关系：熟悉中"))
+        assertTrue(context.contains("地点=房间"))
+        assertFalse(context.contains("地点=院子"))
+    }
+
+
+    @Test
+    fun userQuestionDoesNotSuppressCurrentCommittedSchedule() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【剧情连续性｜当前有效】
+                已定：明天十点去城南
+            """.trimIndent(),
+            relationshipMemory = "",
+            userInput = "明天九点去城南吗？",
+        )
+
+        assertTrue(context.contains("明天十点去城南"))
+    }
+
 }

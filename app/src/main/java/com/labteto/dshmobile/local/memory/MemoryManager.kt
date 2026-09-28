@@ -110,7 +110,7 @@ class MemoryManager @Inject constructor(
             limit = 2_000,
         )
         val replaced = conflicts.findReplacement(candidate, current)
-        return store.remember(
+        val remembered = store.remember(
             content = candidate.content,
             scope = candidate.scope,
             kind = candidate.kind,
@@ -122,5 +122,7 @@ class MemoryManager @Inject constructor(
             importance = candidate.importance,
             replaceIds = replaced?.let { setOf(it.id) }.orEmpty(),
         )
+        store.consolidateIfDue()
+        return remembered
     }
 }

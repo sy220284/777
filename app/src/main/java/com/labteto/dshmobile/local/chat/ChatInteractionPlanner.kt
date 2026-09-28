@@ -55,11 +55,33 @@ data class ChatSceneState(
 )
 
 @Serializable
+enum class ChatContinuityFactKind {
+    EVENT,
+    DECISION,
+    OPEN_THREAD,
+}
+
+@Serializable
+data class ChatContinuityEvidence(
+    val kind: ChatContinuityFactKind = ChatContinuityFactKind.EVENT,
+    val text: String = "",
+    val sourceSequence: Long = 0L,
+    val sourceUserMessageId: String = "",
+    val sourceAssistantMessageId: String = "",
+    val evidence: String = "",
+)
+
+@Serializable
 data class ChatContinuityState(
     val recentEvents: List<String> = emptyList(),
     val recurringEvents: List<String> = emptyList(),
     val decisions: List<String> = emptyList(),
     val unfinished: List<String> = emptyList(),
+    /**
+     * System-owned provenance for the active soft continuity facts above.
+     * Old persisted states decode with an empty list and are gradually grounded by later turns.
+     */
+    val evidence: List<ChatContinuityEvidence> = emptyList(),
 )
 
 @Serializable
@@ -659,6 +681,8 @@ class ChatInteractionPlanner @Inject constructor(
         unfinished = if (raw.containsKey("unfinished")) {
             sanitizeCurrentStrings(value.unfinished, limit = 4, maxChars = 180)
         } else previous.unfinished.takeLast(4),
+        // Provenance is derived from durable Pending turns after parsing; the model never owns it.
+        evidence = previous.evidence,
     )
 
     private fun sanitizeCurrentStrings(

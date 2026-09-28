@@ -469,6 +469,7 @@ class LocalHarnessEngine @Inject constructor(
     private val chatContextRefreshCoordinator by lazy {
         LocalChatContextRefreshCoordinator(
             state = _state,
+            scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
             requestPlanner = { snapshot, prompt, requestLog ->
                 apiKeys.get()?.let { key ->
@@ -756,8 +757,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    private val chatPostTurnLock = Any()
-    private var chatPostTurnJob: Job? = null
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
@@ -3708,6 +3707,7 @@ class LocalHarnessEngine @Inject constructor(
                         .enqueuePending(
                         ChatPendingTurn(
                             sequence = assistantEvent.sequence,
+                            userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId.orEmpty(),
                             assistantMessageId = transcript.id,
                             branchHeadId = transcript.id,
                             userMessage = input,
@@ -4056,6 +4056,8 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
+                    sourceUserMessageId = sourceMessageId
+                        ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -4658,6 +4660,8 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
+                        sourceUserMessageId = sourceMessageId
+                            ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
             }
@@ -5625,12 +5629,7 @@ class LocalHarnessEngine @Inject constructor(
         }
 
     private fun cancelChatPostTurn() {
-        val job = synchronized(chatPostTurnLock) {
-            val current = chatPostTurnJob
-            chatPostTurnJob = null
-            current
-        }
-        job?.cancel()
+        chatContextRefreshCoordinator.cancelScheduledRefresh()
     }
 
     private fun scheduleChatPostTurn(
@@ -5640,33 +5639,18 @@ class LocalHarnessEngine @Inject constructor(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
+        sourceUserMessageId: String? = null,
     ) {
-        cancelChatPostTurn()
-        val boundEventLog = eventLogFor(expectedSessionId)
-        val generation = chatContextRefreshCoordinator.enqueue(
+        chatContextRefreshCoordinator.schedule(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
+            persona = persona,
             expectedSessionId = expectedSessionId,
             expectedAssistantMessageId = expectedAssistantMessageId,
-            boundEventLog = boundEventLog,
-        ) ?: return
-
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            chatContextRefreshCoordinator.refresh(
-                persona = persona,
-                expectedSessionId = expectedSessionId,
-                expectedBaseState = expectedBaseState,
-                expectedGeneration = generation,
-                boundEventLog = boundEventLog,
-            )
-        }
-        synchronized(chatPostTurnLock) { chatPostTurnJob = job }
-        job.invokeOnCompletion {
-            synchronized(chatPostTurnLock) {
-                if (chatPostTurnJob === job) chatPostTurnJob = null
-            }
-        }
-        job.start()
+            expectedBaseState = expectedBaseState,
+            boundEventLog = eventLogFor(expectedSessionId),
+            sourceUserMessageId = sourceUserMessageId,
+        )
     }
 
     private suspend fun enforceChatStyle(

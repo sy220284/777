@@ -8,10 +8,15 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -71,15 +76,55 @@ internal fun finalizeGroupContextAfterRefresh(
 ): ChatContextState {
     if (!complete || processedPending.isEmpty()) return context
     val through = processedPending.maxOf(ChatPendingTurn::sequence)
+    val merged = mergeGroupContinuity(context.continuity, statesInReplyOrder)
+    val grounded = groundContinuityEvidence(
+        previous = context.continuity,
+        candidate = merged,
+        pendingTurns = processedPending,
+    )
     return context.commitProcessed(
         scene = context.scene,
-        continuity = mergeGroupContinuity(context.continuity, statesInReplyOrder),
+        continuity = grounded,
         throughSequence = through,
     )
 }
 
+
+internal fun findChatContinuitySourceUserMessageId(
+    eventLog: LocalSessionEventLog,
+    beforeSequenceExclusive: Long,
+    expectedContent: String,
+    pageSize: Int = 200,
+): String? {
+    val expected = expectedContent.trim()
+    if (expected.isBlank()) return null
+    var before = beforeSequenceExclusive
+    val boundedPageSize = pageSize.coerceIn(1, 500)
+    while (true) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = before,
+            limit = boundedPageSize,
+        )
+        if (page.isEmpty()) return null
+
+        page.asReversed().forEach { event ->
+            decodeTranscriptMessages(event.data).orEmpty()
+                .asReversed()
+                .firstOrNull { message ->
+                    message.role == "user" && message.content.trim() == expected
+                }
+                ?.let { return it.id }
+        }
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < boundedPageSize || oldestSequence <= 0L) return null
+        before = oldestSequence
+    }
+}
+
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
+    private val scope: CoroutineScope,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val requestPlanner: suspend (
         snapshot: LocalHarnessState,
@@ -90,12 +135,63 @@ internal class LocalChatContextRefreshCoordinator(
     private val persistBranchState: (String) -> Unit,
     private val persist: () -> Unit,
 ) {
+    private val scheduledRefreshLock = Any()
+    private var scheduledRefreshJob: Job? = null
+
+    fun cancelScheduledRefresh() {
+        val job = synchronized(scheduledRefreshLock) {
+            val current = scheduledRefreshJob
+            scheduledRefreshJob = null
+            current
+        }
+        job?.cancel()
+    }
+
+    fun schedule(
+        userMessage: String,
+        assistantMessage: String,
+        persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedAssistantMessageId: String,
+        expectedBaseState: ChatCharacterState,
+        boundEventLog: LocalSessionEventLog,
+        sourceUserMessageId: String? = null,
+    ) {
+        cancelScheduledRefresh()
+        val generation = enqueue(
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            expectedSessionId = expectedSessionId,
+            expectedAssistantMessageId = expectedAssistantMessageId,
+            boundEventLog = boundEventLog,
+            sourceUserMessageId = sourceUserMessageId,
+        ) ?: return
+
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            refresh(
+                persona = persona,
+                expectedSessionId = expectedSessionId,
+                expectedBaseState = expectedBaseState,
+                expectedGeneration = generation,
+                boundEventLog = boundEventLog,
+            )
+        }
+        synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
+        job.invokeOnCompletion {
+            synchronized(scheduledRefreshLock) {
+                if (scheduledRefreshJob === job) scheduledRefreshJob = null
+            }
+        }
+        job.start()
+    }
+
     fun enqueue(
         userMessage: String,
         assistantMessage: String,
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         boundEventLog: LocalSessionEventLog,
+        sourceUserMessageId: String? = null,
     ): Long? {
         if (state.value.sessionId != expectedSessionId) return null
         val sequence = findTranscriptEventSequence(
@@ -103,6 +199,20 @@ internal class LocalChatContextRefreshCoordinator(
             type = "assistant/message",
             messageId = expectedAssistantMessageId,
         ) ?: return null
+        val resolvedSourceUserMessageId = sourceUserMessageId
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?: if (userMessage.isBlank()) {
+                ""
+            } else {
+                // Compatibility fallback for older callers that do not yet carry the durable user
+                // message id. Normal foreground turns pass it directly and avoid this log scan.
+                findChatContinuitySourceUserMessageId(
+                    eventLog = boundEventLog,
+                    beforeSequenceExclusive = sequence,
+                    expectedContent = userMessage,
+                ).orEmpty()
+            }
 
         var generation: Long? = null
         var branchSnapshotUpdated = false
@@ -120,6 +230,7 @@ internal class LocalChatContextRefreshCoordinator(
                 val nextContext = baseContext.enqueuePending(
                     ChatPendingTurn(
                         sequence = sequence,
+                        userMessageId = resolvedSourceUserMessageId,
                         assistantMessageId = expectedAssistantMessageId,
                         branchHeadId = expectedAssistantMessageId,
                         userMessage = userMessage,
@@ -216,13 +327,18 @@ internal class LocalChatContextRefreshCoordinator(
         }
 
         val throughSequence = pending.maxOf(ChatPendingTurn::sequence)
+        val groundedContinuity = groundContinuityEvidence(
+            previous = baseContext.continuity,
+            candidate = plan.state.continuity,
+            pendingTurns = pending,
+        )
         val deterministicState = plan.state.copy(
             scene = baseContext.scene,
-            continuity = plan.state.continuity,
+            continuity = groundedContinuity,
         )
         val nextContext = baseContext.commitProcessed(
             scene = baseContext.scene,
-            continuity = deterministicState.continuity,
+            continuity = groundedContinuity,
             throughSequence = throughSequence,
         )
         var applied = false
@@ -276,6 +392,7 @@ internal class LocalChatContextRefreshCoordinator(
         }
         persist()
     }
+
 
     private fun findTranscriptEventSequence(
         eventLog: LocalSessionEventLog,

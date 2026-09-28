@@ -58,7 +58,7 @@ internal object ChatContextAssembler {
         recentAssistantReplies: List<String> = emptyList(),
     ): String {
         val seen = mutableListOf<String>()
-        semanticCore(userInput).takeIf(String::isNotBlank)?.let(seen::add)
+        val userLine = userInput.trim().takeIf(String::isNotBlank)
 
         fun dedupe(block: String): String {
             if (block.isBlank()) return ""
@@ -71,9 +71,13 @@ internal object ChatContextAssembler {
                     return@forEach
                 }
                 val core = semanticCore(line)
-                if (core.isBlank() || seen.none { prior -> semanticallySimilar(core, prior) }) {
+                val duplicatesUserText = userLine?.let { current ->
+                    semanticallySimilar(line, current)
+                } == true
+                val conflictsEarlierFact = seen.any { prior -> factConflicts(line, prior) }
+                if (core.isBlank() || (!duplicatesUserText && !conflictsEarlierFact)) {
                     kept += line
-                    if (core.isNotBlank()) seen += core
+                    if (core.isNotBlank()) seen += line
                 }
             }
             return kept.joinToString("\n").trim()
@@ -98,6 +102,61 @@ internal object ChatContextAssembler {
         return listOf(primary, memory, generationRule)
             .filter(String::isNotBlank)
             .joinToString("\n\n")
+    }
+
+    /**
+     * Shared request-level fact precedence used by both dynamic prompt assembly and historical
+     * checkpoint pruning. The newer/current fact is passed as [right].
+     */
+    internal fun factConflicts(left: String, right: String): Boolean {
+        if (semanticallySimilar(left, right)) return true
+        if (sameStructuredFactSlot(left, right)) return true
+        val oldSchedule = normalizeScheduleFact(left) ?: return false
+        val currentSchedule = normalizeScheduleFact(right) ?: return false
+        return oldSchedule == currentSchedule
+    }
+
+    private fun sameStructuredFactSlot(left: String, right: String): Boolean {
+        val a = left.trim()
+        val b = right.trim()
+        if (hasField(a, "时间") && hasField(b, "时间")) return true
+        if (hasField(a, "地点") && hasField(b, "地点")) return true
+        if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) return true
+        return false
+    }
+
+    private fun hasField(text: String, label: String): Boolean =
+        Regex("""(?:^|[｜|])\s*$label\s*[=:：]""").containsMatchIn(text) ||
+            text.contains("当前硬场景") && text.contains("$label=")
+
+    private fun hasRelationshipStateField(text: String): Boolean =
+        text.contains("关系状态：") ||
+            text.contains("保存时的关系：") ||
+            Regex("""(?:^|[｜|])\s*关系\s*[=:：]""").containsMatchIn(text)
+
+    private fun normalizeScheduleFact(text: String): String? {
+        val normalized = text.lowercase()
+            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
+            .replace(
+                Regex("""^(?:已定|当前有效决定|决定|待续事项|待续|近期关键事件|近期事件|近期)"""),
+                "",
+            )
+            .replace("明天上午", "明天")
+            .replace("明日上午", "明天")
+            .replace("明早", "明天")
+            .replace("明天早上", "明天")
+            .replace("明天晚上", "明天")
+            .replace("明晚", "明天")
+            .replace("今天上午", "今天")
+            .replace("今天早上", "今天")
+            .replace("今早", "今天")
+            .replace("今天晚上", "今天")
+            .replace("今晚", "今天")
+        if (!SCHEDULE_FACT_HINT.containsMatchIn(normalized)) return null
+        val clockNormalized = normalized
+            .replace(ARABIC_CLOCK, "<时>")
+            .replace(CHINESE_CLOCK, "<时>")
+        return clockNormalized.takeIf { it != normalized }
     }
 
     internal fun semanticallySimilar(left: String, right: String): Boolean {
@@ -138,6 +197,13 @@ internal object ChatContextAssembler {
     private fun bigrams(text: String): Set<String> =
         if (text.length < 2) setOf(text)
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
+
+    private val SCHEDULE_FACT_HINT = Regex(
+        """(?:今天|今晚|明天|明早|后天|早上|上午|中午|下午|傍晚|晚上|夜里|出发|见面|碰面|集合|去|回|到)""",
+    )
+    private val ARABIC_CLOCK = Regex("""(?:\d{1,2}[:：]\d{1,2}|\d{1,2}点(?:半|一刻|三刻)?)""")
+    private val CHINESE_CLOCK = Regex("""[零〇一二两三四五六七八九十]{1,4}点(?:半|一刻|三刻)?""")
+
 }
 
 internal data class ChatRepetitionResult(
