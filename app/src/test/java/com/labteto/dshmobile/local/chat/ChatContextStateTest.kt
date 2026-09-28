@@ -325,4 +325,35 @@ class ChatContextStateTest {
         assertTrue(grounded.evidence.isEmpty())
     }
 
+
+    @Test
+    fun newGroundedDecisionDoesNotEraseUnrelatedExistingDecision() {
+        val previous = ChatContinuityState(
+            decisions = listOf(
+                "明早九点去城南",
+                "出门前记得带伞",
+            ),
+        )
+        val pending = listOf(
+            ChatPendingTurn(
+                sequence = 41L,
+                userMessageId = "u41",
+                assistantMessageId = "a41",
+                userMessage = "出发时间改成明天十点，还是去城南。",
+                assistantMessage = "好，改成明天十点出发。",
+            ),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(
+                decisions = listOf("明天十点去城南"),
+            ),
+            pendingTurns = pending,
+        )
+
+        assertTrue(grounded.decisions.contains("明天十点去城南"))
+        assertTrue(grounded.decisions.contains("出门前记得带伞"))
+        assertFalse(grounded.decisions.contains("明早九点去城南"))
+    }
+
 }
