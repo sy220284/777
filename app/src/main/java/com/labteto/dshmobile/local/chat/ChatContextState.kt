@@ -228,6 +228,15 @@ private const val DECISION_CONTINUITY_EVIDENCE_SCORE = 80
 private const val EVENT_CONTINUITY_EVIDENCE_SCORE = 55
 private const val OPEN_THREAD_CONTINUITY_EVIDENCE_SCORE = 55
 private const val DERIVED_CONTINUITY_EVIDENCE_SCORE = 10
+private val DECISION_REMOVAL_SIGNAL = Regex(
+    """(?:取消|作废|不去了|不再去|不去|别去了|不约了|不见了|不出发|撤销|改计划|改成|换成|延期|推迟)""",
+)
+private val OPEN_THREAD_REMOVAL_SIGNAL = Regex(
+    """(?:解决了|说清了|说完了|完成了|处理好了|不用继续|不用再|结束了|不提了|取消了|没事了|算了)""",
+)
+private val GENERIC_OPEN_THREAD_CLOSE_SIGNAL = Regex(
+    """(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)""",
+)
 private const val MAX_PENDING_CONTEXT_CHARS = 1_800
 private const val MAX_SCENE_CONTEXT_CHARS = 700
 private const val MAX_SOFT_CONTINUITY_CHARS = 1_300
@@ -277,8 +286,16 @@ internal fun groundContinuityEvidence(
         preserveUnrelatedPrevious: Boolean = false,
         limit: Int,
     ): List<String> {
-        if (values.isEmpty()) return emptyList()
-        val previousKeys = previousValues.associateBy(::normalizeContinuityFact)
+        val retainedPrevious = previousValues.filterNot { previousFact ->
+            continuityRemovalGrounded(
+                kind = kind,
+                fact = previousFact,
+                turns = orderedTurns,
+                activeFactCount = previousValues.size,
+            )
+        }
+        if (values.isEmpty()) return retainedPrevious.takeLast(limit)
+        val previousKeys = retainedPrevious.associateBy(::normalizeContinuityFact)
         val accepted = mutableListOf<String>()
 
         values.forEach { raw ->
@@ -322,13 +339,13 @@ internal fun groundContinuityEvidence(
 
         // A malformed/hallucinated replacement must not silently erase the previous valid state.
         if (accepted.isEmpty()) {
-            return if (previousValues.isNotEmpty()) previousValues.takeLast(limit) else emptyList()
+            return retainedPrevious.takeLast(limit)
         }
         if (!preserveUnrelatedPrevious) return accepted.takeLast(limit)
 
         // Decisions are independent slots: a newly grounded decision replaces only an older
         // conflicting decision. Unrelated commitments stay active even if the planner omitted them.
-        val preserved = previousValues.filter { old ->
+        val preserved = retainedPrevious.filter { old ->
             accepted.none { fresh ->
                 normalizeContinuityFact(old) == normalizeContinuityFact(fresh) ||
                     ChatContextAssembler.factConflicts(old, fresh)
@@ -357,6 +374,7 @@ internal fun groundContinuityEvidence(
         values = candidate.unfinished,
         previousValues = previous.unfinished,
         allowDerivedEvidence = true,
+        preserveUnrelatedPrevious = true,
         limit = 4,
     )
 
@@ -379,6 +397,34 @@ internal fun groundContinuityEvidence(
             .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
             .takeLast(MAX_CONTINUITY_EVIDENCE),
     )
+}
+
+private fun continuityRemovalGrounded(
+    kind: ChatContinuityFactKind,
+    fact: String,
+    turns: List<ChatPendingTurn>,
+    activeFactCount: Int,
+): Boolean {
+    if (kind == ChatContinuityFactKind.EVENT || fact.isBlank()) return false
+    return turns.any { turn ->
+        val userEvidence = turn.userMessage.trim()
+        if (userEvidence.isBlank()) return@any false
+        val normalized = normalizeContinuityEvidenceText(userEvidence)
+        val hasRemovalSignal = when (kind) {
+            ChatContinuityFactKind.DECISION -> DECISION_REMOVAL_SIGNAL.containsMatchIn(normalized)
+            ChatContinuityFactKind.OPEN_THREAD -> OPEN_THREAD_REMOVAL_SIGNAL.containsMatchIn(normalized)
+            ChatContinuityFactKind.EVENT -> false
+        }
+        if (!hasRemovalSignal) return@any false
+
+        val score = continuityEvidenceScore(fact, userEvidence)
+        when (kind) {
+            ChatContinuityFactKind.DECISION -> score >= 24
+            ChatContinuityFactKind.OPEN_THREAD ->
+                score >= 20 || (activeFactCount == 1 && GENERIC_OPEN_THREAD_CLOSE_SIGNAL.containsMatchIn(normalized))
+            ChatContinuityFactKind.EVENT -> false
+        }
+    }
 }
 
 private fun bestContinuitySource(
