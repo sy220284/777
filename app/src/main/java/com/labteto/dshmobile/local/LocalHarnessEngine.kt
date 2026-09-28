@@ -1474,7 +1474,6 @@ class LocalHarnessEngine @Inject constructor(
             messageId = messageId,
             activeBranch = activeChatBranchMessages(state.chatBranches),
             hotMessages = state.messages,
-            totalMessageCount = state.transcriptIndex.totalMessageCount,
             loadDurableTranscript = { LocalSessionTranscriptPager(eventLog).all() },
         )
         val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
