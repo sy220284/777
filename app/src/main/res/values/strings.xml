@@ -139,6 +139,7 @@
     <string name="local_resource_pressure_medium">Medium</string>
     <string name="local_resource_pressure_high">High</string>
     <string name="local_context_summary">Context %1$d / %2$d chars</string>
+    <string name="local_context_percent">Context %1$d%%</string>
     <string name="local_context_source">Context source: %1$s</string>
     <string name="local_context_source_independent">Independent chat</string>
     <string name="local_context_source_project">Current project</string>
@@ -1122,6 +1123,16 @@
     <string name="local_current_session">Current</string>
     <string name="chatlist_exit_remote_control">Exit remote control</string>
     <string name="local_work_process">Work process</string>
+    <string name="local_process_thinking">Thinking</string>
+    <string name="local_work_process_nodes">%1$d stages</string>
+    <string name="local_work_process_expand">Show work process</string>
+    <string name="local_work_process_collapse">Hide work process</string>
+    <string name="local_work_process_show_more">Show %1$d earlier nodes</string>
+    <string name="local_work_process_show_recent">Show recent nodes only</string>
+    <string name="common_state_expanded">Expanded</string>
+    <string name="common_state_collapsed">Collapsed</string>
+    <string name="local_chat_thinking_expand">Show thinking summary</string>
+    <string name="local_chat_thinking_collapse">Hide thinking summary</string>
     <string name="local_work_composer_hint">Ask something, or hand the task to Harness…</string>
     <string name="local_group_chat_composer_hint">Message the group…</string>
     <string name="local_chat_composer_persona_hint">Message %1$s…</string>

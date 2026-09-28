@@ -1,18 +1,22 @@
 package com.labteto.dshmobile.ui.screens.local
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 
-/**
- * Aggregate runtime subscription kept in a narrow restart scope. Prefer projected state elsewhere;
- * this is only for surfaces that genuinely render many runtime domains together.
- */
+/** Keeps Chat and Work on separate invalidation paths while they share the same conversation substrate. */
 @Composable
-internal fun LocalHarnessStateContent(
+internal fun LocalConversationStateContent(
     viewModel: LocalHarnessViewModel,
-    content: @Composable (LocalHarnessState) -> Unit,
+    usageMode: LocalUsageMode,
+    content: @Composable (LocalConversationSurfaceState) -> Unit,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val source = when (usageMode) {
+        LocalUsageMode.CHAT -> viewModel.chatSurfaceState
+        LocalUsageMode.WORK -> viewModel.workSurfaceState
+    }
+    val state by source.collectAsStateWithLifecycle()
     content(state)
 }

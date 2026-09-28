@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 6490,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 2011,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 2330,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 657,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 662,
     "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt": 1537,
     "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanner.kt": 1033,
     "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt": 1053,
@@ -26,7 +26,13 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 64,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 24,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt": 17,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt": 101,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt": 150,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalConversationSurfaceState.kt": 140,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 24,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt": 87,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkStateContent.kt": 16,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt": 344,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSurfaceComponents.kt": 421,
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
@@ -143,10 +149,48 @@ for class_name, maximum in PROJECTION_FIELD_BUDGETS.items():
             "split the projection instead of recreating aggregate state"
         )
 
+work_projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt"
+work_projection_source = read(work_projection_path)
+work_class_start = work_projection_source.find("data class LocalWorkUiState(")
+work_class_end = work_projection_source.find("\n)", work_class_start)
+if work_class_start < 0 or work_class_end < 0:
+    die("unable to locate LocalWorkUiState")
+work_field_count = len(
+    re.findall(
+        r"^\s*val\s+[A-Za-z0-9_]+\s*:",
+        work_projection_source[work_class_start:work_class_end],
+        re.MULTILINE,
+    )
+)
+if work_field_count > 23:
+    die(
+        f"LocalWorkUiState has {work_field_count} fields (ratchet: 23); "
+        "split status/run-center projections instead of growing the work surface"
+    )
+
+conversation_projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalConversationSurfaceState.kt"
+conversation_projection_source = read(conversation_projection_path)
+conversation_class_start = conversation_projection_source.find("data class LocalConversationSurfaceState(")
+conversation_class_end = conversation_projection_source.find("\n)", conversation_class_start)
+if conversation_class_start < 0 or conversation_class_end < 0:
+    die("unable to locate LocalConversationSurfaceState")
+conversation_field_count = len(re.findall(r"^\s*val\s+[A-Za-z0-9_]+\s*:", conversation_projection_source[conversation_class_start:conversation_class_end], re.MULTILINE))
+if conversation_field_count > 31:
+    die(f"LocalConversationSurfaceState has {conversation_field_count} fields (ratchet: 31); split narrower mode projections instead of widening the shared surface")
+
 screen_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 screen_source = read(screen_path)
 screen_entry_start = screen_source.find("fun LocalHarnessScreen(")
-screen_entry_end = screen_source.find("\n@Composable\nprivate fun GroupChatMemberAvatar", screen_entry_start)
+screen_entry_tail = screen_source[screen_entry_start + 1:] if screen_entry_start >= 0 else ""
+screen_entry_boundary = re.search(
+    r"\n@Composable\n(?:private|internal) fun [A-Za-z0-9_]+\s*\(",
+    screen_entry_tail,
+)
+screen_entry_end = (
+    screen_entry_start + 1 + screen_entry_boundary.start()
+    if screen_entry_boundary is not None
+    else -1
+)
 if screen_entry_start < 0 or screen_entry_end < 0:
     die("unable to locate LocalHarnessScreen entry function")
 screen_entry = screen_source[screen_entry_start:screen_entry_end]
@@ -154,6 +198,12 @@ if "viewModel.state.collectAsStateWithLifecycle()" in screen_entry:
     die("LocalHarnessScreen shell must not directly subscribe to aggregate runtime state")
 if "viewModel.shellState.collectAsStateWithLifecycle()" not in screen_entry:
     die("LocalHarnessScreen must subscribe to LocalHarnessShellState")
+if "viewModel.workState.collectAsStateWithLifecycle()" in screen_entry:
+    die("LocalHarnessScreen shell must not directly subscribe to hot Work state")
+if "LocalHarnessStateContent(" in screen_source or "state: LocalHarnessState" in screen_source:
+    die("Local conversation UI must use mode-specific Chat/Work surface projections, not aggregate state")
+if "LocalConversationStateContent(viewModel, shell.usageMode)" not in screen_source:
+    die("LocalHarnessScreen must select the Chat/Work conversation projection from shell usage mode")
 
 local_root = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 local_root_files = list(local_root.glob("*.kt"))

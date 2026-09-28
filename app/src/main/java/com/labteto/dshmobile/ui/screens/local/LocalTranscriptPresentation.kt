@@ -18,6 +18,17 @@ internal sealed interface LocalTranscriptItem {
         override val key: String = "message:${message.id}"
     }
 
+    data class Thinking(
+        val messages: List<LocalHarnessMessage>,
+    ) : LocalTranscriptItem {
+        init {
+            require(messages.isNotEmpty()) { "思考过程不能为空" }
+            require(messages.all { it.role == "reasoning" }) { "聊天思考只接受 reasoning 消息" }
+        }
+
+        override val key: String = "thinking:${messages.first().id}"
+    }
+
     data class WorkProcess(
         val messages: List<LocalHarnessMessage>,
     ) : LocalTranscriptItem {
@@ -96,6 +107,16 @@ internal fun buildLocalTranscript(
             index += 1
             continue
         }
+        if (!includeWorkProcess && messages[index].role == "reasoning") {
+            val thinking = mutableListOf<LocalHarnessMessage>()
+            while (index < messages.size && messages[index].role == "reasoning") {
+                thinking += messages[index]
+                index += 1
+            }
+            result += LocalTranscriptItem.Thinking(thinking)
+            continue
+        }
+
         if (!isWorkProcessMessage(messages, index)) {
             result += LocalTranscriptItem.Message(messages[index])
             index += 1

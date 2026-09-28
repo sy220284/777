@@ -1,0 +1,420 @@
+package com.labteto.dshmobile.ui.screens.local
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.components.StateDot
+import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+
+@Composable
+internal fun WorkSessionStatusStrip(
+    state: LocalWorkUiState,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val hasStatus = state.running ||
+        state.workflowProgress?.sessionId == state.sessionId ||
+        state.goal != null ||
+        state.todos.isNotEmpty() ||
+        state.activeAgents > 0 ||
+        state.jobs.isNotEmpty()
+    if (!hasStatus) return
+
+    val completedTasks = state.todos.count { it.status == "completed" }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsStatusPill(
+                    state = if (state.running) DsStatus.Running else DsStatus.Neutral,
+                    label = stringResource(
+                        if (state.running) R.string.local_execution_notification_running
+                        else R.string.local_run_center,
+                    ),
+                )
+                state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
+                    Text(
+                        goal,
+                        style = DsType.small13Strong,
+                        color = colors.labelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.local_run_center),
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                    DsPill(
+                        text = if (progress.needsUserAction) {
+                            stringResource(R.string.local_workflow_waiting_user)
+                        } else {
+                            workflowStageLabel(progress.stage)
+                        },
+                    )
+                    DsPill(
+                        text = stringResource(
+                            R.string.local_workflow_processed,
+                            progress.completed,
+                            progress.total,
+                        ),
+                    )
+                }
+                if (state.todos.isNotEmpty()) {
+                    DsPill(
+                        text = stringResource(
+                            R.string.local_run_tasks_progress,
+                            completedTasks,
+                            state.todos.size,
+                        ),
+                    )
+                }
+                if (state.activeAgents > 0) {
+                    DsPill(text = stringResource(R.string.local_run_agents, state.activeAgents))
+                }
+                if (state.jobs.isNotEmpty()) {
+                    DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ExecutionStatusCard(
+    state: LocalWorkUiState,
+    onJobOutput: (String) -> String,
+    onStopJob: (String) -> String,
+    onOpenResults: () -> Unit,
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true,
+) {
+    val colors = DsTheme.colors
+    var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
+    val completed = state.todos.count { it.status == "completed" }
+    val total = state.todos.size
+    val resourceSummary = stringResource(
+        R.string.local_resource_summary,
+        state.activeAgents,
+        state.maxAgents,
+        state.activeTerminals,
+        state.maxTerminals,
+        state.activeVirtualDisplays,
+        state.maxVirtualDisplays,
+        state.activeLanguageServers,
+        state.maxLanguageServers,
+    )
+    val contextSummary = stringResource(
+        R.string.local_context_summary,
+        state.contextChars,
+        state.contextBudgetChars,
+    )
+    val pressureSummary = stringResource(
+        R.string.local_resource_pressure,
+        localResourcePressureLabel(state.resourcePressure),
+    )
+    val contextSourceSummary = stringResource(
+        R.string.local_context_source,
+        localConversationModeLabel(state.conversationMode),
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
+        Column(
+            Modifier.padding(DsSpacing.comfortable),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            if (showHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
+                    Text(
+                        stringResource(R.string.local_run_center),
+                        style = DsType.base16Strong,
+                        color = colors.labelPrimary,
+                    )
+                }
+            }
+
+            state.goal?.let { goal ->
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(
+                        stringResource(R.string.local_run_current_goal),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
+                    Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
+                }
+            }
+
+            state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
+                WorkflowProgressSection(progress)
+            }
+
+            if (state.pendingApproval != null || state.pendingQuestion != null) {
+                Text(
+                    stringResource(R.string.local_workflow_waiting_user),
+                    style = DsType.small13Strong,
+                    color = colors.error,
+                )
+            }
+
+            if (state.plan.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(
+                        stringResource(R.string.local_run_plan),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    state.plan.take(5).forEachIndexed { index, step ->
+                        Text(
+                            (index + 1).toString().padStart(2, '0') + "  " + step,
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (state.todos.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(
+                        stringResource(R.string.local_run_tasks_progress, completed, total),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    state.todos.take(5).forEach { todo ->
+                        val marker = when (todo.status) {
+                            "completed" -> "✓"
+                            "in_progress", "running" -> "●"
+                            else -> "○"
+                        }
+                        Text(
+                            marker + "  " + todo.content,
+                            style = DsType.small13,
+                            color = if (todo.status == "completed") {
+                                colors.labelTertiary
+                            } else {
+                                colors.labelSecondary
+                            },
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            if (state.jobs.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Text(
+                        stringResource(R.string.local_run_background),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    state.jobs.take(4).forEach { job ->
+                        val expanded = expandedJobId == job.id
+                        Surface(
+                            shape = DsShapes.row,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                ) {
+                                    Text(
+                                        job.label,
+                                        style = DsType.small13,
+                                        color = colors.labelSecondary,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        localJobStatusLabel(job.status),
+                                        style = DsType.caption11,
+                                        color = colors.labelTertiary,
+                                    )
+                                    DsButton(
+                                        text = stringResource(
+                                            if (expanded) R.string.local_run_job_hide
+                                            else R.string.local_run_job_view,
+                                        ),
+                                        onClick = {
+                                            if (expanded) {
+                                                expandedJobId = null
+                                                expandedJobOutput = ""
+                                            } else {
+                                                expandedJobId = job.id
+                                                expandedJobOutput = onJobOutput(job.id)
+                                            }
+                                        },
+                                        variant = DsButtonVariant.Ghost,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
+                                if (expanded) {
+                                    Text(
+                                        stringResource(R.string.local_run_job_output),
+                                        style = DsType.caption11Strong,
+                                        color = colors.labelTertiary,
+                                    )
+                                    Text(
+                                        expandedJobOutput.ifBlank {
+                                            stringResource(R.string.local_run_job_output_empty)
+                                        },
+                                        style = DsType.caption11,
+                                        color = colors.labelSecondary,
+                                        maxLines = 12,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                    ) {
+                                        DsButton(
+                                            text = stringResource(R.string.local_run_job_refresh),
+                                            onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                            variant = DsButtonVariant.Ghost,
+                                            size = DsButtonSize.Small,
+                                        )
+                                        if (job.status == "running") {
+                                            DsButton(
+                                                text = stringResource(R.string.local_run_job_stop),
+                                                onClick = {
+                                                    onStopJob(job.id)
+                                                    expandedJobOutput = onJobOutput(job.id)
+                                                },
+                                                variant = DsButtonVariant.Danger,
+                                                size = DsButtonSize.Small,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            DsButton(
+                text = stringResource(R.string.local_run_open_results),
+                onClick = onOpenResults,
+                variant = DsButtonVariant.Outline,
+                size = DsButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Text(
+                    stringResource(R.string.local_run_resources),
+                    style = DsType.caption11Strong,
+                    color = colors.labelTertiary,
+                )
+                Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
+                Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
+                if (state.queuedInputCount > 0) {
+                    Text(
+                        stringResource(R.string.local_queue_count, state.queuedInputCount),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                    )
+                }
+                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
+                Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                if (
+                    state.conversationMode == LocalConversationMode.CONTINUATION &&
+                    !state.handoffSummary.isNullOrBlank()
+                ) {
+                    Text(
+                        stringResource(R.string.local_context_handoff),
+                        style = DsType.caption11Strong,
+                        color = colors.labelTertiary,
+                    )
+                    Text(
+                        state.handoffSummary.orEmpty(),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}

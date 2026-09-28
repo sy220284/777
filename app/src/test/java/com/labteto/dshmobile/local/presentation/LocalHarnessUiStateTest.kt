@@ -60,6 +60,49 @@ class LocalHarnessUiStateTest {
     }
 
     @Test
+    fun workProjectionIgnoresChatChurn() {
+        val base = LocalHarnessState()
+        val unrelatedUpdate = base.copy(
+            chatPersona = base.chatPersona.copy(name = "另一人物"),
+            galleryId = "gallery-2",
+            model = "another-model",
+        )
+
+        assertEquals(base.toWorkUiState(), unrelatedUpdate.toWorkUiState())
+    }
+
+    @Test
+    fun workProjectionChangesForOwnedRunState() {
+        val base = LocalHarnessState()
+
+        assertNotEquals(
+            base.toWorkUiState(),
+            base.copy(running = true, contextChars = 12_000, queuedInputCount = 2).toWorkUiState(),
+        )
+    }
+
+    @Test
+    fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
+        val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
+        val workOnlyUpdate = base.copy(model = "another-model", planMode = true, safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
+        assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
+    }
+
+    @Test
+    fun workSurfaceProjectionIgnoresChatOnlyChurn() {
+        val base = LocalHarnessState(usageMode = LocalUsageMode.WORK)
+        val chatOnlyUpdate = base.copy(chatPersona = base.chatPersona.copy(name = "另一人物"), galleryId = "gallery-2")
+        assertEquals(base.toWorkSurfaceUiState(), chatOnlyUpdate.toWorkSurfaceUiState())
+    }
+
+    @Test
+    fun conversationSurfaceProjectionsStillTrackSharedHotFields() {
+        val base = LocalHarnessState()
+        assertNotEquals(base.toChatSurfaceUiState(), base.copy(running = true).toChatSurfaceUiState())
+        assertNotEquals(base.toWorkSurfaceUiState(), base.copy(running = true).toWorkSurfaceUiState())
+    }
+
+    @Test
     fun projectionsStillChangeForOwnedFields() {
         val base = LocalHarnessState()
 
