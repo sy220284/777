@@ -3683,6 +3683,7 @@ class LocalHarnessEngine @Inject constructor(
                         .enqueuePending(
                         ChatPendingTurn(
                             sequence = assistantEvent.sequence,
+                            userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId,
                             assistantMessageId = transcript.id,
                             branchHeadId = transcript.id,
                             userMessage = input,
@@ -4031,6 +4032,8 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
+                    sourceUserMessageId = sourceMessageId
+                        ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -4633,6 +4636,8 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
+                        sourceUserMessageId = sourceMessageId
+                            ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
             }
@@ -5625,6 +5630,7 @@ class LocalHarnessEngine @Inject constructor(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
+        sourceUserMessageId: String? = null,
     ) {
         cancelChatPostTurn()
         val boundEventLog = eventLogFor(expectedSessionId)
@@ -5634,6 +5640,7 @@ class LocalHarnessEngine @Inject constructor(
             expectedSessionId = expectedSessionId,
             expectedAssistantMessageId = expectedAssistantMessageId,
             boundEventLog = boundEventLog,
+            sourceUserMessageId = sourceUserMessageId,
         ) ?: return
 
         val job = scope.launch(start = CoroutineStart.LAZY) {
