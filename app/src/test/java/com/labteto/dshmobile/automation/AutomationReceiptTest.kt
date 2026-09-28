@@ -331,4 +331,45 @@ class AutomationReceiptTest {
         assertEquals(22 * 60, window.windowEndMinuteOfDay)
     }
 
+
+    @Test
+    fun hugeAutomationMinutesAreRejectedInsteadOfOverflowing() {
+        val failure = runCatching {
+            checkedAutomationMinutesToMillis(Long.MAX_VALUE, "任务延迟")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun negativeAutomationDelayIsRejectedInsteadOfBecomingImmediate() {
+        val failure = runCatching {
+            checkedAutomationFutureMillis(1_000L, -1L, "任务延迟")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun futureTimestampOverflowIsRejectedInsteadOfWrappingIntoPast() {
+        val failure = runCatching {
+            checkedAutomationFutureMillis(Long.MAX_VALUE - 30_000L, 1L, "任务延迟")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun anchoredIntervalRejectsUnrepresentableNextRun() {
+        val failure = runCatching {
+            nextIntervalAnchoredRun(
+                anchorMillis = Long.MAX_VALUE - 10_000L,
+                afterMillis = Long.MAX_VALUE - 1L,
+                intervalMinutes = 1L,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
 }
