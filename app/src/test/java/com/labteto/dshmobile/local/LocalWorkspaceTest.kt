@@ -191,6 +191,20 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun backgroundShellFailureModeRejectsNonZeroExit() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            runBlocking {
+                isolated.shell("echo before-fail; exit 137", 5, throwOnFailure = true)
+            }
+        }
+
+        assertTrue(error.message.orEmpty().contains("PROCESS_EXIT_137"))
+        assertTrue(error.message.orEmpty().contains("before-fail"))
+    }
+
+    @Test
     fun fileObservationCacheIsBoundedAndLru() {
         val cache = LocalFileObservationCache(maxEntries = 2)
         cache.put("a", "1")
