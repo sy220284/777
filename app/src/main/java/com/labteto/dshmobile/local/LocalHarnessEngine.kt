@@ -1681,7 +1681,7 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
         persistChatBranchState("variant-selected")
-        val activeTranscriptSequence = persistRewrittenChatTranscript(
+        val activeTranscriptSequence = persistActiveChatTranscript(
             eventLog = eventLog,
             reason = "variant-selected",
             activeTranscript = activeMessages,
