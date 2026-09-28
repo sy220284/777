@@ -525,7 +525,7 @@
     <string name="settings_local_session_storage_retention">Original session facts are kept until you explicitly delete a session. Compression never drops history.</string>
     <string name="settings_local_session_storage_compact">Compress old segments</string>
     <string name="settings_local_session_storage_export">Export all local sessions</string>
-    <string name="settings_local_session_storage_cleanup">Open session list to clean up</string>
+    <string name="settings_local_session_storage_cleanup">Return to chats to clean up sessions</string>
     <string name="settings_local_session_storage_compacted">Old session segments compressed.</string>
     <string name="settings_local_session_storage_compact_failed">Could not compact local session storage.</string>
     <string name="settings_local_session_storage_exported">Local session archive exported.</string>
