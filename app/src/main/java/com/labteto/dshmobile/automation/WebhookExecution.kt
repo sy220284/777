@@ -51,3 +51,10 @@ internal class WebhookExecutionLimiter(
 
     fun pendingCount(): Int = pending.get()
 }
+
+
+internal fun shouldMarkWebhookQueuedCancellation(
+    cause: Throwable?,
+    currentStatus: String?,
+): Boolean =
+    cause is CancellationException && currentStatus == "queued"
