@@ -261,6 +261,7 @@ class HarnessWebhookService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val executionMutex = Mutex()
+    private val executionLimiter = WebhookExecutionLimiter(MAX_PENDING_RUNS)
     private val listener by lazy { WebhookListener(scope, ::handle) }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -354,15 +355,25 @@ class HarnessWebhookService : Service() {
             val prompt = parsePrompt(request.body.toString(Charsets.UTF_8), headers["content-type"])
             if (prompt.isBlank()) return respond(client, 400, """{"error":"empty prompt"}""")
 
-            val requestId = UUID.randomUUID().toString()
-            resultStore.update(requestId, status = "queued")
-            respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
-            scope.launch {
-                executeWebhookRun(
-                    executionMutex,
-                    update = { status, result, error -> resultStore.update(requestId, status, result, error) },
-                    run = { automationRuntime.runPrompt(prompt) },
-                )
+            if (!executionLimiter.tryAcquire()) {
+                return respond(client, 429, """{"error":"webhook queue full"}""")
+            }
+            var handedOff = false
+            try {
+                val requestId = UUID.randomUUID().toString()
+                resultStore.update(requestId, status = "queued")
+                respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
+                val job = scope.launch {
+                    executeWebhookRun(
+                        executionMutex,
+                        update = { status, result, error -> resultStore.update(requestId, status, result, error) },
+                        run = { automationRuntime.runPrompt(prompt) },
+                    )
+                }
+                job.invokeOnCompletion { executionLimiter.release() }
+                handedOff = true
+            } finally {
+                if (!handedOff) executionLimiter.release()
             }
         }
     }
@@ -442,6 +453,7 @@ class HarnessWebhookService : Service() {
             401 -> "Unauthorized"
             404 -> "Not Found"
             413 -> "Payload Too Large"
+            429 -> "Too Many Requests"
             else -> "Error"
         }
         val bytes = body.toByteArray(Charsets.UTF_8)
@@ -469,6 +481,7 @@ class HarnessWebhookService : Service() {
         private const val NOTIFICATION_ID = 7711
         private const val MAX_HEADER_BYTES = 16 * 1024
         private const val MAX_BODY_BYTES = 64 * 1024
+        private const val MAX_PENDING_RUNS = 32
     }
 }
 
