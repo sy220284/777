@@ -1,0 +1,525 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.chat.ChatPendingTurn
+import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
+import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
+import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
+import com.labteto.dshmobile.local.chat.proactiveConversationFocus
+import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/**
+ * Owns proactive scheduled Chat generation and detached-session persistence.
+ *
+ * The engine retains only the visible-session transaction callbacks that touch its live run lock,
+ * model history, and hot transcript.
+ */
+internal class LocalAutomationChatCoordinator(
+    private val state: StateFlow<LocalHarnessState>,
+    private val sessionCoordinator: LocalSessionCoordinator,
+    private val eventLogFor: (String) -> LocalSessionEventLog,
+    private val chatPersonaStore: ChatPersonaStore,
+    private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val chatReplyCoordinator: LocalChatReplyCoordinator,
+    private val usageTracker: DeepSeekUsageTracker,
+    private val apiKeys: LocalApiKeyStore,
+    private val modelRequestCoordinator: LocalModelRequestCoordinator,
+    private val chatRelationshipMemoryContext: (String, LocalHarnessState) -> String,
+    private val recordStyleGuardHits: (List<String>) -> Unit,
+    private val acquireVisibleTurn: suspend (String, Job?) -> Boolean,
+    private val commitVisibleReply: (
+        LocalHarnessSession,
+        LocalModelReply,
+        String,
+        LocalHarnessMessage,
+        Long,
+    ) -> Unit,
+    private val releaseVisibleTurn: (String, Job?) -> Unit,
+) {
+    suspend fun run(
+        instruction: String,
+        targetSessionId: String,
+        timeoutMillis: Long = 3 * 60_000L,
+        recoverInterrupted: Boolean = false,
+        recoveryStartedAt: Long? = null,
+        quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
+        quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
+        minimumSilenceMinutes: Long? = null,
+        silenceReferenceAt: Long? = null,
+        bypassProactivePolicy: Boolean = false,
+    ): LocalAutomationRunResult {
+        val trigger = instruction.trim()
+        require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
+        withTimeout(15_000L) {
+            while (state.value.loading) delay(50)
+        }
+        require(state.value.configured) { "本机 Harness 尚未配置模型" }
+
+        val initialSession = sessionCoordinator.read(targetSessionId)
+            ?: error("定时互动绑定的聊天已不存在")
+        require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
+        require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
+
+        if (recoverInterrupted) {
+            recoverAutomationChatOutput(
+                eventLog = eventLogFor(targetSessionId),
+                startedAt = recoveryStartedAt,
+            )?.let { recovered ->
+                return LocalAutomationRunResult(sessionId = targetSessionId, output = recovered)
+            }
+        }
+
+        val earlyQuietDecision = if (bypassProactivePolicy) {
+            null
+        } else {
+            evaluateChatProactivePolicy(
+                messages = emptyList(),
+                nowMillis = System.currentTimeMillis(),
+                quietHoursEnabled = quietHoursEnabled,
+                quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
+                quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                minimumGapMinutes = proactiveMinGapMinutes,
+                maxUnanswered = proactiveMaxUnanswered,
+            )
+        }
+        if (earlyQuietDecision?.shouldSend == false) {
+            val reason = earlyQuietDecision.reason ?: "当前处于免打扰时段"
+            eventLogFor(targetSessionId).append("chat/proactive-skipped", buildJsonObject {
+                put("reason", reason)
+                put("automation", true)
+                put("proactive", true)
+                put("persona_id", initialSession.personaId)
+            })
+            return LocalAutomationRunResult(
+                sessionId = targetSessionId,
+                output = reason,
+                delivered = false,
+                skipReason = reason,
+                nextRunAtHint = earlyQuietDecision.retryAt,
+            )
+        }
+
+        if (!bypassProactivePolicy && minimumSilenceMinutes != null) {
+            val earlyEventLog = eventLogFor(targetSessionId)
+            val earlyTranscript = LocalSessionTranscriptPager(earlyEventLog)
+                .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                .messages
+                .ifEmpty {
+                    initialSession.transcriptWindow
+                        .ifEmpty {
+                            initialSession.messages.takeLast(
+                                LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+                            )
+                        }
+                        .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
+                }
+            val silenceDecision = evaluateChatSilenceTrigger(
+                messages = earlyTranscript,
+                nowMillis = System.currentTimeMillis(),
+                silenceMinutes = minimumSilenceMinutes,
+                fallbackReferenceAt = silenceReferenceAt ?: initialSession.updatedAt,
+            )
+            if (!silenceDecision.ready) {
+                val reason = "用户最近仍有互动，尚未达到沉默触发时长"
+                earlyEventLog.append("chat/proactive-skipped", buildJsonObject {
+                    put("reason", reason)
+                    put("automation", true)
+                    put("proactive", true)
+                    put("silence_trigger", true)
+                    put("persona_id", initialSession.personaId)
+                })
+                return LocalAutomationRunResult(
+                    sessionId = targetSessionId,
+                    output = reason,
+                    delivered = false,
+                    skipReason = reason,
+                    nextRunAtHint = silenceDecision.retryAt,
+                )
+            }
+        }
+
+        val automationJob = currentCoroutineContext()[Job]
+        val ownsVisibleTurn = acquireVisibleTurn(targetSessionId, automationJob)
+
+        try {
+            return withTimeout(timeoutMillis.coerceIn(5_000L, 10 * 60_000L)) {
+                val session = sessionCoordinator.read(targetSessionId)
+                    ?: error("定时互动绑定的聊天已不存在")
+                require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
+                require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
+
+                val runtime = state.value
+                val persona = chatPersonaStore.get(session.personaId)
+                val boundEventLog = eventLogFor(session.id)
+                val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
+                    .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    .messages
+                    .ifEmpty {
+                        session.transcriptWindow
+                            .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
+                            .takeLast(AUTOMATION_CHAT_HISTORY_MESSAGES)
+                    }
+                if (!bypassProactivePolicy && minimumSilenceMinutes != null) {
+                    val silenceDecision = evaluateChatSilenceTrigger(
+                        messages = recentTranscript,
+                        nowMillis = System.currentTimeMillis(),
+                        silenceMinutes = minimumSilenceMinutes,
+                        fallbackReferenceAt = silenceReferenceAt ?: session.updatedAt,
+                    )
+                    if (!silenceDecision.ready) {
+                        val reason = "用户刚有新的互动，重新等待沉默触发时长"
+                        boundEventLog.append("chat/proactive-skipped", buildJsonObject {
+                            put("reason", reason)
+                            put("automation", true)
+                            put("proactive", true)
+                            put("silence_trigger", true)
+                            put("rechecked", true)
+                            put("persona_id", persona.id)
+                        })
+                        return@withTimeout LocalAutomationRunResult(
+                            sessionId = session.id,
+                            output = reason,
+                            delivered = false,
+                            skipReason = reason,
+                            nextRunAtHint = silenceDecision.retryAt,
+                        )
+                    }
+                }
+
+                val proactiveDecision = if (bypassProactivePolicy) {
+                    null
+                } else {
+                    evaluateChatProactivePolicy(
+                        messages = recentTranscript,
+                        nowMillis = System.currentTimeMillis(),
+                        quietHoursEnabled = quietHoursEnabled,
+                        quietStartHour = quietStartHour,
+                        quietStartMinute = quietStartMinute,
+                        quietEndHour = quietEndHour,
+                        quietEndMinute = quietEndMinute,
+                        minimumGapMinutes = proactiveMinGapMinutes,
+                        maxUnanswered = proactiveMaxUnanswered,
+                    )
+                }
+                if (proactiveDecision?.shouldSend == false) {
+                    val reason = proactiveDecision.reason ?: "当前不适合继续主动互动"
+                    boundEventLog.append("chat/proactive-skipped", buildJsonObject {
+                        put("reason", reason)
+                        put("automation", true)
+                        put("proactive", true)
+                        put("persona_id", persona.id)
+                    })
+                    return@withTimeout LocalAutomationRunResult(
+                        sessionId = session.id,
+                        output = reason,
+                        delivered = false,
+                        skipReason = reason,
+                        nextRunAtHint = proactiveDecision.retryAt,
+                        waitingForUserReply = proactiveDecision.waitingForUserReply,
+                    )
+                }
+                val conversationFocus = proactiveConversationFocus(
+                    messages = recentTranscript,
+                    fallback = session.handoffSummary?.takeIf(String::isNotBlank) ?: trigger,
+                )
+                val sessionTranscriptIndex = localTranscriptIndexForSession(session)
+                val boundState = runtime.copy(
+                    sessionId = session.id,
+                    usageMode = LocalUsageMode.CHAT,
+                    personaId = session.personaId,
+                    galleryId = session.galleryId,
+                    galleryStoryId = session.galleryStoryId,
+                    gallerySaveSuppressedThrough = session.gallerySaveSuppressedThrough,
+                    chatPersona = persona,
+                    chatState = session.chatState,
+                    replySuggestions = session.replySuggestions,
+                    chatBranches = session.chatBranches,
+                    groupChat = session.groupChat,
+                    conversationMode = session.conversationMode,
+                    parentSessionId = session.parentSessionId,
+                    lineageId = session.lineageId.ifBlank { session.id },
+                    projectId = session.projectId,
+                    handoffSummary = session.handoffSummary,
+                    messages = recentTranscript,
+                    transcriptIndex = sessionTranscriptIndex,
+                    planMode = false,
+                    jobs = emptyList(),
+                    queuedInputCount = 0,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    error = null,
+                )
+                val chatContext = chatTurnCoordinator.prepareProfile(
+                    persona = persona,
+                    state = session.chatState,
+                    context = session.chatContext.withLegacyFallback(session.chatState),
+                    userInput = conversationFocus,
+                    storyContext = session.handoffSummary,
+                )
+                val relationshipMemory = chatRelationshipMemoryContext(conversationFocus, boundState)
+                val proactiveAvoidance = recentProactiveAvoidanceContext(recentTranscript)
+                val proactiveDirective = """
+                    【定时主动互动】
+                    这是用户提前为当前角色设置的主动互动意图，时间到了。它只是幕后触发条件，不是用户刚发来的消息。
+                    触发意图：$trigger
+                    现在由【${persona.name}】主动给用户发一条新消息，延续当前人物、关系和故事。
+                    结合最近聊天、未完话题、角色当下状态和世界设定，自然决定怎么开口；允许简短、突然、带情绪、带动作感或开启一个小剧情。
+                    不要提“定时任务”“自动化”“触发”“系统提醒”等机制，也不要编造用户刚刚说过触发意图里的文字。
+                    只输出角色此刻真正会发给用户的消息，不加说明、标题、分析或幕后旁白。
+                """.trimIndent()
+                val localHistory = buildList {
+                    add(buildJsonObject {
+                        put("role", "system")
+                        put("content", chatSystemPrompt())
+                    })
+                    recentTranscript
+                        .filter { it.role == "user" || it.role == "assistant" }
+                        .forEach { message ->
+                            add(buildJsonObject {
+                                put("role", message.role)
+                                put("content", message.content)
+                            })
+                        }
+                }
+                val dynamicContext = listOf(
+                    chatContext.dynamicPrompt,
+                    relationshipMemory,
+                    proactiveAvoidance,
+                    proactiveDirective,
+                )
+                    .filter(String::isNotBlank)
+                    .joinToString("\n\n")
+                val requestMessages = withChatTurnContext(
+                    history = localHistory,
+                    stableContext = chatContext.stablePrompt,
+                    dynamicContext = dynamicContext,
+                )
+                val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+
+                boundEventLog.append("turn/start", buildJsonObject {
+                    put("model", boundState.model)
+                    put("mode", "chat")
+                    put("automation", true)
+                    put("proactive", true)
+                    put("persona_id", persona.id)
+                })
+                val rawReply = completeAutomationChat(
+                    key = key,
+                    snapshot = boundState,
+                    messages = requestMessages,
+                )
+                var reply = chatTurnCoordinator.finalize(
+                    snapshot = boundState,
+                    persona = persona,
+                    reply = rawReply,
+                    recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                    onGuardEvent = { action, violations ->
+                        recordStyleGuardHits(violations)
+                        boundEventLog.append("chat/style-guard", buildJsonObject {
+                            put("action", action)
+                            put("automation", true)
+                            put("proactive", true)
+                            put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                        })
+                    },
+                )
+                var content = reply.content.orEmpty().trim()
+                require(content.isNotEmpty()) { "角色没有生成可用的主动消息" }
+
+                if (isNearDuplicateProactive(content, recentTranscript)) {
+                    val retryRawReply = completeAutomationChat(
+                        key = key,
+                        snapshot = boundState,
+                        messages = withEphemeralContext(
+                            requestMessages,
+                            """
+                            【主动互动去重重写】
+                            刚生成的内容与最近主动消息过于相似。
+                            换一个话题切入点、开场方式和句式重新写；仍需保持当前人设、关系与故事连续性。
+                            只输出角色真正会发出的新消息。
+                            """.trimIndent(),
+                        ),
+                    )
+                    reply = chatTurnCoordinator.finalize(
+                        snapshot = boundState,
+                        persona = persona,
+                        reply = retryRawReply,
+                        recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                        onGuardEvent = { action, violations ->
+                            recordStyleGuardHits(violations)
+                            boundEventLog.append("chat/style-guard", buildJsonObject {
+                                put("action", action)
+                                put("automation", true)
+                                put("proactive", true)
+                                put("dedupe_retry", true)
+                                put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                            })
+                        },
+                    )
+                    content = reply.content.orEmpty().trim()
+                    require(content.isNotEmpty()) { "角色主动消息去重重写后为空" }
+                }
+
+                val proactiveScene = session.chatContext
+                    .withLegacyFallback(session.chatState)
+                    .scene
+                reply = chatReplyCoordinator.guardProactive(
+                    snapshot = boundState,
+                    persona = persona,
+                    scene = proactiveScene,
+                    initial = reply,
+                    retryRaw = { repairHint ->
+                        completeAutomationChat(
+                            key = key,
+                            snapshot = boundState,
+                            messages = withEphemeralContext(requestMessages, repairHint),
+                        )
+                    },
+                    appendEvent = { type, data ->
+                        boundEventLog.append(type, data)
+                    },
+                )
+                content = reply.content.orEmpty().trim()
+                require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
+
+                val proactiveMessage = LocalHarnessMessage(
+                    id = java.util.UUID.randomUUID().toString(),
+                    role = "assistant",
+                    content = content,
+                    createdAt = System.currentTimeMillis(),
+                    proactive = true,
+                )
+                val assistantEvent = boundEventLog.append("assistant/message", buildJsonObject {
+                    put("role", "assistant")
+                    put("content", content)
+                    // Proactive/automation metadata lives inside the transcript message. Keep the
+                    // model-replay envelope schema clean so only role/content return to the model.
+                    put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
+                })
+
+                if (ownsVisibleTurn && state.value.sessionId == session.id) {
+                    commitVisibleReply(
+                        session,
+                        reply,
+                        content,
+                        proactiveMessage,
+                        assistantEvent.sequence,
+                    )
+                } else {
+                    // Re-read immediately before commit so a detached automation never overwrites a
+                    // foreground turn that completed while the model was generating.
+                    val latest = sessionCoordinator.read(session.id) ?: session
+                    val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
+                        previous = latest.chatState,
+                        userMessage = "",
+                        assistantMessage = content,
+                    )
+                    val latestIndex = localTranscriptIndexForSession(latest)
+                    val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
+                        latestIndex,
+                        listOf(proactiveMessage),
+                    )
+                    val latestWindow = latest.transcriptWindow.ifEmpty {
+                        latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
+                    }
+                    val baseContext = latest.chatContext
+                        .withLegacyFallback(nextChatState)
+                        .applySceneTurn(
+                            userMessage = "",
+                            assistantMessage = content,
+                            sequence = assistantEvent.sequence,
+                        )
+                    val pending = ChatPendingTurn(
+                        sequence = assistantEvent.sequence,
+                        assistantMessageId = proactiveMessage.id,
+                        branchHeadId = proactiveMessage.id,
+                        userMessage = "",
+                        assistantMessage = content,
+                        generation = baseContext.generation,
+                    )
+                    val nextContext = baseContext.enqueuePending(pending)
+                    val nextBranches = if (
+                        nextTranscriptIndex.branchingEligible &&
+                        latest.chatBranches.nodes.isNotEmpty()
+                    ) {
+                        appendMaterializedChatBranchMessage(
+                            current = latest.chatBranches,
+                            activeMessages = emptyList(),
+                            message = proactiveMessage,
+                            parentId = latestIndex.latestDialogueMessageId,
+                            chatState = nextChatState,
+                            chatContext = nextContext,
+                            replySuggestions = latest.replySuggestions,
+                        )
+                    } else {
+                        latest.chatBranches
+                    }
+                    sessionCoordinator.enqueue(
+                        latest.copy(
+                            updatedAt = System.currentTimeMillis(),
+                            messages = emptyList(),
+                            transcriptWindow = (latestWindow + proactiveMessage)
+                                .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                            transcriptIndex = nextTranscriptIndex,
+                            chatState = nextChatState,
+                            chatContext = nextContext,
+                            chatBranches = nextBranches,
+                            transcriptProjectedThroughSequence = assistantEvent.sequence,
+                        ),
+                    )
+                }
+                boundEventLog.append("turn/end", buildJsonObject {
+                    put("reason", "completed")
+                    put("steps", 1)
+                    put("mode", "chat")
+                    put("automation", true)
+                    put("proactive", true)
+                })
+                LocalAutomationRunResult(sessionId = session.id, output = content)
+            }
+        } finally {
+            if (ownsVisibleTurn) {
+                releaseVisibleTurn(targetSessionId, automationJob)
+            }
+        }
+    }
+
+    private suspend fun completeAutomationChat(
+        key: String,
+        snapshot: LocalHarnessState,
+        messages: List<JsonObject>,
+        allowContextOverflowRecovery: Boolean = true,
+    ): LocalModelReply = modelRequestCoordinator.complete(
+        key = key,
+        snapshot = snapshot,
+        messages = messages,
+        step = CHAT_POST_TURN_MODEL_STEP + 200,
+        toolsOverride = JsonArray(emptyList()),
+        publishPreviewEnabled = false,
+        maxAttemptsOverride = snapshot.modelAttempts.coerceIn(1, 3),
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        persistOverflowHistory = false,
+        requestLog = eventLogFor(snapshot.sessionId),
+        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+    )
+}
