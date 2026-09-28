@@ -151,6 +151,11 @@ private data class GroupReplyForStateUpdate(
     val content: String,
 )
 
+private data class GroupStateRefreshBatch(
+    val states: Map<String, ChatCharacterState>,
+    val complete: Boolean,
+)
+
 private data class GroupGeneratedReply(
     val member: LocalGroupChatMember,
     val persona: PersonaProfile,
@@ -3404,9 +3409,9 @@ class LocalHarnessEngine @Inject constructor(
         userMessage: String,
         assistantMessage: String,
         step: Int,
-    ): ChatCharacterState {
+    ): ChatCharacterState? {
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return member.chatState
+        val key = apiKeys.get() ?: return null
         val sharedContext = _state.value.groupChat.context.withLegacyFallback(member.chatState)
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
         val prompt = chatTurnCoordinator.postTurnPrompt(
@@ -3436,7 +3441,7 @@ class LocalHarnessEngine @Inject constructor(
                 previous = plannerState,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
-            )?.state ?: member.chatState
+            )?.state
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -3445,30 +3450,35 @@ class LocalHarnessEngine @Inject constructor(
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
             })
-            member.chatState
+            null
         }
     }
 
     private suspend fun refreshGroupMemberStates(
         replies: List<GroupReplyForStateUpdate>,
         userMessage: String,
-    ): Map<String, ChatCharacterState> {
-        if (replies.isEmpty()) return emptyMap()
+    ): GroupStateRefreshBatch {
+        if (replies.isEmpty()) return GroupStateRefreshBatch(emptyMap(), complete = true)
         if (replies.size == 1) {
             val reply = replies.single()
-            return mapOf(
-                reply.member.galleryId to refreshGroupMemberState(
-                    member = reply.member,
-                    persona = reply.persona,
-                    userMessage = userMessage,
-                    assistantMessage = reply.content,
-                    step = CHAT_POST_TURN_MODEL_STEP + 100,
-                ),
+            val refreshed = refreshGroupMemberState(
+                member = reply.member,
+                persona = reply.persona,
+                userMessage = userMessage,
+                assistantMessage = reply.content,
+                step = CHAT_POST_TURN_MODEL_STEP + 100,
+            )
+            return GroupStateRefreshBatch(
+                states = mapOf(reply.member.galleryId to (refreshed ?: reply.member.chatState)),
+                complete = refreshed != null,
             )
         }
 
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return replies.associate { it.member.galleryId to it.member.chatState }
+        val key = apiKeys.get() ?: return GroupStateRefreshBatch(
+            states = replies.associate { it.member.galleryId to it.member.chatState },
+            complete = false,
+        )
         val prompt = buildString {
             appendLine("你要一次整理多个群聊角色各自的隐藏状态。每个角色的私有状态完全隔离，禁止把甲角色的判断、关系或经历写进乙角色。")
             appendLine("最终只输出一个 JSON 对象，格式为：")
@@ -3526,12 +3536,13 @@ class LocalHarnessEngine @Inject constructor(
                 ) ?: return@forEach
                 result[galleryId] = parsed.state
             }
+            val complete = replies.all { reply -> reply.member.galleryId in result }
             replies.forEach { reply ->
                 if (reply.member.galleryId !in result) {
                     result[reply.member.galleryId] = reply.member.chatState
                 }
             }
-            result
+            GroupStateRefreshBatch(result, complete)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -3540,9 +3551,12 @@ class LocalHarnessEngine @Inject constructor(
                 put("detail", error.message.orEmpty().take(1_000))
                 put("count", replies.size)
             })
-            replies.associate { reply ->
-                reply.member.galleryId to reply.member.chatState
-            }
+            GroupStateRefreshBatch(
+                states = replies.associate { reply ->
+                    reply.member.galleryId to reply.member.chatState
+                },
+                complete = false,
+            )
         }
     }
 
@@ -3737,29 +3751,26 @@ class LocalHarnessEngine @Inject constructor(
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
-            val refreshedStates = refreshGroupMemberStates(
+            val refreshBatch = refreshGroupMemberStates(
                 replies = repliesForStateUpdate,
                 userMessage = input,
             )
+            val refreshedStates = refreshBatch.states
             val refreshedInReplyOrder = repliesForStateUpdate
                 .mapNotNull { reply -> refreshedStates[reply.member.galleryId] }
-            // Shared hard scene is already advanced deterministically from the durable replies.
-            // Planner output may enrich soft continuity but never rewrites physical state.
-            val nextSharedScene = currentGroup.context.scene
-            val nextSharedContinuity = refreshedInReplyOrder
-                .lastOrNull { it.continuity != currentGroup.context.continuity }
-                ?.continuity
-                ?: currentGroup.context.continuity
-            val through = currentGroup.context.pendingTurns
-                .filter { it.generation == currentGroup.context.generation }
-                .maxOfOrNull(ChatPendingTurn::sequence)
-                ?: currentGroup.context.processedThroughSequence
+            val nextSharedContext = finalizeGroupContextAfterRefresh(
+                context = currentGroup.context,
+                statesInReplyOrder = refreshedInReplyOrder,
+                complete = refreshBatch.complete,
+            )
+            if (!refreshBatch.complete) {
+                eventLog.append("group/post-turn-batch", buildJsonObject {
+                    put("status", "pending-preserved")
+                    put("pending_count", currentGroup.context.pendingTurns.size)
+                })
+            }
             currentGroup = currentGroup.copy(
-                context = currentGroup.context.commitProcessed(
-                    scene = nextSharedScene,
-                    continuity = nextSharedContinuity,
-                    throughSequence = through,
-                ),
+                context = nextSharedContext,
                 members = currentGroup.members.map { existing ->
                     val nextState = refreshedStates[existing.galleryId] ?: return@map existing
                     val source = repliesForStateUpdate.firstOrNull { it.member.galleryId == existing.galleryId }
