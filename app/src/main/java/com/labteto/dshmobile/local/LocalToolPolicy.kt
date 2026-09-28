@@ -93,7 +93,7 @@ internal object LocalToolPolicy {
      * Tools whose execution is gated by the approval pipeline.
      *
      * `ALWAYS` means the call reaches the approval decision; it does not mean the user is prompted,
-     * because safe auto-approval can resolve it. `bash` is listed here precisely so that its command
+     * because global auto-approval can resolve it. `bash` is listed here precisely so that its command
      * policy is consulted: a shell call should never bypass the pipeline just because most commands
      * are auto-approved.
      */
@@ -105,7 +105,10 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Safe automatic approval follows the sandbox, not the tool category:
+     * Low-risk classification follows the sandbox, not the tool category.
+     *
+     * This no longer limits global auto-approval; it is retained for impact/display metadata and
+     * one-turn device policy decisions:
      * - anything the sandbox can already reach may be approved automatically, because auto-approval
      *   cannot grant access the untrusted-app SELinux domain does not already permit;
      * - firmware partitions and other apps' private directories stay out of reach no matter what this
