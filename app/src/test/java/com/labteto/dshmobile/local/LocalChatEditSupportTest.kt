@@ -74,6 +74,33 @@ class LocalChatEditSupportTest {
     }
 
     @Test
+    fun branchSelectionHistoryKeepsStructuredUserPayloads() {
+        withLog { log ->
+            log.append(
+                "user/message",
+                durableUserEvent(message("u-branch", "看图"), "看图", "branch-structured"),
+            )
+
+            val history = buildDurableChatModelHistory(
+                eventLog = log,
+                messages = listOf(
+                    message("u-branch", "看图"),
+                    LocalHarnessMessage(
+                        id = "a-branch",
+                        role = "assistant",
+                        content = "看到了",
+                        createdAt = 2L,
+                    ),
+                ),
+                systemPrompt = "system",
+            )
+
+            assertEquals("branch-structured", history[1]["marker"]?.jsonPrimitive?.content)
+            assertEquals("看到了", history[2]["content"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
     fun historicalEditKeepsStructuredQueuedUserMessagePayload() {
         withLog { log ->
             val queued = QueuedAgentInput(
