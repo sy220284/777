@@ -124,9 +124,34 @@ private fun nextCalendarAnchoredRun(
     field: Int,
     amount: Int,
 ): Long {
-    val calendar = Calendar.getInstance().apply { timeInMillis = anchorMillis }
-    while (calendar.timeInMillis <= afterMillis) {
-        calendar.add(field, amount)
+    require(amount == 1) { "日历锚定步长仅支持 1" }
+    if (anchorMillis > afterMillis) return anchorMillis
+
+    val anchor = Calendar.getInstance().apply { timeInMillis = anchorMillis }
+    val candidate = Calendar.getInstance().apply {
+        timeInMillis = afterMillis
+        set(Calendar.HOUR_OF_DAY, anchor.get(Calendar.HOUR_OF_DAY))
+        set(Calendar.MINUTE, anchor.get(Calendar.MINUTE))
+        set(Calendar.SECOND, anchor.get(Calendar.SECOND))
+        set(Calendar.MILLISECOND, anchor.get(Calendar.MILLISECOND))
     }
-    return calendar.timeInMillis
+
+    when (field) {
+        Calendar.DAY_OF_YEAR -> {
+            if (candidate.timeInMillis <= afterMillis) {
+                candidate.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+        Calendar.WEEK_OF_YEAR -> {
+            val targetDay = anchor.get(Calendar.DAY_OF_WEEK)
+            val currentDay = candidate.get(Calendar.DAY_OF_WEEK)
+            val deltaDays = Math.floorMod(targetDay - currentDay, 7)
+            if (deltaDays != 0) candidate.add(Calendar.DAY_OF_YEAR, deltaDays)
+            if (candidate.timeInMillis <= afterMillis) {
+                candidate.add(Calendar.DAY_OF_YEAR, 7)
+            }
+        }
+        else -> error("不支持的日历锚定字段：$field")
+    }
+    return candidate.timeInMillis
 }
