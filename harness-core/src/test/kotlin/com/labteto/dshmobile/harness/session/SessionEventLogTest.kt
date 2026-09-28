@@ -291,6 +291,32 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun largeEventReadPaginatesWithoutLosingContentAndTraceStaysBounded() {
+        val directory = Files.createTempDirectory("harness-event-bounded-read").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("session.events.jsonl"), json)
+            val event = log.append("test/large", buildJsonObject { put("value", "x".repeat(120_000)) })
+            val expected = json.encodeToString(SessionEvent.serializer(), event)
+            val restored = StringBuilder()
+            var offset = 0
+            do {
+                val page = log.read(event.sequence, offsetChars = offset, maxChars = 4_096)
+                assertTrue(page.length <= 4_096)
+                val body = page.substringBefore("\n[结果已分页")
+                restored.append(body)
+                val next = Regex("offset_chars=([0-9]+)").find(page)?.groupValues?.get(1)?.toIntOrNull()
+                if (next != null) assertEquals(offset + body.length, next)
+                offset = next ?: -1
+            } while (offset >= 0)
+            assertEquals(expected, restored.toString())
+            assertTrue(log.tail(1).length <= 49_000)
+            assertTrue(log.tail(1).contains("session_event_read"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun latestOfReturnsNewestMatchingRelevantType() {
         val directory = Files.createTempDirectory("harness-event-latest-of").toFile()
         val file = directory.resolve("session.events.jsonl")
