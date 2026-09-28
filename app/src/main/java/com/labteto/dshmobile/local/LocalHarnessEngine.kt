@@ -1661,7 +1661,13 @@ class LocalHarnessEngine @Inject constructor(
             legacyState = snapshot?.first,
             previousGeneration = state.chatContext.generation,
         )
-        resetModelHistory(buildChatModelHistory(activeMessages, chatSystemPrompt()))
+        resetModelHistory(
+            buildDurableChatModelHistory(
+                eventLog = eventLog,
+                messages = activeMessages,
+                systemPrompt = chatSystemPrompt(),
+            ),
+        )
         updateContextMetrics()
         _state.update { current ->
             current.copy(
@@ -1675,6 +1681,15 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
         persistChatBranchState("variant-selected")
+        val activeTranscriptSequence = persistRewrittenChatTranscript(
+            eventLog = eventLog,
+            reason = "variant-selected",
+            activeTranscript = activeMessages,
+        )
+        transcriptProjectionCursor = maxOf(
+            transcriptProjectionCursor ?: -1L,
+            activeTranscriptSequence,
+        )
         checkpointModelHistory("chat/variant-selected")
         persist()
         true
