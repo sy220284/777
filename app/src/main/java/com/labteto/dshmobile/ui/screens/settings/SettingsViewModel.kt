@@ -26,6 +26,7 @@ import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImageInputMode
+import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.LocalVisionSettings
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -446,6 +447,18 @@ class SettingsViewModel @Inject constructor(
     }
 
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
+
+    suspend fun localSessionStorageStatus(): LocalSessionStorageStatus =
+        localHarness.sessionStorageStatusForUi()
+
+    suspend fun compactLocalSessionStorage(): LocalSessionStorageStatus =
+        localHarness.compactSessionStorageForUi()
+
+    suspend fun exportLocalSessionStorage(uri: Uri): Long = withContext(Dispatchers.IO) {
+        appContext.contentResolver.openOutputStream(uri)?.use { output ->
+            localHarness.exportSessionStorageForUi(output)
+        } ?: error("无法打开会话归档导出文件")
+    }
 
     suspend fun environmentInfo(): String = localHarness.environmentInfoForUi()
 

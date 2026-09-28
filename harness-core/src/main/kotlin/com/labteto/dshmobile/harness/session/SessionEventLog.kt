@@ -2,6 +2,7 @@ package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -21,6 +22,15 @@ data class SessionEvent(
     val createdAt: Long,
     val data: JsonObject,
 )
+
+data class SessionEventFileSnapshot(
+    val name: String,
+    val lastModified: Long,
+    val length: Long,
+    val input: InputStream,
+) : AutoCloseable {
+    override fun close() = input.close()
+}
 
 /**
  * Append-only source of truth for model-visible session facts.
@@ -274,6 +284,31 @@ class SessionEventLog(
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
+        }
+    }
+
+    /**
+     * Open a stable byte snapshot of every durable event file under the append/rotation lock.
+     *
+     * File descriptors remain attached to the same inode if a later append rotates or compresses
+     * the path. [SessionEventFileSnapshot.length] freezes the visible byte boundary, so callers can
+     * release this lock immediately and stream a consistent export without blocking future turns.
+     */
+    fun openDurableFileSnapshot(): List<SessionEventFileSnapshot> = synchronized(lock) {
+        val opened = mutableListOf<SessionEventFileSnapshot>()
+        try {
+            orderedFilesUnsafe().forEach { source ->
+                opened += SessionEventFileSnapshot(
+                    name = source.name,
+                    lastModified = source.lastModified(),
+                    length = source.length(),
+                    input = source.inputStream().buffered(),
+                )
+            }
+            opened
+        } catch (error: Exception) {
+            opened.forEach { runCatching { it.close() } }
+            throw error
         }
     }
 

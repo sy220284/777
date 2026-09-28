@@ -91,6 +91,7 @@ import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -322,6 +323,7 @@ class LocalHarnessEngine @Inject constructor(
         interactionPlanner = chatInteractionPlanner,
     )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
+    private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
     private val sessionRepository by lazy {
         LocalSessionRepository(sessionsRoot, json, scope,
             onWritten = { _state.update { it.copy(sessions = sessionSummaries()) } },
@@ -2846,6 +2848,15 @@ class LocalHarnessEngine @Inject constructor(
 
     suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
+    suspend fun sessionStorageStatusForUi(): LocalSessionStorageStatus =
+        withContext(Dispatchers.IO) { sessionStorageManager.status() }
+
+    suspend fun compactSessionStorageForUi(): LocalSessionStorageStatus =
+        withContext(Dispatchers.IO) { sessionStorageManager.compactAll() }
+
+    suspend fun exportSessionStorageForUi(output: OutputStream): Long =
+        withContext(Dispatchers.IO) { sessionStorageManager.exportAll(output) }
+
     suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
         environmentInfo()
     }
@@ -5085,17 +5096,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
-                val command = args.string("command")
-                val background = args.boolean("run_in_background", false)
-                val timeout = args.int(
-                    "timeout_seconds",
-                    if (background) DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS else DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS,
-                ).coerceIn(
-                    1,
-                    if (background) MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS else MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS,
-                )
-                if (background) jobs.start("后台命令") { _, report -> workspace.shell(command, timeout, report) }
-                else workspace.shell(command, timeout)
+                LocalShellTool.execute(args, workspace, jobs)
             }
             "job_list" -> jobs.list()
             "job_output" -> jobs.output(args.string("job_id"))
@@ -6419,10 +6420,6 @@ class LocalHarnessEngine @Inject constructor(
         const val MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
         const val FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS = 45L
         const val BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS = 240L
-        const val DEFAULT_FOREGROUND_SHELL_TIMEOUT_SECONDS = 30
-        const val DEFAULT_BACKGROUND_SHELL_TIMEOUT_SECONDS = 300
-        const val MAX_FOREGROUND_SHELL_TIMEOUT_SECONDS = 120
-        const val MAX_BACKGROUND_SHELL_TIMEOUT_SECONDS = 900
         const val MAX_PATCH_CHARS = 512_000
         const val MAX_TOOL_RESULT_CHARS = 50_000
         const val MAX_EVENT_CHARS = 65_536
