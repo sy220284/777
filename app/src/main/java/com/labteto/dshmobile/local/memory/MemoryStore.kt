@@ -10,6 +10,44 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
+internal fun compactMemoryRecords(
+    records: List<MemoryRecord>,
+    maxRecords: Int,
+): List<MemoryRecord> {
+    if (maxRecords <= 0 || records.isEmpty()) return emptyList()
+    if (records.size <= maxRecords) return records
+
+    val predecessors = records
+        .asSequence()
+        .filter { !it.supersededBy.isNullOrBlank() }
+        .groupBy { it.supersededBy!! }
+        .mapValues { (_, values) -> values.sortedByDescending(MemoryRecord::updatedAt) }
+    val activeRoots = records
+        .filter(MemoryRecord::active)
+        .sortedWith(
+            compareByDescending<MemoryRecord> { if (it.pinned) 1 else 0 }
+                .thenByDescending(MemoryRecord::importance)
+                .thenByDescending(MemoryRecord::updatedAt),
+        )
+    val selected = linkedSetOf<String>()
+
+    fun retainRootAndNearestPredecessors(root: MemoryRecord) {
+        if (selected.size >= maxRecords) return
+        val queue = mutableListOf(root.id)
+        var cursor = 0
+        while (cursor < queue.size && selected.size < maxRecords) {
+            val id = queue[cursor++]
+            if (!selected.add(id)) continue
+            predecessors[id].orEmpty().forEach { predecessor ->
+                if (predecessor.id !in selected) queue += predecessor.id
+            }
+        }
+    }
+
+    activeRoots.forEach(::retainRootAndNearestPredecessors)
+    return records.filter { it.id in selected }
+}
+
 @Singleton
 class MemoryStore internal constructor(
     private val root: File,
@@ -111,7 +149,7 @@ class MemoryStore internal constructor(
             }
         }
         records += record
-        writeDocument(MemoryDocument(records = records.takeLast(MAX_RECORDS)))
+        writeDocument(MemoryDocument(records = records))
         return record
     }
 
@@ -275,12 +313,14 @@ class MemoryStore internal constructor(
         allowedKinds: Set<MemoryKind> = MemoryKind.values().toSet(),
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
+        recordFilter: (MemoryRecord) -> Boolean = { true },
     ): List<MemoryRecord> {
         val boundedItems = maxItems.coerceIn(1, 20)
         val boundedChars = maxChars.coerceIn(256, 12_000)
         val terms = terms(query)
         val candidates = readDocument().records.asSequence()
             .filter { it.active && it.scope in allowedScopes && it.kind in allowedKinds }
+            .filter(recordFilter)
             .filter {
                 when (it.scope) {
                     MemoryScope.GLOBAL -> true
@@ -325,7 +365,7 @@ class MemoryStore internal constructor(
             }
         }
         .sortedByDescending(MemoryRecord::updatedAt)
-        .take(limit.coerceIn(1, 200))
+        .take(limit.coerceIn(1, MAX_RECORDS))
         .toList()
 
     private fun score(record: MemoryRecord, queryTerms: Set<String>): Int {
@@ -386,7 +426,7 @@ class MemoryStore internal constructor(
                 MemoryDocument()
             }
         }
-        cachedDocument = document
+        cachedDocument = boundedDocument
         cachedStamp = documentStamp()
         return document
     }
@@ -399,13 +439,16 @@ class MemoryStore internal constructor(
     }
 
     private fun writeDocument(document: MemoryDocument) {
+        val boundedDocument = document.copy(
+            records = compactMemoryRecords(document.records, MAX_RECORDS),
+        )
         file.parentFile?.mkdirs()
         if (decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
 
         val temporary = File(file.parentFile, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
+        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), boundedDocument))
         runCatching {
             Files.move(
                 temporary.toPath(),
