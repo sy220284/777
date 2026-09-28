@@ -505,4 +505,71 @@ class ChatContextStateTest {
         assertTrue(grounded.unfinished.contains("还要预订酒店"))
     }
 
+
+    @Test
+    fun cancellingDifferentDestinationDoesNotRemoveExistingDecision() {
+        val previous = ChatContinuityState(
+            decisions = listOf("明天九点去城南"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(decisions = emptyList()),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 64L,
+                    userMessageId = "u64",
+                    assistantMessageId = "a64",
+                    userMessage = "明天不去城北了，那个安排取消。",
+                    assistantMessage = "好，城北不去了。",
+                ),
+            ),
+        )
+
+        assertEquals(previous.decisions, grounded.decisions)
+    }
+
+    @Test
+    fun closingDifferentTopicDoesNotRemoveOnlyOpenThread() {
+        val previous = ChatContinuityState(
+            unfinished = listOf("还要确认车票"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = emptyList()),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 65L,
+                    userMessageId = "u65",
+                    assistantMessageId = "a65",
+                    userMessage = "酒店已经处理好了。",
+                    assistantMessage = "好，酒店这件事解决了。",
+                ),
+            ),
+        )
+
+        assertEquals(previous.unfinished, grounded.unfinished)
+    }
+
+    @Test
+    fun matchingSubjectCancellationStillRemovesDecision() {
+        val previous = ChatContinuityState(
+            decisions = listOf("明天九点去城南"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(decisions = emptyList()),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 66L,
+                    userMessageId = "u66",
+                    assistantMessageId = "a66",
+                    userMessage = "城南不去了，那个安排取消。",
+                    assistantMessage = "好，城南取消。",
+                ),
+            ),
+        )
+
+        assertTrue(grounded.decisions.isEmpty())
+    }
+
 }
