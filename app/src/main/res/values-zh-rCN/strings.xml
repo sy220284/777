@@ -523,7 +523,7 @@
     <string name="settings_local_session_storage_retention">原始会话事实会一直保留到你主动删除会话；压缩不会丢历史。</string>
     <string name="settings_local_session_storage_compact">压缩旧分片</string>
     <string name="settings_local_session_storage_export">导出全部本地会话</string>
-    <string name="settings_local_session_storage_cleanup">打开会话列表清理</string>
+    <string name="settings_local_session_storage_cleanup">返回聊天页清理会话</string>
     <string name="settings_local_session_storage_compacted">旧会话分片已压缩。</string>
     <string name="settings_local_session_storage_compact_failed">本地会话存储压缩失败。</string>
     <string name="settings_local_session_storage_exported">本地会话归档已导出。</string>
