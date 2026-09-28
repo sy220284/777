@@ -74,6 +74,41 @@ class LocalChatEditSupportTest {
     }
 
     @Test
+    fun activeBranchMaterializationDoesNotClearBranchGraph() {
+        withLog { log ->
+            persistActiveChatTranscript(
+                eventLog = log,
+                reason = "variant-selected",
+                activeTranscript = listOf(message("u-active", "当前分支")),
+            )
+
+            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            assertEquals(listOf("chat/active-transcript"), events.map { it.type })
+        }
+    }
+
+    @Test
+    fun destructiveHistoryRewriteStillClearsBranchGraph() {
+        withLog { log ->
+            persistRewrittenChatTranscript(
+                eventLog = log,
+                reason = "user-edited",
+                activeTranscript = listOf(message("u-edited", "改写分支")),
+            )
+
+            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            assertEquals(
+                listOf("chat/branch-state", "chat/active-transcript"),
+                events.map { it.type },
+            )
+            assertEquals(
+                0,
+                decodeChatBranchStateEvent(events.first().data)?.nodes?.size,
+            )
+        }
+    }
+
+    @Test
     fun branchSelectionHistoryKeepsStructuredUserPayloads() {
         withLog { log ->
             log.append(
