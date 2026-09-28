@@ -231,7 +231,7 @@ class GitHubConnectorPlugin(
         body: JsonObject?,
         mutation: Boolean,
     ): GitHubApiResponse {
-        val url = resolveApiPath(path, mutation)
+        val url = resolveApiPath(path, method, mutation)
         val requestBody = when (method) {
             "GET" -> null
             else -> (body?.let { json.encodeToString(JsonObject.serializer(), it) } ?: "{}")
@@ -288,7 +288,7 @@ class GitHubConnectorPlugin(
         error("GitHub API 重试循环异常结束")
     }
 
-    private fun resolveApiPath(raw: String, mutation: Boolean): HttpUrl {
+    private fun resolveApiPath(raw: String, method: String, mutation: Boolean): HttpUrl {
         val path = raw.trim()
         require(path.startsWith("/") && !path.startsWith("//")) { "GitHub API path 必须以单个 / 开头" }
         require(path.length <= MAX_PATH_CHARS) { "GitHub API path 过长" }
@@ -299,11 +299,18 @@ class GitHubConnectorPlugin(
                 url.port == baseUrl.port
         ) { "GitHub 连接器只允许访问已配置的 GitHub API 主机" }
 
-        val normalizedPath = ("/" + url.pathSegments.joinToString("/")).lowercase()
+        val segments = url.pathSegments.filter(String::isNotBlank)
+        val normalizedPath = ("/" + segments.joinToString("/")).lowercase()
         if (mutation) {
             require(normalizedPath.startsWith("/repos/")) { "GitHub 写请求只允许 /repos/... 仓库范围 API" }
             require(FORBIDDEN_MUTATION_PATHS.none(normalizedPath::contains)) {
                 "该 GitHub 管理接口未向 Agent 开放"
+            }
+            require(!(segments.size == 3 && method in setOf("PATCH", "DELETE"))) {
+                "仓库本体修改/删除未向 Agent 开放"
+            }
+            require(!normalizedPath.endsWith("/transfer")) {
+                "仓库转移未向 Agent 开放"
             }
         } else {
             require(READ_PATH_PREFIXES.any { prefix ->
