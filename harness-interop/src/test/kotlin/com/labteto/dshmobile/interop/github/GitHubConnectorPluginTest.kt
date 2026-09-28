@@ -221,6 +221,17 @@ class GitHubConnectorPluginTest {
 
         assertTrue(result.isError)
         assertTrue(result.content.contains("未向 Agent 开放"))
+
+        val deleteRepository = registry.context.tools.execute(
+            "github_api_request",
+            buildJsonObject {
+                put("method", "DELETE")
+                put("path", "/repos/example/project")
+            },
+            context = ToolContext(approval = { true }),
+        )
+        assertTrue(deleteRepository.isError)
+        assertTrue(deleteRepository.content.contains("仓库本体"))
         assertEquals(0, calls)
     }
 
