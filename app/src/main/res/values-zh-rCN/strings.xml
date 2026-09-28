@@ -430,7 +430,7 @@
     <string name="tasks_subtitle">查看计划任务、周期任务和最近执行结果</string>
     <string name="tasks_empty_title">暂无后台任务</string>
     <string name="tasks_empty_subtitle">直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。</string>
-    <string name="tasks_cancelled">任务已取消</string>
+    <string name="tasks_cancelled">任务已删除</string>
     <string name="tasks_missing">任务已经不存在</string>
     <string name="tasks_delete_confirm_title">删除这个任务？</string>
     <string name="tasks_delete_confirm_body">删除后将停止后续执行，并从自动化列表移除。</string>
@@ -789,6 +789,7 @@
     <string name="local_group_chat_member_count">%1$d 位角色</string>
     <string name="local_group_chat_active_speaker">%1$s 正在回复…</string>
     <string name="local_group_chat_members_title">群聊角色</string>
+    <string name="local_group_chat_search_members">搜索角色</string>
     <string name="local_group_chat_members_hint">从已创建的人物中选择 %1$d～%2$d 个。每个角色由独立角色智能体读取自己的完整人设与关系状态。</string>
     <string name="local_group_chat_no_characters">还没有可加入群聊的人物，请先在人设图集创建或保存角色。</string>
     <string name="local_group_chat_selected_count">已选择 %1$d/%2$d</string>
