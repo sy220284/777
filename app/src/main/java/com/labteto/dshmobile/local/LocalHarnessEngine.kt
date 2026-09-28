@@ -3338,16 +3338,10 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
         val runSnapshot = _state.value
-        val mainStepLimit = if (runPolicy.allowToolExecution) {
-            adaptiveAgentStepLimit(
-                configuredBase = mainMaxSteps,
-                task = input,
-                contextChars = runSnapshot.contextChars,
-                contextBudgetChars = runSnapshot.contextBudgetChars,
-                pressure = resourceScheduler.snapshot().pressure,
-                kind = LocalAgentRunKind.FOREGROUND,
-            )
-        } else 1
+        val mainStepLimit = if (runPolicy.allowToolExecution) adaptiveAgentStepLimit(
+            mainMaxSteps, input, runSnapshot.contextChars, runSnapshot.contextBudgetChars,
+            resourceScheduler.snapshot().pressure, LocalAgentRunKind.FOREGROUND,
+        ) else 1
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -4926,9 +4920,7 @@ class LocalHarnessEngine @Inject constructor(
         result: String,
     ): String {
         val budget = adaptiveToolResultBudget(
-            base = currentHistoryBudget(),
-            currentHistoryChars = modelHistory.encodedChars,
-            currentHistoryTokens = modelHistory.estimatedTokens,
+            currentHistoryBudget(), modelHistory.encodedChars, modelHistory.estimatedTokens,
         )
         val retained = retainTextForModel(
             value = result,
