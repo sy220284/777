@@ -196,8 +196,8 @@ if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in eng
     violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
-if "GitHub API：" not in engine or "X-RateLimit-*" not in engine or "compare/main...<branch>?expand=1" not in engine:
-    violations.append("Work prompt must distinguish GitHub API jitter, auth/rate limits, and compare-link fallback")
+if "持续到任务完成或遇到真实阻塞" not in engine or "最终结论必须有实际结果支撑" not in engine:
+    violations.append("Work prompt must retain abstract execution-discipline and evidence-based completion rules")
 if "const val PROBE_ATTEMPTS = 3" not in web_provider or "const val SAFE_HTTP_RETRY_ATTEMPTS = 3" not in web_provider:
     violations.append("Network diagnosis and safe HTTP reads must keep bounded three-attempt retry resilience")
 if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_provider:
