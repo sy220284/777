@@ -58,6 +58,99 @@ internal fun compactMemoryRecords(
     return records.filter { it.id in selected }
 }
 
+
+internal data class MemoryConsolidationResult(
+    val records: List<MemoryRecord>,
+    val mergedCount: Int,
+)
+
+/**
+ * Merge formatting-only duplicates without weakening rollback provenance.
+ *
+ * Exact duplicates are already folded on write. This maintenance pass handles older records and
+ * punctuation/spacing variants, merges all known source messages, and rewires predecessor links to
+ * the surviving newest record.
+ */
+internal fun consolidateMemoryRecords(
+    records: List<MemoryRecord>,
+    maxSourceMessages: Int = 16,
+): MemoryConsolidationResult {
+    if (records.size < 2) return MemoryConsolidationResult(records, 0)
+
+    data class Key(
+        val scope: MemoryScope,
+        val projectId: String?,
+        val lineageId: String?,
+        val subjectKey: String?,
+        val kind: MemoryKind,
+        val content: String,
+    )
+
+    val duplicateGroups = records.asSequence()
+        .filter(MemoryRecord::active)
+        .groupBy { record ->
+            Key(
+                scope = record.scope,
+                projectId = record.projectId,
+                lineageId = record.lineageId,
+                subjectKey = record.subjectKey,
+                kind = record.kind,
+                content = canonicalMemoryIdentity(record.content),
+            )
+        }
+        .values
+        .filter { group -> group.size > 1 && canonicalMemoryIdentity(group.first().content).isNotBlank() }
+        .toList()
+    if (duplicateGroups.isEmpty()) return MemoryConsolidationResult(records, 0)
+
+    val loserToWinner = mutableMapOf<String, String>()
+    val mergedWinners = mutableMapOf<String, MemoryRecord>()
+    duplicateGroups.forEach { group ->
+        val winner = group.maxWith(
+            compareBy<MemoryRecord> { it.updatedAt }
+                .thenBy { it.createdAt }
+                .thenBy { it.id },
+        )
+        group.filter { it.id != winner.id }.forEach { loser -> loserToWinner[loser.id] = winner.id }
+        val mergedSources = group.asSequence()
+            .flatMap { it.sourceMessages.asSequence() }
+            .distinct()
+            .toList()
+            .takeLast(maxSourceMessages.coerceAtLeast(1))
+        mergedWinners[winner.id] = winner.copy(
+            sourceSessionId = winner.sourceSessionId
+                ?: group.asSequence().sortedByDescending(MemoryRecord::updatedAt)
+                    .mapNotNull(MemoryRecord::sourceSessionId)
+                    .firstOrNull(),
+            sourceMessages = mergedSources,
+            hasUnboundSource = group.any(MemoryRecord::hasUnboundSource),
+            importance = group.maxOf(MemoryRecord::importance),
+            pinned = group.any(MemoryRecord::pinned),
+            createdAt = group.minOf(MemoryRecord::createdAt),
+            updatedAt = group.maxOf(MemoryRecord::updatedAt),
+        )
+    }
+
+    val merged = records.mapNotNull { record ->
+        if (record.id in loserToWinner) {
+            null
+        } else {
+            val winner = mergedWinners[record.id] ?: record
+            val successor = winner.supersededBy?.let { loserToWinner[it] ?: it }
+            if (successor == winner.supersededBy) winner else winner.copy(supersededBy = successor)
+        }
+    }
+    return MemoryConsolidationResult(
+        records = merged,
+        mergedCount = loserToWinner.size,
+    )
+}
+
+private fun canonicalMemoryIdentity(text: String): String =
+    text.lowercase()
+        .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
+        .take(2_000)
+
 @Singleton
 class MemoryStore internal constructor(
     private val root: File,
@@ -72,6 +165,7 @@ class MemoryStore internal constructor(
 
     private var cachedDocument: MemoryDocument? = null
     private var cachedStamp: DocumentStamp? = null
+    private var lastConsolidatedAt: Long = 0L
 
     @Synchronized
     fun remember(
@@ -337,8 +431,13 @@ class MemoryStore internal constructor(
     ): List<MemoryRecord> {
         val boundedItems = maxItems.coerceIn(1, 20)
         val boundedChars = maxChars.coerceIn(256, 12_000)
-        val terms = terms(query)
-        val candidates = readDocument().records.asSequence()
+        val queryTerms = terms(query)
+        val broadRecall = BROAD_RECALL_HINT.containsMatchIn(query)
+        val candidateLimit = maxOf(MIN_RECALL_CANDIDATES, boundedItems * 4).coerceAtMost(MAX_RECALL_CANDIDATES)
+
+        // Stage 1: cheap lexical/scope filtering. Explicit recall questions keep a bounded fallback
+        // set so "第一次/上次那件事" can still reach a memory whose wording is very different.
+        val coarse = readDocument().records.asSequence()
             .filter { it.active && it.scope in allowedScopes && it.kind in allowedKinds }
             .filter(recordFilter)
             .filter {
@@ -348,18 +447,38 @@ class MemoryStore internal constructor(
                     MemoryScope.LINEAGE -> lineageId != null && it.lineageId == lineageId
                 }
             }
-            .map { it to score(it, terms) }
-            .filter { (_, score) -> score > 0 }
+            .map { record ->
+                val lexical = lexicalScore(record, queryTerms)
+                Triple(record, lexical, coarseScore(record, lexical))
+            }
+            .filter { (record, lexical, _) -> lexical > 0 || record.pinned || broadRecall }
+            .sortedWith(
+                compareByDescending<Triple<MemoryRecord, Int, Int>> { it.third }
+                    .thenByDescending { it.first.updatedAt },
+            )
+            .take(candidateLimit)
+            .toList()
+
+        // Stage 2: rerank only the small candidate set using phrase overlap and query intent.
+        val reranked = coarse.asSequence()
+            .map { (record, lexical, coarseValue) ->
+                record to fineRecallScore(
+                    record = record,
+                    query = query,
+                    lexical = lexical,
+                    coarse = coarseValue,
+                )
+            }
             .sortedWith(
                 compareByDescending<Pair<MemoryRecord, Int>> { it.second }
                     .thenByDescending { it.first.updatedAt },
             )
-            .map { it.first }
+            .map(Pair<MemoryRecord, Int>::first)
             .toList()
 
         var used = 0
         val selected = mutableListOf<MemoryRecord>()
-        for (record in candidates) {
+        for (record in reranked) {
             val cost = record.content.length + 32
             if (selected.isNotEmpty() && used + cost > boundedChars) break
             selected += record
@@ -367,6 +486,29 @@ class MemoryStore internal constructor(
             if (selected.size >= boundedItems) break
         }
         return selected
+    }
+
+    /**
+     * Low-frequency maintenance for long-lived memory stores.
+     * Called after durable writes; the in-process interval avoids turning every memory capture into
+     * another full scan.
+     */
+    @Synchronized
+    fun consolidateIfDue(
+        now: Long = System.currentTimeMillis(),
+        force: Boolean = false,
+    ): Int {
+        if (!force && lastConsolidatedAt > 0L && now - lastConsolidatedAt < CONSOLIDATION_INTERVAL_MILLIS) {
+            return 0
+        }
+        val current = readDocument().records
+        val consolidated = consolidateMemoryRecords(current, MAX_SOURCE_MESSAGES)
+        val compacted = compactMemoryRecords(consolidated.records, MAX_RECORDS)
+        if (consolidated.mergedCount > 0 || compacted.size != current.size) {
+            writeDocument(MemoryDocument(records = compacted))
+        }
+        lastConsolidatedAt = now
+        return consolidated.mergedCount
     }
 
     @Synchronized
@@ -388,18 +530,46 @@ class MemoryStore internal constructor(
         .take(limit.coerceIn(1, MAX_RECORDS))
         .toList()
 
-    private fun score(record: MemoryRecord, queryTerms: Set<String>): Int {
+    private fun lexicalScore(record: MemoryRecord, queryTerms: Set<String>): Int {
+        if (queryTerms.isEmpty()) return 0
         val contentTerms = terms(record.content)
-        val overlap = if (queryTerms.isEmpty()) 0 else queryTerms.count(contentTerms::contains)
-        val direct = if (
-            queryTerms.isNotEmpty() &&
-            queryTerms.any { record.content.contains(it, ignoreCase = true) }
-        ) 8 else 0
-        val relevance = overlap * 12 + direct
-        if (relevance == 0 && !record.pinned) return 0
-        val pinned = if (record.pinned) 12 else 0
-        val importance = record.importance / 10
-        return relevance + pinned + importance
+        val overlap = queryTerms.count(contentTerms::contains)
+        val direct = if (queryTerms.any { record.content.contains(it, ignoreCase = true) }) 8 else 0
+        return overlap * 12 + direct
+    }
+
+    private fun coarseScore(record: MemoryRecord, lexical: Int): Int =
+        lexical + (if (record.pinned) 12 else 0) + record.importance / 10
+
+    private fun fineRecallScore(
+        record: MemoryRecord,
+        query: String,
+        lexical: Int,
+        coarse: Int,
+    ): Int {
+        val queryCore = canonicalMemoryIdentity(query)
+        val contentCore = canonicalMemoryIdentity(record.content)
+        val phrase = phraseOverlapScore(queryCore, contentCore)
+        val kindBoost = when {
+            RELATIONSHIP_STATUS_QUERY.containsMatchIn(query) &&
+                record.kind == MemoryKind.RELATIONSHIP_STATE -> 50
+            EPISODIC_RECALL_QUERY.containsMatchIn(query) &&
+                record.kind == MemoryKind.RELATIONSHIP_FACT -> 35
+            PREFERENCE_RECALL_QUERY.containsMatchIn(query) &&
+                record.kind == MemoryKind.RELATIONSHIP_PREFERENCE -> 30
+            else -> 0
+        }
+        return coarse * 10 + lexical * 8 + phrase + kindBoost
+    }
+
+    private fun phraseOverlapScore(left: String, right: String): Int {
+        if (left.length < 2 || right.length < 2) return 0
+        if (left.contains(right) || right.contains(left)) return 80
+        val a = (0 until left.length - 1).mapTo(linkedSetOf()) { left.substring(it, it + 2) }
+        val b = (0 until right.length - 1).mapTo(linkedSetOf()) { right.substring(it, it + 2) }
+        if (a.isEmpty() || b.isEmpty()) return 0
+        val shared = a.count(b::contains)
+        return (shared * 60) / minOf(a.size, b.size)
     }
 
     private fun terms(text: String): Set<String> {
@@ -503,5 +673,21 @@ class MemoryStore internal constructor(
         const val DEFAULT_MAX_ITEMS = 6
         const val DEFAULT_MAX_CHARS = 3_500
         const val MAX_SOURCE_MESSAGES = 16
+        const val MIN_RECALL_CANDIDATES = 12
+        const val MAX_RECALL_CANDIDATES = 48
+        const val CONSOLIDATION_INTERVAL_MILLIS = 6L * 60L * 60L * 1_000L
+
+        val BROAD_RECALL_HINT = Regex(
+            """(?i)(?:还记得|你记得|记不记得|第一次|上次|以前|之前|当时|remember|last\s+time|before)""",
+        )
+        val EPISODIC_RECALL_QUERY = Regex(
+            """(?:还记得|你记得|记不记得|第一次|上次|以前|之前|当时|那天|那次)""",
+        )
+        val RELATIONSHIP_STATUS_QUERY = Regex(
+            """(?:什么关系|算什么关系|喜欢我|爱我|讨厌我|在一起|分手|复合|对象|女朋友|男朋友|老婆|老公)""",
+        )
+        val PREFERENCE_RECALL_QUERY = Regex(
+            """(?:喜欢|不喜欢|讨厌|介意|希望|习惯|偏好)""",
+        )
     }
 }
