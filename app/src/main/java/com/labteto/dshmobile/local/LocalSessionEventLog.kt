@@ -76,8 +76,8 @@ class LocalSessionEventLog(
 
     fun tail(limit: Int = 40): String = delegate.tail(limit)
 
-    fun read(sequence: Long, before: Int = 0, after: Int = 0): String =
-        delegate.read(sequence, before, after)
+    fun read(sequence: Long, before: Int = 0, after: Int = 0, offsetChars: Int = 0): String =
+        delegate.read(sequence, before, after, offsetChars)
 
     fun latest(
         type: String,

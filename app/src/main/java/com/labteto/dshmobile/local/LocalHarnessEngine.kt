@@ -4388,7 +4388,7 @@ class LocalHarnessEngine @Inject constructor(
             "session_event_read" -> eventLogForAuthorized(args.optionalString("session_id")).read(
                 sequence = args.int("seq", -1).toLong(),
                 before = args.int("before", 0),
-                after = args.int("after", 0),
+                after = args.int("after", 0), offsetChars = args.int("offset_chars", 0),
             )
             "present" -> workspace.present(args.string("path"))
             else -> "未知工具：${call.name}"

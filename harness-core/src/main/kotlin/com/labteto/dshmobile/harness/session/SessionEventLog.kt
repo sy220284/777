@@ -207,7 +207,9 @@ class SessionEventLog(
                 source.forEachEventLine { line ->
                     if (line.isBlank()) return@forEachEventLine
                     if (segmentTail.size >= wanted) segmentTail.removeFirst()
-                    segmentTail.addLast(line)
+                    segmentTail.addLast(if (line.length > MAX_SEARCH_EVENT_CHARS) {
+                        line.take(MAX_SEARCH_EVENT_CHARS) + "… [事件内容已截断；可用 session_event_read 按字符分页读取]"
+                    } else line)
                 }
                 if (segmentTail.isNotEmpty()) {
                     val chunk = segmentTail.toList()
@@ -218,10 +220,26 @@ class SessionEventLog(
             }
             chunks.flatMap { it }.takeLast(wanted)
         }
-        return if (lines.isEmpty()) "会话事件日志为空" else lines.joinToString("\n")
+        if (lines.isEmpty()) return "会话事件日志为空"
+        val selected = ArrayDeque<String>()
+        var used = 0
+        for (line in lines.asReversed()) {
+            val added = line.length + if (selected.isEmpty()) 0 else 1
+            if (used + added > MAX_SEARCH_RESULT_CHARS) break
+            selected.addFirst(line)
+            used += added
+        }
+        val prefix = if (selected.size < lines.size) "[较早事件已省略；可用 session_event_search 分页检索]\n" else ""
+        return prefix + selected.joinToString("\n")
     }
 
-    fun read(sequence: Long, before: Int = 0, after: Int = 0): String {
+    fun read(
+        sequence: Long,
+        before: Int = 0,
+        after: Int = 0,
+        offsetChars: Int = 0,
+        maxChars: Int = DEFAULT_SEARCH_RESULT_CHARS,
+    ): String {
         val window = synchronized(lock) {
             if (nextSequence.get() == 0L) null
             else readWindowUnsafe(
@@ -232,7 +250,35 @@ class SessionEventLog(
         }
         if (window == null) return "会话事件日志为空"
         if (window.isEmpty()) return "事件不存在：$sequence"
-        return window.joinToString("\n") { json.encodeToString(SessionEvent.serializer(), it) }
+        val offset = offsetChars.coerceAtLeast(0).toLong()
+        val budget = maxChars.coerceIn(MIN_SEARCH_RESULT_CHARS, MAX_SEARCH_RESULT_CHARS)
+        val page = StringBuilder(budget)
+        var cursor = 0L
+        window.forEachIndexed { index, event ->
+            val row = (if (index == 0) "" else "\n") + json.encodeToString(SessionEvent.serializer(), event)
+            val rowEnd = cursor + row.length
+            if (rowEnd > offset && page.length < budget) {
+                val start = (offset - cursor).coerceAtLeast(0).toInt()
+                val count = minOf(row.length - start, budget - page.length)
+                page.append(row, start, start + count)
+            }
+            cursor = rowEnd
+        }
+        if (offset >= cursor) return "事件读取游标超出范围：$offsetChars（总字符数 $cursor）"
+        if (offset == 0L && cursor <= budget) return page.toString()
+        val footer = if (offset + page.length < cursor) {
+            "\n[结果已分页；保持 seq/before/after 不变，继续调用 session_event_read，并传 offset_chars="
+        } else ""
+        if (footer.isEmpty()) return page.toString()
+        val suffix = "]"
+        var bodyLength = minOf(page.length, budget - footer.length - suffix.length - 20)
+        if (bodyLength > 0 && page[bodyLength - 1].isHighSurrogate()) bodyLength--
+        var nextOffset = offset + bodyLength
+        while (bodyLength + footer.length + nextOffset.toString().length + suffix.length > budget) {
+            bodyLength--
+            nextOffset--
+        }
+        return page.substring(0, bodyLength) + footer + nextOffset + suffix
     }
 
     fun latest(
