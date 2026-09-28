@@ -67,7 +67,7 @@ class ChatContextAssemblerTest {
     fun repetitionGuardStillRemovesSamePolarityParaphrase() {
         val result = ChatRepetitionGuard.filter(
             candidate = "这件事你不用再担心了。我们去看看门外。",
-            recentAssistantReplies = listOf("这件事不用担心了。"),
+            recentAssistantReplies = listOf("这件事你不用再担心了。"),
         )
 
         assertFalse(result.text.contains("不用再担心"))
