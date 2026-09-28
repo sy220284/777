@@ -56,8 +56,16 @@ internal class LocalHistoryCompactor(
         val effectiveTailTokens = budget?.tailTokens
         val encodedChars = currentChars ?: history.sumOf { it.toString().length }
         val encodedTokens = currentTokens ?: history.sumOf { estimateModelTokens(it.toString()) }
-        val charPressure = encodedChars > effectiveMaxHistoryChars
-        val tokenPressure = effectiveMaxHistoryTokens?.let { encodedTokens + extraTokens > it } == true
+        val extraTokenRatio = effectiveMaxHistoryTokens?.takeIf { it > 0 }?.let {
+            extraTokens.toDouble() / it.toDouble()
+        } ?: 0.0
+        val historyDepth = (history.size.toDouble() / 80.0).coerceIn(0.0, 1.0)
+        val triggerRatio = (0.92 - historyDepth * 0.08 - extraTokenRatio.coerceIn(0.0, 0.5) * 0.28)
+            .coerceIn(0.68, 0.92)
+        val charPressure = encodedChars > (effectiveMaxHistoryChars * triggerRatio).toInt()
+        val tokenPressure = effectiveMaxHistoryTokens?.let {
+            encodedTokens + extraTokens > (it * triggerRatio).toInt()
+        } == true
         if (history.size < 3 || (!charPressure && !tokenPressure)) return null
 
         var start = 1
