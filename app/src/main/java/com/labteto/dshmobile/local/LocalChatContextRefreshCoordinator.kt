@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
@@ -31,6 +33,52 @@ internal fun renderPendingTurnsForPlanner(pending: List<ChatPendingTurn>): Strin
     }
     append("按上述 用户→角色 的逐回合顺序理解状态变化；后面的回合可以纠正、结束或覆盖前面的临时状态。")
 }.trim()
+
+internal fun mergeGroupContinuity(
+    base: ChatContinuityState,
+    statesInReplyOrder: List<ChatCharacterState>,
+): ChatContinuityState {
+    var merged = base.copy(recurringEvents = emptyList())
+    statesInReplyOrder.forEach { state ->
+        val incoming = state.continuity
+        merged = merged.copy(
+            recentEvents = if (incoming.recentEvents != base.recentEvents) {
+                incoming.recentEvents
+            } else {
+                merged.recentEvents
+            },
+            decisions = if (incoming.decisions != base.decisions) {
+                incoming.decisions
+            } else {
+                merged.decisions
+            },
+            unfinished = if (incoming.unfinished != base.unfinished) {
+                incoming.unfinished
+            } else {
+                merged.unfinished
+            },
+            recurringEvents = emptyList(),
+        )
+    }
+    return merged
+}
+
+internal fun finalizeGroupContextAfterRefresh(
+    context: ChatContextState,
+    statesInReplyOrder: List<ChatCharacterState>,
+    complete: Boolean,
+): ChatContextState {
+    if (!complete) return context
+    val through = context.pendingTurns
+        .filter { it.generation == context.generation }
+        .maxOfOrNull(ChatPendingTurn::sequence)
+        ?: context.processedThroughSequence
+    return context.commitProcessed(
+        scene = context.scene,
+        continuity = mergeGroupContinuity(context.continuity, statesInReplyOrder),
+        throughSequence = through,
+    )
+}
 
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
