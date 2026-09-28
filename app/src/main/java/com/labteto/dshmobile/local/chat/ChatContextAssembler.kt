@@ -133,6 +133,10 @@ internal object ChatContextAssembler {
     private fun normalizeScheduleFact(text: String): String? {
         val normalized = text.lowercase()
             .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
+            .replace(
+                Regex("""^(?:已定|当前有效决定|决定|待续事项|待续|近期关键事件|近期事件|近期)"""),
+                "",
+            )
         if (!SCHEDULE_FACT_HINT.containsMatchIn(normalized)) return null
         val clockNormalized = normalized
             .replace(ARABIC_CLOCK, "<时>")
