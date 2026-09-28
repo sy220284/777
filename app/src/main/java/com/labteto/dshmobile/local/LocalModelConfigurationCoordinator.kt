@@ -146,6 +146,14 @@ internal class LocalModelConfigurationCoordinator(
         }
     }.toString()
 
+    fun legacyConfiguredModelNames(currentModel: String): List<String> =
+        (preferences.getStringSet("configured_models", emptySet())
+            .orEmpty() + currentModel)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
+
     fun normalizeModel(model: String): String {
         val value = model.trim().ifBlank { DEFAULT_MODEL }
         return when (value.lowercase()) {

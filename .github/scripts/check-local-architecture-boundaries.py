@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 6490,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5303,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 2011,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 2330,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 657,
@@ -23,6 +23,17 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 80,
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 46,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 19,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt": 106,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 323,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 525,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt": 98,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt": 76,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeEnvironment.kt": 41,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt": 67,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt": 22,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt": 172,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 64,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 24,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt": 17,

@@ -19,6 +19,11 @@ CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalCont
 COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt"
 RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalAgentRunCoordinator.kt"
 MODEL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
+ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
+TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
+AUTOMATION_CHAT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt"
+PROMPT_CONTEXT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt"
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
 CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
@@ -61,6 +66,11 @@ context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
 coordinator = COORDINATOR.read_text(encoding="utf-8")
 run_coordinator = RUN_COORDINATOR.read_text(encoding="utf-8")
 model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
+model_history_buffer = MODEL_HISTORY_BUFFER.read_text(encoding="utf-8")
+engine_defaults = ENGINE_DEFAULTS.read_text(encoding="utf-8")
+transcript_runtime = TRANSCRIPT_RUNTIME.read_text(encoding="utf-8")
+automation_chat = AUTOMATION_CHAT.read_text(encoding="utf-8")
+prompt_context = PROMPT_CONTEXT.read_text(encoding="utf-8")
 tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
@@ -77,7 +87,8 @@ if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
     violations.append("Release retention must not add an age-based retention window")
 
 def constant(name: str) -> int | None:
-    match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine)
+    source = engine + "\n" + engine_defaults
+    match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", source)
     return int(match.group(1).replace("_", "")) if match else None
 
 preview_chars = constant("MAX_STREAM_PREVIEW_CHARS")
@@ -111,12 +122,24 @@ for forbidden in (
     if forbidden in engine:
         violations.append(f"LocalHarnessEngine.kt reintroduced hot-path pattern: {forbidden}")
 
-# All mutable model-history writes must go through the size-accounting helpers.
-expected_counts = {
-    "modelHistory +=": 2,      # appendModelHistory + resetModelHistory
-    "modelHistory.add(": 1,    # prependModelHistory
-    "modelHistory[0] =": 1,    # replaceSystemModelHistory
-    "modelHistory.clear()": 1, # resetModelHistory
+# Engine must never mutate the underlying model-history collection directly. The dedicated
+# buffer owns every write together with its cached character/token accounting.
+for forbidden_mutation in (
+    "modelHistory +=",
+    "modelHistory.add(",
+    "modelHistory[0] =",
+    "modelHistory.clear()",
+):
+    if forbidden_mutation in engine:
+        violations.append(
+            f"LocalHarnessEngine bypassed LocalModelHistoryBuffer: {forbidden_mutation}"
+        )
+
+expected_buffer_counts = {
+    "messages +=": 2,      # append + reset
+    "messages.add(": 1,    # prepend
+    "messages[0] =": 1,    # replaceSystem
+    "messages.clear()": 1, # reset
 }
 historical_chat_full_scan_patterns = (
     "sourceEventSequenceForMessage(eventLog.events()",
@@ -129,11 +152,11 @@ for pattern in historical_chat_full_scan_patterns:
             "Historical Chat timeline rewrites must page event history instead of materializing the full archive"
         )
 
-for token, expected in expected_counts.items():
-    actual = engine.count(token)
+for token, expected in expected_buffer_counts.items():
+    actual = model_history_buffer.count(token)
     if actual != expected:
         violations.append(
-            f"model history mutation bypass risk: {token!r} count={actual}, expected={expected}"
+            f"LocalModelHistoryBuffer accounting path changed unexpectedly: {token!r} count={actual}, expected={expected}"
         )
 
 if "val events = snapshot()" in event_log:
@@ -167,8 +190,8 @@ if wake_path_count < 5:
 
 if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
     violations.append("Chat branching must materialize full history only on demand and preserve durable branch graphs")
-if "(state.messages + messages).takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)" not in engine:
-    violations.append("Runtime transcript must stay bounded to LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES")
+if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transcript_runtime:
+    violations.append("Runtime transcript must stay bounded inside LocalTranscriptRuntime")
 if "LocalSessionCoordinator(" not in engine or "sessionCoordinator.snapshot(" not in engine:
     violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
 if (
@@ -197,9 +220,9 @@ if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in eng
     violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
-if "以用户当前输入、明确纠正和当前状态为准" not in engine or "当前模式只进行聊天，不执行工作任务或工具操作" not in engine:
+if "以用户当前输入、明确纠正和当前状态为准" not in prompt_context or "当前模式只进行聊天，不执行工作任务或工具操作" not in prompt_context:
     violations.append("Chat prompt must retain current-state priority and chat-only execution boundaries")
-if "持续到任务完成或遇到真实阻塞" not in engine or "最终结论必须有实际结果支撑" not in engine:
+if "持续到任务完成或遇到真实阻塞" not in prompt_context or "最终结论必须有实际结果支撑" not in prompt_context:
     violations.append("Work prompt must retain abstract execution-discipline and evidence-based completion rules")
 if "const val PROBE_ATTEMPTS = 3" not in web_provider or "const val SAFE_HTTP_RETRY_ATTEMPTS = 3" not in web_provider:
     violations.append("Network diagnosis and safe HTTP reads must keep bounded three-attempt retry resilience")
@@ -255,7 +278,7 @@ if "chatReplyCoordinator.finalizeDirect(" not in engine:
     violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
 if "chatReplyCoordinator.finalizeGroup(" not in engine:
     violations.append("Group Chat replies must pass the shared-scene continuity guard")
-if "chatReplyCoordinator.guardProactive(" not in engine:
+if "chatReplyCoordinator.guardProactive(" not in automation_chat:
     violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")
 
 if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:

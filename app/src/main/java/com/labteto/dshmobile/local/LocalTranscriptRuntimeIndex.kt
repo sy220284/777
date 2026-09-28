@@ -32,6 +32,20 @@ internal fun buildLocalTranscriptRuntimeIndex(
 ): LocalTranscriptRuntimeIndex =
     appendLocalTranscriptRuntimeIndex(LocalTranscriptRuntimeIndex(), messages)
 
+internal fun localTranscriptIndexForSession(
+    session: LocalHarnessSession,
+): LocalTranscriptRuntimeIndex =
+    if (
+        session.transcriptIndex.totalMessageCount > 0L ||
+        (session.messages.isEmpty() && session.transcriptWindow.isEmpty())
+    ) {
+        session.transcriptIndex
+    } else {
+        buildLocalTranscriptRuntimeIndex(
+            session.transcriptWindow.ifEmpty { session.messages },
+        )
+    }
+
 internal fun projectLocalTranscriptRuntimeIndexTail(
     snapshot: LocalTranscriptRuntimeIndex,
     events: List<LocalSessionEventLog.Event>,
