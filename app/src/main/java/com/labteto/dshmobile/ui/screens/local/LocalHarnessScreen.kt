@@ -664,7 +664,7 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
-    onEditAndResend: (String, String) -> LocalChatUserEditResult,
+    onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
@@ -735,6 +735,7 @@ private fun LocalChat(
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var editingUserText by rememberSaveable { mutableStateOf("") }
     var editingUserError by remember { mutableStateOf<String?>(null) }
+    var editingUserSubmitting by remember { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
@@ -816,6 +817,7 @@ private fun LocalChat(
         editingUserMessage = null
         editingUserText = ""
         editingUserError = null
+        editingUserSubmitting = false
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
@@ -1721,23 +1723,34 @@ private fun LocalChat(
                 DsButton(
                     text = stringResource(R.string.local_edit_user_message_resend),
                     onClick = {
-                        when (onEditAndResend(message.id, editingUserText)) {
-                            LocalChatUserEditResult.SENT -> {
-                                editingUserMessage = null
-                                editingUserText = ""
-                                editingUserError = null
+                        if (!editingUserSubmitting) {
+                            editingUserSubmitting = true
+                            editingUserError = null
+                            scope.launch {
+                                try {
+                                    when (onEditAndResend(message.id, editingUserText)) {
+                                        LocalChatUserEditResult.SENT -> {
+                                            editingUserMessage = null
+                                            editingUserText = ""
+                                            editingUserError = null
+                                        }
+                                        LocalChatUserEditResult.BUSY -> editingUserError = editUserMessageBusy
+                                        LocalChatUserEditResult.MESSAGE_MISSING -> editingUserError = editUserMessageMissing
+                                        LocalChatUserEditResult.UNAVAILABLE -> editingUserError = editUserMessageUnavailable
+                                        LocalChatUserEditResult.EMPTY -> editingUserError = editUserMessageEmpty
+                                        LocalChatUserEditResult.UNCHANGED -> editingUserError = editUserMessageUnchanged
+                                    }
+                                } finally {
+                                    editingUserSubmitting = false
+                                }
                             }
-                            LocalChatUserEditResult.BUSY -> editingUserError = editUserMessageBusy
-                            LocalChatUserEditResult.MESSAGE_MISSING -> editingUserError = editUserMessageMissing
-                            LocalChatUserEditResult.UNAVAILABLE -> editingUserError = editUserMessageUnavailable
-                            LocalChatUserEditResult.EMPTY -> editingUserError = editUserMessageEmpty
-                            LocalChatUserEditResult.UNCHANGED -> editingUserError = editUserMessageUnchanged
                         }
                     },
-                    enabled = (
-                        editingUserText.trim().isNotEmpty() ||
-                            chatMessageHasAttachmentContext(message)
-                        ) &&
+                    enabled = !editingUserSubmitting &&
+                        (
+                            editingUserText.trim().isNotEmpty() ||
+                                chatMessageHasAttachmentContext(message)
+                            ) &&
                         editingUserText.trim() != editableChatUserText(message).trim() &&
                         messageActionsEnabled,
                     size = DsButtonSize.Small,
