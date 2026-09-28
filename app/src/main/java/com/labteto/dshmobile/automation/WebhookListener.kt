@@ -12,9 +12,12 @@ import kotlinx.coroutines.launch
 internal class WebhookListener(
     private val scope: CoroutineScope,
     private val handle: suspend (Socket) -> Unit,
-    maxClients: Int = DEFAULT_MAX_CLIENTS,
+    private val maxClients: Int = DEFAULT_MAX_CLIENTS,
 ) : AutoCloseable {
-    private val connectionLimiter = WebhookConnectionLimiter(maxClients)
+    init {
+        require(maxClients in 1..1_024) { "Webhook 连接上限必须在 1..1024 之间" }
+    }
+
     private var server: ServerSocket? = null
     private var acceptJob: Job? = null
     private val clients = mutableSetOf<Socket>()
@@ -30,20 +33,21 @@ internal class WebhookListener(
             throw error
         }
         server = socket
+        val generationLimiter = WebhookConnectionLimiter(maxClients)
         acceptJob = scope.launch {
             while (!socket.isClosed) {
                 val client = runCatching { socket.accept() }.getOrNull() ?: break
                 synchronized(this@WebhookListener) {
                     when {
                         server !== socket -> client.close()
-                        !connectionLimiter.tryAcquire() -> client.close()
+                        !generationLimiter.tryAcquire() -> client.close()
                         else -> {
                             clients += client
                             launch {
                                 try {
                                     client.use { handle(it) }
                                 } finally {
-                                    connectionLimiter.release()
+                                    generationLimiter.release()
                                     synchronized(this@WebhookListener) { clients.remove(client) }
                                 }
                             }
