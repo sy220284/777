@@ -432,7 +432,7 @@
     <string name="tasks_subtitle">Scheduled, recurring, and recent background work</string>
     <string name="tasks_empty_title">No background tasks</string>
     <string name="tasks_empty_subtitle">Ask the agent in chat to “remind me tomorrow…” or “run this every week…”. Tasks will appear here.</string>
-    <string name="tasks_cancelled">Task cancelled</string>
+    <string name="tasks_cancelled">Task deleted</string>
     <string name="tasks_missing">That task no longer exists</string>
     <string name="tasks_run_started">Task started</string>
     <string name="tasks_run_now_failed">Task could not be started</string>
@@ -785,6 +785,7 @@
     <string name="local_group_chat_member_count">%1$d characters</string>
     <string name="local_group_chat_active_speaker">%1$s is replying…</string>
     <string name="local_group_chat_members_title">Group characters</string>
+    <string name="local_group_chat_search_members">Search characters</string>
     <string name="local_group_chat_members_hint">Choose %1$d–%2$d saved characters. Each character runs as an isolated role agent with its own full persona and relationship state.</string>
     <string name="local_group_chat_no_characters">No saved characters are available yet. Create or save characters in the character gallery first.</string>
     <string name="local_group_chat_selected_count">Selected %1$d/%2$d</string>
