@@ -277,6 +277,16 @@ class SessionEventLog(
         }
     }
 
+    /**
+     * Visit the immutable segments and active file under the same path lock used by append/rotate.
+     *
+     * This is intentionally synchronous: callers use it for explicit exports where a consistent
+     * byte-level snapshot is more important than allowing the same session to append concurrently.
+     */
+    fun forEachDurableFileLocked(block: (File) -> Unit) = synchronized(lock) {
+        orderedFilesUnsafe().forEach(block)
+    }
+
     /** Compress a bounded amount of old history without requiring another message in this session. */
     fun archiveLegacySegments(limit: Int = 1): Int = synchronized(lock) {
         require(limit in 1..16) { "单次归档分片数须在 1..16 之间" }
