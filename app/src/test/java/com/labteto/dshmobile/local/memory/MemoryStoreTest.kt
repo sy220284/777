@@ -304,4 +304,95 @@ class MemoryStoreTest {
         assertTrue(remaining.hasUnboundSource)
     }
 
+
+    @Test fun searchFiltersRelationshipOwnerBeforeResultLimit() {
+        val memoryStore = store()
+        repeat(6) { index ->
+            memoryStore.remember(
+                content = "关系状态：我和其他角色$index｜在一起",
+                scope = MemoryScope.GLOBAL,
+                kind = MemoryKind.RELATIONSHIP_STATE,
+                subjectKey = "gallery:other-$index",
+                importance = 100,
+            )
+        }
+        val target = memoryStore.remember(
+            content = "关系状态：我和目标角色｜在一起",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:target",
+            importance = 60,
+        )
+
+        val result = memoryStore.search(
+            query = "关系状态 在一起",
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            allowedKinds = setOf(MemoryKind.RELATIONSHIP_STATE),
+            maxItems = 1,
+            recordFilter = { it.subjectKey == "gallery:target" },
+        )
+
+        assertEquals(listOf(target.id), result.map { it.id })
+    }
+
+    @Test fun storageCompactionKeepsActiveRollbackChainBeforeDiscardedNoise() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            pinned: Boolean = false,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            content = id,
+            importance = importance,
+            pinned = pinned,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("forgotten", active = false, updatedAt = 100L),
+            record("old-valid", active = false, supersededBy = "current", updatedAt = 200L),
+            record("current", active = true, pinned = true, importance = 90, updatedAt = 300L),
+            record("other-active", active = true, importance = 40, updatedAt = 400L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 3)
+
+        assertEquals(setOf("old-valid", "current", "other-active"), compacted.map { it.id }.toSet())
+        assertFalse(compacted.any { it.id == "forgotten" })
+    }
+
+    @Test fun storageCompactionPrioritizesPinnedAndImportantActiveRootsWhenOverCapacity() {
+        fun active(id: String, pinned: Boolean, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            pinned = pinned,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("low-new", pinned = false, importance = 10, updatedAt = 400L),
+                active("important", pinned = false, importance = 95, updatedAt = 200L),
+                active("pinned", pinned = true, importance = 20, updatedAt = 100L),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("pinned", "important"), compacted.map { it.id }.toSet())
+    }
+
 }
