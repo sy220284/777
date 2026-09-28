@@ -272,6 +272,8 @@ internal fun groundContinuityEvidence(
         values: List<String>,
         previousValues: List<String>,
         allowDerivedEvidence: Boolean = false,
+        preserveUnrelatedPrevious: Boolean = false,
+        limit: Int,
     ): List<String> {
         if (values.isEmpty()) return emptyList()
         val previousKeys = previousValues.associateBy(::normalizeContinuityFact)
@@ -317,24 +319,43 @@ internal fun groundContinuityEvidence(
         }
 
         // A malformed/hallucinated replacement must not silently erase the previous valid state.
-        return if (accepted.isEmpty() && previousValues.isNotEmpty()) previousValues else accepted
+        if (accepted.isEmpty()) {
+            return if (previousValues.isNotEmpty()) previousValues.takeLast(limit) else emptyList()
+        }
+        if (!preserveUnrelatedPrevious) return accepted.takeLast(limit)
+
+        // Decisions are independent slots: a newly grounded decision replaces only an older
+        // conflicting decision. Unrelated commitments stay active even if the planner omitted them.
+        val preserved = previousValues.filter { old ->
+            accepted.none { fresh ->
+                normalizeContinuityFact(old) == normalizeContinuityFact(fresh) ||
+                    ChatContextAssembler.factConflicts(old, fresh)
+            }
+        }
+        return (preserved + accepted)
+            .distinctBy(::normalizeContinuityFact)
+            .takeLast(limit)
     }
 
     val recentEvents = ground(
         kind = ChatContinuityFactKind.EVENT,
         values = candidate.recentEvents,
         previousValues = previous.recentEvents,
+        limit = 5,
     )
     val decisions = ground(
         kind = ChatContinuityFactKind.DECISION,
         values = candidate.decisions,
         previousValues = previous.decisions,
+        preserveUnrelatedPrevious = true,
+        limit = 4,
     )
     val unfinished = ground(
         kind = ChatContinuityFactKind.OPEN_THREAD,
         values = candidate.unfinished,
         previousValues = previous.unfinished,
         allowDerivedEvidence = true,
+        limit = 4,
     )
 
     val activeKeys = buildSet {
