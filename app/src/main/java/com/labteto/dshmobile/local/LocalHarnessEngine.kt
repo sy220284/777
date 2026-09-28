@@ -2205,36 +2205,114 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
 
-    /** Resolve the current write or shell approval. */
-    internal fun answerApproval(callId: String, approved: Boolean) =
+    /** Resolve the approval owned by the currently visible conversation. */
+    internal fun answerApproval(callId: String, approved: Boolean) {
+        val binding = activeWorkRuns[currentSessionId]
+        if (binding?.interactions?.answerApproval(callId, approved) == true) return
         approvalCoordinator.answerApproval(callId, approved)
+    }
 
-    internal fun enableAutoApproval() =
+    internal fun enableAutoApproval() {
         approvalCoordinator.enableAutoApproval()
+        activeWorkRuns.values.forEach { run ->
+            run.state.update { it.copy(safeAutoApprovalEnabled = true) }
+        }
+    }
 
-    internal fun enableAutoApprovalForPending(callId: String) =
+    internal fun enableAutoApprovalForPending(callId: String) {
+        val binding = activeWorkRuns[currentSessionId]
+        val pending = binding?.state?.value?.pendingApproval?.takeIf { it.callId == callId }
+        if (binding != null && pending != null) {
+            approvalCoordinator.enableAutoApproval()
+            activeWorkRuns.values.forEach { run ->
+                run.state.update { it.copy(safeAutoApprovalEnabled = true) }
+            }
+            binding.eventLog.append("approval/mode", buildJsonObject {
+                put("mode", "global")
+                put("tool", pending.toolName)
+            })
+            binding.interactions.answerApproval(callId, true)
+            return
+        }
         approvalCoordinator.enableAutoApprovalForPending(callId)
+    }
 
-    internal fun enableDeviceApprovalLease(callId: String) =
+    internal fun enableDeviceApprovalLease(callId: String) {
+        val binding = activeWorkRuns[currentSessionId]
+        val pending = binding?.state?.value?.pendingApproval?.takeIf { it.callId == callId }
+        if (binding != null && pending != null) {
+            if (pending.canApproveDeviceTurn) {
+                binding.state.update { it.copy(deviceApprovalLease = true) }
+                binding.eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
+                binding.interactions.answerApproval(callId, true)
+            } else {
+                binding.eventLog.append("approval/device-lease-rejected", buildJsonObject {
+                    put("reason", "pending-tool-requires-explicit-approval")
+                    put("tool", pending.toolName)
+                })
+            }
+            return
+        }
         approvalCoordinator.enableDeviceApprovalLease(callId)
+    }
 
-    internal fun disableDeviceApprovalLease() =
+    internal fun disableDeviceApprovalLease() {
+        activeWorkRuns[currentSessionId]?.let { binding ->
+            binding.state.update { it.copy(deviceApprovalLease = false) }
+            binding.eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
+        }
         approvalCoordinator.disableDeviceApprovalLease()
+    }
 
-    internal fun disableAutoApproval() =
+    internal fun disableAutoApproval() {
         approvalCoordinator.disableAutoApproval()
+        activeWorkRuns.values.forEach { run ->
+            run.state.update { it.copy(safeAutoApprovalEnabled = false) }
+        }
+    }
 
-    /** Resolve the current model-authored question. */
-    internal fun answerQuestion(callId: String, answer: String) =
+    /** Resolve the model-authored question owned by the currently visible conversation. */
+    internal fun answerQuestion(callId: String, answer: String) {
+        val binding = activeWorkRuns[currentSessionId]
+        if (binding?.interactions?.answerQuestion(callId, answer) == true) return
         approvalCoordinator.answerQuestion(callId, answer)
+    }
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    internal fun cancelQuestion(callId: String) =
+    internal fun cancelQuestion(callId: String) {
+        val binding = activeWorkRuns[currentSessionId]
+        if (binding?.interactions?.cancelQuestion(callId) == true) return
         approvalCoordinator.cancelQuestion(callId)
+    }
 
-    /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
+    /** Stop only the run owned by the currently visible conversation. */
     internal fun stop() {
         cancelChatPostTurn()
+        val binding = activeWorkRuns[currentSessionId]
+        if (binding?.job?.isCompleted == false) {
+            binding.interactions.cancelAll()
+            val discarded = binding.pendingInputs.drain()
+            if (discarded.isNotEmpty()) {
+                binding.eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = binding.pendingInputs.snapshot(),
+                        affected = discarded,
+                    ),
+                )
+            }
+            binding.state.update {
+                it.copy(
+                    queuedInputCount = 0,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                )
+            }
+            binding.job?.cancel()
+            return
+        }
+
         interactions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.drain()
@@ -2252,9 +2330,6 @@ class LocalHarnessEngine @Inject constructor(
             activeJob
         }
         running?.cancel()
-        // Keep running=true until runTurn's finally has completed. Otherwise the
-        // composer looks available during cancellation even though queueTurn
-        // correctly still rejects a replacement turn.
         _state.update { it.copy(pendingApproval = null, pendingQuestion = null) }
     }
 
