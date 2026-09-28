@@ -14,7 +14,9 @@ import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
+import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
+import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
@@ -57,6 +59,8 @@ class LocalHarnessViewModel @Inject constructor(
     val state = runtime.session.state
     val streamingState = runtime.session.streamingState
     val shellState = state.projectShellState(viewModelScope)
+    val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
+    val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val workState = state.projectWorkState(viewModelScope)
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()

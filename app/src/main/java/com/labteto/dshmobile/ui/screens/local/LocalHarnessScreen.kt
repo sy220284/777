@@ -79,7 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
@@ -285,7 +285,7 @@ fun LocalHarnessScreen(
             )
         },
     ) {
-        LocalHarnessStateContent(viewModel) { state ->
+        LocalConversationStateContent(viewModel, shell.usageMode) { state ->
             Box(Modifier.fillMaxSize()) {
                 when {
                     localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
@@ -317,7 +317,7 @@ fun LocalHarnessScreen(
                     onCreate = { showNewPersona = true },
                     onDismiss = { showPersonaGallery = false },
                 )
-                else -> LocalChat(
+                else -> LocalConversationSurface(
                     state = state,
                     streamingState = viewModel.streamingState,
                     gallery = gallery,
@@ -493,7 +493,7 @@ private fun LoadingScreen() {
 
 @Composable
 private fun LocalConfiguration(
-    state: LocalHarnessState,
+    state: LocalConversationSurfaceState,
     canCancel: Boolean,
     onOpenMenu: () -> Unit,
     onCancel: () -> Unit,
@@ -609,7 +609,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 }
 
 @Composable
-private fun LocalChat(
+private fun LocalConversationSurface(
     state: LocalHarnessState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
