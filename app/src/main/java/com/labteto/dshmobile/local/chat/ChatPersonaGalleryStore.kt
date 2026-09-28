@@ -30,21 +30,11 @@ data class PersonaGalleryStory(
             appendLine("保存时的关系：${chatState.relationshipState.take(80)}")
             val shared = ChatContextState().withLegacyFallback(chatState)
             val scene = shared.scene
-            if (
-                scene.sceneTime.isNotBlank() ||
-                scene.location.isNotBlank() ||
-                scene.participants.isNotEmpty() ||
-                scene.positions.isNotEmpty() ||
-                scene.activeActions.isNotEmpty() ||
-                scene.keyObjects.isNotEmpty()
-            ) {
+            if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
                 appendLine(
-                    "当前场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}｜" +
-                        "人物=${scene.participants.joinToString("、").ifBlank { "未记录" }}",
+                    "当前硬场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
                 )
-                if (scene.positions.isNotEmpty()) appendLine("人物位置：${scene.positions.joinToString("；")}")
-                if (scene.activeActions.isNotEmpty()) appendLine("进行中：${scene.activeActions.joinToString("；")}")
-                if (scene.keyObjects.isNotEmpty()) appendLine("关键物件：${scene.keyObjects.joinToString("、")}")
+                appendLine("人物位置、进行中动作和物件不从旧场景快照继承，以新会话最近原始对话为准。")
             }
             shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
                 appendLine("近期关键事件：${it.joinToString("；").take(900)}")
