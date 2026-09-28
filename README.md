@@ -50,7 +50,7 @@
 
 ### 设备能力
 
-- 无障碍服务、虚拟屏（VirtualDisplay）、Shizuku 桥——Agent 可以看屏幕、操作界面、提权执行。
+- 无障碍服务、虚拟屏（VirtualDisplay）——Agent 可以看屏幕并操作界面。
 
 ### 聊天模式
 
@@ -95,7 +95,7 @@
 | `harness-core/` | 31 · 4.1k | 纯 JVM Agent 内核：AgentLoop、输入队列、请求执行、上下文组装、会话事件账本、资源调度 |
 | `harness-interop/` | 9 · 2.9k | 互通层：MCP 客户端（HTTP / stdio / 旧传输）与工具桥、LSP 插件 |
 | `harness-runtime-android/` | 6 · 1.0k | 进程运行时：持久终端、托管进程、Android 运行时插件 |
-| `harness-device-android/` | 8 · 1.4k | 设备能力：无障碍服务、虚拟屏控制器、Shizuku 桥、设备提供者 |
+| `harness-device-android/` | 8 · 1.4k | 设备能力：无障碍服务、虚拟屏控制器、设备提供者 |
 | `mock-harness/` | 7 · 1.9k | Ktor 实现的 harness `/api` 模拟服务端，一致性测试的对手盘 |
 | `reference-validation/` | 3 · 204 | 原生一致性运行器：对照锁定官方版本的黄金结果 |
 
