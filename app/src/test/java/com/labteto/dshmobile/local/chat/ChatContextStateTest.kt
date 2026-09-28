@@ -507,6 +507,30 @@ class ChatContextStateTest {
 
 
     @Test
+    fun rephrasedOpenThreadReplacesSameSubjectWithoutDuplicating() {
+        val previous = ChatContinuityState(
+            unfinished = listOf("还要确认车票"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(
+                unfinished = listOf("车票还没确认"),
+            ),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 64L,
+                    userMessageId = "u64",
+                    assistantMessageId = "a64",
+                    userMessage = "车票还没确认，晚点继续看一下。",
+                    assistantMessage = "好，车票这件事还没完成。",
+                ),
+            ),
+        )
+
+        assertEquals(listOf("车票还没确认"), grounded.unfinished)
+    }
+
+    @Test
     fun cancellingDifferentDestinationDoesNotRemoveExistingDecision() {
         val previous = ChatContinuityState(
             decisions = listOf("明天九点去城南"),
