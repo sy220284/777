@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.withLegacyFallback
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
