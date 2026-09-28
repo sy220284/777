@@ -96,6 +96,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.OutputStream
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
@@ -632,6 +633,8 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
+    /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
+    private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
