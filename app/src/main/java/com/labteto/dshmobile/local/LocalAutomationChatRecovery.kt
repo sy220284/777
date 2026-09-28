@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local
 
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
