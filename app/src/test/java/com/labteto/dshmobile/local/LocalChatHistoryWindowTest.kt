@@ -189,6 +189,33 @@ class LocalChatHistoryWindowTest {
 
 
     @Test
+    fun existingCheckpointIsDemotedAndPrunedEvenBeforeNextCompactionBoundary() {
+        val legacy = message(
+            "user",
+            "<chat-continuity>\n- 明早九点去城南\n- 第一次见面在车站\n</chat-continuity>",
+        )
+        val history = listOf(
+            message("system", "系统"),
+            legacy,
+            message("user", "那改成十点吧"),
+            message("assistant", "好，十点。"),
+        )
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 20,
+            compactionBatch = 8,
+            currentFacts = listOf("明早九点去城南"),
+        )
+        val checkpoint = bounded[1]
+
+        assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
+        assertFalse(checkpoint.toString().contains("明早九点去城南"))
+        assertTrue(checkpoint.toString().contains("第一次见面在车站"))
+        assertTrue(bounded.last().toString().contains("好，十点"))
+    }
+
+    @Test
     fun generatedCheckpointIsSystemHistoryAndDropsCanonicalDuplicates() {
         val history = buildList {
             add(message("system", "系统"))
