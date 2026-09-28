@@ -601,7 +601,6 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
     fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
-
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
     suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
