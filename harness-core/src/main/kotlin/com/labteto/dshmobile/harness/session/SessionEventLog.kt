@@ -7,7 +7,6 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -41,7 +40,7 @@ class SessionEventLog(
     }
 
     // Several Android adapters can open the same session while background maintenance is running.
-    private val lock = PATH_LOCKS.computeIfAbsent(file.absolutePath) { Any() }
+    private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
     private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
@@ -603,7 +602,7 @@ class SessionEventLog(
     }
 
     private companion object {
-        val PATH_LOCKS = ConcurrentHashMap<String, Any>()
+        val PATH_LOCKS = Array(64) { Any() }
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
