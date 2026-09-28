@@ -2,6 +2,7 @@ package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -21,6 +22,15 @@ data class SessionEvent(
     val createdAt: Long,
     val data: JsonObject,
 )
+
+data class SessionEventFileSnapshot(
+    val name: String,
+    val lastModified: Long,
+    val length: Long,
+    val input: InputStream,
+) : AutoCloseable {
+    override fun close() = input.close()
+}
 
 /**
  * Append-only source of truth for model-visible session facts.
@@ -278,13 +288,28 @@ class SessionEventLog(
     }
 
     /**
-     * Visit the immutable segments and active file under the same path lock used by append/rotate.
+     * Open a stable byte snapshot of every durable event file under the append/rotation lock.
      *
-     * This is intentionally synchronous: callers use it for explicit exports where a consistent
-     * byte-level snapshot is more important than allowing the same session to append concurrently.
+     * File descriptors remain attached to the same inode if a later append rotates or compresses
+     * the path. [SessionEventFileSnapshot.length] freezes the visible byte boundary, so callers can
+     * release this lock immediately and stream a consistent export without blocking future turns.
      */
-    fun forEachDurableFileLocked(block: (File) -> Unit) = synchronized(lock) {
-        orderedFilesUnsafe().forEach(block)
+    fun openDurableFileSnapshot(): List<SessionEventFileSnapshot> = synchronized(lock) {
+        val opened = mutableListOf<SessionEventFileSnapshot>()
+        try {
+            orderedFilesUnsafe().forEach { source ->
+                opened += SessionEventFileSnapshot(
+                    name = source.name,
+                    lastModified = source.lastModified(),
+                    length = source.length(),
+                    input = source.inputStream().buffered(),
+                )
+            }
+            opened
+        } catch (error: Exception) {
+            opened.forEach { runCatching { it.close() } }
+            throw error
+        }
     }
 
     /** Compress a bounded amount of old history without requiring another message in this session. */
