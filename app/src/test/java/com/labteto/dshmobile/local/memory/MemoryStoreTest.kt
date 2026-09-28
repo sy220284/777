@@ -395,4 +395,67 @@ class MemoryStoreTest {
         assertEquals(setOf("pinned", "important"), compacted.map { it.id }.toSet())
     }
 
+
+    @Test fun storageCompactionNeverLetsOneLongChainEvictOtherActiveMemories() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("chain-1", active = false, supersededBy = "chain-2", updatedAt = 1L),
+            record("chain-2", active = false, supersededBy = "chain-3", updatedAt = 2L),
+            record("chain-3", active = false, supersededBy = "root-a", updatedAt = 3L),
+            record("root-a", active = true, importance = 100, updatedAt = 4L),
+            record("root-b", active = true, importance = 10, updatedAt = 5L),
+            record("root-c", active = true, importance = 10, updatedAt = 6L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 4)
+
+        assertTrue(compacted.any { it.id == "root-a" })
+        assertTrue(compacted.any { it.id == "root-b" })
+        assertTrue(compacted.any { it.id == "root-c" })
+        assertTrue(compacted.any { it.id == "chain-3" })
+        assertFalse(compacted.any { it.id == "chain-1" })
+    }
+
+    @Test fun protectedNewMemorySurvivesCapacityCompaction() {
+        fun active(id: String, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("old-high", importance = 100, updatedAt = 1L),
+                active("old-mid", importance = 80, updatedAt = 2L),
+                active("new-low", importance = 1, updatedAt = 3L),
+            ),
+            maxRecords = 2,
+            protectedIds = setOf("new-low"),
+        )
+
+        assertTrue(compacted.any { it.id == "new-low" })
+        assertEquals(2, compacted.size)
+    }
+
 }
