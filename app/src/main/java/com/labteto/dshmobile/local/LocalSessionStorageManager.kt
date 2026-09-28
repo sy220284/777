@@ -43,7 +43,7 @@ internal class LocalSessionStorageManager(
         val compressedSegments = files.count { isCompressedSegment(it.name) }
         val sessionIds = files.mapNotNull(::sessionIdOf).toSet()
         return LocalSessionStorageStatus(
-            totalBytes = files.sumOf(File::length),
+            totalBytes = files.sumOf { it.length() },
             freeBytes = root.usableSpace,
             budgetBytes = LocalSessionStorageStatus.DEFAULT_BUDGET_BYTES,
             sessionCount = sessionIds.size,
