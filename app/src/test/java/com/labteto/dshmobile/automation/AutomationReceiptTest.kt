@@ -396,4 +396,68 @@ class AutomationReceiptTest {
         assertTrue(failure is IllegalArgumentException)
     }
 
+
+    @Test
+    fun dailyAnchorJumpsAcrossDecadesWithoutIteratingEveryDay() {
+        val anchor = java.util.Calendar.getInstance().apply {
+            set(2000, java.util.Calendar.JANUARY, 1, 9, 30, 15)
+            set(java.util.Calendar.MILLISECOND, 123)
+        }
+        val after = java.util.Calendar.getInstance().apply {
+            set(2099, java.util.Calendar.DECEMBER, 31, 12, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val task = AutomationTask(
+            id = "daily-decades",
+            prompt = "task",
+            createdAt = anchor.timeInMillis,
+            nextRunAt = anchor.timeInMillis,
+            recurringMinutes = 24L * 60L,
+            scheduleType = AutomationScheduleType.DAILY,
+            scheduleAnchorAt = anchor.timeInMillis,
+        )
+
+        val next = requireNotNull(nextAnchoredAutomationRun(task, after.timeInMillis))
+        val result = java.util.Calendar.getInstance().apply { timeInMillis = next }
+
+        assertTrue(next > after.timeInMillis)
+        assertEquals(9, result.get(java.util.Calendar.HOUR_OF_DAY))
+        assertEquals(30, result.get(java.util.Calendar.MINUTE))
+        assertEquals(15, result.get(java.util.Calendar.SECOND))
+        assertEquals(123, result.get(java.util.Calendar.MILLISECOND))
+        assertEquals(1, result.get(java.util.Calendar.DAY_OF_MONTH))
+        assertEquals(java.util.Calendar.JANUARY, result.get(java.util.Calendar.MONTH))
+        assertEquals(2100, result.get(java.util.Calendar.YEAR))
+    }
+
+    @Test
+    fun weeklyAnchorJumpsAcrossDecadesToSameWeekdayAndTime() {
+        val anchor = java.util.Calendar.getInstance().apply {
+            set(2000, java.util.Calendar.JANUARY, 3, 9, 30, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val after = java.util.Calendar.getInstance().apply {
+            set(2099, java.util.Calendar.DECEMBER, 31, 12, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val task = AutomationTask(
+            id = "weekly-decades",
+            prompt = "task",
+            createdAt = anchor.timeInMillis,
+            nextRunAt = anchor.timeInMillis,
+            recurringMinutes = 7L * 24L * 60L,
+            scheduleType = AutomationScheduleType.WEEKLY,
+            scheduleAnchorAt = anchor.timeInMillis,
+        )
+
+        val next = requireNotNull(nextAnchoredAutomationRun(task, after.timeInMillis))
+        val result = java.util.Calendar.getInstance().apply { timeInMillis = next }
+
+        assertTrue(next > after.timeInMillis)
+        assertEquals(anchor.get(java.util.Calendar.DAY_OF_WEEK), result.get(java.util.Calendar.DAY_OF_WEEK))
+        assertEquals(anchor.get(java.util.Calendar.HOUR_OF_DAY), result.get(java.util.Calendar.HOUR_OF_DAY))
+        assertEquals(anchor.get(java.util.Calendar.MINUTE), result.get(java.util.Calendar.MINUTE))
+        assertTrue(next - after.timeInMillis <= 8L * 24L * 60L * 60L * 1000L)
+    }
+
 }
