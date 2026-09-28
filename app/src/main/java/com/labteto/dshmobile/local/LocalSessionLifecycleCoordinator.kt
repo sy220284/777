@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,6 +54,14 @@ internal class LocalSessionLifecycleCoordinator(
     private val sessionSummaries: () -> List<LocalSessionSummary>,
     private val localProjectId: String,
 ) {
+    // Keep only the user's latest tap while a session is being persisted and restored.
+    private val queuedUsageMode = AtomicReference<LocalUsageMode?>(null)
+
+    private fun continueQueuedModeSwitch() {
+        val requested = queuedUsageMode.getAndSet(null) ?: return
+        if (requested != state.value.usageMode) switchUsageMode(requested)
+    }
+
     fun createSession(mode: LocalConversationMode) =
         createSession(mode, state.value.usageMode)
 
@@ -255,6 +264,7 @@ internal class LocalSessionLifecycleCoordinator(
                     state.update { it.copy(loading = false) }
                 }
             }
+            continueQueuedModeSwitch()
         }
     }
 
@@ -284,7 +294,11 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchUsageMode(mode: LocalUsageMode) {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.running) return
+        if (snapshot.loading || runBusy()) {
+            queuedUsageMode.set(mode)
+            return
+        }
+        if (snapshot.running) return
         if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
             if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
             return
@@ -326,6 +340,7 @@ internal class LocalSessionLifecycleCoordinator(
                     state.update { it.copy(loading = false) }
                 }
             }
+            continueQueuedModeSwitch()
             startNextQueuedTurnIfIdle()?.start()
         }
     }

@@ -38,7 +38,26 @@ internal class PanelState(val key: ComposerKey) {
     }
 }
 
-internal class PanelRepository {
-    private val panels = mutableMapOf<ComposerKey, PanelState>()
-    fun get(key: ComposerKey): PanelState = panels.getOrPut(key) { PanelState(key) }
+internal class PanelRepository(
+    private val maxCachedPanels: Int = MAX_CACHED_PANELS,
+) {
+    init {
+        require(maxCachedPanels > 0) { "面板缓存上限必须大于 0" }
+    }
+
+    private val panels = LinkedHashMap<ComposerKey, PanelState>(16, 0.75f, true)
+
+    fun get(key: ComposerKey): PanelState {
+        panels[key]?.let { return it }
+        return PanelState(key).also { panel ->
+            panels[key] = panel
+            while (panels.size > maxCachedPanels) {
+                panels.remove(panels.keys.first())
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_CACHED_PANELS = 8
+    }
 }

@@ -64,6 +64,17 @@ class SessionIndexStateTest {
     }
 
     @Test
+    fun removingSessionAlsoDropsCachedTitle() {
+        val state = SessionIndexState()
+        state.replaceSessions(listOf(session("s1", title = "旧标题")))
+
+        state.removeSession("s1")
+        state.replaceSessions(listOf(session("s1", title = "新标题")))
+
+        assertEquals("新标题", state.session("s1")?.title)
+    }
+
+    @Test
     fun workspaceOrderAndReusableBlankSessionRespectArchiveAndOrigin() {
         val state = SessionIndexState()
         state.replaceSessions(
