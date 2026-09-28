@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -87,30 +88,59 @@ internal class LocalSessionStorageManager(
                 .distinct()
                 .sorted()
                 .forEach { id ->
-                    SessionEventLog(File(root, "$id.events.jsonl"), json)
-                        .forEachDurableFileLocked { source ->
-                            exportedBytes += copyZipEntry(source, zip)
+                    val snapshot = SessionEventLog(File(root, "$id.events.jsonl"), json)
+                        .openDurableFileSnapshot()
+                    snapshot.forEach { source ->
+                        try {
+                            exportedBytes += copyZipEntry(
+                                name = source.name,
+                                lastModified = source.lastModified,
+                                length = source.length,
+                                input = source.input,
+                                zip = zip,
+                            )
+                        } finally {
+                            source.close()
                         }
+                    }
                 }
         }
         return exportedBytes
     }
 
-    private fun copyZipEntry(source: File, zip: ZipOutputStream): Long {
+    private fun copyZipEntry(source: File, zip: ZipOutputStream): Long =
+        source.inputStream().buffered().use { input ->
+            copyZipEntry(
+                name = source.getName(),
+                lastModified = source.lastModified(),
+                length = source.length(),
+                input = input,
+                zip = zip,
+            )
+        }
+
+    private fun copyZipEntry(
+        name: String,
+        lastModified: Long,
+        length: Long,
+        input: InputStream,
+        zip: ZipOutputStream,
+    ): Long {
         var copied = 0L
-        val entry = ZipEntry(source.getName()).also { target ->
-            target.setTime(source.lastModified())
+        var remaining = length.coerceAtLeast(0L)
+        val entry = ZipEntry(name).also { target ->
+            target.setTime(lastModified)
         }
         zip.putNextEntry(entry)
         try {
-            source.inputStream().buffered().use { input ->
-                val buffer = ByteArray(COPY_BUFFER_BYTES)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    zip.write(buffer, 0, read)
-                    copied += read
-                }
+            val buffer = ByteArray(COPY_BUFFER_BYTES)
+            while (remaining > 0L) {
+                val requested = minOf(buffer.size.toLong(), remaining).toInt()
+                val read = input.read(buffer, 0, requested)
+                check(read >= 0) { "导出会话事件时源文件意外截断：$name" }
+                zip.write(buffer, 0, read)
+                copied += read
+                remaining -= read
             }
         } finally {
             zip.closeEntry()
