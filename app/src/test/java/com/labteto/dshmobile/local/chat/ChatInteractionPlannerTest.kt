@@ -799,6 +799,32 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun continuitySanitizerKeepsNewestEntriesWhenModelReturnsTooMany() {
+        val payload = """{
+          "state":{
+            "continuity":{
+              "recentEvents":["事件1","事件2","事件3","事件4","事件5","事件6"],
+              "decisions":["决定1","决定2","决定3","决定4","决定5"],
+              "unfinished":["待续1","待续2","待续3","待续4","待续5"]
+            }
+          },
+          "suggestions":[],
+          "turnSignificance":"MINOR"
+        }"""
+
+        val state = planner.parse(
+            payload,
+            previous = ChatCharacterState(),
+            userMessage = "继续",
+            assistantMessage = "好。",
+        )!!.state
+
+        assertEquals(listOf("事件2", "事件3", "事件4", "事件5", "事件6"), state.continuity.recentEvents)
+        assertEquals(listOf("决定2", "决定3", "决定4", "决定5"), state.continuity.decisions)
+        assertEquals(listOf("待续2", "待续3", "待续4", "待续5"), state.continuity.unfinished)
+    }
+
+    @Test
     fun continuityListsReplaceStaleAggregatesWithLatestOutcome() {
         val previous = ChatCharacterState(
             continuity = ChatContinuityState(
