@@ -4137,12 +4137,8 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         val runPolicy = localAgentRunPolicy(_state.value.usageMode)
         toolExecutionCoordinator.clearTurnCapabilities()
-        if (
-            _state.value.usageMode == LocalUsageMode.WORK &&
-            runCatching { githubCredentials.configured() }.getOrDefault(false)
-        ) {
-            toolExecutionCoordinator.enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
-        }
+        if (_state.value.usageMode == LocalUsageMode.WORK && runCatching { githubCredentials.configured() }.getOrDefault(false))
+            toolExecutionCoordinator.enableGitHubConnectorTools()
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
             // answer's background relationship/state refresh before capturing this turn's context.
@@ -6485,12 +6481,6 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
-
-        val GITHUB_CONNECTOR_TOOL_NAMES = setOf(
-            "github_status",
-            "github_api_get",
-            "github_api_request",
-        )
 
         val PLAN_MODE_BLOCKED_TOOLS = setOf(
             "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",
