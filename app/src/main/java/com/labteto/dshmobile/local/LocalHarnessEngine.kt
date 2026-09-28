@@ -4886,8 +4886,8 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    private fun currentHistoryBudget(): LocalHistoryBudget {
-        val snapshot = _state.value
+    private fun currentHistoryBudget(binding: LocalWorkRunBinding? = null): LocalHistoryBudget {
+        val snapshot = binding?.state?.value ?: _state.value
         return localHistoryBudgetFor(
             memoryClassMb = memoryClassMb,
             pressure = resourceScheduler.snapshot().pressure,
@@ -4896,11 +4896,13 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun updateContextMetrics() {
-        val budget = currentHistoryBudget()
-        _state.update {
+    private fun updateContextMetrics(binding: LocalWorkRunBinding? = null) {
+        val budget = currentHistoryBudget(binding)
+        val history = binding?.modelHistory ?: modelHistory
+        val targetState = binding?.state ?: _state
+        targetState.update {
             it.copy(
-                contextChars = modelHistory.encodedChars,
+                contextChars = history.encodedChars,
                 contextBudgetChars = budget.maxHistoryChars,
             )
         }
@@ -5255,30 +5257,53 @@ class LocalHarnessEngine @Inject constructor(
             }
     }
 
-    private fun checkpointModelHistory(reason: String) {
-        eventLog.append(
+    private fun checkpointModelHistory(
+        reason: String,
+        binding: LocalWorkRunBinding? = null,
+    ) {
+        val log = binding?.eventLog ?: eventLog
+        val history = binding?.modelHistory ?: modelHistory
+        log.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
-            modelHistoryCheckpointCodec.encode(modelHistory.snapshot(), reason),
+            modelHistoryCheckpointCodec.encode(history.snapshot(), reason),
         )
-        turnsSinceModelHistoryCheckpoint = 0
-    }
-
-    private fun checkpointModelHistoryAtTurnBoundary(reason: String) {
-        turnsSinceModelHistoryCheckpoint += 1
-        if (turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
-            checkpointModelHistory(reason)
+        if (binding != null) {
+            binding.turnsSinceModelHistoryCheckpoint = 0
+        } else {
+            turnsSinceModelHistoryCheckpoint = 0
         }
     }
 
-    private fun persist() {
+    private fun checkpointModelHistoryAtTurnBoundary(
+        reason: String,
+        binding: LocalWorkRunBinding? = null,
+    ) {
+        if (binding != null) {
+            binding.turnsSinceModelHistoryCheckpoint += 1
+            if (binding.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+                checkpointModelHistory(reason, binding)
+            }
+        } else {
+            turnsSinceModelHistoryCheckpoint += 1
+            if (turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+                checkpointModelHistory(reason)
+            }
+        }
+    }
+
+    private fun persist(binding: LocalWorkRunBinding? = null) {
         // Capture the durable boundary before the in-memory projection. A concurrent state update
         // may then be included in the snapshot with an older cursor, which is safe because replay
         // can idempotently re-apply its later event.
+        val sessionId = binding?.sessionId ?: currentSessionId
+        val state = binding?.state?.value ?: _state.value
+        val log = binding?.eventLog ?: eventLog
+        val cursor = binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
         val snapshot = sessionCoordinator.snapshot(
-            sessionId = currentSessionId,
-            state = _state.value,
-            controlProjectedThroughSequence = eventLog.latestSequence(),
-            transcriptProjectedThroughSequence = transcriptProjectionCursor,
+            sessionId = sessionId,
+            state = state,
+            controlProjectedThroughSequence = log.latestSequence(),
+            transcriptProjectedThroughSequence = cursor,
         )
         sessionCoordinator.enqueue(snapshot)
     }
