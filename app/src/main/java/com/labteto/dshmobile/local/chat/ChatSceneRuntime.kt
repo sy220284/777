@@ -270,6 +270,10 @@ internal object ChatSceneRuntime {
             .replace(Regex("""(?:里面|里边|内部|外面)$"""), "")
             .replace(Regex("""(?<=[间室房厅院馆店楼车])里$"""), "")
             .replace(Regex("""(?:床边|桌边|桌旁|窗边|门边|门旁|角落|中央|中间)$"""), "")
+            // Movement utterances often end in a sentence-final particle ("回房间吧"). Keep
+            // that conversational particle out of the canonical hard location so repeating the
+            // same move cannot manufacture a second location transition.
+            .replace(Regex("""(?<=[间室房厅院馆店楼车园场站舍屋堂宫宅])(?:吧|呢|啊|呀|啦|了)$"""), "")
             .trim()
             .take(120)
 
