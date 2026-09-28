@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebhookListenerTest {
@@ -46,4 +48,37 @@ class WebhookListenerTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun connectionLimiterRejectsSlowConnectionFloodAndRecovers() {
+        val limiter = WebhookConnectionLimiter(3)
+
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.tryAcquire())
+        assertFalse(limiter.tryAcquire())
+        assertEquals(3, limiter.activeCount())
+
+        assertTrue(limiter.release())
+        assertTrue(limiter.tryAcquire())
+        assertEquals(3, limiter.activeCount())
+    }
+
+    @Test
+    fun connectionLimiterNeverUnderflowsOnExtraRelease() {
+        val limiter = WebhookConnectionLimiter(1)
+
+        assertFalse(limiter.release())
+        assertEquals(0, limiter.activeCount())
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.release())
+        assertFalse(limiter.release())
+        assertEquals(0, limiter.activeCount())
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun connectionLimiterRejectsZeroCapacity() {
+        WebhookConnectionLimiter(0)
+    }
+
 }
