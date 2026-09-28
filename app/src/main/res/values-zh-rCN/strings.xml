@@ -20,7 +20,7 @@
     <string name="local_select_variant_failed">暂时无法切换回复版本，请等待当前回复结束后重试。</string>
     <string name="local_edit_user_message">修改消息</string>
     <string name="local_edit_user_message_hint">修改后会从这条消息重新继续；这条消息之后的对话记录会被清除，并由新的回复重新开始。</string>
-    <string name="local_edit_user_message_resend">重新发送</string>
+    <string name="local_edit_user_message_resend">从这里重新生成</string>
     <string name="local_edit_user_message_busy">聊天仍在处理消息，请等当前回复结束后重试。</string>
     <string name="local_edit_user_message_missing">这条消息已不在当前对话中，请重新进入聊天后再试。</string>
     <string name="local_edit_user_message_unavailable">请切换到已配置模型的聊天会话后重试。</string>
@@ -104,7 +104,7 @@
     <string name="local_context_source_project">当前项目</string>
     <string name="local_context_source_continuation">上一会话交接</string>
     <string name="local_context_handoff">交接摘要</string>
-    <string name="local_streaming_status">代理正在实时响应…</string>
+    <string name="local_streaming_status">正在处理…</string>
     <string name="local_chat_replying">正在回复…</string>
     <string name="local_device_approval_on">本轮设备操作已授权</string>
     <string name="local_approval_scope_show">查看授权范围</string>
@@ -432,12 +432,18 @@
     <string name="tasks_empty_subtitle">直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。</string>
     <string name="tasks_cancelled">任务已取消</string>
     <string name="tasks_missing">任务已经不存在</string>
+    <string name="tasks_delete_confirm_title">删除这个任务？</string>
+    <string name="tasks_delete_confirm_body">删除后将停止后续执行，并从自动化列表移除。</string>
+    <string name="tasks_delete_confirm">确认删除</string>
+    <string name="tasks_mode_work">工作自动化</string>
+    <string name="tasks_mode_chat">角色互动</string>
+    <string name="tasks_chat_mode_unavailable">当前不在单人角色聊天中，只能查看已有互动任务。返回 Chat 模式并进入单人角色会话后即可新建。</string>
     <string name="tasks_run_started">任务已开始执行</string>
     <string name="tasks_run_now_failed">任务当前无法立即执行</string>
     <string name="tasks_background_task">后台任务</string>
     <string name="tasks_once">一次性任务</string>
     <string name="tasks_every_minutes">每 %1$d 分钟</string>
-    <string name="tasks_cancel">取消</string>
+    <string name="tasks_cancel">删除任务</string>
     <string name="tasks_pause">暂停</string>
     <string name="tasks_resume">恢复</string>
     <string name="tasks_next_run">下次执行：%1$s</string>
@@ -458,7 +464,7 @@
     <string name="local_run_open_results">本次文件与成果</string>
     <string name="tools_title">能力中心</string>
     <string name="tools_subtitle">查看工作模式可用能力，并按需管理外部连接</string>
-    <string name="tools_refresh">刷新工具</string>
+    <string name="tools_refresh">刷新能力状态</string>
     <string name="tools_external_services">外部工具服务</string>
     <string name="tools_no_services">暂无已连接服务</string>
     <string name="tools_server_summary">%1$s · %2$d 个工具 · 已连接</string>
@@ -827,9 +833,9 @@
     <string name="persona_gallery_portrait_save_failed">人物形象图保存失败</string>
     <string name="persona_gallery_standee_meta">%1$d 条故事线 · %2$d 条对白</string>
     <string name="persona_gallery_presets_title">作品预置</string>
-    <string name="persona_gallery_presets_hint">先加入人物图谱再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
-    <string name="persona_gallery_preset_add">加入人物图谱</string>
-    <string name="persona_gallery_preset_installed">人物预置已加入图谱</string>
+    <string name="persona_gallery_presets_hint">先加入人设图集再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
+    <string name="persona_gallery_preset_add">加入人设图集</string>
+    <string name="persona_gallery_preset_installed">人物预置已加入人设图集</string>
     <string name="persona_gallery_preset_install_failed">人物预置加入失败</string>
     <string name="persona_gallery_preset_long_press_delete_hint">长按作品预置可删除</string>
     <string name="persona_gallery_preset_delete_title">删除作品预置</string>
@@ -950,6 +956,8 @@
     <string name="tools_github_token_hint">建议使用最小仓库权限的细粒度 Token；保存前会先验证，验证通过后用 Android Keystore 加密</string>
     <string name="tools_github_save">验证并保存</string>
     <string name="tools_github_clear">清除凭据</string>
+    <string name="tools_github_clear_confirm_title">清除 GitHub 凭据？</string>
+    <string name="tools_github_clear_confirm_body">清除后 GitHub 连接器将立即不可用，需要重新填写 Token 才能恢复。</string>
     <string name="tools_capability_group">可用能力</string>
     <string name="tools_connection_group">外部连接</string>
     <string name="tools_capability_terminal">终端与运行环境</string>
@@ -991,12 +999,12 @@
 
 
     <string name="local_persona_picker_title">选择人物</string>
-    <string name="local_persona_picker_intro">新对话可以选择人设图集里已保存的人物；新建人物请到侧边栏的人设图集下方。选中后会从一条全新的故事开始。</string>
+    <string name="local_persona_picker_intro">新对话可以选择人设图集里已保存的人物，也可以直接新建人物。选中后会从一条全新的故事开始。</string>
     <string name="local_persona_picker_current">当前人物：%1$s</string>
     <string name="local_persona_picker_new">新建人物</string>
     <string name="local_persona_picker_edit_current">编辑当前人物</string>
     <string name="local_persona_picker_saved">已创建人物</string>
-    <string name="local_persona_picker_empty">还没有保存过人物。到侧边栏点“新建人物”，保存后就能在这里选择。</string>
+    <string name="local_persona_picker_empty">还没有保存过人物。可以直接新建人物，保存后就能在这里选择。</string>
     <string name="local_persona_picker_saved_hint">已保存人物</string>
 
 
