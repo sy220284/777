@@ -195,6 +195,10 @@ if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in eng
     violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
+if "以用户当前输入、明确纠正和当前状态为准" not in engine or "当前模式只进行聊天，不执行工作任务或工具操作" not in engine:
+    violations.append("Chat prompt must retain current-state priority and chat-only execution boundaries")
+if "持续到任务完成或遇到真实阻塞" not in engine or "最终结论必须有实际结果支撑" not in engine:
+    violations.append("Work prompt must retain abstract execution-discipline and evidence-based completion rules")
 
 if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
