@@ -3984,13 +3984,14 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeToolBatch(
         calls: List<LocalToolCall>,
         allowMutation: Boolean,
+        binding: LocalWorkRunBinding? = null,
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
         if (!parallelSubagents) {
-            return calls.map { call -> call to executeSafely(call, allowMutation) }
+            return calls.map { call -> call to executeSafely(call, allowMutation, binding) }
         }
         return isolatedParallelMap(calls) { call ->
-            call to executeSafely(call, allowMutation)
+            call to executeSafely(call, allowMutation, binding)
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
@@ -4003,8 +4004,12 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun executeSafely(call: LocalToolCall, allowMutation: Boolean): AgentToolResult = try {
-        executeRegistered(call, allowMutation)
+    private suspend fun executeSafely(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        binding: LocalWorkRunBinding? = null,
+    ): AgentToolResult = try {
+        executeRegistered(call, allowMutation, binding)
     } catch (cancelled: CancellationException) {
         if (!currentCoroutineContext().isActive) throw cancelled
         toolFailureResult(call, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消；同批其他任务继续运行")
@@ -4257,7 +4262,20 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun executeRegistered(
         original: LocalToolCall,
         allowMutation: Boolean,
-    ): AgentToolResult = toolExecutionCoordinator.execute(original, allowMutation)
+        binding: LocalWorkRunBinding? = null,
+    ): AgentToolResult = if (binding == null) {
+        toolExecutionCoordinator.execute(original, allowMutation)
+    } else {
+        toolExecutionCoordinator.executeScoped(
+            original = original,
+            sessionId = binding.sessionId,
+            allowMutation = allowMutation,
+            planModeEnabled = binding.state.value.planMode,
+            approval = { call, tool, summary ->
+                approve(binding, call, summary, tool)
+            },
+        )
+    }
 
     private fun subagentToolSchemas(
         allowMutation: Boolean,
