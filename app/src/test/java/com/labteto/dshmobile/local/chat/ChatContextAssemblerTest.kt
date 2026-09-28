@@ -134,4 +134,19 @@ class ChatContextAssemblerTest {
         assertFalse(context.contains("地点=院子"))
     }
 
+
+    @Test
+    fun userQuestionDoesNotSuppressCurrentCommittedSchedule() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【剧情连续性｜当前有效】
+                已定：明天十点去城南
+            """.trimIndent(),
+            relationshipMemory = "",
+            userInput = "明天九点去城南吗？",
+        )
+
+        assertTrue(context.contains("明天十点去城南"))
+    }
+
 }
