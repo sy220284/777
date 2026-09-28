@@ -46,6 +46,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsIconButton
@@ -216,6 +217,7 @@ fun ToolsScreen(
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var confirmClearGitHub by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onClose)
     LaunchedEffect(state.notice) {
@@ -330,12 +332,12 @@ fun ToolsScreen(
                             onClick = { viewModel.configureGitHub(githubToken) },
                             enabled = !state.loading && githubToken.isNotBlank(),
                             size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Outline,
+                            variant = DsButtonVariant.Primary,
                         )
                         if (state.githubConfigured) {
                             DsButton(
                                 text = stringResource(R.string.tools_github_clear),
-                                onClick = viewModel::clearGitHub,
+                                onClick = { confirmClearGitHub = true },
                                 enabled = !state.loading,
                                 size = DsButtonSize.Small,
                                 variant = DsButtonVariant.Ghost,
@@ -457,6 +459,37 @@ fun ToolsScreen(
                 }
                 Text(stringResource(message), style = DsType.small13, color = colors.labelSecondary)
             }
+            }
+        }
+    }
+
+    if (confirmClearGitHub) {
+        DsDialog(
+            title = stringResource(R.string.tools_github_clear_confirm_title),
+            onDismiss = { confirmClearGitHub = false },
+        ) {
+            Text(
+                stringResource(R.string.tools_github_clear_confirm_body),
+                style = DsType.std14,
+                color = colors.labelSecondary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmClearGitHub = false },
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.tools_github_clear),
+                    onClick = {
+                        confirmClearGitHub = false
+                        viewModel.clearGitHub()
+                    },
+                    variant = DsButtonVariant.Danger,
+                )
             }
         }
     }
