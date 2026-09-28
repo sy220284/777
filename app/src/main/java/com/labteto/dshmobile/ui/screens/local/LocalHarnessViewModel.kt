@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
@@ -554,9 +555,9 @@ class LocalHarnessViewModel @Inject constructor(
             current = snapshot.groupChat.announcement,
         )
     }
-    fun editAndResendUserMessage(messageId: String, text: String): Boolean {
-        val edited = engine.editAndResendUserMessage(messageId, text)
-        if (!edited) return false
+    fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
+        val result = engine.editAndResendUserMessage(messageId, text)
+        if (result != LocalChatUserEditResult.SENT) return result
 
         val sessionId = state.value.sessionId
         transcriptHistoryCursor = null
@@ -565,7 +566,7 @@ class LocalHarnessViewModel @Inject constructor(
         viewModelScope.launch {
             prepareTranscriptHistory(sessionId, force = true)
         }
-        return true
+        return result
     }
     fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         engine.selectChatMessageVariant(messageId, targetIndex)

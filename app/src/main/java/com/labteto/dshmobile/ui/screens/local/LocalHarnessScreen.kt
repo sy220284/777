@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import android.graphics.BitmapFactory
 import java.io.File
+import com.labteto.dshmobile.local.LocalChatUserEditResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -630,7 +631,7 @@ private fun LocalChat(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
-    onEditAndResend: (String, String) -> Boolean,
+    onEditAndResend: (String, String) -> LocalChatUserEditResult,
     onSelectMessageVariant: (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
@@ -786,7 +787,11 @@ private fun LocalChat(
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
     val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
-    val editUserMessageFailed = stringResource(R.string.local_edit_user_message_failed)
+    val editUserMessageBusy = stringResource(R.string.local_edit_user_message_busy)
+    val editUserMessageMissing = stringResource(R.string.local_edit_user_message_missing)
+    val editUserMessageUnavailable = stringResource(R.string.local_edit_user_message_unavailable)
+    val editUserMessageEmpty = stringResource(R.string.local_edit_user_message_empty)
+    val editUserMessageUnchanged = stringResource(R.string.local_edit_user_message_unchanged)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -1673,12 +1678,17 @@ private fun LocalChat(
                 DsButton(
                     text = stringResource(R.string.local_edit_user_message_resend),
                     onClick = {
-                        if (onEditAndResend(message.id, editingUserText)) {
-                            editingUserMessage = null
-                            editingUserText = ""
-                            editingUserError = null
-                        } else {
-                            editingUserError = editUserMessageFailed
+                        when (onEditAndResend(message.id, editingUserText)) {
+                            LocalChatUserEditResult.SENT -> {
+                                editingUserMessage = null
+                                editingUserText = ""
+                                editingUserError = null
+                            }
+                            LocalChatUserEditResult.BUSY -> editingUserError = editUserMessageBusy
+                            LocalChatUserEditResult.MESSAGE_MISSING -> editingUserError = editUserMessageMissing
+                            LocalChatUserEditResult.UNAVAILABLE -> editingUserError = editUserMessageUnavailable
+                            LocalChatUserEditResult.EMPTY -> editingUserError = editUserMessageEmpty
+                            LocalChatUserEditResult.UNCHANGED -> editingUserError = editUserMessageUnchanged
                         }
                     },
                     enabled = (

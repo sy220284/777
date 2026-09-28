@@ -1442,27 +1442,35 @@ class LocalHarnessEngine @Inject constructor(
      * message are removed from the active conversation. Hard scene state is replayed from the
      * retained prefix so deleted future locations cannot leak into the new continuation.
      */
-    fun editAndResendUserMessage(messageId: String, replacement: String): Boolean = synchronized(runStateLock) {
+    fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
+        if (state.usageMode != LocalUsageMode.CHAT || !state.configured) {
+            return@synchronized LocalChatUserEditResult.UNAVAILABLE
+        }
         if (
-            state.usageMode != LocalUsageMode.CHAT ||
-            !state.configured ||
             state.loading ||
+            state.running ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0
-        ) return@synchronized false
+        ) return@synchronized LocalChatUserEditResult.BUSY
 
-        val activeTranscript = transcriptForBranchMaterialization(state)
+        val activeTranscript = activeTranscriptForUserEdit(
+            messageId = messageId,
+            activeBranch = activeChatBranchMessages(state.chatBranches),
+            hotMessages = state.messages,
+            totalMessageCount = state.transcriptIndex.totalMessageCount,
+            loadDurableTranscript = { LocalSessionTranscriptPager(eventLog).all() },
+        )
         val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
-        if (originalIndex < 0) return@synchronized false
+        if (originalIndex < 0) return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
         val original = activeTranscript[originalIndex]
-        if (original.role != "user") return@synchronized false
+        if (original.role != "user") return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
 
         val content = withEditedChatUserText(original, requestedText)
-        if (content.isBlank()) return@synchronized false
-        if (editableChatUserText(original).trim() == requestedText) return@synchronized false
+        if (content.isBlank()) return@synchronized LocalChatUserEditResult.EMPTY
+        if (editableChatUserText(original).trim() == requestedText) return@synchronized LocalChatUserEditResult.UNCHANGED
         cancelChatPostTurn()
 
         val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
@@ -1515,7 +1523,7 @@ class LocalHarnessEngine @Inject constructor(
             activeMessages = activeTranscript,
             originalMessageId = messageId,
             editedMessage = edited,
-        ) ?: return@synchronized false
+        ) ?: return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
         val retainedPrefix = rewritten.dropLast(1)
 
         val previousGeneration = if (state.groupChat.enabled) {
@@ -1613,7 +1621,7 @@ class LocalHarnessEngine @Inject constructor(
                 runChatTurn(content, sourceMessageId = edited.id)
             }
         }.also { activeJob = it; it.start() }
-        true
+        LocalChatUserEditResult.SENT
     }
 
     /** Switch among saved alternatives for one user or assistant turn. */
