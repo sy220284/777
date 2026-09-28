@@ -21,7 +21,7 @@
     <string name="local_select_variant_failed">Unable to switch reply version right now. Wait for the current turn to finish and try again.</string>
     <string name="local_edit_user_message">Edit message</string>
     <string name="local_edit_user_message_hint">Resending restarts the conversation from this message. All later conversation history is cleared and replaced by the new continuation.</string>
-    <string name="local_edit_user_message_resend">Resend</string>
+    <string name="local_edit_user_message_resend">Regenerate from here</string>
     <string name="local_edit_user_message_busy">The chat is still processing. Try again when the current reply finishes.</string>
     <string name="local_edit_user_message_missing">This message is no longer in the active conversation. Reopen the chat and try again.</string>
     <string name="local_edit_user_message_unavailable">Switch to a chat session with a configured model and try again.</string>
@@ -439,7 +439,7 @@
     <string name="tasks_background_task">Background task</string>
     <string name="tasks_once">One-time task</string>
     <string name="tasks_every_minutes">Every %1$d minutes</string>
-    <string name="tasks_cancel">Cancel</string>
+    <string name="tasks_cancel">Delete task</string>
     <string name="tasks_pause">Pause</string>
     <string name="tasks_resume">Resume</string>
     <string name="tasks_next_run">Next run: %1$s</string>
@@ -460,7 +460,7 @@
     <string name="local_run_open_results">Files &amp; results</string>
     <string name="tools_title">Capability center</string>
     <string name="tools_subtitle">See what the work mode can do and manage external connections</string>
-    <string name="tools_refresh">Refresh tools</string>
+    <string name="tools_refresh">Refresh capability status</string>
     <string name="tools_external_services">External tool services</string>
     <string name="tools_no_services">No connected services</string>
     <string name="tools_server_summary">%1$s · %2$d tools · connected</string>
@@ -952,6 +952,8 @@
     <string name="tools_github_token_hint">Prefer a fine-grained token with minimum repository permissions; it is validated before encrypted Android Keystore storage</string>
     <string name="tools_github_save">Verify and save</string>
     <string name="tools_github_clear">Clear credential</string>
+    <string name="tools_github_clear_confirm_title">Clear GitHub credential?</string>
+    <string name="tools_github_clear_confirm_body">The GitHub connector will stop working until you enter and verify a token again.</string>
     <string name="tools_capability_group">Capabilities</string>
     <string name="tools_connection_group">Connections</string>
     <string name="tools_capability_terminal">Terminal &amp; runtime</string>
@@ -993,12 +995,12 @@
     <string name="persona_gallery_save_edits_before_switch">Save or cancel the current story edits before switching.</string>
 
     <string name="local_persona_picker_title">Choose character</string>
-    <string name="local_persona_picker_intro">Choose a saved character for a new chat. To create one, use New character below Character gallery in the sidebar. This starts a fresh storyline.</string>
+    <string name="local_persona_picker_intro">Choose a saved character for a new chat, or create one here. This starts a fresh storyline.</string>
     <string name="local_persona_picker_current">Current character: %1$s</string>
     <string name="local_persona_picker_new">Create new character</string>
     <string name="local_persona_picker_edit_current">Edit current character</string>
     <string name="local_persona_picker_saved">Saved characters</string>
-    <string name="local_persona_picker_empty">No saved characters yet. Create one from the sidebar, then select it here.</string>
+    <string name="local_persona_picker_empty">No saved characters yet. Create one here, save it, then select it for a new chat.</string>
     <string name="local_persona_picker_saved_hint">Saved character</string>
 
 
