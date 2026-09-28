@@ -22,6 +22,7 @@ data class ChatContextState(
 @Serializable
 data class ChatPendingTurn(
     val sequence: Long = 0L,
+    val userMessageId: String = "",
     val assistantMessageId: String = "",
     val branchHeadId: String = "",
     val userMessage: String = "",
@@ -29,32 +30,60 @@ data class ChatPendingTurn(
     val generation: Long = 0L,
 )
 
-internal fun ChatContextState.normalized(): ChatContextState = copy(
-    scene = scene.copy(
-        sceneTime = scene.sceneTime.trim().take(80),
-        location = scene.location.trim().take(120),
-        participants = scene.participants.cleanContextLines(8, 80),
-        positions = scene.positions.cleanContextLines(8, 120),
-        activeActions = scene.activeActions.cleanContextLines(6, 120),
-        keyObjects = scene.keyObjects.cleanContextLines(8, 80),
-        // Legacy #241 fields are deliberately no longer carried as durable hard state.
-        currentEvent = "",
-        lastSceneChange = "",
-    ),
-    continuity = continuity.copy(
-        recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180),
-        // Repeated-event history is folded into the latest decision/event instead of growing forever.
-        recurringEvents = emptyList(),
-        decisions = continuity.decisions.cleanRecentContextLines(4, 180),
-        unfinished = continuity.unfinished.cleanRecentContextLines(4, 180),
-    ),
-    sceneEvents = sceneEvents
-        .sortedBy(ChatSceneEvent::sequence)
-        .distinctBy { event ->
-            listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
+internal fun ChatContextState.normalized(): ChatContextState {
+    val recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180)
+    val decisions = continuity.decisions.cleanRecentContextLines(4, 180)
+    val unfinished = continuity.unfinished.cleanRecentContextLines(4, 180)
+    val activeEvidenceKeys = buildSet {
+        recentEvents.forEach { add(ChatContinuityFactKind.EVENT to normalizeContinuityFact(it)) }
+        decisions.forEach { add(ChatContinuityFactKind.DECISION to normalizeContinuityFact(it)) }
+        unfinished.forEach { add(ChatContinuityFactKind.OPEN_THREAD to normalizeContinuityFact(it)) }
+    }
+    val groundedEvidence = continuity.evidence.asSequence()
+        .map { item ->
+            item.copy(
+                text = item.text.trim().take(180),
+                sourceUserMessageId = item.sourceUserMessageId.trim().take(160),
+                sourceAssistantMessageId = item.sourceAssistantMessageId.trim().take(160),
+                evidence = item.evidence.trim().take(360),
+            )
         }
-        .takeLast(RECENT_SCENE_EVENT_LIMIT),
-)
+        .filter { item ->
+            item.text.isNotBlank() &&
+                (item.kind to normalizeContinuityFact(item.text)) in activeEvidenceKeys
+        }
+        .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
+        .takeLast(MAX_CONTINUITY_EVIDENCE)
+        .toList()
+
+    return copy(
+        scene = scene.copy(
+            sceneTime = scene.sceneTime.trim().take(80),
+            location = scene.location.trim().take(120),
+            participants = scene.participants.cleanContextLines(8, 80),
+            positions = scene.positions.cleanContextLines(8, 120),
+            activeActions = scene.activeActions.cleanContextLines(6, 120),
+            keyObjects = scene.keyObjects.cleanContextLines(8, 80),
+            // Legacy #241 fields are deliberately no longer carried as durable hard state.
+            currentEvent = "",
+            lastSceneChange = "",
+        ),
+        continuity = continuity.copy(
+            recentEvents = recentEvents,
+            // Repeated-event history is folded into the latest decision/event instead of growing forever.
+            recurringEvents = emptyList(),
+            decisions = decisions,
+            unfinished = unfinished,
+            evidence = groundedEvidence,
+        ),
+        sceneEvents = sceneEvents
+            .sortedBy(ChatSceneEvent::sequence)
+            .distinctBy { event ->
+                listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
+            }
+            .takeLast(RECENT_SCENE_EVENT_LIMIT),
+    )
+}
 
 internal fun ChatContextState.enqueuePending(turn: ChatPendingTurn): ChatContextState {
     if (turn.sequence <= processedThroughSequence) return this
@@ -170,6 +199,8 @@ internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): Cha
             recentEvents = current.continuity.recentEvents.ifEmpty { legacy.continuity.recentEvents },
             decisions = current.continuity.decisions.ifEmpty { legacy.continuity.decisions },
             unfinished = current.continuity.unfinished.ifEmpty { legacy.continuity.unfinished },
+            evidence = (current.continuity.evidence + legacy.continuity.evidence)
+                .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) },
         ),
     ).normalized()
 }
@@ -192,6 +223,9 @@ internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState)
 private const val HOT_WINDOW_PENDING_TURNS = 10
 private const val PENDING_RAW_FALLBACK_TURNS = 4
 private const val RECENT_SCENE_EVENT_LIMIT = 12
+private const val MAX_CONTINUITY_EVIDENCE = 13
+private const val MIN_CONTINUITY_EVIDENCE_SCORE = 20
+private const val DERIVED_CONTINUITY_EVIDENCE_SCORE = 10
 private const val MAX_PENDING_CONTEXT_CHARS = 1_800
 private const val MAX_SCENE_CONTEXT_CHARS = 700
 private const val MAX_SOFT_CONTINUITY_CHARS = 1_300
@@ -214,6 +248,156 @@ private fun List<String>.cleanRecentContextLines(limit: Int, maxChars: Int): Lis
         .distinct()
         .toList()
         .takeLast(limit)
+
+
+/**
+ * Accept new soft continuity facts only when they can be tied back to a durable Pending turn.
+ *
+ * Legacy facts that were already active remain readable without fabricated provenance. As soon as
+ * the planner changes a fact, the replacement must be grounded in the raw user/assistant turn.
+ */
+internal fun groundContinuityEvidence(
+    previous: ChatContinuityState,
+    candidate: ChatContinuityState,
+    pendingTurns: List<ChatPendingTurn>,
+): ChatContinuityState {
+    val orderedTurns = pendingTurns.sortedBy(ChatPendingTurn::sequence)
+    val previousEvidence = previous.evidence.associateBy { item ->
+        item.kind to normalizeContinuityFact(item.text)
+    }
+    val acceptedEvidence = linkedMapOf<Pair<ChatContinuityFactKind, String>, ChatContinuityEvidence>()
+
+    fun ground(
+        kind: ChatContinuityFactKind,
+        values: List<String>,
+        previousValues: List<String>,
+        allowDerivedEvidence: Boolean = false,
+    ): List<String> {
+        if (values.isEmpty()) return emptyList()
+        val previousKeys = previousValues.associateBy(::normalizeContinuityFact)
+        val accepted = mutableListOf<String>()
+
+        values.forEach { raw ->
+            val value = raw.trim()
+            if (value.isBlank()) return@forEach
+            val key = kind to normalizeContinuityFact(value)
+            if (key.second.isBlank()) return@forEach
+
+            if (key.second in previousKeys) {
+                accepted += value
+                previousEvidence[key]?.let { acceptedEvidence[key] = it.copy(text = value) }
+                return@forEach
+            }
+
+            val direct = bestContinuitySource(value, orderedTurns)
+            if (direct != null) {
+                accepted += value
+                acceptedEvidence[key] = ChatContinuityEvidence(
+                    kind = kind,
+                    text = value,
+                    sourceSequence = direct.first.sequence,
+                    sourceUserMessageId = direct.first.userMessageId,
+                    sourceAssistantMessageId = direct.first.assistantMessageId,
+                    evidence = direct.first.rawEvidence(),
+                )
+                return@forEach
+            }
+
+            if (allowDerivedEvidence) {
+                val inherited = acceptedEvidence.values
+                    .map { evidence -> evidence to continuityEvidenceScore(value, evidence.text + " " + evidence.evidence) }
+                    .filter { (_, score) -> score >= DERIVED_CONTINUITY_EVIDENCE_SCORE }
+                    .maxByOrNull { (_, score) -> score }
+                    ?.first
+                if (inherited != null) {
+                    accepted += value
+                    acceptedEvidence[key] = inherited.copy(kind = kind, text = value)
+                }
+            }
+        }
+
+        // A malformed/hallucinated replacement must not silently erase the previous valid state.
+        return if (accepted.isEmpty() && previousValues.isNotEmpty()) previousValues else accepted
+    }
+
+    val recentEvents = ground(
+        kind = ChatContinuityFactKind.EVENT,
+        values = candidate.recentEvents,
+        previousValues = previous.recentEvents,
+    )
+    val decisions = ground(
+        kind = ChatContinuityFactKind.DECISION,
+        values = candidate.decisions,
+        previousValues = previous.decisions,
+    )
+    val unfinished = ground(
+        kind = ChatContinuityFactKind.OPEN_THREAD,
+        values = candidate.unfinished,
+        previousValues = previous.unfinished,
+        allowDerivedEvidence = true,
+    )
+
+    val activeKeys = buildSet {
+        recentEvents.forEach { add(ChatContinuityFactKind.EVENT to normalizeContinuityFact(it)) }
+        decisions.forEach { add(ChatContinuityFactKind.DECISION to normalizeContinuityFact(it)) }
+        unfinished.forEach { add(ChatContinuityFactKind.OPEN_THREAD to normalizeContinuityFact(it)) }
+    }
+    val carriedLegacyEvidence = previous.evidence.filter { item ->
+        val key = item.kind to normalizeContinuityFact(item.text)
+        key in activeKeys && key !in acceptedEvidence
+    }
+
+    return candidate.copy(
+        recentEvents = recentEvents,
+        recurringEvents = emptyList(),
+        decisions = decisions,
+        unfinished = unfinished,
+        evidence = (carriedLegacyEvidence + acceptedEvidence.values)
+            .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
+            .takeLast(MAX_CONTINUITY_EVIDENCE),
+    )
+}
+
+private fun bestContinuitySource(
+    fact: String,
+    turns: List<ChatPendingTurn>,
+): Pair<ChatPendingTurn, Int>? = turns.asSequence()
+    .map { turn -> turn to continuityEvidenceScore(fact, turn.rawEvidence()) }
+    .filter { (_, score) -> score >= MIN_CONTINUITY_EVIDENCE_SCORE }
+    .maxWithOrNull(
+        compareBy<Pair<ChatPendingTurn, Int>> { it.second }
+            .thenBy { it.first.sequence },
+    )
+
+private fun ChatPendingTurn.rawEvidence(): String =
+    listOf(userMessage.trim(), assistantMessage.trim())
+        .filter(String::isNotBlank)
+        .joinToString(" ")
+        .take(360)
+
+private fun continuityEvidenceScore(fact: String, source: String): Int {
+    val a = normalizeContinuityFact(fact)
+    val b = normalizeContinuityFact(source)
+    if (a.length < 2 || b.length < 2) return 0
+    if (b.contains(a) || a.contains(b)) return 100
+    val aa = continuityBigrams(a)
+    val bb = continuityBigrams(b)
+    if (aa.isEmpty() || bb.isEmpty()) return 0
+    val shared = aa.count(bb::contains)
+    if (shared == 0) return 0
+    val containment = (shared * 100) / minOf(aa.size, bb.size)
+    return if (shared >= 2) containment else containment.coerceAtMost(18)
+}
+
+private fun continuityBigrams(text: String): Set<String> =
+    if (text.length < 2) emptySet()
+    else (0 until text.length - 1).mapTo(linkedSetOf()) { index -> text.substring(index, index + 2) }
+
+private fun normalizeContinuityFact(text: String): String =
+    text.trim()
+        .lowercase()
+        .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）\\[\\]【】|｜=_-]+"""), "")
+        .take(360)
 
 
 internal fun ChatContextState.canonicalFactLines(): List<String> {
