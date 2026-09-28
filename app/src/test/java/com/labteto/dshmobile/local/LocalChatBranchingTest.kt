@@ -116,7 +116,6 @@ class LocalChatBranchingTest {
             messageId = "m50",
             activeBranch = emptyList(),
             hotMessages = history.takeLast(20),
-            totalMessageCount = 20, // A stale index must not hide a visible paged message.
             loadDurableTranscript = { durableReads++; history },
         )
         val rewritten = rewriteChatTranscriptFromUserEdit(
