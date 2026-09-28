@@ -262,7 +262,7 @@ class HarnessWebhookService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val executionMutex = Mutex()
     private val executionLimiter = WebhookExecutionLimiter(MAX_PENDING_RUNS)
-    private val listener by lazy { WebhookListener(scope, ::handle) }
+    private val listener by lazy { WebhookListener(scope, handle = ::handle) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
