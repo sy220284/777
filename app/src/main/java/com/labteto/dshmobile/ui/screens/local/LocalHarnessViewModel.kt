@@ -570,8 +570,10 @@ class LocalHarnessViewModel @Inject constructor(
             current = snapshot.groupChat.announcement,
         )
     }
-    fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
-        val result = engine.editAndResendUserMessage(messageId, text)
+    suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
+        val result = withContext(Dispatchers.IO) {
+            engine.editAndResendUserMessage(messageId, text)
+        }
         if (result == LocalChatUserEditResult.SENT) {
             refreshTranscriptHistoryAfterTimelineRewrite()
         }
