@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -91,6 +92,7 @@ fun DsButton(
     Surface(
         onClick = onClick,
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .height(if (normal) 36.dp else 28.dp)
             .graphicsLayer {
                 scaleX = scale
