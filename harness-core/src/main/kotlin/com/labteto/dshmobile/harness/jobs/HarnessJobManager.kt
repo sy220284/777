@@ -214,13 +214,14 @@ class HarnessJobManager(
                 updatedAt = startedAt,
             ).also { records[id] = it }
         }
-        if (!resumeKind.isNullOrBlank()) {
+        val requiresDurableStart = !resumeKind.isNullOrBlank() || expectedDurationMillis != null
+        if (requiresDurableStart) {
             try {
                 persistCurrentSnapshots()
             } catch (error: Exception) {
                 synchronized(lock) { records.remove(record.id) }
                 notifyChanged()
-                throw IllegalStateException("持久任务元数据写入失败，任务未启动", error)
+                throw IllegalStateException("后台任务元数据写入失败，任务未启动", error)
             }
             launchRecord(record, block)
             notifyChanged()
