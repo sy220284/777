@@ -47,4 +47,67 @@ class SessionEventLogMultiInstanceTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun manyLiveInstancesStayStrictlyMonotonicAcrossRotations() {
+        val root = createTempDir(prefix = "session-log-many-instances-")
+        try {
+            val file = File(root, "session.events.jsonl")
+            val logs = List(8) { index ->
+                SessionEventLog(file, json, maxBytes = 700, clock = { index.toLong() })
+            }
+
+            repeat(1_000) { index ->
+                val event = logs[index % logs.size].append(
+                    "test/stress",
+                    buildJsonObject {
+                        put("index", index)
+                        put("payload", "x".repeat(48))
+                    },
+                )
+                assertEquals(index.toLong(), event.sequence)
+            }
+
+            val snapshot = logs.last().snapshot()
+            assertEquals(1_000, snapshot.size)
+            assertEquals((0L until 1_000L).toList(), snapshot.map(SessionEvent::sequence))
+            assertEquals(1_000, snapshot.map(SessionEvent::sequence).toSet().size)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun repeatedClearFromDifferentInstancesNeverLetsStaleCountersLeakBack() {
+        val root = createTempDir(prefix = "session-log-chaotic-clear-")
+        try {
+            val file = File(root, "session.events.jsonl")
+            val logs = List(8) { index ->
+                SessionEventLog(file, json, maxBytes = 700, clock = { index.toLong() })
+            }
+
+            repeat(25) { cycle ->
+                logs[cycle % logs.size].clear()
+                logs.forEachIndexed { index, log ->
+                    assertEquals(
+                        index.toLong(),
+                        log.append(
+                            "test/after-clear",
+                            buildJsonObject {
+                                put("cycle", cycle)
+                                put("writer", index)
+                            },
+                        ).sequence,
+                    )
+                }
+                assertEquals(
+                    (0L until logs.size.toLong()).toList(),
+                    logs[(cycle + 1) % logs.size].snapshot().map(SessionEvent::sequence),
+                )
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 }
