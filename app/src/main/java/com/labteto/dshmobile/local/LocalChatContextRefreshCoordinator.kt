@@ -107,6 +107,7 @@ internal class LocalChatContextRefreshCoordinator(
         ) ?: return null
 
         var generation: Long? = null
+        var branchSnapshotUpdated = false
         state.update { current ->
             if (current.sessionId != expectedSessionId) {
                 current
@@ -129,10 +130,31 @@ internal class LocalChatContextRefreshCoordinator(
                     ),
                 )
                 generation = nextContext.generation
-                current.copy(chatContext = nextContext)
+                val nextBranches = if (current.transcriptIndex.branchingEligible) {
+                    updateChatBranchNodeSnapshot(
+                        state = current.chatBranches,
+                        messageId = expectedAssistantMessageId,
+                        chatState = current.chatState,
+                        replySuggestions = current.replySuggestions,
+                        chatContext = nextContext,
+                    ).also { updated ->
+                        branchSnapshotUpdated = updated != current.chatBranches
+                    }
+                } else {
+                    current.chatBranches
+                }
+                current.copy(
+                    chatContext = nextContext,
+                    chatBranches = nextBranches,
+                )
             }
         }
-        if (generation != null) persist()
+        if (generation != null) {
+            if (branchSnapshotUpdated && hasChatBranchAlternatives(state.value.chatBranches)) {
+                persistBranchState("chat/pending-enqueued")
+            }
+            persist()
+        }
         return generation
     }
 
