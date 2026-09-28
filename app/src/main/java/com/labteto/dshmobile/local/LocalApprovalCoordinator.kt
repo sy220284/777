@@ -64,11 +64,11 @@ internal class LocalApprovalCoordinator(
         approvalPreferences.setSafeAutoApprovalEnabled(true)
         state.update { it.copy(safeAutoApprovalEnabled = true) }
         eventLog().append("approval/mode", buildJsonObject {
-            put("mode", "safe-global")
+            put("mode", "global")
             pending?.toolName?.let { put("tool", it) }
         })
         persist()
-        if (canResolvePendingByEnablingSafeAutoApproval(pending)) {
+        if (canResolvePendingByEnablingAutoApproval(pending)) {
             pending?.callId?.let { interactions.answerApproval(it, true) }
         }
     }
