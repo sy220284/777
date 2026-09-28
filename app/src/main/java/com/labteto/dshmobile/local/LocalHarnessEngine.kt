@@ -592,8 +592,9 @@ class LocalHarnessEngine @Inject constructor(
      * Detached work runner for scheduled/webhook work.
      *
      * It owns a Work-mode session log but never swaps the UI's current session. Interactive
-     * approvals are deliberately unavailable: safe-global approvals may proceed, everything else
-     * is marked blocked so a background task cannot surface a work prompt inside Chat mode.
+     * approvals are deliberately unavailable: when global auto-approval is enabled, every
+     * approval-gated tool may proceed; otherwise the task is marked blocked so a background task
+     * cannot surface a work prompt inside Chat mode.
      */
     private fun automationSubagentRunner(
         sessionId: String,
