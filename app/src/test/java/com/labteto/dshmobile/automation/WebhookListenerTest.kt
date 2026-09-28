@@ -3,6 +3,9 @@ package com.labteto.dshmobile.automation
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,6 +82,46 @@ class WebhookListenerTest {
     @Test(expected = IllegalArgumentException::class)
     fun connectionLimiterRejectsZeroCapacity() {
         WebhookConnectionLimiter(0)
+    }
+
+
+    @Test
+    fun restartDoesNotLetOldGenerationConsumeNewConnectionCapacity() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val calls = AtomicInteger(0)
+        val listener = WebhookListener(
+            scope = scope,
+            maxClients = 1,
+            handle = { socket ->
+                if (calls.incrementAndGet() == 1) {
+                    firstEntered.countDown()
+                    releaseFirst.await(5, TimeUnit.SECONDS)
+                } else {
+                    socket.getOutputStream().write(42)
+                }
+            },
+        )
+        val firstPort = ServerSocket(0).use { it.localPort }
+        val secondPort = ServerSocket(0).use { it.localPort }
+        var firstClient: Socket? = null
+        try {
+            listener.restart(InetSocketAddress("127.0.0.1", firstPort))
+            firstClient = Socket("127.0.0.1", firstPort)
+            assertTrue(firstEntered.await(3, TimeUnit.SECONDS))
+
+            listener.restart(InetSocketAddress("127.0.0.1", secondPort))
+            Socket("127.0.0.1", secondPort).use { secondClient ->
+                secondClient.soTimeout = 3_000
+                assertEquals(42, secondClient.getInputStream().read())
+            }
+        } finally {
+            releaseFirst.countDown()
+            runCatching { firstClient?.close() }
+            listener.close()
+            scope.cancel()
+        }
     }
 
 }
