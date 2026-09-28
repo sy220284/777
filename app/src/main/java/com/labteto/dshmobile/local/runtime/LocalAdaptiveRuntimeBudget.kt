@@ -62,8 +62,12 @@ internal fun adaptiveToolResultBudget(
     val scale = (1.0 - load * 0.65).coerceIn(0.35, 1.0)
 
     return base.copy(
-        maxToolResultChars = (base.maxToolResultChars * scale).toInt().coerceAtLeast(8_000),
-        maxToolResultTokens = (base.maxToolResultTokens * scale).toInt().coerceAtLeast(2_000),
+        maxToolResultChars = (base.maxToolResultChars * scale).toInt()
+            .coerceAtLeast(minOf(8_000, base.maxToolResultChars))
+            .coerceAtMost(base.maxToolResultChars),
+        maxToolResultTokens = (base.maxToolResultTokens * scale).toInt()
+            .coerceAtLeast(minOf(2_000, base.maxToolResultTokens))
+            .coerceAtMost(base.maxToolResultTokens),
     )
 }
 
