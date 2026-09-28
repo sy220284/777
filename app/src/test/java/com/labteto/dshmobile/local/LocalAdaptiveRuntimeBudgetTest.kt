@@ -36,6 +36,22 @@ class LocalAdaptiveRuntimeBudgetTest {
     }
 
     @Test
+    fun exhaustedSoftBudgetAlwaysGrowsSoLongTaskCanContinue() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "全量审计并修复后完成回归测试",
+            contextChars = 95_000,
+            contextBudgetChars = 100_000,
+            pressure = HarnessResourcePressure.HIGH,
+            kind = LocalAgentRunKind.FOREGROUND,
+        )
+
+        assertTrue(next != null)
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
     fun shrinksModelVisibleToolOutputAsHistoryFills() {
         val base = LocalHistoryBudget(
             maxHistoryChars = 100_000,
