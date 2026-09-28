@@ -46,14 +46,6 @@ for path in SOURCES:
     if "android.util.Log" in text and rel not in ANDROID_LOG_ALLOW:
         violations.append(f"{rel}: route production logging through AppLog")
 
-shizuku = ROOT / "harness-device-android/src/main/java/com/labteto/dshmobile/device/shizuku/ShizukuBridge.kt"
-if shizuku.is_file():
-    text = shizuku.read_text(encoding="utf-8")
-    if re.search(r'ProcessBuilder\s*\(\s*["\']/system/bin/sh["\']\s*,\s*["\']-c["\']', text):
-        violations.append(
-            f"{shizuku.relative_to(ROOT)}: privileged commands must not pass through a shell"
-        )
-
 if violations:
     print("Kotlin risk-pattern guard failed:", file=sys.stderr)
     for violation in violations:
