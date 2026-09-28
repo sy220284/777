@@ -44,22 +44,26 @@ object AppLog {
 
     fun debug(tag: String, message: String) {
         record("D", tag, message, null)
-        Log.d(tag, message)
+        runCatching { Log.d(tag, message) }
     }
 
     fun info(tag: String, message: String) {
         record("I", tag, message, null)
-        Log.i(tag, message)
+        runCatching { Log.i(tag, message) }
     }
 
     fun warn(tag: String, message: String, throwable: Throwable? = null) {
         record("W", tag, message, throwable)
-        if (throwable == null) Log.w(tag, message) else Log.w(tag, message, throwable)
+        runCatching {
+            if (throwable == null) Log.w(tag, message) else Log.w(tag, message, throwable)
+        }
     }
 
     fun error(tag: String, message: String, throwable: Throwable? = null) {
         record("E", tag, message, throwable)
-        if (throwable == null) Log.e(tag, message) else Log.e(tag, message, throwable)
+        runCatching {
+            if (throwable == null) Log.e(tag, message) else Log.e(tag, message, throwable)
+        }
     }
 
     fun snapshot(): List<AppLogEntry> = synchronized(lock) { entries.toList() }
