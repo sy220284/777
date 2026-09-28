@@ -580,8 +580,10 @@ class LocalHarnessViewModel @Inject constructor(
         return result
     }
 
-    fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean {
-        val selected = engine.selectChatMessageVariant(messageId, targetIndex)
+    suspend fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean {
+        val selected = withContext(Dispatchers.IO) {
+            engine.selectChatMessageVariant(messageId, targetIndex)
+        }
         if (selected) refreshTranscriptHistoryAfterTimelineRewrite()
         return selected
     }
