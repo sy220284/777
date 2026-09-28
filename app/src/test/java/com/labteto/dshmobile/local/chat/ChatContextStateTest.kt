@@ -254,4 +254,75 @@ class ChatContextStateTest {
         assertTrue(planner.scene.keyObjects.isEmpty())
     }
 
+
+    @Test
+    fun newSoftFactWithoutRawEvidenceCannotReplaceValidContinuity() {
+        val previous = ChatContinuityState(
+            decisions = listOf("明早九点去城南"),
+        )
+        val candidate = ChatContinuityState(
+            decisions = listOf("明早十点去城北"),
+        )
+        val pending = listOf(
+            ChatPendingTurn(
+                sequence = 20L,
+                userMessageId = "u20",
+                assistantMessageId = "a20",
+                userMessage = "今天天气不错",
+                assistantMessage = "嗯，风也不大。",
+            ),
+        )
+
+        val grounded = groundContinuityEvidence(previous, candidate, pending)
+
+        assertEquals(listOf("明早九点去城南"), grounded.decisions)
+        assertTrue(grounded.evidence.isEmpty())
+    }
+
+    @Test
+    fun groundedSoftFactsKeepExactTurnProvenance() {
+        val pending = listOf(
+            ChatPendingTurn(
+                sequence = 31L,
+                userMessageId = "u31",
+                assistantMessageId = "a31",
+                userMessage = "那就定了，明天十点去城南。",
+                assistantMessage = "好，明天十点出发。",
+            ),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = ChatContinuityState(),
+            candidate = ChatContinuityState(
+                decisions = listOf("明天十点去城南"),
+                unfinished = listOf("城南之行尚未发生"),
+            ),
+            pendingTurns = pending,
+        )
+
+        assertEquals(listOf("明天十点去城南"), grounded.decisions)
+        assertEquals(listOf("城南之行尚未发生"), grounded.unfinished)
+        val decisionEvidence = grounded.evidence.single { it.kind == ChatContinuityFactKind.DECISION }
+        assertEquals(31L, decisionEvidence.sourceSequence)
+        assertEquals("u31", decisionEvidence.sourceUserMessageId)
+        assertEquals("a31", decisionEvidence.sourceAssistantMessageId)
+        assertTrue(decisionEvidence.evidence.contains("明天十点"))
+        assertTrue(grounded.evidence.any { it.kind == ChatContinuityFactKind.OPEN_THREAD })
+    }
+
+    @Test
+    fun unchangedLegacySoftFactRemainsCompatibleWithoutInventedEvidence() {
+        val legacy = ChatContinuityState(
+            recentEvents = listOf("以前已经发生的旧事件"),
+        )
+
+        val grounded = groundContinuityEvidence(
+            previous = legacy,
+            candidate = legacy,
+            pendingTurns = emptyList(),
+        )
+
+        assertEquals(legacy.recentEvents, grounded.recentEvents)
+        assertTrue(grounded.evidence.isEmpty())
+    }
+
 }
