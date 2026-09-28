@@ -140,11 +140,11 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.large),
+                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -582,4 +582,3 @@ private fun LocalSessionDrawerRow(
     }
     }
 }
-
