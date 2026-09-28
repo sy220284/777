@@ -11,7 +11,6 @@ class LocalAgentRunPolicyTest {
 
         assertFalse(policy.toolsEnabled)
         assertFalse(policy.allowToolExecution)
-        assertFalse(policy.imageFallbackToVisionTool)
     }
 
     @Test
@@ -20,6 +19,5 @@ class LocalAgentRunPolicyTest {
 
         assertTrue(policy.toolsEnabled)
         assertTrue(policy.allowToolExecution)
-        assertTrue(policy.imageFallbackToVisionTool)
     }
 }

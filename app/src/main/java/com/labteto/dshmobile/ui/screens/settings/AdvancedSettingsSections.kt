@@ -2,6 +2,8 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,9 +50,8 @@ import com.labteto.dshmobile.local.DeepSeekBillingSchedule
 import com.labteto.dshmobile.local.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
-import com.labteto.dshmobile.local.LocalImageInputMode
+import com.labteto.dshmobile.local.LocalModelCapability
 import com.labteto.dshmobile.local.LocalModelPresets
-import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -62,8 +63,6 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
 
 import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
@@ -448,6 +447,7 @@ internal fun LocalModelSettingsCard(
     val savedRoute = local.modelProfiles.any {
         it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
     }
+    val selectedPreset = LocalModelPresets.find(model, baseUrl)
     val editRoute: (String, String) -> Unit = { name, url ->
         model = name
         baseUrl = url
@@ -479,9 +479,16 @@ internal fun LocalModelSettingsCard(
                                 DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
-                        Text(profile.baseUrl.substringAfter("://").substringBefore('/'),
-                            style = DsType.caption11, color = colors.labelTertiary,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            profile.baseUrl,
+                            style = DsType.caption11,
+                            color = colors.labelTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        ModelCapabilityTags(
+                            LocalModelPresets.capabilitiesFor(profile.model, profile.baseUrl),
+                        )
                     }
                     DsMenu(
                         anchor = { Text("⋯", style = DsType.large20, color = colors.labelSecondary,
@@ -509,20 +516,6 @@ internal fun LocalModelSettingsCard(
             custom = false
             showEditor = true
         }, modifier = Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
-        Text(stringResource(R.string.advanced_image_input_mode), style = DsType.small13Strong,
-            color = colors.labelPrimary)
-        Text(stringResource(R.string.advanced_image_input_hint), style = DsType.caption11,
-            color = colors.labelTertiary)
-        DsSegmented(
-            segments = listOf(
-                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.advanced_image_mode_auto)),
-                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.advanced_image_mode_native)),
-                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.advanced_image_mode_tool)),
-            ),
-            selectedKey = local.imageInputMode.name,
-            onSelect = { viewModel.configureLocalImageInputMode(LocalImageInputMode.valueOf(it)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 
     if (showEditor) {
@@ -571,6 +564,21 @@ internal fun LocalModelSettingsCard(
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                 } else {
                     Text(baseUrl, style = DsType.caption11, color = colors.labelTertiary)
+                    selectedPreset?.let { preset ->
+                        Text(
+                            stringResource(R.string.local_model_chat_endpoint, preset.chatEndpoint),
+                            style = DsType.caption11,
+                            color = colors.labelTertiary,
+                        )
+                        preset.modelsEndpoint?.let { endpoint ->
+                            Text(
+                                stringResource(R.string.local_model_models_endpoint, endpoint),
+                                style = DsType.caption11,
+                                color = colors.labelTertiary,
+                            )
+                        }
+                        ModelCapabilityTags(preset.capabilities)
+                    }
                 }
                 OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); testStatus = null },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -631,6 +639,29 @@ internal fun LocalModelSettingsCard(
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
+    if (capabilities.isEmpty()) return
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+    ) {
+        capabilities.sortedBy { it.ordinal }.forEach { capability ->
+            DsPill(text = stringResource(modelCapabilityLabel(capability)))
+        }
+    }
+}
+
+private fun modelCapabilityLabel(capability: LocalModelCapability): Int = when (capability) {
+    LocalModelCapability.TEXT -> R.string.local_model_capability_text
+    LocalModelCapability.IMAGE -> R.string.local_model_capability_image
+    LocalModelCapability.VIDEO -> R.string.local_model_capability_video
+    LocalModelCapability.AUDIO -> R.string.local_model_capability_audio
+    LocalModelCapability.MUSIC -> R.string.local_model_capability_music
 }
 
 @Composable
@@ -1236,94 +1267,6 @@ private fun StepperRow(
             size = DsButtonSize.Small,
             variant = DsButtonVariant.Ghost,
         )
-    }
-}
-
-@Composable
-internal fun LocalVisionSettingsCard(
-    vision: LocalVisionSettingsSnapshot,
-    viewModel: SettingsViewModel,
-    report: (String) -> Unit,
-) {
-    val visionKeyRequiredMessage = stringResource(R.string.advanced_vision_key_required)
-    val visionSavedMessage = stringResource(R.string.advanced_vision_saved)
-    val visionKeyClearedMessage = stringResource(R.string.advanced_vision_key_cleared)
-    var model by remember(vision.model) { mutableStateOf(vision.model) }
-    var baseUrl by remember(vision.baseUrl) { mutableStateOf(vision.baseUrl) }
-    var apiKey by remember { mutableStateOf("") }
-
-    SettingsCard(stringResource(R.string.advanced_vision_model), Icons.Outlined.Cloud) {
-        Text(
-            if (vision.configured) {
-                stringResource(R.string.advanced_vision_configured)
-            } else {
-                stringResource(R.string.advanced_vision_optional)
-            },
-            style = DsType.caption11,
-            color = DsTheme.colors.labelTertiary,
-        )
-        OutlinedTextField(
-            value = model,
-            onValueChange = { model = it.take(200) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_vision_model)) },
-        )
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it.take(1_000) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_vision_endpoint)) },
-            supportingText = {
-                Text(stringResource(R.string.advanced_vision_endpoint_hint))
-            },
-        )
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it.take(8_000) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(if (vision.configured) R.string.advanced_replace_vision_key else R.string.advanced_vision_key)) },
-            visualTransformation = PasswordVisualTransformation(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(
-                text = stringResource(R.string.advanced_save_vision),
-                onClick = {
-                    if (!vision.configured && apiKey.isBlank()) {
-                        report(visionKeyRequiredMessage)
-                        return@DsButton
-                    }
-                    viewModel.configureLocalVision(
-                        apiKey = apiKey,
-                        model = model,
-                        baseUrl = baseUrl,
-                    ) { error ->
-                        if (error == null) {
-                            apiKey = ""
-                            report(visionSavedMessage)
-                        } else {
-                            report(error)
-                        }
-                    }
-                },
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Outline,
-            )
-            if (vision.configured) {
-                DsButton(
-                    text = stringResource(R.string.advanced_clear_vision_key),
-                    onClick = {
-                        viewModel.clearLocalVisionCredential { error ->
-                            report(error ?: visionKeyClearedMessage)
-                        }
-                    },
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
-                )
-            }
-        }
     }
 }
 

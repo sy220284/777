@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalChatUserEditResult
-import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
@@ -547,7 +546,6 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
-    fun setImageInputMode(mode: LocalImageInputMode) = runtime.model.configureImageInputMode(mode)
     fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = runtime.chat.send(text, attachments)
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     fun createGroupChatSession() = runtime.chat.createGroupChatSession()

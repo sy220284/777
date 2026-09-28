@@ -167,6 +167,40 @@ class LocalVisionPluginTest {
     }
 
     @Test
+    fun documentedTextOnlyCurrentModelFailsBeforeDeviceCapture() = runTest {
+        val device = RecordingDevice()
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        registry.install(
+            LocalVisionPlugin(
+                device = device,
+                keyProvider = { "secret" },
+                routeProvider = {
+                    LocalVisionRoute(
+                        "https://open.bigmodel.cn/api/paas/v4",
+                        "glm-5-turbo",
+                    )
+                },
+                analyzer = analyzer,
+            ),
+        )
+
+        val result = registry.context.tools.execute(
+            name = "vision_analyze_vscreen",
+            input = buildJsonObject {
+                put("id", "display-1")
+                put("prompt", "分析")
+            },
+            context = ToolContext(approval = { true }),
+        )
+
+        assertTrue(result.isError)
+        assertTrue(result.content.contains("当前模型不支持图片理解"))
+        assertTrue(device.calls.isEmpty())
+        assertTrue(analyzer.calls.isEmpty())
+    }
+
+    @Test
     fun missingConfigurationFailsBeforeDeviceCapture() = runTest {
         val device = RecordingDevice()
         val registry = PluginRegistry()

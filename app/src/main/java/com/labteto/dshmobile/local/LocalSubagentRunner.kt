@@ -251,6 +251,9 @@ internal class LocalSubagentRunner(
                     modelStep += 1
                     val durableHistory = history.toList()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
+                    if (hasLocalImageRefs(durableHistory) && selectedMode == LocalImageInputMode.TOOL) {
+                        throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
+                    }
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
@@ -280,29 +283,10 @@ internal class LocalSubagentRunner(
                         if (nativeImageRejected) {
                             onNativeImageRejected(snapshot.baseUrl, routeModel)
                         }
-                        if (snapshot.imageInputMode == LocalImageInputMode.AUTO && nativeImageRejected) {
-                            eventLog().append("subagent/multimodal-fallback", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("step", modelStep)
-                                put("model", routeModel)
-                                put("from", "native")
-                                put("to", "vision-tool")
-                                put("reason", error.message.orEmpty().take(2_000))
-                            })
-                            completeSubagentStep(
-                                key = key,
-                                baseUrl = snapshot.baseUrl,
-                                model = routeModel,
-                                history = prepareMessages(
-                                    durableHistory,
-                                    LocalImageInputMode.TOOL,
-                                    snapshot.baseUrl,
-                                    routeModel,
-                                ),
-                                tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
-                                subagentId = subagentId,
-                                step = modelStep,
-                                durableHistory = history,
+                        if (nativeImageRejected) {
+                            throw IllegalStateException(
+                                "当前模型不支持图片理解，请切换支持图片的模型后重试。",
+                                error,
                             )
                         } else {
                             throw error

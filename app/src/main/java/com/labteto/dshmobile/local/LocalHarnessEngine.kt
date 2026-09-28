@@ -154,7 +154,6 @@ class LocalHarnessEngine @Inject constructor(
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
     private val visionClient: VisionClient,
-    private val visionSettings: LocalVisionSettings,
     private val githubCredentials: LocalGitHubCredentialStore,
     private val bundledNodeRuntime: BundledNodeRuntime,
     private val bundledPythonRuntime: BundledPythonRuntime,
@@ -323,10 +322,21 @@ class LocalHarnessEngine @Inject constructor(
     private val visionPlugin by lazy {
         LocalVisionPlugin(
             device = deviceProvider,
-            keyProvider = visionSettings::apiKey,
-            routeProvider = visionSettings::route,
+            keyProvider = apiKeys::get,
+            routeProvider = {
+                val current = _state.value
+                if (!current.configured) null
+                else LocalVisionRoute(baseUrl = current.baseUrl, model = current.model)
+            },
             analyzer = visionClient,
             workspaceRoot = File(workspace.path),
+            imageSupportProvider = { route ->
+                when (imageCapabilities.state(route.baseUrl, route.model)) {
+                    LocalImageCapability.SUPPORTED -> true
+                    LocalImageCapability.UNSUPPORTED -> false
+                    LocalImageCapability.UNKNOWN -> null
+                }
+            },
         )
     }
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
@@ -2494,10 +2504,20 @@ class LocalHarnessEngine @Inject constructor(
                 mayStaySilent = false,
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
+            val groupRequestHistory = withTailEphemeralContext(baseHistory, prompt)
+            val groupImageMode = resolveLocalImageInputMode(
+                snapshot.imageInputMode,
+                imageCapabilities,
+                snapshot.baseUrl,
+                snapshot.model,
+            )
+            if (hasLocalImageRefs(groupRequestHistory) && groupImageMode == LocalImageInputMode.TOOL) {
+                throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
+            }
             val requestMessages = prepareLocalMultimodalMessages(
-                messages = withTailEphemeralContext(baseHistory, prompt),
+                messages = groupRequestHistory,
                 workspaceRoot = File(workspace.path),
-                mode = LocalImageInputMode.NATIVE,
+                mode = groupImageMode,
                 budget = imageRequestBudget,
             )
             val rawReply = completeWithRetry(
@@ -2556,10 +2576,16 @@ class LocalHarnessEngine @Inject constructor(
                 put("status", "failed")
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
+            val failure = if (hasLocalImageRefs(baseHistory) && imageInputUnsupported(error)) {
+                imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。", error)
+            } else {
+                error
+            }
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
-                failure = error,
+                failure = failure,
             )
         }
     }
@@ -3440,17 +3466,14 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     withEphemeralContext(modelHistory.snapshot(), ephemeralContext)
                 }
-                val selectedMode = if (runPolicy.toolsEnabled) {
-                    resolveLocalImageInputMode(
-                        snapshot.imageInputMode,
-                        imageCapabilities,
-                        snapshot.baseUrl,
-                        snapshot.model,
-                    )
-                } else {
-                    // Chat is a pure model conversation. Images may only travel through the
-                    // model's native multimodal input; vision tools belong to Work.
-                    LocalImageInputMode.NATIVE
+                val selectedMode = resolveLocalImageInputMode(
+                    snapshot.imageInputMode,
+                    imageCapabilities,
+                    snapshot.baseUrl,
+                    snapshot.model,
+                )
+                if (hasLocalImageRefs(durableRequestMessages) && selectedMode == LocalImageInputMode.TOOL) {
+                    throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
                 }
                 val requestMessages = prepareLocalMultimodalMessages(
                     messages = durableRequestMessages,
@@ -3484,34 +3507,7 @@ class LocalHarnessEngine @Inject constructor(
                     if (nativeImageRejected) {
                         imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
                     }
-                    if (
-                        runPolicy.imageFallbackToVisionTool &&
-                        snapshot.imageInputMode == LocalImageInputMode.AUTO &&
-                        nativeImageRejected
-                    ) {
-                        eventLog.append("multimodal/fallback", buildJsonObject {
-                            put("step", modelStep + 1)
-                            put("model", snapshot.model)
-                            put("from", "native")
-                            put("to", "vision-tool")
-                            put("reason", error.message.orEmpty().take(2_000))
-                        })
-                        completeWithRetry(
-                            key = key,
-                            snapshot = snapshot,
-                            messages = prepareLocalMultimodalMessages(
-                                messages = durableRequestMessages,
-                                workspaceRoot = File(workspace.path),
-                                mode = LocalImageInputMode.TOOL,
-                                budget = imageRequestBudget,
-                            ),
-                            step = modelStep + 1,
-                            toolsOverride = tools,
-                            publishPreview = snapshot.usageMode != LocalUsageMode.CHAT,
-                            streamFilterPhrases = chatStreamFilterPhrases(snapshot),
-                            persistOverflowHistory = true,
-                        )
-                    } else if (!runPolicy.imageFallbackToVisionTool && nativeImageRejected) {
+                    if (nativeImageRejected) {
                         throw IllegalStateException(
                             "当前模型不支持图片理解，请切换支持图片的模型后重试。",
                             error,

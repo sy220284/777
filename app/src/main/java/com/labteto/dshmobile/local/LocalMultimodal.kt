@@ -70,7 +70,13 @@ internal class LocalImageCapabilityRegistry {
     private val states = ConcurrentHashMap<String, LocalImageCapability>()
 
     fun state(baseUrl: String, model: String): LocalImageCapability =
-        states[routeKey(baseUrl, model)] ?: LocalImageCapability.UNKNOWN
+        states[routeKey(baseUrl, model)] ?: when (
+            LocalModelPresets.documentedImageInputSupport(model, baseUrl)
+        ) {
+            true -> LocalImageCapability.SUPPORTED
+            false -> LocalImageCapability.UNSUPPORTED
+            null -> LocalImageCapability.UNKNOWN
+        }
 
     fun markSupported(baseUrl: String, model: String) {
         states[routeKey(baseUrl, model)] = LocalImageCapability.SUPPORTED
@@ -85,17 +91,14 @@ internal class LocalImageCapabilityRegistry {
 }
 
 internal fun resolveLocalImageInputMode(
-    requested: LocalImageInputMode,
+    @Suppress("UNUSED_PARAMETER") requested: LocalImageInputMode,
     registry: LocalImageCapabilityRegistry,
     baseUrl: String,
     model: String,
-): LocalImageInputMode = when (requested) {
-    LocalImageInputMode.AUTO -> when (registry.state(baseUrl, model)) {
-        LocalImageCapability.UNSUPPORTED -> LocalImageInputMode.TOOL
-        LocalImageCapability.UNKNOWN,
-        LocalImageCapability.SUPPORTED -> LocalImageInputMode.NATIVE
-    }
-    else -> requested
+): LocalImageInputMode = when (registry.state(baseUrl, model)) {
+    LocalImageCapability.UNSUPPORTED -> LocalImageInputMode.TOOL
+    LocalImageCapability.UNKNOWN,
+    LocalImageCapability.SUPPORTED -> LocalImageInputMode.NATIVE
 }
 
 internal fun buildLocalUserModelMessage(

@@ -493,7 +493,6 @@
     <string name="relay_status_retry">重新配对</string>
     <string name="relay_status_back_local">返回本机</string>
 
-    <string name="local_image_mode_status">图片处理：%1$s</string>
     <string name="local_files_read_failed">无法读取工作区文件</string>
     <string name="local_files_preview_failed">无法预览文件</string>
     <string name="local_files_back_to_files">返回文件</string>
@@ -559,7 +558,6 @@
     <string name="advanced_available">可用</string>
     <string name="advanced_bad_format">“%1$s”的输入格式不正确</string>
     <string name="advanced_clear_key">清除密钥</string>
-    <string name="advanced_clear_vision_key">清除视觉密钥</string>
     <string name="advanced_cleared_field">已清除 %1$s</string>
     <string name="advanced_context_window_label">上下文</string>
     <string name="advanced_deactivate">停用</string>
@@ -606,11 +604,6 @@
     <string name="advanced_memory_saved">记忆设置已保存</string>
     <string name="advanced_memory_settings">记忆设置</string>
     <string name="advanced_memory_updated">记忆已更新</string>
-    <string name="advanced_image_input_mode">图片输入</string>
-    <string name="advanced_image_input_hint">自动：优先让支持多模态的主模型直接看图，服务明确拒绝图片时退回视觉工具；也可强制指定路径。</string>
-    <string name="advanced_image_mode_auto">自动</string>
-    <string name="advanced_image_mode_native">主模型直读</string>
-    <string name="advanced_image_mode_tool">视觉工具</string>
     <string name="advanced_model_attempts">模型失败重试次数</string>
     <string name="advanced_model_configured">本机模型密钥已配置。留空密钥可只修改模型和接口地址。</string>
     <string name="advanced_model_key">模型密钥</string>
@@ -633,6 +626,13 @@
     <string name="local_model_keep_key">留空会沿用此模型已保存的密钥。</string>
     <string name="local_model_test">检测连通性</string>
     <string name="local_model_testing">正在检测…</string>
+    <string name="local_model_chat_endpoint">对话接口：%1$s</string>
+    <string name="local_model_models_endpoint">模型列表接口：%1$s</string>
+    <string name="local_model_capability_text">文本</string>
+    <string name="local_model_capability_image">图片</string>
+    <string name="local_model_capability_video">视频</string>
+    <string name="local_model_capability_audio">音频</string>
+    <string name="local_model_capability_music">音乐</string>
     <string name="advanced_model_unconfigured">尚未配置本机模型密钥。</string>
     <string name="advanced_not_authorized">未授权</string>
     <string name="advanced_notification_access">通知读取</string>
@@ -650,14 +650,12 @@
     <string name="advanced_project_unavailable">项目配置不可用：%1$s</string>
     <string name="advanced_provider_config">配置：%1$s/%2$s</string>
     <string name="advanced_replace_model_key">替换模型密钥（可留空）</string>
-    <string name="advanced_replace_vision_key">替换视觉密钥（可留空）</string>
     <string name="advanced_request_shizuku">请求 Shizuku 授权</string>
     <string name="advanced_restore_default">恢复默认</string>
     <string name="advanced_restored_field">已恢复 %1$s</string>
     <string name="advanced_save_agent_settings">保存智能体设置</string>
     <string name="advanced_save_memory_settings">保存记忆设置</string>
     <string name="advanced_save_model_settings">保存模型设置</string>
-    <string name="advanced_save_vision">保存视觉配置</string>
     <string name="advanced_scope_global">全局</string>
     <string name="advanced_scope_lineage">当前任务链</string>
     <string name="advanced_scope_project">项目</string>
@@ -672,15 +670,6 @@
     <string name="advanced_user_rules">用户长期规则</string>
     <string name="advanced_user_rules_hint">最多保存 6000 字，每轮最多注入 3000 字；适合长期工作规则与回答偏好。</string>
     <string name="advanced_virtual_display">虚拟屏幕</string>
-    <string name="advanced_vision_configured">多模态视觉已配置。主屏分析会在发送截图前要求确认；虚拟屏可在已授权设备任务内连续分析。</string>
-    <string name="advanced_vision_endpoint">视觉接口地址</string>
-    <string name="advanced_vision_endpoint_hint">远程地址必须使用 HTTPS；本机 localhost/127.0.0.1/::1 可使用 HTTP。</string>
-    <string name="advanced_vision_key">视觉模型密钥</string>
-    <string name="advanced_vision_key_cleared">视觉模型密钥已清除</string>
-    <string name="advanced_vision_key_required">首次启用视觉模型请填写密钥</string>
-    <string name="advanced_vision_model">视觉模型</string>
-    <string name="advanced_vision_optional">可选。配置兼容 OpenAI 图片消息格式的多模态模型后，Harness 才会把截图交给视觉模型理解。</string>
-    <string name="advanced_vision_saved">视觉模型配置已保存</string>
 
     <string name="usage_calculation_title">消耗计算</string>
     <string name="usage_calculation_subtitle">本机 API 用量、费用估算与缓存命中</string>

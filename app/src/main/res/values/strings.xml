@@ -495,7 +495,6 @@
     <string name="relay_status_retry">Pair again</string>
     <string name="relay_status_back_local">Back to Local Harness</string>
 
-    <string name="local_image_mode_status">Image handling: %1$s</string>
     <string name="local_files_read_failed">Could not read workspace files</string>
     <string name="local_files_preview_failed">Could not preview file</string>
     <string name="local_files_back_to_files">Back to files</string>
@@ -561,7 +560,6 @@
     <string name="advanced_available">Available</string>
     <string name="advanced_bad_format">The input format for “%1$s” is invalid</string>
     <string name="advanced_clear_key">Clear key</string>
-    <string name="advanced_clear_vision_key">Clear vision key</string>
     <string name="advanced_cleared_field">Cleared %1$s</string>
     <string name="advanced_context_window_label">context</string>
     <string name="advanced_deactivate">Deactivate</string>
@@ -608,11 +606,6 @@
     <string name="advanced_memory_saved">Memory settings saved</string>
     <string name="advanced_memory_settings">Memory settings</string>
     <string name="advanced_memory_updated">Memory updated</string>
-    <string name="advanced_image_input_mode">Image input</string>
-    <string name="advanced_image_input_hint">Auto sends pixels to a multimodal primary model first and falls back to the vision tool when the service explicitly rejects images. You can also force either route.</string>
-    <string name="advanced_image_mode_auto">Auto</string>
-    <string name="advanced_image_mode_native">Primary model</string>
-    <string name="advanced_image_mode_tool">Vision tool</string>
     <string name="advanced_model_attempts">Model retry attempts</string>
     <string name="advanced_model_configured">The on-device model key is configured. Leave the key blank to change only the model or endpoint.</string>
     <string name="advanced_model_key">Model key</string>
@@ -635,6 +628,13 @@
     <string name="local_model_keep_key">Leave blank to keep the saved key for this model.</string>
     <string name="local_model_test">Test connection</string>
     <string name="local_model_testing">Testing…</string>
+    <string name="local_model_chat_endpoint">Chat API: %1$s</string>
+    <string name="local_model_models_endpoint">Models API: %1$s</string>
+    <string name="local_model_capability_text">Text</string>
+    <string name="local_model_capability_image">Image</string>
+    <string name="local_model_capability_video">Video</string>
+    <string name="local_model_capability_audio">Audio</string>
+    <string name="local_model_capability_music">Music</string>
     <string name="advanced_model_unconfigured">The on-device model key has not been configured.</string>
     <string name="advanced_not_authorized">Not authorized</string>
     <string name="advanced_notification_access">Notification access</string>
@@ -652,14 +652,12 @@
     <string name="advanced_project_unavailable">Project configuration unavailable: %1$s</string>
     <string name="advanced_provider_config">Configuration: %1$s/%2$s</string>
     <string name="advanced_replace_model_key">Replace model key (optional)</string>
-    <string name="advanced_replace_vision_key">Replace vision key (optional)</string>
     <string name="advanced_request_shizuku">Request Shizuku permission</string>
     <string name="advanced_restore_default">Restore default</string>
     <string name="advanced_restored_field">Restored %1$s</string>
     <string name="advanced_save_agent_settings">Save agent settings</string>
     <string name="advanced_save_memory_settings">Save memory settings</string>
     <string name="advanced_save_model_settings">Save model settings</string>
-    <string name="advanced_save_vision">Save vision settings</string>
     <string name="advanced_scope_global">Global</string>
     <string name="advanced_scope_lineage">Current task chain</string>
     <string name="advanced_scope_project">Project</string>
@@ -674,15 +672,6 @@
     <string name="advanced_user_rules">Long-term user rules</string>
     <string name="advanced_user_rules_hint">Stores up to 6,000 characters and injects at most 3,000 per turn; suitable for long-term work rules and response preferences.</string>
     <string name="advanced_virtual_display">Virtual display</string>
-    <string name="advanced_vision_configured">Multimodal vision is configured. Main-screen analysis asks before sending screenshots; an authorized virtual-display task can analyze continuously.</string>
-    <string name="advanced_vision_endpoint">Vision endpoint</string>
-    <string name="advanced_vision_endpoint_hint">Remote endpoints must use HTTPS; localhost, 127.0.0.1, and ::1 may use HTTP.</string>
-    <string name="advanced_vision_key">Vision model key</string>
-    <string name="advanced_vision_key_cleared">Vision model key cleared</string>
-    <string name="advanced_vision_key_required">Enter a key before enabling vision for the first time</string>
-    <string name="advanced_vision_model">Vision model</string>
-    <string name="advanced_vision_optional">Optional. After you configure a multimodal model that accepts OpenAI-compatible image messages, Harness can send screenshots to it for analysis.</string>
-    <string name="advanced_vision_saved">Vision settings saved</string>
 
     <string name="usage_calculation_title">Usage calculation</string>
     <string name="usage_calculation_subtitle">Device API usage, cost estimate and cache hit rate</string>
