@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -354,6 +356,25 @@ class ChatContextStateTest {
         assertTrue(grounded.decisions.contains("明天十点去城南"))
         assertTrue(grounded.decisions.contains("出门前记得带伞"))
         assertFalse(grounded.decisions.contains("明早九点去城南"))
+    }
+
+
+    @Test
+    fun legacyContinuityAndPendingJsonDecodeWithoutNewProvenanceFields() {
+        val json = Json { ignoreUnknownKeys = true }
+        val continuity = json.decodeFromString(
+            ChatContinuityState.serializer(),
+            """{"decisions":["明早出发"],"unfinished":["准备行李"]}""",
+        )
+        val pending = json.decodeFromString(
+            ChatPendingTurn.serializer(),
+            """{"sequence":7,"assistantMessageId":"a7","userMessage":"继续","assistantMessage":"好"}""",
+        )
+
+        assertEquals(listOf("明早出发"), continuity.decisions)
+        assertTrue(continuity.evidence.isEmpty())
+        assertEquals("", pending.userMessageId)
+        assertEquals("a7", pending.assistantMessageId)
     }
 
 }
