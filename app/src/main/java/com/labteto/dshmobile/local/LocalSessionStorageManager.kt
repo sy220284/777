@@ -75,24 +75,47 @@ internal class LocalSessionStorageManager(
     fun exportAll(output: OutputStream): Long {
         var exportedBytes = 0L
         ZipOutputStream(output.buffered()).use { zip ->
-            durableFiles().sortedBy { it.getName() }.forEach { source ->
-                val entry = ZipEntry(source.getName()).also { entry ->
-                    entry.setTime(source.lastModified())
+            // Session snapshots are disposable acceleration state; Session Event files are the
+            // source of truth and therefore copied under the same lock used by append/rotation.
+            durableFiles()
+                .filter { source -> source.getName().endsWith(".json") }
+                .sortedBy(File::getName)
+                .forEach { source -> exportedBytes += copyZipEntry(source, zip) }
+
+            durableFiles()
+                .mapNotNull(::sessionIdOf)
+                .distinct()
+                .sorted()
+                .forEach { id ->
+                    SessionEventLog(File(root, "$id.events.jsonl"), json)
+                        .forEachDurableFileLocked { source ->
+                            exportedBytes += copyZipEntry(source, zip)
+                        }
                 }
-                zip.putNextEntry(entry)
-                source.inputStream().buffered().use { input ->
-                    val buffer = ByteArray(COPY_BUFFER_BYTES)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        zip.write(buffer, 0, read)
-                        exportedBytes += read
-                    }
-                }
-                zip.closeEntry()
-            }
         }
         return exportedBytes
+    }
+
+    private fun copyZipEntry(source: File, zip: ZipOutputStream): Long {
+        var copied = 0L
+        val entry = ZipEntry(source.getName()).also { target ->
+            target.setTime(source.lastModified())
+        }
+        zip.putNextEntry(entry)
+        try {
+            source.inputStream().buffered().use { input ->
+                val buffer = ByteArray(COPY_BUFFER_BYTES)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    zip.write(buffer, 0, read)
+                    copied += read
+                }
+            }
+        } finally {
+            zip.closeEntry()
+        }
+        return copied
     }
 
     private fun durableFiles(): List<File> =
