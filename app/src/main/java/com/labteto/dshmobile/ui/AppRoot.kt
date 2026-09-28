@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.ConnectionPhase
+import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
@@ -64,6 +65,7 @@ fun AppRoot(
         var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
         var utilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         var utilityReturnSurface by rememberSaveable { mutableStateOf<String?>(null) }
+        var utilityTaskMode by rememberSaveable { mutableStateOf<String?>(null) }
         var settingsReturnUtilitySurface by rememberSaveable { mutableStateOf<String?>(null) }
         var localNavigationSessionId by rememberSaveable { mutableStateOf<String?>(null) }
         val effectiveLocalSessionId = requestedLocalSessionId ?: localNavigationSessionId
@@ -109,6 +111,7 @@ fun AppRoot(
                 onClose = {
                     utilitySurface = utilityReturnSurface
                     utilityReturnSurface = null
+                    utilityTaskMode = null
                 },
                 onOpenSession = { sessionId ->
                     utilitySurface = null
@@ -120,12 +123,17 @@ fun AppRoot(
                     relayClaimed = false
                     surface = "local"
                     localNavigationSessionId = sessionId
+                    utilityTaskMode = null
+                },
+                initialMode = utilityTaskMode?.let { mode ->
+                    runCatching { AutomationMode.valueOf(mode) }.getOrNull()
                 },
             )
             utilitySurface == "tools" -> ToolsScreen(
                 onClose = { utilitySurface = null },
                 onOpenTasks = {
                     utilityReturnSurface = "tools"
+                    utilityTaskMode = AutomationMode.WORK.name
                     utilitySurface = "tasks"
                 },
                 onOpenSettings = { destination ->
@@ -179,6 +187,7 @@ fun AppRoot(
                 },
                 onOpenTasks = {
                     utilityReturnSurface = null
+                    utilityTaskMode = null
                     utilitySurface = "tasks"
                 },
                 onOpenTools = {
@@ -198,6 +207,7 @@ fun AppRoot(
                 },
                 onOpenTasks = {
                     utilityReturnSurface = null
+                    utilityTaskMode = AutomationMode.WORK.name
                     utilitySurface = "tasks"
                 },
                 onOpenTools = {
