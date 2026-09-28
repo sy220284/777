@@ -221,7 +221,7 @@ if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" n
 legacy_single_chat_step_policy = "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" in engine
 adaptive_single_chat_step_policy = (
     re.search(
-        r"val mainStepLimit\\s*=\\s*if\\s*\\(runPolicy\\.allowToolExecution\\).*?else\\s+1",
+        r"val mainStepLimit\s*=\s*if\s*\(runPolicy\.allowToolExecution\).*?else\s+1",
         engine,
         re.S,
     ) is not None
