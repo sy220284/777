@@ -639,6 +639,8 @@
     <string name="advanced_not_authorized">Not authorized</string>
     <string name="advanced_notification_access">Notification access</string>
     <string name="advanced_pin">Pin</string>
+    <string name="local_unpin_session">Unpin</string>
+    <string name="local_session_actions">Conversation actions</string>
     <string name="advanced_pin_hint">Increase automatic-recall priority</string>
     <string name="advanced_pinned_suffix"> · pinned</string>
     <string name="advanced_project_config">Project configuration</string>

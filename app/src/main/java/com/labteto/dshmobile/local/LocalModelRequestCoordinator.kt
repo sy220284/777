@@ -5,6 +5,7 @@ import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -90,6 +91,11 @@ internal class LocalModelRequestCoordinator(
                         if (publishPreviewEnabled && previewGuard()) resetPreview()
                     }
                     is AgentRequestEvent.AttemptFailed -> {
+                        AppLog.warn(
+                            "LocalModelRequest",
+                            "主智能体模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} " +
+                                "retryable=${event.retryable} detail=${event.reason.take(800)}",
+                        )
                         if (!failureContextLogged) {
                             runCatching {
                                 log.append("request/context-full", buildJsonObject {

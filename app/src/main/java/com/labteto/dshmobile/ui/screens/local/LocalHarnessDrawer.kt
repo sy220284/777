@@ -54,8 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +66,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsFloatingPopup
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsIconFamily
@@ -89,8 +88,11 @@ internal fun LocalModeDrawer(
     gallery: List<PersonaGalleryEntry>,
     usageMode: LocalUsageMode,
     modeSwitchEnabled: Boolean,
+    pinnedSessionIds: Set<String>,
+    sessionTitleOverrides: Map<String, String>,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
+    onClose: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
@@ -108,14 +110,17 @@ internal fun LocalModeDrawer(
     var historyQuery by rememberSaveable { mutableStateOf("") }
     var selectionOpen by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<String>() }
-    val visibleSessions = remember(sessions, usageMode) {
+    val visibleSessions = remember(sessions, usageMode, pinnedSessionIds) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
-            .sortedByDescending(LocalSessionSummary::updatedAt)
+            .sortedWith(
+                compareByDescending<LocalSessionSummary> { it.id in pinnedSessionIds }
+                    .thenByDescending(LocalSessionSummary::updatedAt),
+            )
     }
-    val filteredSessions = remember(visibleSessions, historyQuery) {
+    val filteredSessions = remember(visibleSessions, historyQuery, sessionTitleOverrides) {
         val query = historyQuery.trim()
-        if (query.isEmpty()) visibleSessions else visibleSessions.filter {
-            it.title.contains(query, ignoreCase = true)
+        if (query.isEmpty()) visibleSessions else visibleSessions.filter { session ->
+            (sessionTitleOverrides[session.id] ?: session.title).contains(query, ignoreCase = true)
         }
     }
 
@@ -146,6 +151,12 @@ internal fun LocalModeDrawer(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
+                        tint = colors.labelPrimary,
+                    )
+                    DsIconButton(
+                        icon = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        onClick = onClose,
                         tint = colors.labelPrimary,
                     )
                 }
@@ -239,11 +250,12 @@ internal fun LocalModeDrawer(
                     val galleryEntry = session.galleryId?.let { id ->
                         gallery.firstOrNull { it.id == id }
                     }
+                    val displayTitle = sessionTitleOverrides[session.id] ?: session.title
                     LocalSessionDrawerRow(
-                        title = session.title,
+                        title = displayTitle,
                         summaryPreview = session.summaryPreview,
                         updatedAt = session.updatedAt,
-                        avatarName = galleryEntry?.persona?.name ?: session.title,
+                        avatarName = galleryEntry?.persona?.name ?: displayTitle,
                         portraitPath = galleryEntry?.portraitPath.orEmpty(),
                         groupChat = session.chatMode == LocalChatMode.GROUP,
                         current = session.id == currentSessionId,
@@ -278,8 +290,6 @@ internal fun LocalModeDrawer(
                         ),
                         onClick = onTasks,
                     )
-                    // Chat and Work share the same engine/runtime underneath, but the navigation
-                    // surface exposes only the capabilities that belong to the active product mode.
                     if (usageMode == LocalUsageMode.WORK) {
                         DrawerPrimaryAction(
                             icon = Icons.Outlined.Extension,
@@ -304,10 +314,13 @@ internal fun LocalModeDrawer(
 
     if (selectionOpen) {
         var position by remember { mutableStateOf(IntOffset(24, 160)) }
-        Popup(
+        DsFloatingPopup(
             alignment = Alignment.TopStart,
             offset = position,
-            properties = PopupProperties(focusable = false, clippingEnabled = true),
+            onDismiss = {
+                selectionOpen = false
+                selectedIds.clear()
+            },
         ) {
             Surface(
                 shape = RoundedCornerShape(14.dp),

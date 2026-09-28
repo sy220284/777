@@ -5,8 +5,10 @@ import android.app.UiModeManager
 import android.content.Context
 import com.labteto.dshmobile.connection.KeepAliveWorker
 import com.labteto.dshmobile.notify.NotificationObserver
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,7 @@ class DshApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         val uiModeManager = getSystemService(UiModeManager::class.java)
         uiModeManager.setApplicationNightMode(
             applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),

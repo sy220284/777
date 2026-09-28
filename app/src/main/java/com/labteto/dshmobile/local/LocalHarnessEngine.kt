@@ -1354,16 +1354,33 @@ class LocalHarnessEngine @Inject constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
-        if (state.usageMode != LocalUsageMode.CHAT || !state.configured) {
-            return@synchronized LocalChatUserEditResult.UNAVAILABLE
-        }
+        if (!state.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
         if (
             state.loading ||
             state.running ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
+            activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
+        if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
+            messageId,
+            requestedText,
+            eventLog,
+            memoryStore,
+            modelHistory,
+            modelHistoryCheckpointCodec,
+            _state,
+            ::updateContextMetrics,
+            { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
+            ::checkpointModelHistory,
+            ::persist,
+        ) { content, memoryInput, modelMessage ->
+            queueTurnLocked(content, memoryInput, modelMessage).start()
+        }
+        if (state.usageMode != LocalUsageMode.CHAT) {
+            return@synchronized LocalChatUserEditResult.UNAVAILABLE
+        }
 
         val activeTranscript = activeTranscriptForUserEdit(
             messageId = messageId,
@@ -2172,7 +2189,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
+        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfo())
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
@@ -3625,6 +3642,18 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
+        val mainStepLimit = if (runPolicy.allowToolExecution) {
+            adaptiveAgentStepLimit(
+                configuredBase = mainMaxSteps,
+                task = input,
+                contextChars = runSnapshot.contextChars,
+                contextBudgetChars = runSnapshot.contextBudgetChars,
+                pressure = resourceScheduler.snapshot().pressure,
+                kind = LocalAgentRunKind.FOREGROUND,
+            )
+        } else {
+            1
+        }
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -3633,7 +3662,7 @@ class LocalHarnessEngine @Inject constructor(
             planMode = runSnapshot.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
-            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            maxSteps = mainStepLimit,
             input = input,
             memoryInput = memoryInput,
             allowMutation = runPolicy.allowToolExecution,
@@ -3995,6 +4024,7 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = runSessionId,
                             callId = event.call.id,
                             result = event.output,
+                            binding = binding,
                         )
                         val modelOutput = AgentToolResult(
                             content = boundedContent,
@@ -4099,7 +4129,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 agentRunCoordinator.recordEvent(runContext, event)
             },
-            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            maxSteps = mainStepLimit,
             idFactory = { runContext.runId },
         )
 
@@ -5403,8 +5433,14 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         callId: String?,
         result: String,
+        binding: LocalWorkRunBinding? = null,
     ): String {
-        val budget = currentHistoryBudget()
+        val history = binding?.modelHistory ?: modelHistory
+        val budget = adaptiveToolResultBudget(
+            base = currentHistoryBudget(binding),
+            currentHistoryChars = history.encodedChars,
+            currentHistoryTokens = history.estimatedTokens,
+        )
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,

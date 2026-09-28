@@ -42,10 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
-private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
-private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
-private const val PERSONA_INSPECTION_RECENT_MESSAGES = 28
-private const val PERSONA_AUTOFILL_RECENT_MESSAGES = 12
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -65,6 +61,9 @@ class LocalHarnessViewModel @Inject constructor(
     val gallery = _gallery.asStateFlow()
     private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
     internal val transcriptHistory = _transcriptHistory.asStateFlow()
+    private val conversationUiState = LocalConversationUiStateStore(appContext)
+    val pinnedSessionIds = conversationUiState.pinnedSessionIds
+    val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
     private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
     private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
@@ -73,7 +72,6 @@ class LocalHarnessViewModel @Inject constructor(
             runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }
         }
     }
-
     suspend fun saveCurrentToGallery(
         notes: String,
         existingId: String? = null,
@@ -601,7 +599,9 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
     fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
-    suspend fun deleteSessions(ids: Set<String>): Int = runtime.session.deleteSessions(ids)
+    fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
+    fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
+    suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)

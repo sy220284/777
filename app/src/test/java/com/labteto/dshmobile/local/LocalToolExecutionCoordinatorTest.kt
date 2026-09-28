@@ -103,6 +103,68 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
     }
 
+
+    @Test
+    fun readOnlyScopeBlocksMutationBeforeApprovalOrExecution() = runBlocking {
+        var executed = false
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.MUTATION,
+                ) {
+                    executed = true
+                    ToolResult("ok")
+                },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        val result = coordinator.executeScoped(
+            original = LocalToolCall("c1", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "readonly",
+            allowMutation = false,
+            planModeEnabled = false,
+            approval = { _, _, _ -> true },
+        )
+
+        assertTrue(result.isError)
+        assertEquals("MUTATION_SCOPE_BLOCKED", result.errorCode)
+        assertFalse(executed)
+    }
+
+    @Test
+    fun deniedApprovalIsReportedDistinctly() = runBlocking {
+        var executed = false
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                ) {
+                    executed = true
+                    ToolResult("ok")
+                },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        val result = coordinator.executeScoped(
+            original = LocalToolCall("c1", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "s1",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ -> false },
+        )
+
+        assertTrue(result.isError)
+        assertEquals("APPROVAL_DENIED", result.errorCode)
+        assertFalse(executed)
+        assertTrue(result.recoveryHint.orEmpty().contains("不要重复调用"))
+    }
+
     @Test
     fun scopedExecutionUsesOwningSessionInsteadOfForegroundSession() = runBlocking {
         var observedSessionId = ""

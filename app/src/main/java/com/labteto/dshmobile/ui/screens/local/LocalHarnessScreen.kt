@@ -100,6 +100,7 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -137,6 +138,8 @@ fun LocalHarnessScreen(
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
+    val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
+    val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -229,11 +232,14 @@ fun LocalHarnessScreen(
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
                 modeSwitchEnabled = !shell.running,
+                pinnedSessionIds = pinnedSessionIds,
+                sessionTitleOverrides = sessionTitleOverrides,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
                 },
+                onClose = { scope.launch { drawerState.close() } },
                 onRemote = {
                     scope.launch { drawerState.close() }
                     onOpenRemote()
@@ -336,6 +342,13 @@ fun LocalHarnessScreen(
                     onNewSession = { showNewSessionMode = true },
                     onExitGroupChat = viewModel::leaveGroupChatMode,
                     onOpenRunCenter = { showRunCenter = true },
+                    sessionTitle = sessionTitleOverrides[state.sessionId]
+                        ?: shell.sessions.firstOrNull { it.id == state.sessionId }?.title
+                        ?: stringResource(R.string.chatlist_new_session),
+                    sessionPinned = state.sessionId in pinnedSessionIds,
+                    onTogglePinSession = { viewModel.toggleSessionPinned(state.sessionId) },
+                    onRenameSession = { title -> viewModel.renameSession(state.sessionId, title) },
+                    onDeleteSession = { scope.launch { viewModel.deleteSessions(setOf(state.sessionId)) } },
                     onConfigureChatPersona = viewModel::configureChatPersona,
                     onConfigureGroupMembers = viewModel::configureGroupChatMembers,
                     onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
@@ -615,6 +628,11 @@ private fun LocalConversationSurface(
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
     onOpenRunCenter: () -> Unit,
+    sessionTitle: String,
+    sessionPinned: Boolean,
+    onTogglePinSession: () -> Unit,
+    onRenameSession: (String) -> Boolean,
+    onDeleteSession: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
@@ -666,6 +684,7 @@ private fun LocalConversationSurface(
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
+    var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
@@ -713,8 +732,8 @@ private fun LocalConversationSurface(
         transcriptHistory.loading
     val transcriptPrefixItemCount = if (hiddenTranscriptCount > 0 || hasOlderTranscript) 1 else 0
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
-    val messageEditingEnabled = state.usageMode == LocalUsageMode.CHAT
-    val messageBranchingEnabled = messageEditingEnabled
+    val messageEditingEnabled = true
+    val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
         state.configured &&
             !state.loading &&
@@ -837,11 +856,14 @@ private fun LocalConversationSurface(
                     },
                     onExitGroupChat = onExitGroupChat,
                     onNewSession = onNewSession,
+                    sessionPinned = sessionPinned,
+                    onTogglePin = onTogglePinSession,
+                    onRenameSession = { renameSessionOpen = true },
+                    onDeleteSession = onDeleteSession,
                 )
             } else {
                 WorkSurfaceHeader(
-                    sessionTitle = state.sessions.firstOrNull { it.id == state.sessionId }?.title
-                        ?.takeIf(String::isNotBlank)
+                    sessionTitle = sessionTitle.takeIf(String::isNotBlank)
                         ?: stringResource(R.string.local_usage_work),
                     modelLabel = state.model,
                     configured = state.configured,
@@ -852,6 +874,10 @@ private fun LocalConversationSurface(
                     },
                     onOpenRunCenter = onOpenRunCenter,
                     onNewSession = onNewSession,
+                    sessionPinned = sessionPinned,
+                    onTogglePin = onTogglePinSession,
+                    onRenameSession = { renameSessionOpen = true },
+                    onDeleteSession = onDeleteSession,
                 )
             }
         }
@@ -1504,6 +1530,17 @@ private fun LocalConversationSurface(
             actionsEnabled = messageActionsEnabled,
             onEditAndResend = onEditAndResend,
             onDismiss = { editingUserMessage = null },
+        )
+    }
+
+    if (renameSessionOpen) {
+        RenameDialog(
+            initial = sessionTitle,
+            title = stringResource(R.string.chatlist_session_rename),
+            onDismiss = { renameSessionOpen = false },
+            onConfirm = { title ->
+                if (onRenameSession(title)) renameSessionOpen = false
+            },
         )
     }
 

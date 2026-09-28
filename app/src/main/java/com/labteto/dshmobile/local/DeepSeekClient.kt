@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -54,7 +55,7 @@ class DeepSeekClient @Inject constructor(
             temperature?.let { put("temperature", it) }
             if (tools.isNotEmpty()) {
                 put("tools", tools)
-                put("tool_choice", "auto")
+                if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
         }
         val request = Request.Builder()
@@ -67,10 +68,7 @@ class DeepSeekClient @Inject constructor(
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 val body = response.readModelBodyBounded()
                 if (!response.isSuccessful) {
-                    val detail = runCatching {
-                        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
-                            ?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull()
+                    val detail = providerErrorDetail(body, json)
                     throw LocalModelException(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
@@ -115,7 +113,7 @@ class DeepSeekClient @Inject constructor(
             put("stream_options", buildJsonObject { put("include_usage", true) })
             if (tools.isNotEmpty()) {
                 put("tools", tools)
-                put("tool_choice", "auto")
+                if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
         }
         val request = Request.Builder()
@@ -128,10 +126,7 @@ class DeepSeekClient @Inject constructor(
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
-                    val detail = runCatching {
-                        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
-                            ?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull()
+                    val detail = providerErrorDetail(body, json)
                     throw LocalModelException(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
@@ -261,7 +256,15 @@ class DeepSeekClient @Inject constructor(
         val root = json.parseToJsonElement(body).jsonObject
         val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject ?: error("模型响应缺少 choices[0].message")
-        val calls = message["tool_calls"]?.jsonArray.orEmpty().map { element ->
+        val rawToolCalls = message["tool_calls"]?.jsonArray.orEmpty()
+        val normalizedMessage = if (
+            rawToolCalls.isNotEmpty() && (message["content"] == null || message["content"] is JsonNull)
+        ) {
+            JsonObject(message + ("content" to JsonPrimitive("")))
+        } else {
+            message
+        }
+        val calls = rawToolCalls.map { element ->
             val item = element.jsonObject
             val function = item["function"]?.jsonObject ?: error("工具调用缺少 function")
             val raw = function["arguments"]?.jsonPrimitive?.content ?: "{}"
@@ -276,7 +279,7 @@ class DeepSeekClient @Inject constructor(
         }
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
-            message = message,
+            message = normalizedMessage,
             content = assistantText(message["content"]),
             reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
             toolCalls = calls,
@@ -341,6 +344,32 @@ class DeepSeekClient @Inject constructor(
         const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
     }
 }
+
+internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {
+    val officialDeepSeek = normalizeModelBaseUrl(baseUrl)
+        .lowercase()
+        .contains("api.deepseek.com")
+    val thinkingModel = model.trim().lowercase() in setOf(
+        "deepseek-flash",
+        "deepseek-v4-pro",
+        "deepseek-reasoner",
+    )
+    return !(officialDeepSeek && thinkingModel)
+}
+
+internal fun providerErrorDetail(body: String, json: Json): String? = runCatching {
+    val root = json.parseToJsonElement(body).jsonObject
+    val error = root["error"]
+    when (error) {
+        is JsonObject -> listOf("message", "detail", "type", "code")
+            .mapNotNull { key -> error[key]?.jsonPrimitive?.contentOrNull }
+            .firstOrNull(String::isNotBlank)
+        is JsonPrimitive -> error.contentOrNull
+        else -> null
+    } ?: listOf("message", "detail", "msg")
+        .mapNotNull { key -> root[key]?.jsonPrimitive?.contentOrNull }
+        .firstOrNull(String::isNotBlank)
+}.getOrNull()
 
 class LocalModelException(
     val code: String,
