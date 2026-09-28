@@ -181,7 +181,7 @@ internal class LocalToolExecutionCoordinator(
                 approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
                 timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
                 timedOut -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-                else -> "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。",
+                else -> "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。"
             },
         )
     }
