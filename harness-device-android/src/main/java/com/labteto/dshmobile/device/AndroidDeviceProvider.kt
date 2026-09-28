@@ -12,7 +12,6 @@ import android.util.Base64
 import com.labteto.dshmobile.device.accessibility.AccessibilityNodeSnapshot
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
-import com.labteto.dshmobile.device.shizuku.ShizukuBridge
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
@@ -26,7 +25,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 class AndroidDeviceProvider(
     private val context: Context,
-    private val shizuku: ShizukuBridge = ShizukuBridge(context),
     private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
     private val resourceScheduler: HarnessResourceScheduler? = null,
 ) : HarnessDeviceProvider {
@@ -34,15 +32,10 @@ class AndroidDeviceProvider(
 
     override val capabilities: Set<String> = setOf(
         "device_info",
-        "shizuku_status",
-        "shizuku_request_permission",
         "app_list",
         "app_info",
         "app_launch",
-        "app_stop",
         "settings_get",
-        "settings_set",
-        "dumpsys",
         "accessibility_tree",
         "accessibility_find",
         "accessibility_click_node",
@@ -74,41 +67,12 @@ class AndroidDeviceProvider(
     override suspend fun invoke(capability: String, arguments: Map<String, String>): String =
         when (capability) {
             "device_info" -> deviceInfo()
-            "shizuku_status" -> shizukuStatus()
-            "shizuku_request_permission" -> {
-                val status = shizuku.state()
-                require(status.binderAlive) {
-                    "Shizuku 服务未运行。请先打开 Shizuku 并启动服务（无线调试或 ADB），确认 android_privilege_status 返回 binder_alive=true 后再请求权限"
-                }
-                if (status.permissionGranted) {
-                    "Shizuku 权限已就绪，无需重复请求"
-                } else {
-                    shizuku.requestPermission(arguments["request_code"]?.toIntOrNull() ?: 771)
-                    "已请求 Shizuku 权限；请完成系统授权弹窗后再次调用 android_privilege_status 确认 permission=true"
-                }
-            }
             "app_list" -> appList()
             "app_info" -> appInfo(arguments.required("package"))
             "app_launch" -> appLaunch(arguments.required("package"))
-            "app_stop" -> privileged(
-                listOf("/system/bin/am", "force-stop", arguments.required("package")),
-            )
             "settings_get" -> settingsGet(
                 arguments.required("namespace"),
                 arguments.required("key"),
-            )
-            "settings_set" -> settingsSet(
-                arguments.required("namespace"),
-                arguments.required("key"),
-                arguments.required("value"),
-            )
-            "dumpsys" -> privileged(
-                listOf("/system/bin/dumpsys", arguments.required("service")) +
-                    arguments["args"].orEmpty()
-                        .trim()
-                        .takeIf(String::isNotBlank)
-                        ?.split(Regex("\\s+"))
-                        .orEmpty(),
             )
             "accessibility_tree" -> accessibilityTree()
             "accessibility_find" -> accessibilityFind(arguments)
@@ -241,20 +205,7 @@ class AndroidDeviceProvider(
         append("fingerprint=${Build.FINGERPRINT}")
     }
 
-    private fun shizukuStatus(): String {
-        val state = shizuku.state()
-        val nextAction = when {
-            !state.binderAlive -> "请先打开 Shizuku 并启动服务（无线调试或 ADB），然后重试"
-            !state.permissionGranted -> "调用 android_privilege_request，并完成系统授权弹窗"
-            else -> "ready"
-        }
-        return "binder_alive=${state.binderAlive}\npermission=${state.permissionGranted}\nuid=${state.uid ?: -1}\nnext_action=$nextAction"
-    }
-
     private suspend fun appList(): String = withContext(Dispatchers.IO) {
-        if (shizuku.state().permissionGranted) {
-            return@withContext privileged(listOf("/system/bin/pm", "list", "packages"))
-        }
         context.packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
             .map { it.packageName }
             .sorted()
@@ -292,15 +243,6 @@ class AndroidDeviceProvider(
             "system" -> Settings.System.getString(resolver, key)
             else -> error("settings namespace 仅支持 global/secure/system")
         }.orEmpty()
-    }
-
-    private suspend fun settingsSet(namespace: String, key: String, value: String): String {
-        require(namespace.lowercase() in setOf("global", "secure", "system")) {
-            "settings namespace 仅支持 global/secure/system"
-        }
-        return privileged(
-            listOf("/system/bin/settings", "put", namespace.lowercase(), key, value),
-        )
     }
 
     private fun accessibilityTree(): String =
@@ -409,9 +351,6 @@ class AndroidDeviceProvider(
 
     private fun virtualStatus(status: com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus): String =
         "id=${status.id}\ndisplay_id=${status.displayId}\nsize=${status.width}x${status.height}\ndensity=${status.densityDpi}\nvalid=${status.valid}"
-
-    private suspend fun privileged(command: List<String>): String =
-        shizuku.execute(command)
 
     private fun accessibility(): HarnessAccessibilityService =
         HarnessAccessibilityService.active()
