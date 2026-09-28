@@ -1359,7 +1359,7 @@ class LocalHarnessEngine @Inject constructor(
         if (editableChatUserText(original).trim() == requestedText) return@synchronized LocalChatUserEditResult.UNCHANGED
         cancelChatPostTurn()
 
-        val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
+        val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
         val branchParentState = state.chatBranches.nodes
             .firstOrNull { node -> node.message.id == messageId }
             ?.parentId
@@ -1367,10 +1367,10 @@ class LocalHarnessEngine @Inject constructor(
                 state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
             }
         val baseState = branchParentState
-            ?: restoreChatStateBefore(eventLog, json, sourceSequence, original.createdAt)
+            ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
         val baseGroupState = if (state.groupChat.enabled) {
-            restoreGroupStateBefore(eventLog, json, sourceSequence, original.createdAt)
+            restoreGroupStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
                 ?: state.groupChat.copy(
                     members = state.groupChat.members.map { member ->
                         member.copy(chatState = ChatCharacterState())
@@ -1533,7 +1533,7 @@ class LocalHarnessEngine @Inject constructor(
             return LocalChatUserEditResult.UNCHANGED
         }
 
-        val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
+        val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
             ?: return LocalChatUserEditResult.MESSAGE_MISSING
         val eventsBeforeEdit = eventLog.snapshot()
             .filter { event -> event.sequence < sourceSequence }
@@ -1678,9 +1678,9 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             val branchParentState = chatBranchParentState(branches, messageId)
-            val sourceSequence = sourceEventSequenceForMessage(eventLog, promptMessage.id)
+            val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), promptMessage.id)
             val baseState = branchParentState
-                ?: restoreChatStateBefore(eventLog, json, sourceSequence, promptMessage.createdAt)
+                ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, promptMessage.createdAt)
                 ?: ChatCharacterState()
             val baseContext = restoreBranchContext(
                 snapshot = chatBranchParentContext(branches, messageId),
