@@ -161,7 +161,7 @@ private fun normalizeScheduleFact(text: String): String? {
 private val SCHEDULE_FACT_HINT = Regex(
     """(?:今天|今晚|明天|明早|后天|早上|上午|中午|下午|傍晚|晚上|夜里|出发|见面|碰面|集合|去|回|到)""",
 )
-private val ARABIC_CLOCK = Regex("""\d{1,2}(?:[:：]\d{1,2})?(?:点(?:半|一刻|三刻)?)?""")
+private val ARABIC_CLOCK = Regex("""(?:\d{1,2}[:：]\d{1,2}|\d{1,2}点(?:半|一刻|三刻)?)""")
 private val CHINESE_CLOCK = Regex("""[零〇一二两三四五六七八九十两]{1,4}点(?:半|一刻|三刻)?""")
 
 
