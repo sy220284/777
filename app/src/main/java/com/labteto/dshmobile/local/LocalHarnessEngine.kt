@@ -1326,7 +1326,7 @@ class LocalHarnessEngine @Inject constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
-        if (state.usageMode != LocalUsageMode.CHAT || !state.configured) {
+        if (!state.configured) {
             return@synchronized LocalChatUserEditResult.UNAVAILABLE
         }
         if (
@@ -1336,6 +1336,12 @@ class LocalHarnessEngine @Inject constructor(
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
+        if (state.usageMode == LocalUsageMode.WORK) {
+            return@synchronized editAndResendWorkUserMessageLocked(messageId, requestedText)
+        }
+        if (state.usageMode != LocalUsageMode.CHAT) {
+            return@synchronized LocalChatUserEditResult.UNAVAILABLE
+        }
 
         val activeTranscript = activeTranscriptForUserEdit(
             messageId = messageId,
@@ -1502,6 +1508,86 @@ class LocalHarnessEngine @Inject constructor(
             }
         }.also { activeJob = it; it.start() }
         LocalChatUserEditResult.SENT
+    }
+
+    /**
+     * Work-mode edit keeps the same visible semantics as Chat: discard the selected user turn and
+     * its later transcript/model/control projections, then run the edited prompt as the next turn.
+     * External filesystem side effects cannot be undone, but discarded tool/file events are removed
+     * from the active conversation projection so stale work does not leak into the continuation.
+     */
+    private fun editAndResendWorkUserMessageLocked(
+        messageId: String,
+        requestedText: String,
+    ): LocalChatUserEditResult {
+        val state = _state.value
+        val activeTranscript = LocalSessionTranscriptPager(eventLog).all()
+        val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
+        if (originalIndex < 0) return LocalChatUserEditResult.MESSAGE_MISSING
+        val original = activeTranscript[originalIndex]
+        if (original.role != "user") return LocalChatUserEditResult.MESSAGE_MISSING
+
+        val content = withEditedChatUserText(original, requestedText)
+        if (content.isBlank()) return LocalChatUserEditResult.EMPTY
+        if (editableChatUserText(original).trim() == requestedText) {
+            return LocalChatUserEditResult.UNCHANGED
+        }
+
+        val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
+            ?: return LocalChatUserEditResult.MESSAGE_MISSING
+        val eventsBeforeEdit = eventLog.snapshot()
+            .filter { event -> event.sequence < sourceSequence }
+        val restoredHistory = restoreLocalModelHistory(
+            events = eventsBeforeEdit,
+            legacyFallback = emptyList(),
+            codec = modelHistoryCheckpointCodec,
+        ).messages
+        val restoredControls = projectSessionControlTail(
+            snapshot = LocalHarnessSession(id = state.sessionId),
+            events = eventsBeforeEdit,
+            sequenceExclusive = -1L,
+        )
+        val retainedPrefix = activeTranscript.take(originalIndex)
+        val discarded = activeTranscript.drop(originalIndex)
+        memoryStore.rollbackSourceSessionFrom(
+            sourceSessionId = state.sessionId,
+            createdAtInclusive = original.createdAt,
+            discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
+        )
+
+        modelHistory.reset(restoredHistory)
+        updateContextMetrics()
+        _state.update { current ->
+            current.copy(
+                messages = retainedPrefix.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                transcriptIndex = buildLocalTranscriptRuntimeIndex(retainedPrefix),
+                plan = restoredControls.plan,
+                todos = restoredControls.todos,
+                goal = restoredControls.goal,
+                planMode = restoredControls.planMode,
+                error = null,
+            )
+        }
+        val baselineSequence = persistActiveChatTranscript(
+            eventLog = eventLog,
+            reason = "work-user-edited",
+            activeTranscript = retainedPrefix,
+        )
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, baselineSequence)
+        checkpointModelHistory("work/user-edit-baseline")
+        persist()
+
+        val editedModelMessage = editedChatUserModelMessage(
+            eventLog = eventLog,
+            originalMessageId = messageId,
+            content = content,
+        )
+        queueTurnLocked(
+            content = content,
+            memoryInput = requestedText,
+            modelMessage = editedModelMessage,
+        ).start()
+        return LocalChatUserEditResult.SENT
     }
 
     /** Switch among saved alternatives for one user or assistant turn. */
