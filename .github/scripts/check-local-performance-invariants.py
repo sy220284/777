@@ -212,8 +212,10 @@ if "if (!policy.toolsEnabled) return JsonArray(emptyList())" not in tool_coordin
     violations.append("Chat capability policy must project an empty model tool catalog through LocalToolExecutionCoordinator")
 if "toolCalls = if (runPolicy.allowToolExecution)" not in engine:
     violations.append("Chat model replies must strip unexpected tool calls before AgentLoop execution")
-if "runPolicy.imageFallbackToVisionTool" not in engine:
-    violations.append("Chat native-image failures must not fall back to Work vision tools")
+if '"to", "vision-tool"' in engine or '"multimodal/fallback"' in engine:
+    violations.append("Native-image failures must not fall back to a separate vision model")
+if "当前模型不支持图片理解" not in engine:
+    violations.append("Unsupported current-model image input must surface an explicit user-facing error")
 if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
     violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
 if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in engine:

@@ -79,7 +79,6 @@ import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
-import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -333,7 +332,6 @@ fun LocalHarnessScreen(
                     onGenerateReplySuggestions = viewModel::generateReplySuggestions,
                     onLoadOlderTranscript = viewModel::loadOlderTranscript,
                     onImportAttachment = viewModel::importAttachment,
-                    onImageModeChange = viewModel::setImageInputMode,
                     onStop = viewModel::stop,
                     onNewSession = { showNewSessionMode = true },
                     onExitGroupChat = viewModel::leaveGroupChatMode,
@@ -621,7 +619,6 @@ private fun LocalConversationSurface(
     onGenerateReplySuggestions: suspend () -> Boolean,
     onLoadOlderTranscript: suspend (String) -> Result<Int>,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
-    onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
@@ -668,7 +665,6 @@ private fun LocalConversationSurface(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
-    var showImageModePicker by rememberSaveable { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
@@ -1222,24 +1218,6 @@ private fun LocalConversationSurface(
                             onRemove = { attachments.removeAt(index) },
                         )
                     }
-                    if (
-                        state.usageMode == LocalUsageMode.WORK &&
-                        attachments.any { it.mediaType.startsWith("image/") }
-                    ) {
-                        val imageModeLabel = stringResource(
-                            when (state.imageInputMode) {
-                                LocalImageInputMode.AUTO -> R.string.advanced_image_mode_auto
-                                LocalImageInputMode.NATIVE -> R.string.advanced_image_mode_native
-                                LocalImageInputMode.TOOL -> R.string.advanced_image_mode_tool
-                            },
-                        )
-                        DsButton(
-                            text = stringResource(R.string.local_image_mode_status, imageModeLabel),
-                            onClick = { showImageModePicker = true },
-                            variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                        )
-                    }
                 }
                 OutlinedTextField(
                     value = input,
@@ -1608,36 +1586,6 @@ private fun LocalConversationSurface(
             }
         }
     }
-    if (showImageModePicker && state.usageMode == LocalUsageMode.WORK) {
-        DsBottomSheet(
-            title = stringResource(R.string.advanced_image_input_mode),
-            onDismiss = { showImageModePicker = false },
-        ) {
-            Text(
-                stringResource(R.string.advanced_image_input_hint),
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                listOf(
-                    LocalImageInputMode.AUTO to R.string.advanced_image_mode_auto,
-                    LocalImageInputMode.NATIVE to R.string.advanced_image_mode_native,
-                    LocalImageInputMode.TOOL to R.string.advanced_image_mode_tool,
-                ).forEach { (mode, label) ->
-                    DsButton(
-                        text = stringResource(label),
-                        onClick = {
-                            onImageModeChange(mode)
-                            showImageModePicker = false
-                        },
-                        variant = if (state.imageInputMode == mode) DsButtonVariant.Info else DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
-                }
-            }
-        }
-    }
-
 }
 
 @Composable

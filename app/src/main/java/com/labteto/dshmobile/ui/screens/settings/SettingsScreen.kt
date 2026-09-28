@@ -147,7 +147,6 @@ fun SettingsScreen(
     val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
-    val visionSettings by viewModel.visionSettings.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
@@ -518,7 +517,6 @@ fun SettingsScreen(
                         }
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
-                        LocalVisionSettingsCard(visionSettings, viewModel, toast.second)
                     }
 
                     SettingsDestination.PRICING -> {

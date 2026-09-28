@@ -25,10 +25,7 @@ import com.labteto.dshmobile.local.DeepSeekPricingRepository
 import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
-import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
-import com.labteto.dshmobile.local.LocalVisionSettings
-import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -89,7 +86,6 @@ class SettingsViewModel @Inject constructor(
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalSettingsRuntime,
     private val deepSeekPricingRepository: DeepSeekPricingRepository,
-    private val localVisionSettings: LocalVisionSettings,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     @ApplicationContext context: Context,
@@ -112,8 +108,6 @@ class SettingsViewModel @Inject constructor(
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
 
-    private val _visionSettings = MutableStateFlow(LocalVisionSettingsSnapshot())
-    val visionSettings: StateFlow<LocalVisionSettingsSnapshot> = _visionSettings.asStateFlow()
 
     private val _projectSettings = MutableStateFlow(RemoteProjectSettingsState())
     val projectSettings: StateFlow<RemoteProjectSettingsState> = _projectSettings.asStateFlow()
@@ -206,19 +200,11 @@ class SettingsViewModel @Inject constructor(
     fun refreshAdvancedSettings() {
         refreshRemoteSettings()
         refreshDeviceCapabilities()
-        refreshVisionSettings()
         refreshMemories()
     }
 
     fun refreshDeepSeekPricing() {
         viewModelScope.launch { deepSeekPricingRepository.refreshFromOfficial() }
-    }
-
-    fun refreshVisionSettings() {
-        viewModelScope.launch {
-            _visionSettings.value = runCatching { localVisionSettings.snapshot() }
-                .getOrElse { LocalVisionSettingsSnapshot() }
-        }
     }
 
     fun refreshRemoteSettings() {
@@ -388,10 +374,6 @@ class SettingsViewModel @Inject constructor(
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String): String =
         localHarness.testModel(apiKey, model, baseUrl)
 
-    fun configureLocalImageInputMode(mode: LocalImageInputMode) {
-        localHarness.configureImageInputMode(mode)
-    }
-
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
     }
@@ -468,35 +450,6 @@ class SettingsViewModel @Inject constructor(
     suspend fun environmentInfo(): String = localHarness.environmentInfo()
 
     suspend fun diagnosticReport(): String = localHarness.diagnosticReport()
-
-    fun configureLocalVision(
-        apiKey: String,
-        model: String,
-        baseUrl: String,
-        onDone: (String?) -> Unit = {},
-    ) {
-        viewModelScope.launch {
-            runCatching {
-                localVisionSettings.configure(apiKey, model, baseUrl)
-            }.onSuccess { snapshot ->
-                _visionSettings.value = snapshot
-                onDone(null)
-            }.onFailure { error ->
-                onDone(error.message ?: "视觉模型配置失败")
-            }
-        }
-    }
-
-    fun clearLocalVisionCredential(onDone: (String?) -> Unit = {}) {
-        viewModelScope.launch {
-            runCatching { localVisionSettings.clearCredential() }
-                .onSuccess { snapshot ->
-                    _visionSettings.value = snapshot
-                    onDone(null)
-                }
-                .onFailure { error -> onDone(error.message ?: "清除视觉模型密钥失败") }
-        }
-    }
 
     fun clearLocalCredential() {
         localHarness.clearCredential()

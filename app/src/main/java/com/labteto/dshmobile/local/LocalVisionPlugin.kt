@@ -44,6 +44,9 @@ class LocalVisionPlugin(
     private val routeProvider: () -> LocalVisionRoute?,
     private val analyzer: LocalVisionAnalyzer,
     private val workspaceRoot: File? = null,
+    private val imageSupportProvider: (LocalVisionRoute) -> Boolean? = { route ->
+        LocalModelPresets.documentedImageInputSupport(route.model, route.baseUrl)
+    },
 ) : HarnessPlugin {
     override val id: String = "local-vision"
     private val analysisCache = workspaceRoot?.let { root ->
@@ -56,13 +59,20 @@ class LocalVisionPlugin(
                 name = "vision_status",
                 schema = schema(
                     name = "vision_status",
-                    description = "检查本机视觉模型是否已配置",
+                    description = "检查当前使用模型是否可以处理图片",
                 ),
                 access = ToolAccess.READ_ONLY,
                 approvalPolicy = ToolApprovalPolicy.NEVER,
                 executor = HarnessToolExecutor { _, _, _ ->
-                    val configured = routeProvider() != null && keyProvider() != null
-                    ToolResult(if (configured) "视觉模型已配置" else "视觉模型尚未配置")
+                    val route = routeProvider()
+                    val key = keyProvider()
+                    ToolResult(
+                        when {
+                            route == null || key.isNullOrBlank() -> "当前模型尚未配置"
+                            imageSupportProvider(route) == false -> "当前模型不支持图片理解"
+                            else -> "当前模型可用于图片分析"
+                        },
+                    )
                 },
             ),
         )
@@ -71,7 +81,7 @@ class LocalVisionPlugin(
                 name = "vision_analyze_screen",
                 schema = schema(
                     name = "vision_analyze_screen",
-                    description = "截取当前主屏并交给已配置的多模态模型分析；图像会发送到外部视觉模型",
+                    description = "截取当前主屏并交给当前使用模型分析；仅当前模型支持图片时可用",
                     properties = mapOf("prompt" to "string"),
                     required = setOf("prompt"),
                 ),
@@ -113,7 +123,7 @@ class LocalVisionPlugin(
                 name = "vision_analyze_file",
                 schema = schema(
                     name = "vision_analyze_file",
-                    description = "分析工作区内的 PNG/JPEG/WebP/GIF 图片；图片会发送到外部视觉模型；相同图片与分析要求可复用已批准分析缓存",
+                    description = "使用当前模型分析工作区内的 PNG/JPEG/WebP/GIF 图片；当前模型不支持图片时会明确返回不支持；相同图片与分析要求可复用已批准分析缓存",
                     properties = mapOf(
                         "path" to "string",
                         "prompt" to "string",
@@ -180,11 +190,13 @@ class LocalVisionPlugin(
         screenshotCapability: String,
         screenshotArguments: Map<String, String>,
     ): ToolResult {
-        if (routeProvider() == null || keyProvider().isNullOrBlank()) {
-            return ToolResult(
-                "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
-                isError = true,
-            )
+        val route = routeProvider()
+            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
+        if (keyProvider().isNullOrBlank()) {
+            return ToolResult("当前模型密钥尚未配置，请先在模型设置中填写密钥", isError = true)
+        }
+        if (imageSupportProvider(route) == false) {
+            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
         }
         val imageDataUrl = device.invoke(screenshotCapability, screenshotArguments)
         if (!imageDataUrl.startsWith("data:image/")) {
@@ -205,9 +217,12 @@ class LocalVisionPlugin(
         fixedKey: String? = null,
     ): ToolResult {
         val route = fixedRoute ?: routeProvider()
-            ?: return ToolResult("视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥", isError = true)
+            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
+        if (imageSupportProvider(route) == false) {
+            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
+        }
         val key = fixedKey ?: keyProvider()
-            ?: return ToolResult("视觉模型密钥尚未配置", isError = true)
+            ?: return ToolResult("当前模型密钥尚未配置", isError = true)
         val boundedPrompt = buildString {
             appendLine(intro)
             appendLine("只描述可见事实，不要臆测画面外内容。")
@@ -219,7 +234,11 @@ class LocalVisionPlugin(
         }.fold(
             onSuccess = { ToolResult(it) },
             onFailure = { error ->
-                ToolResult("视觉分析失败：${error.message ?: error::class.java.simpleName}", isError = true)
+                if (imageInputUnsupported(error)) {
+                    ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
+                } else {
+                    ToolResult("图片分析失败：${error.message ?: error::class.java.simpleName}", isError = true)
+                }
             },
         )
     }

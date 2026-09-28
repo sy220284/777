@@ -26,10 +26,10 @@ import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
- * OpenAI-compatible multimodal transport used only by explicit vision tools.
+ * OpenAI-compatible multimodal transport for explicit image-analysis tools.
  *
- * The primary text agent remains unchanged. Screenshots are sent here only after a model tool call,
- * keeping image bytes out of the text model's durable conversation history.
+ * The route and credential always come from the currently selected model. Screenshots are sent only
+ * after a model tool call, keeping image bytes out of durable conversation history.
  */
 @Singleton
 class VisionClient @Inject constructor(
@@ -72,9 +72,9 @@ class VisionClient @Inject constructor(
         prompt: String,
         imageDataUrl: String,
     ): String = withContext(Dispatchers.IO) {
-        require(apiKey.isNotBlank()) { "视觉模型密钥为空" }
-        require(model.isNotBlank()) { "视觉模型名称为空" }
-        require(prompt.isNotBlank()) { "视觉分析要求不能为空" }
+        require(apiKey.isNotBlank()) { "当前模型密钥为空" }
+        require(model.isNotBlank()) { "当前模型名称为空" }
+        require(prompt.isNotBlank()) { "图片分析要求不能为空" }
         validateImageDataUrl(imageDataUrl)
 
         val payload = buildPayload(model, prompt, imageDataUrl)
@@ -94,7 +94,7 @@ class VisionClient @Inject constructor(
                     }.getOrNull()
                     throw LocalModelException(
                         code = "VISION_HTTP_${response.code}",
-                        message = "视觉模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
+                        message = "当前模型图片请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
@@ -110,14 +110,14 @@ class VisionClient @Inject constructor(
         } catch (error: SocketTimeoutException) {
             throw LocalModelException(
                 code = "VISION_TIMEOUT",
-                message = "视觉模型推理超时：${error.message ?: "请求未在时限内完成"}",
+                message = "当前模型图片推理超时：${error.message ?: "请求未在时限内完成"}",
                 retryable = true,
                 cause = error,
             )
         } catch (error: java.io.IOException) {
             throw LocalModelException(
                 code = "VISION_NETWORK",
-                message = "视觉模型网络请求失败：${error.message ?: "网络异常"}",
+                message = "当前模型图片请求网络失败：${error.message ?: "网络异常"}",
                 retryable = true,
                 cause = error,
             )
@@ -165,7 +165,7 @@ class VisionClient @Inject constructor(
         val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject
             ?.get("content")
-            ?: error("视觉模型响应缺少 choices[0].message.content")
+            ?: error("当前模型响应缺少 choices[0].message.content")
         return when (content) {
             is JsonPrimitive -> content.contentOrNull.orEmpty()
             is JsonArray -> content.mapNotNull { part ->
@@ -178,7 +178,7 @@ class VisionClient @Inject constructor(
                 }
             }.joinToString("\n")
             else -> ""
-        }.trim().ifBlank { error("视觉模型返回了空文本") }
+        }.trim().ifBlank { error("当前模型返回了空文本") }
     }
 
     private fun isDeepSeekEndpoint(baseUrl: String): Boolean = runCatching {
@@ -193,9 +193,9 @@ class VisionClient @Inject constructor(
     }
 
     private fun validateImageDataUrl(value: String) {
-        require(value.startsWith("data:image/")) { "视觉输入必须是图片 data URL" }
-        require(";base64," in value.take(128)) { "视觉输入必须使用 base64 data URL" }
-        require(value.length <= MAX_IMAGE_DATA_URL_CHARS) { "视觉输入超过大小上限" }
+        require(value.startsWith("data:image/")) { "图片输入必须是图片 data URL" }
+        require(";base64," in value.take(128)) { "图片输入必须使用 base64 data URL" }
+        require(value.length <= MAX_IMAGE_DATA_URL_CHARS) { "图片输入超过大小上限" }
     }
 
     private fun Response.readBounded(maxBytes: Int = MAX_RESPONSE_BYTES): String {
@@ -204,7 +204,7 @@ class VisionClient @Inject constructor(
         if (declared > maxBytes) {
             throw LocalModelException(
                 code = "VISION_RESPONSE_TOO_LARGE",
-                message = "视觉模型响应超过 ${maxBytes} 字节上限",
+                message = "当前模型响应超过 ${maxBytes} 字节上限",
                 retryable = false,
             )
         }
@@ -219,7 +219,7 @@ class VisionClient @Inject constructor(
                 if (total > maxBytes) {
                     throw LocalModelException(
                         code = "VISION_RESPONSE_TOO_LARGE",
-                        message = "视觉模型响应超过 ${maxBytes} 字节上限",
+                        message = "当前模型响应超过 ${maxBytes} 字节上限",
                         retryable = false,
                     )
                 }

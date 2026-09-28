@@ -10,18 +10,15 @@ package com.labteto.dshmobile.local
 internal data class LocalAgentRunPolicy(
     val toolsEnabled: Boolean,
     val allowToolExecution: Boolean,
-    val imageFallbackToVisionTool: Boolean,
 )
 
 internal fun localAgentRunPolicy(usageMode: LocalUsageMode): LocalAgentRunPolicy = when (usageMode) {
     LocalUsageMode.CHAT -> LocalAgentRunPolicy(
         toolsEnabled = false,
         allowToolExecution = false,
-        imageFallbackToVisionTool = false,
     )
     LocalUsageMode.WORK -> LocalAgentRunPolicy(
         toolsEnabled = true,
         allowToolExecution = true,
-        imageFallbackToVisionTool = true,
     )
 }
