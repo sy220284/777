@@ -12,6 +12,7 @@ import java.io.IOException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -178,6 +179,7 @@ class GitHubConnectorPlugin(
                 )
             }
         }.getOrElse { error ->
+            if (error is CancellationException) throw error
             GitHubConnectorStatus(
                 configured = true,
                 error = error.message ?: error::class.java.simpleName,
@@ -217,6 +219,7 @@ class GitHubConnectorPlugin(
                 isError = response.status !in 200..299,
             )
         }.getOrElse { error ->
+            if (error is CancellationException) throw error
             ToolResult(
                 content = "[GITHUB_REQUEST_FAILED] ${error.message ?: error::class.java.simpleName}",
                 isError = true,

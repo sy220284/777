@@ -616,11 +616,12 @@ object LocalToolCatalog {
             "session_id" to string("可选；留空使用当前会话"),
             "seq" to integer("事件序号"),
         ), listOf("seq")))
-        add(tool("session_event_read", "读取完整事件和可选的前后事件", properties(
+        add(tool("session_event_read", "按字符分页读取事件和可选的前后事件", properties(
             "session_id" to string("可选；留空使用当前会话"),
             "seq" to integer("事件序号"),
             "before" to integer("前置事件数，最多 20"),
             "after" to integer("后置事件数，最多 20"),
+            "offset_chars" to integer("可选；按上一页提示继续读取的字符偏移，默认 0"),
         ), listOf("seq")))
         add(tool("present", "把工作区中的成果文件标记为最终交付物", properties(
             "path" to string("成果文件的相对路径"),

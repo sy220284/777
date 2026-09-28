@@ -2,6 +2,7 @@ package com.labteto.dshmobile.interop.github
 
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -271,6 +272,38 @@ class GitHubConnectorPluginTest {
         assertTrue(read.isError)
         assertTrue(read.content.contains("GITHUB_NOT_CONFIGURED"))
         assertEquals(0, calls)
+    }
+
+    @Test
+    fun cancellationDuringRequestPropagatesToCaller() = runBlocking {
+        val http = OkHttpClient.Builder()
+            .addInterceptor { throw CancellationException("cancelled") }
+            .build()
+        val plugin = GitHubConnectorPlugin(
+            http = http,
+            json = Json,
+            credentialProvider = { "github_pat_test_secret_1234567890" },
+            apiBaseUrl = "https://api.github.test",
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        var statusCancelled = false
+        var readCancelled = false
+        try {
+            plugin.status()
+        } catch (_: CancellationException) {
+            statusCancelled = true
+        }
+        try {
+            registry.context.tools.execute(
+                "github_api_get",
+                buildJsonObject { put("path", "/repos/example/project") },
+            )
+        } catch (_: CancellationException) {
+            readCancelled = true
+        }
+        assertTrue(statusCancelled)
+        assertTrue(readCancelled)
     }
 
     private companion object {
