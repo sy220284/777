@@ -199,6 +199,44 @@ class AgentLoopTest {
     }
 
     @Test
+    fun softStepBudgetExtendsSameTurnUntilTaskCompletes() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        val loop = AgentLoop(
+            model = AgentModel {
+                request += 1
+                if (request < 4) {
+                    AgentModelReply(
+                        toolCalls = listOf(
+                            AgentToolCall(
+                                id = "call-$request",
+                                name = "work",
+                                arguments = buildJsonObject { put("step", request) },
+                            ),
+                        ),
+                    )
+                } else {
+                    AgentModelReply(content = "任务完成")
+                }
+            },
+            tools = AgentToolExecutor { AgentToolResult("继续") },
+            eventSink = AgentEventSink { events += it },
+            maxSteps = 1,
+            stepLimitExtender = AgentStepLimitExtender { currentLimit, _ -> currentLimit + 1 },
+            idFactory = { "turn-soft-budget" },
+        )
+
+        val result = loop.run("完成长任务")
+
+        assertEquals(AgentStopReason.COMPLETED, result.stopReason)
+        assertEquals(4, result.steps)
+        assertEquals("任务完成", result.answer)
+        assertEquals(4, events.count { it is AgentEvent.StepStarted })
+        assertFalse(events.any { it is AgentEvent.TurnStepLimit })
+        assertTrue(events.last() is AgentEvent.TurnCompleted)
+    }
+
+    @Test
     fun modelFailureProducesFailureWithoutCompletion() = runTest {
         val events = mutableListOf<AgentEvent>()
         val loop = AgentLoop(
