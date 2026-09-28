@@ -115,7 +115,7 @@ class LocalAdaptiveRuntimeBudgetTest {
     }
 
     @Test
-    fun continuationStopsWhenContextBudgetIsExhausted() {
+    fun exhaustedContextStillReceivesContinuationBudgetForRecovery() {
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = 128,
             configuredBase = 32,
@@ -126,11 +126,11 @@ class LocalAdaptiveRuntimeBudgetTest {
             kind = LocalAgentRunKind.SUBAGENT,
         )
 
-        assertEquals(null, next)
+        assertTrue(requireNotNull(next) > 128)
     }
 
     @Test
-    fun continuationStopsNearContextLimitUnderHighResourcePressure() {
+    fun highPressureNearContextLimitStillContinuesWithSmallerGrowth() {
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = 128,
             configuredBase = 32,
@@ -141,11 +141,11 @@ class LocalAdaptiveRuntimeBudgetTest {
             kind = LocalAgentRunKind.SUBAGENT,
         )
 
-        assertEquals(null, next)
+        assertTrue(requireNotNull(next) > 128)
     }
 
     @Test
-    fun continuationDoesNotGuessWhenContextBudgetIsUnknown() {
+    fun unknownContextBudgetDoesNotTurnIntoTaskStop() {
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = 128,
             configuredBase = 32,
@@ -156,7 +156,7 @@ class LocalAdaptiveRuntimeBudgetTest {
             kind = LocalAgentRunKind.SUBAGENT,
         )
 
-        assertEquals(null, next)
+        assertTrue(requireNotNull(next) > 128)
     }
 
 }
