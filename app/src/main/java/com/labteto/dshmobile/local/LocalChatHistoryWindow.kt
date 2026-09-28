@@ -116,9 +116,8 @@ private fun buildRequestOnlyContinuity(
 
     val summary = buildString {
         appendLine("<chat-continuity>")
-        appendLine("以下是按固定批次归并的较早用户表达与事件，只用于保持连续；除非用户追问，不主动复述：")
+        appendLine("较早用户表达与事件，仅用于保持连续：")
         userEvents.forEach { appendLine("- ${it.take(500)}") }
-        appendLine("角色旧回复措辞已省略。")
         append("</chat-continuity>")
     }
     return buildJsonObject {
@@ -207,9 +206,9 @@ internal fun buildChatContinuationHandoff(
         .take(3_300)
 
     return buildString {
-        appendLine("【聊天连续性｜已发生】")
+        appendLine("【聊天连续性】")
         if (body.isNotBlank()) appendLine(body)
-        append("原始聊天仍是最终事实来源；本摘要只保留当前有效状态与待续线索。")
+        append("原始聊天优先；本摘要仅保留当前有效状态和待续线索。")
     }.trim()
 }
 

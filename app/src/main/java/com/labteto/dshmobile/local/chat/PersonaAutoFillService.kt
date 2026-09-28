@@ -399,36 +399,25 @@ class PersonaAutoFillService @Inject constructor(
         const val MAX_REPAIR_CHARS = 24_000
 
         val SYSTEM_PROMPT = """
-            你负责把角色扮演需求整理成结构化角色卡，供聊天模式每轮固定注入。
+            你负责把角色需求整理成结构化角色卡，只输出可解析 JSON，不解释。
 
-            只输出一个可直接解析的标准 JSON 对象，不要 Markdown，不要解释。
-            推荐字段如下：name, identity, background, personality, speechStyle, relationship,
+            字段：name, identity, background, personality, speechStyle, relationship,
             worldSetting, franchise, timelinePosition, coreMotivations, valuePriorities,
             behaviorPatterns, internalContradictions, knowledgeBoundary, loreEntries,
             hardConstraints, exampleDialogues, bannedPhrases, signaturePhrases。
 
             规则：
-            1. 根据用户补充描述、最近聊天和当前已填写内容综合整理；已经明确的设定优先保留。
-            2. name 必须给出；其他字段确实无法可靠判断时可以省略，禁止为了凑字段胡乱扩写。
-            3. 缺少的信息可以做低风险、符合角色气质的补全，但不要篡改用户明确设定。
-            4. identity 抓住身份定位、外在辨识度和关键能力；background 主要写经历与处境。
-            5. personality 写性格驱动力、克制点、软肋和情绪边界；speechStyle 写成可执行的说话规则。
-            6. relationship 明确角色如何看待用户、亲疏边界、称呼习惯和互动倾向。
-            7. coreMotivations 写长期驱动力；valuePriorities 写发生冲突时的价值排序；behaviorPatterns 写稳定行动方式；internalContradictions 写真实存在的内在拉扯。
-            8. knowledgeBoundary 明确角色知道或不知道什么，避免观众上帝视角；timelinePosition 说明采用哪个剧情阶段。
-            9. loreEntries 只拆稳定世界资料，每项结构为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}。优先 0-6 条，只写真正有长期价值的资料。
-            10. hardConstraints 写 3-8 条真正影响扮演稳定性的硬规则；exampleDialogues 写 2-4 条短对白。
-            11. bannedPhrases 只放会明显破坏角色感或产生机械感的表达；signaturePhrases 只放少量自然常用表达。
-            12. “默认角色”只是占位名；只要描述或聊天里出现明确角色名，就应替换成真实角色名。
-            13. 数组字段优先输出 JSON 字符串数组；没有合适内容时可省略或返回空数组。
-            14. 控制篇幅，优先保证 JSON 完整闭合。单个文本字段尽量不超过 500 字，单个数组尽量不超过 8 项。
+            1. 用户明确设定和已有字段优先；name 必填，未知信息可省略，只做低风险补全。
+            2. identity/background 写身份与经历；personality/speechStyle 写稳定性格与可执行表达；relationship 写与用户的长期互动边界。
+            3. coreMotivations/valuePriorities/behaviorPatterns/internalContradictions 写长期驱动、价值排序、稳定行为和内在拉扯；knowledgeBoundary/timelinePosition 明确认知范围与剧情阶段。
+            4. loreEntries 仅保存稳定世界资料，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}，优先0～6条；hardConstraints 3～8条，exampleDialogues 2～4条；禁用词和惯用语保持少量。
+            5. 出现明确角色名时替换占位名；数组使用 JSON 数组。
+            6. 优先保证 JSON 完整；单文本尽量≤500字，数组≤8项。
         """.trimIndent()
 
         val REPAIR_PROMPT = """
-            你只负责修复下面这段角色卡输出的 JSON 格式。
-            只返回一个完整、可解析的 JSON 对象，不要 Markdown，不要解释，不要新增人物事实。
-            保留原有字段和值；若某个数组字段被写成单个字符串，可以保留字符串或改成字符串数组。
-            若内容在末尾被截断，只保留已经完整出现、能可靠恢复的字段，确保最终 JSON 正常闭合。
+            修复下方角色卡 JSON。只输出可解析 JSON，不解释、不新增事实。
+            保留可可靠恢复的字段和值；规范数组；截断内容只保留确定部分并闭合结构。
         """.trimIndent()
     }
 }

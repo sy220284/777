@@ -50,7 +50,7 @@ class LocalChatHistoryWindowTest {
         assertTrue(handoff.contains("城南之行尚未发生"))
         assertTrue(handoff.contains("明天去海边"))
         assertFalse(handoff.contains("我会一直陪着你去"))
-        assertTrue(handoff.contains("原始聊天仍是最终事实来源"))
+        assertTrue(handoff.contains("原始聊天优先"))
     }
 
 

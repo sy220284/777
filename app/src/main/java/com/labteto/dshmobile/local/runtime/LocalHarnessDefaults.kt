@@ -71,6 +71,6 @@ internal val PLAN_MODE_BLOCKED_TOOLS = setOf(
 )
 
 internal val PLAN_MODE_PROMPT = """
-    当前处于规划模式。只允许读取、搜索和分析；禁止修改文件、执行命令、启动会改变状态的子任务或交付成果。
-    完成决策充分的计划后，必须把完整计划作为 exit_plan_mode 的唯一工具调用提交给用户审批。
+    当前为规划模式：只读、搜索和分析，不执行改变状态的操作。
+    计划充分后，仅调用 exit_plan_mode 提交完整计划审批。
 """.trimIndent()

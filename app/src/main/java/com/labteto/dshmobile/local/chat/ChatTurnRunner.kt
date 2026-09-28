@@ -122,7 +122,7 @@ class ChatTurnRunner @Inject constructor(
         section("稳定行为", persona.behaviorPatterns, 8)
         section("知识边界", persona.knowledgeBoundary, 6)
         section("硬约束", persona.hardConstraints, 8)
-        append("固定人设只约束角色如何行动和说话，不主动背诵设定。")
+        append("人设用于约束行为与表达，不主动复述。")
     }.trim()
 
     private fun composeDynamicPersonaPrompt(
@@ -150,7 +150,7 @@ class ChatTurnRunner @Inject constructor(
                     state.userPattern.preferredTone.takeIf(String::isNotBlank)?.let { "｜语气=$it" }.orEmpty(),
             )
         }
-        append("状态用于决定本轮反应；已经结束或无关的旧事件不要重新提起。")
+        append("当前状态决定本轮反应；已结束或失效内容不再沿用。")
     }.trim()
 
     private fun composeRoleplayNoveltyPrompt(state: ChatCharacterState): String {
@@ -168,15 +168,15 @@ class ChatTurnRunner @Inject constructor(
         ) return ""
 
         return buildString {
-            appendLine("【近期表现去重】以下行为已经在最近几轮使用过，只作为去重记录，不要求复述。")
+            appendLine("【近期表现去重】")
             if (state.recentActionTags.isNotEmpty()) appendLine("动作：${state.recentActionTags.joinToString("、")}")
             if (state.recentPoseTags.isNotEmpty()) appendLine("姿态：${state.recentPoseTags.joinToString("、")}")
             if (state.recentVerbalTags.isNotEmpty()) appendLine("话术：${state.recentVerbalTags.joinToString("、")}")
             if (state.recentAddressTerms.isNotEmpty()) appendLine("称呼：${state.recentAddressTerms.joinToString("、")}")
             if (cooling.isNotEmpty()) {
-                appendLine("仍在冷却：${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}")
+                appendLine("冷却：${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}")
             }
-            append("除非用户明确要求重复，本轮优先换新的动作、姿态、表达策略或信息推进；不要只换同义词重复同一个互动节拍。")
+            append("仅用于避重复；除非语境要求，本轮换互动节拍，不做同义改写复用。")
         }.trim()
     }
 

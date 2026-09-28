@@ -10,8 +10,8 @@ class ChatTurnModeTest {
         assertEquals(ChatTurnMode.CONTINUE_BEAT, inferChatTurnMode("继续"))
         assertEquals(ChatTurnMode.CONTINUE_BEAT, inferChatTurnMode("然后呢"))
         val prompt = renderChatTurnModeForModel("继续")
-        assertTrue(prompt.contains("继续当前节拍"))
-        assertTrue(prompt.contains("不为“推进”凭空换场"))
+        assertTrue(prompt.contains("【继续】"))
+        assertTrue(prompt.contains("不无过渡跳时、换场或加人"))
     }
 
     @Test
@@ -24,7 +24,7 @@ class ChatTurnModeTest {
     @Test
     fun followUpDoesNotOpenNewPlot() {
         assertEquals(ChatTurnMode.FOLLOW_UP, inferChatTurnMode("为什么呢"))
-        assertTrue(renderChatTurnModeForModel("为什么呢").contains("不额外开启新剧情"))
+        assertTrue(renderChatTurnModeForModel("为什么呢").contains("无明确过渡时保持当前场景"))
     }
 
     @Test

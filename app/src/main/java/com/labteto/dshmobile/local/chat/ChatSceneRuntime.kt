@@ -390,10 +390,10 @@ internal object ChatReplyContinuityGuard {
             ChatContinuityGuardMode.GROUP -> appendLine("【群聊场景连续性修复】")
             ChatContinuityGuardMode.PROACTIVE -> appendLine("【主动互动场景连续性修复】")
         }
-        appendLine("刚才候选回复无过渡改变了当前场景，因此不会提交。")
-        if (scene.location.isNotBlank()) appendLine("当前已确认地点：${scene.location}")
-        if (scene.sceneTime.isNotBlank()) appendLine("当前已确认时间：${scene.sceneTime}")
-        appendLine("重新生成本轮回复；若确实需要换地点，请自然写出实际移动、进入、返回或明确的时间/场景过渡。")
-        append("只输出角色最终回复，不解释修复过程。")
+        appendLine("上一版无过渡改变了场景。")
+        if (scene.location.isNotBlank()) appendLine("当前地点：${scene.location}")
+        if (scene.sceneTime.isNotBlank()) appendLine("当前时间：${scene.sceneTime}")
+        appendLine("按当前场景重写；需要变化时补足自然过渡。")
+        append("只输出最终回复。")
     }
 }

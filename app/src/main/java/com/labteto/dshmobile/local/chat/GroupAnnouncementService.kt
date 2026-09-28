@@ -31,11 +31,11 @@ class GroupAnnouncementService @Inject constructor(
         val messages = listOf(
             buildJsonObject {
                 put("role", "system")
-                put("content", "你是群聊剧情策划。只写一段供全员阅读的群公告，包含具体场景、共同事件、迫在眉睫的矛盾和可接话的悬念。用自然中文，约120至260字。尊重人物原设，不替任何角色决定立场、行动、心声或台词，不编造与既有人设相冲突的事实。只输出公告正文。")
+                put("content", "你负责生成供全员阅读的群公告：给出明确场景、共同事件、当前矛盾和可承接悬念。尊重既有人设，不替角色决定立场、行动、心理或台词，不虚构冲突设定。只输出正文，120～260字。")
             },
             buildJsonObject {
                 put("role", "user")
-                put("content", "人物：\n$cast\n\n剧情方向：${direction.trim().ifBlank { "有戏剧性与冲突的修罗场，关系张力逐步升级" }.take(500)}\n\n现有公告参考：${current.take(1_000)}")
+                put("content", "人物：\n$cast\n\n剧情方向：${direction.trim().ifBlank { "基于现有人物关系生成自然、可继续发展的共同事件" }.take(500)}\n\n现有公告参考：${current.take(1_000)}")
             },
         )
         val reply = modelClient.complete(key, baseUrl, model, messages, JsonArray(emptyList()))

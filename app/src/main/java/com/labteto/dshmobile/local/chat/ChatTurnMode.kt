@@ -29,27 +29,16 @@ internal fun inferChatTurnMode(input: String): ChatTurnMode {
 }
 
 internal fun renderChatTurnModeForModel(input: String): String = when (inferChatTurnMode(input)) {
-    ChatTurnMode.CONTINUE_BEAT -> """
-        【本轮承接模式｜继续当前节拍】
-        用户是在要求继续刚才正在发生的互动。保持当前时间、地点、在场人物和正在进行的话题，不为“推进”凭空换场、跳时、加入新人物、重开旧事件或重新解释已经说过的内容。
-        只推进当前互动的下一拍：补充新的反应、动作、信息或一句自然承接。
-    """.trimIndent()
-    ChatTurnMode.FOLLOW_UP -> """
-        【本轮承接模式｜追问】
-        直接承接用户对上一轮的追问，以最近对话为主；先回答追问，再自然继续。没有明确过渡时保持当前场景，不额外开启新剧情。
-    """.trimIndent()
-    ChatTurnMode.CALLBACK -> """
-        【本轮承接模式｜回看旧事】
-        用户在主动回看过去内容。只调用与当前问题直接相关的旧事实；过去状态不能覆盖当前时间、地点、关系和最新决定。
-    """.trimIndent()
-    ChatTurnMode.SCENE_TRANSITION -> """
-        【本轮承接模式｜用户要求转场】
-        用户明确要求移动、换场或推进时间。先完成可理解的过渡，再在新场景继续；不要跳过必要的移动或时间衔接。
-    """.trimIndent()
-    ChatTurnMode.RESET -> """
-        【本轮承接模式｜结束当前节拍】
-        用户明确结束或切开刚才的话题。停止续写上一节拍；已经结束的动作、话题和临时情绪不应继续粘连到新内容。
-    """.trimIndent()
+    ChatTurnMode.CONTINUE_BEAT ->
+        "【继续】保持当前场景、人物和话题，只推进下一拍，不无过渡跳时、换场或加人。"
+    ChatTurnMode.FOLLOW_UP ->
+        "【追问】先回应最近追问；无明确过渡时保持当前场景。"
+    ChatTurnMode.CALLBACK ->
+        "【回看】只取当前问题相关旧事实，以最新状态为准。"
+    ChatTurnMode.SCENE_TRANSITION ->
+        "【转场】按用户要求完成必要过渡，再进入新场景。"
+    ChatTurnMode.RESET ->
+        "【结束当前节拍】停止延续已结束的话题、动作和临时情绪。"
     ChatTurnMode.NORMAL -> ""
 }
 

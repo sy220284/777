@@ -64,7 +64,7 @@ class LocalHistoryCompactorTest {
             .compact(history, summaryMode = LocalHistorySummaryMode.WORK)
             ?: error("expected structured compaction")
 
-        assertTrue(compaction.summary.contains("结构化提取式检查点"))
+        assertTrue(compaction.summary.contains("较早工作检查点"))
         assertTrue(compaction.summary.contains("目标与需求："))
         assertTrue(compaction.summary.contains("约束与边界："))
         assertTrue(compaction.summary.contains("关键决定与阶段结论："))
@@ -161,7 +161,7 @@ class LocalHistoryCompactorTest {
 
         assertTrue(compaction.summary.contains("较早聊天"))
         assertTrue(compaction.summary.contains("较早用户表达与事件"))
-        assertTrue(compaction.summary.contains("角色旧回复措辞已省略"))
+        assertTrue(compaction.summary.contains("当前人设、关系、长期记忆和近期原始对话优先"))
         assertFalse(compaction.summary.contains("我还记得你说想看日落"))
         assertFalse(compaction.summary.contains("当前目标、计划"))
         assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
