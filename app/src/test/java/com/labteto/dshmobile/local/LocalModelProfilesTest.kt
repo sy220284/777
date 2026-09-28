@@ -26,6 +26,20 @@ class LocalModelProfilesTest {
         assertTrue(LocalModelCapability.VIDEO in kimi.capabilities)
         assertEquals(true, kimi.imageInputSupported)
 
+        val kimi256k = LocalModelPresets.find("k3-256k", "https://api.kimi.com/coding/v1")!!
+        assertTrue(LocalModelCapability.IMAGE in kimi256k.capabilities)
+        assertFalse(LocalModelCapability.VIDEO in kimi256k.capabilities)
+        assertEquals(true, kimi256k.imageInputSupported)
+
+        val currentKimiIds = LocalModelPresets.entries
+            .filter { it.provider.startsWith("Kimi Code") }
+            .map { it.model }
+            .toSet()
+        assertEquals(
+            setOf("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
+            currentKimiIds,
+        )
+
         val glm = LocalModelPresets.find("glm-5-turbo", "https://open.bigmodel.cn/api/paas/v4")!!
         assertTrue(LocalModelCapability.TEXT in glm.capabilities)
         assertFalse(LocalModelCapability.IMAGE in glm.capabilities)
