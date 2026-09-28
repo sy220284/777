@@ -14,14 +14,14 @@ internal fun checkedAutomationMinutesToMillis(
     allowZero: Boolean = true,
 ): Long {
     if (allowZero) {
-        require(minutes >= 0L) { "$label不能为负数" }
+        require(minutes >= 0L) { "${label}不能为负数" }
     } else {
-        require(minutes > 0L) { "$label必须大于 0" }
+        require(minutes > 0L) { "${label}必须大于 0" }
     }
     return try {
         Math.multiplyExact(minutes, 60_000L)
     } catch (_: ArithmeticException) {
-        throw IllegalArgumentException("$label过大")
+        throw IllegalArgumentException("${label}过大")
     }
 }
 
@@ -32,7 +32,7 @@ internal fun checkedAutomationAddMillis(
 ): Long = try {
     Math.addExact(baseMillis, deltaMillis)
 } catch (_: ArithmeticException) {
-    throw IllegalArgumentException("$label超出可表示时间范围")
+    throw IllegalArgumentException("${label}超出可表示时间范围")
 }
 
 internal fun checkedAutomationFutureMillis(
@@ -47,7 +47,7 @@ internal fun checkedAutomationFutureMillis(
 
 internal fun parseOptionalAutomationLong(raw: String?, label: String): Long? {
     if (raw == null) return null
-    return raw.toLongOrNull() ?: throw IllegalArgumentException("$label必须是 64 位整数")
+    return raw.toLongOrNull() ?: throw IllegalArgumentException("${label}必须是 64 位整数")
 }
 
 internal fun nextIntervalAnchoredRun(
