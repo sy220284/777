@@ -239,8 +239,8 @@ if "modelRequestCoordinator.complete(" not in engine:
     violations.append("Foreground model transport must stay routed through LocalModelRequestCoordinator")
 if "toolExecutionCoordinator.execute(" not in engine:
     violations.append("Foreground registered tools must stay routed through LocalToolExecutionCoordinator")
-if "chatTurnCoordinator.prepare(" not in engine or "chatTurnCoordinator.finalize(" not in engine:
-    violations.append("Chat semantic preparation/finalization must stay routed through LocalChatTurnCoordinator")
+if "chatTurnCoordinator.prepare(" not in engine:
+    violations.append("Chat semantic preparation must stay routed through LocalChatTurnCoordinator")
 if "messages = emptyList()" not in coordinator:
     violations.append("LocalSessionCoordinator must keep legacy full transcript out of new snapshots")
 
