@@ -23,8 +23,8 @@ import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.DeepSeekPricingRepository
 import com.labteto.dshmobile.local.DeepSeekPricingState
-import com.labteto.dshmobile.local.LocalHarnessEngine
-import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.LocalVisionSettings
@@ -87,7 +87,7 @@ data class DeviceCapabilitiesState(
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
     private val connectionManager: ConnectionManager,
-    private val localHarness: LocalHarnessEngine,
+    private val localHarness: LocalSettingsRuntime,
     private val deepSeekPricingRepository: DeepSeekPricingRepository,
     private val localVisionSettings: LocalVisionSettings,
     private val memoryStore: MemoryStore,
@@ -101,7 +101,12 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
-    val localHarnessState: StateFlow<LocalHarnessState> = localHarness.state
+    val localHarnessState: StateFlow<LocalHarnessSettingsState> = localHarness.state
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = localHarness.initialState,
+        )
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = deepSeekPricingRepository.state
 
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
@@ -364,24 +369,24 @@ class SettingsViewModel @Inject constructor(
         autoRecall: Boolean,
         autoMemory: Boolean,
     ) {
-        localHarness.configure(apiKey, model, baseUrl)
+        localHarness.configureModel(apiKey, model, baseUrl)
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
     }
 
     fun configureLocalModel(apiKey: String, model: String, baseUrl: String) {
-        localHarness.configure(apiKey, model, baseUrl)
+        localHarness.configureModel(apiKey, model, baseUrl)
     }
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String) =
-        withContext(Dispatchers.IO) { localHarness.saveModelConfiguration(apiKey, model, baseUrl) }
+        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 
-    fun removeLocalModel(id: String) = localHarness.removeModelProfile(id)
+    fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String): String =
-        localHarness.testModelConfiguration(apiKey, model, baseUrl)
+        localHarness.testModel(apiKey, model, baseUrl)
 
     fun configureLocalImageInputMode(mode: LocalImageInputMode) {
         localHarness.configureImageInputMode(mode)
@@ -392,7 +397,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshMemories() {
-        val local = localHarness.state.value
+        val local = localHarness.memoryContext()
         val scopes = when (local.conversationMode) {
             com.labteto.dshmobile.local.LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
             com.labteto.dshmobile.local.LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
@@ -449,20 +454,20 @@ class SettingsViewModel @Inject constructor(
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
 
     suspend fun localSessionStorageStatus(): LocalSessionStorageStatus =
-        localHarness.sessionStorageStatusForUi()
+        localHarness.sessionStorageStatus()
 
     suspend fun compactLocalSessionStorage(): LocalSessionStorageStatus =
-        localHarness.compactSessionStorageForUi()
+        localHarness.compactSessionStorage()
 
     suspend fun exportLocalSessionStorage(uri: Uri): Long = withContext(Dispatchers.IO) {
         appContext.contentResolver.openOutputStream(uri)?.use { output ->
-            localHarness.exportSessionStorageForUi(output)
+            localHarness.exportSessionStorage(output)
         } ?: error("无法打开会话归档导出文件")
     }
 
-    suspend fun environmentInfo(): String = localHarness.environmentInfoForUi()
+    suspend fun environmentInfo(): String = localHarness.environmentInfo()
 
-    suspend fun diagnosticReport(): String = localHarness.diagnosticReportForUi()
+    suspend fun diagnosticReport(): String = localHarness.diagnosticReport()
 
     fun configureLocalVision(
         apiKey: String,

@@ -23,7 +23,7 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
 import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -253,7 +253,7 @@ class WebhookController @Inject constructor(
 
 @AndroidEntryPoint
 class HarnessWebhookService : Service() {
-    @Inject lateinit var engine: LocalHarnessEngine
+    @Inject lateinit var automationRuntime: LocalAutomationRuntime
     @Inject lateinit var controller: WebhookController
     @Inject lateinit var tokenStore: WebhookTokenStore
     @Inject lateinit var resultStore: WebhookResultStore
@@ -361,7 +361,7 @@ class HarnessWebhookService : Service() {
                 executeWebhookRun(
                     executionMutex,
                     update = { status, result, error -> resultStore.update(requestId, status, result, error) },
-                    run = { engine.runAutomationPrompt(prompt) },
+                    run = { automationRuntime.runPrompt(prompt) },
                 )
             }
         }

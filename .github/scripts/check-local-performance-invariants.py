@@ -93,6 +93,7 @@ if preview_interval is None or not 16 <= preview_interval <= 250:
 for forbidden in (
     "modelHistory.sumOf",
     "state.streamingAssistant + delta.content",
+    "_state.update { it.copy(streamingAssistant",
     "state.messages.mapTo(hashSetOf()",
     "state.messages.maxOfOrNull(LocalHarnessMessage::createdAt)",
     'title = state.messages.firstOrNull { it.role == "user" }',

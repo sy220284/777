@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
@@ -42,8 +43,8 @@ import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
-import com.labteto.dshmobile.local.LocalHarnessEngine
-import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
+import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -66,8 +67,10 @@ import java.util.Calendar
 import java.util.Date
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
 
@@ -81,9 +84,14 @@ data class TasksUiState(
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val scheduler: HarnessAutomationScheduler,
-    private val engine: LocalHarnessEngine,
+    private val localRuntime: LocalTaskRuntime,
 ) : ViewModel() {
-    val harnessState = engine.state
+    val harnessState: StateFlow<LocalHarnessTaskState> = localRuntime.state
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = localRuntime.initialState,
+        )
     private val _state = MutableStateFlow(TasksUiState())
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
 
@@ -202,7 +210,7 @@ class TasksViewModel @Inject constructor(
                     windowStartMinuteOfDay == windowEndMinuteOfDay
             )
         ) return false
-        val snapshot = engine.state.value
+        val snapshot = localRuntime.snapshot()
         if (mode == AutomationMode.CHAT) {
             if (
                 snapshot.usageMode != LocalUsageMode.CHAT ||
@@ -505,7 +513,7 @@ private fun ColumnScope.TaskEditorPane(
     state: TaskEditorStateRefs,
     chatMode: Boolean,
     taskMode: AutomationMode,
-    harnessState: LocalHarnessState,
+    harnessState: LocalHarnessTaskState,
     viewModel: TasksViewModel,
     createInvalidMessage: String,
     onReset: () -> Unit,
