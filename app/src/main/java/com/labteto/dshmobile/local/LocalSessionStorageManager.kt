@@ -39,12 +39,12 @@ internal class LocalSessionStorageManager(
 ) {
     fun status(): LocalSessionStorageStatus {
         val files = durableFiles()
-        val rawSegments = files.count { isRawSegment(it.name) }
-        val compressedSegments = files.count { isCompressedSegment(it.name) }
+        val rawSegments = files.count { isRawSegment(it.getName()) }
+        val compressedSegments = files.count { isCompressedSegment(it.getName()) }
         val sessionIds = files.mapNotNull(::sessionIdOf).toSet()
         return LocalSessionStorageStatus(
             totalBytes = files.sumOf { it.length() },
-            freeBytes = root.usableSpace,
+            freeBytes = root.getUsableSpace(),
             budgetBytes = LocalSessionStorageStatus.DEFAULT_BUDGET_BYTES,
             sessionCount = sessionIds.size,
             rawSegmentCount = rawSegments,
@@ -75,9 +75,9 @@ internal class LocalSessionStorageManager(
     fun exportAll(output: OutputStream): Long {
         var exportedBytes = 0L
         ZipOutputStream(output.buffered()).use { zip ->
-            durableFiles().sortedBy { it.name }.forEach { source ->
-                val entry = ZipEntry(source.name).apply {
-                    time = source.lastModified()
+            durableFiles().sortedBy { it.getName() }.forEach { source ->
+                val entry = ZipEntry(source.getName()).also { entry ->
+                    entry.setTime(source.lastModified())
                 }
                 zip.putNextEntry(entry)
                 source.inputStream().buffered().use { input ->
@@ -99,16 +99,16 @@ internal class LocalSessionStorageManager(
         root.listFiles().orEmpty()
             .filter { file ->
                 file.isFile &&
-                    !file.name.endsWith(".tmp") &&
-                    !file.name.contains(".corrupt-") &&
+                    !file.getName().endsWith(".tmp") &&
+                    !file.getName().contains(".corrupt-") &&
                     (
-                        file.name.endsWith(".json") ||
-                            file.name.contains(".events.jsonl")
+                        file.getName().endsWith(".json") ||
+                            file.getName().contains(".events.jsonl")
                     )
             }
 
     private fun sessionIdOf(file: File): String? {
-        val name = file.name
+        val name = file.getName()
         return when {
             ".events.jsonl" in name -> name.substringBefore(".events.jsonl").takeIf(String::isNotBlank)
             name.endsWith(".json") -> name.removeSuffix(".json").takeIf(String::isNotBlank)
