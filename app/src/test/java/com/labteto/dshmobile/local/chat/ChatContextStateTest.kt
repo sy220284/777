@@ -181,6 +181,26 @@ class ChatContextStateTest {
     }
 
     @Test
+    fun repeatedSameSceneMentionDoesNotConsumeHardEventWindow() {
+        val moved = ChatContextState(
+            scene = ChatSceneState(location = "院子"),
+        ).applySceneTurn(
+            userMessage = "我们回到房间吧。",
+            assistantMessage = "好，回房间。",
+            sequence = 10L,
+        )
+        val repeated = moved.applySceneTurn(
+            userMessage = "我们回到房间吧。",
+            assistantMessage = "已经在房间了。",
+            sequence = 11L,
+        )
+
+        assertEquals("房间", moved.scene.location)
+        assertEquals(1, moved.sceneEvents.count { it.kind == ChatSceneEventKind.LOCATION })
+        assertEquals(moved.sceneEvents, repeated.sceneEvents)
+    }
+
+    @Test
     fun largeSoftStateCannotPushPendingFallbackOutOfRequestContext() {
         var context = ChatContextState(
             scene = ChatSceneState(sceneTime = "深夜", location = "很长很长的房间名"),
