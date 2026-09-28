@@ -136,11 +136,28 @@ class LocalChatBranchingTest {
             messageId = "m50",
             activeBranch = history.takeLast(20),
             hotMessages = history.takeLast(20),
-            totalMessageCount = 100,
             loadDurableTranscript = { history },
         )
 
         assertEquals(history, active)
+    }
+
+    @Test
+    fun visibleHotTargetStillKeepsDurablePrefixWhenRuntimeCountCouldBeStale() {
+        val history = (1..100).map { index ->
+            message("m$index", "user", "消息$index", index.toLong())
+        }
+        var durableReads = 0
+
+        val active = activeTranscriptForUserEdit(
+            messageId = "m90",
+            activeBranch = emptyList(),
+            hotMessages = history.takeLast(20),
+            loadDurableTranscript = { durableReads++; history },
+        )
+
+        assertEquals(1, durableReads)
+        assertEquals((1..100).map { "m$it" }, active.map { it.id })
     }
 
     @Test
@@ -156,7 +173,6 @@ class LocalChatBranchingTest {
             messageId = "m50",
             activeBranch = emptyList(),
             hotMessages = hotTail,
-            totalMessageCount = 60,
             loadDurableTranscript = { durable },
         )
         val rewritten = rewriteChatTranscriptFromUserEdit(
@@ -182,7 +198,6 @@ class LocalChatBranchingTest {
             messageId = "m58",
             activeBranch = emptyList(),
             hotMessages = hotTail,
-            totalMessageCount = 60,
             loadDurableTranscript = { durable },
         )
 
@@ -204,7 +219,6 @@ class LocalChatBranchingTest {
             messageId = "live-50",
             activeBranch = emptyList(),
             hotMessages = liveTail,
-            totalMessageCount = 60,
             loadDurableTranscript = { durable },
         )
 
