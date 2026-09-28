@@ -57,4 +57,29 @@ class LocalAdaptiveRuntimeBudgetTest {
         assertTrue(loaded.maxToolResultChars >= 8_000)
         assertTrue(loaded.maxToolResultTokens >= 2_000)
     }
+
+    @Test
+    fun adaptiveToolBudgetNeverGrowsAboveTinyBase() {
+        val base = LocalHistoryBudget(
+            maxHistoryChars = 2_000,
+            tailChars = 1_000,
+            maxSummaryChars = 500,
+            maxToolResultChars = 1_000,
+            maxHistoryTokens = 500,
+            tailTokens = 250,
+            maxToolResultTokens = 500,
+        )
+
+        val loaded = adaptiveToolResultBudget(
+            base,
+            currentHistoryChars = 2_000,
+            currentHistoryTokens = 500,
+        )
+
+        assertTrue(loaded.maxToolResultChars <= base.maxToolResultChars)
+        assertTrue(loaded.maxToolResultTokens <= base.maxToolResultTokens)
+        assertTrue(loaded.maxToolResultChars > 0)
+        assertTrue(loaded.maxToolResultTokens > 0)
+    }
+
 }
