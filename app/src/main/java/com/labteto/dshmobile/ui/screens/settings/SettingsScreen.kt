@@ -71,6 +71,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.ChatStyleGuard
+import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
@@ -154,6 +155,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
+    val storageExported = stringResource(R.string.settings_local_session_storage_exported)
+    val storageExportFailed = stringResource(R.string.settings_local_session_storage_export_failed)
+    val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
+    val storageCompactFailed = stringResource(R.string.settings_local_session_storage_compact_failed)
     val diagnosticExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) scope.launch {
             try {
@@ -174,6 +179,24 @@ fun SettingsScreen(
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
+    var localSessionStorageStatus by remember { mutableStateOf<LocalSessionStorageStatus?>(null) }
+    var localSessionStorageBusy by rememberSaveable { mutableStateOf(false) }
+    val sessionStorageExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            localSessionStorageBusy = true
+            try {
+                viewModel.exportLocalSessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                toast.second(storageExported)
+            } catch (_: Exception) {
+                toast.second(storageExportFailed)
+            } finally {
+                localSessionStorageBusy = false
+            }
+        }
+    }
     val scrollState = rememberScrollState()
 
     BackHandler {
@@ -188,6 +211,9 @@ fun SettingsScreen(
     LaunchedEffect(page) {
         scrollState.scrollTo(0)
         if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
+        if (page == SettingsDestination.ADVANCED) {
+            localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
+        }
     }
     LaunchedEffect(showEnvironment) {
         environmentInfo = if (showEnvironment) {
@@ -564,6 +590,25 @@ fun SettingsScreen(
                     SettingsDestination.ADVANCED -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
+                        LocalSessionStorageCard(
+                            status = localSessionStorageStatus,
+                            busy = localSessionStorageBusy,
+                            onCompact = {
+                                scope.launch {
+                                    localSessionStorageBusy = true
+                                    try {
+                                        localSessionStorageStatus = viewModel.compactLocalSessionStorage()
+                                        toast.second(storageCompacted)
+                                    } catch (_: Exception) {
+                                        toast.second(storageCompactFailed)
+                                    } finally {
+                                        localSessionStorageBusy = false
+                                    }
+                                }
+                            },
+                            onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
+                            onCleanup = onClose,
+                        )
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Link,
