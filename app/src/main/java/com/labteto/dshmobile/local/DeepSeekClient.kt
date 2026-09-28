@@ -48,12 +48,16 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
             temperature?.let { put("temperature", it) }
             if (tools.isNotEmpty()) {
+                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
+                    put("reasoning_effort", "none")
+                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
@@ -105,6 +109,7 @@ class DeepSeekClient @Inject constructor(
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
@@ -112,6 +117,9 @@ class DeepSeekClient @Inject constructor(
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             if (tools.isNotEmpty()) {
+                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
+                    put("reasoning_effort", "none")
+                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
@@ -328,6 +336,22 @@ class DeepSeekClient @Inject constructor(
             }
         }
         return output.toString(Charsets.UTF_8.name())
+    }
+
+    private fun resolveToolCallingMode(
+        model: String,
+        baseUrl: String,
+        tools: JsonArray,
+    ): LocalModelToolCallingMode {
+        val mode = LocalModelPresets.toolCallingModeFor(model, baseUrl)
+        if (tools.isNotEmpty() && mode == LocalModelToolCallingMode.RESPONSES_ONLY) {
+            throw LocalModelException(
+                code = "MODEL_TOOL_CALLING_UNSUPPORTED",
+                message = "当前模型在工作模式下需要 Responses API 才支持工具调用，当前调用链暂不支持，请切换支持 Chat Completions 工具调用的模型后重试。",
+                retryable = false,
+            )
+        }
+        return mode
     }
 
     private fun endpoint(baseUrl: String): String {
