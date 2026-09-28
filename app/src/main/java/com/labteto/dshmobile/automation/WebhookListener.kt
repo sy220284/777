@@ -11,8 +11,8 @@ import kotlinx.coroutines.launch
 /** Serializes binding and closes accepted sockets when a listener generation is replaced. */
 internal class WebhookListener(
     private val scope: CoroutineScope,
-    private val handle: suspend (Socket) -> Unit,
     private val maxClients: Int = DEFAULT_MAX_CLIENTS,
+    private val handle: suspend (Socket) -> Unit,
 ) : AutoCloseable {
     init {
         require(maxClients in 1..1_024) { "Webhook 连接上限必须在 1..1024 之间" }
