@@ -76,14 +76,25 @@ internal fun ChatContextState.applySceneTurn(
         sequence = sequence,
     )
     if (events.isEmpty()) return this
-    val mergedEvents = (sceneEvents + events)
+
+    var reducedScene = scene
+    val effectiveEvents = mutableListOf<ChatSceneEvent>()
+    events.sortedBy(ChatSceneEvent::sequence).forEach { event ->
+        val next = ChatSceneRuntime.reduce(reducedScene, listOf(event))
+        val changed = next.location != reducedScene.location || next.sceneTime != reducedScene.sceneTime
+        if (changed) effectiveEvents += event
+        reducedScene = next
+    }
+    if (effectiveEvents.isEmpty()) return normalized()
+
+    val mergedEvents = (sceneEvents + effectiveEvents)
         .sortedBy(ChatSceneEvent::sequence)
         .distinctBy { event ->
             listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
         }
         .takeLast(RECENT_SCENE_EVENT_LIMIT)
     return copy(
-        scene = ChatSceneRuntime.reduce(scene, events),
+        scene = reducedScene,
         sceneEvents = mergedEvents,
     ).normalized()
 }
