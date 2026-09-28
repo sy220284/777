@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.automation
 
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,4 +21,33 @@ internal suspend fun executeWebhookRun(
     } catch (error: Exception) {
         update("failed", null, error.message ?: error::class.java.simpleName)
     }
+}
+
+
+internal class WebhookExecutionLimiter(
+    private val maxPending: Int,
+) {
+    private val pending = AtomicInteger(0)
+
+    init {
+        require(maxPending in 1..1_024) { "Webhook 等待队列上限必须在 1..1024 之间" }
+    }
+
+    fun tryAcquire(): Boolean {
+        while (true) {
+            val current = pending.get()
+            if (current >= maxPending) return false
+            if (pending.compareAndSet(current, current + 1)) return true
+        }
+    }
+
+    fun release(): Boolean {
+        while (true) {
+            val current = pending.get()
+            if (current <= 0) return false
+            if (pending.compareAndSet(current, current - 1)) return true
+        }
+    }
+
+    fun pendingCount(): Int = pending.get()
 }
