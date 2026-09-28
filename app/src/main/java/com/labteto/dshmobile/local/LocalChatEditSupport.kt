@@ -1,9 +1,88 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
+internal fun editAndResendWorkUserMessage(
+    messageId: String,
+    requestedText: String,
+    eventLog: LocalSessionEventLog,
+    memoryStore: MemoryStore,
+    modelHistory: LocalModelHistoryBuffer,
+    modelHistoryCheckpointCodec: ModelHistoryCheckpointCodec,
+    stateFlow: MutableStateFlow<LocalHarnessState>,
+    updateContextMetrics: () -> Unit,
+    updateTranscriptProjectionCursor: (Long) -> Unit,
+    checkpointModelHistory: (String) -> Unit,
+    persist: () -> Unit,
+    queueTurn: (String, String, JsonObject) -> Unit,
+): LocalChatUserEditResult {
+    val state = stateFlow.value
+    val activeTranscript = LocalSessionTranscriptPager(eventLog).all()
+    val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
+    if (originalIndex < 0) return LocalChatUserEditResult.MESSAGE_MISSING
+    val original = activeTranscript[originalIndex]
+    if (original.role != "user") return LocalChatUserEditResult.MESSAGE_MISSING
+
+    val content = withEditedChatUserText(original, requestedText)
+    if (content.isBlank()) return LocalChatUserEditResult.EMPTY
+    if (editableChatUserText(original).trim() == requestedText) return LocalChatUserEditResult.UNCHANGED
+
+    val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
+        ?: return LocalChatUserEditResult.MESSAGE_MISSING
+    val eventsBeforeEdit = eventLog.snapshot().filter { event -> event.sequence < sourceSequence }
+    val restoredHistory = restoreLocalModelHistory(
+        events = eventsBeforeEdit,
+        legacyFallback = emptyList(),
+        codec = modelHistoryCheckpointCodec,
+    ).messages
+    val restoredControls = projectSessionControlTail(
+        snapshot = LocalHarnessSession(id = state.sessionId),
+        events = eventsBeforeEdit,
+        sequenceExclusive = -1L,
+    )
+    val retainedPrefix = activeTranscript.take(originalIndex)
+    val discarded = activeTranscript.drop(originalIndex)
+    memoryStore.rollbackSourceSessionFrom(
+        sourceSessionId = state.sessionId,
+        createdAtInclusive = original.createdAt,
+        discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
+    )
+
+    modelHistory.reset(restoredHistory)
+    updateContextMetrics()
+    stateFlow.update { current ->
+        current.copy(
+            messages = retainedPrefix.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+            transcriptIndex = buildLocalTranscriptRuntimeIndex(retainedPrefix),
+            plan = restoredControls.plan,
+            todos = restoredControls.todos,
+            goal = restoredControls.goal,
+            planMode = restoredControls.planMode,
+            error = null,
+        )
+    }
+    val baselineSequence = persistActiveChatTranscript(
+        eventLog = eventLog,
+        reason = "work-user-edited",
+        activeTranscript = retainedPrefix,
+    )
+    updateTranscriptProjectionCursor(baselineSequence)
+    checkpointModelHistory("work/user-edit-baseline")
+    persist()
+
+    val editedModelMessage = editedChatUserModelMessage(eventLog, messageId, content)
+    queueTurn(content, requestedText, editedModelMessage)
+    return LocalChatUserEditResult.SENT
+}
 
 internal fun editedChatUserModelMessage(
     eventLog: LocalSessionEventLog,
