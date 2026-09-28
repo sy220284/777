@@ -610,7 +610,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 
 @Composable
 private fun LocalConversationSurface(
-    state: LocalHarnessState,
+    state: LocalConversationSurfaceState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
