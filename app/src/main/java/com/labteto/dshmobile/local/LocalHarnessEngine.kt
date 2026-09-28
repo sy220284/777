@@ -4437,9 +4437,16 @@ class LocalHarnessEngine @Inject constructor(
     private fun searchCapabilities(query: String, target: MutableSet<String>): String =
         toolExecutionCoordinator.searchCapabilities(query, target)
 
-    private suspend fun executeBuiltin(call: LocalToolCall, allowMutation: Boolean): String {
+    private suspend fun executeBuiltin(
+        call: LocalToolCall,
+        allowMutation: Boolean,
+        executionSessionId: String?,
+    ): String {
         val args = call.arguments
-        if (_state.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
+        val binding = executionSessionId?.let(activeWorkRuns::get)
+        val executionState = binding?.state ?: _state
+        val boundSessionId = binding?.sessionId ?: currentSessionId
+        if (executionState.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
         return when (call.name) {
@@ -4449,7 +4456,7 @@ class LocalHarnessEngine @Inject constructor(
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
             )
             "tool_output_read" -> toolOutputStore.read(
-                sessionId = currentSessionId,
+                sessionId = boundSessionId,
                 callId = args.string("call_id"),
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
@@ -4531,7 +4538,7 @@ class LocalHarnessEngine @Inject constructor(
                 val background = args.boolean("run_in_background", false)
                 val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 if (background) {
-                    startPersistentWebFetch(input, maxBytes, format, timeout)
+                    startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId)
                 } else {
                     webTools.fetch(input, maxBytes, format, timeout)
                 }
@@ -4570,17 +4577,22 @@ class LocalHarnessEngine @Inject constructor(
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfo()
-            "capability_search" -> searchCapabilities(args.string("query"))
-            "update_plan" -> updatePlan(args)
-            "exit_plan_mode" -> exitPlanMode(call, args.string("plan"))
-            "todo_write" -> updateTodos(args)
-            "create_goal" -> createGoal(args.string("description"))
-            "get_goal" -> getGoal()
-            "update_goal" -> updateGoal(args.string("status"), args.optionalString("note"))
+            "capability_search" -> if (binding == null) {
+                searchCapabilities(args.string("query"))
+            } else {
+                searchCapabilities(args.string("query"), binding.enabledOptionalTools)
+            }
+            "update_plan" -> updatePlan(args, binding)
+            "exit_plan_mode" -> exitPlanMode(call, args.string("plan"), binding)
+            "todo_write" -> updateTodos(args, binding)
+            "create_goal" -> createGoal(args.string("description"), binding)
+            "get_goal" -> getGoal(binding)
+            "update_goal" -> updateGoal(args.string("status"), args.optionalString("note"), binding)
             "ask_user_question" -> askUser(
                 call,
                 args.string("question"),
                 args["options"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                binding,
             )
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readSkill)
                 ?: workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
@@ -4589,7 +4601,7 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = args.optionalString("model")
-                val maxSteps = args.int("max_steps", _state.value.subagentMaxSteps).coerceIn(1, 128)
+                val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
                     startPersistentReadonlySubagent(
@@ -4613,9 +4625,9 @@ class LocalHarnessEngine @Inject constructor(
                     inheritHistory = true,
                     allowMutation = allowMutation,
                     parentCallId = call.id,
-                    maxSteps = _state.value.subagentMaxSteps,
+                    maxSteps = executionState.value.subagentMaxSteps,
                 )
-            "list_subagent_models" -> "${_state.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
+            "list_subagent_models" -> "${executionState.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
             "list_agents" -> jobs.listAgents()
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
             "interrupt_agent" -> jobs.kill(args.string("agent_id"))
@@ -4626,16 +4638,16 @@ class LocalHarnessEngine @Inject constructor(
             )
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
-                memoryTools.execute(call.name, args, allowMutation)
-            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id")).search(
+                memoryTools(binding).execute(call.name, args, allowMutation)
+            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).search(
                 query = args.string("query"),
                 limit = args.int("limit", 50),
                 afterSequence = args.long("after_sequence", -1L),
             )
-            "session_trace" -> eventLogForAuthorized(args.optionalString("session_id")).tail(args.int("limit", 40))
-            "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"))
+            "session_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
+            "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId)
                 .read(args.int("seq", -1).toLong(), before = 1, after = 1)
-            "session_event_read" -> eventLogForAuthorized(args.optionalString("session_id")).read(
+            "session_event_read" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).read(
                 sequence = args.int("seq", -1).toLong(),
                 before = args.int("before", 0),
                 after = args.int("after", 0), offsetChars = args.int("offset_chars", 0),
