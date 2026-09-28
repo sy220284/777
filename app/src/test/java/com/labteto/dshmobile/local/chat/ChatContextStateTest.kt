@@ -426,4 +426,83 @@ class ChatContextStateTest {
         assertEquals("u52", grounded.evidence.single().sourceUserMessageId)
     }
 
+
+    @Test
+    fun emptyPlannerListsCannotEraseValidSoftFactsWithoutRemovalEvidence() {
+        val previous = ChatContinuityState(
+            decisions = listOf("明天九点去城南"),
+            unfinished = listOf("还要确认车票"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(
+                decisions = emptyList(),
+                unfinished = emptyList(),
+            ),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 61L,
+                    userMessageId = "u61",
+                    assistantMessageId = "a61",
+                    userMessage = "今天天气不错",
+                    assistantMessage = "嗯，挺舒服的。",
+                ),
+            ),
+        )
+
+        assertEquals(previous.decisions, grounded.decisions)
+        assertEquals(previous.unfinished, grounded.unfinished)
+    }
+
+    @Test
+    fun explicitCancellationClearsOnlyMatchingDecision() {
+        val previous = ChatContinuityState(
+            decisions = listOf(
+                "明天九点去城南",
+                "出门前记得带伞",
+            ),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(decisions = emptyList()),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 62L,
+                    userMessageId = "u62",
+                    assistantMessageId = "a62",
+                    userMessage = "明天不去城南了，那个安排取消。",
+                    assistantMessage = "好，那城南的安排取消。",
+                ),
+            ),
+        )
+
+        assertFalse(grounded.decisions.contains("明天九点去城南"))
+        assertTrue(grounded.decisions.contains("出门前记得带伞"))
+    }
+
+    @Test
+    fun newOpenThreadDoesNotSilentlyEraseUnrelatedExistingThread() {
+        val previous = ChatContinuityState(
+            unfinished = listOf("还要确认车票"),
+        )
+        val grounded = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(
+                unfinished = listOf("还要预订酒店"),
+            ),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 63L,
+                    userMessageId = "u63",
+                    assistantMessageId = "a63",
+                    userMessage = "酒店还没订，晚点记得订一下。",
+                    assistantMessage = "好，酒店这件事还没完成。",
+                ),
+            ),
+        )
+
+        assertTrue(grounded.unfinished.contains("还要确认车票"))
+        assertTrue(grounded.unfinished.contains("还要预订酒店"))
+    }
+
 }
