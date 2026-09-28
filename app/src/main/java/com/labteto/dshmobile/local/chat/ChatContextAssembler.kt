@@ -141,6 +141,17 @@ internal object ChatContextAssembler {
                 Regex("""^(?:已定|当前有效决定|决定|待续事项|待续|近期关键事件|近期事件|近期)"""),
                 "",
             )
+            .replace("明天上午", "明天")
+            .replace("明日上午", "明天")
+            .replace("明早", "明天")
+            .replace("明天早上", "明天")
+            .replace("明天晚上", "明天")
+            .replace("明晚", "明天")
+            .replace("今天上午", "今天")
+            .replace("今天早上", "今天")
+            .replace("今早", "今天")
+            .replace("今天晚上", "今天")
+            .replace("今晚", "今天")
         if (!SCHEDULE_FACT_HINT.containsMatchIn(normalized)) return null
         val clockNormalized = normalized
             .replace(ARABIC_CLOCK, "<时>")
