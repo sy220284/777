@@ -747,13 +747,13 @@
     <string name="local_approval_impact_high">High</string>
     <string name="local_approval_impact_critical">Critical</string>
     <string name="local_approval_purpose_title">What will this operation do?</string>
-    <string name="local_approval_safe_scope">This operation is eligible for safe auto-approval: a workspace-bounded write, or a read-only action that does not change external state. Once enabled, the setting persists across chats.</string>
+    <string name="local_approval_safe_scope">This operation has lower impact. When auto-approval is enabled, every approval-gated operation is approved automatically across chats; tool permissions and safety boundaries still apply.</string>
     <string name="local_approval_device_scope">This operation affects device state and needs confirmation. You can approve it once or authorize ordinary device UI actions for the current agent turn; privileged device actions still require approval each time.</string>
-    <string name="local_approval_high_risk_scope">This operation may affect state outside the workspace, processes, the network, the device, or privileged resources. Safe auto-approval does not bypass confirmation for this operation.</string>
+    <string name="local_approval_high_risk_scope">This operation may affect state outside the workspace, processes, the network, the device, or privileged resources. When auto-approval is enabled, this operation is also approved automatically; tool permissions and safety boundaries still apply.</string>
     <string name="local_approval_once">Approve once</string>
     <string name="local_approval_reject">Reject</string>
-    <string name="local_approval_enable_safe">Enable safe auto-approval</string>
-    <string name="local_approval_safe_enabled">Safe auto-approval is enabled and will remain active in later chats.</string>
+    <string name="local_approval_enable_safe">Enable auto-approval for all</string>
+    <string name="local_approval_safe_enabled">Auto-approval is enabled: every approval-gated operation will be approved automatically in later chats.</string>
     <string name="local_approval_device_turn">Approve ordinary device actions for this turn</string>
     <string name="local_approval_purpose_update">Update workspace content to complete the current task.</string>
     <string name="local_approval_purpose_shell">Run local steps required for the current task.</string>
