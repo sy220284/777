@@ -1,5 +1,4 @@
 package com.labteto.dshmobile.ui.screens.local
-
 import android.graphics.BitmapFactory
 import java.io.File
 import com.labteto.dshmobile.local.LocalChatUserEditResult
@@ -91,6 +90,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
@@ -129,17 +129,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import kotlinx.coroutines.flow.StateFlow
 internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
 ): LocalUsageMode = pending ?: current
-
 internal fun localHarnessShowsBlockingLoading(
     loading: Boolean,
     hasRenderedSurface: Boolean,
 ): Boolean = loading && !hasRenderedSurface
-
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
@@ -153,7 +151,7 @@ fun LocalHarnessScreen(
     updateStatus: String?,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -181,25 +179,25 @@ fun LocalHarnessScreen(
         }
     }
 
-    LaunchedEffect(state.loading) {
-        if (!state.loading) hasRenderedHarnessSurface = true
+    LaunchedEffect(shell.loading) {
+        if (!shell.loading) hasRenderedHarnessSurface = true
     }
 
-    LaunchedEffect(pendingUsageMode, state.loading, state.usageMode) {
+    LaunchedEffect(pendingUsageMode, shell.loading, shell.usageMode) {
         val pending = pendingUsageMode ?: return@LaunchedEffect
         when {
-            state.usageMode == pending && !state.loading -> pendingUsageMode = null
-            !state.loading -> {
+            shell.usageMode == pending && !shell.loading -> pendingUsageMode = null
+            !shell.loading -> {
                 // A rejected/no-op transition should not leave the sidebar showing a phantom mode.
                 // Give the engine one frame window to publish loading=true before rolling back.
                 delay(250)
-                if (!state.loading && state.usageMode != pending) pendingUsageMode = null
+                if (!shell.loading && shell.usageMode != pending) pendingUsageMode = null
             }
         }
     }
 
-    LaunchedEffect(state.sessionId) {
-        viewModel.prepareTranscriptHistory(state.sessionId)
+    LaunchedEffect(shell.sessionId) {
+        viewModel.prepareTranscriptHistory(shell.sessionId)
     }
 
     // Swiping the drawer open must release the composer focus as well as its IME.
@@ -213,10 +211,10 @@ fun LocalHarnessScreen(
     fun switchUsageMode(target: LocalUsageMode) {
         val returningFromGroupToSingle =
             target == LocalUsageMode.CHAT &&
-                state.usageMode == LocalUsageMode.CHAT &&
-                state.groupChat.enabled
-        if (target == state.usageMode && pendingUsageMode == null && !returningFromGroupToSingle) return
-        if (target != state.usageMode) {
+                shell.usageMode == LocalUsageMode.CHAT &&
+                shell.groupChat.enabled
+        if (target == shell.usageMode && pendingUsageMode == null && !returningFromGroupToSingle) return
+        if (target != shell.usageMode) {
             val key = "shown_" + target.name.lowercase()
             if (!modeIntroPreferences.getBoolean(key, false)) {
                 modeIntroPreferences.edit().putBoolean(key, true).apply()
@@ -227,10 +225,10 @@ fun LocalHarnessScreen(
         viewModel.switchUsageMode(target)
     }
 
-    LaunchedEffect(requestedSessionId, state.sessions) {
+    LaunchedEffect(requestedSessionId, shell.sessions) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
-        if (target == state.sessionId || state.sessions.any { it.id == target }) {
-            if (target != state.sessionId) viewModel.switchSession(target)
+        if (target == shell.sessionId || shell.sessions.any { it.id == target }) {
+            if (target != shell.sessionId) viewModel.switchSession(target)
             onSessionRequestConsumed()
         }
     }
@@ -243,11 +241,11 @@ fun LocalHarnessScreen(
         drawerState = drawerState,
         drawerContent = {
             LocalModeDrawer(
-                currentSessionId = state.sessionId,
-                sessions = state.sessions,
+                currentSessionId = shell.sessionId,
+                sessions = shell.sessions,
                 gallery = gallery,
-                usageMode = localHarnessDrawerUsageMode(state.usageMode, pendingUsageMode),
-                modeSwitchEnabled = !state.running,
+                usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
+                modeSwitchEnabled = !shell.running,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -271,7 +269,7 @@ fun LocalHarnessScreen(
                     showRunCenter = true
                 },
                 galleryCount = gallery.size,
-                groupMemberCount = state.groupChat.members.size,
+                groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = {
                     scope.launch { drawerState.close() }
                     viewModel.openGroupChatMode()
@@ -305,104 +303,107 @@ fun LocalHarnessScreen(
             )
         },
     ) {
-        Box(Modifier.fillMaxSize()) {
-            when {
-                localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
-            showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
-                entries = gallery,
-                presets = viewModel.personaPresets,
-                currentPersona = state.chatPersona,
-                currentGalleryId = state.galleryId,
-                currentGalleryStoryId = state.galleryStoryId,
-                currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
-                currentSessionId = state.sessionId,
-                canSave = !state.loading && !state.running,
-                onSaveCurrent = viewModel::saveCurrentToGallery,
-                onEditNotes = viewModel::editGalleryNotes,
-                onRenameStory = viewModel::renameGalleryStory,
-                onInspect = viewModel::inspectGalleryPersona,
-                onApplySuggestions = viewModel::applyGallerySuggestions,
-                onDelete = viewModel::deleteGalleryEntry,
-                onDeleteStory = viewModel::deleteGalleryStory,
-                onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
-                onExport = viewModel::exportGalleryPersona,
-                onImport = viewModel::importGalleryPersona,
-                onInstallPreset = viewModel::installPersonaPreset,
-                onSetPortrait = viewModel::setGalleryPortrait,
-                onRemovePortrait = viewModel::removeGalleryPortrait,
-                onStart = { id, storyId, freshStory ->
-                    if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
-                },
-                onDismiss = { showPersonaGallery = false },
-            )
-            else -> LocalChat(
-                state = state,
-                gallery = gallery,
-                transcriptHistory = transcriptHistory,
-                modeIntro = modeIntro,
-                onOpenMenu = {
-                    drawerFocusManager.clearFocus(force = true)
-                    drawerKeyboard?.hide()
-                    scope.launch { drawerState.open() }
-                },
-                onConfigure = onOpenSettings,
-                onSelectModel = viewModel::selectModel,
-                onSend = viewModel::send,
-                onEditAndResend = viewModel::editAndResendUserMessage,
-                onSelectMessageVariant = viewModel::selectChatMessageVariant,
-                onRegenerate = viewModel::regenerateReply,
-                onGenerateReplySuggestions = viewModel::generateReplySuggestions,
-                onLoadOlderTranscript = viewModel::loadOlderTranscript,
-                onImportAttachment = viewModel::importAttachment,
-                onImageModeChange = viewModel::setImageInputMode,
-                onStop = viewModel::stop,
-                onNewSession = { showNewSessionMode = true },
-                onExitGroupChat = viewModel::leaveGroupChatMode,
-                onOpenRunCenter = { showRunCenter = true },
-                onConfigureChatPersona = viewModel::configureChatPersona,
-                onConfigureGroupMembers = viewModel::configureGroupChatMembers,
-                onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
-                onAutoFillChatPersona = viewModel::autoFillChatPersona,
-                onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
-                onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
-                onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
-                onPlanModeChange = viewModel::setPlanMode,
-                onApprove = viewModel::approve,
-                onDeny = viewModel::deny,
-                onAutoApprove = viewModel::enableAutoApproval,
-                onAutoApprovePending = viewModel::enableAutoApprovalForPending,
-                onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
-                onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
-                onDisableAutoApprove = viewModel::disableAutoApproval,
-                onAnswerQuestion = viewModel::answerQuestion,
-                onCancelQuestion = viewModel::cancelQuestion,
-            )
-            }
-            if (state.loading && hasRenderedHarnessSurface) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {},
-                        ),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    CircularProgressIndicator(
+        LocalHarnessStateContent(viewModel) { state ->
+            Box(Modifier.fillMaxSize()) {
+                when {
+                    localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
+                showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
+                    entries = gallery,
+                    presets = viewModel.personaPresets,
+                    currentPersona = state.chatPersona,
+                    currentGalleryId = state.galleryId,
+                    currentGalleryStoryId = state.galleryStoryId,
+                    currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
+                    currentSessionId = state.sessionId,
+                    canSave = !state.loading && !state.running,
+                    onSaveCurrent = viewModel::saveCurrentToGallery,
+                    onEditNotes = viewModel::editGalleryNotes,
+                    onRenameStory = viewModel::renameGalleryStory,
+                    onInspect = viewModel::inspectGalleryPersona,
+                    onApplySuggestions = viewModel::applyGallerySuggestions,
+                    onDelete = viewModel::deleteGalleryEntry,
+                    onDeleteStory = viewModel::deleteGalleryStory,
+                    onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
+                    onExport = viewModel::exportGalleryPersona,
+                    onImport = viewModel::importGalleryPersona,
+                    onInstallPreset = viewModel::installPersonaPreset,
+                    onSetPortrait = viewModel::setGalleryPortrait,
+                    onRemovePortrait = viewModel::removeGalleryPortrait,
+                    onStart = { id, storyId, freshStory ->
+                        if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
+                    },
+                    onDismiss = { showPersonaGallery = false },
+                )
+                else -> LocalChat(
+                    state = state,
+                    streamingState = viewModel.streamingState,
+                    gallery = gallery,
+                    transcriptHistory = transcriptHistory,
+                    modeIntro = modeIntro,
+                    onOpenMenu = {
+                        drawerFocusManager.clearFocus(force = true)
+                        drawerKeyboard?.hide()
+                        scope.launch { drawerState.open() }
+                    },
+                    onConfigure = onOpenSettings,
+                    onSelectModel = viewModel::selectModel,
+                    onSend = viewModel::send,
+                    onEditAndResend = viewModel::editAndResendUserMessage,
+                    onSelectMessageVariant = viewModel::selectChatMessageVariant,
+                    onRegenerate = viewModel::regenerateReply,
+                    onGenerateReplySuggestions = viewModel::generateReplySuggestions,
+                    onLoadOlderTranscript = viewModel::loadOlderTranscript,
+                    onImportAttachment = viewModel::importAttachment,
+                    onImageModeChange = viewModel::setImageInputMode,
+                    onStop = viewModel::stop,
+                    onNewSession = { showNewSessionMode = true },
+                    onExitGroupChat = viewModel::leaveGroupChatMode,
+                    onOpenRunCenter = { showRunCenter = true },
+                    onConfigureChatPersona = viewModel::configureChatPersona,
+                    onConfigureGroupMembers = viewModel::configureGroupChatMembers,
+                    onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
+                    onAutoFillChatPersona = viewModel::autoFillChatPersona,
+                    onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
+                    onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
+                    onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
+                    onPlanModeChange = viewModel::setPlanMode,
+                    onApprove = viewModel::approve,
+                    onDeny = viewModel::deny,
+                    onAutoApprove = viewModel::enableAutoApproval,
+                    onAutoApprovePending = viewModel::enableAutoApprovalForPending,
+                    onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
+                    onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
+                    onDisableAutoApprove = viewModel::disableAutoApproval,
+                    onAnswerQuestion = viewModel::answerQuestion,
+                    onCancelQuestion = viewModel::cancelQuestion,
+                )
+                }
+                if (state.loading && hasRenderedHarnessSurface) {
+                    Box(
                         modifier = Modifier
-                            .padding(top = DsSpacing.large)
-                            .size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = DsTheme.colors.accent,
-                    )
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(top = DsSpacing.large)
+                                .size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = DsTheme.colors.accent,
+                        )
+                    }
                 }
             }
         }
     }
 
     if (showNewSessionMode) {
-        if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
+        if (shell.usageMode == LocalUsageMode.CHAT && shell.groupChat.enabled) {
             GroupNewSessionDialog(
                 onDismiss = { showNewSessionMode = false },
                 onNewGroup = {
@@ -425,7 +426,7 @@ fun LocalHarnessScreen(
         }
     }
 
-    if (showNewPersona && state.usageMode == LocalUsageMode.CHAT) {
+    if (showNewPersona && shell.usageMode == LocalUsageMode.CHAT) {
         ChatPersonaDialog(
             profile = remember { PersonaProfile(name = "") },
             onSave = { profile -> viewModel.createGalleryPersona(profile).map { Unit } },
@@ -438,8 +439,8 @@ fun LocalHarnessScreen(
     filesMode?.let { mode ->
         LocalWorkspaceFilesDialog(
             mode = mode,
-            sessionId = state.sessionId,
-            workspacePath = state.workspacePath,
+            sessionId = shell.sessionId,
+            workspacePath = shell.workspacePath,
             loadWorkspace = viewModel::workspaceFiles,
             loadConversation = viewModel::conversationFiles,
             loadPreview = viewModel::previewWorkspaceFile,
@@ -447,30 +448,32 @@ fun LocalHarnessScreen(
         )
     }
 
-    if (showRunCenter && state.usageMode == LocalUsageMode.WORK) {
-        Dialog(onDismissRequest = { showRunCenter = false }) {
-            ExecutionStatusCard(
-                state = state,
-                onJobOutput = viewModel::backgroundJobOutput,
-                onStopJob = viewModel::stopBackgroundJob,
-                onOpenResults = {
-                    showRunCenter = false
-                    filesMode = LocalFilesMode.CONVERSATION
-                },
-            )
+    if (showRunCenter && shell.usageMode == LocalUsageMode.WORK) {
+        LocalHarnessStateContent(viewModel) { state ->
+            Dialog(onDismissRequest = { showRunCenter = false }) {
+                ExecutionStatusCard(
+                    state = state,
+                    onJobOutput = viewModel::backgroundJobOutput,
+                    onStopJob = viewModel::stopBackgroundJob,
+                    onOpenResults = {
+                        showRunCenter = false
+                        filesMode = LocalFilesMode.CONVERSATION
+                    },
+                )
+            }
         }
     }
 
-    if (showPersonaGallerySavePrompt && state.usageMode == LocalUsageMode.CHAT) {
+    if (showPersonaGallerySavePrompt && shell.usageMode == LocalUsageMode.CHAT) {
         PersonaGallerySavePromptDialog(
-            persona = state.chatPersona,
+            persona = shell.chatPersona,
             isUpdate = viewModel.currentGalleryNeedsUpdate(),
-            canSave = !state.loading && !state.running,
+            canSave = !shell.loading && !shell.running,
             onSaveCurrent = {
                 viewModel.saveCurrentToGallery(
                     notes = "",
-                    existingId = state.galleryId,
-                    existingStoryId = state.galleryStoryId,
+                    existingId = shell.galleryId,
+                    existingStoryId = shell.galleryStoryId,
                 )
             },
             onContinue = {
@@ -655,6 +658,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalChat(
     state: LocalHarnessState,
+    streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
     modeIntro: LocalUsageMode?,
@@ -1250,35 +1254,15 @@ private fun LocalChat(
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                     }
                 }
-                if (
-                    state.usageMode == LocalUsageMode.CHAT &&
-                    state.running &&
-                    state.streamingAssistant.isNotBlank()
-                ) {
+                if (state.usageMode == LocalUsageMode.CHAT && state.running) {
                     item(key = "streaming:${state.sessionId}") {
-                        LocalMessageRow(
-                            message = LocalHarnessMessage(
-                                id = "streaming:${state.sessionId}",
-                                role = "assistant",
-                                content = state.streamingAssistant,
-                                createdAt = 0L,
-                            ),
-                            chatMode = true,
-                            groupMode = false,
-                            canEdit = false,
-                            canRegenerate = false,
-                            canSelectVariant = false,
-                            branchInfo = null,
-                            onEdit = { },
-                            onSelectVariant = { _, _ -> false },
-                            onRegenerate = { false },
+                        LocalStreamingChatTurn(
+                            sessionId = state.sessionId,
+                            streamingState = streamingState,
                         )
                     }
                 }
-                if (
-                    state.running &&
-                    (state.usageMode == LocalUsageMode.WORK || state.streamingAssistant.isBlank())
-                ) {
+                if (state.running && state.usageMode == LocalUsageMode.WORK) {
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1317,36 +1301,11 @@ private fun LocalChat(
             )
         }
 
-        if (
-            state.usageMode == LocalUsageMode.WORK &&
-            state.running &&
-            state.streamingAssistant.isNotBlank()
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                shape = RoundedCornerShape(18.dp),
-                color = streamingSurfaceColor,
-            ) {
-                Column(
-                    Modifier.padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                ) {
-                    Text(
-                        stringResource(R.string.local_streaming_status),
-                        style = DsType.caption11,
-                        color = colors.labelTertiary,
-                    )
-                    val preview = state.streamingAssistant
-                    Text(
-                        if (preview.length > 1_200) "…" + preview.takeLast(1_200) else preview,
-                        style = DsType.std14,
-                        color = colors.labelPrimary,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+        if (state.usageMode == LocalUsageMode.WORK && state.running) {
+            LocalStreamingWorkPreview(
+                streamingState = streamingState,
+                surfaceColor = streamingSurfaceColor,
+            )
         }
 
         state.error?.let { error ->
