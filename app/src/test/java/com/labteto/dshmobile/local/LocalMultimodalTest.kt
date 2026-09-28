@@ -169,6 +169,21 @@ class LocalMultimodalTest {
     }
 
     @Test
+    fun legacyToolPreferenceCannotForceASeparateVisionRoute() {
+        val registry = LocalImageCapabilityRegistry()
+
+        assertEquals(
+            LocalImageInputMode.NATIVE,
+            resolveLocalImageInputMode(
+                LocalImageInputMode.TOOL,
+                registry,
+                "https://api.example.com",
+                "unknown-model",
+            ),
+        )
+    }
+
+    @Test
     fun capabilityRegistryIsIsolatedByEndpointAndModel() {
         val registry = LocalImageCapabilityRegistry()
         registry.markUnsupported("https://api.example.com", "text-model")
