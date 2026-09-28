@@ -19,8 +19,11 @@ internal class LocalJobManager(
         onSnapshotsChanged = { snapshots -> store?.write(snapshots) },
     )
 
-    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
-        delegate.start(label, block)
+    fun start(
+        label: String,
+        expectedDurationMillis: Long? = null,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): String = delegate.start(label, expectedDurationMillis, block)
 
     fun startPersistent(
         label: String,
