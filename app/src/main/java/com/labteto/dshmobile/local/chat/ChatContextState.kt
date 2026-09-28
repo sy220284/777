@@ -224,7 +224,9 @@ private const val HOT_WINDOW_PENDING_TURNS = 10
 private const val PENDING_RAW_FALLBACK_TURNS = 4
 private const val RECENT_SCENE_EVENT_LIMIT = 12
 private const val MAX_CONTINUITY_EVIDENCE = 13
-private const val MIN_CONTINUITY_EVIDENCE_SCORE = 20
+private const val DECISION_CONTINUITY_EVIDENCE_SCORE = 80
+private const val EVENT_CONTINUITY_EVIDENCE_SCORE = 55
+private const val OPEN_THREAD_CONTINUITY_EVIDENCE_SCORE = 55
 private const val DERIVED_CONTINUITY_EVIDENCE_SCORE = 10
 private const val MAX_PENDING_CONTEXT_CHARS = 1_800
 private const val MAX_SCENE_CONTEXT_CHARS = 700
@@ -291,7 +293,7 @@ internal fun groundContinuityEvidence(
                 return@forEach
             }
 
-            val direct = bestContinuitySource(value, orderedTurns)
+            val direct = bestContinuitySource(kind, value, orderedTurns)
             if (direct != null) {
                 accepted += value
                 acceptedEvidence[key] = ChatContinuityEvidence(
@@ -380,15 +382,23 @@ internal fun groundContinuityEvidence(
 }
 
 private fun bestContinuitySource(
+    kind: ChatContinuityFactKind,
     fact: String,
     turns: List<ChatPendingTurn>,
-): Pair<ChatPendingTurn, Int>? = turns.asSequence()
-    .map { turn -> turn to continuityEvidenceScore(fact, turn.rawEvidence()) }
-    .filter { (_, score) -> score >= MIN_CONTINUITY_EVIDENCE_SCORE }
-    .maxWithOrNull(
-        compareBy<Pair<ChatPendingTurn, Int>> { it.second }
-            .thenBy { it.first.sequence },
-    )
+): Pair<ChatPendingTurn, Int>? {
+    val threshold = when (kind) {
+        ChatContinuityFactKind.DECISION -> DECISION_CONTINUITY_EVIDENCE_SCORE
+        ChatContinuityFactKind.EVENT -> EVENT_CONTINUITY_EVIDENCE_SCORE
+        ChatContinuityFactKind.OPEN_THREAD -> OPEN_THREAD_CONTINUITY_EVIDENCE_SCORE
+    }
+    return turns.asSequence()
+        .map { turn -> turn to continuityEvidenceScore(fact, turn.rawEvidence()) }
+        .filter { (_, score) -> score >= threshold }
+        .maxWithOrNull(
+            compareBy<Pair<ChatPendingTurn, Int>> { it.second }
+                .thenBy { it.first.sequence },
+        )
+}
 
 private fun ChatPendingTurn.rawEvidence(): String =
     listOf(userMessage.trim(), assistantMessage.trim())
@@ -397,18 +407,33 @@ private fun ChatPendingTurn.rawEvidence(): String =
         .take(360)
 
 private fun continuityEvidenceScore(fact: String, source: String): Int {
-    val a = normalizeContinuityFact(fact)
-    val b = normalizeContinuityFact(source)
+    val a = normalizeContinuityEvidenceText(fact)
+    val b = normalizeContinuityEvidenceText(source)
     if (a.length < 2 || b.length < 2) return 0
-    if (b.contains(a) || a.contains(b)) return 100
+    if (b.contains(a)) return 100
     val aa = continuityBigrams(a)
     val bb = continuityBigrams(b)
     if (aa.isEmpty() || bb.isEmpty()) return 0
     val shared = aa.count(bb::contains)
     if (shared == 0) return 0
-    val containment = (shared * 100) / minOf(aa.size, bb.size)
-    return if (shared >= 2) containment else containment.coerceAtMost(18)
+    // Evidence must cover the proposed fact, not merely the shorter of the two strings.
+    val factCoverage = (shared * 100) / aa.size
+    return if (shared >= 2) factCoverage else factCoverage.coerceAtMost(18)
 }
+
+private fun normalizeContinuityEvidenceText(text: String): String =
+    normalizeContinuityFact(text)
+        .replace("明天上午", "明天")
+        .replace("明日上午", "明天")
+        .replace("明早", "明天")
+        .replace("明天早上", "明天")
+        .replace("明天晚上", "明天")
+        .replace("明晚", "明天")
+        .replace("今天上午", "今天")
+        .replace("今天早上", "今天")
+        .replace("今早", "今天")
+        .replace("今天晚上", "今天")
+        .replace("今晚", "今天")
 
 private fun continuityBigrams(text: String): Set<String> =
     if (text.length < 2) emptySet()
