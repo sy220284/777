@@ -139,30 +139,7 @@ private fun normalizeChatContinuityText(text: String): String =
 private fun historicalFactSupersededByCurrent(
     historical: String,
     current: String,
-): Boolean {
-    if (ChatContextAssembler.semanticallySimilar(historical, current)) return true
-    val oldSchedule = normalizeScheduleFact(historical) ?: return false
-    val currentSchedule = normalizeScheduleFact(current) ?: return false
-    return oldSchedule == currentSchedule
-}
-
-private fun normalizeScheduleFact(text: String): String? {
-    val normalized = normalizeChatContinuityText(text)
-        .lowercase()
-        .replace(Regex("""[，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
-        .replace(Regex("""\s+"""), "")
-    if (!SCHEDULE_FACT_HINT.containsMatchIn(normalized)) return null
-    val clockNormalized = normalized
-        .replace(ARABIC_CLOCK, "<时>")
-        .replace(CHINESE_CLOCK, "<时>")
-    return clockNormalized.takeIf { it != normalized }
-}
-
-private val SCHEDULE_FACT_HINT = Regex(
-    """(?:今天|今晚|明天|明早|后天|早上|上午|中午|下午|傍晚|晚上|夜里|出发|见面|碰面|集合|去|回|到)""",
-)
-private val ARABIC_CLOCK = Regex("""(?:\d{1,2}[:：]\d{1,2}|\d{1,2}点(?:半|一刻|三刻)?)""")
-private val CHINESE_CLOCK = Regex("""[零〇一二两三四五六七八九十两]{1,4}点(?:半|一刻|三刻)?""")
+): Boolean = ChatContextAssembler.factConflicts(historical, current)
 
 
 internal fun buildChatContinuationHandoff(
