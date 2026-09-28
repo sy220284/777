@@ -58,7 +58,7 @@ internal object ChatContextAssembler {
         recentAssistantReplies: List<String> = emptyList(),
     ): String {
         val seen = mutableListOf<String>()
-        userInput.trim().takeIf(String::isNotBlank)?.let(seen::add)
+        val userLine = userInput.trim().takeIf(String::isNotBlank)
 
         fun dedupe(block: String): String {
             if (block.isBlank()) return ""
@@ -71,7 +71,11 @@ internal object ChatContextAssembler {
                     return@forEach
                 }
                 val core = semanticCore(line)
-                if (core.isBlank() || seen.none { prior -> factConflicts(line, prior) }) {
+                val duplicatesUserText = userLine?.let { current ->
+                    semanticallySimilar(line, current)
+                } == true
+                val conflictsEarlierFact = seen.any { prior -> factConflicts(line, prior) }
+                if (core.isBlank() || (!duplicatesUserText && !conflictsEarlierFact)) {
                     kept += line
                     if (core.isNotBlank()) seen += line
                 }
