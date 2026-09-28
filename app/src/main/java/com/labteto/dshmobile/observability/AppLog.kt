@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.observability
 
 import android.util.Log
+import java.io.File
 import java.util.ArrayDeque
+import java.util.Base64
+import java.util.concurrent.Executors
 
 data class AppLogEntry(
     val timestampMillis: Long,
@@ -15,14 +18,29 @@ data class AppLogEntry(
 /**
  * Process-wide logging facade.
  *
- * Android logcat remains the immediate sink. A bounded in-memory tail is kept as the stable
- * observability seam for diagnostics/export without spreading android.util.Log across the codebase.
- * Only the throwable type/message are retained here; full stack traces stay in logcat.
+ * Android logcat remains the immediate sink. A bounded in-memory tail is kept for the current
+ * process and a sanitized app-private tail is persisted so diagnostics remain useful after a crash,
+ * update or process restart.
  */
 object AppLog {
     private const val MAX_ENTRIES = 200
+    private const val MAX_EXPORT_ENTRIES = 800
+    private const val MAX_PERSISTED_BYTES = 2L * 1024L * 1024L
+    private const val ROTATED_ENTRIES = 400
     private val lock = Any()
+    private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
+    private val persistenceExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "777-app-log").apply { isDaemon = true }
+    }
+
+    @Volatile
+    private var persistentFile: File? = null
+
+    fun configurePersistence(file: File) {
+        persistentFile = file
+        runCatching { file.parentFile?.mkdirs() }
+    }
 
     fun debug(tag: String, message: String) {
         record("D", tag, message, null)
@@ -46,8 +64,32 @@ object AppLog {
 
     fun snapshot(): List<AppLogEntry> = synchronized(lock) { entries.toList() }
 
+    /** Includes the sanitized tail from previous processes and de-duplicates current-process rows. */
+    fun exportSnapshot(): List<AppLogEntry> {
+        val merged = readPersisted() + snapshot()
+        return merged
+            .distinctBy {
+                listOf(
+                    it.timestampMillis.toString(),
+                    it.level,
+                    it.tag,
+                    it.message,
+                    it.throwableType.orEmpty(),
+                    it.throwableMessage.orEmpty(),
+                ).joinToString("\u0000")
+            }
+            .sortedBy(AppLogEntry::timestampMillis)
+            .takeLast(MAX_EXPORT_ENTRIES)
+    }
+
     fun clear() {
         synchronized(lock) { entries.clear() }
+        val file = persistentFile ?: return
+        persistenceExecutor.execute {
+            synchronized(persistenceLock) {
+                runCatching { if (file.exists()) file.writeText("") }
+            }
+        }
     }
 
     private fun record(level: String, tag: String, message: String, throwable: Throwable?) {
@@ -63,5 +105,89 @@ object AppLog {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
             entries.addLast(entry)
         }
+        persistAsync(
+            entry.copy(
+                message = sanitizeDiagnosticText(entry.message),
+                throwableMessage = entry.throwableMessage?.let(::sanitizeDiagnosticText),
+            ),
+        )
     }
+
+    private fun persistAsync(entry: AppLogEntry) {
+        val file = persistentFile ?: return
+        persistenceExecutor.execute {
+            synchronized(persistenceLock) {
+                runCatching {
+                    file.parentFile?.mkdirs()
+                    rotateIfNeeded(file)
+                    file.appendText(encodeEntry(entry) + "\n")
+                }
+            }
+        }
+    }
+
+    private fun rotateIfNeeded(file: File) {
+        if (!file.exists() || file.length() < MAX_PERSISTED_BYTES) return
+        val tail = file.useLines { sequence -> sequence.toList().takeLast(ROTATED_ENTRIES) }
+        file.writeText(tail.joinToString(separator = "\n", postfix = if (tail.isEmpty()) "" else "\n"))
+    }
+
+    private fun readPersisted(): List<AppLogEntry> {
+        val file = persistentFile ?: return emptyList()
+        return synchronized(persistenceLock) {
+            runCatching {
+                if (!file.isFile) return@runCatching emptyList()
+                file.useLines { lines ->
+                    lines.mapNotNull(::decodeEntry).toList().takeLast(MAX_EXPORT_ENTRIES)
+                }
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    private fun encodeEntry(entry: AppLogEntry): String = listOf(
+        entry.timestampMillis.toString(),
+        entry.level,
+        encode(entry.tag),
+        encode(entry.message),
+        encode(entry.throwableType.orEmpty()),
+        encode(entry.throwableMessage.orEmpty()),
+    ).joinToString("\t")
+
+    private fun decodeEntry(line: String): AppLogEntry? {
+        val parts = line.split('\t')
+        if (parts.size != 6) return null
+        return runCatching {
+            AppLogEntry(
+                timestampMillis = parts[0].toLong(),
+                level = parts[1],
+                tag = decode(parts[2]),
+                message = decode(parts[3]),
+                throwableType = decode(parts[4]).takeIf(String::isNotBlank),
+                throwableMessage = decode(parts[5]).takeIf(String::isNotBlank),
+            )
+        }.getOrNull()
+    }
+
+    private fun encode(value: String): String =
+        Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+
+    private fun decode(value: String): String =
+        String(Base64.getDecoder().decode(value), Charsets.UTF_8)
 }
+
+internal fun sanitizeDiagnosticText(value: String): String {
+    var result = value
+    DIAGNOSTIC_SECRET_PATTERNS.forEach { pattern ->
+        result = pattern.replace(result) { match ->
+            val prefix = match.groups[1]?.value.orEmpty()
+            prefix + "<redacted>"
+        }
+    }
+    return result
+}
+
+private val DIAGNOSTIC_SECRET_PATTERNS = listOf(
+    Regex("(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s,;]+"),
+    Regex("(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\\s*[:=]\\s*[\\\"']?)[^\\s,\\\"'}]+"),
+    Regex("(?i)()\\b(?:github_pat|ghp|gho|ghu|ghs)_[A-Za-z0-9_]+\\b"),
+)
