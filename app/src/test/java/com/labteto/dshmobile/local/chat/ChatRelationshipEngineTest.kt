@@ -359,6 +359,45 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun explicitRefusalDoesNotBecomeIntimateIntent() {
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("别抱我"),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            classifyExplicitInteractionIntent("不要亲我"),
+        )
+
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("别碰我，停下来", previous),
+        )
+        assertEquals(0, nextInteractionIntensity("别碰我，停下来", previous))
+    }
+
+    @Test
+    fun interactionResetWordDoesNotMatchInsideUnrelatedText() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+        )
+
+        assertFalse(isInteractionResetIntent("预算了三万，接着聊"))
+        assertTrue(isInteractionResetIntent("算了，换个话题"))
+        assertEquals(
+            ChatInteractionIntent.FLIRTING,
+            resolveChatInteractionIntent("继续，预算了三万", previous),
+        )
+    }
+
+    @Test
     fun intimateContextDoesNotStickToUnrelatedNewTopic() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,
