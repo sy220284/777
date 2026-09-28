@@ -430,7 +430,7 @@ class HarnessJobManager(
         } else {
             "达到或超过请求期限后"
         }
-        return "应用进程$timing中断，后台命令未完成（已运行约 ${elapsedSeconds} 秒；请求上限 ${requestedSeconds} 秒）；请检查设备进程退出记录"
+        return "应用进程${timing}中断，后台命令未完成（已运行约 ${elapsedSeconds} 秒；请求上限 ${requestedSeconds} 秒）；请检查设备进程退出记录"
     }
 
     private companion object {
