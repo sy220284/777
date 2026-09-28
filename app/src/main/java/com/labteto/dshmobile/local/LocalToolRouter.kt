@@ -9,9 +9,9 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Keeps the model-facing tool surface small without hiding capabilities permanently.
  *
- * Core conversation/file/web tools stay visible. Android, vision, runtime, GitHub, MCP, LSP, automation and
- * webhook tools are discovered on demand through capability_search and remain enabled for the
- * current turn only.
+ * Core conversation/file/web tools stay visible. Android, vision, runtime, MCP, LSP, automation and
+ * webhook tools are discovered on demand through capability_search. GitHub stays optional too, but a
+ * configured connector may be pre-enabled at Work-turn start so the first model step can call it directly.
  */
 internal object LocalToolRouter {
     private val optionalExact = setOf(
