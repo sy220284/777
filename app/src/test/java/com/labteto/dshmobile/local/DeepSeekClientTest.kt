@@ -169,7 +169,7 @@ class DeepSeekClientTest {
                   "tool_calls": [{
                     "id": "call-1",
                     "type": "function",
-                    "function": {"name": "read", "arguments": "{\\\"path\\\":\\\"a.txt\\\"}"}
+                    "function": {"name": "read", "arguments": "{\"path\":\"a.txt\"}"}
                   }]
                 }
               }]
