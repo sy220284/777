@@ -3651,9 +3651,7 @@ class LocalHarnessEngine @Inject constructor(
                 pressure = resourceScheduler.snapshot().pressure,
                 kind = LocalAgentRunKind.FOREGROUND,
             )
-        } else {
-            1
-        }
+        } else 1
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
