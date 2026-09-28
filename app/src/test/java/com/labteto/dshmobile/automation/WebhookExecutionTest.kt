@@ -92,4 +92,36 @@ class WebhookExecutionTest {
         assertEquals(listOf("running", "completed"), secondStates)
     }
 
+
+    @Test fun executionLimiterRejectsOverflowAndRecoversCapacity() {
+        val limiter = WebhookExecutionLimiter(3)
+
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.tryAcquire())
+        assertFalse(limiter.tryAcquire())
+        assertEquals(3, limiter.pendingCount())
+
+        assertTrue(limiter.release())
+        assertEquals(2, limiter.pendingCount())
+        assertTrue(limiter.tryAcquire())
+        assertEquals(3, limiter.pendingCount())
+    }
+
+    @Test fun executionLimiterNeverUnderflowsOnExtraRelease() {
+        val limiter = WebhookExecutionLimiter(1)
+
+        assertFalse(limiter.release())
+        assertEquals(0, limiter.pendingCount())
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.release())
+        assertFalse(limiter.release())
+        assertEquals(0, limiter.pendingCount())
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun executionLimiterRejectsZeroCapacity() {
+        WebhookExecutionLimiter(0)
+    }
+
 }
