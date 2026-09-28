@@ -200,4 +200,30 @@ class HarnessJobPersistenceTest {
         assertTrue(manager.output("job-preflight-race").contains("[cancelled]"))
     }
 
+
+    @Test
+    fun duplicateIdFactoryFallsBackInsteadOfLoopingForever() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-duplicate" },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-duplicate",
+                    label = "旧任务",
+                    status = "completed",
+                ),
+            ),
+        )
+
+        val started = manager.start("新任务") { _, _ -> "done" }
+        runCurrent()
+
+        val id = started.substringAfterLast('：')
+        assertTrue(id != "job-duplicate")
+        assertTrue(id.startsWith("job-"))
+        assertTrue(manager.output(id).contains("[completed]"))
+        assertTrue(manager.output("job-duplicate").contains("[completed]"))
+    }
+
 }
