@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -118,6 +119,16 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
+        if (!allowMutation && registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+            return AgentToolResult(
+                content = "当前子任务是只读作用域，不能执行会改变状态的工具：" + call.name,
+                isError = true,
+                errorCode = "MUTATION_SCOPE_BLOCKED",
+                recoveryHint = "改用只读检查工具，或由父智能体在可写作用域执行该操作。",
+            )
+        }
+
+        var approvalDenied = false
         val result = registry.execute(
             name = call.name,
             input = call.arguments,
@@ -127,7 +138,9 @@ internal class LocalToolExecutionCoordinator(
                 allowMutation = allowMutation,
                 attributes = mapOf("call_id" to call.id),
                 approval = { tool ->
-                    approval(call, tool, approvalSummary(call, tool))
+                    val granted = approval(call, tool, approvalSummary(call, tool))
+                    if (!granted) approvalDenied = true
+                    granted
                 },
             ),
         )
@@ -143,16 +156,33 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
+        val timedOut = result.content.startsWith("工具执行超时：")
+        val errorCode = when {
+            approvalDenied -> "APPROVAL_DENIED"
+            timedOut -> "TOOL_TIMEOUT"
+            else -> "TOOL_REPORTED_ERROR"
+        }
+        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        AppLog.warn(
+            "LocalToolExecution",
+            "工具执行失败 tool=${call.name} code=$errorCode retryable=${timedOut && readLike}",
+        )
         return AgentToolResult(
             content = result.content,
             isError = true,
-            errorCode = "TOOL_REPORTED_ERROR",
+            errorCode = errorCode,
+            retryable = timedOut && readLike,
             sideEffect = if (registered.access in MUTATING_ACCESSES) {
                 AgentToolSideEffect.POSSIBLE
             } else {
                 AgentToolSideEffect.NONE
             },
-            recoveryHint = "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。",
+            recoveryHint = when {
+                approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
+                timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
+                timedOut -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+                else -> "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。"
+            },
         )
     }
 

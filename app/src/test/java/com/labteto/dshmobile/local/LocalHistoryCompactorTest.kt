@@ -225,6 +225,33 @@ class LocalHistoryCompactorTest {
         assertTrue(after < before)
     }
 
+
+    @Test
+    fun deepHistoryCompactsBeforeReachingTheHardCharacterCeiling() {
+        val history = buildList {
+            add(message("system", "系统"))
+            repeat(58) { index ->
+                add(
+                    message(
+                        if (index % 2 == 0) "user" else "assistant",
+                        "历史-$index-" + "旧".repeat(125),
+                    ),
+                )
+            }
+        }
+        val beforeChars = history.sumOf { it.toString().length }
+        assertTrue(beforeChars < 10_000)
+
+        val compaction = LocalHistoryCompactor(
+            maxHistoryChars = 10_000,
+            tailChars = 1_500,
+            maxSummaryChars = 1_000,
+        ).compact(history) ?: error("expected proactive compaction")
+
+        assertTrue(compaction.omittedMessages > 0)
+        assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
+    }
+
     @Test
     fun retainedToolTextKeepsSupplementaryCharactersWhole() {
         val source = "前".repeat(40) + "😀" + "后".repeat(40)

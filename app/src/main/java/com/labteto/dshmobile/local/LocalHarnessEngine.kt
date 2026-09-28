@@ -2042,7 +2042,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
+        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfo())
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
@@ -3338,6 +3338,7 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val mainMaxSteps = _state.value.mainMaxSteps
         val runSnapshot = _state.value
+        val mainStepLimit = if (runPolicy.allowToolExecution) adaptiveAgentStepLimit(mainMaxSteps, input, runSnapshot.contextChars, runSnapshot.contextBudgetChars, resourceScheduler.snapshot().pressure, LocalAgentRunKind.FOREGROUND) else 1
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -3346,7 +3347,7 @@ class LocalHarnessEngine @Inject constructor(
             planMode = runSnapshot.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
-            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            maxSteps = mainStepLimit,
             input = input,
             memoryInput = memoryInput,
             allowMutation = runPolicy.allowToolExecution,
@@ -3811,7 +3812,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 agentRunCoordinator.recordEvent(runContext, event)
             },
-            maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1,
+            maxSteps = mainStepLimit,
             idFactory = { runContext.runId },
         )
 
@@ -4915,7 +4916,7 @@ class LocalHarnessEngine @Inject constructor(
         callId: String?,
         result: String,
     ): String {
-        val budget = currentHistoryBudget()
+        val budget = adaptiveToolResultBudget(currentHistoryBudget(), modelHistory.encodedChars, modelHistory.estimatedTokens)
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,

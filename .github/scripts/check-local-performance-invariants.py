@@ -218,7 +218,16 @@ if "当前模型不支持图片理解" not in engine:
     violations.append("Unsupported current-model image input must surface an explicit user-facing error")
 if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
     violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
-if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in engine:
+legacy_single_chat_step_policy = "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" in engine
+adaptive_single_chat_step_policy = (
+    re.search(
+        r"val mainStepLimit\s*=\s*if\s*\(runPolicy\.allowToolExecution\).*?else\s+1",
+        engine,
+        re.S,
+    ) is not None
+    and engine.count("maxSteps = mainStepLimit") >= 2
+)
+if not (legacy_single_chat_step_policy or adaptive_single_chat_step_policy):
     violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
