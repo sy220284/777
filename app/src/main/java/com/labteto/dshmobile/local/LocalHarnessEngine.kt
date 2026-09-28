@@ -2576,7 +2576,11 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Switch between inspection-only planning and normal execution. */
     internal fun setPlanMode(enabled: Boolean) {
-        if (_state.value.usageMode == LocalUsageMode.CHAT || isRunBusy()) return
+        if (
+            _state.value.usageMode == LocalUsageMode.CHAT ||
+            isRunBusy() ||
+            activeWorkRuns[currentSessionId]?.job?.isCompleted == false
+        ) return
         _state.update { it.copy(planMode = enabled) }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
@@ -3697,7 +3701,7 @@ class LocalHarnessEngine @Inject constructor(
                     ensureSystemMessage(binding)
                     val snapshot = runState.value
                     if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         val relationshipMemory = chatRelationshipMemoryContext(memoryInput, snapshot)
                         val preparedChat = chatTurnCoordinator.prepare(
                             snapshot = snapshot,
@@ -3716,7 +3720,7 @@ class LocalHarnessEngine @Inject constructor(
                                 handoffSummary = snapshot.handoffSummary,
                             ),
                         )
-                        captureAutoMemoryDirective(memoryInput, sourceMessageId)
+                        captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     requestPrepared = true
                 }
