@@ -44,7 +44,7 @@ class LocalSessionStorageManagerTest {
                 File(root, "a.events.jsonl"),
                 File(root, "a.events.jsonl.part-0"),
                 File(root, "a.events.jsonl.part-1.gz"),
-            ).sumOf(File::length),
+            ).sumOf { it.length() },
             status.totalBytes,
         )
         assertEquals(LocalSessionStorageStatus.DEFAULT_BUDGET_BYTES, status.budgetBytes)
