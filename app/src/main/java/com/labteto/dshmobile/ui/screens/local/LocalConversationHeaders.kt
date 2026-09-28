@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -85,7 +87,8 @@ internal fun ChatSurfaceHeader(
                 .weight(1f)
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
-                .clickable(enabled = !running, onClick = onContextClick)
+                .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
+                .semantics(mergeDescendants = true) { }
                 .padding(horizontal = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
@@ -186,7 +189,8 @@ internal fun WorkSurfaceHeader(
                 .weight(1f)
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
-                .clickable(enabled = !running, onClick = onModelClick)
+                .clickable(enabled = !running, role = Role.Button, onClick = onModelClick)
+                .semantics(mergeDescendants = true) { }
                 .padding(horizontal = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),

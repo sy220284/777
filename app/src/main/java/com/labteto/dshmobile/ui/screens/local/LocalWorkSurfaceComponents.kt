@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -97,6 +99,9 @@ internal fun WorkSessionStatusStrip(
                 )
             }
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

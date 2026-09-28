@@ -27,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -92,12 +95,16 @@ fun ThinkingRow(
     streaming: Boolean = false,
 ) {
     val colors = DsTheme.colors
+    val disclosureState = stringResource(
+        if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 24.dp)
             .clip(DsShapes.row)
-            .clickable(onClick = onToggle)
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = disclosureState }
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -120,7 +127,7 @@ fun ThinkingRow(
         )
         Icon(
             Icons.Filled.KeyboardArrowDown,
-            contentDescription = stringResource(R.string.chat_thinking),
+            contentDescription = null,
             tint = colors.labelTertiary,
             modifier = Modifier
                 .size(18.dp)

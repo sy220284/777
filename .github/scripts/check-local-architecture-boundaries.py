@@ -31,8 +31,8 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 24,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt": 87,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkStateContent.kt": 16,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt": 339,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSurfaceComponents.kt": 415,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt": 344,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSurfaceComponents.kt": 421,
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
