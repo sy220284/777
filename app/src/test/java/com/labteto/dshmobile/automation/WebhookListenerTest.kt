@@ -11,21 +11,39 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WebhookListenerTest {
-    @Test fun repeatedRestartReleasesPortAndServesOnlyCurrentListener() {
+    @Test fun repeatedRestartReleasesEveryPreviousPortAndServesOnlyCurrentListener() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val port = ServerSocket(0).use { it.localPort }
         val listener = WebhookListener(scope) { it.getOutputStream().write(42) }
+        val usedPorts = mutableListOf<Int>()
         try {
-            repeat(10) {
+            repeat(100) {
                 val currentPort = ServerSocket(0).use { it.localPort }
                 listener.restart(InetSocketAddress("127.0.0.1", currentPort))
+                usedPorts += currentPort
+
                 Socket("127.0.0.1", currentPort).use { client ->
                     client.soTimeout = 3000
                     assertEquals(42, client.getInputStream().read())
                 }
+
+                if (usedPorts.size > 1) {
+                    val previousPort = usedPorts[usedPorts.lastIndex - 1]
+                    ServerSocket().use { probe ->
+                        probe.reuseAddress = true
+                        probe.bind(InetSocketAddress("127.0.0.1", previousPort))
+                    }
+                }
             }
+
+            val finalPort = usedPorts.last()
             listener.close()
-            ServerSocket().use { it.reuseAddress = true; it.bind(InetSocketAddress("127.0.0.1", port)) }
-        } finally { listener.close(); scope.cancel() }
+            ServerSocket().use { probe ->
+                probe.reuseAddress = true
+                probe.bind(InetSocketAddress("127.0.0.1", finalPort))
+            }
+        } finally {
+            listener.close()
+            scope.cancel()
+        }
     }
 }
