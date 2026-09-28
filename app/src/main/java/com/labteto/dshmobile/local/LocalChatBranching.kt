@@ -117,30 +117,15 @@ internal fun activeTranscriptForUserEdit(
     messageId: String,
     activeBranch: List<LocalHarnessMessage>,
     hotMessages: List<LocalHarnessMessage>,
-    totalMessageCount: Long,
     loadDurableTranscript: () -> List<LocalHarnessMessage>,
 ): List<LocalHarnessMessage> {
     val branchContainsTarget = activeBranch.any { it.id == messageId }
-    if (branchContainsTarget && activeBranch.size.toLong() >= totalMessageCount) {
-        return activeBranch
-    }
-
     val hotContainsTarget = hotMessages.any { it.id == messageId }
-    if (
-        activeBranch.isEmpty() &&
-        hotContainsTarget &&
-        hotMessages.size.toLong() >= totalMessageCount
-    ) {
-        return hotMessages
-    }
 
+    // Never infer that a bounded runtime window is the whole conversation from the runtime count.
+    // Legacy migrations and interrupted projection updates can leave that count stale. The durable
+    // projection supplies the prefix; a currently visible/selected tail remains authoritative.
     val durable = loadDurableTranscript()
-    if (durable.any { it.id == messageId }) return durable
-
-    // Legacy or just-migrated sessions can have a complete live tail while the durable projection
-    // boundary still lacks that newest tail. A message already visible in the active UI must not
-    // become uneditable merely because the archive has not caught up yet. Merge the durable prefix
-    // with the authoritative live tail instead of discarding either side.
     return when {
         branchContainsTarget -> mergeDurableTranscriptWithLiveTail(durable, activeBranch)
         hotContainsTarget -> mergeDurableTranscriptWithLiveTail(durable, hotMessages)
