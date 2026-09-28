@@ -165,4 +165,39 @@ class HarnessJobPersistenceTest {
 
         assertTrue(manager.output(persistentId).contains("[completed]"))
     }
+
+    @Test
+    fun persistentTaskKilledDuringDurablePreflightNeverStartsLater() = runTest {
+        var ran = false
+        var killedDuringPreflight = false
+        lateinit var manager: HarnessJobManager
+        manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-preflight-race" },
+            onSnapshotsChanged = { snapshots ->
+                if (!killedDuringPreflight &&
+                    snapshots.any { it.id == "job-preflight-race" && it.status == "running" }
+                ) {
+                    killedDuringPreflight = true
+                    manager.kill("job-preflight-race")
+                }
+            },
+        )
+
+        manager.startPersistent(
+            label = "durable",
+            resumeKind = "web_fetch",
+            resumePayload = "{\"url\":\"https://example.com\"}",
+        ) { _, _ ->
+            ran = true
+            "must not run"
+        }
+        runCurrent()
+
+        assertTrue(killedDuringPreflight)
+        assertFalse(ran)
+        assertTrue(manager.output("job-preflight-race").contains("[cancelled]"))
+    }
+
 }
