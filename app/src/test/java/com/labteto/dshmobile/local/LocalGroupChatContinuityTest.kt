@@ -30,6 +30,7 @@ class LocalGroupChatContinuityTest {
         val result = finalizeGroupContextAfterRefresh(
             context = context,
             statesInReplyOrder = listOf(ChatCharacterState()),
+            processedPending = context.pendingTurns,
             complete = false,
         )
 
@@ -69,6 +70,7 @@ class LocalGroupChatContinuityTest {
         val result = finalizeGroupContextAfterRefresh(
             context = context,
             statesInReplyOrder = listOf(first, second),
+            processedPending = context.pendingTurns,
             complete = true,
         )
 
@@ -77,6 +79,35 @@ class LocalGroupChatContinuityTest {
         assertEquals(listOf("明早出门尚未发生"), result.continuity.unfinished)
         assertEquals(22L, result.processedThroughSequence)
         assertEquals(emptyList<ChatPendingTurn>(), result.pendingTurns)
+    }
+
+    @Test
+    fun successfulGroupRefreshCommitsOnlyPendingActuallyShownToPlanner() {
+        val context = ChatContextState(
+            continuity = ChatContinuityState(recentEvents = listOf("旧事件")),
+            processedThroughSequence = 10L,
+            pendingTurns = listOf(
+                ChatPendingTurn(sequence = 20L, assistantMessageId = "a20", generation = 4L),
+                ChatPendingTurn(sequence = 22L, assistantMessageId = "a22", generation = 4L),
+                ChatPendingTurn(sequence = 24L, assistantMessageId = "a24", generation = 4L),
+            ),
+            generation = 4L,
+        )
+        val processed = context.pendingTurns.take(2)
+        val state = ChatCharacterState(
+            continuity = ChatContinuityState(recentEvents = listOf("已归并前两条")),
+        )
+
+        val result = finalizeGroupContextAfterRefresh(
+            context = context,
+            statesInReplyOrder = listOf(state),
+            processedPending = processed,
+            complete = true,
+        )
+
+        assertEquals(22L, result.processedThroughSequence)
+        assertEquals(listOf(24L), result.pendingTurns.map { it.sequence })
+        assertEquals(listOf("已归并前两条"), result.continuity.recentEvents)
     }
 
     @Test
