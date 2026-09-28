@@ -363,7 +363,10 @@ internal fun groundContinuityEvidence(
         val preserved = retainedPrevious.filter { old ->
             accepted.none { fresh ->
                 normalizeContinuityFact(old) == normalizeContinuityFact(fresh) ||
-                    ChatContextAssembler.factConflicts(old, fresh)
+                    (
+                        kind == ChatContinuityFactKind.DECISION &&
+                            ChatContextAssembler.factConflicts(old, fresh)
+                    )
             }
         }
         return (preserved + accepted)
