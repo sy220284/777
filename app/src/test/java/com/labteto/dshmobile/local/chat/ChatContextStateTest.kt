@@ -181,6 +181,36 @@ class ChatContextStateTest {
     }
 
     @Test
+    fun largeSoftStateCannotPushPendingFallbackOutOfRequestContext() {
+        var context = ChatContextState(
+            scene = ChatSceneState(sceneTime = "深夜", location = "很长很长的房间名"),
+            continuity = ChatContinuityState(
+                recentEvents = (1..5).map { "近期事件$it-" + "事".repeat(170) },
+                decisions = (1..4).map { "决定$it-" + "定".repeat(170) },
+                unfinished = (1..4).map { "待续$it-" + "续".repeat(170) },
+            ),
+            generation = 7L,
+        )
+        repeat(16) { index ->
+            context = context.enqueuePending(
+                ChatPendingTurn(
+                    sequence = (100 + index).toLong(),
+                    assistantMessageId = "a$index",
+                    userMessage = "用户旧事实$index-" + "问".repeat(170),
+                    assistantMessage = "角色旧事实$index-" + "答".repeat(220),
+                    generation = 7L,
+                ),
+            )
+        }
+
+        val rendered = renderChatContextForModel(context)
+
+        assertTrue(rendered.contains("#105 用户：用户旧事实5"))
+        assertTrue(rendered.contains("地点=很长很长的房间名"))
+        assertTrue(rendered.contains("事实优先级：当前用户输入 > 尚未归并原文"))
+    }
+
+    @Test
     fun plannerReceivesOnlyEventBackedHardSceneFields() {
         val state = ChatCharacterState()
         val context = ChatContextState(
