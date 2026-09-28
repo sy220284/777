@@ -572,53 +572,55 @@ internal class LocalSubagentRunner(
                 }
             },
         )
-        return try {
-            executor.execute {
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    modelClient.complete(key, baseUrl, model, history, tools)
+        var activeHistory = history
+        var overflowRound = 0
+        while (true) {
+            try {
+                return executor.execute {
+                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                        modelClient.complete(key, baseUrl, model, activeHistory, tools)
+                    }
                 }
-            }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val compacted = historyCompactor.compactForOverflow(
-                history,
-                LocalHistorySummaryMode.WORK,
-            ) ?: throw error
-            durableHistory?.let { durable ->
-                applyOverflowCompaction(
-                    history = durable,
-                    compactor = historyCompactor,
-                    summaryMode = LocalHistorySummaryMode.WORK,
-                )?.let { durableCompaction ->
-                    eventLog().append("subagent/compaction", buildJsonObject {
-                        put("agent_id", subagentId)
-                        put("trigger", "context-overflow")
-                        put("omitted_messages", durableCompaction.omittedMessages)
-                        put("summary", durableCompaction.summary)
-                        put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
-                        put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
-                    })
+            } catch (error: Throwable) {
+                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+                val compacted = historyCompactor.compactForOverflow(
+                    activeHistory,
+                    LocalHistorySummaryMode.WORK,
+                ) ?: throw error
+                val madeProgress =
+                    compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                        compacted.messages != activeHistory
+                if (!madeProgress) throw error
+
+                overflowRound += 1
+                durableHistory?.let { durable ->
+                    applyOverflowCompaction(
+                        history = durable,
+                        compactor = historyCompactor,
+                        summaryMode = LocalHistorySummaryMode.WORK,
+                    )?.let { durableCompaction ->
+                        eventLog().append("subagent/compaction", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("trigger", "context-overflow")
+                            put("round", overflowRound)
+                            put("omitted_messages", durableCompaction.omittedMessages)
+                            put("summary", durableCompaction.summary)
+                            put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
+                            put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
+                        })
+                    }
                 }
+                eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("step", step)
+                    put("round", overflowRound)
+                    put("model", model)
+                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                    put("omitted_messages", compacted.omittedMessages)
+                })
+                activeHistory = compacted.messages
             }
-            eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
-                put("agent_id", subagentId)
-                put("step", step)
-                put("model", model)
-                put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                put("omitted_messages", compacted.omittedMessages)
-            })
-            completeSubagentStep(
-                key = key,
-                baseUrl = baseUrl,
-                model = model,
-                history = compacted.messages,
-                tools = tools,
-                subagentId = subagentId,
-                step = step,
-                durableHistory = null,
-                allowContextOverflowRecovery = false,
-            )
         }
     }
 
