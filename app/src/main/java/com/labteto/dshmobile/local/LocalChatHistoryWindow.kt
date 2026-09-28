@@ -142,7 +142,7 @@ internal fun buildChatContinuationHandoff(
             )
             append("人物位置、动作和物件以最近原始对话为准，不从旧场景快照继承。")
         }
-    }.trim()
+    }.trim().take(500)
 
     val pendingBlock = buildString {
         val pending = shared.pendingForRequest(limit = 4)
@@ -157,7 +157,7 @@ internal fun buildChatContinuationHandoff(
                 }
             }
         }
-    }.trim()
+    }.trim().take(1_200)
 
     val recentUserBlock = buildString {
         val recentUserEvents = messages.asSequence()
@@ -170,7 +170,7 @@ internal fun buildChatContinuationHandoff(
             appendLine("近期用户表达与事件：")
             recentUserEvents.forEach { appendLine("- ${it.take(360)}") }
         }
-    }.trim()
+    }.trim().take(1_200)
 
     val continuityBlock = buildString {
         shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
@@ -185,7 +185,7 @@ internal fun buildChatContinuationHandoff(
         state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
             append("共同经历：${moments.joinToString("；").take(700)}")
         }
-    }.trim()
+    }.trim().take(1_000)
 
     val body = listOf(sceneBlock, pendingBlock, recentUserBlock, continuityBlock)
         .filter(String::isNotBlank)
