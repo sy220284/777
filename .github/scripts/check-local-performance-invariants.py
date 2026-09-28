@@ -115,6 +115,17 @@ expected_counts = {
     "modelHistory[0] =": 1,    # replaceSystemModelHistory
     "modelHistory.clear()": 1, # resetModelHistory
 }
+historical_chat_full_scan_patterns = (
+    "sourceEventSequenceForMessage(eventLog.events()",
+    "restoreChatStateBefore(eventLog.events()",
+    "restoreGroupStateBefore(eventLog.events()",
+)
+for pattern in historical_chat_full_scan_patterns:
+    if pattern in engine:
+        violations.append(
+            "Historical Chat timeline rewrites must page event history instead of materializing the full archive"
+        )
+
 for token, expected in expected_counts.items():
     actual = engine.count(token)
     if actual != expected:
