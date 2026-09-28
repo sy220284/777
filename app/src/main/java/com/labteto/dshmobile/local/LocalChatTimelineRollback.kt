@@ -117,3 +117,124 @@ internal fun restoreGroupStateBefore(
         }.getOrNull()
     }
     .lastOrNull()
+
+/**
+ * Paged variant for long-lived sessions. Historical edit is an interactive path, so it must not
+ * materialize the complete event archive merely to locate one source message or rollback state.
+ */
+internal fun sourceEventSequenceForMessage(
+    eventLog: LocalSessionEventLog,
+    messageId: String,
+): Long? {
+    var beforeSequenceExclusive = Long.MAX_VALUE
+    while (true) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = beforeSequenceExclusive,
+            limit = CHAT_TIMELINE_SCAN_PAGE_SIZE,
+        )
+        if (page.isEmpty()) return null
+
+        page.asReversed().firstOrNull { event ->
+            (event.type == "user/message" || event.type == LOCAL_AGENT_INBOX_EVENT_TYPE) &&
+                decodeTranscriptMessages(event.data)
+                    .orEmpty()
+                    .any { message -> message.id == messageId }
+        }?.let { event -> return event.sequence }
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < CHAT_TIMELINE_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
+        beforeSequenceExclusive = oldestSequence
+    }
+}
+
+internal fun restoreChatStateBefore(
+    eventLog: LocalSessionEventLog,
+    json: Json,
+    sequenceExclusive: Long?,
+    createdAtExclusive: Long,
+): ChatCharacterState? = scanTimelineBackward(
+    eventLog = eventLog,
+    sequenceExclusive = sequenceExclusive,
+    createdAtExclusive = createdAtExclusive,
+) { event ->
+    if (
+        event.type != "chat/state-baseline" &&
+        !(
+            event.type == "chat/post-turn" &&
+                event.data["status"]?.jsonPrimitive?.contentOrNull == "updated"
+            )
+    ) {
+        return@scanTimelineBackward null
+    }
+    decodeChatStateEvent(event, json)
+}
+
+internal fun restoreGroupStateBefore(
+    eventLog: LocalSessionEventLog,
+    json: Json,
+    sequenceExclusive: Long?,
+    createdAtExclusive: Long,
+): LocalGroupChatState? = scanTimelineBackward(
+    eventLog = eventLog,
+    sequenceExclusive = sequenceExclusive,
+    createdAtExclusive = createdAtExclusive,
+) { event ->
+    if (event.type != "group/state" && event.type != "chat/state-baseline") {
+        return@scanTimelineBackward null
+    }
+    val key = if (event.type == "chat/state-baseline") "group_state" else "state"
+    val encoded = event.data[key] as? JsonObject ?: return@scanTimelineBackward null
+    runCatching {
+        json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
+    }.getOrNull()
+}
+
+private fun decodeChatStateEvent(
+    event: LocalSessionEventLog.Event,
+    json: Json,
+): ChatCharacterState? {
+    val encoded = event.data["state"] as? JsonObject
+    if (encoded != null) {
+        return runCatching {
+            json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
+        }.getOrNull()
+    }
+
+    // Compatibility with old post-turn events that only persisted these two fields.
+    val mood = event.data["mood"]?.jsonPrimitive?.contentOrNull
+    val relationship = event.data["relationship_state"]?.jsonPrimitive?.contentOrNull
+    if (mood == null && relationship == null) return null
+    return ChatCharacterState(
+        mood = mood ?: "自然",
+        relationshipState = relationship ?: "熟悉中",
+        updatedAt = event.createdAt,
+    )
+}
+
+private inline fun <T> scanTimelineBackward(
+    eventLog: LocalSessionEventLog,
+    sequenceExclusive: Long?,
+    createdAtExclusive: Long,
+    crossinline decode: (LocalSessionEventLog.Event) -> T?,
+): T? {
+    var beforeSequenceExclusive = sequenceExclusive ?: Long.MAX_VALUE
+    while (true) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = beforeSequenceExclusive,
+            limit = CHAT_TIMELINE_SCAN_PAGE_SIZE,
+        )
+        if (page.isEmpty()) return null
+
+        for (event in page.asReversed()) {
+            if (sequenceExclusive == null && event.createdAt >= createdAtExclusive) continue
+            decode(event)?.let { return it }
+        }
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < CHAT_TIMELINE_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
+        beforeSequenceExclusive = oldestSequence
+    }
+}
+
+private const val CHAT_TIMELINE_SCAN_PAGE_SIZE = 200
+
