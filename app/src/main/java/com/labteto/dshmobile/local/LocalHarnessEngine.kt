@@ -5892,10 +5892,8 @@ class LocalHarnessEngine @Inject constructor(
         5. 表达长短和形式服从人物与语境，避免机械、模板化或脱离当前关系的回答。
         6. 当前模式只进行聊天，不执行工作任务或工具操作。
     """.trimIndent()
-
     private fun workSystemPrompt(): String = """
         你是“神言神语”的本机工作智能体。准确理解用户目标与约束，调用可用能力完成任务，并对最终结果负责。
-
         遵循以下原则：
         1. 先了解现状再行动，优先复用已有信息、实现和经过验证的路径。
         2. 能执行就直接推进；持续到任务完成或遇到真实阻塞，不以计划、部分结果或工具返回成功代替完成。
@@ -5907,7 +5905,6 @@ class LocalHarnessEngine @Inject constructor(
         8. 最终结论必须有实际结果支撑。仍能解决的问题继续处理；确实受阻时准确说明已完成、未完成及阻塞原因。
         ${if (_state.value.planMode) PLAN_MODE_PROMPT else ""}
     """.trimIndent()
-
     private fun withChatTurnContext(
         history: List<JsonObject>,
         stableContext: String,
