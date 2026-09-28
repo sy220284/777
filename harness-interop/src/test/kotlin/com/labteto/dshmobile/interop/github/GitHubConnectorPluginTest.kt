@@ -110,6 +110,82 @@ class GitHubConnectorPluginTest {
     }
 
     @Test
+    fun readRetriesTransientGatewayFailureButMutationDoesNot() = runTest {
+        val token = "github_pat_test_secret_1234567890"
+        var readCalls = 0
+        val readHttp = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                readCalls += 1
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(if (readCalls == 1) 503 else 200)
+                    .message(if (readCalls == 1) "Service Unavailable" else "OK")
+                    .body(
+                        (if (readCalls == 1) """{"message":"retry"}""" else """{"ok":true}""")
+                            .toResponseBody(JSON_MEDIA),
+                    )
+                    .build()
+            }
+            .build()
+        val readRegistry = PluginRegistry()
+        readRegistry.install(
+            GitHubConnectorPlugin(
+                http = readHttp,
+                json = Json,
+                credentialProvider = { token },
+                apiBaseUrl = "https://api.github.test",
+            ),
+        )
+
+        val read = readRegistry.context.tools.execute(
+            "github_api_get",
+            buildJsonObject { put("path", "/repos/example/project") },
+        )
+        assertFalse(read.isError)
+        assertEquals(2, readCalls)
+
+        var writeCalls = 0
+        val writeHttp = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                writeCalls += 1
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(503)
+                    .message("Service Unavailable")
+                    .body("""{"message":"unknown delivery"}""".toResponseBody(JSON_MEDIA))
+                    .build()
+            }
+            .build()
+        val writeRegistry = PluginRegistry()
+        writeRegistry.install(
+            GitHubConnectorPlugin(
+                http = writeHttp,
+                json = Json,
+                credentialProvider = { token },
+                apiBaseUrl = "https://api.github.test",
+            ),
+        )
+        val write = writeRegistry.context.tools.execute(
+            "github_api_request",
+            buildJsonObject {
+                put("method", "POST")
+                put("path", "/repos/example/project/pulls")
+                put("body", buildJsonObject {
+                    put("title", "test")
+                    put("head", "feature")
+                    put("base", "main")
+                })
+            },
+            context = ToolContext(approval = { true }),
+        )
+
+        assertTrue(write.isError)
+        assertEquals(1, writeCalls)
+    }
+
+    @Test
     fun connectorRejectsSensitiveRepositoryAdministrationRoutes() = runTest {
         var calls = 0
         val http = OkHttpClient.Builder()
