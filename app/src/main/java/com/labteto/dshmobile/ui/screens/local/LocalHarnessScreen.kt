@@ -6,6 +6,9 @@ import com.labteto.dshmobile.local.LocalChatUserEditResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -184,7 +187,7 @@ fun LocalHarnessScreen(
     LaunchedEffect(pendingUsageMode, state.loading, state.usageMode) {
         val pending = pendingUsageMode ?: return@LaunchedEffect
         when {
-            state.usageMode == pending -> pendingUsageMode = null
+            state.usageMode == pending && !state.loading -> pendingUsageMode = null
             !state.loading -> {
                 // A rejected/no-op transition should not leave the sidebar showing a phantom mode.
                 // Give the engine one frame window to publish loading=true before rolling back.
@@ -203,7 +206,7 @@ fun LocalHarnessScreen(
             target == LocalUsageMode.CHAT &&
                 state.usageMode == LocalUsageMode.CHAT &&
                 state.groupChat.enabled
-        if (target == state.usageMode && !returningFromGroupToSingle) return
+        if (target == state.usageMode && pendingUsageMode == null && !returningFromGroupToSingle) return
         if (target != state.usageMode) {
             val key = "shown_" + target.name.lowercase()
             if (!modeIntroPreferences.getBoolean(key, false)) {
@@ -235,7 +238,7 @@ fun LocalHarnessScreen(
                 sessions = state.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(state.usageMode, pendingUsageMode),
-                modeSwitchEnabled = !state.running && !state.loading,
+                modeSwitchEnabled = !state.running,
                 onUsageModeChange = ::switchUsageMode,
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -1867,38 +1870,49 @@ internal fun LocalUsageModePill(
     } else if (backgroundState.hasImage) {
         colors.bgModulePlatform.copy(alpha = 0.28f)
     } else {
-        colors.bgLayer1
+        colors.bgModulePlatform
     }
+    val indicatorOffset by animateDpAsState(
+        targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else 126.dp,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "usage mode indicator",
+    )
     Surface(
+        modifier = Modifier.width(264.dp).height(52.dp),
         shape = DsShapes.pillFull,
         color = containerColor,
+        border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
         shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
     ) {
-        Row(
-            Modifier.padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            listOf(
-                LocalUsageMode.CHAT to R.string.local_usage_chat,
-                LocalUsageMode.WORK to R.string.local_usage_work,
-            ).forEach { (mode, labelRes) ->
-                val active = selected == mode
-                Box(
-                    modifier = Modifier
-                        .heightIn(min = DsSpacing.touchTarget)
-                        .clip(DsShapes.pillFull)
-                        .background(if (active) colors.labelPrimary else Color.Transparent)
-                        .clickable(enabled = enabled) { onSelect(mode) }
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        stringResource(labelRes),
-                        style = DsType.small13Strong,
-                        color = if (active) colors.bgBase else colors.labelSecondary,
-                    )
+        Box(Modifier.padding(4.dp)) {
+            Surface(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .size(width = 126.dp, height = 44.dp),
+                shape = DsShapes.pillFull,
+                color = colors.bgLayer1,
+                border = BorderStroke(1.dp, colors.borderL1),
+                shadowElevation = 2.dp,
+            ) {}
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                listOf(
+                    LocalUsageMode.CHAT to R.string.local_usage_chat,
+                    LocalUsageMode.WORK to R.string.local_usage_work,
+                ).forEach { (mode, labelRes) ->
+                    Box(
+                        modifier = Modifier
+                            .size(width = 126.dp, height = 44.dp)
+                            .clip(DsShapes.pillFull)
+                            .clickable(enabled = enabled) { onSelect(mode) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(labelRes),
+                            style = DsType.std14,
+                            color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
+                        )
+                    }
                 }
             }
         }
