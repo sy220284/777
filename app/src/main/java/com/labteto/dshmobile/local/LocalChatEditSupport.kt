@@ -136,30 +136,6 @@ private fun findDurableUserModelMessage(
     }
 }
 
-private fun findTranscriptEvent(
-    eventLog: LocalSessionEventLog,
-    type: String,
-    messageId: String,
-): LocalSessionEventLog.Event? {
-    var beforeSequenceExclusive = Long.MAX_VALUE
-    while (true) {
-        val page = eventLog.pageBefore(
-            sequenceExclusive = beforeSequenceExclusive,
-            limit = CHAT_EVENT_SCAN_PAGE_SIZE,
-        )
-        if (page.isEmpty()) return null
-        page.asReversed().firstOrNull { event ->
-            event.type == type &&
-                decodeTranscriptMessages(event.data).orEmpty()
-                    .any { message -> message.id == messageId }
-        }?.let { return it }
-
-        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
-        if (page.size < CHAT_EVENT_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
-        beforeSequenceExclusive = oldestSequence
-    }
-}
-
 private fun loadDurableUserModelMessages(
     eventLog: LocalSessionEventLog,
     messageIds: Set<String>,
