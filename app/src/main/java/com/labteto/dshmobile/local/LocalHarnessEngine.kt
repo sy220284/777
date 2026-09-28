@@ -3696,7 +3696,7 @@ class LocalHarnessEngine @Inject constructor(
                         .enqueuePending(
                         ChatPendingTurn(
                             sequence = assistantEvent.sequence,
-                            userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId,
+                            userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId.orEmpty(),
                             assistantMessageId = transcript.id,
                             branchHeadId = transcript.id,
                             userMessage = input,
