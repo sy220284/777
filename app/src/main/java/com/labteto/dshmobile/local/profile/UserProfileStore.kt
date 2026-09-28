@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.profile
 
 import android.content.Context
+import com.labteto.dshmobile.local.chat.RecoveringChatDocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -16,31 +17,33 @@ data class UserProfile(
 )
 
 @Singleton
-class UserProfileStore @Inject constructor(
-    @ApplicationContext context: Context,
+class UserProfileStore internal constructor(
+    private val file: File,
     private val json: Json,
 ) {
-    private val file = File(context.filesDir, "local-harness/profile/user.json")
+    @Inject constructor(@ApplicationContext context: Context, json: Json) :
+        this(File(context.filesDir, "local-harness/profile/user.json"), json)
+
+    private val durableFile = RecoveringChatDocumentFile(file)
 
     @Synchronized
-    fun read(): UserProfile {
-        if (!file.isFile) return UserProfile()
-        return runCatching {
-            json.decodeFromString(UserProfile.serializer(), file.readText())
-        }.getOrDefault(UserProfile())
-    }
+    fun read(): UserProfile =
+        durableFile.read(
+            defaultValue = ::UserProfile,
+            decode = ::decode,
+        )
 
     @Synchronized
     fun write(profile: UserProfile) {
         val clean = profile.copy(customRules = profile.customRules.trim().take(MAX_RULE_CHARS))
-        file.parentFile?.mkdirs()
-        val temporary = File(file.parentFile, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(UserProfile.serializer(), clean))
-        if (!temporary.renameTo(file)) {
-            file.writeText(temporary.readText())
-            temporary.delete()
+        val encoded = json.encodeToString(UserProfile.serializer(), clean)
+        durableFile.write(encoded) { candidate ->
+            runCatching { decode(candidate) }.isSuccess
         }
     }
+
+    private fun decode(encoded: String): UserProfile =
+        json.decodeFromString(UserProfile.serializer(), encoded)
 
     private companion object {
         const val MAX_RULE_CHARS = 6_000
