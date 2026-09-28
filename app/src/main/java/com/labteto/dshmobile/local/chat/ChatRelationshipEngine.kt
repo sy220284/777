@@ -46,7 +46,9 @@ internal fun hasChineseSuggestiveFlirtingIntent(input: String): Boolean =
 
 internal fun isInteractionResetIntent(input: String): Boolean {
     val text = input.trim().lowercase()
-    return INTENT_RESET_HINTS.any { text.contains(it) }
+    return INTENT_RESET_EXACT.any { text == it || text.startsWith("$it，") || text.startsWith("$it,") } ||
+        INTENT_RESET_HINTS.any { text.contains(it) } ||
+        NEGATED_INTIMACY_HINTS.any { text.contains(it) }
 }
 
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
@@ -58,6 +60,9 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     }
 
     val nonInteractionContext = NON_INTERACTION_INTENT_HINTS.any { text.contains(it) }
+    if (NEGATED_INTIMACY_HINTS.any { text.contains(it) }) {
+        return ChatInteractionIntent.NORMAL
+    }
     val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
     if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
 
@@ -347,8 +352,16 @@ private val SHORT_INTERACTION_CONTINUATIONS = setOf(
     "嗯", "嗯嗯", "好", "行", "可以", "来吧", "继续", "接着", "再来", "别停", "就这样",
     "你猜", "是吗", "哦？", "嗯？", "然后呢",
 )
+private val INTENT_RESET_EXACT = listOf("算了")
+
 private val INTENT_RESET_HINTS = listOf(
-    "换个话题", "先不聊这个", "不聊这个", "说正事", "算了", "停一下", "到此为止",
+    "换个话题", "先不聊这个", "不聊这个", "说正事", "停一下", "到此为止",
+)
+
+private val NEGATED_INTIMACY_HINTS = listOf(
+    "别抱我", "不要抱我", "别碰我", "不要碰我", "别亲我", "不要亲我",
+    "别吻我", "不要吻我", "别搂我", "不要搂我", "离我远点", "别靠近我",
+    "停止亲", "停止抱", "停下来",
 )
 
 /**

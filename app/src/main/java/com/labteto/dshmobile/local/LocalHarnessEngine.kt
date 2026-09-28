@@ -151,6 +151,11 @@ private data class GroupReplyForStateUpdate(
     val content: String,
 )
 
+private data class GroupStateRefreshBatch(
+    val states: Map<String, ChatCharacterState>,
+    val complete: Boolean,
+)
+
 private data class GroupGeneratedReply(
     val member: LocalGroupChatMember,
     val persona: PersonaProfile,
@@ -1482,7 +1487,7 @@ class LocalHarnessEngine @Inject constructor(
         if (editableChatUserText(original).trim() == requestedText) return@synchronized LocalChatUserEditResult.UNCHANGED
         cancelChatPostTurn()
 
-        val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), messageId)
+        val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
         val branchParentState = state.chatBranches.nodes
             .firstOrNull { node -> node.message.id == messageId }
             ?.parentId
@@ -1490,10 +1495,10 @@ class LocalHarnessEngine @Inject constructor(
                 state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
             }
         val baseState = branchParentState
-            ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
+            ?: restoreChatStateBefore(eventLog, json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
         val baseGroupState = if (state.groupChat.enabled) {
-            restoreGroupStateBefore(eventLog.events(), json, sourceSequence, original.createdAt)
+            restoreGroupStateBefore(eventLog, json, sourceSequence, original.createdAt)
                 ?: state.groupChat.copy(
                     members = state.groupChat.members.map { member ->
                         member.copy(chatState = ChatCharacterState())
@@ -1706,9 +1711,9 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             val branchParentState = chatBranchParentState(branches, messageId)
-            val sourceSequence = sourceEventSequenceForMessage(eventLog.events(), promptMessage.id)
+            val sourceSequence = sourceEventSequenceForMessage(eventLog, promptMessage.id)
             val baseState = branchParentState
-                ?: restoreChatStateBefore(eventLog.events(), json, sourceSequence, promptMessage.createdAt)
+                ?: restoreChatStateBefore(eventLog, json, sourceSequence, promptMessage.createdAt)
                 ?: ChatCharacterState()
             val baseContext = restoreBranchContext(
                 snapshot = chatBranchParentContext(branches, messageId),
@@ -2780,52 +2785,6 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun recoverAutomationChatOutput(
-        eventLog: LocalSessionEventLog,
-        startedAt: Long?,
-    ): String? {
-        val threshold = startedAt ?: return null
-        var turnStartSequence: Long? = null
-        var turnEnded = false
-        var recovered: String? = null
-        eventLog.events().forEach { event ->
-            if (
-                event.createdAt >= threshold &&
-                event.type == "turn/start" &&
-                event.data["automation"]?.jsonPrimitive?.booleanOrNull == true &&
-                event.data["proactive"]?.jsonPrimitive?.booleanOrNull == true
-            ) {
-                turnStartSequence = event.sequence
-                turnEnded = false
-                recovered = null
-                return@forEach
-            }
-            val startSequence = turnStartSequence ?: return@forEach
-            if (event.sequence <= startSequence) return@forEach
-            if (event.type == "turn/end") {
-                turnEnded = true
-                return@forEach
-            }
-            if (event.type != "assistant/message") return@forEach
-            decodeTranscriptMessages(event.data)
-                .orEmpty()
-                .lastOrNull { message -> message.role == "assistant" && message.proactive }
-                ?.let { message -> recovered = message.content }
-        }
-        val output = recovered ?: return null
-        if (!turnEnded) {
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
-                put("steps", 1)
-                put("mode", "chat")
-                put("automation", true)
-                put("proactive", true)
-                put("recovered", true)
-            })
-        }
-        return output
-    }
-
     private fun persistAutomationTranscript(
         session: LocalHarnessSession,
         messages: List<LocalHarnessMessage>,
@@ -3411,18 +3370,27 @@ class LocalHarnessEngine @Inject constructor(
         persona: PersonaProfile,
         userMessage: String,
         assistantMessage: String,
+        sharedPending: List<ChatPendingTurn>,
         step: Int,
-    ): ChatCharacterState {
+    ): ChatCharacterState? {
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return member.chatState
+        val key = apiKeys.get() ?: return null
         val sharedContext = _state.value.groupChat.context.withLegacyFallback(member.chatState)
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
-        val prompt = chatTurnCoordinator.postTurnPrompt(
-            persona = persona,
-            state = plannerState,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
+        val prompt = buildString {
+            appendLine(
+                chatTurnCoordinator.postTurnPrompt(
+                    persona = persona,
+                    state = plannerState,
+                    userMessage = userMessage,
+                    assistantMessage = assistantMessage,
+                ),
+            )
+            appendLine()
+            appendLine("【群聊共享待归并回合】")
+            appendLine(renderPendingTurnsForPlanner(sharedPending))
+            append("continuity 只能根据以上共享待归并回合更新；角色私有情绪、关系与互动状态仍只根据当前角色自己的本轮对话更新。")
+        }
         return try {
             val plannerReply = completeWithRetry(
                 key = key,
@@ -3444,7 +3412,7 @@ class LocalHarnessEngine @Inject constructor(
                 previous = plannerState,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
-            )?.state ?: member.chatState
+            )?.state
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -3453,32 +3421,42 @@ class LocalHarnessEngine @Inject constructor(
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
             })
-            member.chatState
+            null
         }
     }
 
     private suspend fun refreshGroupMemberStates(
         replies: List<GroupReplyForStateUpdate>,
         userMessage: String,
-    ): Map<String, ChatCharacterState> {
-        if (replies.isEmpty()) return emptyMap()
+        sharedPending: List<ChatPendingTurn>,
+    ): GroupStateRefreshBatch {
+        if (replies.isEmpty()) return GroupStateRefreshBatch(emptyMap(), complete = true)
         if (replies.size == 1) {
             val reply = replies.single()
-            return mapOf(
-                reply.member.galleryId to refreshGroupMemberState(
-                    member = reply.member,
-                    persona = reply.persona,
-                    userMessage = userMessage,
-                    assistantMessage = reply.content,
-                    step = CHAT_POST_TURN_MODEL_STEP + 100,
-                ),
+            val refreshed = refreshGroupMemberState(
+                member = reply.member,
+                persona = reply.persona,
+                userMessage = userMessage,
+                assistantMessage = reply.content,
+                sharedPending = sharedPending,
+                step = CHAT_POST_TURN_MODEL_STEP + 100,
+            )
+            return GroupStateRefreshBatch(
+                states = mapOf(reply.member.galleryId to (refreshed ?: reply.member.chatState)),
+                complete = refreshed != null,
             )
         }
 
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return replies.associate { it.member.galleryId to it.member.chatState }
+        val key = apiKeys.get() ?: return GroupStateRefreshBatch(
+            states = replies.associate { it.member.galleryId to it.member.chatState },
+            complete = false,
+        )
         val prompt = buildString {
             appendLine("你要一次整理多个群聊角色各自的隐藏状态。每个角色的私有状态完全隔离，禁止把甲角色的判断、关系或经历写进乙角色。")
+            appendLine("【群聊共享待归并回合】")
+            appendLine(renderPendingTurnsForPlanner(sharedPending))
+            appendLine("每个角色 plan 的 continuity 只能根据以上共享待归并回合更新；私有情绪、关系与互动状态只根据该角色自己的本轮对话更新。")
             appendLine("最终只输出一个 JSON 对象，格式为：")
             appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
@@ -3534,12 +3512,13 @@ class LocalHarnessEngine @Inject constructor(
                 ) ?: return@forEach
                 result[galleryId] = parsed.state
             }
+            val complete = replies.all { reply -> reply.member.galleryId in result }
             replies.forEach { reply ->
                 if (reply.member.galleryId !in result) {
                     result[reply.member.galleryId] = reply.member.chatState
                 }
             }
-            result
+            GroupStateRefreshBatch(result, complete)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -3548,9 +3527,12 @@ class LocalHarnessEngine @Inject constructor(
                 put("detail", error.message.orEmpty().take(1_000))
                 put("count", replies.size)
             })
-            replies.associate { reply ->
-                reply.member.galleryId to reply.member.chatState
-            }
+            GroupStateRefreshBatch(
+                states = replies.associate { reply ->
+                    reply.member.galleryId to reply.member.chatState
+                },
+                complete = false,
+            )
         }
     }
 
@@ -3745,29 +3727,35 @@ class LocalHarnessEngine @Inject constructor(
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
-            val refreshedStates = refreshGroupMemberStates(
+            val sharedPendingForRefresh = currentGroup.context.pendingTurns
+                .asSequence()
+                .filter { it.sequence > currentGroup.context.processedThroughSequence }
+                .filter { it.generation == currentGroup.context.generation }
+                .sortedBy(ChatPendingTurn::sequence)
+                .take(GROUP_POST_TURN_PENDING_BATCH)
+                .toList()
+            val refreshBatch = refreshGroupMemberStates(
                 replies = repliesForStateUpdate,
                 userMessage = input,
+                sharedPending = sharedPendingForRefresh,
             )
+            val refreshedStates = refreshBatch.states
             val refreshedInReplyOrder = repliesForStateUpdate
                 .mapNotNull { reply -> refreshedStates[reply.member.galleryId] }
-            // Shared hard scene is already advanced deterministically from the durable replies.
-            // Planner output may enrich soft continuity but never rewrites physical state.
-            val nextSharedScene = currentGroup.context.scene
-            val nextSharedContinuity = refreshedInReplyOrder
-                .lastOrNull { it.continuity != currentGroup.context.continuity }
-                ?.continuity
-                ?: currentGroup.context.continuity
-            val through = currentGroup.context.pendingTurns
-                .filter { it.generation == currentGroup.context.generation }
-                .maxOfOrNull(ChatPendingTurn::sequence)
-                ?: currentGroup.context.processedThroughSequence
+            val nextSharedContext = finalizeGroupContextAfterRefresh(
+                context = currentGroup.context,
+                statesInReplyOrder = refreshedInReplyOrder,
+                processedPending = sharedPendingForRefresh,
+                complete = refreshBatch.complete,
+            )
+            if (!refreshBatch.complete) {
+                eventLog.append("group/post-turn-batch", buildJsonObject {
+                    put("status", "pending-preserved")
+                    put("pending_count", currentGroup.context.pendingTurns.size)
+                })
+            }
             currentGroup = currentGroup.copy(
-                context = currentGroup.context.commitProcessed(
-                    scene = nextSharedScene,
-                    continuity = nextSharedContinuity,
-                    throughSequence = through,
-                ),
+                context = nextSharedContext,
                 members = currentGroup.members.map { existing ->
                     val nextState = refreshedStates[existing.galleryId] ?: return@map existing
                     val source = repliesForStateUpdate.firstOrNull { it.member.galleryId == existing.galleryId }
@@ -6454,6 +6442,7 @@ class LocalHarnessEngine @Inject constructor(
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
+        const val GROUP_POST_TURN_PENDING_BATCH = 8
         const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
         const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         const val LOCAL_PROJECT_ID = "local-workspace"

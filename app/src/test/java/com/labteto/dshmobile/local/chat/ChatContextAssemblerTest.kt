@@ -53,6 +53,28 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun repetitionGuardKeepsOppositePolarityCorrection() {
+        val result = ChatRepetitionGuard.filter(
+            candidate = "我已经决定明天不去城南了，我们改到后天再说。",
+            recentAssistantReplies = listOf("我已经决定明天去城南了，我们九点出发。"),
+        )
+
+        assertTrue(result.text.contains("明天不去城南"))
+        assertTrue(result.text.contains("改到后天"))
+    }
+
+    @Test
+    fun repetitionGuardStillRemovesSamePolarityParaphrase() {
+        val result = ChatRepetitionGuard.filter(
+            candidate = "这件事你不用再担心了。我们去看看门外。",
+            recentAssistantReplies = listOf("这件事你不用再担心了。"),
+        )
+
+        assertFalse(result.text.contains("不用再担心"))
+        assertTrue(result.text.contains("去看看门外"))
+    }
+
+    @Test
     fun recentRoleplayBeatsAreInjectedAsSemanticNoveltyGuard() {
         val rendered = ChatContextAssembler.assemble(
             dynamicPrompt = "【当前状态】\n情绪=自然",

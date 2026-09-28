@@ -189,6 +189,33 @@ class LocalChatHistoryWindowTest {
 
 
     @Test
+    fun existingCheckpointIsDemotedAndPrunedEvenBeforeNextCompactionBoundary() {
+        val legacy = message(
+            "user",
+            "<chat-continuity>\n- 明早九点去城南\n- 第一次见面在车站\n</chat-continuity>",
+        )
+        val history = listOf(
+            message("system", "系统"),
+            legacy,
+            message("user", "那改成十点吧"),
+            message("assistant", "好，十点。"),
+        )
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 20,
+            compactionBatch = 8,
+            currentFacts = listOf("明早十点去城南"),
+        )
+        val checkpoint = bounded[1]
+
+        assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
+        assertFalse(checkpoint.toString().contains("明早九点去城南"))
+        assertTrue(checkpoint.toString().contains("第一次见面在车站"))
+        assertTrue(bounded.last().toString().contains("好，十点"))
+    }
+
+    @Test
     fun generatedCheckpointIsSystemHistoryAndDropsCanonicalDuplicates() {
         val history = buildList {
             add(message("system", "系统"))
@@ -238,6 +265,28 @@ class LocalChatHistoryWindowTest {
         val checkpoint = bounded.first { it.toString().contains("<compacted-summary>") }
 
         assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
+    }
+
+
+    @Test
+    fun oldScheduleWithDifferentClockIsRemovedByCurrentDecision() {
+        val history = buildList {
+            add(message("system", "系统"))
+            repeat(15) { index ->
+                add(message("user", if (index == 0) "明早九点去城南" else "旧事件$index"))
+                add(message("assistant", "角色旧回复$index"))
+            }
+        }
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 10,
+            compactionBatch = 4,
+            currentFacts = listOf("明早十点去城南"),
+        )
+        val checkpoint = bounded.first { it.toString().contains("<chat-continuity>") }
+
+        assertFalse(checkpoint.toString().contains("明早九点去城南"))
     }
 
     private fun message(role: String, content: String) = buildJsonObject {

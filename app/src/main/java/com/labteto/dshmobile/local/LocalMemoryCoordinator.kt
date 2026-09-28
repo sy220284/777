@@ -95,27 +95,27 @@ internal class LocalMemoryCoordinator(
             MemoryKind.RELATIONSHIP_STATE,
             MemoryKind.RELATIONSHIP_PREFERENCE,
         )
+        val currentSubjectKey = chatRelationshipSubjectKey(
+            snapshot.galleryId,
+            snapshot.personaId,
+        )
         val recalled = memoryStore.search(
             query = ChatMemorySelector.semanticQuery(query, snapshot.chatPersona.name),
             allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
             projectId = null,
             lineageId = snapshot.lineageId,
             allowedKinds = relationshipKinds,
-            maxItems = 12,
+            maxItems = 4,
             maxChars = 4_000,
-        ).filter {
-            relationshipMemoryMatchesSubject(
-                memory = it,
-                currentSubjectKey = chatRelationshipSubjectKey(
-                    snapshot.galleryId,
-                    snapshot.personaId,
-                ),
-                currentLineageId = snapshot.lineageId,
-                subjectLabel = snapshot.chatPersona.name,
-            )
-        }
-            .distinctBy { it.id }
-            .take(4)
+            recordFilter = { memory ->
+                relationshipMemoryMatchesSubject(
+                    memory = memory,
+                    currentSubjectKey = currentSubjectKey,
+                    currentLineageId = snapshot.lineageId,
+                    subjectLabel = snapshot.chatPersona.name,
+                )
+            },
+        ).distinctBy { it.id }
         if (recalled.isEmpty()) return ""
 
         return buildString {
@@ -141,7 +141,7 @@ internal class LocalMemoryCoordinator(
             allowedScopes = setOf(MemoryScope.GLOBAL),
             projectId = null,
             lineageId = null,
-            limit = 200,
+            limit = 2_000,
         ).asSequence()
             .filter {
                 it.kind == MemoryKind.RELATIONSHIP_STATE &&

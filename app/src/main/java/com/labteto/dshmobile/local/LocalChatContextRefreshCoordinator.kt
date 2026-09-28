@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
@@ -32,6 +34,50 @@ internal fun renderPendingTurnsForPlanner(pending: List<ChatPendingTurn>): Strin
     append("按上述 用户→角色 的逐回合顺序理解状态变化；后面的回合可以纠正、结束或覆盖前面的临时状态。")
 }.trim()
 
+internal fun mergeGroupContinuity(
+    base: ChatContinuityState,
+    statesInReplyOrder: List<ChatCharacterState>,
+): ChatContinuityState {
+    var merged = base.copy(recurringEvents = emptyList())
+    statesInReplyOrder.forEach { state ->
+        val incoming = state.continuity
+        merged = merged.copy(
+            recentEvents = if (incoming.recentEvents != base.recentEvents) {
+                incoming.recentEvents
+            } else {
+                merged.recentEvents
+            },
+            decisions = if (incoming.decisions != base.decisions) {
+                incoming.decisions
+            } else {
+                merged.decisions
+            },
+            unfinished = if (incoming.unfinished != base.unfinished) {
+                incoming.unfinished
+            } else {
+                merged.unfinished
+            },
+            recurringEvents = emptyList(),
+        )
+    }
+    return merged
+}
+
+internal fun finalizeGroupContextAfterRefresh(
+    context: ChatContextState,
+    statesInReplyOrder: List<ChatCharacterState>,
+    processedPending: List<ChatPendingTurn>,
+    complete: Boolean,
+): ChatContextState {
+    if (!complete || processedPending.isEmpty()) return context
+    val through = processedPending.maxOf(ChatPendingTurn::sequence)
+    return context.commitProcessed(
+        scene = context.scene,
+        continuity = mergeGroupContinuity(context.continuity, statesInReplyOrder),
+        throughSequence = through,
+    )
+}
+
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
@@ -59,6 +105,7 @@ internal class LocalChatContextRefreshCoordinator(
         ) ?: return null
 
         var generation: Long? = null
+        var branchSnapshotUpdated = false
         state.update { current ->
             if (current.sessionId != expectedSessionId) {
                 current
@@ -81,10 +128,31 @@ internal class LocalChatContextRefreshCoordinator(
                     ),
                 )
                 generation = nextContext.generation
-                current.copy(chatContext = nextContext)
+                val nextBranches = if (current.transcriptIndex.branchingEligible) {
+                    updateChatBranchNodeSnapshot(
+                        state = current.chatBranches,
+                        messageId = expectedAssistantMessageId,
+                        chatState = current.chatState,
+                        replySuggestions = current.replySuggestions,
+                        chatContext = nextContext,
+                    ).also { updated ->
+                        branchSnapshotUpdated = updated != current.chatBranches
+                    }
+                } else {
+                    current.chatBranches
+                }
+                current.copy(
+                    chatContext = nextContext,
+                    chatBranches = nextBranches,
+                )
             }
         }
-        if (generation != null) persist()
+        if (generation != null) {
+            if (branchSnapshotUpdated && hasChatBranchAlternatives(state.value.chatBranches)) {
+                persistBranchState("chat/pending-enqueued")
+            }
+            persist()
+        }
         return generation
     }
 

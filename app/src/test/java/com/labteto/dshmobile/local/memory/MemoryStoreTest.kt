@@ -304,4 +304,189 @@ class MemoryStoreTest {
         assertTrue(remaining.hasUnboundSource)
     }
 
+
+    @Test fun laterUnboundConfirmationProtectsEarlierExactFactFromRollback() {
+        val memoryStore = store()
+        val exact = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u1",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+
+        assertEquals(exact.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u1"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(exact.id, remaining.id)
+        assertTrue(remaining.hasUnboundSource)
+        assertTrue(remaining.sourceMessages.isEmpty())
+    }
+
+    @Test fun searchFiltersRelationshipOwnerBeforeResultLimit() {
+        val memoryStore = store()
+        repeat(6) { index ->
+            memoryStore.remember(
+                content = "关系状态：我和其他角色$index｜在一起",
+                scope = MemoryScope.GLOBAL,
+                kind = MemoryKind.RELATIONSHIP_STATE,
+                subjectKey = "gallery:other-$index",
+                importance = 100,
+            )
+        }
+        val target = memoryStore.remember(
+            content = "关系状态：我和目标角色｜在一起",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:target",
+            importance = 60,
+        )
+
+        val result = memoryStore.search(
+            query = "关系状态 在一起",
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            allowedKinds = setOf(MemoryKind.RELATIONSHIP_STATE),
+            maxItems = 1,
+            recordFilter = { it.subjectKey == "gallery:target" },
+        )
+
+        assertEquals(listOf(target.id), result.map { it.id })
+    }
+
+    @Test fun storageCompactionKeepsActiveRollbackChainBeforeDiscardedNoise() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            pinned: Boolean = false,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            content = id,
+            importance = importance,
+            pinned = pinned,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("forgotten", active = false, updatedAt = 100L),
+            record("old-valid", active = false, supersededBy = "current", updatedAt = 200L),
+            record("current", active = true, pinned = true, importance = 90, updatedAt = 300L),
+            record("other-active", active = true, importance = 40, updatedAt = 400L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 3)
+
+        assertEquals(setOf("old-valid", "current", "other-active"), compacted.map { it.id }.toSet())
+        assertFalse(compacted.any { it.id == "forgotten" })
+    }
+
+    @Test fun storageCompactionPrioritizesPinnedAndImportantActiveRootsWhenOverCapacity() {
+        fun active(id: String, pinned: Boolean, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            pinned = pinned,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("low-new", pinned = false, importance = 10, updatedAt = 400L),
+                active("important", pinned = false, importance = 95, updatedAt = 200L),
+                active("pinned", pinned = true, importance = 20, updatedAt = 100L),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("pinned", "important"), compacted.map { it.id }.toSet())
+    }
+
+
+    @Test fun storageCompactionNeverLetsOneLongChainEvictOtherActiveMemories() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("chain-1", active = false, supersededBy = "chain-2", updatedAt = 1L),
+            record("chain-2", active = false, supersededBy = "chain-3", updatedAt = 2L),
+            record("chain-3", active = false, supersededBy = "root-a", updatedAt = 3L),
+            record("root-a", active = true, importance = 100, updatedAt = 4L),
+            record("root-b", active = true, importance = 10, updatedAt = 5L),
+            record("root-c", active = true, importance = 10, updatedAt = 6L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 4)
+
+        assertTrue(compacted.any { it.id == "root-a" })
+        assertTrue(compacted.any { it.id == "root-b" })
+        assertTrue(compacted.any { it.id == "root-c" })
+        assertTrue(compacted.any { it.id == "chain-3" })
+        assertFalse(compacted.any { it.id == "chain-1" })
+    }
+
+    @Test fun protectedNewMemorySurvivesCapacityCompaction() {
+        fun active(id: String, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("old-high", importance = 100, updatedAt = 1L),
+                active("old-mid", importance = 80, updatedAt = 2L),
+                active("new-low", importance = 1, updatedAt = 3L),
+            ),
+            maxRecords = 2,
+            protectedIds = setOf("new-low"),
+        )
+
+        assertTrue(compacted.any { it.id == "new-low" })
+        assertEquals(2, compacted.size)
+    }
+
 }

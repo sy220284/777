@@ -48,7 +48,15 @@ internal fun boundedChatRequestHistory(
         .toList()
 
     val maximumHotMessages = recentMessages + compactionBatch
-    if (dialogue.size <= maximumHotMessages) return history
+    if (dialogue.size <= maximumHotMessages) {
+        if (existingSummaryIndex < 0 || existingSummary == null) return history
+        val rebuiltBody = body.toMutableList()
+        rebuiltBody[existingSummaryIndex] = existingSummary
+        return buildList {
+            leadingSystem?.let(::add)
+            addAll(rebuiltBody)
+        }
+    }
 
     val overflow = dialogue.size - maximumHotMessages
     val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
@@ -80,7 +88,7 @@ private fun pruneChatContinuitySummary(
         val line = raw.trim()
         if (!line.startsWith("- ")) return@filter true
         val factLine = line.removePrefix("- ").trim()
-        currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(factLine, fact) }
+        currentFacts.none { fact -> historicalFactSupersededByCurrent(factLine, fact) }
     }.joinToString("\n")
     return JsonObject(
         message +
@@ -99,7 +107,7 @@ private fun buildRequestOnlyContinuity(
         .map(::normalizeChatContinuityText)
         .filter(String::isNotBlank)
         .filter { event ->
-            currentFacts.none { fact -> ChatContextAssembler.semanticallySimilar(event, fact) }
+            currentFacts.none { fact -> historicalFactSupersededByCurrent(event, fact) }
         }
         .distinct()
         .toList()
@@ -128,50 +136,103 @@ private fun normalizeChatContinuityText(text: String): String =
         .trim()
 
 
+private fun historicalFactSupersededByCurrent(
+    historical: String,
+    current: String,
+): Boolean {
+    if (ChatContextAssembler.semanticallySimilar(historical, current)) return true
+    val oldSchedule = normalizeScheduleFact(historical) ?: return false
+    val currentSchedule = normalizeScheduleFact(current) ?: return false
+    return oldSchedule == currentSchedule
+}
+
+private fun normalizeScheduleFact(text: String): String? {
+    val normalized = normalizeChatContinuityText(text)
+        .lowercase()
+        .replace(Regex("""[，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
+        .replace(Regex("""\s+"""), "")
+    if (!SCHEDULE_FACT_HINT.containsMatchIn(normalized)) return null
+    val clockNormalized = normalized
+        .replace(ARABIC_CLOCK, "<时>")
+        .replace(CHINESE_CLOCK, "<时>")
+    return clockNormalized.takeIf { it != normalized }
+}
+
+private val SCHEDULE_FACT_HINT = Regex(
+    """(?:今天|今晚|明天|明早|后天|早上|上午|中午|下午|傍晚|晚上|夜里|出发|见面|碰面|集合|去|回|到)""",
+)
+private val ARABIC_CLOCK = Regex("""(?:\d{1,2}[:：]\d{1,2}|\d{1,2}点(?:半|一刻|三刻)?)""")
+private val CHINESE_CLOCK = Regex("""[零〇一二两三四五六七八九十两]{1,4}点(?:半|一刻|三刻)?""")
+
+
 internal fun buildChatContinuationHandoff(
     state: ChatCharacterState,
     messages: List<LocalHarnessMessage>,
     context: ChatContextState = ChatContextState(),
-): String = buildString {
-    appendLine("【聊天连续性｜已发生】")
+): String {
     val shared = context.withLegacyFallback(state)
-    val scene = shared.scene
-    if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
-        appendLine(
-            "当前硬场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
-        )
-        appendLine("人物位置、动作和物件以最近原始对话为准，不从旧场景快照继承。")
-    }
-    shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
-        appendLine("近期关键事件：${it.joinToString("；").take(900)}")
-    }
-    shared.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("当前有效决定：${it.joinToString("；").take(720)}")
-    }
-    shared.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-        appendLine("待续事项：${it.joinToString("；").take(720)}")
-    }
-    val pending = shared.pendingForRequest()
-    if (pending.isNotEmpty()) {
-        appendLine("尚未归并的最新事实：")
-        pending.forEach { turn ->
-            if (turn.userMessage.isNotBlank()) appendLine("- 用户：${normalizeChatContinuityText(turn.userMessage).take(320)}")
-            if (turn.assistantMessage.isNotBlank()) appendLine("- 角色：${normalizeChatContinuityText(turn.assistantMessage).take(360)}")
+    val sceneBlock = buildString {
+        val scene = shared.scene
+        if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
+            appendLine(
+                "当前硬场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
+            )
+            append("人物位置、动作和物件以最近原始对话为准，不从旧场景快照继承。")
         }
-    }
-    state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
-        appendLine("共同经历：${moments.joinToString("；").take(1_000)}")
-    }
-    val recentUserEvents = messages.asSequence()
-        .filter { it.role == "user" }
-        .map { normalizeChatContinuityText(it.content) }
+    }.trim().take(500)
+
+    val pendingBlock = buildString {
+        val pending = shared.pendingForRequest(limit = 4)
+        if (pending.isNotEmpty()) {
+            appendLine("尚未归并的最新事实：")
+            pending.forEach { turn ->
+                if (turn.userMessage.isNotBlank()) {
+                    appendLine("- 用户：${normalizeChatContinuityText(turn.userMessage).take(240)}")
+                }
+                if (turn.assistantMessage.isNotBlank()) {
+                    appendLine("- 角色：${normalizeChatContinuityText(turn.assistantMessage).take(280)}")
+                }
+            }
+        }
+    }.trim().take(1_200)
+
+    val recentUserBlock = buildString {
+        val recentUserEvents = messages.asSequence()
+            .filter { it.role == "user" }
+            .map { normalizeChatContinuityText(it.content) }
+            .filter(String::isNotBlank)
+            .toList()
+            .takeLast(4)
+        if (recentUserEvents.isNotEmpty()) {
+            appendLine("近期用户表达与事件：")
+            recentUserEvents.forEach { appendLine("- ${it.take(360)}") }
+        }
+    }.trim().take(1_200)
+
+    val continuityBlock = buildString {
+        shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
+            appendLine("近期关键事件：${it.joinToString("；").take(800)}")
+        }
+        shared.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+            appendLine("当前有效决定：${it.joinToString("；").take(640)}")
+        }
+        shared.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
+            appendLine("待续事项：${it.joinToString("；").take(640)}")
+        }
+        state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
+            append("共同经历：${moments.joinToString("；").take(700)}")
+        }
+    }.trim().take(1_000)
+
+    val body = listOf(sceneBlock, pendingBlock, continuityBlock, recentUserBlock)
         .filter(String::isNotBlank)
-        .toList()
-        .takeLast(4)
-    if (recentUserEvents.isNotEmpty()) {
-        appendLine("近期用户表达与事件：")
-        recentUserEvents.forEach { appendLine("- ${it.take(420)}") }
-    }
-    append("原始聊天仍是最终事实来源；本摘要只保留当前有效状态与待续线索。")
-}.trim().take(3_500)
+        .joinToString("\n")
+        .take(3_300)
+
+    return buildString {
+        appendLine("【聊天连续性｜已发生】")
+        if (body.isNotBlank()) appendLine(body)
+        append("原始聊天仍是最终事实来源；本摘要只保留当前有效状态与待续线索。")
+    }.trim()
+}
 

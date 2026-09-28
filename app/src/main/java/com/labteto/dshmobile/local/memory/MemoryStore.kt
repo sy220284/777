@@ -10,6 +10,54 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
+internal fun compactMemoryRecords(
+    records: List<MemoryRecord>,
+    maxRecords: Int,
+    protectedIds: Set<String> = emptySet(),
+): List<MemoryRecord> {
+    if (maxRecords <= 0 || records.isEmpty()) return emptyList()
+    if (records.size <= maxRecords) return records
+
+    val predecessors = records
+        .asSequence()
+        .filter { !it.supersededBy.isNullOrBlank() }
+        .groupBy { it.supersededBy!! }
+        .mapValues { (_, values) -> values.sortedByDescending(MemoryRecord::updatedAt) }
+    val activeRoots = records
+        .filter(MemoryRecord::active)
+        .sortedWith(
+            compareByDescending<MemoryRecord> { if (it.id in protectedIds) 1 else 0 }
+                .thenByDescending { if (it.pinned) 1 else 0 }
+                .thenByDescending(MemoryRecord::importance)
+                .thenByDescending(MemoryRecord::updatedAt),
+        )
+
+    val selected = linkedSetOf<String>()
+    activeRoots.take(maxRecords).forEach { selected += it.id }
+    if (selected.size >= maxRecords) {
+        return records.filter { it.id in selected }
+    }
+
+    // Fill rollback history breadth-first: all active memories keep their nearest predecessor
+    // before one long supersession chain is allowed to consume the remaining capacity.
+    var frontier = activeRoots
+        .take(maxRecords)
+        .map(MemoryRecord::id)
+    while (frontier.isNotEmpty() && selected.size < maxRecords) {
+        val nextFrontier = mutableListOf<String>()
+        frontier.forEach { successorId ->
+            predecessors[successorId].orEmpty().forEach { predecessor ->
+                if (selected.size >= maxRecords) return@forEach
+                if (selected.add(predecessor.id)) {
+                    nextFrontier += predecessor.id
+                }
+            }
+        }
+        frontier = nextFrontier
+    }
+    return records.filter { it.id in selected }
+}
+
 @Singleton
 class MemoryStore internal constructor(
     private val root: File,
@@ -64,6 +112,8 @@ class MemoryStore internal constructor(
                     records[duplicateIndex].sourceMessages,
                     sourceRef(sourceSessionId, sourceMessageId),
                 ),
+                hasUnboundSource = records[duplicateIndex].hasUnboundSource ||
+                    sourceMessageId.isNullOrBlank(),
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
@@ -111,7 +161,15 @@ class MemoryStore internal constructor(
             }
         }
         records += record
-        writeDocument(MemoryDocument(records = records.takeLast(MAX_RECORDS)))
+        writeDocument(
+            MemoryDocument(
+                records = compactMemoryRecords(
+                    records = records,
+                    maxRecords = MAX_RECORDS,
+                    protectedIds = setOf(record.id),
+                ),
+            ),
+        )
         return record
     }
 
@@ -275,12 +333,14 @@ class MemoryStore internal constructor(
         allowedKinds: Set<MemoryKind> = MemoryKind.values().toSet(),
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
+        recordFilter: (MemoryRecord) -> Boolean = { true },
     ): List<MemoryRecord> {
         val boundedItems = maxItems.coerceIn(1, 20)
         val boundedChars = maxChars.coerceIn(256, 12_000)
         val terms = terms(query)
         val candidates = readDocument().records.asSequence()
             .filter { it.active && it.scope in allowedScopes && it.kind in allowedKinds }
+            .filter(recordFilter)
             .filter {
                 when (it.scope) {
                     MemoryScope.GLOBAL -> true
@@ -325,7 +385,7 @@ class MemoryStore internal constructor(
             }
         }
         .sortedByDescending(MemoryRecord::updatedAt)
-        .take(limit.coerceIn(1, 200))
+        .take(limit.coerceIn(1, MAX_RECORDS))
         .toList()
 
     private fun score(record: MemoryRecord, queryTerms: Set<String>): Int {

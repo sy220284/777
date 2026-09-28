@@ -7,9 +7,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class LocalChatTimelineRollbackTest {
+    @get:Rule
+    val temporary = TemporaryFolder()
+
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
@@ -100,6 +105,33 @@ class LocalChatTimelineRollbackTest {
         assertNotNull(restored)
         assertEquals(group, restored)
         assertEquals(memberState, restored!!.members.single().chatState)
+    }
+
+    @Test
+    fun pagedRollbackLookupCrossesMoreThanOneHistoryPage() {
+        val log = LocalSessionEventLog(temporary.newFile("timeline.events.jsonl"), json)
+        val expected = ChatCharacterState(
+            mood = "安定",
+            relationshipState = "熟悉",
+            currentFocus = "旧回合边界",
+            updatedAt = 10L,
+        )
+        log.append("chat/state-baseline", buildJsonObject {
+            put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), expected))
+        })
+        val user = message("u-paged", "很早的一句", 20L)
+        val source = log.append("user/message", buildJsonObject {
+            put("transcript", encodeTranscriptMessages(listOf(user)))
+        })
+        repeat(260) { index ->
+            log.append("noise/event", buildJsonObject { put("index", index) })
+        }
+
+        assertEquals(source.sequence, sourceEventSequenceForMessage(log, user.id))
+        assertEquals(
+            expected,
+            restoreChatStateBefore(log, json, source.sequence, user.createdAt),
+        )
     }
 
     private fun baseline(

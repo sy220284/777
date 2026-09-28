@@ -179,23 +179,10 @@ class ChatInteractionPlanner @Inject constructor(
         if (state.dynamics.sharedMoments.isNotEmpty()) {
             appendLine("共同经历：${state.dynamics.sharedMoments.joinToString("；")}")
         }
-        if (
-            state.scene.sceneTime.isNotBlank() ||
-            state.scene.location.isNotBlank() ||
-            state.scene.participants.isNotEmpty() ||
-            state.scene.positions.isNotEmpty() ||
-            state.scene.activeActions.isNotEmpty() ||
-            state.scene.keyObjects.isNotEmpty()
-        ) {
+        if (state.scene.sceneTime.isNotBlank() || state.scene.location.isNotBlank()) {
             appendLine(
-                "当前场景：时间=${state.scene.sceneTime.ifBlank { "未知" }}｜地点=${state.scene.location.ifBlank { "未知" }}｜" +
-                    "人物=${state.scene.participants.joinToString("、").ifBlank { "未记录" }}｜" +
-                    "位置=${state.scene.positions.joinToString("；").ifBlank { "未记录" }}｜" +
-                    "动作=${state.scene.activeActions.joinToString("；").ifBlank { "无" }}",
+                "当前硬场景：时间=${state.scene.sceneTime.ifBlank { "未知" }}｜地点=${state.scene.location.ifBlank { "未知" }}",
             )
-            if (state.scene.keyObjects.isNotEmpty()) {
-                appendLine("场景物件：${state.scene.keyObjects.joinToString("、")}")
-            }
         }
         if (state.continuity.recentEvents.isNotEmpty()) {
             appendLine("近期事件：${state.continuity.recentEvents.joinToString("；")}")
@@ -683,8 +670,8 @@ class ChatInteractionPlanner @Inject constructor(
         .filter(String::isNotBlank)
         .map { it.take(maxChars) }
         .distinctBy(::normalize)
-        .take(limit)
         .toList()
+        .takeLast(limit)
 
     private fun ageTransientState(
         previous: ChatCharacterState,

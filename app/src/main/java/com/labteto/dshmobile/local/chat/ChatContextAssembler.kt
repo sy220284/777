@@ -160,7 +160,10 @@ internal object ChatRepetitionGuard {
         val kept = segments(candidate).filter { segment ->
             val normalized = normalize(segment)
             val duplicate = normalized.length >= MIN_REPEAT_CHARS &&
-                recentSegments.any { old -> ChatContextAssembler.semanticallySimilar(segment, old) }
+                recentSegments.any { old ->
+                    samePolarity(segment, old) &&
+                        ChatContextAssembler.semanticallySimilar(segment, old)
+                }
             if (duplicate) repeated += segment
             !duplicate
         }
@@ -181,6 +184,14 @@ internal object ChatRepetitionGuard {
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
+
+    private fun samePolarity(left: String, right: String): Boolean =
+        hasNegation(left) == hasNegation(right)
+
+    private fun hasNegation(text: String): Boolean =
+        NEGATION_MARKER.containsMatchIn(normalize(text))
+
+    private val NEGATION_MARKER = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|停止|拒绝|否认)""")
 
     private const val MIN_REPEAT_CHARS = 10
     private const val MIN_RESULT_CHARS = 4

@@ -42,11 +42,11 @@ internal fun ChatContextState.normalized(): ChatContextState = copy(
         lastSceneChange = "",
     ),
     continuity = continuity.copy(
-        recentEvents = continuity.recentEvents.cleanContextLines(5, 180),
+        recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180),
         // Repeated-event history is folded into the latest decision/event instead of growing forever.
         recurringEvents = emptyList(),
-        decisions = continuity.decisions.cleanContextLines(4, 180),
-        unfinished = continuity.unfinished.cleanContextLines(4, 180),
+        decisions = continuity.decisions.cleanRecentContextLines(4, 180),
+        unfinished = continuity.unfinished.cleanRecentContextLines(4, 180),
     ),
     sceneEvents = sceneEvents
         .sortedBy(ChatSceneEvent::sequence)
@@ -76,14 +76,25 @@ internal fun ChatContextState.applySceneTurn(
         sequence = sequence,
     )
     if (events.isEmpty()) return this
-    val mergedEvents = (sceneEvents + events)
+
+    var reducedScene = scene
+    val effectiveEvents = mutableListOf<ChatSceneEvent>()
+    events.sortedBy(ChatSceneEvent::sequence).forEach { event ->
+        val next = ChatSceneRuntime.reduce(reducedScene, listOf(event))
+        val changed = next.location != reducedScene.location || next.sceneTime != reducedScene.sceneTime
+        if (changed) effectiveEvents += event
+        reducedScene = next
+    }
+    if (effectiveEvents.isEmpty()) return normalized()
+
+    val mergedEvents = (sceneEvents + effectiveEvents)
         .sortedBy(ChatSceneEvent::sequence)
         .distinctBy { event ->
             listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
         }
         .takeLast(RECENT_SCENE_EVENT_LIMIT)
     return copy(
-        scene = ChatSceneRuntime.reduce(scene, events),
+        scene = reducedScene,
         sceneEvents = mergedEvents,
     ).normalized()
 }
@@ -141,9 +152,26 @@ internal fun ChatContextState.hasUsefulFacts(): Boolean =
         sceneEvents.isNotEmpty()
 
 internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): ChatContextState {
-    if (hasUsefulFacts()) return normalized()
-    val legacy = copy(scene = state.scene, continuity = state.continuity).normalized()
-    return if (legacy.hasUsefulFacts()) legacy else this
+    val current = normalized()
+    val legacy = ChatContextState(
+        scene = ChatSceneState(
+            sceneTime = state.scene.sceneTime,
+            location = state.scene.location,
+        ),
+        continuity = state.continuity,
+    ).normalized()
+
+    return current.copy(
+        scene = current.scene.copy(
+            sceneTime = current.scene.sceneTime.ifBlank { legacy.scene.sceneTime },
+            location = current.scene.location.ifBlank { legacy.scene.location },
+        ),
+        continuity = current.continuity.copy(
+            recentEvents = current.continuity.recentEvents.ifEmpty { legacy.continuity.recentEvents },
+            decisions = current.continuity.decisions.ifEmpty { legacy.continuity.decisions },
+            unfinished = current.continuity.unfinished.ifEmpty { legacy.continuity.unfinished },
+        ),
+    ).normalized()
 }
 
 internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState): ChatCharacterState =
@@ -162,8 +190,12 @@ internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState)
     )
 
 private const val HOT_WINDOW_PENDING_TURNS = 10
-private const val PENDING_RAW_FALLBACK_TURNS = 6
+private const val PENDING_RAW_FALLBACK_TURNS = 4
 private const val RECENT_SCENE_EVENT_LIMIT = 12
+private const val MAX_PENDING_CONTEXT_CHARS = 1_800
+private const val MAX_SCENE_CONTEXT_CHARS = 700
+private const val MAX_SOFT_CONTINUITY_CHARS = 1_300
+private const val MAX_RENDERED_CONTEXT_BODY_CHARS = 3_900
 
 private fun List<String>.cleanContextLines(limit: Int, maxChars: Int): List<String> =
     asSequence()
@@ -173,6 +205,16 @@ private fun List<String>.cleanContextLines(limit: Int, maxChars: Int): List<Stri
         .distinct()
         .take(limit)
         .toList()
+
+private fun List<String>.cleanRecentContextLines(limit: Int, maxChars: Int): List<String> =
+    asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .map { it.take(maxChars) }
+        .distinct()
+        .toList()
+        .takeLast(limit)
+
 
 internal fun ChatContextState.canonicalFactLines(): List<String> {
     val normalized = normalized()
@@ -188,7 +230,33 @@ internal fun ChatContextState.canonicalFactLines(): List<String> {
 internal fun renderChatContextForModel(context: ChatContextState): String {
     val normalized = context.normalized()
     if (!normalized.hasUsefulFacts()) return ""
-    return buildString {
+
+    val pendingSection = buildString {
+        val pending = normalized.pendingTurns
+            .filter { it.sequence > normalized.processedThroughSequence }
+            .filter { it.generation == normalized.generation }
+            .sortedBy(ChatPendingTurn::sequence)
+        if (pending.isNotEmpty()) {
+            appendLine("【尚未归并｜最高连续性优先】")
+            appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
+            val overflowFallback = pending
+                .dropLast(HOT_WINDOW_PENDING_TURNS.coerceAtMost(pending.size))
+                .takeLast(PENDING_RAW_FALLBACK_TURNS)
+            if (overflowFallback.isNotEmpty()) {
+                appendLine("以下较老 Pending 可能已退出热窗口，补充原文事实：")
+                overflowFallback.forEach { turn ->
+                    if (turn.userMessage.isNotBlank()) {
+                        appendLine("#${turn.sequence} 用户：${turn.userMessage.trim().take(180)}")
+                    }
+                    if (turn.assistantMessage.isNotBlank()) {
+                        appendLine("#${turn.sequence} 角色：${turn.assistantMessage.trim().take(240)}")
+                    }
+                }
+            }
+        }
+    }.trim().take(MAX_PENDING_CONTEXT_CHARS)
+
+    val sceneSection = buildString {
         val scene = normalized.scene
         if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
             appendLine("【当前场景｜硬连续性】")
@@ -200,9 +268,11 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
                 appendLine("最近硬状态事件：$label=${event.to}")
             }
             appendLine("硬状态目前只包含有确定性事件来源的时间与地点；人物位置、进行中动作和物件以最近原始对话为准，不把旧快照当成当前事实。")
-            appendLine("若没有明确移动、时间推进或合理叙事跳切，保持当前场景不变。")
+            append("若没有明确移动、时间推进或合理叙事跳切，保持当前场景不变。")
         }
+    }.trim().take(MAX_SCENE_CONTEXT_CHARS)
 
+    val continuitySection = buildString {
         val continuity = normalized.continuity
         if (
             continuity.recentEvents.isNotEmpty() ||
@@ -212,31 +282,19 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
             appendLine("【剧情连续性｜当前有效】")
             if (continuity.recentEvents.isNotEmpty()) appendLine("近期：${continuity.recentEvents.joinToString("；")}")
             if (continuity.decisions.isNotEmpty()) appendLine("已定：${continuity.decisions.joinToString("；")}")
-            if (continuity.unfinished.isNotEmpty()) appendLine("待续：${continuity.unfinished.joinToString("；")}")
+            if (continuity.unfinished.isNotEmpty()) append("待续：${continuity.unfinished.joinToString("；")}")
         }
+    }.trim().take(MAX_SOFT_CONTINUITY_CHARS)
 
-        val pending = normalized.pendingTurns
-            .filter { it.sequence > normalized.processedThroughSequence }
-            .filter { it.generation == normalized.generation }
-            .sortedBy(ChatPendingTurn::sequence)
-        if (pending.isNotEmpty()) {
-            appendLine("【尚未归并｜优先于上方状态】")
-            appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
-            val overflowFallback = pending
-                .dropLast(HOT_WINDOW_PENDING_TURNS.coerceAtMost(pending.size))
-                .takeLast(PENDING_RAW_FALLBACK_TURNS)
-            if (overflowFallback.isNotEmpty()) {
-                appendLine("以下较老 Pending 可能已退出热窗口，补充原文事实：")
-                overflowFallback.forEach { turn ->
-                    if (turn.userMessage.isNotBlank()) {
-                        appendLine("#${turn.sequence} 用户：${turn.userMessage.trim().take(240)}")
-                    }
-                    if (turn.assistantMessage.isNotBlank()) {
-                        appendLine("#${turn.sequence} 角色：${turn.assistantMessage.trim().take(320)}")
-                    }
-                }
-            }
+    val body = listOf(pendingSection, sceneSection, continuitySection)
+        .filter(String::isNotBlank)
+        .joinToString("\n\n")
+        .take(MAX_RENDERED_CONTEXT_BODY_CHARS)
+
+    return buildString {
+        if (body.isNotBlank()) {
+            appendLine(body)
         }
         append("事实优先级：当前用户输入 > 尚未归并原文 > 当前场景/连续性 > 历史检查点。")
-    }.trim().take(2_600)
+    }.trim()
 }

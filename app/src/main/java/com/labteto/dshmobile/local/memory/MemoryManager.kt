@@ -107,7 +107,7 @@ class MemoryManager @Inject constructor(
             allowedScopes = setOf(scope),
             projectId = projectId,
             lineageId = lineageId,
-            limit = 200,
+            limit = 2_000,
         )
         val replaced = conflicts.findReplacement(candidate, current)
         return store.remember(
