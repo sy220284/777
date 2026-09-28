@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
-import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
