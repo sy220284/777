@@ -92,8 +92,6 @@ import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.chatBranchInfo
-import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
-import com.labteto.dshmobile.local.editableChatUserText
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -733,9 +731,6 @@ private fun LocalChat(
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
-    var editingUserText by rememberSaveable { mutableStateOf("") }
-    var editingUserError by remember { mutableStateOf<String?>(null) }
-    var editingUserSubmitting by remember { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
@@ -815,19 +810,11 @@ private fun LocalChat(
         showPersonaPicker = false
         if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
-        editingUserText = ""
-        editingUserError = null
-        editingUserSubmitting = false
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
     val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
-    val editUserMessageBusy = stringResource(R.string.local_edit_user_message_busy)
-    val editUserMessageMissing = stringResource(R.string.local_edit_user_message_missing)
-    val editUserMessageUnavailable = stringResource(R.string.local_edit_user_message_unavailable)
-    val editUserMessageEmpty = stringResource(R.string.local_edit_user_message_empty)
-    val editUserMessageUnchanged = stringResource(R.string.local_edit_user_message_unchanged)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -1256,11 +1243,7 @@ private fun LocalChat(
                             } else {
                                 null
                             },
-                            onEdit = { message ->
-                                editingUserMessage = message
-                                editingUserText = editableChatUserText(message)
-                                editingUserError = null
-                            },
+                            onEdit = { message -> editingUserMessage = message },
                             onSelectVariant = onSelectMessageVariant,
                             onRegenerate = onRegenerate,
                         )
@@ -1680,83 +1663,12 @@ private fun LocalChat(
         )
     }
     editingUserMessage?.let { message ->
-        DsBottomSheet(
-            title = stringResource(R.string.local_edit_user_message),
-            onDismiss = {
-                editingUserMessage = null
-                editingUserText = ""
-                editingUserError = null
-            },
-        ) {
-            Text(
-                stringResource(R.string.local_edit_user_message_hint),
-                style = DsType.small13,
-                color = colors.labelSecondary,
-            )
-            OutlinedTextField(
-                value = editingUserText,
-                onValueChange = {
-                    editingUserText = it
-                    editingUserError = null
-                },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 8,
-            )
-            editingUserError?.let { error ->
-                Text(error, style = DsType.small13, color = colors.error)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                DsButton(
-                    text = stringResource(R.string.common_cancel),
-                    onClick = {
-                        editingUserMessage = null
-                        editingUserText = ""
-                        editingUserError = null
-                    },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                )
-                DsButton(
-                    text = stringResource(R.string.local_edit_user_message_resend),
-                    onClick = {
-                        if (!editingUserSubmitting) {
-                            editingUserSubmitting = true
-                            editingUserError = null
-                            scope.launch {
-                                try {
-                                    when (onEditAndResend(message.id, editingUserText)) {
-                                        LocalChatUserEditResult.SENT -> {
-                                            editingUserMessage = null
-                                            editingUserText = ""
-                                            editingUserError = null
-                                        }
-                                        LocalChatUserEditResult.BUSY -> editingUserError = editUserMessageBusy
-                                        LocalChatUserEditResult.MESSAGE_MISSING -> editingUserError = editUserMessageMissing
-                                        LocalChatUserEditResult.UNAVAILABLE -> editingUserError = editUserMessageUnavailable
-                                        LocalChatUserEditResult.EMPTY -> editingUserError = editUserMessageEmpty
-                                        LocalChatUserEditResult.UNCHANGED -> editingUserError = editUserMessageUnchanged
-                                    }
-                                } finally {
-                                    editingUserSubmitting = false
-                                }
-                            }
-                        }
-                    },
-                    enabled = !editingUserSubmitting &&
-                        (
-                            editingUserText.trim().isNotEmpty() ||
-                                chatMessageHasAttachmentContext(message)
-                            ) &&
-                        editingUserText.trim() != editableChatUserText(message).trim() &&
-                        messageActionsEnabled,
-                    size = DsButtonSize.Small,
-                )
-            }
-        }
+        LocalChatEditMessageSheet(
+            message = message,
+            actionsEnabled = messageActionsEnabled,
+            onEditAndResend = onEditAndResend,
+            onDismiss = { editingUserMessage = null },
+        )
     }
 
     if (
