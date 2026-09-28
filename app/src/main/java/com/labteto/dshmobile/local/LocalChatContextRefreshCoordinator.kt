@@ -85,6 +85,39 @@ internal fun finalizeGroupContextAfterRefresh(
     )
 }
 
+
+internal fun findChatContinuitySourceUserMessageId(
+    eventLog: LocalSessionEventLog,
+    beforeSequenceExclusive: Long,
+    expectedContent: String,
+    pageSize: Int = 200,
+): String? {
+    val expected = expectedContent.trim()
+    if (expected.isBlank()) return null
+    var before = beforeSequenceExclusive
+    val boundedPageSize = pageSize.coerceIn(1, 500)
+    while (true) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = before,
+            limit = boundedPageSize,
+        )
+        if (page.isEmpty()) return null
+
+        page.asReversed().forEach { event ->
+            decodeTranscriptMessages(event.data).orEmpty()
+                .asReversed()
+                .firstOrNull { message ->
+                    message.role == "user" && message.content.trim() == expected
+                }
+                ?.let { return it.id }
+        }
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < boundedPageSize || oldestSequence <= 0L) return null
+        before = oldestSequence
+    }
+}
+
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
@@ -113,7 +146,7 @@ internal class LocalChatContextRefreshCoordinator(
         val sourceUserMessageId = if (userMessage.isBlank()) {
             ""
         } else {
-            findSourceUserMessageId(
+            findChatContinuitySourceUserMessageId(
                 eventLog = boundEventLog,
                 beforeSequenceExclusive = sequence,
                 expectedContent = userMessage,
@@ -299,35 +332,6 @@ internal class LocalChatContextRefreshCoordinator(
         persist()
     }
 
-    private fun findSourceUserMessageId(
-        eventLog: LocalSessionEventLog,
-        beforeSequenceExclusive: Long,
-        expectedContent: String,
-    ): String? {
-        val expected = expectedContent.trim()
-        if (expected.isBlank()) return null
-        var before = beforeSequenceExclusive
-        while (true) {
-            val page = eventLog.pageBefore(
-                sequenceExclusive = before,
-                limit = EVENT_SCAN_PAGE_SIZE,
-            )
-            if (page.isEmpty()) return null
-
-            page.asReversed().forEach { event ->
-                decodeTranscriptMessages(event.data).orEmpty()
-                    .asReversed()
-                    .firstOrNull { message ->
-                        message.role == "user" && message.content.trim() == expected
-                    }
-                    ?.let { return it.id }
-            }
-
-            val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
-            if (page.size < EVENT_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
-            before = oldestSequence
-        }
-    }
 
     private fun findTranscriptEventSequence(
         eventLog: LocalSessionEventLog,
