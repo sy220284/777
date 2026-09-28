@@ -11,6 +11,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -153,5 +154,53 @@ class DeepSeekClientTest {
         assertEquals(60L, reply.usage.reasoningTokens)
         assertEquals(true, reply.usage.reported)
     }
+
+    @Test
+    fun normalizesNullAssistantContentForToolReplay() {
+        val reply = client.parse(
+            """
+            {
+              "choices": [{
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "reasoning_content": "需要先读取文件",
+                  "tool_calls": [{
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {"name": "read", "arguments": "{\\\"path\\\":\\\"a.txt\\\"}"}
+                  }]
+                }
+              }]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("", reply.message["content"]?.jsonPrimitive?.content)
+        assertEquals("需要先读取文件", reply.message["reasoning_content"]?.jsonPrimitive?.content)
+        assertEquals("read", reply.toolCalls.single().name)
+    }
+
+    @Test
+    fun omitsToolChoiceForOfficialDeepSeekThinkingModels() {
+        assertFalse(shouldSendToolChoice("https://api.deepseek.com", "deepseek-flash"))
+        assertFalse(shouldSendToolChoice("https://api.deepseek.com/v1", "deepseek-v4-pro"))
+        assertTrue(shouldSendToolChoice("https://api.deepseek.com", "deepseek-chat"))
+        assertTrue(shouldSendToolChoice("https://proxy.example.com/v1", "deepseek-flash"))
+    }
+
+    @Test
+    fun extractsProviderErrorAcrossCompatibleShapes() {
+        val json = Json { ignoreUnknownKeys = true }
+        assertEquals(
+            "reasoning_content must be passed back",
+            providerErrorDetail("""{"error":{"message":"reasoning_content must be passed back"}}""", json),
+        )
+        assertEquals(
+            "bad request",
+            providerErrorDetail("""{"message":"bad request"}""", json),
+        )
+    }
+
 
 }
