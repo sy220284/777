@@ -12,7 +12,11 @@ import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -120,6 +124,7 @@ internal fun findChatContinuitySourceUserMessageId(
 
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
+    private val scope: CoroutineScope,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val requestPlanner: suspend (
         snapshot: LocalHarnessState,
@@ -130,6 +135,56 @@ internal class LocalChatContextRefreshCoordinator(
     private val persistBranchState: (String) -> Unit,
     private val persist: () -> Unit,
 ) {
+    private val scheduledRefreshLock = Any()
+    private var scheduledRefreshJob: Job? = null
+
+    fun cancelScheduledRefresh() {
+        val job = synchronized(scheduledRefreshLock) {
+            val current = scheduledRefreshJob
+            scheduledRefreshJob = null
+            current
+        }
+        job?.cancel()
+    }
+
+    fun schedule(
+        userMessage: String,
+        assistantMessage: String,
+        persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedAssistantMessageId: String,
+        expectedBaseState: ChatCharacterState,
+        boundEventLog: LocalSessionEventLog,
+        sourceUserMessageId: String? = null,
+    ) {
+        cancelScheduledRefresh()
+        val generation = enqueue(
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            expectedSessionId = expectedSessionId,
+            expectedAssistantMessageId = expectedAssistantMessageId,
+            boundEventLog = boundEventLog,
+            sourceUserMessageId = sourceUserMessageId,
+        ) ?: return
+
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            refresh(
+                persona = persona,
+                expectedSessionId = expectedSessionId,
+                expectedBaseState = expectedBaseState,
+                expectedGeneration = generation,
+                boundEventLog = boundEventLog,
+            )
+        }
+        synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
+        job.invokeOnCompletion {
+            synchronized(scheduledRefreshLock) {
+                if (scheduledRefreshJob === job) scheduledRefreshJob = null
+            }
+        }
+        job.start()
+    }
+
     fun enqueue(
         userMessage: String,
         assistantMessage: String,
