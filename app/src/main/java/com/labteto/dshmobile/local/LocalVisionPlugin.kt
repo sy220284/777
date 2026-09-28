@@ -78,27 +78,6 @@ class LocalVisionPlugin(
         )
         context.tools.register(
             HarnessTool(
-                name = "vision_analyze_screen",
-                schema = schema(
-                    name = "vision_analyze_screen",
-                    description = "截取当前主屏并交给当前使用模型分析；仅当前模型支持图片时可用",
-                    properties = mapOf("prompt" to "string"),
-                    required = setOf("prompt"),
-                ),
-                access = ToolAccess.NETWORK,
-                approvalPolicy = ToolApprovalPolicy.ALWAYS,
-                timeoutMillis = 240_000L,
-                executor = HarnessToolExecutor { _, input, _ ->
-                    analyze(
-                        prompt = input.requiredString("prompt"),
-                        screenshotCapability = "android_screenshot",
-                        screenshotArguments = emptyMap(),
-                    )
-                },
-            ),
-        )
-        context.tools.register(
-            HarnessTool(
                 name = "vision_analyze_vscreen",
                 schema = schema(
                     name = "vision_analyze_vscreen",
@@ -180,7 +159,6 @@ class LocalVisionPlugin(
 
     override suspend fun uninstall(context: HarnessContext) {
         context.tools.unregister("vision_status")
-        context.tools.unregister("vision_analyze_screen")
         context.tools.unregister("vision_analyze_vscreen")
         context.tools.unregister("vision_analyze_file")
     }

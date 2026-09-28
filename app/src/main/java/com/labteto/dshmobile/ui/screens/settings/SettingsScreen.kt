@@ -889,9 +889,8 @@ private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
 private fun deviceCapabilitiesState(state: DeviceCapabilitiesState): StateDotState = when {
     state.loading -> StateDotState.Running
     state.error != null -> StateDotState.Error
-    state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
-        StateDotState.Done
-    state.shizukuAlive || state.accessibility || state.notifications -> StateDotState.Warning
+    state.notifications && state.virtualDisplay -> StateDotState.Done
+    state.notifications || state.virtualDisplay -> StateDotState.Warning
     else -> StateDotState.Idle
 }
 

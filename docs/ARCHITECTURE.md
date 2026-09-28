@@ -63,7 +63,7 @@ harness-runtime-android/
 harness-interop/
                 MCP HTTP/stdio transports and LSP process client/framing
 harness-device-android/
-                Android device capabilities (accessibility, notifications, Shizuku, virtual display)
+                Android device capabilities (notifications, clipboard, app/system info, virtual display)
 mock-harness/   Ktor implementation of the /api protocol for tests
 reference-validation/
                 official Harness semantic/conformance validation

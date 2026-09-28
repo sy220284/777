@@ -1278,8 +1278,7 @@ internal fun DeviceCapabilitiesCard(
     val overallState = when {
         state.loading -> DsStatus.Running
         state.error != null -> DsStatus.Failed
-        state.shizukuGranted && state.accessibility && state.notifications && state.virtualDisplay ->
-            DsStatus.Done
+        state.notifications && state.virtualDisplay -> DsStatus.Done
         else -> DsStatus.Warning
     }
     val overallLabel = stringResource(
@@ -1293,25 +1292,6 @@ internal fun DeviceCapabilitiesCard(
 
     SettingsCard(stringResource(R.string.advanced_device_capabilities), Icons.Outlined.PhoneAndroid) {
         DsStatusPill(state = overallState, label = overallLabel)
-        CapabilityRow(
-            label = stringResource(R.string.advanced_shizuku_service),
-            enabled = state.shizukuAlive,
-            hint = stringResource(R.string.advanced_shizuku_service_hint),
-        )
-        CapabilityRow(
-            label = stringResource(R.string.advanced_shizuku_permission),
-            enabled = state.shizukuGranted,
-            hint = stringResource(R.string.advanced_shizuku_permission_hint),
-            actionLabel = stringResource(R.string.advanced_request_shizuku),
-            onAction = viewModel::requestShizukuPermission,
-        )
-        CapabilityRow(
-            label = stringResource(R.string.advanced_accessibility),
-            enabled = state.accessibility,
-            hint = stringResource(R.string.advanced_accessibility_hint),
-            actionLabel = stringResource(R.string.advanced_enable_accessibility),
-            onAction = viewModel::openAccessibilitySettings,
-        )
         CapabilityRow(
             label = stringResource(R.string.advanced_notification_access),
             enabled = state.notifications,

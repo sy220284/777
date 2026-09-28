@@ -15,55 +15,42 @@ import org.junit.Test
 
 class AndroidDevicePluginTest {
     @Test
-    fun registersDeviceSurfaceWithExplicitRiskPolicies() = runTest {
-        val provider = RecordingProvider()
+    fun registersSupportedDeviceSurfaceWithExplicitRiskPolicies() = runTest {
         val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(provider))
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
 
         val names = registry.context.tools.names().toSet()
+        assertEquals(16, names.size)
         assertTrue("android_device_info" in names)
-        assertTrue("android_settings_set" in names)
+        assertTrue("android_app_launch" in names)
+        assertTrue("android_settings_get" in names)
+        assertTrue("android_notification_status" in names)
         assertTrue("android_vscreen_create" in names)
         assertTrue("android_vscreen_screenshot" in names)
-        assertTrue("android_find" in names)
-        assertTrue("android_click_node" in names)
-        assertTrue("android_wait" in names)
-        assertTrue("android_notification_status" in names)
+        assertFalse("android_privilege_status" in names)
+        assertFalse("android_screen" in names)
+        assertFalse("android_tap" in names)
+        assertFalse("android_vscreen_tap" in names)
 
         val info = requireNotNull(registry.context.tools.get("android_device_info"))
         assertEquals(ToolAccess.READ_ONLY, info.access)
         assertEquals(ToolApprovalPolicy.MUTATION, info.approvalPolicy)
 
-        val settingsSet = requireNotNull(registry.context.tools.get("android_settings_set"))
-        assertEquals(ToolAccess.PRIVILEGED, settingsSet.access)
-        assertEquals(ToolApprovalPolicy.ALWAYS, settingsSet.approvalPolicy)
+        val notificationList = requireNotNull(registry.context.tools.get("android_notification_list"))
+        assertEquals(ToolAccess.READ_ONLY, notificationList.access)
+        assertEquals(ToolApprovalPolicy.ALWAYS, notificationList.approvalPolicy)
 
-        val appStop = requireNotNull(registry.context.tools.get("android_app_stop"))
-        assertEquals(ToolAccess.PRIVILEGED, appStop.access)
-        assertEquals(ToolApprovalPolicy.ALWAYS, appStop.approvalPolicy)
-
-        val tap = requireNotNull(registry.context.tools.get("android_tap"))
-        assertEquals(ToolAccess.DEVICE, tap.access)
-        assertEquals(ToolApprovalPolicy.MUTATION, tap.approvalPolicy)
-
-        val find = requireNotNull(registry.context.tools.get("android_find"))
-        assertEquals(ToolAccess.READ_ONLY, find.access)
-        val wait = requireNotNull(registry.context.tools.get("android_wait"))
-        assertEquals(ToolAccess.READ_ONLY, wait.access)
-        val clickNode = requireNotNull(registry.context.tools.get("android_click_node"))
-        assertEquals(ToolAccess.DEVICE, clickNode.access)
-        val notificationStatus = requireNotNull(registry.context.tools.get("android_notification_status"))
-        assertEquals(ToolAccess.READ_ONLY, notificationStatus.access)
+        val screenshot = requireNotNull(registry.context.tools.get("android_vscreen_screenshot"))
+        assertEquals(ToolAccess.READ_ONLY, screenshot.access)
+        assertEquals(ToolApprovalPolicy.ALWAYS, screenshot.approvalPolicy)
     }
 
     @Test
-    fun exposesCompleteCatalogAndUninstallsWithoutLeakingTools() = runTest {
+    fun uninstallsWithoutLeakingTools() = runTest {
         val registry = PluginRegistry()
         registry.install(AndroidDevicePlugin(RecordingProvider()))
 
-        val names = registry.context.tools.names()
-        assertEquals(36, names.size)
-        assertEquals(36, names.toSet().size)
+        assertEquals(16, registry.context.tools.names().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
@@ -82,12 +69,9 @@ class AndroidDevicePluginTest {
             input = buildJsonObject { },
             context = ToolContext(allowMutation = false),
         )
-        val tap = registry.context.tools.execute(
-            name = "android_tap",
-            input = buildJsonObject {
-                put("x", 12)
-                put("y", 34)
-            },
+        val launch = registry.context.tools.execute(
+            name = "android_app_launch",
+            input = buildJsonObject { put("package", "com.example.demo") },
             context = ToolContext(
                 allowMutation = false,
                 approval = { true },
@@ -96,52 +80,8 @@ class AndroidDevicePluginTest {
 
         assertFalse(info.isError)
         assertEquals("ok:device_info", info.content)
-        assertTrue(tap.isError)
+        assertTrue(launch.isError)
         assertEquals(listOf("device_info"), provider.calls.map { it.first })
-    }
-
-    @Test
-    fun privilegedToolCannotReachProviderWithoutApproval() = runTest {
-        val provider = RecordingProvider()
-        val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(provider))
-
-        val denied = registry.context.tools.execute(
-            name = "android_settings_set",
-            input = buildJsonObject {
-                put("namespace", "secure")
-                put("key", "demo")
-                put("value", "1")
-            },
-        )
-
-        assertTrue(denied.isError)
-        assertTrue(provider.calls.isEmpty())
-    }
-
-    @Test
-    fun approvedPrivilegedToolReceivesArgumentsExactlyOnce() = runTest {
-        val provider = RecordingProvider()
-        val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(provider))
-
-        val result = registry.context.tools.execute(
-            name = "android_settings_set",
-            input = buildJsonObject {
-                put("namespace", "secure")
-                put("key", "demo")
-                put("value", "1")
-            },
-            context = ToolContext(approval = { true }),
-        )
-
-        assertFalse(result.isError)
-        assertEquals("ok:settings_set", result.content)
-        assertEquals(1, provider.calls.size)
-        assertEquals("settings_set", provider.calls.single().first)
-        assertEquals("secure", provider.calls.single().second["namespace"])
-        assertEquals("demo", provider.calls.single().second["key"])
-        assertEquals("1", provider.calls.single().second["value"])
     }
 
     @Test
@@ -149,9 +89,8 @@ class AndroidDevicePluginTest {
         val provider = RecordingProvider()
         val registry = PluginRegistry()
         registry.install(AndroidDevicePlugin(provider))
-        val names = listOf("android_screen", "android_find", "android_wait", "android_screenshot",
-            "android_notification_list", "android_clipboard_get", "android_vscreen_screenshot", "android_dumpsys")
-        for (name in names) {
+
+        for (name in listOf("android_notification_list", "android_clipboard_get", "android_vscreen_screenshot")) {
             assertTrue(registry.context.tools.execute(name, buildJsonObject {}).isError)
             assertTrue(provider.calls.isEmpty())
             assertEquals(ToolApprovalPolicy.ALWAYS, registry.context.tools.get(name)!!.approvalPolicy)

@@ -55,19 +55,6 @@ class LocalApprovalPolicyTest {
     }
 
     @Test
-    fun deviceTurnLeaseCannotOverrideAlwaysApproval() {
-        assertTrue(canUseDeviceApprovalLease(
-            tool("android_tap", ToolAccess.DEVICE, ToolApprovalPolicy.MUTATION),
-        ))
-        assertFalse(canUseDeviceApprovalLease(
-            tool("android_privilege_request", ToolAccess.DEVICE, ToolApprovalPolicy.ALWAYS),
-        ))
-        assertFalse(canUseDeviceApprovalLease(
-            tool("android_settings_set", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS),
-        ))
-    }
-
-    @Test
     fun sessionEventReadsAreEligibleForPersistentSafeApproval() {
         for (name in listOf("session_event_search", "session_trace", "session_event_trace", "session_event_read")) {
             val definition = tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))

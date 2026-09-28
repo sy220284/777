@@ -16,31 +16,31 @@ class LocalToolRouterTest {
     @Test
     fun optionalToolsStayHiddenUntilCapabilitySearchEnablesThem() {
         val core = tool("read", "读取文件")
-        val android = tool("android_tap", "按屏幕坐标点击")
-        val vision = tool("vision_analyze_screen", "分析当前屏幕")
+        val android = tool("android_app_launch", "启动 Android 应用")
+        val vision = tool("vision_analyze_vscreen", "分析虚拟屏画面")
         val all = listOf(core, android, vision)
 
         val initial = LocalToolRouter.visibleSchemas(all, emptySet())
         assertEquals(listOf("read"), names(initial))
 
-        val matches = LocalToolRouter.search(all, "安卓 界面")
-        assertTrue(matches.any { it.name == "android_tap" })
+        val matches = LocalToolRouter.search(all, "安卓 应用")
+        assertTrue(matches.any { it.name == "android_app_launch" })
         val enabled = matches.map(HarnessTool::name).toSet()
-        assertTrue("android_tap" in names(LocalToolRouter.visibleSchemas(all, enabled)))
-        assertTrue("vision_analyze_screen" !in names(LocalToolRouter.visibleSchemas(all, enabled)))
+        assertTrue("android_app_launch" in names(LocalToolRouter.visibleSchemas(all, enabled)))
+        assertTrue("vision_analyze_vscreen" !in names(LocalToolRouter.visibleSchemas(all, enabled)))
     }
 
     @Test
     fun workspaceImageAnalyzerIsAlwaysVisibleForAutomaticFallback() {
         val read = tool("read", "读取文件")
         val image = tool("vision_analyze_file", "分析工作区图片")
-        val screen = tool("vision_analyze_screen", "分析当前屏幕")
+        val screen = tool("vision_analyze_vscreen", "分析虚拟屏画面")
 
         val visible = names(LocalToolRouter.visibleSchemas(listOf(read, image, screen), emptySet()))
 
         assertTrue("read" in visible)
         assertTrue("vision_analyze_file" in visible)
-        assertTrue("vision_analyze_screen" !in visible)
+        assertTrue("vision_analyze_vscreen" !in visible)
     }
 
     @Test

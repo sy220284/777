@@ -657,8 +657,6 @@ internal class LocalSubagentRunner(
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",
             "android_vscreen_launch",
-            "android_vscreen_tap",
-            "android_vscreen_swipe",
             "android_vscreen_screenshot",
             "vision_analyze_vscreen",
         )

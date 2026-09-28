@@ -109,7 +109,7 @@
     <string name="local_device_approval_on">本轮设备操作已授权</string>
     <string name="local_approval_scope_show">查看授权范围</string>
     <string name="local_approval_scope_hide">收起授权范围</string>
-    <string name="local_device_approval_scope">当前代理回合中的普通界面点击、输入和滑动会直接执行；Shizuku、高权限、MCP、凭据和命令仍需逐次确认。</string>
+    <string name="local_device_approval_scope">当前代理回合中的普通设备操作会直接执行；外部工具、凭据和命令仍按各自权限策略确认。</string>
     <string name="local_welcome_title">今天想做什么？</string>
     <string name="local_welcome_hint">描述目标即可开始。需要改动文件或操作设备时，我会先请求你确认。</string>
     <string name="local_suggestions_title">试试这些</string>
@@ -547,7 +547,6 @@
     <string name="common_enabled">已开启</string>
     <string name="common_disabled">已关闭</string>
     <string name="common_refresh">刷新</string>
-    <string name="advanced_accessibility">无障碍控制</string>
     <string name="advanced_agent_limits_hint">主循环 4–128；子代理 1–128；重试 1–5。</string>
     <string name="advanced_agent_saved">智能体设置已保存</string>
     <string name="advanced_agent_settings">智能体设置</string>
@@ -567,14 +566,10 @@
     <string name="advanced_device_status_ready">设备能力已就绪</string>
     <string name="advanced_device_status_needs_setup">部分能力需要配置</string>
     <string name="advanced_device_status_error">设备能力检查失败</string>
-    <string name="advanced_shizuku_service_hint">检查本机 Shizuku 服务是否正在运行。</string>
-    <string name="advanced_shizuku_permission_hint">用于通过 Shizuku 执行需要较高权限的设备操作。</string>
-    <string name="advanced_accessibility_hint">用于执行常规界面点击、输入与导航。</string>
     <string name="advanced_notification_access_hint">任务需要通知上下文时读取本机通知。</string>
     <string name="advanced_virtual_display_hint">允许设备任务在隔离的虚拟屏幕中持续执行。</string>
     <string name="advanced_discover_models">发现可用模型</string>
     <string name="advanced_discovering_models">正在发现…</string>
-    <string name="advanced_enable_accessibility">开启无障碍控制</string>
     <string name="advanced_enable_notifications">开启通知读取</string>
     <string name="advanced_endpoint">接口地址</string>
     <string name="advanced_kind_constraint">约束</string>
@@ -652,7 +647,6 @@
     <string name="advanced_project_unavailable">项目配置不可用：%1$s</string>
     <string name="advanced_provider_config">配置：%1$s/%2$s</string>
     <string name="advanced_replace_model_key">替换模型密钥（可留空）</string>
-    <string name="advanced_request_shizuku">请求 Shizuku 授权</string>
     <string name="advanced_restore_default">恢复默认</string>
     <string name="advanced_restored_field">已恢复 %1$s</string>
     <string name="advanced_save_agent_settings">保存智能体设置</string>
@@ -665,8 +659,6 @@
     <string name="advanced_secret_replace_hint">已设置，输入新值可替换</string>
     <string name="advanced_secret_unset">尚未设置</string>
     <string name="advanced_select">选择…</string>
-    <string name="advanced_shizuku_permission">Shizuku 授权</string>
-    <string name="advanced_shizuku_service">Shizuku 服务</string>
     <string name="advanced_subagent_steps">子代理步数</string>
     <string name="advanced_updated_field">已更新 %1$s</string>
     <string name="advanced_user_rules">用户长期规则</string>

@@ -44,8 +44,6 @@ internal const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
 internal val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
     "android_vscreen_status",
     "android_vscreen_launch",
-    "android_vscreen_tap",
-    "android_vscreen_swipe",
     "android_vscreen_screenshot",
     "vision_analyze_vscreen",
 )
@@ -54,7 +52,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "subagent", "subagent_fork", "workflow", "ask_user_question",
     "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
     "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
-    "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
+    "memory_remember", "memory_update", "memory_forget",
     "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
     "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
     "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",

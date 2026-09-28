@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -10,47 +11,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 
 class LocalVisionPluginTest {
-    @Test
-    fun mainScreenAnalysisRequiresApprovalBeforeCapturingPixels() = runTest {
-        val device = RecordingDevice()
-        val analyzer = RecordingAnalyzer()
-        val registry = PluginRegistry()
-        registry.install(plugin(device, analyzer))
-
-        val denied = registry.context.tools.execute(
-            name = "vision_analyze_screen",
-            input = buildJsonObject { put("prompt", "找按钮") },
-        )
-
-        assertTrue(denied.isError)
-        assertTrue(device.calls.isEmpty())
-        assertTrue(analyzer.calls.isEmpty())
-    }
-
-    @Test
-    fun approvedMainScreenAnalysisSendsScreenshotOnce() = runTest {
-        val device = RecordingDevice()
-        val analyzer = RecordingAnalyzer()
-        val registry = PluginRegistry()
-        registry.install(plugin(device, analyzer))
-
-        val result = registry.context.tools.execute(
-            name = "vision_analyze_screen",
-            input = buildJsonObject { put("prompt", "找登录按钮") },
-            context = ToolContext(approval = { true }),
-        )
-
-        assertFalse(result.isError)
-        assertEquals("视觉结果", result.content)
-        assertEquals(listOf("android_screenshot" to emptyMap<String, String>()), device.calls)
-        assertEquals(1, analyzer.calls.size)
-        assertTrue(analyzer.calls.single().prompt.contains("找登录按钮"))
-        assertEquals("data:image/png;base64,AAAA", analyzer.calls.single().image)
-    }
-
     @Test
     fun virtualScreenAnalysisUsesRequestedDisplayAfterFreshApproval() = runTest {
         val device = RecordingDevice()
@@ -76,16 +38,35 @@ class LocalVisionPluginTest {
     }
 
     @Test
+    fun virtualScreenCannotUploadWithoutApproval() = runTest {
+        val device = RecordingDevice()
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        registry.install(plugin(device, analyzer))
+
+        val denied = registry.context.tools.execute(
+            "vision_analyze_vscreen",
+            buildJsonObject {
+                put("id", "display-1")
+                put("prompt", "分析")
+            },
+        )
+
+        assertTrue(denied.isError)
+        assertTrue(device.calls.isEmpty())
+        assertTrue(analyzer.calls.isEmpty())
+    }
+
+    @Test
     fun workspaceImageAnalysisRequiresApprovalAndStaysInsideWorkspace() = runTest {
         val root = Files.createTempDirectory("vision-workspace").toFile()
         try {
             root.resolve("shot.png").writeBytes(validPngBytes())
-            val device = RecordingDevice()
             val analyzer = RecordingAnalyzer()
             val registry = PluginRegistry()
             registry.install(
                 LocalVisionPlugin(
-                    device = device,
+                    device = RecordingDevice(),
                     keyProvider = { "secret" },
                     routeProvider = { LocalVisionRoute("https://vision.example/v1", "vision-model") },
                     analyzer = analyzer,
@@ -226,21 +207,6 @@ class LocalVisionPluginTest {
         assertTrue(device.calls.isEmpty())
     }
 
-    @Test
-    fun virtualScreenCannotUploadWithoutApproval() = runTest {
-        val device = RecordingDevice()
-        val analyzer = RecordingAnalyzer()
-        val registry = PluginRegistry()
-        registry.install(plugin(device, analyzer))
-        val denied = registry.context.tools.execute("vision_analyze_vscreen", buildJsonObject {
-            put("id", "display-1")
-            put("prompt", "分析")
-        })
-        assertTrue(denied.isError)
-        assertTrue(device.calls.isEmpty())
-        assertTrue(analyzer.calls.isEmpty())
-    }
-
     private fun plugin(
         device: HarnessDeviceProvider,
         analyzer: LocalVisionAnalyzer,
@@ -252,7 +218,7 @@ class LocalVisionPluginTest {
     )
 
     private class RecordingDevice : HarnessDeviceProvider {
-        override val capabilities: Set<String> = setOf("android_screenshot", "vscreen_screenshot")
+        override val capabilities: Set<String> = setOf("vscreen_screenshot")
         val calls = mutableListOf<Pair<String, Map<String, String>>>()
 
         override suspend fun invoke(

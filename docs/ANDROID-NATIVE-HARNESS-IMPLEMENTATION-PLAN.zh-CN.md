@@ -33,7 +33,7 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 - Android 16 是唯一目标平台，不为 Android 8～15 增加兼容债务。
 - Harness Core 使用 Kotlin 原生实现。
 - UI、Android 能力和 Harness Core 必须解耦。
-- Harness Core 不直接依赖 Compose、Activity、Service、Shizuku 或无障碍服务。
+- Harness Core 不直接依赖 Compose、Activity、Service 或具体 Android 设备服务实现。
 - 模型可见的状态必须来自可持久化的 Session Event。
 - 文件、进程、终端、网络、设备控制全部通过能力接口接入。
 - 官方行为兼容以“输入/事件/状态/输出一致”为准，不追求类名或代码结构逐行相似。
@@ -95,12 +95,11 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 │  └─ 后台任务
 │
 ├─ harness-device-android
-│  ├─ Shizuku
-│  ├─ 无障碍
-│  ├─ 截图 / 视觉
-│  ├─ App 控制
-│  ├─ 系统设置
+│  ├─ 设备与应用信息
+│  ├─ App 启动
+│  ├─ 系统设置读取
 │  ├─ 通知 / 剪贴板
+│  ├─ Intent
 │  └─ 虚拟屏
 │
 ├─ harness-interop
@@ -381,42 +380,27 @@ Harness 工具层提供：
 
 ### P6：Android Device Provider
 
-新增 Android 专属工具族。
-
-#### Shizuku
-
-负责：
-
-- 包管理；
-- Activity / Service 调用；
-- settings；
-- dumpsys；
-- 系统属性；
-- 进程与权限状态；
-- 安装 / 卸载（必须审批）。
-
-#### 无障碍
-
-负责：
-
-- 控件树；
-- 文本定位；
-- 点击；
-- 输入；
-- 滚动；
-- 返回 / 首页。
+新增 Android 专属工具族，保持在普通应用权限与明确系统授权范围内。
 
 #### Android API
 
 负责：
 
+- 设备与应用信息；
+- 应用启动；
+- 系统设置读取；
 - 剪贴板；
 - 通知；
 - Intent；
-- 文件选择；
-- 分享；
-- 电量与网络状态；
-- 应用信息。
+- 文件选择与分享。
+
+#### VirtualDisplay
+
+负责：
+
+- 创建、查询与关闭隔离虚拟显示；
+- 在虚拟显示中启动应用；
+- 截取虚拟显示画面供视觉模型分析。
 
 所有高风险操作必须显示明确审批目标与参数。
 
@@ -472,35 +456,24 @@ Android 后台限制无法提供桌面常驻进程的秒级语义，必须明确
 
 ```text
 android_device_info
-android_screen
-android_screenshot
-android_tap
-android_type
-android_swipe
-android_back
-android_home
 
 android_app_list
 android_app_info
 android_app_launch
-android_app_stop
-android_app_install
-android_app_uninstall
 
 android_settings_get
-android_settings_set
-android_permissions
+android_open_uri
 
+android_notification_status
 android_notification_list
 android_clipboard_get
 android_clipboard_set
 
 android_vscreen_create
+android_vscreen_list
 android_vscreen_status
 android_vscreen_launch
-android_vscreen_tap
-android_vscreen_swipe
-android_vscreen_key
+android_vscreen_screenshot
 android_vscreen_close
 ```
 
@@ -660,9 +633,8 @@ Harness Core 升级比普通 UI 升级风险更高。
 - 工作区写入；
 - 普通进程执行；
 - 网络；
-- Android 界面操作；
-- Shizuku 系统操作；
-- 安装 / 卸载；
+- Android 设备操作；
+- 设备敏感信息读取；
 - 外部目录访问。
 
 工具必须声明能力级别。
@@ -672,9 +644,8 @@ Harness Core 升级比普通 UI 升级风险更高。
 - read/search：工作区内默认允许；
 - write/edit：审批；
 - shell：审批；
-- 安装/卸载：强审批；
-- Shizuku 修改系统设置：强审批；
-- 无障碍点击涉及付款、账号、安全设置：阻断或二次确认；
+- 通知、剪贴板和虚拟屏截图等敏感读取：每次审批；
+- 应用启动、URI 打开和虚拟屏变更：按设备操作策略审批；
 - 外部应用私有数据：普通 App 权限下不可访问；
 - API Key：Keystore；
 - Session：应用私有目录；
@@ -707,7 +678,7 @@ Official reference runner
 Differential conformance suite
 ```
 
-涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代 Shizuku、无障碍、厂商 ROM 行为。
+涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代通知授权、虚拟显示与厂商 ROM 行为。
 
 ---
 
@@ -808,11 +779,10 @@ app
 4. `feat: add process runtime and persistent PTY`
 5. `feat: add native MCP client`
 6. `feat: add native LSP client`
-7. `feat: add Shizuku Android provider`
-8. `feat: add accessibility and screen provider`
-9. `feat: add vision interaction loop`
-10. `feat: add virtual display agent runtime`
-11. `feat: add signed in-app updater`
+7. `feat: add Android API device provider`
+8. `feat: add vision interaction loop`
+9. `feat: add virtual display agent runtime`
+10. `feat: add signed in-app updater`
 
 不得把 P0～P9 全塞进一个巨型 PR。
 
