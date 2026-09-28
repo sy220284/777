@@ -359,6 +359,7 @@ fun LocalHarnessScreen(
                 onImageModeChange = viewModel::setImageInputMode,
                 onStop = viewModel::stop,
                 onNewSession = { showNewSessionMode = true },
+                onExitGroupChat = viewModel::leaveGroupChatMode,
                 onOpenRunCenter = { showRunCenter = true },
                 onConfigureChatPersona = viewModel::configureChatPersona,
                 onConfigureGroupMembers = viewModel::configureGroupChatMembers,
@@ -403,13 +404,27 @@ fun LocalHarnessScreen(
     }
 
     if (showNewSessionMode) {
-        NewSessionModeDialog(
-            onDismiss = { showNewSessionMode = false },
-            onSelect = { mode ->
-                showNewSessionMode = false
-                viewModel.createSession(mode)
-            },
-        )
+        if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
+            GroupNewSessionDialog(
+                onDismiss = { showNewSessionMode = false },
+                onNewGroup = {
+                    showNewSessionMode = false
+                    viewModel.createGroupChatSession()
+                },
+                onNewSingle = {
+                    showNewSessionMode = false
+                    viewModel.createSingleChatSession()
+                },
+            )
+        } else {
+            NewSessionModeDialog(
+                onDismiss = { showNewSessionMode = false },
+                onSelect = { mode ->
+                    showNewSessionMode = false
+                    viewModel.createSession(mode)
+                },
+            )
+        }
     }
 
     if (showNewPersona && state.usageMode == LocalUsageMode.CHAT) {
@@ -658,6 +673,7 @@ private fun LocalChat(
     onImageModeChange: (LocalImageInputMode) -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
+    onExitGroupChat: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onConfigureGroupMembers: (List<String>) -> Boolean,
@@ -1000,6 +1016,15 @@ private fun LocalChat(
                         contentDescription = stringResource(R.string.local_execution_console),
                         onClick = onOpenRunCenter,
                         tint = colors.labelSecondary,
+                    )
+                }
+                if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
+                    DsButton(
+                        text = stringResource(R.string.local_group_chat_leave),
+                        onClick = onExitGroupChat,
+                        enabled = !state.running && !state.loading,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
                     )
                 }
                 DsIconButton(

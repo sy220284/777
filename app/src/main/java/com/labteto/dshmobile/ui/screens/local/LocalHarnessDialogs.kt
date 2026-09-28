@@ -84,6 +84,33 @@ internal fun NewSessionModeDialog(
 }
 
 @Composable
+internal fun GroupNewSessionDialog(
+    onDismiss: () -> Unit,
+    onNewGroup: () -> Unit,
+    onNewSingle: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    DsDialog(title = stringResource(R.string.local_group_new_session_title), onDismiss = onDismiss) {
+        Text(
+            stringResource(R.string.local_group_new_session_intro),
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+        DsButton(
+            text = stringResource(R.string.local_group_new_group),
+            onClick = onNewGroup,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DsButton(
+            text = stringResource(R.string.local_group_new_single),
+            onClick = onNewSingle,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Outline,
+        )
+    }
+}
+
+@Composable
 internal fun ChatPersonaPickerDialog(
     entries: List<PersonaGalleryEntry>,
     currentPersona: PersonaProfile,
