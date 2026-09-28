@@ -53,8 +53,8 @@ internal fun ChatContextState.normalized(): ChatContextState {
                 (item.kind to normalizeContinuityFact(item.text)) in activeEvidenceKeys
         }
         .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
-        .takeLast(MAX_CONTINUITY_EVIDENCE)
         .toList()
+        .takeLast(MAX_CONTINUITY_EVIDENCE)
 
     return copy(
         scene = scene.copy(
