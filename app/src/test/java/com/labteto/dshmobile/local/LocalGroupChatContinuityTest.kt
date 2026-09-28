@@ -53,6 +53,7 @@ class LocalGroupChatContinuityTest {
             pendingTurns = listOf(
                 ChatPendingTurn(
                     sequence = 20L,
+                    userMessageId = "u20",
                     assistantMessageId = "a20",
                     userMessage = "那就定了，明天十点出门。",
                     assistantMessage = "好，明天十点出门。",
@@ -60,6 +61,7 @@ class LocalGroupChatContinuityTest {
                 ),
                 ChatPendingTurn(
                     sequence = 22L,
+                    userMessageId = "u22",
                     assistantMessageId = "a22",
                     userMessage = "明早出门还没发生，等明天。",
                     assistantMessage = "嗯，等明早再出门。",
@@ -89,6 +91,14 @@ class LocalGroupChatContinuityTest {
         assertEquals(listOf("大家在客厅聊天"), result.continuity.recentEvents)
         assertEquals(listOf("明天十点出门"), result.continuity.decisions)
         assertEquals(listOf("明早出门尚未发生"), result.continuity.unfinished)
+        assertEquals(
+            "u20",
+            result.continuity.evidence.single { it.kind.name == "DECISION" }.sourceUserMessageId,
+        )
+        assertEquals(
+            "u22",
+            result.continuity.evidence.single { it.kind.name == "OPEN_THREAD" }.sourceUserMessageId,
+        )
         assertEquals(22L, result.processedThroughSequence)
         assertEquals(emptyList<ChatPendingTurn>(), result.pendingTurns)
     }
