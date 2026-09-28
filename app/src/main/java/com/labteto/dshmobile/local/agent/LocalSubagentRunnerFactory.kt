@@ -47,6 +47,7 @@ internal class LocalSubagentRunnerFactory(
             memoryTools: LocalMemoryTools,
             enabledOptionalTools: MutableSet<String>,
         ) -> AgentToolResult,
+        historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -78,6 +79,7 @@ internal class LocalSubagentRunnerFactory(
             toolOutputSessionId = { sessionId },
             runSessionId = { sessionId },
             runKind = runKind,
+            historySnapshotProvider = historySnapshot,
         )
     }
 
@@ -90,12 +92,13 @@ internal class LocalSubagentRunnerFactory(
         toolOutputSessionId: () -> String = defaultSessionId,
         runSessionId: () -> String = defaultSessionId,
         runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
+        historySnapshotProvider: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
         state = runnerState,
         jobs = jobs,
-        historySnapshot = modelHistory::snapshot,
+        historySnapshot = historySnapshotProvider,
         contextSnapshot = contextSnapshotProvider,
         eventLog = eventLogProvider,
         schemas = schemasProvider,
