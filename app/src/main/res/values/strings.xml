@@ -763,6 +763,11 @@
     <string name="local_group_announcement_generate">Generate story draft</string>
     <string name="local_group_announcement_save">Save notice</string>
     <string name="local_group_chat_title">Group chat</string>
+    <string name="local_group_chat_leave">Leave group</string>
+    <string name="local_group_new_session_title">New conversation</string>
+    <string name="local_group_new_session_intro">Start a new group chat or a blank one-to-one chat.</string>
+    <string name="local_group_new_group">New group chat</string>
+    <string name="local_group_new_single">New blank chat</string>
     <string name="local_group_chat_member_count">%1$d characters</string>
     <string name="local_group_chat_active_speaker">%1$s is replying…</string>
     <string name="local_group_chat_members_title">Group characters</string>

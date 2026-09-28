@@ -761,6 +761,11 @@
     <string name="local_group_announcement_generate">生成剧情草稿</string>
     <string name="local_group_announcement_save">保存公告</string>
     <string name="local_group_chat_title">群聊</string>
+    <string name="local_group_chat_leave">退出群聊</string>
+    <string name="local_group_new_session_title">新建对话</string>
+    <string name="local_group_new_session_intro">选择新群聊，或开始一段空白单人对话。</string>
+    <string name="local_group_new_group">新建群聊对话</string>
+    <string name="local_group_new_single">新建空白单人对话</string>
     <string name="local_group_chat_member_count">%1$d 位角色</string>
     <string name="local_group_chat_active_speaker">%1$s 正在回复…</string>
     <string name="local_group_chat_members_title">群聊角色</string>
