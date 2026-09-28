@@ -98,4 +98,65 @@ class LocalAdaptiveRuntimeBudgetTest {
         assertTrue(loaded.maxToolResultTokens > 0)
     }
 
+
+    @Test
+    fun healthyContinuationCanGrowBeyondLegacy128StepCeiling() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "全量审计、排查、修复、测试",
+            contextChars = 20_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
+    fun continuationStopsWhenContextBudgetIsExhausted() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 500_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertEquals(null, next)
+    }
+
+    @Test
+    fun continuationStopsNearContextLimitUnderHighResourcePressure() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 450_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.HIGH,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertEquals(null, next)
+    }
+
+    @Test
+    fun continuationDoesNotGuessWhenContextBudgetIsUnknown() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 10_000,
+            contextBudgetChars = 0,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertEquals(null, next)
+    }
+
 }
