@@ -10,7 +10,6 @@ import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.withLegacyFallback
-import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -404,7 +403,7 @@ internal class LocalAutomationChatCoordinator(
                 require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
 
                 val proactiveMessage = LocalHarnessMessage(
-                    id = UUID.randomUUID().toString(),
+                    id = java.util.UUID.randomUUID().toString(),
                     role = "assistant",
                     content = content,
                     createdAt = System.currentTimeMillis(),
