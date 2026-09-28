@@ -4850,6 +4850,7 @@ class LocalHarnessEngine @Inject constructor(
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
         temperature: Double? = null,
+        binding: LocalWorkRunBinding? = null,
     ): LocalModelReply = modelRequestCoordinator.complete(
         key = key,
         snapshot = snapshot,
@@ -4861,8 +4862,14 @@ class LocalHarnessEngine @Inject constructor(
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = persistOverflowHistory,
         streamFilterPhrases = streamFilterPhrases,
-        requestLog = requestLog,
+        requestLog = requestLog ?: binding?.eventLog,
         temperature = temperature,
+        previewGuard = {
+            binding == null || currentSessionId == binding.sessionId
+        },
+        overflowPersister = binding?.let { runBinding ->
+            { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
+        },
     )
 
     private fun persistForegroundOverflowCompaction(
@@ -4870,20 +4877,35 @@ class LocalHarnessEngine @Inject constructor(
         summaryMode: LocalHistorySummaryMode,
     ) {
         if (snapshot.sessionId != currentSessionId || snapshot.groupChat.enabled) return
-        val compaction = modelHistory.compactOverflow(
+        persistOverflowCompaction(
+            snapshot = snapshot,
+            summaryMode = summaryMode,
+            binding = null,
+        )
+    }
+
+    private fun persistOverflowCompaction(
+        snapshot: LocalHarnessState,
+        summaryMode: LocalHistorySummaryMode,
+        binding: LocalWorkRunBinding?,
+    ) {
+        if (binding != null && snapshot.sessionId != binding.sessionId) return
+        val history = binding?.modelHistory ?: modelHistory
+        val log = binding?.eventLog ?: eventLog
+        val compaction = history.compactOverflow(
             compactor = historyCompactor,
             summaryMode = summaryMode,
         ) ?: return
-        eventLog.append("session/compaction", buildJsonObject {
+        log.append("session/compaction", buildJsonObject {
             put("trigger", "context-overflow")
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
             put("estimated_tokens_before", compaction.estimatedTokensBefore)
             put("estimated_tokens_after", compaction.estimatedTokensAfter)
         })
-        checkpointModelHistory("session/context-overflow")
-        updateContextMetrics()
-        persist()
+        checkpointModelHistory("session/context-overflow", binding)
+        updateContextMetrics(binding)
+        persist(binding)
     }
 
     private fun currentHistoryBudget(binding: LocalWorkRunBinding? = null): LocalHistoryBudget {
@@ -4937,22 +4959,28 @@ class LocalHarnessEngine @Inject constructor(
             "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
-    private fun compactHistoryIfNeeded(extraTokens: Int = 0) {
-        val budget = currentHistoryBudget()
-        val compaction = modelHistory.compact(
+    private fun compactHistoryIfNeeded(
+        extraTokens: Int = 0,
+        binding: LocalWorkRunBinding? = null,
+    ) {
+        val budget = currentHistoryBudget(binding)
+        val history = binding?.modelHistory ?: modelHistory
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
+        val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
             extraTokens = extraTokens,
-            summaryMode = if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
                 LocalHistorySummaryMode.CHAT
             } else {
                 LocalHistorySummaryMode.WORK
             },
         ) ?: run {
-            updateContextMetrics()
+            updateContextMetrics(binding)
             return
         }
-        eventLog.append(
+        log.append(
             "session/compaction",
             buildJsonObject {
                 put("omitted_messages", compaction.omittedMessages)
@@ -4962,29 +4990,34 @@ class LocalHarnessEngine @Inject constructor(
                 put("extra_request_tokens", extraTokens)
             },
         )
-        checkpointModelHistory("session/compaction")
-        updateContextMetrics()
-        persist()
+        checkpointModelHistory("session/compaction", binding)
+        updateContextMetrics(binding)
+        persist(binding)
     }
 
-    private fun ensureSystemMessage() {
-        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") return
-        val prompt = systemPrompt()
-        modelHistory.prepend(
+    private fun ensureSystemMessage(binding: LocalWorkRunBinding? = null) {
+        val history = binding?.modelHistory ?: modelHistory
+        val log = binding?.eventLog ?: eventLog
+        if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") return
+        val prompt = systemPrompt(binding)
+        history.prepend(
             buildJsonObject {
                 put("role", "system")
                 put("content", prompt)
             },
         )
-        eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-        updateContextMetrics()
+        log.append("system/prompt", buildJsonObject { put("content", prompt) })
+        updateContextMetrics(binding)
     }
 
-    private fun systemPrompt(): String = when {
-        _state.value.usageMode != LocalUsageMode.CHAT ->
-            workSystemPrompt(workspace.path, _state.value.planMode)
-        _state.value.groupChat.enabled -> groupChatSystemPrompt()
-        else -> chatSystemPrompt()
+    private fun systemPrompt(binding: LocalWorkRunBinding? = null): String {
+        val snapshot = binding?.state?.value ?: _state.value
+        return when {
+            snapshot.usageMode != LocalUsageMode.CHAT ->
+                workSystemPrompt(workspace.path, snapshot.planMode)
+            snapshot.groupChat.enabled -> groupChatSystemPrompt()
+            else -> chatSystemPrompt()
+        }
     }
 
     private fun environmentInfo(): String {
