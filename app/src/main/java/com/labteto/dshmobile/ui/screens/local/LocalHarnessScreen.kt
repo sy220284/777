@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -1664,37 +1666,43 @@ internal fun LocalUsageModePill(
     } else {
         colors.bgModulePlatform
     }
-    val indicatorOffset by animateDpAsState(
-        targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else 126.dp,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "usage mode indicator",
-    )
     Surface(
-        modifier = Modifier.width(264.dp).height(52.dp),
+        modifier = Modifier.fillMaxWidth().widthIn(max = 264.dp).height(52.dp),
         shape = DsShapes.pillFull,
         color = containerColor,
         border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
         shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
     ) {
-        Box(Modifier.padding(4.dp)) {
+        BoxWithConstraints(Modifier.padding(4.dp)) {
+            val segmentWidth = maxWidth / 2
+            val indicatorOffset by animateDpAsState(
+                targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else segmentWidth,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                label = "usage mode indicator",
+            )
             Surface(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
-                    .size(width = 126.dp, height = 44.dp),
+                    .width(segmentWidth)
+                    .height(44.dp),
                 shape = DsShapes.pillFull,
                 color = colors.bgLayer1,
                 border = BorderStroke(1.dp, colors.borderL1),
                 shadowElevation = 2.dp,
             ) {}
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 listOf(
                     LocalUsageMode.CHAT to R.string.local_usage_chat,
                     LocalUsageMode.WORK to R.string.local_usage_work,
                 ).forEach { (mode, labelRes) ->
                     Box(
                         modifier = Modifier
-                            .size(width = 126.dp, height = 44.dp)
+                            .width(segmentWidth)
+                            .height(44.dp)
                             .clip(DsShapes.pillFull)
                             .clickable(enabled = enabled) { onSelect(mode) },
                         contentAlignment = Alignment.Center,
