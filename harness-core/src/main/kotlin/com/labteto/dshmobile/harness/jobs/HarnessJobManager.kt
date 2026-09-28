@@ -4,6 +4,8 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
@@ -20,6 +22,8 @@ data class JobSnapshot(
     val output: String = "",
     val resumeKind: String? = null,
     val resumePayload: String? = null,
+    val startedAt: Long = 0L,
+    val deadlineAt: Long = 0L,
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
@@ -51,6 +55,8 @@ class HarnessJobManager(
         val inbox: MutableList<String> = mutableListOf(),
         val resumeKind: String? = null,
         val resumePayload: String? = null,
+        val startedAt: Long = System.currentTimeMillis(),
+        val deadlineAt: Long = 0L,
         var updatedAt: Long = System.currentTimeMillis(),
     )
 
@@ -68,7 +74,7 @@ class HarnessJobManager(
                     output = if (interrupted) {
                         snapshot.output.takeLast(MAX_OUTPUT).let { previous ->
                             val detail = if (snapshot.resumeKind.isNullOrBlank()) {
-                                "应用进程中断，后台命令未完成；请检查设备进程退出记录"
+                                interruptedProcessDetail(snapshot)
                             } else "进程中断，等待安全恢复"
                             if (previous.isBlank()) detail
                             else "${previous}\n$detail".takeLast(MAX_OUTPUT)
@@ -78,6 +84,8 @@ class HarnessJobManager(
                     },
                     resumeKind = snapshot.resumeKind,
                     resumePayload = snapshot.resumePayload,
+                    startedAt = snapshot.startedAt,
+                    deadlineAt = snapshot.deadlineAt,
                     updatedAt = snapshot.updatedAt,
                 )
             }
@@ -85,8 +93,17 @@ class HarnessJobManager(
         publish()
     }
 
-    fun start(label: String, block: suspend (String, (String) -> Unit) -> String): String =
-        startInternal(label, resumeKind = null, resumePayload = null, block = block)
+    fun start(
+        label: String,
+        expectedDurationMillis: Long? = null,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): String = startInternal(
+        label = label,
+        resumeKind = null,
+        resumePayload = null,
+        expectedDurationMillis = expectedDurationMillis,
+        block = block,
+    )
 
     fun startPersistent(
         label: String,
@@ -99,6 +116,7 @@ class HarnessJobManager(
             label = label,
             resumeKind = resumeKind.take(MAX_RESUME_KIND),
             resumePayload = resumePayload.take(MAX_RESUME_PAYLOAD),
+            expectedDurationMillis = null,
             block = block,
         )
     }
@@ -168,6 +186,7 @@ class HarnessJobManager(
         label: String,
         resumeKind: String?,
         resumePayload: String?,
+        expectedDurationMillis: Long? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         val record = synchronized(lock) {
@@ -180,20 +199,29 @@ class HarnessJobManager(
             do {
                 id = idFactory()
             } while (records.containsKey(id))
+            val startedAt = System.currentTimeMillis()
+            val deadlineAt = expectedDurationMillis
+                ?.takeIf { it > 0L }
+                ?.let { duration -> startedAt + duration.coerceAtMost(MAX_EXPECTED_DURATION_MILLIS) }
+                ?: 0L
             Record(
                 id = id,
                 label = label.take(MAX_LABEL),
                 resumeKind = resumeKind,
                 resumePayload = resumePayload,
+                startedAt = startedAt,
+                deadlineAt = deadlineAt,
+                updatedAt = startedAt,
             ).also { records[id] = it }
         }
-        if (!resumeKind.isNullOrBlank()) {
+        val requiresDurableStart = !resumeKind.isNullOrBlank() || expectedDurationMillis != null
+        if (requiresDurableStart) {
             try {
                 persistCurrentSnapshots()
             } catch (error: Exception) {
                 synchronized(lock) { records.remove(record.id) }
                 notifyChanged()
-                throw IllegalStateException("持久任务元数据写入失败，任务未启动", error)
+                throw IllegalStateException("后台任务元数据写入失败，任务未启动", error)
             }
             launchRecord(record, block)
             notifyChanged()
@@ -209,6 +237,16 @@ class HarnessJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ) {
         record.job = scope.launch {
+            val heartbeat = launch {
+                while (isActive) {
+                    delay(RUNNING_HEARTBEAT_MILLIS)
+                    synchronized(lock) {
+                        if (record.status != "running") return@launch
+                        record.updatedAt = System.currentTimeMillis()
+                    }
+                    publish()
+                }
+            }
             try {
                 val report: (String) -> Unit = { output ->
                     synchronized(lock) {
@@ -237,6 +275,7 @@ class HarnessJobManager(
                     record.updatedAt = System.currentTimeMillis()
                 }
             } finally {
+                heartbeat.cancel()
                 publish()
             }
         }
@@ -351,6 +390,8 @@ class HarnessJobManager(
         output = record.output,
         resumeKind = record.resumeKind,
         resumePayload = record.resumePayload,
+        startedAt = record.startedAt,
+        deadlineAt = record.deadlineAt,
         updatedAt = record.updatedAt,
     )
 
@@ -376,6 +417,23 @@ class HarnessJobManager(
         onSnapshotsChanged(synchronized(lock) { records.values.map(::snapshot) })
     }
 
+    private fun interruptedProcessDetail(snapshot: JobSnapshot): String {
+        val startedAt = snapshot.startedAt
+        val deadlineAt = snapshot.deadlineAt
+        if (startedAt <= 0L || deadlineAt <= startedAt) {
+            return "应用进程中断，后台命令未完成；请检查设备进程退出记录"
+        }
+        val observedAt = snapshot.updatedAt.coerceAtLeast(startedAt)
+        val elapsedSeconds = ((observedAt - startedAt) / 1_000L).coerceAtLeast(0L)
+        val requestedSeconds = ((deadlineAt - startedAt) / 1_000L).coerceAtLeast(1L)
+        val timing = if (observedAt < deadlineAt) {
+            "在请求期限前"
+        } else {
+            "达到或超过请求期限后"
+        }
+        return "应用进程${timing}中断，后台命令未完成（已运行约 ${elapsedSeconds} 秒；请求上限 ${requestedSeconds} 秒）；请检查设备进程退出记录"
+    }
+
     private companion object {
         const val AGENT_PREFIX = "子代理："
         const val MAX_LABEL = 160
@@ -386,5 +444,7 @@ class HarnessJobManager(
         const val MAX_RESUME_PAYLOAD = 64_000
         const val DEFAULT_MAX_CONCURRENT_JOBS = 4
         const val DEFAULT_MAX_RETAINED_JOBS = 64
+        const val MAX_EXPECTED_DURATION_MILLIS = 24L * 60L * 60L * 1000L
+        const val RUNNING_HEARTBEAT_MILLIS = 30_000L
     }
 }

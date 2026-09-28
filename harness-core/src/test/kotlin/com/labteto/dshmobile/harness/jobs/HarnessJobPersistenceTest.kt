@@ -51,6 +51,32 @@ class HarnessJobPersistenceTest {
 
 
     @Test
+    fun timedEphemeralStartDoesNotLaunchWithoutDurableDeadlineEvidence() = runTest {
+        var ran = false
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            onSnapshotsChanged = { error("disk full") },
+        )
+
+        val failure = runCatching {
+            manager.start(
+                label = "后台命令",
+                expectedDurationMillis = 900_000L,
+            ) { _, _ ->
+                ran = true
+                "done"
+            }
+        }.exceptionOrNull()
+
+        runCurrent()
+
+        assertTrue(failure is IllegalStateException)
+        assertFalse(ran)
+        assertTrue(manager.list() == "没有后台任务")
+    }
+
+    @Test
     fun interruptedPersistentJobsCanResumeInBatchesWithoutStrandingOverflow() = runTest {
         val gates = (1..8).associateWith { CompletableDeferred<Unit>() }
         val snapshots = (1..8).map { index ->

@@ -118,6 +118,42 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun interruptedNonPersistentJobReportsEarlyTerminationAgainstRequestedDeadline() = runTest {
+        val root = createTempDir(prefix = "interrupted-shell-deadline-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-shell",
+                        label = "后台命令",
+                        status = "running",
+                        startedAt = 1_000L,
+                        deadlineAt = 901_000L,
+                        updatedAt = 721_000L,
+                    ),
+                ),
+            )
+
+            val restarted = LocalJobManager(this, store) { }
+            val output = restarted.output("job-shell")
+
+            assertTrue(output.contains("[interrupted]"))
+            assertTrue(output.contains("在请求期限前中断"))
+            assertTrue(output.contains("已运行约 720 秒"))
+            assertTrue(output.contains("请求上限 900 秒"))
+            val persisted = store.read().single()
+            assertEquals(1_000L, persisted.startedAt)
+            assertEquals(901_000L, persisted.deadlineAt)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-")
         try {
