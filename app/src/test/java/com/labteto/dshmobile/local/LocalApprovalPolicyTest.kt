@@ -60,10 +60,10 @@ class LocalApprovalPolicyTest {
             tool("android_tap", ToolAccess.DEVICE, ToolApprovalPolicy.MUTATION),
         ))
         assertFalse(canUseDeviceApprovalLease(
-            tool("android_privilege_request", ToolAccess.DEVICE, ToolApprovalPolicy.ALWAYS),
+            tool("android_screen", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS),
         ))
         assertFalse(canUseDeviceApprovalLease(
-            tool("android_settings_set", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS),
+            tool("android_notification_list", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS),
         ))
     }
 
