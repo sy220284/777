@@ -3,6 +3,7 @@ package com.labteto.dshmobile.automation
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -11,7 +12,9 @@ import kotlinx.coroutines.launch
 internal class WebhookListener(
     private val scope: CoroutineScope,
     private val handle: suspend (Socket) -> Unit,
+    maxClients: Int = DEFAULT_MAX_CLIENTS,
 ) : AutoCloseable {
+    private val connectionLimiter = WebhookConnectionLimiter(maxClients)
     private var server: ServerSocket? = null
     private var acceptJob: Job? = null
     private val clients = mutableSetOf<Socket>()
@@ -31,11 +34,18 @@ internal class WebhookListener(
             while (!socket.isClosed) {
                 val client = runCatching { socket.accept() }.getOrNull() ?: break
                 synchronized(this@WebhookListener) {
-                    if (server !== socket) client.close() else {
-                        clients += client
-                        launch {
-                            try { client.use { handle(it) } } finally {
-                                synchronized(this@WebhookListener) { clients.remove(client) }
+                    when {
+                        server !== socket -> client.close()
+                        !connectionLimiter.tryAcquire() -> client.close()
+                        else -> {
+                            clients += client
+                            launch {
+                                try {
+                                    client.use { handle(it) }
+                                } finally {
+                                    connectionLimiter.release()
+                                    synchronized(this@WebhookListener) { clients.remove(client) }
+                                }
                             }
                         }
                     }
@@ -52,4 +62,36 @@ internal class WebhookListener(
         acceptJob?.cancel()
         acceptJob = null
     }
+
+    private companion object {
+        const val DEFAULT_MAX_CLIENTS = 64
+    }
+}
+
+internal class WebhookConnectionLimiter(
+    private val maxClients: Int,
+) {
+    private val active = AtomicInteger(0)
+
+    init {
+        require(maxClients in 1..1_024) { "Webhook 连接上限必须在 1..1024 之间" }
+    }
+
+    fun tryAcquire(): Boolean {
+        while (true) {
+            val current = active.get()
+            if (current >= maxClients) return false
+            if (active.compareAndSet(current, current + 1)) return true
+        }
+    }
+
+    fun release(): Boolean {
+        while (true) {
+            val current = active.get()
+            if (current <= 0) return false
+            if (active.compareAndSet(current, current - 1)) return true
+        }
+    }
+
+    fun activeCount(): Int = active.get()
 }
