@@ -663,7 +663,7 @@ private fun LocalChat(
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
-    onSelectMessageVariant: (String, Int) -> Boolean,
+    onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
     onLoadOlderTranscript: suspend (String) -> Result<Int>,
