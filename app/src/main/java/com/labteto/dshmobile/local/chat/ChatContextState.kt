@@ -237,6 +237,18 @@ private val OPEN_THREAD_REMOVAL_SIGNAL = Regex(
 private val GENERIC_OPEN_THREAD_CLOSE_SIGNAL = Regex(
     """(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)""",
 )
+private val GENERIC_OPEN_THREAD_CLOSE_EXACT = Regex(
+    """^(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)$""",
+)
+private val GENERIC_DECISION_CLOSE_EXACT = Regex(
+    """^(?:那个)?(?:安排|计划|约定)(?:取消|作废|延期|推迟)(?:了)?$""",
+)
+private val CONTINUITY_ANCHOR_TIME_NOISE = Regex(
+    """(?:今天|明天|后天|今晚|明晚|今早|明早|上午|中午|下午|傍晚|晚上|夜里|[0-9０-９零〇一二两三四五六七八九十]{1,4}(?:[:：点时][0-9０-９零〇一二两三四五六七八九十半一刻三刻]{0,4}))""",
+)
+private val CONTINUITY_ANCHOR_GENERIC_NOISE = Regex(
+    """(?:当前有效决定|已定|决定|安排|计划|约定|还要|需要|记得|确认|准备|继续|尚未|未完成|完成|发生|出发|过去|前往|去|到|回|改成|换成|取消|作废|延期|推迟|解决|处理|不用|不再|别|不)""",
+)
 private const val MAX_PENDING_CONTEXT_CHARS = 1_800
 private const val MAX_SCENE_CONTEXT_CHARS = 700
 private const val MAX_SOFT_CONTINUITY_CHARS = 1_300
@@ -418,14 +430,45 @@ private fun continuityRemovalGrounded(
         if (!hasRemovalSignal) return@any false
 
         val score = continuityEvidenceScore(fact, userEvidence)
+        val anchorMatched = continuityRemovalAnchorMatches(fact, userEvidence)
         when (kind) {
-            ChatContinuityFactKind.DECISION -> score >= 24
+            ChatContinuityFactKind.DECISION ->
+                anchorMatched ||
+                    score >= 50 ||
+                    (activeFactCount == 1 && GENERIC_DECISION_CLOSE_EXACT.matches(normalized))
             ChatContinuityFactKind.OPEN_THREAD ->
-                score >= 20 || (activeFactCount == 1 && GENERIC_OPEN_THREAD_CLOSE_SIGNAL.containsMatchIn(normalized))
+                anchorMatched ||
+                    score >= 45 ||
+                    (activeFactCount == 1 && GENERIC_OPEN_THREAD_CLOSE_EXACT.matches(normalized))
             ChatContinuityFactKind.EVENT -> false
         }
     }
 }
+
+private fun continuityRemovalAnchorMatches(
+    fact: String,
+    source: String,
+): Boolean {
+    val anchors = continuityRemovalAnchors(fact)
+    if (anchors.isEmpty()) return false
+    val normalizedSource = normalizeContinuityEvidenceText(source)
+    return anchors.any(normalizedSource::contains)
+}
+
+private fun continuityRemovalAnchors(fact: String): Set<String> {
+    val core = normalizeContinuityEvidenceText(fact)
+        .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
+        .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
+    if (core.length < 2) return emptySet()
+    return continuityBigrams(core)
+        .filterTo(linkedSetOf()) { anchor ->
+            anchor.length >= 2 && anchor !in GENERIC_CONTINUITY_ANCHORS
+        }
+}
+
+private val GENERIC_CONTINUITY_ANCHORS = setOf(
+    "这个", "那个", "事情", "这事", "那事", "一下", "之后", "然后", "已经",
+)
 
 private fun bestContinuitySource(
     kind: ChatContinuityFactKind,
