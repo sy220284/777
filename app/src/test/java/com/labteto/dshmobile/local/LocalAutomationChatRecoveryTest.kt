@@ -2,7 +2,9 @@ package com.labteto.dshmobile.local
 
 import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -48,7 +50,7 @@ class LocalAutomationChatRecoveryTest {
         assertNotNull(end)
         assertEquals(
             true,
-            end!!.data["recovered"]?.toString()?.toBooleanStrictOrNull(),
+            end!!.data["recovered"]?.jsonPrimitive?.booleanOrNull,
         )
     }
 
