@@ -1371,10 +1371,10 @@ class LocalHarnessEngine @Inject constructor(
             modelHistory,
             modelHistoryCheckpointCodec,
             _state,
-            ::updateContextMetrics,
+            { updateContextMetrics() },
             { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
-            ::checkpointModelHistory,
-            ::persist,
+            { reason -> checkpointModelHistory(reason) },
+            { persist() },
         ) { content, memoryInput, modelMessage ->
             queueTurnLocked(content, memoryInput, modelMessage).start()
         }
