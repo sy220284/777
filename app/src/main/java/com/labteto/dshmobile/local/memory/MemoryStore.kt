@@ -31,22 +31,30 @@ internal fun compactMemoryRecords(
                 .thenByDescending(MemoryRecord::importance)
                 .thenByDescending(MemoryRecord::updatedAt),
         )
-    val selected = linkedSetOf<String>()
 
-    fun retainRootAndNearestPredecessors(root: MemoryRecord) {
-        if (selected.size >= maxRecords) return
-        val queue = mutableListOf(root.id)
-        var cursor = 0
-        while (cursor < queue.size && selected.size < maxRecords) {
-            val id = queue[cursor++]
-            if (!selected.add(id)) continue
-            predecessors[id].orEmpty().forEach { predecessor ->
-                if (predecessor.id !in selected) queue += predecessor.id
-            }
-        }
+    val selected = linkedSetOf<String>()
+    activeRoots.take(maxRecords).forEach { selected += it.id }
+    if (selected.size >= maxRecords) {
+        return records.filter { it.id in selected }
     }
 
-    activeRoots.forEach(::retainRootAndNearestPredecessors)
+    // Fill rollback history breadth-first: all active memories keep their nearest predecessor
+    // before one long supersession chain is allowed to consume the remaining capacity.
+    var frontier = activeRoots
+        .take(maxRecords)
+        .map(MemoryRecord::id)
+    while (frontier.isNotEmpty() && selected.size < maxRecords) {
+        val nextFrontier = mutableListOf<String>()
+        frontier.forEach { successorId ->
+            predecessors[successorId].orEmpty().forEach { predecessor ->
+                if (selected.size >= maxRecords) return@forEach
+                if (selected.add(predecessor.id)) {
+                    nextFrontier += predecessor.id
+                }
+            }
+        }
+        frontier = nextFrontier
+    }
     return records.filter { it.id in selected }
 }
 
