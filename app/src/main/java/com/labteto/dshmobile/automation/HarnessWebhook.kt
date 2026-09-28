@@ -370,7 +370,21 @@ class HarnessWebhookService : Service() {
                         run = { automationRuntime.runPrompt(prompt) },
                     )
                 }
-                job.invokeOnCompletion { executionLimiter.release() }
+                job.invokeOnCompletion { cause ->
+                    if (
+                        shouldMarkWebhookQueuedCancellation(
+                            cause = cause,
+                            currentStatus = resultStore.get(requestId)?.status,
+                        )
+                    ) {
+                        resultStore.update(
+                            requestId,
+                            status = "cancelled",
+                            error = "Webhook 服务已停止",
+                        )
+                    }
+                    executionLimiter.release()
+                }
                 handedOff = true
             } finally {
                 if (!handedOff) executionLimiter.release()
