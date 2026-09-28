@@ -75,7 +75,7 @@ internal class LocalSessionStorageManager(
     fun exportAll(output: OutputStream): Long {
         var exportedBytes = 0L
         ZipOutputStream(output.buffered()).use { zip ->
-            durableFiles().sortedBy(File::name).forEach { source ->
+            durableFiles().sortedBy { it.name }.forEach { source ->
                 val entry = ZipEntry(source.name).apply {
                     time = source.lastModified()
                 }
