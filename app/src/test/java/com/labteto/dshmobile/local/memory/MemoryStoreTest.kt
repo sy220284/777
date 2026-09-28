@@ -643,4 +643,36 @@ class MemoryStoreTest {
         assertEquals(listOf(episode.id), recalled.map { it.id })
     }
 
+
+    @Test fun boundedSourceHistoryMarksOlderOmittedProvenanceAsUnbound() {
+        val memoryStore = store()
+        repeat(20) { index ->
+            memoryStore.remember(
+                content = "用户喜欢简洁回复",
+                scope = MemoryScope.GLOBAL,
+                sourceSessionId = "s",
+                sourceMessageId = "u$index",
+            )
+        }
+
+        var active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertEquals(16, active.single().sourceMessages.size)
+        assertTrue(active.single().hasUnboundSource)
+
+        val trackedIds = active.single().sourceMessages.map { it.messageId }.toSet()
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = trackedIds,
+            ),
+        )
+        active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertTrue(active.single().sourceMessages.isEmpty())
+        assertTrue(active.single().hasUnboundSource)
+    }
+
 }
