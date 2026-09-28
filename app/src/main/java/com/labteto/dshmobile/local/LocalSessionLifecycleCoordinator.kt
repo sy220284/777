@@ -94,8 +94,15 @@ internal class LocalSessionLifecycleCoordinator(
         scope.launch {
             transitionMutex.withLock {
                 try {
-                    cancelActiveRunAndJoin()
-                    jobs.stopNonPersistentAndJoin()
+                    // A Work turn owns its own session-bound runtime. Creating another conversation
+                    // must not tear it down; it simply becomes a background run. Chat still uses the
+                    // visible single-session runtime and keeps the old cancellation boundary.
+                    val preserveWorkRun =
+                        sourceState.usageMode == LocalUsageMode.WORK && sourceState.running
+                    if (!preserveWorkRun) {
+                        cancelActiveRunAndJoin()
+                        jobs.stopNonPersistentAndJoin()
+                    }
                     persist()
 
                     val nextSessionId = UUID.randomUUID().toString()
@@ -298,7 +305,9 @@ internal class LocalSessionLifecycleCoordinator(
             queuedUsageMode.set(mode)
             return
         }
-        if (snapshot.running) return
+        // Work can continue in its session-bound runtime while the user moves to Chat. A running
+        // Chat turn still owns the visible runtime and therefore keeps the existing guard.
+        if (snapshot.running && snapshot.usageMode != LocalUsageMode.WORK) return
         if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
             if (snapshot.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
             return
@@ -325,19 +334,18 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchSession(sessionId: String) {
         if (sessionId == currentSessionId()) return
-        // Foreground turns still share one visible runtime state. Switching that state underneath an
-        // active turn would let late tool/results land in the newly selected session. Stop and join
-        // the visible turn first, preserving its durable log, then load the requested conversation.
-        // Persistent/background jobs remain owned by LocalJobManager and are not cancelled here.
-        val cancelForegroundRun = runBusy()
+        // Work turns are session-owned: changing the visible conversation only changes the UI
+        // projection. Never stop the Work turn, its subagents, terminals or non-persistent jobs here.
+        // Chat still uses the legacy visible turn slot; if one is active, close it safely before the
+        // shared Chat runtime is replaced.
+        val cancelVisibleChatRun = runBusy()
         if (!beginTransition()) return
         state.update { it.copy(loading = true) }
         scope.launch {
             transitionMutex.withLock {
                 try {
-                    if (cancelForegroundRun) cancelActiveRunAndJoin()
+                    if (cancelVisibleChatRun) cancelActiveRunAndJoin()
                     persist()
-                    jobs.stopNonPersistentAndJoin()
                     activateSession(sessionId, null)
                     loadSession(sessionId)
                     restartInterruptedSafeJobs()
