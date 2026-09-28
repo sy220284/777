@@ -13,8 +13,8 @@ internal fun inferChatTurnMode(input: String): ChatTurnMode {
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatTurnMode.NORMAL
 
-    if (RESET_HINTS.any { text.contains(it) }) return ChatTurnMode.RESET
-    if (SCENE_TRANSITION_HINTS.any { text.contains(it) }) return ChatTurnMode.SCENE_TRANSITION
+    if (hasResetIntent(text)) return ChatTurnMode.RESET
+    if (hasSceneTransitionIntent(text)) return ChatTurnMode.SCENE_TRANSITION
     if (CALLBACK_HINTS.any { text.contains(it) }) return ChatTurnMode.CALLBACK
     if (text in CONTINUE_EXACT || (text.length <= 12 && CONTINUE_PREFIXES.any { text.startsWith(it) })) {
         return ChatTurnMode.CONTINUE_BEAT
@@ -53,6 +53,17 @@ internal fun renderChatTurnModeForModel(input: String): String = when (inferChat
     ChatTurnMode.NORMAL -> ""
 }
 
+private fun hasResetIntent(text: String): Boolean =
+    RESET_EXACT.any { text == it || text.startsWith("$it，") || text.startsWith("$it,") } ||
+        RESET_HINTS.any { text.contains(it) }
+
+private fun hasSceneTransitionIntent(text: String): Boolean {
+    val transition = SCENE_TRANSITION_HINTS.firstOrNull { text.contains(it) } ?: return false
+    val index = text.indexOf(transition)
+    val prefix = text.substring(maxOf(0, index - 4), index)
+    return NEGATED_TRANSITION_PREFIXES.none { negation -> prefix.endsWith(negation) }
+}
+
 private val CONTINUE_EXACT = setOf(
     "嗯", "嗯嗯", "好", "好的", "行", "可以", "继续", "接着", "接着说", "然后呢",
     "再来", "别停", "就这样", "继续吧", "接着吧", "往下说", "后面呢",
@@ -80,7 +91,13 @@ private val SCENE_TRANSITION_HINTS = listOf(
     "换个地方", "换地方", "到外面", "去外面", "第二天", "次日", "翌日", "过一会", "过了一会",
 )
 
+private val RESET_EXACT = listOf("算了")
+
 private val RESET_HINTS = listOf(
-    "换个话题", "先不聊这个", "不聊这个", "别提这个", "别再提", "说正事", "算了",
+    "换个话题", "先不聊这个", "不聊这个", "别提这个", "别再提", "说正事",
     "停一下", "到此为止", "结束这个话题",
+)
+
+private val NEGATED_TRANSITION_PREFIXES = listOf(
+    "不想", "不要", "不去", "别去", "别", "不许", "不准", "不打算",
 )
