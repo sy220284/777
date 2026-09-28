@@ -127,11 +127,21 @@ internal fun persistRewrittenChatTranscript(
             encodeChatBranchStateEvent(clearedBranches) + ("reason" to JsonPrimitive(reason)),
         ),
     )
-    return eventLog.append("chat/active-transcript", buildJsonObject {
-        put("reason", reason)
-        put("transcript", encodeTranscriptMessages(activeTranscript))
-    }).sequence
+    return persistActiveChatTranscript(
+        eventLog = eventLog,
+        reason = reason,
+        activeTranscript = activeTranscript,
+    )
 }
+
+internal fun persistActiveChatTranscript(
+    eventLog: LocalSessionEventLog,
+    reason: String,
+    activeTranscript: List<LocalHarnessMessage>,
+): Long = eventLog.append("chat/active-transcript", buildJsonObject {
+    put("reason", reason)
+    put("transcript", encodeTranscriptMessages(activeTranscript))
+}).sequence
 
 private fun findDurableUserModelMessage(
     eventLog: LocalSessionEventLog,
