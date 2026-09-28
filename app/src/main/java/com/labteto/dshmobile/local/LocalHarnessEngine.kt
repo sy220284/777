@@ -1476,7 +1476,6 @@ class LocalHarnessEngine @Inject constructor(
             messageId = messageId,
             activeBranch = activeChatBranchMessages(state.chatBranches),
             hotMessages = state.messages,
-            totalMessageCount = state.transcriptIndex.totalMessageCount,
             loadDurableTranscript = { LocalSessionTranscriptPager(eventLog).all() },
         )
         val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
@@ -1664,7 +1663,13 @@ class LocalHarnessEngine @Inject constructor(
             legacyState = snapshot?.first,
             previousGeneration = state.chatContext.generation,
         )
-        resetModelHistory(buildChatModelHistory(activeMessages, chatSystemPrompt()))
+        resetModelHistory(
+            buildDurableChatModelHistory(
+                eventLog = eventLog,
+                messages = activeMessages,
+                systemPrompt = chatSystemPrompt(),
+            ),
+        )
         updateContextMetrics()
         _state.update { current ->
             current.copy(
@@ -1678,6 +1683,15 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
         persistChatBranchState("variant-selected")
+        val activeTranscriptSequence = persistActiveChatTranscript(
+            eventLog = eventLog,
+            reason = "variant-selected",
+            activeTranscript = activeMessages,
+        )
+        transcriptProjectionCursor = maxOf(
+            transcriptProjectionCursor ?: -1L,
+            activeTranscriptSequence,
+        )
         checkpointModelHistory("chat/variant-selected")
         persist()
         true

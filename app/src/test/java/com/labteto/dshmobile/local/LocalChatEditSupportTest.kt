@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -69,6 +70,145 @@ class LocalChatEditSupportTest {
 
             assertEquals("first", history[1]["marker"]?.jsonPrimitive?.content)
             assertEquals("second", history[3]["marker"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun activeBranchMaterializationDoesNotClearBranchGraph() {
+        withLog { log ->
+            persistActiveChatTranscript(
+                eventLog = log,
+                reason = "variant-selected",
+                activeTranscript = listOf(message("u-active", "当前分支")),
+            )
+
+            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            assertEquals(listOf("chat/active-transcript"), events.map { it.type })
+        }
+    }
+
+    @Test
+    fun destructiveHistoryRewriteStillClearsBranchGraph() {
+        withLog { log ->
+            persistRewrittenChatTranscript(
+                eventLog = log,
+                reason = "user-edited",
+                activeTranscript = listOf(message("u-edited", "改写分支")),
+            )
+
+            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            assertEquals(
+                listOf("chat/branch-state", "chat/active-transcript"),
+                events.map { it.type },
+            )
+            assertEquals(
+                0,
+                decodeChatBranchStateEvent(events.first().data)?.nodes?.size,
+            )
+        }
+    }
+
+    @Test
+    fun branchSelectionHistoryKeepsStructuredUserPayloads() {
+        withLog { log ->
+            log.append(
+                "user/message",
+                durableUserEvent(message("u-branch", "看图"), "看图", "branch-structured"),
+            )
+
+            val history = buildDurableChatModelHistory(
+                eventLog = log,
+                messages = listOf(
+                    message("u-branch", "看图"),
+                    LocalHarnessMessage(
+                        id = "a-branch",
+                        role = "assistant",
+                        content = "看到了",
+                        createdAt = 2L,
+                    ),
+                ),
+                systemPrompt = "system",
+            )
+
+            assertEquals("branch-structured", history[1]["marker"]?.jsonPrimitive?.content)
+            assertEquals("看到了", history[2]["content"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun historicalEditKeepsStructuredQueuedUserMessagePayload() {
+        withLog { log ->
+            val queued = QueuedAgentInput(
+                content = "看这张图",
+                memoryInput = "看这张图",
+                modelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "看这张图")
+                    put("marker", "queued")
+                },
+                id = "queued-user",
+            )
+            log.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "queued",
+                    pending = listOf(queued),
+                    affected = listOf(queued),
+                    transcript = listOf(message("queued-user", "看这张图")),
+                ),
+            )
+
+            val edited = editedChatUserModelMessage(
+                eventLog = log,
+                originalMessageId = "queued-user",
+                content = "重新看这张图",
+            )
+
+            assertEquals("重新看这张图", edited["content"]?.jsonPrimitive?.content)
+            assertEquals("queued", edited["marker"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun editedHistoryRestoresStructuredQueuedMessages() {
+        withLog { log ->
+            val queued = QueuedAgentInput(
+                content = "排队补充",
+                memoryInput = "排队补充",
+                modelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "排队补充")
+                    put("marker", "queued-prefix")
+                },
+                id = "queued-prefix",
+            )
+            log.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "queued",
+                    pending = listOf(queued),
+                    affected = listOf(queued),
+                    transcript = listOf(message("queued-prefix", "排队补充")),
+                ),
+            )
+
+            val history = buildEditedChatModelHistory(
+                eventLog = log,
+                messages = listOf(
+                    message("queued-prefix", "排队补充"),
+                    message("replacement", "修改后的下一句"),
+                ),
+                groupMode = false,
+                editedMessageId = "replacement",
+                editedModelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "修改后的下一句")
+                },
+                systemPrompt = "system",
+            )
+
+            assertEquals("queued-prefix", history[1]["marker"]?.jsonPrimitive?.content)
+            assertEquals("修改后的下一句", history[2]["content"]?.jsonPrimitive?.content)
         }
     }
 
