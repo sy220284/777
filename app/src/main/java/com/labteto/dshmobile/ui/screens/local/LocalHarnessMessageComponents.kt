@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +67,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun localResourcePressureLabel(pressure: String): String = stringResource(
@@ -105,7 +107,7 @@ internal fun LocalMessageRow(
     canSelectVariant: Boolean,
     branchInfo: LocalChatBranchInfo?,
     onEdit: (LocalHarnessMessage) -> Unit,
-    onSelectVariant: (String, Int) -> Boolean,
+    onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
 ) {
     val colors = DsTheme.colors
@@ -115,12 +117,14 @@ internal fun LocalMessageRow(
     val copiedMessage = stringResource(R.string.chat_copy_success)
     val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
     val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
-    val selectVariantWithFeedback: (String, Int) -> Boolean = { id, index ->
-        val selected = onSelectVariant(id, index)
-        if (!selected) {
-            Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+    val variantScope = rememberCoroutineScope()
+    val selectVariantWithFeedback: (String, Int) -> Unit = { id, index ->
+        variantScope.launch {
+            val selected = onSelectVariant(id, index)
+            if (!selected) {
+                Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+            }
         }
-        selected
     }
 
     when (message.role) {
@@ -242,7 +246,7 @@ private fun MessageVariantControls(
     messageId: String,
     branchInfo: LocalChatBranchInfo?,
     enabled: Boolean,
-    onSelectVariant: (String, Int) -> Boolean,
+    onSelectVariant: (String, Int) -> Unit,
 ) {
     val info = branchInfo ?: return
     val colors = DsTheme.colors
