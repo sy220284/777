@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,105 +39,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-
-@Composable
-internal fun WorkSessionStatusStrip(
-    state: LocalWorkUiState,
-    onClick: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    val hasStatus = state.running ||
-        state.workflowProgress?.sessionId == state.sessionId ||
-        state.goal != null ||
-        state.todos.isNotEmpty() ||
-        state.activeAgents > 0 ||
-        state.jobs.isNotEmpty()
-    if (!hasStatus) return
-
-    val completedTasks = state.todos.count { it.status == "completed" }
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsStatusPill(
-                    state = if (state.running) DsStatus.Running else DsStatus.Neutral,
-                    label = stringResource(
-                        if (state.running) R.string.local_execution_notification_running
-                        else R.string.local_run_center,
-                    ),
-                )
-                state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
-                    Text(
-                        goal,
-                        style = DsType.small13Strong,
-                        color = colors.labelPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                } ?: Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.local_run_center),
-                    tint = colors.labelTertiary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
-                    DsPill(
-                        text = if (progress.needsUserAction) {
-                            stringResource(R.string.local_workflow_waiting_user)
-                        } else {
-                            workflowStageLabel(progress.stage)
-                        },
-                    )
-                    DsPill(
-                        text = stringResource(
-                            R.string.local_workflow_processed,
-                            progress.completed,
-                            progress.total,
-                        ),
-                    )
-                }
-                if (state.todos.isNotEmpty()) {
-                    DsPill(
-                        text = stringResource(
-                            R.string.local_run_tasks_progress,
-                            completedTasks,
-                            state.todos.size,
-                        ),
-                    )
-                }
-                if (state.activeAgents > 0) {
-                    DsPill(text = stringResource(R.string.local_run_agents, state.activeAgents))
-                }
-                if (state.jobs.isNotEmpty()) {
-                    DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
-                }
-            }
-        }
-    }
-}
 
 @Composable
 internal fun ExecutionStatusCard(

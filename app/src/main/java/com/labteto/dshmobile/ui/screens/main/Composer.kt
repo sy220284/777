@@ -41,8 +41,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.input.key.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -75,6 +73,7 @@ import com.labteto.dshmobile.core.wire.dto.FileAttachmentRef
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.ContextMeter
+import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.skeleton
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -177,6 +176,7 @@ internal fun Composer(
     val haptics = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    var composerFocused by remember { mutableStateOf(false) }
     // A file that is still uploading has no receipt to cite yet, and one that failed never will;
     // the send affordance waits for the chips rather than sending a message that names neither.
     val attachmentsSettled = attachments.none { it is PendingAttachment.File && it.state !is FileUploadState.Ready }
@@ -193,44 +193,77 @@ internal fun Composer(
         currentOnSend(text)
     }
 
+    val composerExpanded =
+        composerFocused || attachments.isNotEmpty() || preparing || draft.contains('\n')
+
+    @Composable
+    fun SendControl() {
+        CircleAction(
+            icon = Icons.Filled.ArrowUpward,
+            description = stringResource(R.string.chat_composer_send),
+            size = 36,
+            background = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
+            tint = if (canSend) colors.onAccent else colors.labelTertiary,
+            enabled = canSend,
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                submitDraft()
+            },
+        )
+    }
+
+    @Composable
+    fun StopControl() {
+        CircleAction(
+            icon = null,
+            description = stringResource(R.string.chat_composer_stop),
+            size = 36,
+            background = colors.error,
+            tint = colors.onAccent,
+            enabled = true,
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onStop()
+            },
+        ) {
+            Box(
+                Modifier
+                    .size(11.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White),
+            )
+        }
+    }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium)
-            .shadow(6.dp, DsShapes.composer, clip = false)
+            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small)
+            .shadow(2.dp, DsShapes.composer, clip = false)
             .animateContentSize(),
         shape = DsShapes.composer,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.BOTTOM, colors.composerCard),
+        color = colors.wallpaperSurface(
+            WallpaperSurfaceLevel.INPUT,
+            BackgroundRegion.BOTTOM,
+            colors.composerCard,
+        ),
         border = BorderStroke(1.dp, colors.borderL1),
     ) {
         Column(
-            Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            TextField(
-                value = draft,
-                onValueChange = onDraftChange,
-                modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
-                    if (event.key == Key.Enter && (event.isCtrlPressed || event.isMetaPressed)) {
-                        if (event.type == KeyEventType.KeyUp && canSend) {
-                            submitDraft()
-                        }
-                        true
-                    } else false
-                },
-                // No `keyboardActions` here. The field is multi-line, so it carries the default IME
-                // action and the on-screen return key inserts a newline — which means an
-                // `onSend` action could never fire, and the one that used to sit here never did.
-                // The send key is the button; Ctrl/Cmd+Enter above is the shortcut.
-                enabled = enabled,
-                placeholder = {
-                    Text(
-                        stringResource(R.string.chat_composer_hint),
-                        style = DsType.std14,
-                        color = colors.labelTertiary,
-                    )
-                },
-                leadingIcon = {
+            if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
+            AnimatedVisibility(visible = attachments.isNotEmpty()) {
+                AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                if (!composerExpanded) {
                     CircleAction(
                         icon = Icons.Filled.Add,
                         description = stringResource(R.string.chat_composer_attach_file),
@@ -240,107 +273,75 @@ internal fun Composer(
                         enabled = enabled && !preparing,
                         onClick = onOpenAttachments,
                     )
-                },
-                minLines = 1,
-                maxLines = 8,
-                textStyle = DsType.std14,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    cursorColor = colors.accent,
-                    focusedTextColor = colors.labelPrimary,
-                    unfocusedTextColor = colors.labelPrimary,
-                ),
-            )
+                }
 
-            if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
-            AnimatedVisibility(visible = attachments.isNotEmpty()) {
-                AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
+                DsComposerField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    placeholder = stringResource(R.string.chat_composer_hint),
+                    modifier = Modifier
+                        .weight(1f)
+                        .onPreviewKeyEvent { event ->
+                            if (event.key == Key.Enter && (event.isCtrlPressed || event.isMetaPressed)) {
+                                if (event.type == KeyEventType.KeyUp && canSend) {
+                                    submitDraft()
+                                }
+                                true
+                            } else false
+                        },
+                    enabled = enabled,
+                    maxLines = 8,
+                    onFocusedChange = { composerFocused = it },
+                )
+
+                if (!composerExpanded) {
+                    SendControl()
+                    if (running) StopControl()
+                }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.compact),
-            ) {
-                CircleAction(
-                    icon = FeatherIcons.Tool,
-                    description = stringResource(R.string.chat_context_tools),
-                    size = 30,
-                    background = Color.Transparent,
-                    tint = colors.labelTertiary,
-                    enabled = enabled,
-                    onClick = onOpenTools,
-                )
-
-                PermissionChip(
-                    select = permissions,
-                    pending = pendingPermission,
-                    enabled = enabled,
-                    onPick = onPermissionPick,
-                )
-
-                Spacer(Modifier.weight(1f))
-
-                ContextMeter(contextBreakdown, contextPressure)
-
-                // Send is always present; stop joins it while a turn runs.
-                //
-                // These used to share one slot, swapping on `running`, which meant a running
-                // session offered no way to send at all — the Queue and Steer modes in the + sheet
-                // were unreachable from the phone, and the on-screen return key inserts a newline,
-                // so there was nothing else to press. The host has always admitted
-                // `session/prompt` with `mode: queue|steer` mid-turn; only the button was missing.
-                //
-                // Stop keeps the right-hand position it had, so the gesture for stopping a turn is
-                // where it always was and send appears beside it rather than under the thumb
-                // already reaching for stop.
-                CircleAction(
-                    icon = Icons.Filled.ArrowUpward,
-                    description = stringResource(R.string.chat_composer_send),
-                    size = 36,
-                    background = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-                    tint = if (canSend) colors.onAccent else colors.labelTertiary,
-                    enabled = canSend,
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        submitDraft()
-                    },
-                )
-
-                AnimatedVisibility(
-                    visible = running,
-                    enter = fadeIn(DsAnimations.fade) + scaleIn(initialScale = 0.85f),
-                    exit = fadeOut(DsAnimations.fade) + scaleOut(targetScale = 0.85f),
+            if (composerExpanded) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
                     CircleAction(
-                        icon = null,
-                        description = stringResource(R.string.chat_composer_stop),
-                        size = 36,
-                        background = colors.error,
-                        tint = colors.onAccent,
-                        enabled = true,
-                        onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onStop()
-                        },
-                    ) {
-                        Box(
-                            Modifier
-                                .size(11.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(Color.White),
-                        )
-                    }
+                        icon = Icons.Filled.Add,
+                        description = stringResource(R.string.chat_composer_attach_file),
+                        size = 30,
+                        background = colors.hoverSolid,
+                        tint = colors.labelPrimary,
+                        enabled = enabled && !preparing,
+                        onClick = onOpenAttachments,
+                    )
+                    CircleAction(
+                        icon = FeatherIcons.Tool,
+                        description = stringResource(R.string.chat_context_tools),
+                        size = 30,
+                        background = Color.Transparent,
+                        tint = colors.labelTertiary,
+                        enabled = enabled,
+                        onClick = onOpenTools,
+                    )
+
+                    PermissionChip(
+                        select = permissions,
+                        pending = pendingPermission,
+                        enabled = enabled,
+                        onPick = onPermissionPick,
+                    )
+
+                    Spacer(Modifier.weight(1f))
+                    ContextMeter(contextBreakdown, contextPressure)
+                    SendControl()
+                    if (running) StopControl()
                 }
             }
         }
     }
 }
+
 
 /**
  * The permission preset chip.

@@ -150,6 +150,10 @@ fun AppRoot(
                     settingsReturnUtilitySurface = null
                 },
                 initialDestination = settingsDestination,
+                onCheckUpdate = {
+                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                },
+                updateStatus = updateInstallStatus,
             )
             showPair -> PairScreen(
                 autoScanOnOpen = autoScanPair,
@@ -194,10 +198,6 @@ fun AppRoot(
                     utilityReturnSurface = null
                     utilitySurface = "tools"
                 },
-                onCheckUpdate = {
-                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                },
-                updateStatus = updateInstallStatus,
             )
             showMain && selectedRemoteMatches -> MainScreen(
                 onOpenSettings = {

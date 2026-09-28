@@ -324,12 +324,18 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     fun switchSession(sessionId: String) {
-        if (sessionId == currentSessionId() || runBusy()) return
+        if (sessionId == currentSessionId()) return
+        // Foreground turns still share one visible runtime state. Switching that state underneath an
+        // active turn would let late tool/results land in the newly selected session. Stop and join
+        // the visible turn first, preserving its durable log, then load the requested conversation.
+        // Persistent/background jobs remain owned by LocalJobManager and are not cancelled here.
+        val cancelForegroundRun = runBusy()
         if (!beginTransition()) return
         state.update { it.copy(loading = true) }
         scope.launch {
             transitionMutex.withLock {
                 try {
+                    if (cancelForegroundRun) cancelActiveRunAndJoin()
                     persist()
                     jobs.stopNonPersistentAndJoin()
                     activateSession(sessionId, null)

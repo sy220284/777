@@ -62,7 +62,7 @@ fun DsBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
-                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.comfortable),
+                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             // A short grabber stands in for the platform drag handle so the sheet still reads as
@@ -78,13 +78,13 @@ fun DsBottomSheet(
             }
             if (title != null) {
                 Row(
-                    Modifier.fillMaxWidth().padding(top = DsSpacing.small),
+                    Modifier.fillMaxWidth().padding(top = DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = DsType.large20, color = colors.labelPrimary)
+                        Text(title, style = DsType.base16Strong, color = colors.labelPrimary)
                         if (subtitle != null) {
-                            Text(subtitle, style = DsType.caption11, color = colors.labelTertiary)
+                            Text(subtitle, style = DsType.small13, color = colors.labelTertiary)
                         }
                     }
                     trailing?.invoke()

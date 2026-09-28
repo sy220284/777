@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
@@ -138,6 +139,8 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
 fun SettingsScreen(
     onClose: () -> Unit,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
+    onCheckUpdate: () -> Unit = {},
+    updateStatus: String? = null,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
@@ -318,6 +321,13 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
                                 iconFamily = DsIconFamily.Neutral,
                                 onClick = { page = SettingsDestination.ADVANCED },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.CloudDownload,
+                                title = stringResource(R.string.settings_update_check),
+                                subtitle = updateStatus,
+                                iconFamily = DsIconFamily.Cyan,
+                                onClick = onCheckUpdate,
                             )
                         }
                         Text(

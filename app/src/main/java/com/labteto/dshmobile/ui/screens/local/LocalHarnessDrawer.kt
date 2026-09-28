@@ -30,7 +30,6 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
@@ -104,8 +103,6 @@ internal fun LocalModeDrawer(
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
-    onCheckUpdate: () -> Unit,
-    updateStatus: String?,
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
@@ -281,35 +278,24 @@ internal fun LocalModeDrawer(
                         ),
                         onClick = onTasks,
                     )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Extension,
-                        title = stringResource(R.string.tools_title),
-                        onClick = onTools,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.QrCodeScanner,
-                        title = stringResource(R.string.local_remote_control),
-                        onClick = onRemote,
-                    )
+                    // Chat and Work share the same engine/runtime underneath, but the navigation
+                    // surface exposes only the capabilities that belong to the active product mode.
+                    if (usageMode == LocalUsageMode.WORK) {
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.Extension,
+                            title = stringResource(R.string.tools_title),
+                            onClick = onTools,
+                        )
+                        DrawerPrimaryAction(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            title = stringResource(R.string.local_remote_control),
+                            onClick = onRemote,
+                        )
+                    }
                     DrawerPrimaryAction(
                         icon = Icons.Outlined.Settings,
                         title = stringResource(R.string.settings_title),
                         onClick = onSettings,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.CloudDownload,
-                        title = stringResource(R.string.settings_update_check),
-                        onClick = onCheckUpdate,
-                    )
-                }
-                updateStatus?.let { status ->
-                    Text(
-                        status,
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = DsSpacing.small),
                     )
                 }
             }

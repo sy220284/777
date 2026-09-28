@@ -19,6 +19,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.decodeFromJsonElement
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -85,14 +89,47 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                 } }) { Text(stringResource(R.string.common_close)) }
             }
             key(terminal.id) { TerminalScreen(store, key, terminal, Modifier.weight(1f)) }
-            rename?.let { title -> AlertDialog(onDismissRequest = { rename = null }, title = { Text(stringResource(R.string.common_rename)) },
-                text = { OutlinedTextField(title, { rename = it }, singleLine = true) },
-                confirmButton = { TextButton(enabled = title.isNotBlank() && title.length <= 120 && !busy, onClick = { operation {
-                    store.apiForHost(key.host)?.terminalRename(key.sessionId, terminal.id, title)?.requireValue()
-                        ?: error(resources.getString(R.string.common_offline))
-                    rename = null; refresh()
-                } }) { Text(stringResource(R.string.common_save)) } },
-                dismissButton = { TextButton(onClick = { rename = null }) { Text(stringResource(R.string.common_cancel)) } }) }
+            rename?.let { title ->
+                DsDialog(
+                    title = stringResource(R.string.common_rename),
+                    onDismiss = { if (!busy) rename = null },
+                ) {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { rename = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !busy,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        DsButton(
+                            text = stringResource(R.string.common_cancel),
+                            onClick = { rename = null },
+                            enabled = !busy,
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                        DsButton(
+                            text = stringResource(R.string.common_save),
+                            onClick = {
+                                operation {
+                                    store.apiForHost(key.host)
+                                        ?.terminalRename(key.sessionId, terminal.id, title)
+                                        ?.requireValue()
+                                        ?: error(resources.getString(R.string.common_offline))
+                                    rename = null
+                                    refresh()
+                                }
+                            },
+                            enabled = title.isNotBlank() && title.length <= 120 && !busy,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
+            }
         }
     }
 }
