@@ -109,12 +109,11 @@ internal object LocalToolPolicy {
      *
      * This no longer limits global auto-approval; it is retained for impact/display metadata and
      * one-turn device policy decisions:
-     * - anything the sandbox can already reach may be approved automatically, because auto-approval
-     *   cannot grant access the untrusted-app SELinux domain does not already permit;
-     * - firmware partitions and other apps' private directories stay out of reach no matter what this
-     *   policy returns, so they need no prompt-based guard here;
-     * - tool categories that act outside the filesystem sandbox (device control, privileged HTTP)
-     *   remain explicit.
+     * - workspace-bounded writes and read-only tools are classified low risk;
+     * - firmware partitions and other apps' private directories stay out of reach regardless of
+     *   approval mode because the kernel boundary still applies;
+     * - categories that act outside the filesystem sandbox remain higher impact even though global
+     *   auto-approval may skip their prompt when the user enables it.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
