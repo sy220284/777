@@ -121,6 +121,29 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun historyBootstrapConsumesOnlyTheLiveWindowBeforePagingOlderRows() {
+        assertEquals(28, transcriptHistoryBootstrapLimit(liveMessageCount = 28, maxPageSize = 200))
+        assertEquals(1, transcriptHistoryBootstrapLimit(liveMessageCount = 0, maxPageSize = 200))
+        assertEquals(200, transcriptHistoryBootstrapLimit(liveMessageCount = 500, maxPageSize = 200))
+    }
+
+    @Test
+    fun historyBootstrapKeepsPageRowsThatAreMissingFromLiveWindow() {
+        val page = (1..5).map { index ->
+            message("m$index", "user", "page-$index")
+        } + message("m3", "user", "duplicate-page-3")
+        val live = listOf(
+            message("m4", "assistant", "live-4"),
+            message("m5", "user", "live-5"),
+        )
+
+        val extras = transcriptHistoryPageExtras(pageMessages = page, liveMessages = live)
+
+        assertEquals(listOf("m1", "m2", "m3"), extras.map { it.id })
+        assertEquals("page-3", extras.last().content)
+    }
+
+    @Test
     fun eventBackedOlderHistoryMergesBeforeLiveTailAndLiveMessageWins() {
         val older = listOf(
             message("m1", "user", "old-1"),

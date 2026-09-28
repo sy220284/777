@@ -47,6 +47,23 @@ internal fun localTranscriptWindow(
     )
 }
 
+internal fun transcriptHistoryBootstrapLimit(
+    liveMessageCount: Int,
+    maxPageSize: Int,
+): Int = liveMessageCount.coerceAtLeast(1).coerceAtMost(maxPageSize.coerceAtLeast(1))
+
+internal fun transcriptHistoryPageExtras(
+    pageMessages: List<LocalHarnessMessage>,
+    liveMessages: List<LocalHarnessMessage>,
+): List<LocalHarnessMessage> {
+    if (pageMessages.isEmpty()) return emptyList()
+    val liveIds = liveMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+    val seen = hashSetOf<String>()
+    return pageMessages.filter { message ->
+        message.id !in liveIds && seen.add(message.id)
+    }
+}
+
 internal fun mergeLocalTranscriptHistory(
     olderMessages: List<LocalHarnessMessage>,
     liveMessages: List<LocalHarnessMessage>,
