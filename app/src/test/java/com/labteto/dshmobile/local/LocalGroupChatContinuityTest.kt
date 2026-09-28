@@ -90,7 +90,10 @@ class LocalGroupChatContinuityTest {
 
         assertEquals(listOf("大家在客厅聊天"), result.continuity.recentEvents)
         assertEquals(listOf("今晚留在家里", "明天十点出门"), result.continuity.decisions)
-        assertEquals(listOf("明早出门尚未发生"), result.continuity.unfinished)
+        assertEquals(
+            listOf("明日安排待定", "明早出门尚未发生"),
+            result.continuity.unfinished,
+        )
         assertEquals(
             "u20",
             result.continuity.evidence.single { it.kind.name == "DECISION" }.sourceUserMessageId,
