@@ -1716,6 +1716,9 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject? = null,
     ): Job? = synchronized(runStateLock) {
         if (sessionTransitioning) return@synchronized null
+        if (_state.value.usageMode == LocalUsageMode.WORK) {
+            return@synchronized queueWorkTurnLocked(content, memoryInput, modelMessage)
+        }
         if (activeJob?.isCompleted == false) {
             val queuedInput = QueuedAgentInput(
                 content = content,
@@ -1739,6 +1742,107 @@ class LocalHarnessEngine @Inject constructor(
             return@synchronized null
         }
         queueTurnLocked(content, memoryInput, modelMessage)
+    }
+
+    private fun queueWorkTurnLocked(
+        content: String,
+        memoryInput: String,
+        modelMessage: JsonObject?,
+    ): Job? {
+        val sessionId = currentSessionId
+        val existing = activeWorkRuns[sessionId]
+        if (existing?.job?.isCompleted == false) {
+            val queuedInput = QueuedAgentInput(
+                content = content,
+                memoryInput = memoryInput,
+                modelMessage = modelMessage,
+                id = UUID.randomUUID().toString(),
+            )
+            if (!existing.pendingInputs.offer(queuedInput)) {
+                existing.state.update {
+                    it.copy(error = "当前执行中的补充消息已达到 ${MAX_PENDING_INPUTS} 条上限")
+                }
+                return null
+            }
+            recordUserTranscript(
+                content = content,
+                modelMessage = modelMessage,
+                queued = true,
+                queuedInput = queuedInput,
+                binding = existing,
+            )
+            existing.state.update { it.copy(queuedInputCount = existing.pendingInputs.size()) }
+            persist(existing)
+            return null
+        }
+
+        val durableMessage = modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", content)
+        }
+        val sourceMessageId = recordUserTranscript(content, durableMessage, queued = false)
+        appendUserToModelHistory(durableMessage)
+        persist()
+
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = _state.value.copy(running = true, error = null),
+            initialHistory = modelHistory.snapshot(),
+            eventLog = eventLogFor(sessionId),
+            initialTranscriptProjectionCursor = transcriptProjectionCursor,
+            maxPendingInputs = MAX_PENDING_INPUTS,
+            pruneToolResult = ::pruneToolResult,
+        )
+        activeWorkRuns[sessionId] = binding
+        binding.mirrorJob = scope.launch {
+            binding.state.collect {
+                mirrorWorkRunState(binding)
+            }
+        }
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            runAgentTurn(
+                input = content,
+                memoryInput = memoryInput,
+                sourceMessageId = sourceMessageId,
+                binding = binding,
+            )
+        }
+        binding.job = job
+        return job
+    }
+
+    private fun mirrorWorkRunState(binding: LocalWorkRunBinding) {
+        if (currentSessionId != binding.sessionId || _state.value.sessionId != binding.sessionId) return
+        val run = binding.state.value
+        _state.update { visible ->
+            if (visible.sessionId != binding.sessionId) {
+                visible
+            } else {
+                visible.copy(
+                    messages = run.messages,
+                    transcriptIndex = run.transcriptIndex,
+                    plan = run.plan,
+                    todos = run.todos,
+                    goal = run.goal,
+                    planMode = run.planMode,
+                    running = run.running,
+                    pendingApproval = run.pendingApproval,
+                    pendingQuestion = run.pendingQuestion,
+                    queuedInputCount = run.queuedInputCount,
+                    workflowProgress = run.workflowProgress,
+                    contextChars = run.contextChars,
+                    contextBudgetChars = run.contextBudgetChars,
+                    error = run.error,
+                )
+            }
+        }
+    }
+
+    private fun syncVisibleWorkRun(sessionId: String) {
+        val binding = activeWorkRuns[sessionId] ?: return
+        modelHistory.reset(binding.modelHistory.snapshot())
+        transcriptProjectionCursor = binding.transcriptProjectionCursor
+        mirrorWorkRunState(binding)
     }
 
     private fun queueTurn(
@@ -1772,11 +1876,16 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject?,
         queued: Boolean,
         queuedInput: QueuedAgentInput? = null,
+        binding: LocalWorkRunBinding? = null,
     ): String {
-        val before = _state.value
-        persistChatTimelineBaseline(eventLog, json, before)
+        val targetState = binding?.state ?: _state
+        val targetLog = binding?.eventLog ?: eventLog
+        val targetTranscript = binding?.transcriptRuntime ?: transcriptRuntime
+        val targetPending = binding?.pendingInputs ?: pendingInputs
+        val before = targetState.value
+        persistChatTimelineBaseline(targetLog, json, before)
         val durableInput = queuedInput.takeIf { queued }
-        val transcriptMessage = transcriptRuntime.newMessage("user", content).let { message ->
+        val transcriptMessage = targetTranscript.newMessage("user", content).let { message ->
             durableInput?.id
                 ?.takeIf(String::isNotBlank)
                 ?.let { durableId -> message.copy(id = durableId) }
@@ -1784,24 +1893,24 @@ class LocalHarnessEngine @Inject constructor(
         }
         val userEvent = if (queued) {
             val durableInput = requireNotNull(durableInput) { "排队消息缺少持久编号" }
-            eventLog.append(
+            targetLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
                     action = "queued",
-                    pending = pendingInputs.snapshot(),
+                    pending = targetPending.snapshot(),
                     affected = listOf(durableInput),
                     transcript = listOf(transcriptMessage),
                 ),
             )
         } else {
-            eventLog.append("user/message", buildJsonObject {
+            targetLog.append("user/message", buildJsonObject {
                 put("content", content)
                 modelMessage?.let { put("model_message", it) }
                 put("queued", false)
                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
             })
         }
-        transcriptRuntime.applyMessages(listOf(transcriptMessage), userEvent.sequence)
+        targetTranscript.applyMessages(listOf(transcriptMessage), userEvent.sequence)
         if (before.usageMode == LocalUsageMode.CHAT && !before.groupChat.enabled) {
             automationScheduler.onChatUserActivity(
                 sessionId = before.sessionId,
@@ -1822,21 +1931,24 @@ class LocalHarnessEngine @Inject constructor(
                 chatContext = before.chatContext,
                 replySuggestions = before.replySuggestions,
             )
-            _state.update {
+            targetState.update {
                 it.copy(
                     replySuggestions = emptyList(),
                     chatBranches = branches,
                 )
             }
         } else if (before.usageMode == LocalUsageMode.CHAT) {
-            _state.update { it.copy(replySuggestions = emptyList()) }
+            targetState.update { it.copy(replySuggestions = emptyList()) }
         }
         return transcriptMessage.id
     }
 
-    private fun appendUserToModelHistory(message: JsonObject) {
-        modelHistory.append(message)
-        updateContextMetrics()
+    private fun appendUserToModelHistory(
+        message: JsonObject,
+        binding: LocalWorkRunBinding? = null,
+    ) {
+        (binding?.modelHistory ?: modelHistory).append(message)
+        updateContextMetrics(binding)
     }
 
     internal suspend fun runAutomationPrompt(
