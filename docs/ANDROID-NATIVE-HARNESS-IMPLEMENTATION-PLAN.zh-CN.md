@@ -382,18 +382,6 @@ Harness 工具层提供：
 
 新增 Android 专属工具族。
 
-#### Shizuku
-
-负责：
-
-- 包管理；
-- Activity / Service 调用；
-- settings；
-- dumpsys；
-- 系统属性；
-- 进程与权限状态；
-- 安装 / 卸载（必须审批）。
-
 #### 无障碍
 
 负责：
