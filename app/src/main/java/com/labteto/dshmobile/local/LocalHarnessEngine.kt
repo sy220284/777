@@ -2875,16 +2875,9 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
-
-    suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus {
-        val validated = githubPlugin.validateCredential(token)
-        githubCredentials.put(token)
-        return validated
-    }
-
+    suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
+        githubPlugin.validateCredential(token).also { githubCredentials.put(token) }
     suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
-
-    suspend fun githubConnectorStatusForUi(): GitHubConnectorStatus = githubPlugin.status()
 
     suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
