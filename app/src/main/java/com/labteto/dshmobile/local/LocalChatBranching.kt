@@ -16,6 +16,10 @@ import kotlinx.serialization.json.put
 private const val CHAT_BRANCH_ROOT = "__chat_root__"
 private const val LOCAL_IMPORTED_ATTACHMENT_MARKER = "本次附件已导入本机工作区："
 
+enum class LocalChatUserEditResult {
+    SENT, BUSY, UNAVAILABLE, MESSAGE_MISSING, EMPTY, UNCHANGED,
+}
+
 @Serializable
 data class LocalChatBranchNode(
     val message: LocalHarnessMessage,
@@ -106,6 +110,24 @@ internal fun rewriteChatTranscriptFromUserEdit(
         addAll(activeMessages.subList(0, index))
         add(editedMessage)
     }
+}
+
+/** A paged, visible message may precede the hot window or a partially restored branch graph. */
+internal fun activeTranscriptForUserEdit(
+    messageId: String,
+    activeBranch: List<LocalHarnessMessage>,
+    hotMessages: List<LocalHarnessMessage>,
+    totalMessageCount: Long,
+    loadDurableTranscript: () -> List<LocalHarnessMessage>,
+): List<LocalHarnessMessage> {
+    if (activeBranch.any { it.id == messageId } &&
+        activeBranch.size.toLong() >= totalMessageCount
+    ) return activeBranch
+    if (activeBranch.isEmpty() &&
+        hotMessages.any { it.id == messageId } &&
+        hotMessages.size.toLong() >= totalMessageCount
+    ) return hotMessages
+    return loadDurableTranscript()
 }
 
 internal fun replayHardChatContextFromTranscript(

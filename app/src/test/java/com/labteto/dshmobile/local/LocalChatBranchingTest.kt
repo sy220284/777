@@ -107,6 +107,43 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun historicalEditReadsDurablePrefixWhenMessageIsOutsideHotWindow() {
+        val history = (1..100).map { index ->
+            message("m$index", "user", "消息$index", index.toLong())
+        }
+        var durableReads = 0
+        val active = activeTranscriptForUserEdit(
+            messageId = "m50",
+            activeBranch = emptyList(),
+            hotMessages = history.takeLast(20),
+            totalMessageCount = 20, // A stale index must not hide a visible paged message.
+            loadDurableTranscript = { durableReads++; history },
+        )
+        val rewritten = rewriteChatTranscriptFromUserEdit(
+            active, "m50", message("edited", "user", "改后的第50条", 101),
+        )!!
+
+        assertEquals(1, durableReads)
+        assertEquals((1..49).map { "m$it" } + "edited", rewritten.map { it.id })
+    }
+
+    @Test
+    fun historicalEditReadsDurablePrefixWhenBranchGraphIsIncomplete() {
+        val history = (1..100).map { index ->
+            message("m$index", "user", "消息$index", index.toLong())
+        }
+        val active = activeTranscriptForUserEdit(
+            messageId = "m50",
+            activeBranch = history.takeLast(20),
+            hotMessages = history.takeLast(20),
+            totalMessageCount = 100,
+            loadDurableTranscript = { history },
+        )
+
+        assertEquals(history, active)
+    }
+
+    @Test
     fun historicalEditReplayDoesNotKeepDeletedFutureLocation() {
         val retained = listOf(
             message("u1", "user", "进去说吧。", 1),
