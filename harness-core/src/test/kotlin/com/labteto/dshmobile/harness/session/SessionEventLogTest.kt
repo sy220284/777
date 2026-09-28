@@ -139,6 +139,37 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun dormantSessionArchivesLegacySegmentsWithoutAppendingAndKeepsHistory() {
+        val directory = Files.createTempDirectory("harness-idle-archive").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 700)
+            repeat(36) { index ->
+                log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(5) + index) })
+            }
+            val archives = directory.listFiles().orEmpty().filter { it.name.endsWith(".gz") }
+            assertTrue(archives.size >= 2)
+            archives.take(2).forEach { archive ->
+                val raw = File(archive.path.removeSuffix(".gz"))
+                GZIPInputStream(archive.inputStream()).use { input -> raw.writeBytes(input.readBytes()) }
+                assertTrue(archive.delete())
+            }
+
+            val idleLog = SessionEventLog(file, json, maxBytes = 700)
+            assertEquals(1, idleLog.archiveLegacySegments())
+            assertEquals(1, idleLog.archiveLegacySegments())
+            assertEquals(0, idleLog.archiveLegacySegments())
+            assertEquals((0L..35L).toList(), idleLog.snapshot().map(SessionEvent::sequence))
+            assertEquals(35L, idleLog.latestSequence())
+            assertTrue(directory.listFiles().orEmpty().none {
+                it.name.matches(Regex("events\\.jsonl\\.part-[0-9]+"))
+            })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun latestTypedEventSkipsMalformedRowsAndKeepsNewestCompleteMatch() {
         val directory = Files.createTempDirectory("harness-event-latest").toFile()
         val file = directory.resolve("session.events.jsonl")

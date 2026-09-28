@@ -67,8 +67,11 @@ class HarnessJobManager(
                     status = if (interrupted) "interrupted" else snapshot.status,
                     output = if (interrupted) {
                         snapshot.output.takeLast(MAX_OUTPUT).let { previous ->
-                            if (previous.isBlank()) "进程中断，等待安全恢复"
-                            else "${previous}\n进程中断，等待安全恢复".takeLast(MAX_OUTPUT)
+                            val detail = if (snapshot.resumeKind.isNullOrBlank()) {
+                                "应用进程中断，后台命令未完成；请检查设备进程退出记录"
+                            } else "进程中断，等待安全恢复"
+                            if (previous.isBlank()) detail
+                            else "${previous}\n$detail".takeLast(MAX_OUTPUT)
                         }
                     } else {
                         snapshot.output.takeLast(MAX_OUTPUT)

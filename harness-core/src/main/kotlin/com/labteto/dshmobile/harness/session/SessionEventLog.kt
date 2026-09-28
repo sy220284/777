@@ -39,8 +39,9 @@ class SessionEventLog(
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
     }
 
-    private val lock = Any()
-    private val nextSequence = AtomicLong(readNextSequence())
+    // Several Android adapters can open the same session while background maintenance is running.
+    private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
+    private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
@@ -274,6 +275,18 @@ class SessionEventLog(
             file.writeText("")
             nextSequence.set(0L)
         }
+    }
+
+    /** Compress a bounded amount of old history without requiring another message in this session. */
+    fun archiveLegacySegments(limit: Int = 1): Int = synchronized(lock) {
+        require(limit in 1..16) { "单次归档分片数须在 1..16 之间" }
+        var archived = 0
+        segmentFilesUnsafe().filter { !it.name.endsWith(COMPRESSED_SUFFIX) }
+            .take(limit).forEach { source ->
+                compressSegmentUnsafe(source)
+                archived++
+            }
+        archived
     }
 
     /**
@@ -589,6 +602,7 @@ class SessionEventLog(
     }
 
     private companion object {
+        val PATH_LOCKS = Array(64) { Any() }
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200

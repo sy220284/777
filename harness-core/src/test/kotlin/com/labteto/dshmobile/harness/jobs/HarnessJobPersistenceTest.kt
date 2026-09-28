@@ -12,6 +12,17 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
     @Test
+    fun restartedShellJobReportsInterruptionWithoutSuggestingRecovery() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(JobSnapshot("job-device", "后台命令", "running")),
+        )
+        assertTrue(manager.output("job-device").contains("后台命令未完成"))
+        assertTrue(manager.interruptedSnapshots().isEmpty())
+    }
+
+    @Test
     fun persistentStartDoesNotLaunchWhenDurableSnapshotWriteFails() = runTest {
         var ran = false
         val manager = HarnessJobManager(

@@ -849,6 +849,7 @@ class LocalHarnessEngine @Inject constructor(
                 startNextQueuedTurnIfIdle()?.start()
                 scheduleInterruptedSafeJobs()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
+                scope.launch { LocalSessionArchiveMaintenance(sessionsRoot, json, { currentSessionId }).run() }
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -6043,7 +6044,8 @@ class LocalHarnessEngine @Inject constructor(
             commands = commands,
             runtimeStatuses = listOf(bundledNodeRuntime.status(), bundledPythonRuntime.status(), bundledGitRuntime.status()),
             recentDiagnostics = AppLog.snapshot(),
-        )
+        ) + "\n" + LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) +
+            "\n" + LocalProcessExitStatus.read(context)
     }
 
     private fun newTranscriptMessage(
