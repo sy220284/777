@@ -567,4 +567,45 @@ class MemoryStoreTest {
         assertEquals(setOf("gallery:one", "gallery:two"), all(memoryStore).mapNotNull { it.subjectKey }.toSet())
     }
 
+
+    @Test fun consolidatedSourcesStillRollbackIndependentlyByMessage() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "用户喜欢简洁回复",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s",
+            sourceMessageId = "u1",
+        )
+        memoryStore.remember(
+            content = "用户喜欢简洁回复。",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s",
+            sourceMessageId = "u2",
+        )
+        assertEquals(1, memoryStore.consolidateIfDue(force = true))
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        var active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertEquals(listOf("u1"), active.single().sourceMessages.map { it.messageId })
+
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = setOf("u1"),
+            ),
+        )
+        active = all(memoryStore)
+        assertTrue(active.isEmpty())
+    }
+
 }
