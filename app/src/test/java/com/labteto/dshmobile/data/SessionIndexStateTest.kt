@@ -69,7 +69,7 @@ class SessionIndexStateTest {
         state.replaceSessions(listOf(session("s1", title = "旧标题")))
 
         state.removeSession("s1")
-        state.addSession(session("s1", title = "新标题"))
+        state.replaceSessions(listOf(session("s1", title = "新标题")))
 
         assertEquals("新标题", state.session("s1")?.title)
     }
