@@ -148,6 +148,17 @@ fun interface AgentEventSink {
 }
 
 /**
+ * Allows a runtime adapter to treat [AgentLoop.maxSteps] as a soft budget.
+ *
+ * Returning a value greater than [currentLimit] extends the same turn without resetting step
+ * numbering or losing tool/model history. Returning null (or a non-growing value) keeps the
+ * original hard-stop behaviour.
+ */
+fun interface AgentStepLimitExtender {
+    fun extend(currentLimit: Int, stepsUsed: Int): Int?
+}
+
+/**
  * Platform-neutral turn/step loop.
  *
  * Every model-visible mutation is appended to [eventSink] before the next step starts. Cancellation
@@ -164,6 +175,7 @@ class AgentLoop(
     private val isParallelTool: (AgentToolCall) -> Boolean = { false },
     private val eventSink: AgentEventSink = AgentEventSink { },
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
+    private val stepLimitExtender: AgentStepLimitExtender? = null,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
     init {
@@ -183,8 +195,15 @@ class AgentLoop(
         eventSink.append(AgentEvent.TurnStarted(turnId, cleanInput))
 
         try {
-            repeat(maxSteps) { stepIndex ->
-                val step = stepIndex + 1
+            var stepLimit = maxSteps
+            var step = 0
+            while (true) {
+                if (step >= stepLimit) {
+                    val extended = stepLimitExtender?.extend(stepLimit, step)
+                    if (extended == null || extended <= stepLimit) break
+                    stepLimit = extended
+                }
+                step += 1
                 eventSink.append(AgentEvent.StepStarted(turnId, step))
                 val reply = model.complete(messages.toList())
                 requireUniqueCallIds(reply.toolCalls)
@@ -279,12 +298,12 @@ class AgentLoop(
                 eventSink.append(AgentEvent.StepFinished(turnId, step))
             }
 
-            eventSink.append(AgentEvent.TurnStepLimit(turnId, maxSteps))
+            eventSink.append(AgentEvent.TurnStepLimit(turnId, step))
             return AgentRunResult(
                 turnId = turnId,
                 answer = messages.lastOrNull { it.role == "assistant" }?.content.orEmpty(),
                 messages = messages.toList(),
-                steps = maxSteps,
+                steps = step,
                 stopReason = AgentStopReason.STEP_LIMIT,
             )
         } catch (cancelled: CancellationException) {
