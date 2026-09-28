@@ -66,13 +66,11 @@ internal fun mergeGroupContinuity(
 internal fun finalizeGroupContextAfterRefresh(
     context: ChatContextState,
     statesInReplyOrder: List<ChatCharacterState>,
+    processedPending: List<ChatPendingTurn>,
     complete: Boolean,
 ): ChatContextState {
-    if (!complete) return context
-    val through = context.pendingTurns
-        .filter { it.generation == context.generation }
-        .maxOfOrNull(ChatPendingTurn::sequence)
-        ?: context.processedThroughSequence
+    if (!complete || processedPending.isEmpty()) return context
+    val through = processedPending.maxOf(ChatPendingTurn::sequence)
     return context.commitProcessed(
         scene = context.scene,
         continuity = mergeGroupContinuity(context.continuity, statesInReplyOrder),
