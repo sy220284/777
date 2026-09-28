@@ -47,8 +47,9 @@ internal fun adaptiveAgentStepLimit(
  *
  * The configured value remains the baseline. Once the task reaches it, continuation grows from the
  * amount of work already spent, task complexity, context pressure and resource pressure. There is no
- * normal fixed ceiling here: a healthy task keeps receiving budget until the model finishes, while
- * cancellation and unrecoverable failures remain the actual stop conditions.
+ * normal fixed ceiling here: a healthy task keeps receiving budget until the model finishes.
+ * Continuation stops when context safety cannot be established or live pressure makes further
+ * expansion unsafe, so dynamic continuation cannot turn into an effectively unbounded runaway.
  */
 internal fun nextAdaptiveAgentStepLimit(
     currentLimit: Int,
@@ -61,12 +62,14 @@ internal fun nextAdaptiveAgentStepLimit(
 ): Int? {
     if (currentLimit <= 0 || currentLimit == Int.MAX_VALUE) return null
 
+    if (contextBudgetChars <= 0) return null
+
     val base = configuredBase.coerceAtLeast(1)
     val normalized = task.lowercase()
     val complexityHits = ADAPTIVE_COMPLEXITY_CUES.count(normalized::contains).coerceAtMost(6)
-    val contextRatio = if (contextBudgetChars > 0) {
-        contextChars.toDouble() / contextBudgetChars.toDouble()
-    } else 0.0
+    val contextRatio = contextChars.coerceAtLeast(0).toDouble() / contextBudgetChars.toDouble()
+    if (contextRatio >= 1.0) return null
+    if (pressure == HarnessResourcePressure.HIGH && contextRatio >= 0.85) return null
 
     val complexityFactor = 1.0 + complexityHits * 0.08 +
         if (kind == LocalAgentRunKind.SUBAGENT || kind == LocalAgentRunKind.AUTOMATION) 0.08 else 0.0
