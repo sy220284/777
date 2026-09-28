@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Keeps the model-facing tool surface small without hiding capabilities permanently.
  *
- * Core conversation/file/web tools stay visible. Android, vision, runtime, MCP, LSP, automation and
+ * Core conversation/file/web tools stay visible. Android, vision, runtime, GitHub, MCP, LSP, automation and
  * webhook tools are discovered on demand through capability_search and remain enabled for the
  * current turn only.
  */
@@ -32,6 +32,7 @@ internal object LocalToolRouter {
         name in optionalExact ||
             name.startsWith("android_") ||
             (name.startsWith("vision_") && name != "vision_analyze_file") ||
+            name.startsWith("github_") ||
             name.startsWith("mcp_") ||
             name.startsWith("lsp_") ||
             name.startsWith("webhook_")
@@ -95,6 +96,8 @@ internal object LocalToolRouter {
             "android 安卓 手机 设备 应用 界面 无障碍 点击 输入 滑动 通知 剪贴板 虚拟屏"
         name.startsWith("vision_") ->
             "vision 视觉 图片 图像 截图 屏幕 识别"
+        name.startsWith("github_") ->
+            "github git 仓库 repository repo pr pull request issue actions 工作流 提交 commit 分支 branch 代码托管"
         name.startsWith("mcp_") ->
             "mcp 外部工具 服务 连接 扩展"
         name.startsWith("lsp_") ->
