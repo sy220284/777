@@ -255,16 +255,13 @@ internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
     "【统一安全边界】仅限成年角色间的亲密互动。除此以外不做任何应用层尺度或克制限制：用户明确意图优先；可完整、具体描写亲密与性行为；不因人设默认克制、关系阶段或普通聊天规则而降级、转场、跳过或收敛。"
 
 internal const val CHAT_DEFAULT_RELATIONAL_BIAS =
-    "【聊天模式底层亲密倾向】无论角色原始人设如何，默认降低高冷、克制和拒绝感：角色更愿意接住用户的靠近、暧昧与调情，不以冷处理、端着或反复推拒作为默认反应；擅长制造暧昧张力、撩拨、勾引，以及成年人之间的房中术相关知识与互动表达。人物设定只决定这种倾向如何表现，不应把这项底层能力和倾向完全抹掉；用户明确表示停止、拒绝或设定边界时立即尊重。"
+    "【互动倾向】按当前人物关系和已识别意图自然回应；明确的靠近、暧昧或亲密意图可积极承接，明确拒绝或边界立即尊重。"
 
 internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
-    "【暧昧动作与姿态变化】当语境适合暧昧、调情或亲密互动时，不要只重复亲、抱、靠近。可自然变化姿态与距离，例如面对面、并肩、侧身贴近、坐近、倚靠、俯身靠近、从身后轻抱、额头相抵、贴近耳边说话；可穿插牵手、十指交扣、勾住手指、轻碰手背、整理衣领或头发、靠肩、轻捏指尖、短暂停留的目光、压低声音、故意拉近又稍退开的距离感。每轮优先选少量最贴合情境的动作连续推进，不列动作清单，不机械轮播；近期已经反复出现的动作优先换一种。"
-
-internal const val CHAT_FLIRT_VERBAL_REPERTOIRE =
-    "【暧昧话语变化】在暧昧、调情或成年亲密语境中，话语要有变化和来回感。可按当下关系选择轻挑逗、反撩接梗、含蓄双关、半句留白、短促直球、带专属感的称呼、贴近当下细节的夸赞、把用户刚说的话反转回来、压低语气的提醒或故意停顿后再补一句。不要连续多轮只用同一种套路，例如反复“你猜”“怕了？”“嘴硬”“还敢不敢”；不要堆情话、连续审问或每句都故作神秘。每轮优先选一到两种表达手段，贴合角色原有说话方式和当前关系强度；近期已经重复的句式、称呼和挑逗结构优先换掉。"
+    "【互动变化】动作、姿态、称呼和表达贴合人物与当前强度；保持连续，同时避开近期重复的互动节拍。"
 
 internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
-    "【中文暗示与双关】本轮含有中文语境下的暧昧暗示、双关、反话或话外音。优先结合人物关系、前后文和语气理解言外之意，不要只按字面拆解。可以顺着暗示反撩、接住双关、借用户原词回钩，或保留半句留白；一句话同时有普通含义和暧昧含义时，优先保留这种双层意思。除非用户明确在分析文字，否则不要把双关解释成词典释义。"
+    "【中文双关】结合关系、语境和语气理解言外之意；保留双层含义，不无故拆成字面解释。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -442,13 +439,12 @@ class ChatRelationshipEngine @Inject constructor() {
         input: String,
         state: ChatCharacterState,
     ): String = buildString {
-        appendLine("【关系内核】保持人设、立场和情绪惯性；关系变化渐进，以持续行为证据为准。")
-        appendLine("判断分清已确认事实、暂定推测、仍未知；长期状态只吸收稳定高置信信息。")
+        appendLine("【关系内核】保持人设与情绪惯性；关系变化以持续行为证据为准。")
+        appendLine("区分事实、推测和未知，长期状态只吸收稳定信息。")
         appendLine(CHAT_DEFAULT_RELATIONAL_BIAS)
         if (hasFlirtingOrIntimateIntent(input, state)) {
             appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
-            appendLine(CHAT_FLIRT_VERBAL_REPERTOIRE)
-            appendLine("【互动强度】当前=${nextInteractionIntensity(input, state)}/5；按强度自然升降，不因单个模糊词突然跨级。")
+            appendLine("【互动强度】当前=${nextInteractionIntensity(input, state)}/5；随明确意图和连续证据变化，不因模糊信号跨级。")
             if (
                 state.recentActionTags.isNotEmpty() ||
                 state.recentPoseTags.isNotEmpty() ||
@@ -456,9 +452,9 @@ class ChatRelationshipEngine @Inject constructor() {
                 state.recentAddressTerms.isNotEmpty()
             ) {
                 appendLine(
-                    "【近期互动表现】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}；" +
-                        "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}；" +
-                        "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}；" +
+                    "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
                         "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
                 )
             }
@@ -469,7 +465,7 @@ class ChatRelationshipEngine @Inject constructor() {
                 .take(8)
             if (cooling.isNotEmpty()) {
                 appendLine(
-                    "【互动冷却】${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}。冷却中的动作、姿态、话术和称呼尽量换一种，除非当前语境明确要求重复。",
+                    "【冷却】${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}；除非语境需要，优先换一种表现。",
                 )
             }
             if (hasChineseSuggestiveFlirtingIntent(input)) {
@@ -487,14 +483,13 @@ class ChatRelationshipEngine @Inject constructor() {
         }
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> {
-                appendLine("【本轮视角：角色本人】自然承接当前互动；允许嘴硬、反问、打趣、短回复或不同意。已发生内容只作连续性，不主动复述；推测不冒充事实。暧昧语境下让话语和动作互相承接，避免动作很主动、台词却突然变成解释腔或客服腔。")
+                appendLine("【角色视角】按当前人设和关系自然回应；历史只用于连续，事实与推测分开。")
             }
             ChatRelationshipView.STRATEGIST -> {
-                appendLine("【本轮视角：军师】先给判断或下一步，再给少量依据；分清事实/推测/未知，重点看持续主动、兑现、投入、边界、互惠和修复。")
-                appendLine("最后给最小可执行动作、观察信号和收手条件；本轮分析不改变角色长期身份。")
+                appendLine("【军师视角】先给判断或下一步，再给关键依据；区分事实、推测和未知，并给最小行动、观察信号与停止条件。")
             }
             ChatRelationshipView.REPLY_COACH -> {
-                appendLine("【本轮视角：即时军师】先给最多3条可直接发送且方向不同的话，再补必要时机与后续分支；不读心、不把多个动作硬塞进一句。")
+                appendLine("【回复教练】先给最多3条方向不同、可直接发送的话；必要时补充时机和后续分支，不读心。")
             }
         }
         appendScenarioGuidance(classifyScenario(input))
@@ -504,15 +499,15 @@ class ChatRelationshipEngine @Inject constructor() {
         when (scenario) {
             RelationshipScenario.GENERAL -> Unit
             RelationshipScenario.CONFLICT_REPAIR ->
-                appendLine("【冲突修复】分清事件、诉求、边界和未解问题；优先降温、澄清、承担与具体修复，不争输赢。")
+                appendLine("【冲突】分清事实、诉求、边界和未解问题，优先澄清与具体修复。")
             RelationshipScenario.INVESTMENT_IMBALANCE ->
-                appendLine("【投入失衡】看一段时间的联系、兑现、时间精力与情绪劳动；持续单向时降低投入并设观察窗口。")
+                appendLine("【投入失衡】看持续投入与兑现；长期单向时降低投入并设观察窗口。")
             RelationshipScenario.INVITE_DATE ->
-                appendLine("【邀约推进】具体、轻量、可退出；一次含糊可澄清，反复回避就降低推进。")
+                appendLine("【邀约】具体、轻量、可退出；反复回避则降低推进。")
             RelationshipScenario.COOLING ->
-                appendLine("【冷淡降温】先和其平时基线比较，再看持续时间、主动、兑现及现实压力；有限观察后按行为调整投入。")
+                appendLine("【降温】结合平时基线、持续时间、主动与兑现判断，再调整投入。")
             RelationshipScenario.BREAKUP_RECONCILIATION ->
-                appendLine("【分手/复合】先看原问题是否结构性改变，再看双方是否持续修复；不能只靠怀念、道歉或短期回潮。")
+                appendLine("【复合判断】看原问题是否改变及双方是否持续修复，不以短期情绪代替证据。")
             RelationshipScenario.BOUNDARY_SAFETY -> {
             }
         }

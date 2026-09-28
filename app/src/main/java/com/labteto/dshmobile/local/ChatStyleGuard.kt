@@ -81,14 +81,6 @@ internal object ChatStyleGuard {
         return result.ifBlank { "……" }
     }
 
-    fun repairPrompt(candidate: String, violations: List<String>): String = buildString {
-        appendLine("上一版聊天回复命中了禁止使用的 AI / 客服套话，请重新写一版。")
-        appendLine("必须保留原本想表达的意思和当前情绪，但改成自然即时聊天，不要解释你在改写。")
-        appendLine("禁止词：" + violations.joinToString("、"))
-        appendLine("候选回复：")
-        append(candidate.take(MAX_CANDIDATE_CHARS))
-    }
-
     /**
      * Legacy deterministic scrub kept for compatibility with older callers and tests.
      * New real-time chat uses [filterLiteral] so streamed and durable text stay identical.
@@ -132,5 +124,4 @@ internal object ChatStyleGuard {
     }
 
     private val CHAT_SENTENCE = Regex("[^。！？!?\\n]+[。！？!?]*|\\n+")
-    private const val MAX_CANDIDATE_CHARS = 6_000
 }

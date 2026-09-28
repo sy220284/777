@@ -157,7 +157,7 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
     ): String = buildString {
-        appendLine("更新角色隐藏状态。只输出 JSON，不解释；不要生成回复建议。")
+        appendLine("更新角色隐藏状态，只输出 JSON。")
         appendLine("角色=${persona.name}" +
             persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
             persona.relationship.takeIf(String::isNotBlank)?.let { "｜关系=$it" }.orEmpty())
@@ -219,28 +219,21 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         if (hasFlirtingOrIntimateIntent(userMessage, state)) {
-            appendLine("本轮处于暧昧/亲密互动：状态更新应保留互动连续性与张力变化，不把接梗、双关或反撩误写成普通闲聊。")
-            if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
-                appendLine("用户本轮含中文暗示或双关：按前后文理解话外音，不把字面歧义当成新的事实。")
-            }
+            appendLine("当前为亲密互动：按上下文保留互动连续性；双关不当作新事实。")
         }
         if (hasAdultIntimacyIntent(userMessage, state)) {
-            appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认，不被普通聊天规则降级或转移。")
+            appendLine("当前意图明确，状态更新按实际互动推进，不重复确认或自行转移。")
         }
 
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
-        appendLine("state 可用字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。scene 由系统事件归约器维护，不要输出或改写。短期字段省略时会自然衰减；已经解决时请显式写空字符串或空数组。")
-        appendLine("interactionIntent、interactionIntensity、recentActionTags、recentPoseTags、recentVerbalTags、recentAddressTerms、interactionCooldowns 由系统根据真实对话维护，不要在 JSON 中输出或猜测。")
+        appendLine("state字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。")
         appendLine("规则：")
-        appendLine("1. facts 只放明确事实；hypotheses 放带置信度的暂定解释；证据不足放 unknowns；sharedMoments 只写真正共同经历。")
-        appendLine("2. 数值与用户画像渐进变化；stage 仅在明确关系事件或连续强证据下改变。stage 只用 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
-        appendLine("3. NONE=无新状态，MINOR=短期变化，MAJOR=承诺、关系事件、重大共同经历或稳定人物事实；NONE 时 state 可为空。")
-        appendLine("4. suggestions 固定输出空数组；回复建议只在用户主动点击时另行生成。")
-        appendLine("5. 用户实际发言和明确纠正优先；不虚构事实、不替用户作重大不可逆决定。现实关系军师场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
-        appendLine("6. activeGoal/currentAgenda/internalConflict/immediateConcern 只写角色当下真实驱动，不凭空制造阴谋、爱意或分析腔。")
-        appendLine("7. 当前场景是系统维护的硬状态，只用于理解上下文，不要在 state 中重写 scene。")
-        appendLine("8. continuity 用事件事实概括剧情：recentEvents 只留最近 3～5 条关键变化；重复/同类事项直接归并进最新事件或最终决定；decisions 最多 4 条，只保留当前有效结论；unfinished 最多 4 条，只列仍未完成事项。禁止复制旧台词。")
-        appendLine("9. continuity 或关系/人物状态发生有效变化时，turnSignificance 至少为 MINOR；纯场景移动由系统事件层独立记录。")
+        appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构。")
+        appendLine("- 状态与用户画像渐进变化；stage 仅在明确事件或持续强证据下变化，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
+        appendLine("- 已失效短期状态显式清空；scene 和 interaction* 由系统维护，不输出。")
+        appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
+        appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
+        appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
     fun suggestionsPrompt(
@@ -250,7 +243,7 @@ class ChatInteractionPlanner @Inject constructor(
         assistantMessage: String,
         recentDialogue: List<Pair<String, String>> = emptyList(),
     ): String = buildString {
-        appendLine("根据最近几条角色聊天，生成用户下一句可直接发送的回复建议。只输出 JSON，不解释。")
+        appendLine("根据最近对话生成用户下一句可直接发送的建议，只输出 JSON。")
         appendLine(
             "角色=${persona.name}" +
                 persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
@@ -275,7 +268,7 @@ class ChatInteractionPlanner @Inject constructor(
             }
             .takeLast(6)
         if (dialogue.isNotEmpty()) {
-            appendLine("最近对话（按时间从旧到新；越靠后优先级越高）：")
+            appendLine("最近对话（旧→新）：")
             dialogue.forEach { (role, content) ->
                 val speaker = if (role == "user") "用户" else "角色"
                 appendLine("${speaker}：${content.take(MAX_MESSAGE_CHARS)}")
@@ -285,24 +278,20 @@ class ChatInteractionPlanner @Inject constructor(
             appendLine("角色：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         }
         if (hasFlirtingOrIntimateIntent(userMessage, state)) {
-            appendLine("当前为暧昧/亲密语境：4条建议都要承接当前互动，其中至少2条能自然接梗、反撩或延续双关；避免照搬角色刚用过的动作、称呼和挑逗套路。")
-            if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
-                appendLine("用户这句含中文暗示或双关：优先给能接住言外之意的回复，不做词义解释。")
-            }
+            appendLine("当前为亲密语境：建议承接当前互动，避免复用近期动作、称呼和表达套路。")
         }
-        if (hasAdultIntimacyIntent(userMessage, state)) {
-            appendLine("本轮为成年角色亲密互动：建议顺着用户明确方向保持连续，不重复确认。")
+        if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
+            appendLine("存在中文双关时接住言外之意，不做词义解释。")
         }
         appendLine(
             "输出：{\"suggestions\":[{\"label\":\"2到6字短标签\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"用户可直接发送的下一句\",\"bold\":false}]}",
         )
         appendLine("规则：")
-        appendLine("1. 必须给4条明显不同的建议，优先覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
-        appendLine("2. 以最近对话为主依据，最后1到2轮权重最高；更早内容只用于理解承接，禁止压过后续新信息。")
-        appendLine("3. 如果后续消息已经纠正、结束、拒绝或切换话题，必须以最新状态为准，禁止把已经失效的话题重新带回来。")
-        appendLine("4. text 必须直接回应角色最后一句，贴合用户最近几轮真实说话习惯和当前关系，不写万能句，不照搬更早对话。")
-        appendLine("5. 禁止同义改写凑数，不虚构事实，不替用户作重大不可逆决定。")
-        appendLine("6. 现实关系场景禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+        appendLine("- 给4条明显不同的建议，明确覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
+        appendLine("- 最新1～2轮和当前状态优先；已结束、拒绝或被纠正的话题不得复活。")
+        appendLine("- 直接承接角色最后一句，贴合用户表达习惯和当前关系。")
+        appendLine("- 不用同义改写凑数，不虚构事实，不替用户作重大决定。")
+        appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? {

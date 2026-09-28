@@ -190,9 +190,9 @@ internal class LocalHistoryCompactor(
             when (summaryMode) {
                 LocalHistorySummaryMode.WORK -> {
                     val sections = structuredWorkSummary(messages, summaryLimit)
-                    append("以下是较早会话的结构化提取式检查点，共折叠 ")
+                    append("较早工作检查点，共折叠 ")
                     append(messages.size)
-                    append(" 条模型消息。所有条目只摘自原会话；当前目标、计划、任务清单与工作区文件仍以实时状态为准。")
+                    append(" 条模型消息；内容均提取自原会话，实时目标、计划、任务和工作区状态优先。")
                     appendSummarySection("目标与需求", sections.goals)
                     appendSummarySection("约束与边界", sections.constraints)
                     appendSummarySection("关键决定与阶段结论", sections.decisions)
@@ -205,14 +205,14 @@ internal class LocalHistoryCompactor(
                     }
                 }
                 LocalHistorySummaryMode.CHAT -> {
-                    append("以下是较早聊天的连续性检查点，共折叠 ")
+                    append("较早聊天连续性检查点，共折叠 ")
                     append(messages.size)
-                    append(" 条模型消息。这里记录的是已发生内容，只用于保持连续，禁止把摘要当成本轮要复述的台词或背景。")
+                    append(" 条模型消息，仅用于承接，不主动复述。")
                     if (user.isNotEmpty()) {
                         append("\n\n较早用户表达与事件：")
                         user.forEach { append("\n- ").append(it) }
                     }
-                    append("\n\n角色旧回复措辞已省略；当前人物设定、关系状态、长期记忆与最近原始对话以实时上下文为准。")
+                    append("\n\n当前人设、关系、长期记忆和近期原始对话优先。")
                 }
             }
         }

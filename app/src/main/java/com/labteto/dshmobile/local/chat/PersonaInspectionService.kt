@@ -202,34 +202,19 @@ class PersonaInspectionService @Inject constructor(
         )
 
         val SYSTEM_PROMPT = """
-            你负责审计角色扮演的人物一致性。只做证据整理，不替用户修改人设。
-
-            只输出一个 JSON 对象，结构必须严格为：
-            {
-              "conflicts":[
-                {"field":"personality","fixedValue":"固定设定","observedValue":"对话中明确表现","reason":"为什么构成冲突"}
-              ],
-              "suggestions":[
-                {"field":"background","value":"可追加到固定人设的新内容","evidence":"对应的对话证据"}
-              ]
-            }
+            审计角色一致性，只整理证据，不修改人设。只输出标准 JSON：
+            {"conflicts":[{"field":"","fixedValue":"","observedValue":"","reason":""}],
+             "suggestions":[{"field":"","value":"","evidence":""}]}
 
             规则：
-            1. conflicts 只记录真实矛盾：对话中稳定、明确地违背固定人设。一次玩笑、临时情绪、假设、梦境、用户猜测不算冲突。
-            2. suggestions 只提取对话中已经明确、以后仍稳定有用、固定人设里尚未包含的内容。禁止为了补全而猜测。
-            3. 同义内容不要重复建议；固定人设已有更完整版本时不要给较短版本。
-            4. 用户明确纠正角色“不会这么说/不会这么做”等内容优先放 corrections。
-            5. 人物身份、经历、能力等事实分别放 identity/background；稳定性格放 personality；可执行说话习惯放 speechStyle。
-            6. 与用户长期关系定位、称呼习惯和互动边界放 relationship；世界规则放 worldSetting。
-            7. 长期驱动力放 coreMotivations；价值冲突顺序放 valuePriorities；重复稳定行动方式放 behaviorPatterns；人物自身长期拉扯放 internalContradictions；角色知道/不知道什么放 knowledgeBoundary；剧情阶段放 timelinePosition。
-            8. 一条建议只写一个可直接追加的小事实或规则，不要把整份人设重新生成一遍。不要在人物检查里自动生成世界书条目。
-            9. field 只能使用 identity, background, personality, speechStyle, relationship, worldSetting,
+            1. conflicts 只报有明确对话证据的稳定冲突；玩笑、临时情绪、假设、梦境和用户猜测不算。
+            2. 同时检查知识越界、关系突变、过度迎合、推测当事实和长期表达漂移。
+            3. suggestions 只提取明确、稳定、长期有用且人设未包含的新信息；同义项去重，一条只写一个事实。
+            4. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
+            5. field 只能使用 identity, background, personality, speechStyle, relationship, worldSetting,
                franchise, timelinePosition, coreMotivations, valuePriorities, behaviorPatterns,
                internalContradictions, knowledgeBoundary, hardConstraints, exampleDialogues,
-               bannedPhrases, signaturePhrases, corrections。
-            10. 没有冲突或新增内容时返回空数组。
-            11. 同时检查知识越界、关系突然跳变、过度迎合、把推测当事实、说话方式长期偏离等运行时跑偏；只有有明确对话证据时才报 conflicts。
-            12. 不要 Markdown，不要解释，只输出标准 JSON。
+               bannedPhrases, signaturePhrases, corrections；无结果返回空数组。
         """.trimIndent()
     }
 }

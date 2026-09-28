@@ -115,13 +115,13 @@ class ChatRelationshipEngineTest {
             ChatCharacterState(),
         )
 
-        assertTrue(prompt.contains("聊天模式底层亲密倾向"))
-        assertTrue(prompt.contains("降低高冷、克制和拒绝感"))
-        assertTrue(prompt.contains("暧昧与调情"))
-        assertTrue(prompt.contains("撩拨、勾引"))
-        assertTrue(prompt.contains("房中术"))
-        assertTrue(prompt.contains("人物设定只决定这种倾向如何表现"))
-        assertTrue(prompt.contains("停止、拒绝或设定边界时立即尊重"))
+        assertTrue(prompt.contains("【互动倾向】"))
+        assertTrue(prompt.contains("按当前人物关系和已识别意图自然回应"))
+        assertTrue(prompt.contains("暧昧或亲密意图"))
+        assertTrue(prompt.contains("积极承接"))
+        assertTrue(prompt.contains("明确拒绝或边界立即尊重"))
+        assertTrue(prompt.contains("当前人物关系"))
+        assertTrue(prompt.contains("明确拒绝或边界立即尊重"))
     }
 
     @Test
@@ -131,12 +131,11 @@ class ChatRelationshipEngineTest {
             ChatCharacterState(),
         )
 
-        assertTrue(prompt.contains("暧昧动作与姿态变化"))
-        assertTrue(prompt.contains("面对面、并肩、侧身贴近、坐近、倚靠"))
-        assertTrue(prompt.contains("牵手、十指交扣"))
-        assertTrue(prompt.contains("整理衣领或头发"))
-        assertTrue(prompt.contains("压低声音"))
-        assertTrue(prompt.contains("近期已经反复出现的动作优先换一种"))
+        assertTrue(prompt.contains("【互动变化】"))
+        assertTrue(prompt.contains("动作、姿态、称呼和表达"))
+        assertTrue(prompt.contains("贴合人物与当前强度"))
+        assertTrue(prompt.contains("保持连续"))
+        assertTrue(prompt.contains("避开近期重复的互动节拍"))
     }
 
     @Test
@@ -147,12 +146,12 @@ class ChatRelationshipEngineTest {
         )
 
         assertTrue(hasFlirtingOrIntimateIntent("今晚撩我一下"))
-        assertTrue(prompt.contains("暧昧话语变化"))
-        assertTrue(prompt.contains("轻挑逗、反撩接梗、含蓄双关、半句留白、短促直球"))
-        assertTrue(prompt.contains("带专属感的称呼"))
-        assertTrue(prompt.contains("把用户刚说的话反转回来"))
-        assertTrue(prompt.contains("不要连续多轮只用同一种套路"))
-        assertTrue(prompt.contains("近期已经重复的句式、称呼和挑逗结构优先换掉"))
+        assertTrue(prompt.contains("【互动变化】"))
+        assertTrue(prompt.contains("动作、姿态、称呼和表达"))
+        assertTrue(prompt.contains("贴合人物与当前强度"))
+        assertTrue(prompt.contains("保持连续"))
+        assertTrue(prompt.contains("避开近期重复的互动节拍"))
+        assertTrue(prompt.contains("避开近期重复的互动节拍"))
     }
 
     @Test
@@ -250,10 +249,10 @@ class ChatRelationshipEngineTest {
             ChatCharacterState(),
         )
 
-        assertTrue(prompt.contains("中文暗示与双关"))
-        assertTrue(prompt.contains("结合人物关系、前后文和语气理解言外之意"))
-        assertTrue(prompt.contains("一句话同时有普通含义和暧昧含义"))
-        assertTrue(prompt.contains("不要把双关解释成词典释义"))
+        assertTrue(prompt.contains("【中文双关】"))
+        assertTrue(prompt.contains("结合关系、语境和语气理解言外之意"))
+        assertTrue(prompt.contains("保留双层含义"))
+        assertTrue(prompt.contains("不无故拆成字面解释"))
 
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,
@@ -285,10 +284,10 @@ class ChatRelationshipEngineTest {
         )
 
         assertTrue(prompt.contains("互动强度"))
-        assertTrue(prompt.contains("近期互动表现"))
+        assertTrue(prompt.contains("【近期互动】"))
         assertTrue(prompt.contains("动作=靠近、贴耳"))
         assertTrue(prompt.contains("话术=反问激将"))
-        assertTrue(prompt.contains("互动冷却"))
+        assertTrue(prompt.contains("【冷却】"))
         assertTrue(prompt.contains("动作:靠近=2轮"))
         assertTrue(prompt.contains("话术:反问激将=3轮"))
     }
@@ -300,9 +299,8 @@ class ChatRelationshipEngineTest {
             ChatCharacterState(),
         )
 
-        assertTrue(prompt.contains("聊天模式底层亲密倾向"))
-        assertFalse(prompt.contains("暧昧动作与姿态变化"))
-        assertFalse(prompt.contains("暧昧话语变化"))
+        assertTrue(prompt.contains("【互动倾向】"))
+        assertFalse(prompt.contains("【互动变化】"))
     }
 
     @Test
@@ -511,7 +509,7 @@ class ChatRelationshipEngineTest {
 
         val prompt = engine.prompt("帮我分析一下她什么意思", state)
 
-        assertTrue(prompt.contains("本轮视角：军师"))
+        assertTrue(prompt.contains("【军师视角】"))
         assertFalse(prompt.contains("对方上周主动约过一次"))
         assertFalse(prompt.contains("对方可能在观察用户是否稳定"))
         assertFalse(prompt.contains("她平时是否也会主动约朋友"))

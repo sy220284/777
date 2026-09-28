@@ -353,10 +353,9 @@ internal class LocalAutomationChatCoordinator(
                         messages = withEphemeralContext(
                             requestMessages,
                             """
-                            【主动互动去重重写】
-                            刚生成的内容与最近主动消息过于相似。
-                            换一个话题切入点、开场方式和句式重新写；仍需保持当前人设、关系与故事连续性。
-                            只输出角色真正会发出的新消息。
+                            【主动互动去重】
+                            上一版与近期内容过近。保持人物与剧情连续，换切入点和表达重新生成。
+                            只输出新消息。
                             """.trimIndent(),
                         ),
                     )

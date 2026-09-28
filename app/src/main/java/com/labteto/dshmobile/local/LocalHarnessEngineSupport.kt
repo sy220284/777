@@ -71,9 +71,9 @@ internal fun seedLocalWorkspaceGuide(workspacePath: String) {
         """
         # 工作区指南
 
-        - 所有文件操作限定在当前应用的本机工作区。
-        - 修改前先读取原文件，完成后重新读取或搜索关键内容复核。
-        - shell 使用安卓 `/system/bin/sh`，只依赖系统现有命令。
+        - 文件操作限当前工作区。
+        - 修改前读取，修改后复核。
+        - shell 使用 `/system/bin/sh` 和现有命令。
         """.trimIndent() + "\n",
     )
 }

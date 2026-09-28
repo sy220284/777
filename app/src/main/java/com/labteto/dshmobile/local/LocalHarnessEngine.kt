@@ -1650,7 +1650,7 @@ class LocalHarnessEngine @Inject constructor(
             val key = apiKeys.get() ?: error("请先配置模型密钥")
             val messages = withEphemeralContext(
                 modelHistory.dropLast(1),
-                "根据本轮已有的工具结果重新组织最终回复。只回答用户，不调用工具，也不要声称再次执行了操作。",
+                "基于本轮已有结果重写最终回复；不要调用工具或声称重新执行。",
             )
             val reply = completeWithRetry(
                 key = key,

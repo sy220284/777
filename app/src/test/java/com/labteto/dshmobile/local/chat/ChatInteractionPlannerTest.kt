@@ -893,12 +893,11 @@ class ChatInteractionPlannerTest {
         )
 
         assertTrue(prompt.contains("\"suggestions\":[]"))
-        assertTrue(prompt.contains("回复建议只在用户主动点击时另行生成"))
-        assertTrue(prompt.contains("由系统根据真实对话维护"))
-        assertTrue(prompt.contains("scene 由系统事件归约器维护"))
-        assertTrue(prompt.contains("不要在 state 中重写 scene"))
-        assertTrue(prompt.contains("纯场景移动由系统事件层独立记录"))
-        assertTrue(prompt.contains("重复/同类事项直接归并"))
+        assertTrue(prompt.contains("suggestions 固定为空"))
+        assertTrue(prompt.contains("interaction* 由系统维护"))
+        assertTrue(prompt.contains("scene 和 interaction* 由系统维护"))
+        assertTrue(prompt.contains("NONE=无有效变化"))
+        assertTrue(prompt.contains("合并重复"))
     }
 
     @Test
@@ -919,12 +918,13 @@ class ChatInteractionPlannerTest {
                 "assistant" to "那火锅怎么样？",
             ),
         )
-        assertTrue(prompt.contains("必须给4条明显不同的建议"))
-        assertTrue(prompt.contains("最近对话（按时间从旧到新；越靠后优先级越高）"))
+        assertTrue(prompt.contains("给4条明显不同的建议"))
+        assertTrue(prompt.contains("自然|俏皮|直球|放飞"))
+        assertTrue(prompt.contains("最近对话（旧→新）"))
         assertTrue(prompt.contains("算了，换个话题，今晚吃什么？"))
         assertTrue(prompt.contains("那火锅怎么样？"))
         assertTrue(!prompt.contains("最旧消息不应保留"))
-        assertTrue(prompt.contains("禁止把已经失效的话题重新带回来"))
+        assertTrue(prompt.contains("已结束、拒绝或被纠正的话题不得复活"))
         assertTrue(!prompt.contains("\"state\""))
 
         val suggestions = planner.parseSuggestions(
@@ -963,9 +963,9 @@ class ChatInteractionPlannerTest {
 
         assertTrue(prompt.contains("互动状态"))
         assertTrue(prompt.contains("强度=3/5"))
-        assertTrue(prompt.contains("当前为暧昧/亲密语境"))
-        assertTrue(prompt.contains("至少2条能自然接梗、反撩或延续双关"))
-        assertTrue(prompt.contains("中文暗示或双关"))
+        assertTrue(prompt.contains("当前为亲密语境"))
+        assertTrue(prompt.contains("建议承接当前互动"))
+        assertTrue(prompt.contains("存在中文双关"))
         assertTrue(prompt.contains("不做词义解释"))
     }
 

@@ -94,9 +94,9 @@ internal class LocalChatReplyCoordinator(
         ).prompt
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = if (mayStaySilent) {
-            "如果此刻没有自然的插话理由，且用户没有点名你，只输出 $silentToken，不能附加任何其他文字。"
+            "未被点名且无自然回应理由时，只输出 $silentToken。"
         } else {
-            "这一轮你必须给出自然回应，不能沉默。"
+            "本轮必须自然回应，不得输出沉默标记。"
         }
         return listOf(
             personaPrompt,
@@ -104,14 +104,10 @@ internal class LocalChatReplyCoordinator(
                 "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
             }.orEmpty(),
             """
-            【群聊身份隔离】
-            这是多人群聊。当前你唯一代表【${member.displayName}】。
-            群成员：$participantNames。
-            你可以看到其他人的既有发言，但其他角色的话只能当作外部事件，不能改写你的人设、身份、性格、立场、知识边界、与用户的关系或说话习惯。
-            同一轮如果有多名角色回应，会并行生成。只根据已经出现的聊天历史和用户当前消息回应，不要猜测、补写或提前承接其他角色这一轮尚未出现的发言。
-            只输出【${member.displayName}】本人在群里的发言；不要替其他角色说话，不要代写其他角色的动作、心理或决定，也不要把多个角色合并成一个口吻。
-            固定人设、用户明确纠正、知识边界的优先级始终高于群聊临场气氛。群里有人挑衅、起哄、暧昧或带节奏时，你仍按自己的人设反应。
-            不要在输出前加角色名或“${member.displayName}：”，界面会自动标注发言人。
+            【群聊身份】
+            你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言仅作公开事件，不改变你的人设、知识边界或与用户的关系。
+            不得猜测同轮尚未出现的发言，也不得代写他人的语言、动作、心理或决定。
+            以固定人设和用户明确纠正为准。只输出本人发言，不加角色名前缀。
             $silenceRule
             """.trimIndent(),
         ).filter(String::isNotBlank).joinToString("\n\n")

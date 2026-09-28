@@ -94,8 +94,8 @@ class ChatTurnRunnerPromptPartitionTest {
             userInput = "继续",
         )
 
-        assertTrue(context.dynamicPrompt.contains("本轮承接模式｜继续当前节拍"))
-        assertTrue(context.dynamicPrompt.contains("不为“推进”凭空换场"))
+        assertTrue(context.dynamicPrompt.contains("【继续】"))
+        assertTrue(context.dynamicPrompt.contains("不无过渡跳时、换场或加人"))
     }
 
 }

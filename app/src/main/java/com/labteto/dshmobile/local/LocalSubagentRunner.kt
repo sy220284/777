@@ -209,9 +209,9 @@ internal class LocalSubagentRunner(
                 put(
                     "content",
                     if (allowMutation) {
-                        "你是本机子代理。完成指定子任务；可使用工作区、命令、网页和技能，修改或执行命令按权限审批。"
+                        "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
                     } else {
-                        "你是本机只读子代理。完成指定子任务；可读取和搜索工作区、技能与网页，禁止修改文件或执行命令。"
+                        "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
                     },
                 )
             }
@@ -220,7 +220,7 @@ internal class LocalSubagentRunner(
                     put("role", "system")
                     put(
                         "content",
-                        "【父任务约束】\n$inherited\n遵守以上约束；若本子任务有明确更新，以本子任务为准。",
+                        "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
                     )
                 }
                 val index = if (
@@ -233,7 +233,7 @@ internal class LocalSubagentRunner(
                     put("role", "system")
                     put(
                         "content",
-                        "【独立虚拟屏】已分配 id=$id。操作界面时只用 android_vscreen_* 并传入该 id；不要操作主屏。",
+                        "【独立虚拟屏】id=$id；界面操作仅用 android_vscreen_* 并传入该 id，禁止操作主屏。",
                     )
                 }
             }

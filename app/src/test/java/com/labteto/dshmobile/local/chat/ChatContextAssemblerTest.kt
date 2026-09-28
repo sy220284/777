@@ -86,12 +86,12 @@ class ChatContextAssemblerTest {
             ),
         )
 
-        assertTrue(rendered.contains("近期已使用互动节拍"))
+        assertTrue(rendered.contains("近期已用节拍"))
         assertTrue(rendered.contains("叹气"))
         assertTrue(rendered.contains("看向别处"))
         assertTrue(rendered.contains("沉默停顿"))
         assertTrue(rendered.contains("端起饮品"))
-        assertTrue(rendered.contains("不只换同义词"))
+        assertTrue(rendered.contains("优先换一种表达或互动方式"))
     }
 
     @Test
