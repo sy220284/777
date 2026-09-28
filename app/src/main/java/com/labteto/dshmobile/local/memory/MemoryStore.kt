@@ -433,7 +433,11 @@ class MemoryStore internal constructor(
         val boundedChars = maxChars.coerceIn(256, 12_000)
         val queryTerms = terms(query)
         val broadRecall = BROAD_RECALL_HINT.containsMatchIn(query)
-        val candidateLimit = maxOf(MIN_RECALL_CANDIDATES, boundedItems * 4).coerceAtMost(MAX_RECALL_CANDIDATES)
+        val candidateLimit = if (broadRecall) {
+            MAX_RECALL_CANDIDATES
+        } else {
+            maxOf(MIN_RECALL_CANDIDATES, boundedItems * 4).coerceAtMost(MAX_RECALL_CANDIDATES)
+        }
 
         // Stage 1: cheap lexical/scope filtering. Explicit recall questions keep a bounded fallback
         // set so "第一次/上次那件事" can still reach a memory whose wording is very different.
