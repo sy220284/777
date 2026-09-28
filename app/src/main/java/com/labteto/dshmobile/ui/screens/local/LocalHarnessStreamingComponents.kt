@@ -35,33 +35,49 @@ internal fun LocalStreamingChatTurn(
     streamingState: StateFlow<LocalHarnessStreamingState>,
 ) {
     val stream by streamingState.collectAsStateWithLifecycle()
-    if (stream.assistant.isNotBlank()) {
-        LocalMessageRow(
-            message = LocalHarnessMessage(
-                id = "streaming:$sessionId",
-                role = "assistant",
-                content = stream.assistant,
-                createdAt = 0L,
-            ),
-            chatMode = true,
-            groupMode = false,
-            canEdit = false,
-            canRegenerate = false,
-            canSelectVariant = false,
-            branchInfo = null,
-            onEdit = { },
-            onSelectVariant = { _, _ -> false },
-            onRegenerate = { false },
-        )
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(
-                stringResource(R.string.local_chat_replying),
-                style = DsType.small13,
-                color = DsTheme.colors.labelTertiary,
+    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        if (stream.reasoning.isNotBlank()) {
+            ChatThinkingRow(
+                messages = listOf(
+                    LocalHarnessMessage(
+                        id = "streaming-reasoning:$sessionId",
+                        role = "reasoning",
+                        content = stream.reasoning,
+                        createdAt = 0L,
+                    ),
+                ),
+                streaming = true,
             )
+        }
+        if (stream.assistant.isNotBlank()) {
+            LocalMessageRow(
+                message = LocalHarnessMessage(
+                    id = "streaming:$sessionId",
+                    role = "assistant",
+                    content = stream.assistant,
+                    createdAt = 0L,
+                ),
+                chatMode = true,
+                groupMode = false,
+                canEdit = false,
+                canRegenerate = false,
+                canSelectVariant = false,
+                branchInfo = null,
+                onEdit = { },
+                onSelectVariant = { _, _ -> false },
+                onRegenerate = { false },
+            )
+        }
+        if (stream.reasoning.isBlank() && stream.assistant.isBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(
+                    stringResource(R.string.local_chat_replying),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelTertiary,
+                )
+            }
         }
     }
 }
@@ -72,30 +88,63 @@ internal fun LocalStreamingWorkPreview(
     surfaceColor: Color,
 ) {
     val stream by streamingState.collectAsStateWithLifecycle()
-    val preview = stream.assistant
-    if (preview.isBlank()) return
-    Surface(
-        modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-        shape = RoundedCornerShape(18.dp),
-        color = surfaceColor,
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Column(
-            Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
-            Text(
-                stringResource(R.string.local_streaming_status),
-                style = DsType.caption11,
-                color = DsTheme.colors.labelTertiary,
+        if (stream.reasoning.isNotBlank()) {
+            WorkProcessRow(
+                messages = listOf(
+                    LocalHarnessMessage(
+                        id = "streaming-work-reasoning",
+                        role = "reasoning",
+                        content = stream.reasoning,
+                        createdAt = 0L,
+                    ),
+                ),
+                running = true,
             )
-            Text(
-                if (preview.length > 1_200) "…" + preview.takeLast(1_200) else preview,
-                style = DsType.std14,
-                color = DsTheme.colors.labelPrimary,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
-            )
+        }
+        if (stream.assistant.isNotBlank()) {
+            val preview = stream.assistant
+            Surface(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                shape = RoundedCornerShape(18.dp),
+                color = surfaceColor,
+            ) {
+                Column(
+                    Modifier.padding(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                ) {
+                    Text(
+                        stringResource(R.string.local_streaming_status),
+                        style = DsType.caption11,
+                        color = DsTheme.colors.labelTertiary,
+                    )
+                    Text(
+                        if (preview.length > 1_200) "…" + preview.takeLast(1_200) else preview,
+                        style = DsType.std14,
+                        color = DsTheme.colors.labelPrimary,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        if (stream.reasoning.isBlank() && stream.assistant.isBlank()) {
+            Row(
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(
+                    stringResource(R.string.local_streaming_status),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelTertiary,
+                )
+            }
         }
     }
 }

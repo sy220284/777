@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.ui.AgentOperationKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,11 +85,12 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun chatProjectionHidesWorkProcessAndKeepsOnlyConversationRows() {
+    fun chatProjectionShowsCompactThinkingButHidesToolNoise() {
         val items = buildLocalTranscript(
             messages = listOf(
                 message("u1", "user", "在吗"),
-                message("r1", "reasoning", "内部思考"),
+                message("r1", "reasoning", "先判断用户是在确认我是否在线"),
+                message("r2", "reasoning", "保持简短回应即可"),
                 message("p1", "progress", "准备调用工具"),
                 message("t1", "tool", "tool output", toolName = "read"),
                 message("a1", "assistant", "在。"),
@@ -96,10 +98,45 @@ class LocalTranscriptPresentationTest {
             includeWorkProcess = false,
         )
 
-        assertEquals(2, items.size)
+        assertEquals(3, items.size)
         assertEquals("user", (items[0] as LocalTranscriptItem.Message).message.role)
-        assertEquals("assistant", (items[1] as LocalTranscriptItem.Message).message.role)
-        assertEquals("在。", (items[1] as LocalTranscriptItem.Message).message.content)
+        val thinking = items[1] as LocalTranscriptItem.Thinking
+        assertEquals(listOf("r1", "r2"), thinking.messages.map { it.id })
+        assertEquals("assistant", (items[2] as LocalTranscriptItem.Message).message.role)
+        assertEquals("在。", (items[2] as LocalTranscriptItem.Message).message.content)
+    }
+
+    @Test
+    fun workProcessNodesKeepThinkingAndCollapseRawToolNoise() {
+        val nodes = buildWorkProcessNodes(
+            listOf(
+                message("r1", "reasoning", "先确认相关实现，再做最小修改。"),
+                message("t1", "tool", "/private/project/A.kt raw content", toolName = "read"),
+                message("t2", "tool", "/private/project/B.kt raw content", toolName = "read_file"),
+                message("t3", "tool", "many grep matches", toolName = "grep"),
+            ),
+        )
+
+        assertEquals(3, nodes.size)
+        assertTrue(nodes[0].isThinking)
+        assertEquals("先确认相关实现，再做最小修改。", nodes[0].thinkingSummary)
+        assertEquals(AgentOperationKind.Inspect, nodes[1].kind)
+        assertEquals(2, nodes[1].count)
+        assertEquals(AgentOperationKind.Search, nodes[2].kind)
+        assertTrue(nodes.none { it.thinkingSummary?.contains("/private/project") == true })
+    }
+
+    @Test
+    fun compactProcessSummaryRemovesCodeUrlsAndDeepPaths() {
+        val summary = compactProcessSummary(
+            "先检查 `LocalHarnessScreen.kt`、PlainFile.kt 和 /private/project/ui/Screen.kt，再参考 https://example.com/raw 做调整。",
+        )
+
+        assertTrue(summary != null)
+        assertTrue("LocalHarnessScreen.kt" !in summary.orEmpty())
+        assertTrue("PlainFile.kt" !in summary.orEmpty())
+        assertTrue("/private/project" !in summary.orEmpty())
+        assertTrue("https://example.com" !in summary.orEmpty())
     }
 
     @Test

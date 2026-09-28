@@ -1,6 +1,4 @@
 package com.labteto.dshmobile.ui.screens.local
-import android.graphics.BitmapFactory
-import java.io.File
 import com.labteto.dshmobile.local.LocalChatUserEditResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,9 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -39,23 +37,19 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
-import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,7 +58,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -78,8 +71,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -87,7 +78,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
@@ -110,11 +100,7 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -282,10 +268,6 @@ fun LocalHarnessScreen(
                         showPersonaGallery = true
                     }
                 },
-                onNewPersona = {
-                    scope.launch { drawerState.close() }
-                    showNewPersona = true
-                },
                 onTasks = {
                     scope.launch { drawerState.close() }
                     onOpenTasks()
@@ -332,6 +314,7 @@ fun LocalHarnessScreen(
                     onStart = { id, storyId, freshStory ->
                         if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
                     },
+                    onCreate = { showNewPersona = true },
                     onDismiss = { showPersonaGallery = false },
                 )
                 else -> LocalChat(
@@ -359,6 +342,14 @@ fun LocalHarnessScreen(
                     onNewSession = { showNewSessionMode = true },
                     onExitGroupChat = viewModel::leaveGroupChatMode,
                     onOpenRunCenter = { showRunCenter = true },
+                    workStatusContent = {
+                        LocalWorkStateContent(viewModel) { workState ->
+                            WorkSessionStatusStrip(
+                                state = workState,
+                                onClick = { showRunCenter = true },
+                            )
+                        }
+                    },
                     onConfigureChatPersona = viewModel::configureChatPersona,
                     onConfigureGroupMembers = viewModel::configureGroupChatMembers,
                     onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
@@ -449,16 +440,20 @@ fun LocalHarnessScreen(
     }
 
     if (showRunCenter && shell.usageMode == LocalUsageMode.WORK) {
-        LocalHarnessStateContent(viewModel) { state ->
-            Dialog(onDismissRequest = { showRunCenter = false }) {
+        LocalWorkStateContent(viewModel) { workState ->
+            DsBottomSheet(
+                title = stringResource(R.string.local_run_center),
+                onDismiss = { showRunCenter = false },
+            ) {
                 ExecutionStatusCard(
-                    state = state,
+                    state = workState,
                     onJobOutput = viewModel::backgroundJobOutput,
                     onStopJob = viewModel::stopBackgroundJob,
                     onOpenResults = {
                         showRunCenter = false
                         filesMode = LocalFilesMode.CONVERSATION
                     },
+                    showHeader = false,
                 )
             }
         }
@@ -484,48 +479,6 @@ fun LocalHarnessScreen(
         )
     }
 
-}
-
-@Composable
-private fun GroupChatMemberAvatar(
-    member: LocalGroupChatMember,
-    active: Boolean,
-) {
-    val colors = DsTheme.colors
-    val portrait by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = member.portraitPath,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            decodeLocalPersonaHeaderPortrait(member.portraitPath)
-        }
-    }
-
-    Surface(
-        modifier = Modifier.size(24.dp),
-        shape = CircleShape,
-        color = if (active) colors.accent.copy(alpha = 0.16f)
-        else colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
-        border = if (active) BorderStroke(1.dp, colors.accent) else null,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (portrait != null) {
-                Image(
-                    bitmap = portrait!!,
-                    contentDescription = member.displayName,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Text(
-                    member.displayName.trim().take(1).ifBlank { "·" },
-                    style = DsType.caption11,
-                    color = if (active) colors.accent else colors.labelSecondary,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -677,6 +630,7 @@ private fun LocalChat(
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
     onOpenRunCenter: () -> Unit,
+    workStatusContent: @Composable () -> Unit,
     onConfigureChatPersona: (PersonaProfile) -> Unit,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
@@ -701,12 +655,6 @@ private fun LocalChat(
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
-    val headerChipColor = if (backgroundState.hasImage) Color.Transparent else colors.bgModulePlatform
-    val streamingSurfaceColor = backgroundState.wallpaperSurface(
-        base = colors.bgModulePlatform,
-        level = WallpaperSurfaceLevel.CARD,
-        region = BackgroundRegion.MIDDLE,
-    )
     val composerSurfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
@@ -881,159 +829,49 @@ private fun LocalChat(
             Modifier.fillMaxWidth().background(topSurfaceColor)
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DsIconButton(
-                    icon = FeatherIcons.Menu,
-                    contentDescription = stringResource(R.string.local_open_menu),
-                    onClick = onOpenMenu,
-                    tint = colors.labelSecondary,
+            if (state.usageMode == LocalUsageMode.CHAT) {
+                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
+                val contextSource = when (state.conversationMode) {
+                    LocalConversationMode.INDEPENDENT -> null
+                    else -> localConversationModeLabel(state.conversationMode)
+                }
+                ChatSurfaceHeader(
+                    personaName = state.chatPersona.name,
+                    portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+                    secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
+                    groupEnabled = state.groupChat.enabled,
+                    groupMembers = state.groupChat.members,
+                    activeSpeakerName = state.groupActiveSpeakerName,
+                    running = state.running || state.loading,
+                    onOpenMenu = onOpenMenu,
+                    onContextClick = {
+                        if (state.groupChat.enabled) showGroupMemberPicker = true
+                        else showPersonaPicker = true
+                    },
+                    onExitGroupChat = onExitGroupChat,
+                    onNewSession = onNewSession,
                 )
-                Spacer(Modifier.width(DsSpacing.small))
-                Row(
-                    modifier = Modifier.weight(1f)
-                        .heightIn(min = DsSpacing.touchTarget)
-                        .clip(DsShapes.row)
-                        .background(if (state.usageMode == LocalUsageMode.CHAT) Color.Transparent else headerChipColor)
-                        .clickable(enabled = !state.running) {
-                            if (state.usageMode == LocalUsageMode.CHAT) {
-                                if (state.groupChat.enabled) showGroupMemberPicker = true
-                                else showPersonaPicker = true
-                            } else if (state.configured) {
-                                showModelPicker = true
-                            } else {
-                                onConfigure()
-                            }
-                        }
-                        .padding(horizontal = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                ) {
-                    if (state.usageMode == LocalUsageMode.CHAT) {
-                        if (!state.groupChat.enabled) {
-                            LocalPersonaHeaderAvatar(
-                                name = state.chatPersona.name,
-                                portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                            )
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(
-                                if (state.groupChat.enabled) {
-                                    stringResource(R.string.local_group_chat_title)
-                                } else {
-                                    state.chatPersona.name
-                                },
-                                style = DsType.base16Strong,
-                                color = colors.labelPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (state.groupChat.enabled) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    state.groupChat.members.take(6).forEach { member ->
-                                        GroupChatMemberAvatar(
-                                            member = member,
-                                            active = state.groupActiveSpeakerName == member.displayName,
-                                        )
-                                    }
-                                    Text(
-                                        state.groupActiveSpeakerName?.let { speaker ->
-                                            stringResource(R.string.local_group_chat_active_speaker, speaker)
-                                        } ?: stringResource(
-                                            R.string.local_group_chat_member_count,
-                                            state.groupChat.members.size,
-                                        ),
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                            } else {
-                                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
-                                val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
-                                val contextSource = when (state.conversationMode) {
-                                    LocalConversationMode.INDEPENDENT -> null
-                                    else -> localConversationModeLabel(state.conversationMode)
-                                }
-                                val secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · ")
-                                if (secondary.isNotBlank()) {
-                                    Text(
-                                        secondary,
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = colors.labelSecondary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    } else {
-                        Icon(
-                            Icons.Outlined.Tune,
-                            contentDescription = null,
-                            tint = colors.labelSecondary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            if (state.configured) state.model else stringResource(R.string.local_model_setup),
-                            style = DsType.small13Strong,
-                            color = colors.labelPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = colors.labelSecondary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-                if (state.usageMode == LocalUsageMode.WORK) {
-                    DsIconButton(
-                        icon = FeatherIcons.CheckSquare,
-                        contentDescription = stringResource(R.string.local_execution_console),
-                        onClick = onOpenRunCenter,
-                        tint = colors.labelSecondary,
-                    )
-                }
-                if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
-                    DsButton(
-                        text = stringResource(R.string.local_group_chat_leave),
-                        onClick = onExitGroupChat,
-                        enabled = !state.running && !state.loading,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
-                }
-                DsIconButton(
-                    icon = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.chatlist_new_session),
-                    onClick = onNewSession,
-                    tint = colors.labelSecondary,
+            } else {
+                WorkSurfaceHeader(
+                    sessionTitle = state.sessions.firstOrNull { it.id == state.sessionId }?.title
+                        ?.takeIf(String::isNotBlank)
+                        ?: stringResource(R.string.local_usage_work),
+                    modelLabel = state.model,
+                    configured = state.configured,
+                    running = state.running,
+                    onOpenMenu = onOpenMenu,
+                    onModelClick = {
+                        if (state.configured) showModelPicker = true else onConfigure()
+                    },
+                    onOpenRunCenter = onOpenRunCenter,
+                    onNewSession = onNewSession,
                 )
             }
         }
 
         if (state.usageMode == LocalUsageMode.WORK) {
-            WorkSessionStatusStrip(
-                state = state,
-                onClick = onOpenRunCenter,
-            )
+            workStatusContent()
         }
 
         modeIntro?.let { mode ->
@@ -1251,6 +1089,7 @@ private fun LocalChat(
                             onSelectVariant = onSelectMessageVariant,
                             onRegenerate = onRegenerate,
                         )
+                        is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                     }
                 }
@@ -1260,27 +1099,6 @@ private fun LocalChat(
                             sessionId = state.sessionId,
                             streamingState = streamingState,
                         )
-                    }
-                }
-                if (state.running && state.usageMode == LocalUsageMode.WORK) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(DsSpacing.small))
-                                Text(
-                                    stringResource(
-                                        if (state.usageMode == LocalUsageMode.CHAT) {
-                                            R.string.local_chat_replying
-                                        } else {
-                                            R.string.local_streaming_status
-                                        },
-                                    ),
-                                    style = DsType.small13,
-                                    color = colors.labelTertiary,
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -1304,7 +1122,7 @@ private fun LocalChat(
         if (state.usageMode == LocalUsageMode.WORK && state.running) {
             LocalStreamingWorkPreview(
                 streamingState = streamingState,
-                surfaceColor = streamingSurfaceColor,
+                surfaceColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             )
         }
 
@@ -1344,6 +1162,47 @@ private fun LocalChat(
                 color = colors.error,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
             )
+        }
+
+        if (
+            state.usageMode == LocalUsageMode.CHAT &&
+            !state.groupChat.enabled &&
+            !state.running &&
+            state.replySuggestions.any { it.text.isNotBlank() }
+        ) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = DsSpacing.medium),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                items(
+                    items = state.replySuggestions.filter { it.text.isNotBlank() }.take(3),
+                    key = { suggestion -> suggestion.label + "|" + suggestion.text },
+                ) { suggestion ->
+                    Surface(
+                        onClick = { drafts[state.sessionId] = suggestion.text },
+                        shape = DsShapes.pillFull,
+                        color = colors.wallpaperSurface(
+                            WallpaperSurfaceLevel.FLOATING,
+                            BackgroundRegion.BOTTOM,
+                        ),
+                        border = BorderStroke(1.dp, colors.borderL1),
+                    ) {
+                        Text(
+                            suggestion.label.ifBlank {
+                                suggestion.text.take(18)
+                            },
+                            style = DsType.small13,
+                            color = colors.labelSecondary,
+                            maxLines = 1,
+                            modifier = Modifier.padding(
+                                horizontal = DsSpacing.medium,
+                                vertical = DsSpacing.xsmall,
+                            ),
+                        )
+                    }
+                }
+            }
         }
 
         Surface(
@@ -1417,7 +1276,8 @@ private fun LocalChat(
                 if (state.usageMode == LocalUsageMode.WORK) {
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         DsButton(
                             text = stringResource(
@@ -1425,7 +1285,6 @@ private fun LocalChat(
                                 else R.string.local_plan_button_off,
                             ),
                             onClick = { onPlanModeChange(!state.planMode) },
-                            modifier = Modifier.weight(1f),
                             variant = if (state.planMode) DsButtonVariant.Info else DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                             enabled = !state.running,
@@ -1433,10 +1292,16 @@ private fun LocalChat(
                         DsButton(
                             text = stringResource(R.string.local_auto_approve_short),
                             onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                            modifier = Modifier.weight(1f),
                             variant = if (state.safeAutoApprovalEnabled) DsButtonVariant.Info else DsButtonVariant.Ghost,
                             size = DsButtonSize.Small,
                         )
+                        Spacer(Modifier.weight(1f))
+                        if (state.contextBudgetChars > 0) {
+                            val contextPercent = (
+                                state.contextChars.toFloat() / state.contextBudgetChars.toFloat() * 100f
+                            ).toInt().coerceIn(0, 999)
+                            DsPill(text = stringResource(R.string.local_context_percent, contextPercent))
+                        }
                     }
                 }
                 Row(
@@ -1456,11 +1321,9 @@ private fun LocalChat(
                         state.usageMode == LocalUsageMode.CHAT &&
                         !state.groupChat.enabled
                     ) {
-                        DsButton(
-                            text = stringResource(
-                                if (replySuggestionsLoading) R.string.common_loading
-                                else R.string.local_reply_suggestions_open,
-                            ),
+                        DsIconButton(
+                            icon = Icons.Outlined.AutoAwesome,
+                            contentDescription = stringResource(R.string.local_reply_suggestions_open),
                             onClick = {
                                 if (state.replySuggestions.any { it.text.isNotBlank() }) {
                                     showReplySuggestions = true
@@ -1476,13 +1339,16 @@ private fun LocalChat(
                                     }
                                 }
                             },
-                            variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
                             enabled = !state.running &&
                                 !replySuggestionsLoading &&
                                 state.messages.any { message ->
                                     message.role == "assistant" && message.content.isNotBlank()
                                 },
+                            tint = if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                                colors.accent
+                            } else {
+                                colors.labelSecondary
+                            },
                         )
                     }
                     Spacer(Modifier.weight(1f))
@@ -1844,145 +1710,6 @@ internal fun LocalUsageModePill(
 }
 
 @Composable
-internal fun LocalPersonaHeaderAvatar(
-    name: String,
-    portraitPath: String,
-) {
-    val colors = DsTheme.colors
-    val portrait by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = portraitPath,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            decodeLocalPersonaHeaderPortrait(portraitPath)
-        }
-    }
-    Surface(
-        modifier = Modifier.size(34.dp),
-        shape = CircleShape,
-        color = colors.accentTertiary,
-        border = BorderStroke(1.dp, colors.borderL1),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (portrait != null) {
-                Image(
-                    bitmap = portrait!!,
-                    contentDescription = name,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Text(
-                    name.trim().take(1).ifBlank { "·" },
-                    style = DsType.small13Strong,
-                    color = colors.accent,
-                )
-            }
-        }
-    }
-}
-
-private fun decodeLocalPersonaHeaderPortrait(path: String): ImageBitmap? {
-    if (path.isBlank()) return null
-    val file = File(path)
-    if (!file.isFile) return null
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    while (longest / sample > 256) sample *= 2
-    return BitmapFactory.decodeFile(
-        file.absolutePath,
-        BitmapFactory.Options().apply { inSampleSize = sample },
-    )?.asImageBitmap()
-}
-
-@Composable
-private fun WorkSessionStatusStrip(
-    state: LocalHarnessState,
-    onClick: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    val hasStatus = state.running ||
-        state.workflowProgress?.sessionId == state.sessionId ||
-        state.goal != null ||
-        state.todos.isNotEmpty() ||
-        state.activeAgents > 0 ||
-        state.jobs.isNotEmpty()
-    if (!hasStatus) return
-
-    val completedTasks = state.todos.count { it.status == "completed" }
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsStatusPill(
-                    state = if (state.running) DsStatus.Running else DsStatus.Neutral,
-                    label = stringResource(
-                        if (state.running) R.string.local_execution_notification_running
-                        else R.string.local_run_center,
-                    ),
-                )
-                state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
-                    Text(
-                        goal,
-                        style = DsType.small13Strong,
-                        color = colors.labelPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                } ?: Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.local_run_center),
-                    tint = colors.labelTertiary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
-                    DsPill(text = if (progress.needsUserAction) stringResource(R.string.local_workflow_waiting_user) else workflowStageLabel(progress.stage))
-                    DsPill(text = stringResource(R.string.local_workflow_processed, progress.completed, progress.total))
-                }
-                if (state.todos.isNotEmpty()) {
-                    DsPill(
-                        text = stringResource(
-                            R.string.local_run_tasks_progress,
-                            completedTasks,
-                            state.todos.size,
-                        ),
-                    )
-                }
-                if (state.activeAgents > 0) {
-                    DsPill(text = stringResource(R.string.local_run_agents, state.activeAgents))
-                }
-                if (state.jobs.isNotEmpty()) {
-                    DsPill(text = stringResource(R.string.local_run_background) + " " + state.jobs.size)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
     workspacePath: String,
@@ -2070,261 +1797,6 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
                 subtitle = stringResource(R.string.local_suggestion_tasks_hint),
                 onClick = { onSuggestion(tasksPrompt) },
             )
-        }
-    }
-}
-
-@Composable
-private fun ExecutionStatusCard(
-    state: LocalHarnessState,
-    onJobOutput: (String) -> String,
-    onStopJob: (String) -> String,
-    onOpenResults: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
-    var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
-    val completed = state.todos.count { it.status == "completed" }
-    val total = state.todos.size
-    val resourceSummary = stringResource(
-        R.string.local_resource_summary,
-        state.activeAgents,
-        state.maxAgents,
-        state.activeTerminals,
-        state.maxTerminals,
-        state.activeVirtualDisplays,
-        state.maxVirtualDisplays,
-        state.activeLanguageServers,
-        state.maxLanguageServers,
-    )
-    val contextSummary = stringResource(
-        R.string.local_context_summary,
-        state.contextChars,
-        state.contextBudgetChars,
-    )
-    val pressureSummary = stringResource(
-        R.string.local_resource_pressure,
-        localResourcePressureLabel(state.resourcePressure),
-    )
-    val contextSourceSummary = stringResource(
-        R.string.local_context_source,
-        localConversationModeLabel(state.conversationMode),
-    )
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-    ) {
-        Column(
-            Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
-                Text(
-                    stringResource(R.string.local_run_center),
-                    style = DsType.base16Strong,
-                    color = colors.labelPrimary,
-                )
-            }
-
-            state.goal?.let { goal ->
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                    Text(stringResource(R.string.local_run_current_goal), style = DsType.caption11Strong, color = colors.labelTertiary)
-                    Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
-                    Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
-                }
-            }
-
-            state.workflowProgress?.takeIf { it.sessionId == state.sessionId }?.let { progress ->
-                WorkflowProgressSection(progress)
-            }
-
-            if (state.pendingApproval != null || state.pendingQuestion != null) {
-                Text(
-                    stringResource(R.string.local_workflow_waiting_user),
-                    style = DsType.small13Strong,
-                    color = colors.error,
-                )
-            }
-
-            if (state.plan.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                    Text(stringResource(R.string.local_run_plan), style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.plan.take(5).forEachIndexed { index, step ->
-                        Text(
-                            (index + 1).toString().padStart(2, '0') + "  " + step,
-                            style = DsType.small13,
-                            color = colors.labelSecondary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
-            if (state.todos.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                    Text(
-                        stringResource(R.string.local_run_tasks_progress, completed, total),
-                        style = DsType.caption11Strong,
-                        color = colors.labelTertiary,
-                    )
-                    state.todos.take(5).forEach { todo ->
-                        val marker = when (todo.status) {
-                            "completed" -> "✓"
-                            "in_progress", "running" -> "●"
-                            else -> "○"
-                        }
-                        Text(
-                            marker + "  " + todo.content,
-                            style = DsType.small13,
-                            color = if (todo.status == "completed") colors.labelTertiary else colors.labelSecondary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
-            if (state.jobs.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                    Text(stringResource(R.string.local_run_background), style = DsType.caption11Strong, color = colors.labelTertiary)
-                    state.jobs.take(4).forEach { job ->
-                        val expanded = expandedJobId == job.id
-                        Surface(
-                            shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                                ) {
-                                    Text(
-                                        job.label,
-                                        style = DsType.small13,
-                                        color = colors.labelSecondary,
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        localJobStatusLabel(job.status),
-                                        style = DsType.caption11,
-                                        color = colors.labelTertiary,
-                                    )
-                                    DsButton(
-                                        text = stringResource(
-                                            if (expanded) R.string.local_run_job_hide
-                                            else R.string.local_run_job_view,
-                                        ),
-                                        onClick = {
-                                            if (expanded) {
-                                                expandedJobId = null
-                                                expandedJobOutput = ""
-                                            } else {
-                                                expandedJobId = job.id
-                                                expandedJobOutput = onJobOutput(job.id)
-                                            }
-                                        },
-                                        variant = DsButtonVariant.Ghost,
-                                        size = DsButtonSize.Small,
-                                    )
-                                }
-                                if (expanded) {
-                                    Text(
-                                        stringResource(R.string.local_run_job_output),
-                                        style = DsType.caption11Strong,
-                                        color = colors.labelTertiary,
-                                    )
-                                    Text(
-                                        expandedJobOutput.ifBlank {
-                                            stringResource(R.string.local_run_job_output_empty)
-                                        },
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                        maxLines = 12,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End,
-                                    ) {
-                                        DsButton(
-                                            text = stringResource(R.string.local_run_job_refresh),
-                                            onClick = { expandedJobOutput = onJobOutput(job.id) },
-                                            variant = DsButtonVariant.Ghost,
-                                            size = DsButtonSize.Small,
-                                        )
-                                        if (job.status == "running") {
-                                            DsButton(
-                                                text = stringResource(R.string.local_run_job_stop),
-                                                onClick = {
-                                                    onStopJob(job.id)
-                                                    expandedJobOutput = onJobOutput(job.id)
-                                                },
-                                                variant = DsButtonVariant.Danger,
-                                                size = DsButtonSize.Small,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            DsButton(
-                text = stringResource(R.string.local_run_open_results),
-                onClick = onOpenResults,
-                variant = DsButtonVariant.Outline,
-                size = DsButtonSize.Small,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(stringResource(R.string.local_run_resources), style = DsType.caption11Strong, color = colors.labelTertiary)
-                Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
-                Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
-                if (state.queuedInputCount > 0) {
-                    Text(
-                        stringResource(R.string.local_queue_count, state.queuedInputCount),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                    )
-                }
-                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
-                Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
-                if (
-                    state.conversationMode == LocalConversationMode.CONTINUATION &&
-                    !state.handoffSummary.isNullOrBlank()
-                ) {
-                    Text(
-                        stringResource(R.string.local_context_handoff),
-                        style = DsType.caption11Strong,
-                        color = colors.labelTertiary,
-                    )
-                    Text(
-                        state.handoffSummary.orEmpty(),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
         }
     }
 }

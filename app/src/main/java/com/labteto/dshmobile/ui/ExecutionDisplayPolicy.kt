@@ -95,7 +95,7 @@ internal fun agentOperationKind(toolName: String?): AgentOperationKind {
 }
 
 @StringRes
-internal fun agentOperationLabelRes(toolName: String?): Int = when (agentOperationKind(toolName)) {
+internal fun agentOperationLabelRes(kind: AgentOperationKind): Int = when (kind) {
     AgentOperationKind.Inspect -> R.string.agent_operation_inspect
     AgentOperationKind.Search -> R.string.agent_operation_search
     AgentOperationKind.Update -> R.string.agent_operation_update
@@ -108,6 +108,10 @@ internal fun agentOperationLabelRes(toolName: String?): Int = when (agentOperati
     AgentOperationKind.External -> R.string.agent_operation_external
     AgentOperationKind.Generic -> R.string.agent_operation_generic
 }
+
+@StringRes
+internal fun agentOperationLabelRes(toolName: String?): Int =
+    agentOperationLabelRes(agentOperationKind(toolName))
 
 @StringRes
 internal fun agentApprovalPurposeRes(toolName: String?): Int = when (agentOperationKind(toolName)) {

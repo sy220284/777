@@ -43,7 +43,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,8 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -104,7 +101,6 @@ internal fun LocalModeDrawer(
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
-    onNewPersona: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
@@ -113,10 +109,8 @@ internal fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
-    var searchOpen by rememberSaveable { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<String>() }
-    val searchFocusRequester = remember { FocusRequester() }
     val visibleSessions = remember(sessions, usageMode) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
             .sortedByDescending(LocalSessionSummary::updatedAt)
@@ -126,10 +120,6 @@ internal fun LocalModeDrawer(
         if (query.isEmpty()) visibleSessions else visibleSessions.filter {
             it.title.contains(query, ignoreCase = true)
         }
-    }
-
-    LaunchedEffect(searchOpen) {
-        if (searchOpen) searchFocusRequester.requestFocus()
     }
 
     ModalDrawerSheet(
@@ -156,15 +146,6 @@ internal fun LocalModeDrawer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     DsIconButton(
-                        icon = Icons.Outlined.Search,
-                        contentDescription = stringResource(R.string.chatlist_search_hint),
-                        onClick = {
-                            searchOpen = !searchOpen
-                            if (!searchOpen) historyQuery = ""
-                        },
-                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
-                    )
-                    DsIconButton(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
@@ -182,26 +163,23 @@ internal fun LocalModeDrawer(
                     )
                 }
 
-                if (searchOpen) {
-                    OutlinedTextField(
-                        value = historyQuery,
-                        onValueChange = { historyQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(searchFocusRequester)
-                            .padding(bottom = DsSpacing.small),
-                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = null,
-                                tint = colors.labelTertiary,
-                            )
-                        },
-                        singleLine = true,
-                        shape = DsShapes.block,
-                    )
-                }
+                OutlinedTextField(
+                    value = historyQuery,
+                    onValueChange = { historyQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = DsSpacing.small),
+                    placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = colors.labelTertiary,
+                        )
+                    },
+                    singleLine = true,
+                    shape = DsShapes.block,
+                )
             }
 
             LazyColumn(
@@ -219,58 +197,24 @@ internal fun LocalModeDrawer(
                                 icon = Icons.Outlined.PersonSearch,
                                 title = stringResource(R.string.local_group_chat),
                                 trailing = groupMemberCount.takeIf { it > 0 }?.toString(),
-                                iconFamily = DsIconFamily.Purple,
                                 onClick = onOpenGroupChat,
                             )
                             DrawerPrimaryAction(
                                 icon = Icons.Outlined.Image,
                                 title = stringResource(R.string.persona_gallery_title),
                                 trailing = galleryCount.toString(),
-                                iconFamily = DsIconFamily.Purple,
                                 onClick = onOpenPersonaGallery,
-                            )
-                            DrawerPrimaryAction(
-                                icon = Icons.Filled.Add,
-                                title = stringResource(R.string.local_persona_picker_new),
-                                iconFamily = DsIconFamily.Green,
-                                onClick = onNewPersona,
-                            )
-                            DrawerPrimaryAction(
-                                icon = Icons.Outlined.Schedule,
-                                title = stringResource(R.string.tasks_chat_title),
-                                iconFamily = DsIconFamily.Amber,
-                                onClick = onTasks,
-                            )
-                            DrawerPrimaryAction(
-                                icon = Icons.Outlined.Extension,
-                                title = stringResource(R.string.tools_title),
-                                iconFamily = DsIconFamily.Neutral,
-                                onClick = onTools,
                             )
                         } else {
                             DrawerPrimaryAction(
                                 icon = FeatherIcons.FileText,
                                 title = stringResource(R.string.chatlist_workspace_files),
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = onWorkspaceFiles,
                             )
                             DrawerPrimaryAction(
                                 icon = FeatherIcons.CheckSquare,
                                 title = stringResource(R.string.local_run_center),
-                                iconFamily = DsIconFamily.Green,
                                 onClick = onOpenRunCenter,
-                            )
-                            DrawerPrimaryAction(
-                                icon = Icons.Outlined.Schedule,
-                                title = stringResource(R.string.tasks_title),
-                                iconFamily = DsIconFamily.Amber,
-                                onClick = onTasks,
-                            )
-                            DrawerPrimaryAction(
-                                icon = Icons.Outlined.Extension,
-                                title = stringResource(R.string.tools_title),
-                                iconFamily = DsIconFamily.Neutral,
-                                onClick = onTools,
                             )
                         }
                     }
@@ -302,7 +246,6 @@ internal fun LocalModeDrawer(
                         title = session.title,
                         summaryPreview = session.summaryPreview,
                         updatedAt = session.updatedAt,
-                        usageMode = session.usageMode,
                         avatarName = galleryEntry?.persona?.name ?: session.title,
                         portraitPath = galleryEntry?.portraitPath.orEmpty(),
                         groupChat = session.chatMode == LocalChatMode.GROUP,
@@ -330,24 +273,32 @@ internal fun LocalModeDrawer(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 DsGroupCard {
-                    if (usageMode == LocalUsageMode.WORK) {
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            iconFamily = DsIconFamily.Cyan,
-                            onClick = onRemote,
-                        )
-                    }
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Schedule,
+                        title = stringResource(
+                            if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
+                            else R.string.tasks_title,
+                        ),
+                        onClick = onTasks,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.Extension,
+                        title = stringResource(R.string.tools_title),
+                        onClick = onTools,
+                    )
+                    DrawerPrimaryAction(
+                        icon = Icons.Outlined.QrCodeScanner,
+                        title = stringResource(R.string.local_remote_control),
+                        onClick = onRemote,
+                    )
                     DrawerPrimaryAction(
                         icon = Icons.Outlined.Settings,
                         title = stringResource(R.string.settings_title),
-                        iconFamily = DsIconFamily.Neutral,
                         onClick = onSettings,
                     )
                     DrawerPrimaryAction(
                         icon = Icons.Outlined.CloudDownload,
                         title = stringResource(R.string.settings_update_check),
-                        iconFamily = DsIconFamily.Green,
                         onClick = onCheckUpdate,
                     )
                 }
@@ -483,7 +434,6 @@ private fun LocalSessionDrawerRow(
     title: String,
     summaryPreview: String?,
     updatedAt: Long,
-    usageMode: LocalUsageMode,
     avatarName: String,
     portraitPath: String,
     groupChat: Boolean,
@@ -561,12 +511,6 @@ private fun LocalSessionDrawerRow(
                     style = DsType.caption11,
                     color = colors.labelCaption,
                     maxLines = 1,
-                )
-                DsPill(
-                    text = stringResource(
-                        if (usageMode == LocalUsageMode.CHAT) R.string.local_usage_chat
-                        else R.string.local_usage_work,
-                    ),
                 )
                 if (groupChat) {
                     DsPill(text = stringResource(R.string.local_group_chat_title))

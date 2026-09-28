@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectShellState
+import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -44,7 +45,6 @@ private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
 private const val PERSONA_INSPECTION_RECENT_MESSAGES = 28
 private const val PERSONA_AUTOFILL_RECENT_MESSAGES = 12
-/** UI adapter over capability-scoped local runtimes. */
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -57,6 +57,7 @@ class LocalHarnessViewModel @Inject constructor(
     val state = runtime.session.state
     val streamingState = runtime.session.streamingState
     val shellState = state.projectShellState(viewModelScope)
+    val workState = state.projectWorkState(viewModelScope)
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
     private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
@@ -64,7 +65,6 @@ class LocalHarnessViewModel @Inject constructor(
     private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
     private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
-
     init {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }

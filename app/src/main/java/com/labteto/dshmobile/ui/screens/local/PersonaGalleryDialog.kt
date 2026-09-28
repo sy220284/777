@@ -184,6 +184,7 @@ internal fun PersonaGalleryScreen(
     onSetPortrait: suspend (String, android.net.Uri) -> Result<PersonaGalleryEntry>,
     onRemovePortrait: suspend (String) -> Result<PersonaGalleryEntry>,
     onStart: (String, String?, Boolean) -> Unit,
+    onCreate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -440,6 +441,12 @@ internal fun PersonaGalleryScreen(
                 characterCount = entries.size,
                 storyCount = entries.sumOf { it.stories.size },
                 dialogueCount = entries.sumOf { it.totalDialogueCount() },
+            )
+            DsButton(
+                text = stringResource(R.string.local_persona_picker_new),
+                onClick = onCreate,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
             )
 
             val installedPresetIds = entries
