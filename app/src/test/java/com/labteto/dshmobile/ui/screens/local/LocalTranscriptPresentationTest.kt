@@ -140,6 +140,25 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
+        val nodes = (1..12).map { index -> LocalWorkProcessNode(thinkingSummary = "节点 $index") }
+        val recent = visibleWorkProcessNodes(nodes, showAll = false)
+        val all = visibleWorkProcessNodes(nodes, showAll = true)
+        assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
+        assertEquals("节点 5", recent.first().thinkingSummary)
+        assertEquals("节点 12", recent.last().thinkingSummary)
+        assertEquals(12, all.size)
+    }
+
+    @Test
+    fun compactProcessSummaryKeepsLatestPartOfLongStreamingReasoning() {
+        val summary = compactProcessSummary("旧内容 ".repeat(500) + "当前正在核对最终状态。")
+        assertTrue(summary != null)
+        assertTrue(summary.orEmpty().contains("当前正在核对最终状态"))
+        assertTrue(summary.orEmpty().length <= 180)
+    }
+
+    @Test
     fun transcriptWindowKeepsOnlyNewestMessagesAndReportsHiddenCount() {
         val messages = (1..500).map { index ->
             message("m$index", if (index % 2 == 0) "assistant" else "user", "message-$index")

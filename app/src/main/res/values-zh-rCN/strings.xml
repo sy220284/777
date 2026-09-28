@@ -1125,6 +1125,10 @@
     <string name="local_work_process_nodes">%1$d 个节点</string>
     <string name="local_work_process_expand">展开工作过程</string>
     <string name="local_work_process_collapse">收起工作过程</string>
+    <string name="local_work_process_show_more">查看更早的 %1$d 个节点</string>
+    <string name="local_work_process_show_recent">只看最近节点</string>
+    <string name="common_state_expanded">已展开</string>
+    <string name="common_state_collapsed">已折叠</string>
     <string name="local_chat_thinking_expand">展开思考摘要</string>
     <string name="local_chat_thinking_collapse">收起思考摘要</string>
     <string name="local_work_composer_hint">问点什么，或直接交给 Harness 执行…</string>

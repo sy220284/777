@@ -44,6 +44,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalChatBranchInfo
@@ -55,6 +58,9 @@ import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsIconFamily
@@ -298,7 +304,8 @@ internal fun compactProcessSummary(
     text: String,
     maxChars: Int = 180,
 ): String? {
-    val normalized = text
+    val bounded = if (text.length > 1_200) text.takeLast(1_200) else text
+    val normalized = bounded
         .replace(Regex("`[^`]*`"), " ")
         .replace(Regex("https?://\\S+"), " ")
         .replace(Regex("(?:(?:[A-Za-z]:\\\\)|/)(?:[^\\s/]+[/\\\\]){1,}[^\\s]+"), " ")
@@ -315,7 +322,7 @@ internal fun compactProcessSummary(
         .trim()
     if (normalized.isBlank() || normalized.startsWith("{") || normalized.startsWith("[")) return null
     if (normalized.length <= maxChars) return normalized
-    return normalized.take((maxChars - 1).coerceAtLeast(1)).trimEnd() + "…"
+    return "…" + normalized.takeLast((maxChars - 1).coerceAtLeast(1)).trimStart()
 }
 
 internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<LocalWorkProcessNode> {
@@ -363,6 +370,17 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
     }
 
     return if (nodes.isNotEmpty()) nodes else listOf(LocalWorkProcessNode(kind = AgentOperationKind.Generic))
+}
+
+internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
+
+internal fun visibleWorkProcessNodes(
+    nodes: List<LocalWorkProcessNode>,
+    showAll: Boolean,
+    collapsedLimit: Int = LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT,
+): List<LocalWorkProcessNode> {
+    if (showAll || nodes.size <= collapsedLimit.coerceAtLeast(1)) return nodes
+    return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
 }
 
 internal fun compactReasoningSummary(
@@ -421,10 +439,16 @@ internal fun WorkProcessRow(
     val colors = DsTheme.colors
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
-    val thinkingPreview = nodes.firstOrNull { it.isThinking }?.thinkingSummary
-    val firstOperation = nodes.firstOrNull { !it.isThinking }?.kind
+    var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
+    val thinkingPreview = nodes.lastOrNull { it.isThinking }?.thinkingSummary
+    val latestOperation = nodes.lastOrNull { !it.isThinking }?.kind
     val preview = thinkingPreview?.let { compactProcessSummary(it, maxChars = 86) }
-        ?: firstOperation?.let { stringResource(agentOperationLabelRes(it)) }
+        ?: latestOperation?.let { stringResource(agentOperationLabelRes(it)) }
+    val collapsedHiddenCount = (nodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
+    val visibleNodes = visibleWorkProcessNodes(nodes, showAllNodes)
+    val disclosureState = stringResource(
+        if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -438,7 +462,8 @@ internal fun WorkProcessRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded }
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics { stateDescription = disclosureState }
                     .padding(vertical = DsSpacing.xsmall),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -479,7 +504,7 @@ internal fun WorkProcessRow(
             }
 
             if (expanded) {
-                nodes.forEach { node ->
+                visibleNodes.forEach { node ->
                     if (node.isThinking) {
                         WorkThinkingNodeRow(node.thinkingSummary.orEmpty())
                     } else {
@@ -489,6 +514,19 @@ internal fun WorkProcessRow(
                             count = node.count,
                         )
                     }
+                }
+                if (collapsedHiddenCount > 0) {
+                    DsButton(
+                        text = if (showAllNodes) {
+                            stringResource(R.string.local_work_process_show_recent)
+                        } else {
+                            stringResource(R.string.local_work_process_show_more, collapsedHiddenCount)
+                        },
+                        onClick = { showAllNodes = !showAllNodes },
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
