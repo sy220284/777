@@ -21,7 +21,6 @@ import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
-import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
@@ -3814,33 +3813,9 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
-            stepLimitExtender = if (runPolicy.allowToolExecution) {
-                AgentStepLimitExtender { currentLimit, stepsUsed ->
-                    val current = _state.value
-                    val next = nextAdaptiveAgentStepLimit(
-                        currentLimit = currentLimit,
-                        configuredBase = mainMaxSteps,
-                        task = input,
-                        contextChars = current.contextChars,
-                        contextBudgetChars = current.contextBudgetChars,
-                        pressure = resourceScheduler.snapshot().pressure,
-                        kind = LocalAgentRunKind.FOREGROUND,
-                    )
-                    if (next != null && next > currentLimit) {
-                        eventLog.append("turn/budget-extended", buildJsonObject {
-                            put("steps_used", stepsUsed)
-                            put("previous_limit", currentLimit)
-                            put("next_limit", next)
-                            put("context_chars", current.contextChars)
-                            put("context_budget_chars", current.contextBudgetChars)
-                            put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
-                        })
-                    }
-                    next
-                }
-            } else {
-                null
-            },
+            stepLimitExtender = localForegroundStepLimitExtender(
+                runPolicy.allowToolExecution, mainMaxSteps, input, { _state.value }, { resourceScheduler.snapshot().pressure },
+            ) { eventLog.append("turn/budget-extended", it) },
             idFactory = { runContext.runId },
         )
 
