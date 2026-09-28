@@ -112,6 +112,8 @@ class MemoryStore internal constructor(
                     records[duplicateIndex].sourceMessages,
                     sourceRef(sourceSessionId, sourceMessageId),
                 ),
+                hasUnboundSource = records[duplicateIndex].hasUnboundSource ||
+                    sourceMessageId.isNullOrBlank(),
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
