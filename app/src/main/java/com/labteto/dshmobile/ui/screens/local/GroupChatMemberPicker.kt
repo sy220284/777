@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.MIN_GROUP_CHAT_MEMBERS
