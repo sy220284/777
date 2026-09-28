@@ -2351,7 +2351,21 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun captureAutoMemoryDirective(
         text: String,
         sourceMessageId: String? = null,
-    ) = memoryCoordinator.captureAutoMemoryDirective(text, sourceMessageId)
+        binding: LocalWorkRunBinding? = null,
+    ) {
+        if (binding == null) {
+            memoryCoordinator.captureAutoMemoryDirective(text, sourceMessageId)
+            return
+        }
+        LocalMemoryCoordinator(
+            state = binding.state,
+            memoryStore = memoryStore,
+            memoryManager = memoryManager,
+            currentSessionId = { binding.sessionId },
+            eventLog = { binding.eventLog },
+            persist = { persist(binding) },
+        ).captureAutoMemoryDirective(text, sourceMessageId)
+    }
 
     private fun chatRelationshipMemoryContext(
         query: String,
@@ -2361,8 +2375,12 @@ class LocalHarnessEngine @Inject constructor(
     private fun hydrateNewChatStateFromRelationshipMemory() =
         memoryCoordinator.hydrateNewChatStateFromRelationshipMemory()
 
-    private suspend fun drainPendingInputsIntoHistory() {
-        val queued = pendingInputs.drain()
+    private suspend fun drainPendingInputsIntoHistory(binding: LocalWorkRunBinding? = null) {
+        val targetPending = binding?.pendingInputs ?: pendingInputs
+        val targetHistory = binding?.modelHistory ?: modelHistory
+        val targetState = binding?.state ?: _state
+        val targetLog = binding?.eventLog ?: eventLog
+        val queued = targetPending.drain()
         if (queued.isEmpty()) return
         val durableMessages = mutableListOf<JsonObject>()
         queued.forEach { input ->
@@ -2370,22 +2388,76 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "user")
                 put("content", input.content)
             }
-            modelHistory.append(durableMessage)
+            targetHistory.append(durableMessage)
             durableMessages += durableMessage
-            captureAutoMemoryDirective(input.memoryInput, input.id)
+            captureAutoMemoryDirective(input.memoryInput, input.id, binding)
         }
-        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
-        eventLog.append(
+        targetState.update { it.copy(queuedInputCount = targetPending.size()) }
+        targetLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent(
                 action = "claimed",
-                pending = pendingInputs.snapshot(),
+                pending = targetPending.snapshot(),
                 affected = queued,
                 modelMessages = durableMessages,
             ),
         )
-        updateContextMetrics()
-        persist()
+        updateContextMetrics(binding)
+        persist(binding)
+    }
+
+    private fun finishBoundWorkTurn(
+        binding: LocalWorkRunBinding,
+        completedJob: Job?,
+    ): Job? = synchronized(runStateLock) {
+        if (binding.job !== completedJob) return@synchronized null
+
+        // Always checkpoint the final Work history before detaching it from memory. A later switch
+        // back to this conversation can then rebuild the exact model-visible context from Session
+        // Event without depending on whichever session is currently shown.
+        checkpointModelHistory("work/background-turn-end", binding)
+        persist(binding)
+
+        val next = binding.pendingInputs.poll()
+        if (next == null) {
+            binding.job = null
+            activeWorkRuns.remove(binding.sessionId, binding)
+            binding.mirrorJob?.cancel()
+            binding.mirrorJob = null
+            if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
+                modelHistory.reset(binding.modelHistory.snapshot())
+                transcriptProjectionCursor = binding.transcriptProjectionCursor
+                mirrorWorkRunState(binding)
+            }
+            return@synchronized null
+        }
+
+        val durableMessage = next.modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", next.content)
+        }
+        binding.state.update { it.copy(queuedInputCount = binding.pendingInputs.size()) }
+        appendUserToModelHistory(durableMessage, binding)
+        binding.eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "resumed",
+                pending = binding.pendingInputs.snapshot(),
+                affected = listOf(next),
+                modelMessages = listOf(durableMessage),
+            ),
+        )
+        persist(binding)
+        scope.launch(start = CoroutineStart.LAZY) {
+            runAgentTurn(
+                input = next.content,
+                memoryInput = next.memoryInput,
+                sourceMessageId = next.id,
+                binding = binding,
+            )
+        }.also { nextJob ->
+            binding.job = nextJob
+        }
     }
 
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
