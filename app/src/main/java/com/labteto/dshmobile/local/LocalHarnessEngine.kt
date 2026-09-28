@@ -2777,52 +2777,6 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun recoverAutomationChatOutput(
-        eventLog: LocalSessionEventLog,
-        startedAt: Long?,
-    ): String? {
-        val threshold = startedAt ?: return null
-        var turnStartSequence: Long? = null
-        var turnEnded = false
-        var recovered: String? = null
-        eventLog.events().forEach { event ->
-            if (
-                event.createdAt >= threshold &&
-                event.type == "turn/start" &&
-                event.data["automation"]?.jsonPrimitive?.booleanOrNull == true &&
-                event.data["proactive"]?.jsonPrimitive?.booleanOrNull == true
-            ) {
-                turnStartSequence = event.sequence
-                turnEnded = false
-                recovered = null
-                return@forEach
-            }
-            val startSequence = turnStartSequence ?: return@forEach
-            if (event.sequence <= startSequence) return@forEach
-            if (event.type == "turn/end") {
-                turnEnded = true
-                return@forEach
-            }
-            if (event.type != "assistant/message") return@forEach
-            decodeTranscriptMessages(event.data)
-                .orEmpty()
-                .lastOrNull { message -> message.role == "assistant" && message.proactive }
-                ?.let { message -> recovered = message.content }
-        }
-        val output = recovered ?: return null
-        if (!turnEnded) {
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
-                put("steps", 1)
-                put("mode", "chat")
-                put("automation", true)
-                put("proactive", true)
-                put("recovered", true)
-            })
-        }
-        return output
-    }
-
     private fun persistAutomationTranscript(
         session: LocalHarnessSession,
         messages: List<LocalHarnessMessage>,
