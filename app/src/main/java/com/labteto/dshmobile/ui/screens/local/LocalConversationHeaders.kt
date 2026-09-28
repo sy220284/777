@@ -20,13 +20,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +50,9 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -69,19 +76,16 @@ internal fun ChatSurfaceHeader(
     onContextClick: () -> Unit,
     onExitGroupChat: () -> Unit,
     onNewSession: () -> Unit,
+    sessionPinned: Boolean,
+    onTogglePin: () -> Unit,
+    onRenameSession: () -> Unit,
+    onDeleteSession: () -> Unit,
 ) {
     val colors = DsTheme.colors
     Row(
         Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsIconButton(
-            icon = FeatherIcons.Menu,
-            contentDescription = stringResource(R.string.local_open_menu),
-            onClick = onOpenMenu,
-            tint = colors.labelSecondary,
-        )
-        Spacer(Modifier.width(DsSpacing.small))
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -153,10 +157,22 @@ internal fun ChatSurfaceHeader(
             )
         }
         DsIconButton(
+            icon = FeatherIcons.Menu,
+            contentDescription = stringResource(R.string.local_open_menu),
+            onClick = onOpenMenu,
+            tint = colors.labelSecondary,
+        )
+        DsIconButton(
             icon = Icons.Filled.Add,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,
+        )
+        ConversationActionsMenu(
+            pinned = sessionPinned,
+            onTogglePin = onTogglePin,
+            onRename = onRenameSession,
+            onDelete = onDeleteSession,
         )
     }
 }
@@ -171,19 +187,16 @@ internal fun WorkSurfaceHeader(
     onModelClick: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onNewSession: () -> Unit,
+    sessionPinned: Boolean,
+    onTogglePin: () -> Unit,
+    onRenameSession: () -> Unit,
+    onDeleteSession: () -> Unit,
 ) {
     val colors = DsTheme.colors
     Row(
         Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsIconButton(
-            icon = FeatherIcons.Menu,
-            contentDescription = stringResource(R.string.local_open_menu),
-            onClick = onOpenMenu,
-            tint = colors.labelSecondary,
-        )
-        Spacer(Modifier.width(DsSpacing.small))
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -238,10 +251,63 @@ internal fun WorkSurfaceHeader(
             tint = colors.labelSecondary,
         )
         DsIconButton(
+            icon = FeatherIcons.Menu,
+            contentDescription = stringResource(R.string.local_open_menu),
+            onClick = onOpenMenu,
+            tint = colors.labelSecondary,
+        )
+        DsIconButton(
             icon = Icons.Filled.Add,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,
+        )
+        ConversationActionsMenu(
+            pinned = sessionPinned,
+            onTogglePin = onTogglePin,
+            onRename = onRenameSession,
+            onDelete = onDeleteSession,
+        )
+    }
+}
+
+@Composable
+private fun ConversationActionsMenu(
+    pinned: Boolean,
+    onTogglePin: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        DsIconButton(
+            icon = Icons.Filled.MoreVert,
+            contentDescription = stringResource(R.string.local_session_actions),
+            onClick = { expanded = true },
+            tint = DsTheme.colors.labelSecondary,
+        )
+        DsPopupMenu(
+            expanded = expanded,
+            onDismiss = { expanded = false },
+            items = listOf(
+                MenuItem(
+                    text = stringResource(
+                        if (pinned) R.string.local_unpin_session else R.string.advanced_pin,
+                    ),
+                    onClick = onTogglePin,
+                ),
+                MenuItem(
+                    text = stringResource(R.string.common_rename),
+                    icon = FeatherIcons.Edit3,
+                    onClick = onRename,
+                ),
+                MenuItem(
+                    text = stringResource(R.string.local_delete_session),
+                    icon = Icons.Outlined.DeleteOutline,
+                    danger = true,
+                    onClick = onDelete,
+                ),
+            ),
         )
     }
 }
