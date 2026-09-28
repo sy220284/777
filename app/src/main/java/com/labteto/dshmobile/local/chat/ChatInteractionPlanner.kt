@@ -670,8 +670,8 @@ class ChatInteractionPlanner @Inject constructor(
         .filter(String::isNotBlank)
         .map { it.take(maxChars) }
         .distinctBy(::normalize)
-        .take(limit)
         .toList()
+        .takeLast(limit)
 
     private fun ageTransientState(
         previous: ChatCharacterState,
