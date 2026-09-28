@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -69,6 +70,83 @@ class LocalChatEditSupportTest {
 
             assertEquals("first", history[1]["marker"]?.jsonPrimitive?.content)
             assertEquals("second", history[3]["marker"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun historicalEditKeepsStructuredQueuedUserMessagePayload() {
+        withLog { log ->
+            val queued = QueuedAgentInput(
+                content = "看这张图",
+                memoryInput = "看这张图",
+                modelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "看这张图")
+                    put("marker", "queued")
+                },
+                id = "queued-user",
+            )
+            log.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "queued",
+                    pending = listOf(queued),
+                    affected = listOf(queued),
+                    transcript = listOf(message("queued-user", "看这张图")),
+                ),
+            )
+
+            val edited = editedChatUserModelMessage(
+                eventLog = log,
+                originalMessageId = "queued-user",
+                content = "重新看这张图",
+            )
+
+            assertEquals("重新看这张图", edited["content"]?.jsonPrimitive?.content)
+            assertEquals("queued", edited["marker"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun editedHistoryRestoresStructuredQueuedMessages() {
+        withLog { log ->
+            val queued = QueuedAgentInput(
+                content = "排队补充",
+                memoryInput = "排队补充",
+                modelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "排队补充")
+                    put("marker", "queued-prefix")
+                },
+                id = "queued-prefix",
+            )
+            log.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "queued",
+                    pending = listOf(queued),
+                    affected = listOf(queued),
+                    transcript = listOf(message("queued-prefix", "排队补充")),
+                ),
+            )
+
+            val history = buildEditedChatModelHistory(
+                eventLog = log,
+                messages = listOf(
+                    message("queued-prefix", "排队补充"),
+                    message("replacement", "修改后的下一句"),
+                ),
+                groupMode = false,
+                editedMessageId = "replacement",
+                editedModelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "修改后的下一句")
+                },
+                systemPrompt = "system",
+            )
+
+            assertEquals("queued-prefix", history[1]["marker"]?.jsonPrimitive?.content)
+            assertEquals("修改后的下一句", history[2]["content"]?.jsonPrimitive?.content)
         }
     }
 
