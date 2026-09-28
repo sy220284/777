@@ -142,6 +142,52 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun configuredConnectorCanPreEnableRegisteredOptionalToolsForFirstModelStep() {
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "github_status",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                ) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    name = "github_api_get",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                ) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    name = "github_api_request",
+                    access = ToolAccess.PRIVILEGED,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                ) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    name = "process_exec",
+                    access = ToolAccess.PROCESS,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                ) { ToolResult("ok") },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        coordinator.enableOptionalTools(
+            setOf("github_status", "github_api_get", "github_api_request", "missing_tool"),
+        )
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+
+        assertEquals(
+            setOf("github_status", "github_api_get", "github_api_request"),
+            visible,
+        )
+        assertFalse("process_exec" in visible)
+    }
+
+    @Test
     fun capabilitySearchEnablesOptionalToolForCurrentTurn() {
         val registry = ToolRegistry().apply {
             register(

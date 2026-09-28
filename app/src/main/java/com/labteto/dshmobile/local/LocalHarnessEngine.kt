@@ -53,6 +53,9 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
+import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
+import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -267,6 +270,7 @@ class LocalHarnessEngine @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val visionClient: VisionClient,
     private val visionSettings: LocalVisionSettings,
+    private val githubCredentials: LocalGitHubCredentialStore,
     private val bundledNodeRuntime: BundledNodeRuntime,
     private val bundledPythonRuntime: BundledPythonRuntime,
     private val bundledGitRuntime: BundledGitRuntime,
@@ -406,6 +410,11 @@ class LocalHarnessEngine @Inject constructor(
         workspaceRoot = File(workspace.path),
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
+    )
+    private val githubPlugin = GitHubConnectorPlugin(
+        http = http,
+        json = json,
+        credentialProvider = githubCredentials::get,
     )
     private val lspPlugin by lazy {
         com.labteto.dshmobile.interop.lsp.LspPlugin(
@@ -848,6 +857,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginRegistry.install(builtinPlugin)
                 pluginRegistry.install(runtimePlugin)
                 pluginRegistry.install(mcpPlugin)
+                pluginRegistry.install(githubPlugin)
                 pluginRegistry.install(lspPlugin)
                 pluginRegistry.install(devicePlugin)
                 pluginRegistry.install(visionPlugin)
@@ -2864,6 +2874,11 @@ class LocalHarnessEngine @Inject constructor(
         DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
     }
 
+    internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
+    internal suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
+        githubPlugin.validateCredential(token).also { githubCredentials.put(token) }
+    internal suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
+
     internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
     internal suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
@@ -4116,6 +4131,8 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         val runPolicy = localAgentRunPolicy(_state.value.usageMode)
         toolExecutionCoordinator.clearTurnCapabilities()
+        if (_state.value.usageMode == LocalUsageMode.WORK && runCatching { githubCredentials.configured() }.getOrDefault(false))
+            toolExecutionCoordinator.enableGitHubConnectorTools()
         if (_state.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
             // answer's background relationship/state refresh before capturing this turn's context.

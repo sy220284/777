@@ -35,6 +35,17 @@ internal class LocalToolExecutionCoordinator(
     fun enabledOptionalSnapshot(): Set<String> =
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
+    fun enableOptionalTools(names: Collection<String>) {
+        val registered = registry.names().toSet()
+        synchronized(enabledOptionalTools) {
+            enabledOptionalTools += names.filter { name ->
+                name in registered && LocalToolRouter.isOptional(name)
+            }
+        }
+    }
+
+    fun enableGitHubConnectorTools() = enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
+
     fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
         val tools = registry.names().mapNotNull(registry::get)
@@ -54,7 +65,7 @@ internal class LocalToolExecutionCoordinator(
         val tools = registry.names().mapNotNull(registry::get)
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
-            return "未找到匹配的扩展能力；可换用 Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
+            return "未找到匹配的扩展能力；可换用 GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
         }
         synchronized(target) {
             target += matches.map(HarnessTool::name)
@@ -156,6 +167,7 @@ internal class LocalToolExecutionCoordinator(
     }
 
     private companion object {
+        val GITHUB_CONNECTOR_TOOL_NAMES = setOf("github_status", "github_api_get", "github_api_request")
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
