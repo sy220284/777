@@ -727,6 +727,8 @@ private fun LocalConversationSurface(
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
+    val transcriptPrefixItemCount = if (hiddenTranscriptCount > 0 || hasOlderTranscript) 1 else 0
+    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
     val messageEditingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageBranchingEnabled = messageEditingEnabled
     val messageActionsEnabled =
@@ -811,15 +813,15 @@ private fun LocalConversationSurface(
         attachmentError = null
         showReplySuggestions = false
         if (transcriptItems.isNotEmpty()) {
-            listState.scrollToItem(transcriptItems.lastIndex)
+            listState.scrollToItem(transcriptLastListIndex)
         }
     }
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
         if (transcriptItems.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            if (lastVisible >= transcriptItems.lastIndex - 2) {
-                listState.animateScrollToItem(transcriptItems.lastIndex)
+            if (lastVisible >= transcriptLastListIndex - 2) {
+                listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
     }
