@@ -124,4 +124,26 @@ class WebhookExecutionTest {
         WebhookExecutionLimiter(0)
     }
 
+
+    @Test fun queuedCancellationCompletionIsRecognized() {
+        assertTrue(
+            shouldMarkWebhookQueuedCancellation(
+                cause = kotlinx.coroutines.CancellationException("stop"),
+                currentStatus = "queued",
+            ),
+        )
+        assertFalse(
+            shouldMarkWebhookQueuedCancellation(
+                cause = kotlinx.coroutines.CancellationException("stop"),
+                currentStatus = "running",
+            ),
+        )
+        assertFalse(
+            shouldMarkWebhookQueuedCancellation(
+                cause = IllegalStateException("boom"),
+                currentStatus = "queued",
+            ),
+        )
+    }
+
 }
