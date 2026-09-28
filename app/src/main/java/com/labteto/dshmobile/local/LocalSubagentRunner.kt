@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -144,10 +145,17 @@ internal class LocalSubagentRunner(
             mutableListOf()
         }
         val progress = ArrayDeque<String>()
-        val stepLimit = maxSteps.coerceIn(1, 128)
         val snapshot = state.value
         val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
         val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+        val stepLimit = adaptiveAgentStepLimit(
+            configuredBase = maxSteps,
+            task = task,
+            contextChars = history.sumOf { it.toString().length } + task.length,
+            contextBudgetChars = runHistoryBudget?.maxHistoryChars ?: snapshot.contextBudgetChars,
+            pressure = resourceScheduler.snapshot().pressure,
+            kind = runKind,
+        )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
@@ -361,6 +369,7 @@ internal class LocalSubagentRunner(
                                 event.call.id,
                                 event.output,
                                 runHistoryBudget,
+                                history,
                             )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
@@ -462,6 +471,10 @@ internal class LocalSubagentRunner(
             }
             return LocalSubagentResult(LocalSubagentStatus.CANCELLED, output, "TASK_CANCELLED")
         } catch (error: LocalModelException) {
+            AppLog.warn(
+                "LocalSubagentRunner",
+                "子智能体模型失败 agent=$subagentId model=$routeModel code=${error.code} detail=${error.message.orEmpty().take(800)}",
+            )
             val partial = progress.joinToString("\n")
             val output = buildString {
                 append("[subagent][$subagentId][${error.code}] 模型阶段失败：${error.message}")
@@ -590,12 +603,18 @@ internal class LocalSubagentRunner(
         callId: String,
         output: String,
         budget: LocalHistoryBudget?,
+        history: List<JsonObject>,
     ): String {
         budget ?: return output
+        val adaptiveBudget = adaptiveToolResultBudget(
+            base = budget,
+            currentHistoryChars = history.sumOf { it.toString().length },
+            currentHistoryTokens = history.sumOf { estimateModelTokens(it.toString()) },
+        )
         val retained = retainTextForModel(
             value = output,
-            maxTokens = budget.maxToolResultTokens,
-            maxChars = budget.maxToolResultChars,
+            maxTokens = adaptiveBudget.maxToolResultTokens,
+            maxChars = adaptiveBudget.maxToolResultChars,
         )
         if (!retained.truncated) return retained.text
         val stored = spillToolOutput(callId, output)
