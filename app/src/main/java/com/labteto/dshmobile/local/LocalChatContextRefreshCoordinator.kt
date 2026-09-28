@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.coroutines.CancellationException
@@ -71,9 +72,15 @@ internal fun finalizeGroupContextAfterRefresh(
 ): ChatContextState {
     if (!complete || processedPending.isEmpty()) return context
     val through = processedPending.maxOf(ChatPendingTurn::sequence)
+    val merged = mergeGroupContinuity(context.continuity, statesInReplyOrder)
+    val grounded = groundContinuityEvidence(
+        previous = context.continuity,
+        candidate = merged,
+        pendingTurns = processedPending,
+    )
     return context.commitProcessed(
         scene = context.scene,
-        continuity = mergeGroupContinuity(context.continuity, statesInReplyOrder),
+        continuity = grounded,
         throughSequence = through,
     )
 }
@@ -120,6 +127,11 @@ internal class LocalChatContextRefreshCoordinator(
                 val nextContext = baseContext.enqueuePending(
                     ChatPendingTurn(
                         sequence = sequence,
+                        userMessageId = if (userMessage.isNotBlank()) {
+                            current.transcriptIndex.latestUserMessageId.orEmpty()
+                        } else {
+                            ""
+                        },
                         assistantMessageId = expectedAssistantMessageId,
                         branchHeadId = expectedAssistantMessageId,
                         userMessage = userMessage,
@@ -216,13 +228,18 @@ internal class LocalChatContextRefreshCoordinator(
         }
 
         val throughSequence = pending.maxOf(ChatPendingTurn::sequence)
+        val groundedContinuity = groundContinuityEvidence(
+            previous = baseContext.continuity,
+            candidate = plan.state.continuity,
+            pendingTurns = pending,
+        )
         val deterministicState = plan.state.copy(
             scene = baseContext.scene,
-            continuity = plan.state.continuity,
+            continuity = groundedContinuity,
         )
         val nextContext = baseContext.commitProcessed(
             scene = baseContext.scene,
-            continuity = deterministicState.continuity,
+            continuity = groundedContinuity,
             throughSequence = throughSequence,
         )
         var applied = false
