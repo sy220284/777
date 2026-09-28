@@ -10,11 +10,10 @@ internal fun editedChatUserModelMessage(
     originalMessageId: String,
     content: String,
 ): JsonObject {
-    val original = findTranscriptEvent(
+    val original = findDurableUserModelMessage(
         eventLog = eventLog,
-        type = "user/message",
         messageId = originalMessageId,
-    )?.data?.get("model_message") as? JsonObject
+    )
     return original?.let { replaceLocalUserModelMessageText(it, content) }
         ?: buildJsonObject {
             put("role", "user")
@@ -100,6 +99,43 @@ internal fun persistRewrittenChatTranscript(
     }).sequence
 }
 
+private fun findDurableUserModelMessage(
+    eventLog: LocalSessionEventLog,
+    messageId: String,
+): JsonObject? {
+    var beforeSequenceExclusive = Long.MAX_VALUE
+    while (true) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = beforeSequenceExclusive,
+            limit = CHAT_EVENT_SCAN_PAGE_SIZE,
+        )
+        if (page.isEmpty()) return null
+
+        page.asReversed().forEach { event ->
+            val containsTarget = decodeTranscriptMessages(event.data)
+                .orEmpty()
+                .any { message -> message.id == messageId }
+            if (!containsTarget) return@forEach
+
+            when (event.type) {
+                "user/message" -> {
+                    (event.data["model_message"] as? JsonObject)?.let { return it }
+                }
+                LOCAL_AGENT_INBOX_EVENT_TYPE -> {
+                    decodeLocalAgentInboxPending(event.data)
+                        ?.firstOrNull { input -> input.id == messageId }
+                        ?.modelMessage
+                        ?.let { return it }
+                }
+            }
+        }
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < CHAT_EVENT_SCAN_PAGE_SIZE || oldestSequence <= 0L) return null
+        beforeSequenceExclusive = oldestSequence
+    }
+}
+
 private fun findTranscriptEvent(
     eventLog: LocalSessionEventLog,
     type: String,
@@ -141,16 +177,32 @@ private fun loadDurableUserModelMessages(
         if (page.isEmpty()) break
 
         page.asReversed().forEach { event ->
-            if (event.type != "user/message") return@forEach
-            val structured = event.data["model_message"] as? JsonObject ?: return@forEach
-            decodeTranscriptMessages(event.data)
+            val transcriptUsers = decodeTranscriptMessages(event.data)
                 .orEmpty()
                 .asSequence()
                 .filter { message -> message.role == "user" && message.id in remaining }
-                .forEach { message ->
-                    result[message.id] = structured
-                    remaining.remove(message.id)
+                .toList()
+            if (transcriptUsers.isEmpty()) return@forEach
+
+            when (event.type) {
+                "user/message" -> {
+                    val structured = event.data["model_message"] as? JsonObject ?: return@forEach
+                    transcriptUsers.forEach { message ->
+                        result[message.id] = structured
+                        remaining.remove(message.id)
+                    }
                 }
+                LOCAL_AGENT_INBOX_EVENT_TYPE -> {
+                    val queuedById = decodeLocalAgentInboxPending(event.data)
+                        .orEmpty()
+                        .associateBy { input -> input.id }
+                    transcriptUsers.forEach userLoop@ { message ->
+                        val structured = queuedById[message.id]?.modelMessage ?: return@userLoop
+                        result[message.id] = structured
+                        remaining.remove(message.id)
+                    }
+                }
+            }
         }
         if (remaining.isEmpty()) break
 
