@@ -2,7 +2,7 @@ package com.labteto.dshmobile.interop.github
 
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -18,7 +18,7 @@ import org.junit.Test
 
 class GitHubConnectorPluginTest {
     @Test
-    fun connectorInjectsCredentialWithoutReturningItToTheModel() = runTest {
+    fun connectorInjectsCredentialWithoutReturningItToTheModel() = runBlocking {
         val token = "github_pat_test_secret_1234567890"
         var authorization: String? = null
         val http = OkHttpClient.Builder()
@@ -54,7 +54,7 @@ class GitHubConnectorPluginTest {
     }
 
     @Test
-    fun mutationRequiresApprovalAndNeverLeaksCredentialIntoArguments() = runTest {
+    fun mutationRequiresApprovalAndNeverLeaksCredentialIntoArguments() = runBlocking {
         val token = "github_pat_test_secret_1234567890"
         var method: String? = null
         var path: String? = null
@@ -110,7 +110,7 @@ class GitHubConnectorPluginTest {
     }
 
     @Test
-    fun readRetriesTransientGatewayFailureButMutationDoesNot() = runTest {
+    fun readRetriesTransientGatewayFailureButMutationDoesNot() = runBlocking {
         val token = "github_pat_test_secret_1234567890"
         var readCalls = 0
         val readHttp = OkHttpClient.Builder()
@@ -186,7 +186,7 @@ class GitHubConnectorPluginTest {
     }
 
     @Test
-    fun connectorRejectsSensitiveRepositoryAdministrationRoutes() = runTest {
+    fun connectorRejectsSensitiveRepositoryAdministrationRoutes() = runBlocking {
         var calls = 0
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->
@@ -236,7 +236,7 @@ class GitHubConnectorPluginTest {
     }
 
     @Test
-    fun missingCredentialIsReportedWithoutNetworkAccess() = runTest {
+    fun missingCredentialIsReportedWithoutNetworkAccess() = runBlocking {
         var calls = 0
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->
