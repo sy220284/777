@@ -234,6 +234,9 @@ private val DECISION_REMOVAL_SIGNAL = Regex(
 private val OPEN_THREAD_REMOVAL_SIGNAL = Regex(
     """(?:解决了|说清了|说完了|完成了|处理好了|不用继续|不用再|结束了|不提了|取消了|没事了|算了)""",
 )
+private val OPEN_THREAD_EVIDENCE_SIGNAL = Regex(
+    """(?:还没|尚未|未完成|没完成|待定|待办|记得|需要|还要|晚点|之后再|稍后)""",
+)
 private val GENERIC_OPEN_THREAD_CLOSE_SIGNAL = Regex(
     """(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)""",
 )
@@ -481,12 +484,36 @@ private fun bestContinuitySource(
         ChatContinuityFactKind.OPEN_THREAD -> OPEN_THREAD_CONTINUITY_EVIDENCE_SCORE
     }
     return turns.asSequence()
-        .map { turn -> turn to continuityEvidenceScore(fact, turn.rawEvidence()) }
-        .filter { (_, score) -> score >= threshold }
+        .map { turn ->
+            val source = turn.rawEvidence()
+            Triple(turn, continuityEvidenceScore(fact, source), source)
+        }
+        .filter { (_, score, source) ->
+            continuityEvidenceGrounded(kind, fact, source, score, threshold)
+        }
+        .map { (turn, score, _) -> turn to score }
         .maxWithOrNull(
             compareBy<Pair<ChatPendingTurn, Int>> { it.second }
                 .thenBy { it.first.sequence },
         )
+}
+
+private fun continuityEvidenceGrounded(
+    kind: ChatContinuityFactKind,
+    fact: String,
+    source: String,
+    score: Int,
+    threshold: Int,
+): Boolean {
+    val normalizedSource = normalizeContinuityEvidenceText(source)
+    val anchors = continuityRemovalAnchors(fact)
+    if (score >= threshold) {
+        if (kind != ChatContinuityFactKind.DECISION || anchors.isEmpty()) return true
+        return anchors.any(normalizedSource::contains)
+    }
+    if (kind != ChatContinuityFactKind.OPEN_THREAD) return false
+    if (!OPEN_THREAD_EVIDENCE_SIGNAL.containsMatchIn(normalizedSource)) return false
+    return anchors.isNotEmpty() && anchors.any(normalizedSource::contains)
 }
 
 private fun ChatPendingTurn.rawEvidence(): String =
