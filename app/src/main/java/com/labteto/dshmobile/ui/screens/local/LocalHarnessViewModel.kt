@@ -47,6 +47,9 @@ private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
 private const val PERSONA_INSPECTION_RECENT_MESSAGES = 28
 private const val PERSONA_AUTOFILL_RECENT_MESSAGES = 12
+private const val LOCAL_CONVERSATION_UI_PREFS = "local_conversation_ui"
+private const val LOCAL_PINNED_SESSION_IDS = "pinned_session_ids"
+private const val LOCAL_SESSION_TITLE_PREFIX = "session_title:"
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -66,6 +69,24 @@ class LocalHarnessViewModel @Inject constructor(
     val gallery = _gallery.asStateFlow()
     private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
     internal val transcriptHistory = _transcriptHistory.asStateFlow()
+    private val conversationUiPrefs = appContext.getSharedPreferences(
+        LOCAL_CONVERSATION_UI_PREFS,
+        Context.MODE_PRIVATE,
+    )
+    private val _pinnedSessionIds = MutableStateFlow(
+        conversationUiPrefs.getStringSet(LOCAL_PINNED_SESSION_IDS, emptySet())
+            .orEmpty()
+            .toSet(),
+    )
+    val pinnedSessionIds = _pinnedSessionIds.asStateFlow()
+    private val _sessionTitleOverrides = MutableStateFlow(
+        conversationUiPrefs.all.mapNotNull { (key, value) ->
+            if (!key.startsWith(LOCAL_SESSION_TITLE_PREFIX)) return@mapNotNull null
+            val title = value as? String ?: return@mapNotNull null
+            key.removePrefix(LOCAL_SESSION_TITLE_PREFIX) to title
+        }.toMap(),
+    )
+    val sessionTitleOverrides = _sessionTitleOverrides.asStateFlow()
     private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
     private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
@@ -603,7 +624,41 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
     fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
-    suspend fun deleteSessions(ids: Set<String>): Int = runtime.session.deleteSessions(ids)
+
+    fun toggleSessionPinned(sessionId: String) {
+        val updated = _pinnedSessionIds.value.toMutableSet().apply {
+            if (!add(sessionId)) remove(sessionId)
+        }.toSet()
+        _pinnedSessionIds.value = updated
+        conversationUiPrefs.edit()
+            .putStringSet(LOCAL_PINNED_SESSION_IDS, updated)
+            .apply()
+    }
+
+    fun renameSession(sessionId: String, title: String): Boolean {
+        val normalized = title.trim().take(80)
+        if (normalized.isBlank()) return false
+        _sessionTitleOverrides.value = _sessionTitleOverrides.value + (sessionId to normalized)
+        conversationUiPrefs.edit()
+            .putString(LOCAL_SESSION_TITLE_PREFIX + sessionId, normalized)
+            .apply()
+        return true
+    }
+
+    suspend fun deleteSessions(ids: Set<String>): Int {
+        val deleted = runtime.session.deleteSessions(ids)
+        if (deleted > 0) {
+            val pinned = _pinnedSessionIds.value - ids
+            val titles = _sessionTitleOverrides.value - ids
+            _pinnedSessionIds.value = pinned
+            _sessionTitleOverrides.value = titles
+            conversationUiPrefs.edit().apply {
+                putStringSet(LOCAL_PINNED_SESSION_IDS, pinned)
+                ids.forEach { remove(LOCAL_SESSION_TITLE_PREFIX + it) }
+            }.apply()
+        }
+        return deleted
+    }
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
