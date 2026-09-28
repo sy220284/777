@@ -592,6 +592,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun persistentSubagentRunner(
         sessionId: String,
         boundState: LocalHarnessState,
+        historySnapshot: () -> List<JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner = subagentRunnerFactory.createBound(
         sessionId = sessionId,
         boundState = boundState,
@@ -606,6 +607,7 @@ class LocalHarnessEngine @Inject constructor(
                 enabledOptionalTools = enabledOptional,
             )
         },
+        historySnapshot = historySnapshot,
     )
 
 
@@ -4619,8 +4621,12 @@ class LocalHarnessEngine @Inject constructor(
                         model = model,
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
+                        sessionId = boundSessionId,
+                        boundState = executionState.value,
+                        historySnapshot = binding?.modelHistory?.let { history -> history::snapshot }
+                            ?: modelHistory::snapshot,
                     )
-                } else subagents.run(
+                } else (binding?.let(::workSubagents) ?: subagents).run(
                     task = task,
                     inheritHistory = false,
                     allowMutation = false,
@@ -4630,7 +4636,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             "subagent_fork", "fork_subagent" ->
-                subagents.run(
+                (binding?.let(::workSubagents) ?: subagents).run(
                     task = args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
@@ -4645,6 +4651,7 @@ class LocalHarnessEngine @Inject constructor(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
                 args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                binding,
             )
             "session_search" -> searchSessions(args.string("query"))
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
@@ -4696,10 +4703,11 @@ class LocalHarnessEngine @Inject constructor(
         model: String?,
         maxSteps: Int,
         virtualScreen: Boolean,
+        sessionId: String = currentSessionId,
+        boundState: LocalHarnessState = _state.value,
+        historySnapshot: () -> List<JsonObject> = modelHistory::snapshot,
     ): String {
-        val sessionId = currentSessionId
-        val boundState = _state.value
-        val boundSubagents = persistentSubagentRunner(sessionId, boundState)
+        val boundSubagents = persistentSubagentRunner(sessionId, boundState, historySnapshot)
         val payload = buildJsonObject {
             put("session_id", sessionId)
             put("task", task)
