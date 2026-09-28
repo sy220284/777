@@ -1,11 +1,7 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
-import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import kotlin.math.ceil
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Treats the configured step value as a baseline instead of a brittle fixed ceiling.
@@ -55,38 +51,6 @@ internal fun adaptiveAgentStepLimit(
  * Context and resource pressure only reduce the size of each extension; they do not terminate a
  * task that is still making progress. Context overflow is handled by the compaction recovery path.
  */
-internal fun completionFirstStepLimitExtender(
-    configuredBase: Int,
-    task: String,
-    kind: LocalAgentRunKind,
-    stateSnapshot: () -> LocalHarnessState,
-    resourceScheduler: HarnessResourceScheduler,
-    eventLog: LocalSessionEventLog,
-): AgentStepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
-    val current = stateSnapshot()
-    val pressure = resourceScheduler.snapshot().pressure
-    val next = nextAdaptiveAgentStepLimit(
-        currentLimit = currentLimit,
-        configuredBase = configuredBase,
-        task = task,
-        contextChars = current.contextChars,
-        contextBudgetChars = current.contextBudgetChars,
-        pressure = pressure,
-        kind = kind,
-    )
-    if (next != null && next > currentLimit) {
-        eventLog.append("turn/budget-extended", buildJsonObject {
-            put("steps_used", stepsUsed)
-            put("previous_limit", currentLimit)
-            put("next_limit", next)
-            put("context_chars", current.contextChars)
-            put("context_budget_chars", current.contextBudgetChars)
-            put("resource_pressure", pressure.name.lowercase())
-        })
-    }
-    next
-}
-
 internal fun nextAdaptiveAgentStepLimit(
     currentLimit: Int,
     configuredBase: Int,
