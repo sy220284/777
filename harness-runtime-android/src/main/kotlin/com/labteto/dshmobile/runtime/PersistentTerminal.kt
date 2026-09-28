@@ -33,13 +33,14 @@ class PersistentPipeTerminalProvider(
             val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
             if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
             val resolved = resolveCommand(command)
-            val managed = ManagedProcess.start(ProcessBuilder(resolved)
-                .directory(directory)
-                .redirectErrorStream(true)
-                .apply {
-                    environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
-                    environment().putAll(baseEnvironment())
-                }
+            val managed = ManagedProcess.start(
+                ProcessBuilder(resolved)
+                    .directory(directory)
+                    .redirectErrorStream(true)
+                    .apply {
+                        environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
+                        environment().putAll(baseEnvironment())
+                    },
             )
             val process = managed.process
             val id = "term-" + UUID.randomUUID().toString().replace("-", "").take(16)
@@ -48,29 +49,49 @@ class PersistentPipeTerminalProvider(
         }
 
     override suspend fun write(sessionId: String, input: String) = withContext(Dispatchers.IO) {
-        val session = requireSession(sessionId)
+        val session = requireLiveSession(sessionId)
         session.input.write(input.toByteArray())
         session.input.flush()
     }
 
     override suspend fun read(sessionId: String): String = withContext(Dispatchers.IO) {
-        val session = requireSession(sessionId)
-        val available = session.output.available()
-        if (available <= 0) return@withContext ""
+        val session = requireKnownSession(sessionId)
+        val available = runCatching { session.output.available() }.getOrDefault(0)
+        if (available <= 0) {
+            if (!session.managed.process.isAlive) releaseIfCurrent(sessionId, session)
+            return@withContext ""
+        }
+
         val bytes = ByteArray(minOf(available, MAX_READ_BYTES))
         val count = session.output.read(bytes)
-        if (count <= 0) "" else bytes.decodeToString(0, count)
+        val text = if (count <= 0) "" else bytes.decodeToString(0, count)
+
+        if (
+            !session.managed.process.isAlive &&
+            runCatching { session.output.available() }.getOrDefault(0) <= 0
+        ) {
+            releaseIfCurrent(sessionId, session)
+        }
+        text
     }
 
     override suspend fun close(sessionId: String) = withContext(Dispatchers.IO) {
         val session = sessions.remove(sessionId) ?: return@withContext
-        session.managed.terminate()
-        runCatching { session.input.close() }
-        runCatching { session.output.close() }
+        release(session)
         Unit
     }
 
-    fun isAlive(sessionId: String): Boolean = sessions[sessionId]?.managed?.process?.isAlive == true
+    fun isAlive(sessionId: String): Boolean {
+        val session = sessions[sessionId] ?: return false
+        if (session.managed.process.isAlive) return true
+
+        // Preserve a finished process just long enough for terminal_read to drain its final output.
+        // Empty finished sessions can be released immediately instead of accumulating forever.
+        if (runCatching { session.output.available() }.getOrDefault(0) <= 0) {
+            releaseIfCurrent(sessionId, session)
+        }
+        return false
+    }
 
     fun nativePtyAvailable(): Boolean = false
 
@@ -99,8 +120,25 @@ class PersistentPipeTerminalProvider(
         return (extraSearchPaths() + inherited + androidDefaults).distinctBy { it.path }
     }
 
-    private fun requireSession(id: String): Session =
-        sessions[id]?.takeIf { it.managed.process.isAlive } ?: error("终端会话不存在或已结束：$id")
+    private fun requireKnownSession(id: String): Session =
+        sessions[id] ?: error("终端会话不存在：$id")
+
+    private fun requireLiveSession(id: String): Session {
+        val session = requireKnownSession(id)
+        if (session.managed.process.isAlive) return session
+        releaseIfCurrent(id, session)
+        error("终端会话已结束：$id")
+    }
+
+    private fun releaseIfCurrent(id: String, session: Session) {
+        if (sessions.remove(id, session)) release(session)
+    }
+
+    private fun release(session: Session) {
+        session.managed.terminate()
+        runCatching { session.input.close() }
+        runCatching { session.output.close() }
+    }
 
     private companion object {
         const val MAX_READ_BYTES = 64 * 1024
