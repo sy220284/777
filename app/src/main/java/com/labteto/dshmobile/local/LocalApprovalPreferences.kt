@@ -3,10 +3,12 @@ package com.labteto.dshmobile.local
 import android.content.SharedPreferences
 
 /**
- * Single durable source of truth for safe automatic approval.
+ * Single durable source of truth for global automatic approval.
  *
- * The setting is device-local and intentionally independent from conversation files. A legacy
- * session flag may seed it once during upgrade, but an explicit persisted choice always wins.
+ * The setting is device-local and intentionally independent from conversation files. Historical
+ * method/key names keep the old "safe" wording for compatibility, but true now means every
+ * approval-gated operation is approved automatically. A legacy session flag may seed it once
+ * during upgrade, but an explicit persisted choice always wins.
  */
 internal class LocalApprovalPreferences(
     private val preferences: SharedPreferences,

@@ -31,8 +31,8 @@ class LocalApprovalPolicyTest {
     }
 
     @Test
-    fun enablingSafeModeOnlyResolvesACurrentlySafeApproval() {
-        val safe = LocalApproval(
+    fun enablingAutoApprovalResolvesAnyCurrentApproval() {
+        val lowRisk = LocalApproval(
             callId = "safe",
             toolName = "read",
             summary = "read",
@@ -42,16 +42,16 @@ class LocalApprovalPolicyTest {
         )
         val highRisk = LocalApproval(
             callId = "risk",
-            toolName = "bash",
-            summary = "bash",
+            toolName = "github_api_request",
+            summary = "github write",
             arguments = "{}",
-            access = "process",
+            access = "privileged",
             canAutoApproveSafely = false,
         )
 
-        assertTrue(canResolvePendingByEnablingSafeAutoApproval(safe))
-        assertFalse(canResolvePendingByEnablingSafeAutoApproval(highRisk))
-        assertFalse(canResolvePendingByEnablingSafeAutoApproval(null))
+        assertTrue(canResolvePendingByEnablingAutoApproval(lowRisk))
+        assertTrue(canResolvePendingByEnablingAutoApproval(highRisk))
+        assertFalse(canResolvePendingByEnablingAutoApproval(null))
     }
 
     @Test
