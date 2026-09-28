@@ -51,8 +51,20 @@ class LocalGroupChatContinuityTest {
             continuity = base,
             processedThroughSequence = 10L,
             pendingTurns = listOf(
-                ChatPendingTurn(sequence = 20L, assistantMessageId = "a20", generation = 3L),
-                ChatPendingTurn(sequence = 22L, assistantMessageId = "a22", generation = 3L),
+                ChatPendingTurn(
+                    sequence = 20L,
+                    assistantMessageId = "a20",
+                    userMessage = "那就定了，明天十点出门。",
+                    assistantMessage = "好，明天十点出门。",
+                    generation = 3L,
+                ),
+                ChatPendingTurn(
+                    sequence = 22L,
+                    assistantMessageId = "a22",
+                    userMessage = "明早出门还没发生，等明天。",
+                    assistantMessage = "嗯，等明早再出门。",
+                    generation = 3L,
+                ),
             ),
             generation = 3L,
         )
@@ -87,9 +99,27 @@ class LocalGroupChatContinuityTest {
             continuity = ChatContinuityState(recentEvents = listOf("旧事件")),
             processedThroughSequence = 10L,
             pendingTurns = listOf(
-                ChatPendingTurn(sequence = 20L, assistantMessageId = "a20", generation = 4L),
-                ChatPendingTurn(sequence = 22L, assistantMessageId = "a22", generation = 4L),
-                ChatPendingTurn(sequence = 24L, assistantMessageId = "a24", generation = 4L),
+                ChatPendingTurn(
+                    sequence = 20L,
+                    assistantMessageId = "a20",
+                    userMessage = "已归并前两条",
+                    assistantMessage = "记录到了。",
+                    generation = 4L,
+                ),
+                ChatPendingTurn(
+                    sequence = 22L,
+                    assistantMessageId = "a22",
+                    userMessage = "继续",
+                    assistantMessage = "好。",
+                    generation = 4L,
+                ),
+                ChatPendingTurn(
+                    sequence = 24L,
+                    assistantMessageId = "a24",
+                    userMessage = "第三条还没归并",
+                    assistantMessage = "收到。",
+                    generation = 4L,
+                ),
             ),
             generation = 4L,
         )
