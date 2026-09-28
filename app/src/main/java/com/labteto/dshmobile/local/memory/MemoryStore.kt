@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 internal fun compactMemoryRecords(
     records: List<MemoryRecord>,
     maxRecords: Int,
+    protectedIds: Set<String> = emptySet(),
 ): List<MemoryRecord> {
     if (maxRecords <= 0 || records.isEmpty()) return emptyList()
     if (records.size <= maxRecords) return records
@@ -25,7 +26,8 @@ internal fun compactMemoryRecords(
     val activeRoots = records
         .filter(MemoryRecord::active)
         .sortedWith(
-            compareByDescending<MemoryRecord> { if (it.pinned) 1 else 0 }
+            compareByDescending<MemoryRecord> { if (it.id in protectedIds) 1 else 0 }
+                .thenByDescending { if (it.pinned) 1 else 0 }
                 .thenByDescending(MemoryRecord::importance)
                 .thenByDescending(MemoryRecord::updatedAt),
         )
@@ -149,7 +151,15 @@ class MemoryStore internal constructor(
             }
         }
         records += record
-        writeDocument(MemoryDocument(records = records))
+        writeDocument(
+            MemoryDocument(
+                records = compactMemoryRecords(
+                    records = records,
+                    maxRecords = MAX_RECORDS,
+                    protectedIds = setOf(record.id),
+                ),
+            ),
+        )
         return record
     }
 
@@ -439,16 +449,13 @@ class MemoryStore internal constructor(
     }
 
     private fun writeDocument(document: MemoryDocument) {
-        val boundedDocument = document.copy(
-            records = compactMemoryRecords(document.records, MAX_RECORDS),
-        )
         file.parentFile?.mkdirs()
         if (decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
 
         val temporary = File(file.parentFile, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), boundedDocument))
+        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
         runCatching {
             Files.move(
                 temporary.toPath(),
@@ -462,7 +469,7 @@ class MemoryStore internal constructor(
         if (decodeDocument(backup) == null && decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
-        cachedDocument = boundedDocument
+        cachedDocument = document
         cachedStamp = documentStamp()
     }
 
