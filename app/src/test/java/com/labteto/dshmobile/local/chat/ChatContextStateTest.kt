@@ -63,9 +63,53 @@ class ChatContextStateTest {
         assertTrue(state.scene.currentEvent.isBlank())
         assertTrue(state.scene.lastSceneChange.isBlank())
         assertTrue(state.continuity.recurringEvents.isEmpty())
-        assertEquals(5, state.continuity.recentEvents.size)
-        assertEquals(4, state.continuity.decisions.size)
-        assertEquals(4, state.continuity.unfinished.size)
+        assertEquals(listOf("事件4", "事件5", "事件6", "事件7", "事件8"), state.continuity.recentEvents)
+        assertEquals(listOf("决定4", "决定5", "决定6", "决定7"), state.continuity.decisions)
+        assertEquals(listOf("待续4", "待续5", "待续6", "待续7"), state.continuity.unfinished)
+    }
+
+    @Test
+    fun legacyFallbackMergesMissingDomainsWithoutRevivingSoftSceneSnapshot() {
+        val current = ChatContextState(
+            scene = ChatSceneState(location = "房间"),
+            pendingTurns = listOf(
+                ChatPendingTurn(
+                    sequence = 8L,
+                    assistantMessageId = "a8",
+                    userMessage = "继续",
+                    assistantMessage = "好。",
+                    generation = 0L,
+                ),
+            ),
+        )
+        val legacy = ChatCharacterState(
+            scene = ChatSceneState(
+                sceneTime = "夜晚",
+                location = "旧院子",
+                participants = listOf("旧人物"),
+                positions = listOf("靠着旧墙"),
+                activeActions = listOf("喝旧茶"),
+                keyObjects = listOf("旧石桌"),
+            ),
+            continuity = ChatContinuityState(
+                recentEvents = listOf("刚确认明日行程"),
+                decisions = listOf("明早十点出发"),
+                unfinished = listOf("城南之行尚未发生"),
+            ),
+        )
+
+        val merged = current.withLegacyFallback(legacy)
+
+        assertEquals("房间", merged.scene.location)
+        assertEquals("夜晚", merged.scene.sceneTime)
+        assertTrue(merged.scene.participants.isEmpty())
+        assertTrue(merged.scene.positions.isEmpty())
+        assertTrue(merged.scene.activeActions.isEmpty())
+        assertTrue(merged.scene.keyObjects.isEmpty())
+        assertEquals(listOf("刚确认明日行程"), merged.continuity.recentEvents)
+        assertEquals(listOf("明早十点出发"), merged.continuity.decisions)
+        assertEquals(listOf("城南之行尚未发生"), merged.continuity.unfinished)
+        assertEquals("a8", merged.pendingTurns.single().assistantMessageId)
     }
 
     @Test
