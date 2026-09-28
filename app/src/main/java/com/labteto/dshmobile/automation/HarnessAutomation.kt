@@ -108,7 +108,7 @@ internal fun nextAnchoredAutomationRun(
     if (task.scheduleType == AutomationScheduleType.WINDOW) {
         val constrainedAfter = maxOf(
             afterMillis,
-            suggestedRunAt?.minus(60_000L) ?: afterMillis,
+            suggestedRunAt?.let { checkedAutomationAddMillis(it, -60_000L, "建议执行时间") } ?: afterMillis,
         )
         return nextDailyWindowRun(
             previousScheduledAt = task.nextRunAt,
@@ -121,7 +121,7 @@ internal fun nextAnchoredAutomationRun(
     suggestedRunAt?.takeIf { it > afterMillis }?.let { return it }
 
     if (task.scheduleType == AutomationScheduleType.SILENCE) {
-        return task.silenceMinutes?.let { afterMillis + it * 60_000L }
+        return task.silenceMinutes?.let { checkedAutomationFutureMillis(afterMillis, it, "沉默触发间隔") }
     }
 
     val anchor = task.scheduleAnchorAt ?: task.nextRunAt
@@ -134,7 +134,7 @@ internal fun nextAnchoredAutomationRun(
             val minutes = task.recurringMinutes ?: return null
             nextIntervalAnchoredRun(anchor, afterMillis, minutes)
         }
-        else -> task.recurringMinutes?.let { afterMillis + it * 60_000L }
+        else -> task.recurringMinutes?.let { checkedAutomationFutureMillis(afterMillis, it, "任务周期") }
     }
 }
 
@@ -159,7 +159,7 @@ internal fun firstDailyWindowRun(
 
     val window = candidates.firstOrNull { (_, end) -> end > afterMillis }
         ?: error("Unable to resolve next daily window")
-    val lower = maxOf(window.first, afterMillis + 60_000L)
+    val lower = maxOf(window.first, checkedAutomationAddMillis(afterMillis, 60_000L, "时间窗起点"))
     if (lower >= window.second) {
         return firstDailyWindowRun(
             afterMillis = window.second,
@@ -196,7 +196,7 @@ internal fun nextDailyWindowRun(
             endMinuteOfDay = endMinuteOfDay,
         )
         if (bounds.second > afterMillis) {
-            val lower = maxOf(bounds.first, afterMillis + 60_000L)
+            val lower = maxOf(bounds.first, checkedAutomationAddMillis(afterMillis, 60_000L, "时间窗起点"))
             if (lower < bounds.second) {
                 return interpolateWindow(lower, bounds.second, randomFraction)
             }
@@ -255,17 +255,29 @@ internal fun checkedAutomationMinutesToMillis(
     }
 }
 
+internal fun checkedAutomationAddMillis(
+    baseMillis: Long,
+    deltaMillis: Long,
+    label: String,
+): Long = try {
+    Math.addExact(baseMillis, deltaMillis)
+} catch (_: ArithmeticException) {
+    throw IllegalArgumentException("$label超出可表示时间范围")
+}
+
 internal fun checkedAutomationFutureMillis(
     baseMillis: Long,
     minutes: Long,
     label: String,
-): Long {
-    val delta = checkedAutomationMinutesToMillis(minutes, label)
-    return try {
-        Math.addExact(baseMillis, delta)
-    } catch (_: ArithmeticException) {
-        throw IllegalArgumentException("$label超出可表示时间范围")
-    }
+): Long = checkedAutomationAddMillis(
+    baseMillis = baseMillis,
+    deltaMillis = checkedAutomationMinutesToMillis(minutes, label),
+    label = label,
+)
+
+internal fun parseOptionalAutomationLong(raw: String?, label: String): Long? {
+    if (raw == null) return null
+    return raw.toLongOrNull() ?: throw IllegalArgumentException("$label必须是 64 位整数")
 }
 
 internal fun nextIntervalAnchoredRun(
@@ -1159,7 +1171,7 @@ class HarnessAutomationWorker(
                 )
                 deferredOneShot -> run.nextRunAtHint
                 !manualRun && task.recurringMinutes != null ->
-                    finished + task.recurringMinutes * 60_000L
+                    checkedAutomationFutureMillis(finished, task.recurringMinutes, "任务周期")
                 else -> task.nextRunAt
             }
             val receiptStatus = if (run.delivered) "completed" else "skipped"
@@ -1282,7 +1294,7 @@ class HarnessAutomationWorker(
             val next = if (chained) {
                 nextAnchoredAutomationRun(task, finished)
             } else {
-                task.recurringMinutes?.let { finished + it * 60_000L }
+                task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
                 val nextFailureStreak = current.failureStreak + 1
@@ -1356,7 +1368,7 @@ class HarnessAutomationWorker(
             val next = if (chained) {
                 nextAnchoredAutomationRun(task, finished)
             } else {
-                task.recurringMinutes?.let { finished + it * 60_000L }
+                task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
                 val nextFailureStreak = current.failureStreak + 1
@@ -1463,12 +1475,17 @@ class AutomationPlugin(
             approval = ToolApprovalPolicy.ALWAYS,
         ) { input ->
             val now = System.currentTimeMillis()
-            val runAt = input["run_at_epoch_ms"]?.jsonPrimitive?.content?.toLongOrNull()
-                ?: checkedAutomationFutureMillis(
-                    now,
-                    input["delay_minutes"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
-                    "任务延迟",
-                )
+            val runAt = parseOptionalAutomationLong(
+                input["run_at_epoch_ms"]?.jsonPrimitive?.content,
+                "run_at_epoch_ms",
+            ) ?: checkedAutomationFutureMillis(
+                now,
+                parseOptionalAutomationLong(
+                    input["delay_minutes"]?.jsonPrimitive?.content,
+                    "delay_minutes",
+                ) ?: 0L,
+                "任务延迟",
+            )
             val id = input.required("id")
             scheduler.scheduleOnce(
                 id = id,
@@ -1494,14 +1511,20 @@ class AutomationPlugin(
         ) { input ->
             val first = checkedAutomationFutureMillis(
                 System.currentTimeMillis(),
-                input["delay_minutes"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                parseOptionalAutomationLong(
+                    input["delay_minutes"]?.jsonPrimitive?.content,
+                    "delay_minutes",
+                ) ?: 0L,
                 "首次任务延迟",
             )
             val id = input.required("id")
             scheduler.schedulePeriodic(
                 id = id,
                 prompt = input.required("prompt"),
-                intervalMinutes = input.required("interval_minutes").toLong(),
+                intervalMinutes = parseOptionalAutomationLong(
+                    input.required("interval_minutes"),
+                    "interval_minutes",
+                ) ?: error("缺少参数：interval_minutes"),
                 firstRunAtMillis = first,
                 notify = input["notify"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: true,
             )
