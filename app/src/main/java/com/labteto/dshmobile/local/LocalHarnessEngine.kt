@@ -489,6 +489,16 @@ class LocalHarnessEngine @Inject constructor(
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
+    private fun memoryTools(binding: LocalWorkRunBinding?): LocalMemoryTools =
+        binding?.let { runBinding ->
+            LocalMemoryTools(
+                memoryStore,
+                memoryManager,
+                { runBinding.state.value },
+                { runBinding.sessionId },
+            )
+        } ?: memoryTools
+
     private val subagentRunnerFactory by lazy {
         LocalSubagentRunnerFactory(
             apiKeys = apiKeys,
@@ -4914,20 +4924,30 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun updatePlan(args: JsonObject): String {
+    private fun updatePlan(
+        args: JsonObject,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
         val items = args["items"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
             ?: args.optionalString("plan")?.lines()?.filter { it.isNotBlank() }
             ?: emptyList()
         val normalized = items.take(20)
-        _state.update { it.copy(plan = normalized) }
-        eventLog.append("plan/state", buildJsonObject {
+        targetState.update { it.copy(plan = normalized) }
+        log.append("plan/state", buildJsonObject {
             put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
         })
-        persist()
+        persist(binding)
         return if (normalized.isEmpty()) "计划已清空" else "计划已更新，共 ${normalized.size} 项"
     }
 
-    private fun updateTodos(args: JsonObject): String {
+    private fun updateTodos(
+        args: JsonObject,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
         val allowed = setOf("pending", "in_progress", "completed")
         val items = args["items"]?.jsonArray.orEmpty().mapNotNull { element ->
             val item = element.jsonObject
@@ -4935,8 +4955,8 @@ class LocalHarnessEngine @Inject constructor(
             val status = item["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
             if (content.isEmpty() || status !in allowed) null else LocalTodoItem(content.take(500), status)
         }.take(50)
-        _state.update { it.copy(todos = items) }
-        eventLog.append("todo/state", buildJsonObject {
+        targetState.update { it.copy(todos = items) }
+        log.append("todo/state", buildJsonObject {
             put("items", JsonArray(items.map { item ->
                 buildJsonObject {
                     put("content", item.content)
@@ -4944,98 +4964,143 @@ class LocalHarnessEngine @Inject constructor(
                 }
             }))
         })
-        persist()
+        persist(binding)
         return if (items.isEmpty()) "任务清单已清空" else "任务清单已更新，共 ${items.size} 项"
     }
 
-    private fun createGoal(description: String): String {
+    private fun createGoal(
+        description: String,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
         val goal = LocalGoal(description.trim().take(2_000))
-        _state.update { it.copy(goal = goal) }
-        eventLog.append("goal/state", buildJsonObject {
+        targetState.update { it.copy(goal = goal) }
+        log.append("goal/state", buildJsonObject {
             put("description", goal.description)
             put("status", goal.status)
             goal.note?.let { put("note", it) }
         })
-        persist()
+        persist(binding)
         return "目标已创建：${goal.description}"
     }
 
-    private fun getGoal(): String {
-        val goal = _state.value.goal ?: return "当前会话没有目标"
+    private fun getGoal(binding: LocalWorkRunBinding? = null): String {
+        val goal = (binding?.state ?: _state).value.goal ?: return "当前会话没有目标"
         return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$it" }.orEmpty()}"
     }
 
-    private fun updateGoal(status: String, note: String?): String {
+    private fun updateGoal(
+        status: String,
+        note: String?,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val current = _state.value.goal ?: error("当前会话没有目标")
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
+        val current = targetState.value.goal ?: error("当前会话没有目标")
         val updated = current.copy(status = status, note = note?.take(2_000))
-        _state.update { it.copy(goal = updated) }
-        eventLog.append("goal/state", buildJsonObject {
+        targetState.update { it.copy(goal = updated) }
+        log.append("goal/state", buildJsonObject {
             put("description", updated.description)
             put("status", updated.status)
             updated.note?.let { put("note", it) }
         })
-        persist()
+        persist(binding)
         return "目标状态已更新为 $status"
     }
 
-    private suspend fun askUser(call: LocalToolCall, question: String, options: List<String>): String =
-        interactions.awaitQuestion(
-            LocalQuestion(call.id, question.take(2_000), options.take(6)),
-        )
+    private suspend fun askUser(
+        call: LocalToolCall,
+        question: String,
+        options: List<String>,
+        binding: LocalWorkRunBinding? = null,
+    ): String = (binding?.interactions ?: interactions).awaitQuestion(
+        LocalQuestion(call.id, question.take(2_000), options.take(6)),
+    )
 
-    private suspend fun exitPlanMode(call: LocalToolCall, plan: String): String {
-        if (!_state.value.planMode) return "当前未启用规划模式"
+    private suspend fun exitPlanMode(
+        call: LocalToolCall,
+        plan: String,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
+        val targetState = binding?.state ?: _state
+        val log = binding?.eventLog ?: eventLog
+        val history = binding?.modelHistory ?: modelHistory
+        if (!targetState.value.planMode) return "当前未启用规划模式"
         val answer = askUser(
             call,
             "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
             listOf("批准并进入执行模式", "继续规划"),
+            binding,
         )
         return if (answer == "批准并进入执行模式") {
             val approvedPlan = plan.lines().map(String::trim).filter(String::isNotEmpty).take(20)
-            _state.update {
+            targetState.update {
                 it.copy(
                     planMode = false,
                     plan = approvedPlan,
                 )
             }
-            // Persist the approved plan before leaving planning mode. If the process dies between
-            // these two events, recovery stays conservatively in planning mode with the approved
-            // plan instead of entering execution mode without its durable plan.
-            eventLog.append("plan/state", buildJsonObject {
+            log.append("plan/state", buildJsonObject {
                 put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
             })
-            eventLog.append("plan/mode", buildJsonObject { put("active", false) })
-            if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-                val prompt = systemPrompt()
-                modelHistory.replaceSystem(
+            log.append("plan/mode", buildJsonObject { put("active", false) })
+            if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+                val prompt = systemPrompt(binding)
+                history.replaceSystem(
                     buildJsonObject { put("role", "system"); put("content", prompt) },
                 )
-                eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
-                updateContextMetrics()
+                log.append("system/prompt", buildJsonObject { put("content", prompt) })
+                updateContextMetrics(binding)
             }
-            persist()
+            persist(binding)
             "计划已获批准，已进入执行模式"
         } else {
             "用户要求继续规划。反馈：$answer"
         }
     }
 
-    private suspend fun runWorkflow(tasks: List<String>, mode: String, requiredEvidence: List<String>): String {
-        _state.update { it.copy(workflowProgress = null) }
+    private fun workSubagents(binding: LocalWorkRunBinding): LocalSubagentRunner =
+        subagentRunnerFactory.createBound(
+            sessionId = binding.sessionId,
+            boundState = binding.state.value,
+            runKind = LocalAgentRunKind.SUBAGENT,
+            schemasProvider = ::subagentToolSchemas,
+            executeTool = { call, allowMutation, boundMemoryTools, enabledOptional ->
+                executePersistentSubagentTool(
+                    call = call,
+                    allowMutation = allowMutation,
+                    sessionId = binding.sessionId,
+                    memoryTools = boundMemoryTools,
+                    enabledOptionalTools = enabledOptional,
+                )
+            },
+            historySnapshot = binding.modelHistory::snapshot,
+        )
+
+    private suspend fun runWorkflow(
+        tasks: List<String>,
+        mode: String,
+        requiredEvidence: List<String>,
+        binding: LocalWorkRunBinding? = null,
+    ): String {
+        val targetState = binding?.state ?: _state
+        val runner = binding?.let(::workSubagents) ?: subagents
+        targetState.update { it.copy(workflowProgress = null) }
         return LocalWorkflowCoordinator(
-            execute = { prompt -> subagents.runResult(
+            execute = { prompt -> runner.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
-                maxSteps = _state.value.subagentMaxSteps,
+                maxSteps = targetState.value.subagentMaxSteps,
             ).requireCompletedOutput() },
             pruneOutput = ::pruneToolResult,
-            onProgress = { progress -> _state.update { state ->
+            onProgress = { progress -> targetState.update { state ->
                 val previousBlock = state.workflowProgress?.takeIf { it.needsUserAction }
                 val blocked = progress.stage == "受阻"
                 state.copy(workflowProgress = LocalWorkflowProgress(
-                    sessionId = currentSessionId,
+                    sessionId = binding?.sessionId ?: currentSessionId,
                     stage = progress.stage,
                     task = progress.task,
                     completed = progress.completed,
@@ -5056,8 +5121,11 @@ class LocalHarnessEngine @Inject constructor(
         return if (hits.isEmpty()) "未找到历史会话事件" else hits.take(50).joinToString("\n\n")
     }
 
-    private fun eventLogForAuthorized(requestedId: String?): LocalSessionEventLog {
-        val id = requestedId?.takeIf(String::isNotBlank) ?: currentSessionId
+    private fun eventLogForAuthorized(
+        requestedId: String?,
+        defaultSessionId: String = currentSessionId,
+    ): LocalSessionEventLog {
+        val id = requestedId?.takeIf(String::isNotBlank) ?: defaultSessionId
         require(id == currentSessionId || sessionSummaries().any { it.id == id }) { "会话不存在或无权访问：$id" }
         return eventLogFor(id)
     }
