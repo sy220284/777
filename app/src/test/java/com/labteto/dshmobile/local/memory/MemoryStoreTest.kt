@@ -489,4 +489,82 @@ class MemoryStoreTest {
         assertEquals(2, compacted.size)
     }
 
+
+    @Test fun explicitEpisodicRecallKeepsLowLexicalFactInCandidateSet() {
+        val memoryStore = store()
+        val episode = memoryStore.remember(
+            content = "关系对象稳定信息：她平时喜欢海边看日落",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+            lineageId = "lineage",
+            importance = 80,
+        )
+        memoryStore.remember(
+            content = "关系状态：我和她｜在一起",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            lineageId = "lineage",
+            importance = 100,
+        )
+
+        val recalled = memoryStore.search(
+            query = "你还记得我们第一次出去那天吗",
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = "lineage",
+            allowedKinds = setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+            ),
+            maxItems = 1,
+        )
+
+        assertEquals(listOf(episode.id), recalled.map { it.id })
+    }
+
+    @Test fun consolidationMergesFormattingVariantsAndPreservesAllSources() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "用户喜欢简洁回复",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s1",
+            sourceMessageId = "u1",
+            importance = 70,
+        )
+        memoryStore.remember(
+            content = "用户喜欢简洁回复。",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s2",
+            sourceMessageId = "u2",
+            importance = 90,
+            pinned = true,
+        )
+
+        assertEquals(1, memoryStore.consolidateIfDue(force = true))
+        val active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertTrue(active.single().pinned)
+        assertEquals(90, active.single().importance)
+        assertEquals(setOf("u1", "u2"), active.single().sourceMessages.map { it.messageId }.toSet())
+    }
+
+    @Test fun consolidationNeverMergesSameTextAcrossCharacterSubjects() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "关系状态：我和同名角色｜在一起",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:one",
+        )
+        memoryStore.remember(
+            content = "关系状态：我和同名角色｜在一起。",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:two",
+        )
+
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(setOf("gallery:one", "gallery:two"), all(memoryStore).mapNotNull { it.subjectKey }.toSet())
+    }
+
 }
