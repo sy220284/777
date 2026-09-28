@@ -161,6 +161,8 @@ fun LocalHarnessScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val drawerFocusManager = LocalFocusManager.current
+    val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) {
         context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE)
     }
@@ -200,6 +202,14 @@ fun LocalHarnessScreen(
 
     LaunchedEffect(state.sessionId) {
         viewModel.prepareTranscriptHistory(state.sessionId)
+    }
+
+    // Swiping the drawer open must release the composer focus as well as its IME.
+    LaunchedEffect(drawerState.targetValue, drawerState.isOpen) {
+        if (drawerState.targetValue == DrawerValue.Open || drawerState.isOpen) {
+            drawerFocusManager.clearFocus(force = true)
+            drawerKeyboard?.hide()
+        }
     }
 
     fun switchUsageMode(target: LocalUsageMode) {
@@ -332,7 +342,11 @@ fun LocalHarnessScreen(
                 gallery = gallery,
                 transcriptHistory = transcriptHistory,
                 modeIntro = modeIntro,
-                onOpenMenu = { scope.launch { drawerState.open() } },
+                onOpenMenu = {
+                    drawerFocusManager.clearFocus(force = true)
+                    drawerKeyboard?.hide()
+                    scope.launch { drawerState.open() }
+                },
                 onConfigure = onOpenSettings,
                 onSelectModel = viewModel::selectModel,
                 onSend = viewModel::send,
