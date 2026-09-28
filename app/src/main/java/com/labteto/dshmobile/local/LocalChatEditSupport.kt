@@ -63,6 +63,40 @@ internal fun buildEditedChatModelHistory(
     }
 }
 
+internal fun buildDurableChatModelHistory(
+    eventLog: LocalSessionEventLog,
+    messages: List<LocalHarnessMessage>,
+    systemPrompt: String,
+): List<JsonObject> {
+    val durableUserMessages = loadDurableUserModelMessages(
+        eventLog = eventLog,
+        messageIds = messages.asSequence()
+            .filter { message -> message.role == "user" }
+            .map(LocalHarnessMessage::id)
+            .toSet(),
+    )
+    return buildList {
+        add(buildJsonObject {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+        messages.forEach { message ->
+            when (message.role) {
+                "user" -> add(
+                    durableUserMessages[message.id] ?: buildJsonObject {
+                        put("role", "user")
+                        put("content", message.content)
+                    },
+                )
+                "assistant" -> add(buildJsonObject {
+                    put("role", "assistant")
+                    put("content", message.content)
+                })
+            }
+        }
+    }
+}
+
 internal fun buildChatModelHistory(
     messages: List<LocalHarnessMessage>,
     systemPrompt: String,
