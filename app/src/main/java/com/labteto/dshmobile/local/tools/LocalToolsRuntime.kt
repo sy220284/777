@@ -11,6 +11,9 @@ class LocalToolsRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
     internal suspend fun servers(): List<McpServerSnapshot> = engine.mcpServersForUi()
+    internal suspend fun githubConfigured(): Boolean = engine.githubConnectorConfiguredForUi()
+    internal suspend fun configureGitHub(token: String) = engine.configureGitHubConnectorForUi(token)
+    internal suspend fun clearGitHub() = engine.clearGitHubConnectorForUi()
     internal fun installedPluginIds(): List<String> = engine.installedPluginIdsForUi()
     internal suspend fun connectHttp(serverId: String, endpoint: String): String =
         engine.connectMcpHttpForUi(serverId, endpoint)

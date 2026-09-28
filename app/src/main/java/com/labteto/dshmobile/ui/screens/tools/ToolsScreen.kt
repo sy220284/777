@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -79,6 +80,7 @@ enum class ToolsNotice {
 data class ToolsUiState(
     val loading: Boolean = false,
     val servers: List<McpServerSnapshot> = emptyList(),
+    val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
@@ -105,6 +107,7 @@ class ToolsViewModel @Inject constructor(
                 _state.value = ToolsUiState(
                     loading = false,
                     servers = servers,
+                    githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
                     remotePlugins = sessionStore.plugins.value,
                 )
@@ -141,6 +144,45 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun configureGitHub(token: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
+            try {
+                localTools.configureGitHub(token)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    githubConfigured = true,
+                    localPlugins = localTools.installedPluginIds(),
+                    notice = ToolsNotice.CONNECTED,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    notice = ToolsNotice.CONNECT_FAILED,
+                )
+            }
+        }
+    }
+
+    fun clearGitHub() {
+        viewModelScope.launch {
+            try {
+                localTools.clearGitHub()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    githubConfigured = false,
+                    notice = ToolsNotice.DISCONNECTED,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
+            }
+        }
+    }
+
     fun disconnect(serverId: String) {
         viewModelScope.launch {
             try {
@@ -171,6 +213,8 @@ fun ToolsScreen(
     val colors = DsTheme.colors
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
+    var githubToken by remember { mutableStateOf("") }
+    var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onClose)
@@ -178,6 +222,7 @@ fun ToolsScreen(
         if (state.notice == ToolsNotice.CONNECTED) {
             serverId = ""
             endpoint = ""
+            githubToken = ""
         }
     }
 
@@ -253,6 +298,52 @@ fun ToolsScreen(
 
             Text(stringResource(R.string.tools_connection_group), style = DsType.std14, color = colors.labelTertiary)
             DsGroupCard {
+                DsCategoryRow(
+                    icon = Icons.Outlined.Link,
+                    title = stringResource(R.string.tools_github_connector),
+                    subtitle = stringResource(R.string.tools_github_connector_hint),
+                    value = stringResource(
+                        if (state.githubConfigured) R.string.tools_github_configured
+                        else R.string.tools_github_unconfigured,
+                    ),
+                    onClick = { showGitHubConfig = !showGitHubConfig },
+                )
+                if (showGitHubConfig) {
+                    OutlinedTextField(
+                        value = githubToken,
+                        onValueChange = { githubToken = it.take(4096) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.tools_github_token)) },
+                        supportingText = { Text(stringResource(R.string.tools_github_token_hint)) },
+                        enabled = !state.loading,
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsButton(
+                            text = stringResource(
+                                if (state.loading) R.string.tools_processing else R.string.tools_github_save,
+                            ),
+                            onClick = { viewModel.configureGitHub(githubToken) },
+                            enabled = !state.loading && githubToken.isNotBlank(),
+                            size = DsButtonSize.Small,
+                            variant = DsButtonVariant.Outline,
+                        )
+                        if (state.githubConfigured) {
+                            DsButton(
+                                text = stringResource(R.string.tools_github_clear),
+                                onClick = viewModel::clearGitHub,
+                                enabled = !state.loading,
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Ghost,
+                            )
+                        }
+                    }
+                }
+
                 DsCategoryRow(
                     icon = Icons.Outlined.Link,
                     title = stringResource(R.string.tools_external_services),

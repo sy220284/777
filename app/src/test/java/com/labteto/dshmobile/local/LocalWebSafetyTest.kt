@@ -26,6 +26,11 @@ class LocalWebSafetyTest {
         assertFalse(classifyProbeStatus(504).first)
         assertTrue(classifyProbeStatus(403).first)
         assertTrue(classifyProbeStatus(500).first)
+        assertFalse(shouldRetryProbeStatus(407))
+        assertTrue(shouldRetryProbeStatus(502))
+        assertTrue(shouldRetryProbeStatus(503))
+        assertTrue(shouldRetryProbeStatus(504))
+        assertFalse(shouldRetryProbeStatus(500))
     }
 
     @Test

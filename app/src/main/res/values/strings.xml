@@ -944,6 +944,14 @@
     <string name="tasks_try_now">Try now</string>
     <string name="tasks_create_invalid">Enter valid task content and timing. Custom intervals and silence triggers must be at least 1 hour.</string>
     <string name="tools_external_services_hint">Connect HTTP tool servers only when needed</string>
+    <string name="tools_github_connector">GitHub connector</string>
+    <string name="tools_github_connector_hint">Built-in GitHub REST API; credentials are injected inside the connector and never enter model arguments or logs</string>
+    <string name="tools_github_configured">Configured</string>
+    <string name="tools_github_unconfigured">Not configured</string>
+    <string name="tools_github_token">GitHub token</string>
+    <string name="tools_github_token_hint">Prefer a fine-grained token with minimum repository permissions; it is validated before encrypted Android Keystore storage</string>
+    <string name="tools_github_save">Verify and save</string>
+    <string name="tools_github_clear">Clear credential</string>
     <string name="tools_capability_group">Capabilities</string>
     <string name="tools_connection_group">Connections</string>
     <string name="tools_capability_terminal">Terminal &amp; runtime</string>

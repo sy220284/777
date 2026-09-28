@@ -48,11 +48,13 @@ class LocalToolRouterTest {
         val tools = listOf(
             tool("process_exec", "直接执行本机进程"),
             tool("vision_status", "查看视觉配置"),
+            tool("github_api_get", "读取 GitHub REST API"),
             tool("read", "读取文件"),
         )
 
         assertEquals("process_exec", LocalToolRouter.search(tools, "终端 运行时").first().name)
         assertEquals("vision_status", LocalToolRouter.search(tools, "视觉 图片").first().name)
+        assertEquals("github_api_get", LocalToolRouter.search(tools, "GitHub PR").first().name)
     }
 
     private fun tool(name: String, description: String): HarnessTool = HarnessTool(

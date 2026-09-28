@@ -19,10 +19,12 @@ import java.net.Socket
 import java.util.concurrent.TimeUnit
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocketFactory
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -40,6 +42,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 /** Android providers for web search, safe fetch and user-visible network diagnostics. */
 @Singleton
@@ -163,7 +166,11 @@ class LocalWebProvider @Inject constructor(
                 .method(verb, requestBody)
             safeHeaders.forEach { (name, value) -> builder.header(name, value) }
             route.hostHeader?.let { builder.header("Host", it) }
-            route.client.newCall(builder.build()).execute().use { response ->
+            executeWithTransientRetry(
+                client = route.client,
+                request = builder.build(),
+                attempts = if (verb in SAFE_RETRY_METHODS) SAFE_HTTP_RETRY_ATTEMPTS else 1,
+            ).use { response ->
                 if (response.isRedirect) {
                     if (verb !in setOf("GET", "HEAD")) {
                         throw LocalWebException("HTTP_REDIRECT", "会改变远端状态的 HTTP 请求拒绝自动跟随重定向")
@@ -190,6 +197,7 @@ class LocalWebProvider @Inject constructor(
                     url = current.uri.toString(),
                     status = response.code,
                     mediaType = mediaType,
+                    headers = safeResponseHeaders(response),
                     content = bounded.bytes.toString(responseBody?.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8),
                     bytesRead = bounded.bytes.size,
                     truncated = bounded.truncated,
@@ -318,7 +326,7 @@ class LocalWebProvider @Inject constructor(
                 if (probe.reachable) {
                     "结论：DNS、安全策略与实际 HTTP/TLS 连通性均已验证。"
                 } else {
-                    "结论：DNS 与安全策略检查通过，但实际连接失败；请检查代理分流、TUN 规则、TLS 拦截或目标服务可达性。"
+                    "结论：DNS 与安全策略检查通过，但连续探测仍未建立稳定连接；这可能是链路抖动、代理/网关、TLS 或目标服务问题，单凭该结果不能判定 VPN/代理存在规则性阻断。"
                 },
             )
         }.trimEnd()
@@ -564,7 +572,33 @@ class LocalWebProvider @Inject constructor(
         return if (uri.port == -1 || uri.port == defaultPort) uri.host else "${uri.host}:${uri.port}"
     }
 
-    private fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
+    private suspend fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
+        val failures = mutableListOf<String>()
+        repeat(PROBE_ATTEMPTS) { index ->
+            val attempt = probeConnectivityOnce(target)
+            if (attempt.reachable) {
+                return if (index == 0) {
+                    attempt
+                } else {
+                    attempt.copy(detail = "第 ${index + 1}/$PROBE_ATTEMPTS 次探测成功：${attempt.detail}")
+                }
+            }
+            failures += "${index + 1}/$PROBE_ATTEMPTS ${attempt.detail}"
+            if (!attempt.retryable || index == PROBE_ATTEMPTS - 1) {
+                return if (index == 0) {
+                    attempt
+                } else {
+                    attempt.copy(
+                        detail = "连续 ${index + 1} 次探测未建立稳定连接；${failures.joinToString("；")}",
+                    )
+                }
+            }
+            delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
+        }
+        error("网络探测重试循环异常结束")
+    }
+
+    private fun probeConnectivityOnce(target: ValidatedTarget): ConnectivityProbe {
         return try {
             val route = requestRoute(target, PROBE_CALL_TIMEOUT_SECONDS)
             val builder = Request.Builder()
@@ -574,12 +608,56 @@ class LocalWebProvider @Inject constructor(
             route.hostHeader?.let { builder.header("Host", it) }
             route.client.newCall(builder.build()).execute().use { response ->
                 val classification = classifyProbeStatus(response.code)
-                ConnectivityProbe(classification.first, classification.second)
+                ConnectivityProbe(
+                    reachable = classification.first,
+                    detail = classification.second,
+                    retryable = shouldRetryProbeStatus(response.code),
+                )
             }
         } catch (error: SocketTimeoutException) {
-            ConnectivityProbe(false, "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}")
+            ConnectivityProbe(
+                reachable = false,
+                detail = "探测超时（PROBE_TIMEOUT）：${error.message ?: "连接未完成"}",
+                retryable = true,
+            )
         } catch (error: java.io.IOException) {
-            ConnectivityProbe(false, "探测失败（PROBE_FAILED）：${error.message ?: error::class.java.simpleName}")
+            ConnectivityProbe(
+                reachable = false,
+                detail = "探测失败（PROBE_FAILED）：${error.message ?: error::class.java.simpleName}",
+                retryable = isRetryableTransportFailure(error),
+            )
+        }
+    }
+
+    private suspend fun executeWithTransientRetry(
+        client: OkHttpClient,
+        request: Request,
+        attempts: Int,
+    ): Response {
+        val boundedAttempts = attempts.coerceAtLeast(1)
+        repeat(boundedAttempts) { index ->
+            try {
+                val response = client.newCall(request).execute()
+                if (index + 1 < boundedAttempts && shouldRetryProbeStatus(response.code)) {
+                    response.close()
+                    delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
+                    return@repeat
+                }
+                return response
+            } catch (error: java.io.IOException) {
+                if (!isRetryableTransportFailure(error) || index + 1 >= boundedAttempts) throw error
+                delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
+            }
+        }
+        error("HTTP 重试循环异常结束")
+    }
+
+    private fun isRetryableTransportFailure(error: java.io.IOException): Boolean =
+        error !is UnknownHostException && error !is SSLPeerUnverifiedException
+
+    private fun safeResponseHeaders(response: Response): Map<String, String> = buildMap {
+        SAFE_RESPONSE_HEADERS.forEach { name ->
+            response.header(name)?.let { value -> put(name, value) }
         }
     }
     private fun systemHttpProxy(): ProxyEndpoint? {
@@ -680,7 +758,11 @@ class LocalWebProvider @Inject constructor(
 
     private data class BoundedBytes(val bytes: ByteArray, val truncated: Boolean)
 
-    private data class ConnectivityProbe(val reachable: Boolean, val detail: String)
+    private data class ConnectivityProbe(
+        val reachable: Boolean,
+        val detail: String,
+        val retryable: Boolean = false,
+    )
 
     private data class RequestRoute(
         val client: OkHttpClient,
@@ -736,6 +818,9 @@ class LocalWebProvider @Inject constructor(
         const val MAX_FETCH_BYTES = 4 * 1024 * 1024
         const val PROBE_TIMEOUT_SECONDS = 6L
         const val PROBE_CALL_TIMEOUT_SECONDS = 8L
+        const val PROBE_ATTEMPTS = 3
+        const val SAFE_HTTP_RETRY_ATTEMPTS = 3
+        const val NETWORK_RETRY_BACKOFF_MS = 200L
         const val DEFAULT_FETCH_TIMEOUT_SECONDS = 45L
         const val MIN_FETCH_TIMEOUT_SECONDS = 5L
         const val MAX_FETCH_TIMEOUT_SECONDS = 300L
@@ -748,7 +833,18 @@ class LocalWebProvider @Inject constructor(
         const val DEFAULT_DOWNLOAD_BYTES = 20L * 1024L * 1024L
         const val MAX_DOWNLOAD_BYTES = 100L * 1024L * 1024L
         val HTTP_METHODS = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
+        val SAFE_RETRY_METHODS = setOf("GET", "HEAD")
         val SAFE_REQUEST_HEADERS = setOf("accept", "content-type", "if-none-match", "if-modified-since")
+        val SAFE_RESPONSE_HEADERS = listOf(
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+            "X-RateLimit-Resource",
+            "Retry-After",
+            "ETag",
+            "Last-Modified",
+            "X-GitHub-Request-Id",
+        )
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
 }
@@ -756,6 +852,7 @@ data class LocalHttpResponse(
     val url: String,
     val status: Int,
     val mediaType: String,
+    val headers: Map<String, String> = emptyMap(),
     val content: String,
     val bytesRead: Int,
     val truncated: Boolean,

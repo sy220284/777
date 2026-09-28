@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 6470,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 6490,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 2011,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 657,
@@ -34,7 +34,7 @@ LINE_BUDGETS = {
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 24
+ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 25
 AGGREGATE_STATE_MAX_FIELDS = 66
 LOCAL_ROOT_MAX_KOTLIN_FILES = 90
 PROJECTION_FIELD_BUDGETS = {

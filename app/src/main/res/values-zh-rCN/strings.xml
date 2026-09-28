@@ -942,6 +942,14 @@
     <string name="tasks_try_now">立即试一次</string>
     <string name="tasks_create_invalid">请填写有效任务和时间；自定义周期与沉默触发至少 1 小时。</string>
     <string name="tools_external_services_hint">需要时再连接 HTTP 工具服务</string>
+    <string name="tools_github_connector">GitHub 连接器</string>
+    <string name="tools_github_connector_hint">内置 GitHub REST API；凭据仅在连接器内部注入，不进入模型参数或日志</string>
+    <string name="tools_github_configured">已配置</string>
+    <string name="tools_github_unconfigured">未配置</string>
+    <string name="tools_github_token">GitHub Token</string>
+    <string name="tools_github_token_hint">建议使用最小仓库权限的细粒度 Token；保存前会先验证，验证通过后用 Android Keystore 加密</string>
+    <string name="tools_github_save">验证并保存</string>
+    <string name="tools_github_clear">清除凭据</string>
     <string name="tools_capability_group">可用能力</string>
     <string name="tools_connection_group">外部连接</string>
     <string name="tools_capability_terminal">终端与运行环境</string>
