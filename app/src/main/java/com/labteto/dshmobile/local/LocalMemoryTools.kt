@@ -63,9 +63,13 @@ internal class LocalMemoryTools(
                 ) {
                     return "只有“继续当前任务”对话可以写入 lineage 记忆，避免产生无法召回的幽灵记忆"
                 }
-                val kind = runCatching {
-                    MemoryKind.valueOf((args.optionalString("kind") ?: "fact").uppercase())
-                }.getOrDefault(MemoryKind.FACT)
+                val requestedKind = args.optionalString("kind")
+                val kind = if (requestedKind == null) {
+                    MemoryKind.FACT
+                } else {
+                    runCatching { MemoryKind.valueOf(requestedKind.uppercase()) }.getOrNull()
+                        ?: return "记忆类型无效：$requestedKind"
+                }
                 val record = runCatching {
                     manager.remember(
                         content = args.string("content"),
