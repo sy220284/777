@@ -145,7 +145,7 @@
     <string name="local_context_source_project">Current project</string>
     <string name="local_context_source_continuation">Previous chat handoff</string>
     <string name="local_context_handoff">Handoff summary</string>
-    <string name="local_streaming_status">Agent is responding…</string>
+    <string name="local_streaming_status">Working…</string>
     <string name="local_chat_replying">Replying…</string>
     <string name="local_device_approval_on">Device actions approved for this turn</string>
     <string name="local_approval_scope_show">View permission scope</string>
@@ -434,6 +434,12 @@
     <string name="tasks_empty_subtitle">Ask the agent in chat to “remind me tomorrow…” or “run this every week…”. Tasks will appear here.</string>
     <string name="tasks_cancelled">Task deleted</string>
     <string name="tasks_missing">That task no longer exists</string>
+    <string name="tasks_delete_confirm_title">Delete this task?</string>
+    <string name="tasks_delete_confirm_body">Deleting it stops future runs and removes it from the automation list.</string>
+    <string name="tasks_delete_confirm">Delete</string>
+    <string name="tasks_mode_work">Work automation</string>
+    <string name="tasks_mode_chat">Character interaction</string>
+    <string name="tasks_chat_mode_unavailable">You are not in a single-character chat. Existing interaction tasks are still available, but creating one requires Chat mode with a single character.</string>
     <string name="tasks_run_started">Task started</string>
     <string name="tasks_run_now_failed">Task could not be started</string>
     <string name="tasks_background_task">Background task</string>
