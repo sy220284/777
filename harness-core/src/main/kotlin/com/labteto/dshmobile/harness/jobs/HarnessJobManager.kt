@@ -3,6 +3,7 @@ package com.labteto.dshmobile.harness.jobs
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -236,7 +237,7 @@ class HarnessJobManager(
         record: Record,
         block: suspend (String, (String) -> Unit) -> String,
     ) {
-        record.job = scope.launch {
+        val launched = scope.launch(start = CoroutineStart.LAZY) {
             val heartbeat = launch {
                 while (isActive) {
                     delay(RUNNING_HEARTBEAT_MILLIS)
@@ -278,6 +279,19 @@ class HarnessJobManager(
                 heartbeat.cancel()
                 publish()
             }
+        }
+        val shouldStart = synchronized(lock) {
+            if (record.status == "running" && record.job == null) {
+                record.job = launched
+                true
+            } else {
+                false
+            }
+        }
+        if (shouldStart) {
+            launched.start()
+        } else {
+            launched.cancel()
         }
     }
 
