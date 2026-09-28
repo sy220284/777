@@ -136,6 +136,7 @@ internal class LocalChatContextRefreshCoordinator(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         boundEventLog: LocalSessionEventLog,
+        sourceUserMessageId: String? = null,
     ): Long? {
         if (state.value.sessionId != expectedSessionId) return null
         val sequence = findTranscriptEventSequence(
@@ -143,15 +144,20 @@ internal class LocalChatContextRefreshCoordinator(
             type = "assistant/message",
             messageId = expectedAssistantMessageId,
         ) ?: return null
-        val sourceUserMessageId = if (userMessage.isBlank()) {
-            ""
-        } else {
-            findChatContinuitySourceUserMessageId(
-                eventLog = boundEventLog,
-                beforeSequenceExclusive = sequence,
-                expectedContent = userMessage,
-            ).orEmpty()
-        }
+        val resolvedSourceUserMessageId = sourceUserMessageId
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?: if (userMessage.isBlank()) {
+                ""
+            } else {
+                // Compatibility fallback for older callers that do not yet carry the durable user
+                // message id. Normal foreground turns pass it directly and avoid this log scan.
+                findChatContinuitySourceUserMessageId(
+                    eventLog = boundEventLog,
+                    beforeSequenceExclusive = sequence,
+                    expectedContent = userMessage,
+                ).orEmpty()
+            }
 
         var generation: Long? = null
         var branchSnapshotUpdated = false
@@ -169,7 +175,7 @@ internal class LocalChatContextRefreshCoordinator(
                 val nextContext = baseContext.enqueuePending(
                     ChatPendingTurn(
                         sequence = sequence,
-                        userMessageId = sourceUserMessageId,
+                        userMessageId = resolvedSourceUserMessageId,
                         assistantMessageId = expectedAssistantMessageId,
                         branchHeadId = expectedAssistantMessageId,
                         userMessage = userMessage,
