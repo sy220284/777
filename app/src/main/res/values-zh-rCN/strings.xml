@@ -745,13 +745,13 @@
     <string name="local_approval_impact_high">高</string>
     <string name="local_approval_impact_critical">关键</string>
     <string name="local_approval_purpose_title">这项操作是做什么的？</string>
-    <string name="local_approval_safe_scope">该操作属于安全自动批准范围：受工作区边界约束的写入，或不会改变外部状态的只读操作。开启后会跨对话持续生效。</string>
+    <string name="local_approval_safe_scope">该操作影响较低。开启自动批准后，所有需要审批的操作都会直接批准，并跨对话持续生效；工具自身权限和安全边界仍然有效。</string>
     <string name="local_approval_device_scope">该操作影响设备状态，需要确认。可只批准本次，或仅在当前代理回合内授权普通设备界面操作；高权限设备能力仍逐次确认。</string>
-    <string name="local_approval_high_risk_scope">该操作会影响工作区外状态、进程、网络、设备或高权限资源，需要按影响等级确认。安全自动批准不会绕过当前操作。</string>
+    <string name="local_approval_high_risk_scope">该操作可能影响工作区外状态、进程、网络、设备或高权限资源。开启自动批准后，本操作也会直接批准；工具自身权限和安全边界仍然有效。</string>
     <string name="local_approval_once">仅批准本次</string>
     <string name="local_approval_reject">拒绝</string>
-    <string name="local_approval_enable_safe">开启安全操作自动批准</string>
-    <string name="local_approval_safe_enabled">安全操作自动批准已开启，并会在后续对话继续生效。</string>
+    <string name="local_approval_enable_safe">开启全部自动批准</string>
+    <string name="local_approval_safe_enabled">自动批准已开启：所有需要审批的操作都会直接批准，并在后续对话继续生效。</string>
     <string name="local_approval_device_turn">批准本轮普通设备操作</string>
     <string name="local_approval_purpose_update">更新工作区内容以完成当前任务。</string>
     <string name="local_approval_purpose_shell">运行当前任务所需的本机步骤。</string>
