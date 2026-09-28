@@ -92,6 +92,20 @@ class ComposerRegressionTest {
         assertSame(original, repository.get(original.key))
     }
 
+    @Test fun composerRepositoryEvictsLeastRecentlyUsedDrafts() {
+        val repository = ComposerRepository(maxCachedDrafts = 2)
+        val first = repository.get(ComposerKey("host", "first"))
+        val second = repository.get(ComposerKey("host", "second"))
+        first.text = "keep"
+        second.text = "evict"
+
+        assertSame(first, repository.get(first.key))
+        repository.get(ComposerKey("host", "third"))
+
+        assertSame(first, repository.get(first.key))
+        assertNotSame(second, repository.get(second.key))
+    }
+
     @Test fun pickerUsesMultipleContentsAndCancellationIsEmpty() {
         val picker = ActivityResultContracts.GetMultipleContents()
         val intent = picker.createIntent(context, "image/*")
