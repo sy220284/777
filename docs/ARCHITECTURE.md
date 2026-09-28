@@ -118,3 +118,34 @@ tools/capture/  Node recorder of real harness traffic → conformance fixtures
 - Transient assistant rows never touch the durable cursor, never count as a
   gap, and are never paged; only the settlement is history.
 - Protocol baseline: harness `0.1.3-alpha.1` (`core.DshCore.PROTOCOL_BASELINE`).
+
+
+## Local runtime growth boundary
+
+The on-device runtime is a modular monolith. Existing Gradle modules remain the binary/runtime
+boundary; feature responsibilities inside `app` are separated by capability packages so adding a
+feature does not require another process-wide dependency or another Gradle module.
+
+Local UI dependencies flow through capability runtimes:
+
+```
+UI / ViewModels
+  -> local.presentation / local.chat / local.work / local.session / local.model / local.tools
+  -> LocalHarnessEngine (orchestration kernel)
+  -> coordinators / repositories / harness-core
+```
+
+`LocalHarnessEngine` owns cross-capability turn consistency, but its methods are module-internal and
+new UI/worker code may not depend on it directly. High-frequency streaming preview is a separate
+`StateFlow`, so token updates do not rewrite the aggregate runtime snapshot. Settings, Tasks and
+the app shell consume narrow projections with `distinctUntilChanged`.
+
+The remote `SessionStore` remains the single lock/stream orchestration owner by design. Mutable
+session index, open-session fold state and remote stream lifetime already live in
+`SessionIndexState`, `OpenSessionFoldState` and `SessionRemoteStreamCoordinator`; splitting the
+lock owner further would add synchronization and allocation cost without reducing the wire-domain
+coupling. Its file-size ratchet prevents new responsibilities from returning there.
+
+Physical feature Gradle modules should be added only when a capability can depend on a smaller
+dependency set than `:app`; package boundaries and CI ratchets are preferred until then to avoid
+extra configuration/build overhead and duplicated DI surfaces.

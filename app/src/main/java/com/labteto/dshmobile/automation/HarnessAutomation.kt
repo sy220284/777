@@ -22,7 +22,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.LocalAutomationWorkException
 import com.labteto.dshmobile.local.LocalHarnessBlockedException
-import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
 import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -1005,7 +1005,7 @@ class HarnessAutomationWorker(
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface WorkerEntryPoint {
-        fun localHarnessEngine(): LocalHarnessEngine
+        fun localAutomationRuntime(): LocalAutomationRuntime
         fun automationStore(): AutomationStore
         fun automationScheduler(): HarnessAutomationScheduler
         fun notifications(): DshNotifications
@@ -1042,9 +1042,9 @@ class HarnessAutomationWorker(
         }
 
         return try {
-            val engine = entry.localHarnessEngine()
+            val runtime = entry.localAutomationRuntime()
             val workSessionId = if (task.mode == AutomationMode.WORK) {
-                engine.prepareAutomationWorkSession(
+                runtime.prepareWorkSession(
                     text = task.prompt,
                     preferredSessionId = task.workSessionId,
                 ).also { sessionId ->
@@ -1057,12 +1057,12 @@ class HarnessAutomationWorker(
                 task.workSessionId
             }
             val run = when (task.mode) {
-                AutomationMode.WORK -> engine.runAutomationWork(
+                AutomationMode.WORK -> runtime.runWork(
                     text = task.prompt,
                     preferredSessionId = workSessionId,
                     recoverInterrupted = recovering,
                 )
-                AutomationMode.CHAT -> engine.runAutomationChat(
+                AutomationMode.CHAT -> runtime.runChat(
                     instruction = task.prompt,
                     targetSessionId = requireNotNull(task.targetSessionId) {
                         "角色定时互动缺少目标会话"

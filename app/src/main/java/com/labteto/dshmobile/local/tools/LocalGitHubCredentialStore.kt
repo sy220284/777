@@ -1,7 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.labteto.dshmobile.local.KeystorePreferenceSecretStore
 import javax.inject.Inject
 import javax.inject.Singleton
 

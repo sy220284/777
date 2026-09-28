@@ -47,7 +47,7 @@ import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.DeepSeekBillingSchedule
 import com.labteto.dshmobile.local.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.DeepSeekPricingState
-import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.LocalVisionSettingsSnapshot
@@ -429,7 +429,7 @@ private fun ModelProviderRow(
 
 @Composable
 internal fun LocalModelSettingsCard(
-    local: LocalHarnessState,
+    local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
@@ -779,7 +779,7 @@ private fun formatDeepSeekPrice(value: Double): String =
 
 @Composable
 internal fun MemoryOverviewCard(
-    local: LocalHarnessState,
+    local: LocalHarnessSettingsState,
     recordCount: Int,
 ) {
     SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
@@ -822,7 +822,7 @@ private fun MemoryKind.matchesFilter(filter: MemoryFilter): Boolean = when (filt
 
 @Composable
 internal fun LocalMemorySettingsCard(
-    local: LocalHarnessState,
+    local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {
@@ -1143,7 +1143,7 @@ private fun memoryKindLabel(kind: MemoryKind): String = stringResource(
 
 @Composable
 internal fun LocalAgentSettingsCard(
-    local: LocalHarnessState,
+    local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {

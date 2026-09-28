@@ -55,6 +55,7 @@ import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
+import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -385,10 +386,10 @@ class LocalHarnessEngine @Inject constructor(
             toolSchemas = ::modelToolSchemas,
             defaultEventLog = { eventLog },
             resetPreview = {
-                _state.update { it.copy(streamingAssistant = "", streamingReasoning = "") }
+                _streamingState.value = LocalHarnessStreamingState()
             },
             publishPreview = { preview ->
-                _state.update { it.copy(streamingAssistant = preview) }
+                _streamingState.update { it.copy(assistant = preview) }
             },
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
@@ -472,7 +473,9 @@ class LocalHarnessEngine @Inject constructor(
                 LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
-    val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
+    internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
 
     private val chatContextRefreshCoordinator by lazy {
         LocalChatContextRefreshCoordinator(
@@ -877,29 +880,29 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Read-only file views used by the local Harness UI. Heavy filesystem work stays off main. */
-    suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
+    internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
         conversationFilesCoordinator.workspaceFiles()
     }
 
-    suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
+    internal suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
         withContext(Dispatchers.IO) {
             conversationFilesCoordinator.conversationFiles(sessionId)
         }
 
-    suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
+    internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) {
             conversationFilesCoordinator.preview(path)
         }
 
     /** Save the local model route and its encrypted credential. */
-    fun configure(apiKey: String, model: String, baseUrl: String) {
+    internal fun configure(apiKey: String, model: String, baseUrl: String) {
         scope.launch {
             runCatching { saveModelConfiguration(apiKey, model, baseUrl) }
                 .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
 
-    suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
         val result = modelConfiguration.save(apiKey, model, baseUrl)
         _state.update {
@@ -915,7 +918,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Switch the active route and its corresponding encrypted key together. */
-    fun selectModel(id: String) {
+    internal fun selectModel(id: String) {
         scope.launch {
             val current = _state.value
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
@@ -942,7 +945,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    fun removeModelProfile(id: String) {
+    internal fun removeModelProfile(id: String) {
         if (isRunBusy() || _state.value.loading) return
         scope.launch {
             val current = _state.value
@@ -966,32 +969,32 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
+    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
         modelConfiguration.test(apiKey, model, baseUrl)
 
     /** Choose how user image attachments reach the local model. */
-    fun configureImageInputMode(mode: LocalImageInputMode) =
+    internal fun configureImageInputMode(mode: LocalImageInputMode) =
         settingsCoordinator.configureImageInputMode(mode)
 
     /** Persist execution limits exposed from Settings. */
-    fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
+    internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
         settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
 
     /** Persist user-authored behavioral rules and memory recall preference. */
-    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
+    internal fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(customRules, autoRecall, autoMemory)
 
     /** Master switch for local chat output filtering. */
-    fun configureChatStyleGuard(enabled: Boolean) =
+    internal fun configureChatStyleGuard(enabled: Boolean) =
         settingsCoordinator.configureChatStyleGuard(enabled)
 
-    fun addChatStyleGuardPhrase(value: String): Boolean =
+    internal fun addChatStyleGuardPhrase(value: String): Boolean =
         settingsCoordinator.addChatStyleGuardPhrase(value)
 
-    fun removeChatStyleGuardPhrase(value: String) =
+    internal fun removeChatStyleGuardPhrase(value: String) =
         settingsCoordinator.removeChatStyleGuardPhrase(value)
 
-    fun clearChatStyleGuardHits() =
+    internal fun clearChatStyleGuardHits() =
         settingsCoordinator.clearChatStyleGuardHits()
 
     private fun chatStreamFilterPhrases(
@@ -1002,7 +1005,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun recordStyleGuardHits(violations: List<String>) =
         settingsCoordinator.recordStyleGuardHits(violations)
 
-    fun configureChatPersona(profile: PersonaProfile) {
+    internal fun configureChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
         if (
             snapshot.running ||
@@ -1042,7 +1045,7 @@ class LocalHarnessEngine @Inject constructor(
      * Existing transcripts are deliberately left untouched by refusing the switch once dialogue
      * exists; callers can start a fresh chat instead.
      */
-    fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) {
+    internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) {
         val snapshot = _state.value
         if (
             snapshot.running ||
@@ -1074,7 +1077,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Create a brand-new character for the current empty chat. */
-    fun createChatPersona(profile: PersonaProfile) {
+    internal fun createChatPersona(profile: PersonaProfile) {
         val snapshot = _state.value
         if (
             snapshot.running ||
@@ -1105,7 +1108,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
+    internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
         _state.update { state ->
@@ -1118,7 +1121,7 @@ class LocalHarnessEngine @Inject constructor(
         if (_state.value.sessionId == snapshot.sessionId) persist()
     }
 
-    fun clearChatGalleryBinding(
+    internal fun clearChatGalleryBinding(
         expectedGalleryId: String,
         expectedStoryId: String? = null,
         keepCharacter: Boolean = false,
@@ -1138,7 +1141,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** A story direction is a user preference for future turns, never a synthetic user message. */
-    fun selectChatDirection(direction: String?) {
+    internal fun selectChatDirection(direction: String?) {
         val snapshot = _state.value
         if (
             snapshot.loading ||
@@ -1168,7 +1171,7 @@ class LocalHarnessEngine @Inject constructor(
      * This is suspendable so the UI only reports "synced" after the profile file and session state
      * have both been updated.
      */
-    suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
+    internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
         val snapshot = _state.value
         check(
             !snapshot.running &&
@@ -1197,7 +1200,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    fun createGroupChatSession() {
+    internal fun createGroupChatSession() {
         createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
@@ -1205,7 +1208,7 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    fun createSingleChatSession() {
+    internal fun createSingleChatSession() {
         createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
@@ -1213,7 +1216,7 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
+    internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = _state.value
         if (
             snapshot.loading ||
@@ -1280,7 +1283,7 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
-    fun setGroupChatAnnouncement(text: String): Boolean {
+    internal fun setGroupChatAnnouncement(text: String): Boolean {
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT ||
             !snapshot.groupChat.enabled) return false
@@ -1295,7 +1298,7 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
-    fun removeGroupChatMemberByGalleryId(galleryId: String) {
+    internal fun removeGroupChatMemberByGalleryId(galleryId: String) {
         val snapshot = _state.value
         if (
             snapshot.loading ||
@@ -1330,7 +1333,7 @@ class LocalHarnessEngine @Inject constructor(
      * Normal chat turns never call this path, so keeping the affordance visible has zero model
      * cost until it is tapped.
      */
-    suspend fun generateReplySuggestions(): Boolean {
+    internal suspend fun generateReplySuggestions(): Boolean {
         val snapshot = _state.value
         if (
             snapshot.loading ||
@@ -1437,7 +1440,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
-    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) {
         val prompt = text.trim()
         if ((prompt.isEmpty() && attachments.isEmpty()) || _state.value.loading || !_state.value.configured) return
         cancelChatPostTurn()
@@ -1466,7 +1469,7 @@ class LocalHarnessEngine @Inject constructor(
      * message are removed from the active conversation. Hard scene state is replayed from the
      * retained prefix so deleted future locations cannot leak into the new continuation.
      */
-    fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
+    internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
         if (state.usageMode != LocalUsageMode.CHAT || !state.configured) {
@@ -1648,7 +1651,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Switch among saved alternatives for one user or assistant turn. */
-    fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean = synchronized(runStateLock) {
+    internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean = synchronized(runStateLock) {
         val state = _state.value
         if (
             state.usageMode != LocalUsageMode.CHAT ||
@@ -1706,7 +1709,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
-    fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
+    internal fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
         if (!state.configured || state.loading ||
             state.groupChat.enabled ||
@@ -1833,7 +1836,8 @@ class LocalHarnessEngine @Inject constructor(
         } catch (error: Exception) {
             _state.update { it.copy(error = error.message ?: "重新生成失败") }
         } finally {
-            _state.update { it.copy(running = false, streamingAssistant = "", streamingReasoning = "") }
+            _state.update { it.copy(running = false) }
+            _streamingState.value = LocalHarnessStreamingState()
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
         }
@@ -1975,7 +1979,7 @@ class LocalHarnessEngine @Inject constructor(
      * model reaches either boundary, the run is stopped and WorkManager can surface the task as
      * blocked instead of silently granting power.
      */
-    suspend fun runAutomationPrompt(
+    internal suspend fun runAutomationPrompt(
         text: String,
         timeoutMillis: Long = 5 * 60_000L,
     ): String = runAutomationWork(
@@ -1984,7 +1988,7 @@ class LocalHarnessEngine @Inject constructor(
         timeoutMillis = timeoutMillis,
     ).output
 
-    suspend fun prepareAutomationWorkSession(
+    internal suspend fun prepareAutomationWorkSession(
         text: String,
         preferredSessionId: String? = null,
     ): String {
@@ -2001,7 +2005,7 @@ class LocalHarnessEngine @Inject constructor(
      * Execute automation in its own durable Work session without changing the visible Chat/Work
      * surface. Recurring tasks can pass [preferredSessionId] so all runs remain in one work history.
      */
-    suspend fun runAutomationWork(
+    internal suspend fun runAutomationWork(
         text: String,
         preferredSessionId: String? = null,
         timeoutMillis: Long = 5 * 60_000L,
@@ -2139,7 +2143,7 @@ class LocalHarnessEngine @Inject constructor(
      * visible we temporarily own the normal turn slot so user input queues behind the proactive
      * message instead of racing it; detached chats are generated without changing the visible UI.
      */
-    suspend fun runAutomationChat(
+    internal suspend fun runAutomationChat(
         instruction: String,
         targetSessionId: String,
         timeoutMillis: Long = 3 * 60_000L,
@@ -2272,8 +2276,6 @@ class LocalHarnessEngine @Inject constructor(
                     current.copy(
                         running = true,
                         error = null,
-                        streamingAssistant = "",
-                        streamingReasoning = "",
                     )
                 } else {
                     current
@@ -2682,8 +2684,6 @@ class LocalHarnessEngine @Inject constructor(
                             pendingApproval = null,
                             pendingQuestion = null,
                             deviceApprovalLease = false,
-                            streamingAssistant = "",
-                            streamingReasoning = "",
                         )
                     } else {
                         current
@@ -2852,39 +2852,39 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Copy a picked image/file into the app-private workspace before the model sees it. */
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
+    internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
-    suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
+    internal suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
 
-    suspend fun sessionStorageStatusForUi(): LocalSessionStorageStatus =
+    internal suspend fun sessionStorageStatusForUi(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { sessionStorageManager.status() }
 
-    suspend fun compactSessionStorageForUi(): LocalSessionStorageStatus =
+    internal suspend fun compactSessionStorageForUi(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { sessionStorageManager.compactAll() }
 
-    suspend fun exportSessionStorageForUi(output: OutputStream): Long =
+    internal suspend fun exportSessionStorageForUi(output: OutputStream): Long =
         withContext(Dispatchers.IO) { sessionStorageManager.exportAll(output) }
 
-    suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
+    internal suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
         environmentInfo()
     }
 
-    suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
+    internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
         DiagnosticReport.build(AppLog.snapshot(), environmentInfo())
     }
 
-    suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
-    suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
+    internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
+    internal suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
         githubPlugin.validateCredential(token).also { githubCredentials.put(token) }
-    suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
+    internal suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
 
-    suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
+    internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
 
-    suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
+    internal suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
         mcpPlugin.connectHttpFromUi(pluginRegistry.context, serverId, endpoint)
 
-    suspend fun connectMcpStdioForUi(
+    internal suspend fun connectMcpStdioForUi(
         serverId: String,
         command: List<String>,
         workingDirectory: String? = null,
@@ -2895,44 +2895,44 @@ class LocalHarnessEngine @Inject constructor(
         workingDirectory,
     )
 
-    suspend fun disconnectMcpForUi(serverId: String): String =
+    internal suspend fun disconnectMcpForUi(serverId: String): String =
         mcpPlugin.disconnectFromUi(pluginRegistry.context, serverId)
 
-    fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
+    internal fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
-    fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId)
+    internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId)
 
-    fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
+    internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
 
     /** Resolve the current write or shell approval. */
-    fun answerApproval(callId: String, approved: Boolean) =
+    internal fun answerApproval(callId: String, approved: Boolean) =
         approvalCoordinator.answerApproval(callId, approved)
 
-    fun enableAutoApproval() =
+    internal fun enableAutoApproval() =
         approvalCoordinator.enableAutoApproval()
 
-    fun enableAutoApprovalForPending(callId: String) =
+    internal fun enableAutoApprovalForPending(callId: String) =
         approvalCoordinator.enableAutoApprovalForPending(callId)
 
-    fun enableDeviceApprovalLease(callId: String) =
+    internal fun enableDeviceApprovalLease(callId: String) =
         approvalCoordinator.enableDeviceApprovalLease(callId)
 
-    fun disableDeviceApprovalLease() =
+    internal fun disableDeviceApprovalLease() =
         approvalCoordinator.disableDeviceApprovalLease()
 
-    fun disableAutoApproval() =
+    internal fun disableAutoApproval() =
         approvalCoordinator.disableAutoApproval()
 
     /** Resolve the current model-authored question. */
-    fun answerQuestion(callId: String, answer: String) =
+    internal fun answerQuestion(callId: String, answer: String) =
         approvalCoordinator.answerQuestion(callId, answer)
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    fun cancelQuestion(callId: String) =
+    internal fun cancelQuestion(callId: String) =
         approvalCoordinator.cancelQuestion(callId)
 
     /** Stop the active model/tool turn. New work stays blocked until cleanup completes. */
-    fun stop() {
+    internal fun stop() {
         cancelChatPostTurn()
         interactions.cancelAll()
         val running = synchronized(runStateLock) {
@@ -2958,10 +2958,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
-    fun createSession(mode: LocalConversationMode) =
+    internal fun createSession(mode: LocalConversationMode) =
         sessionLifecycle.createSession(mode)
 
-    fun createSession(
+    internal fun createSession(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         galleryEntry: PersonaGalleryEntry? = null,
@@ -2978,24 +2978,24 @@ class LocalHarnessEngine @Inject constructor(
     )
 
     /** Backward-compatible entry point: a plain new session is fully independent. */
-    fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
+    internal fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
 
-    fun switchChatMode(mode: LocalChatMode) =
+    internal fun switchChatMode(mode: LocalChatMode) =
         sessionLifecycle.switchChatMode(mode)
 
     /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
-    fun switchUsageMode(mode: LocalUsageMode) =
+    internal fun switchUsageMode(mode: LocalUsageMode) =
         sessionLifecycle.switchUsageMode(mode)
 
-    fun switchSession(sessionId: String) =
+    internal fun switchSession(sessionId: String) =
         sessionLifecycle.switchSession(sessionId)
 
     /** Permanently remove selected local sessions and their durable event segments. */
-    suspend fun deleteSessions(requestedIds: Set<String>): Int =
+    internal suspend fun deleteSessions(requestedIds: Set<String>): Int =
         sessionLifecycle.deleteSessions(requestedIds)
 
     /** Remove the local API key after an in-flight turn has finished cancelling. */
-    fun clearCredential() {
+    internal fun clearCredential() {
         if (!beginSessionTransition()) return
         _state.update { it.copy(loading = true) }
         scope.launch {
@@ -3127,7 +3127,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Switch between inspection-only planning and normal execution. */
-    fun setPlanMode(enabled: Boolean) {
+    internal fun setPlanMode(enabled: Boolean) {
         if (_state.value.usageMode == LocalUsageMode.CHAT || isRunBusy()) return
         _state.update { it.copy(planMode = enabled) }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
@@ -3197,7 +3197,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
+    internal fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
         val snapshot = _state.value
         val notice = snapshot.personaCorrectionNotice
         if (
@@ -3874,8 +3874,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
-                    streamingAssistant = "",
-                    streamingReasoning = "",
                 )
             }
             persist()
@@ -4055,8 +4053,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
-                    streamingAssistant = "",
-                    streamingReasoning = "",
                 )
             }
             persist()
@@ -4117,8 +4113,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
-                    streamingAssistant = "",
-                    streamingReasoning = "",
                 )
             }
             persist()
@@ -4696,8 +4690,6 @@ class LocalHarnessEngine @Inject constructor(
                     pendingApproval = null,
                     pendingQuestion = null,
                     deviceApprovalLease = false,
-                    streamingAssistant = "",
-                    streamingReasoning = "",
                 )
             }
             persist()
@@ -6104,8 +6096,6 @@ class LocalHarnessEngine @Inject constructor(
                     } else {
                         appendLocalTranscriptRuntimeIndex(state.transcriptIndex, messages)
                     },
-                    streamingAssistant = if (clearStreamingPreview) "" else state.streamingAssistant,
-                    streamingReasoning = if (clearStreamingPreview) "" else state.streamingReasoning,
                 )
             }
         }

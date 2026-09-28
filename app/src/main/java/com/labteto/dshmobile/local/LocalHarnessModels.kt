@@ -206,6 +206,12 @@ data class ChatPersonaCorrectionNotice(
     val correction: String,
 )
 
+/** High-frequency model preview kept outside the aggregate runtime state. */
+data class LocalHarnessStreamingState(
+    val assistant: String = "",
+    val reasoning: String = "",
+)
+
 /** State rendered by the standalone, on-device Harness screen. */
 data class LocalHarnessState(
     val loading: Boolean = true,
@@ -269,8 +275,6 @@ data class LocalHarnessState(
     val resourcePressure: String = "low",
     val contextChars: Int = 0,
     val contextBudgetChars: Int = 0,
-    val streamingAssistant: String = "",
-    val streamingReasoning: String = "",
     val running: Boolean = false,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,

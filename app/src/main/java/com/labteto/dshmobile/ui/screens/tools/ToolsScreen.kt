@@ -41,7 +41,7 @@ import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
-import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -88,7 +88,7 @@ data class ToolsUiState(
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val engine: LocalHarnessEngine,
+    private val localTools: LocalToolsRuntime,
     private val sessionStore: SessionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
@@ -103,11 +103,11 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
                 sessionStore.refreshPlugins()
-                val (servers, plugins) = engine.mcpServersForUi() to engine.installedPluginIdsForUi()
+                val (servers, plugins) = localTools.servers() to localTools.installedPluginIds()
                 _state.value = ToolsUiState(
                     loading = false,
                     servers = servers,
-                    githubConfigured = engine.githubConnectorConfiguredForUi(),
+                    githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
                     remotePlugins = sessionStore.plugins.value,
                 )
@@ -126,11 +126,11 @@ class ToolsViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                engine.connectMcpHttpForUi(serverId, endpoint)
+                localTools.connectHttp(serverId, endpoint)
                 _state.value = _state.value.copy(
                     loading = false,
-                    servers = engine.mcpServersForUi(),
-                    localPlugins = engine.installedPluginIdsForUi(),
+                    servers = localTools.servers(),
+                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -148,11 +148,11 @@ class ToolsViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                engine.configureGitHubConnectorForUi(token)
+                localTools.configureGitHub(token)
                 _state.value = _state.value.copy(
                     loading = false,
                     githubConfigured = true,
-                    localPlugins = engine.installedPluginIdsForUi(),
+                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -169,7 +169,7 @@ class ToolsViewModel @Inject constructor(
     fun clearGitHub() {
         viewModelScope.launch {
             try {
-                engine.clearGitHubConnectorForUi()
+                localTools.clearGitHub()
                 _state.value = _state.value.copy(
                     loading = false,
                     githubConfigured = false,
@@ -186,11 +186,11 @@ class ToolsViewModel @Inject constructor(
     fun disconnect(serverId: String) {
         viewModelScope.launch {
             try {
-                engine.disconnectMcpForUi(serverId)
+                localTools.disconnect(serverId)
                 _state.value = _state.value.copy(
                     loading = false,
-                    servers = engine.mcpServersForUi(),
-                    localPlugins = engine.installedPluginIdsForUi(),
+                    servers = localTools.servers(),
+                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.DISCONNECTED,
                 )
             } catch (cancelled: CancellationException) {

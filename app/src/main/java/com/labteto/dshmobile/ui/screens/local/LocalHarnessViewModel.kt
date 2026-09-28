@@ -10,10 +10,11 @@ import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
-import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalUiRuntime
+import com.labteto.dshmobile.local.presentation.projectShellState
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -39,23 +40,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
-
 private const val MAX_PERSONA_PORTRAIT_BYTES = 20L * 1024L * 1024L
 private const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
 private const val PERSONA_INSPECTION_RECENT_MESSAGES = 28
 private const val PERSONA_AUTOFILL_RECENT_MESSAGES = 12
-
-/** UI adapter for the process-wide on-device Harness engine. */
+/** UI adapter over capability-scoped local runtimes. */
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
-    private val engine: LocalHarnessEngine,
+    private val runtime: LocalUiRuntime,
     private val personaAutoFillService: PersonaAutoFillService,
     private val groupAnnouncementService: GroupAnnouncementService,
     private val personaInspectionService: PersonaInspectionService,
     private val galleryStore: ChatPersonaGalleryStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val state = engine.state
+    val state = runtime.session.state
+    val streamingState = runtime.session.streamingState
+    val shellState = state.projectShellState(viewModelScope)
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
     private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
@@ -86,7 +87,7 @@ class LocalHarnessViewModel @Inject constructor(
             "请在单人聊天空闲时保存人设与故事"
         }
         val completeHistory = withContext(Dispatchers.IO) {
-            engine.completeTranscriptForUi(snapshot.sessionId)
+            runtime.session.completeTranscriptForUi(snapshot.sessionId)
         }
         val archiveHistory = if (
             snapshot.galleryStoryId == null &&
@@ -110,7 +111,7 @@ class LocalHarnessViewModel @Inject constructor(
                 forceNewStory = forceNewStory,
             ).also { _gallery.value = galleryStore.list() }
         }
-        engine.bindChatGallery(outcome.entry.id, outcome.storyId)
+        runtime.chat.bindChatGallery(outcome.entry.id, outcome.storyId)
         outcome.entry
     }
 
@@ -169,7 +170,7 @@ class LocalHarnessViewModel @Inject constructor(
             snapshot.transcriptIndex.hasDialogue
         ) return false
         val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-        engine.selectChatPersona(entry.persona, galleryId = entry.id)
+        runtime.chat.selectChatPersona(entry.persona, galleryId = entry.id)
         return true
     }
 
@@ -223,7 +224,7 @@ class LocalHarnessViewModel @Inject constructor(
             snapshot.galleryStoryId == story?.id
         ) {
             val recent = withContext(Dispatchers.IO) {
-                engine.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
+                runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
             }
             (archived + recent)
                 .distinctBy { it.id.ifBlank { "${it.role}|${it.createdAt}|${it.content}" } }
@@ -251,7 +252,7 @@ class LocalHarnessViewModel @Inject constructor(
         }
         _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
         if (state.value.galleryId == id) {
-            engine.configureChatPersona(updated.persona)
+            runtime.chat.configureChatPersona(updated.persona)
         }
         updated
     }
@@ -377,8 +378,8 @@ class LocalHarnessViewModel @Inject constructor(
             _gallery.value = galleryStore.list()
         }
         deleteManagedPortrait(portraitPath)
-        engine.removeGroupChatMemberByGalleryId(id)
-        engine.clearChatGalleryBinding(expectedGalleryId = id)
+        runtime.chat.removeGroupChatMemberByGalleryId(id)
+        runtime.chat.clearChatGalleryBinding(expectedGalleryId = id)
     }
 
     suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
@@ -386,7 +387,7 @@ class LocalHarnessViewModel @Inject constructor(
             check(galleryStore.deleteStory(id, storyId)) { "图集故事已不存在" }
             _gallery.value = galleryStore.list()
         }
-        engine.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
+        runtime.chat.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
     }
 
     suspend fun deleteGalleryHistoryMessage(
@@ -408,7 +409,7 @@ class LocalHarnessViewModel @Inject constructor(
         val snapshot = state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
         val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-        engine.createSession(
+        runtime.session.createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
             galleryEntry = entry,
@@ -449,7 +450,7 @@ class LocalHarnessViewModel @Inject constructor(
                 ?.messages
                 .orEmpty()
             val firstPage = withContext(Dispatchers.IO) {
-                engine.transcriptPageForUi(
+                runtime.session.transcriptPageForUi(
                     sessionId = sessionId,
                     cursor = null,
                     limit = transcriptHistoryBootstrapLimit(
@@ -507,7 +508,7 @@ class LocalHarnessViewModel @Inject constructor(
 
         return try {
             val page = withContext(Dispatchers.IO) {
-                engine.transcriptPageForUi(
+                runtime.session.transcriptPageForUi(
                     sessionId = sessionId,
                     cursor = cursor,
                     limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
@@ -540,22 +541,22 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
-    fun selectModel(model: String) = engine.selectModel(model)
-    fun setImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
-    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = engine.send(text, attachments)
-    suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
-    fun createGroupChatSession() = engine.createGroupChatSession()
-    fun createSingleChatSession() = engine.createSingleChatSession()
-    fun openGroupChatMode() = engine.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
-    fun leaveGroupChatMode() = engine.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.SINGLE)
+    fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
+    fun selectModel(model: String) = runtime.model.selectModel(model)
+    fun setImageInputMode(mode: LocalImageInputMode) = runtime.model.configureImageInputMode(mode)
+    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = runtime.chat.send(text, attachments)
+    suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
+    fun createGroupChatSession() = runtime.chat.createGroupChatSession()
+    fun createSingleChatSession() = runtime.chat.createSingleChatSession()
+    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
+    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.SINGLE)
     fun configureGroupChatMembers(ids: List<String>): Boolean {
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
         val entries = ids.distinct().mapNotNull(entriesById::get)
         if (entries.size != ids.distinct().size) return false
-        return engine.configureGroupChatMembers(entries)
+        return runtime.chat.configureGroupChatMembers(entries)
     }
-    fun setGroupChatAnnouncement(text: String): Boolean = engine.setGroupChatAnnouncement(text)
+    fun setGroupChatAnnouncement(text: String): Boolean = runtime.chat.setGroupChatAnnouncement(text)
 
     suspend fun generateGroupChatAnnouncement(direction: String): Result<String> = runCatching {
         val snapshot = state.value
@@ -572,7 +573,7 @@ class LocalHarnessViewModel @Inject constructor(
     }
     suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
         val result = withContext(Dispatchers.IO) {
-            engine.editAndResendUserMessage(messageId, text)
+            runtime.chat.editAndResendUserMessage(messageId, text)
         }
         if (result == LocalChatUserEditResult.SENT) {
             refreshTranscriptHistoryAfterTimelineRewrite()
@@ -582,7 +583,7 @@ class LocalHarnessViewModel @Inject constructor(
 
     suspend fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean {
         val selected = withContext(Dispatchers.IO) {
-            engine.selectChatMessageVariant(messageId, targetIndex)
+            runtime.chat.selectChatMessageVariant(messageId, targetIndex)
         }
         if (selected) refreshTranscriptHistoryAfterTimelineRewrite()
         return selected
@@ -597,32 +598,32 @@ class LocalHarnessViewModel @Inject constructor(
             prepareTranscriptHistory(sessionId, force = true)
         }
     }
-    fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
-    suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
-    suspend fun workspaceFiles() = engine.workspaceFilesForUi()
-    suspend fun conversationFiles(sessionId: String) = engine.conversationFilesForUi(sessionId)
-    suspend fun previewWorkspaceFile(path: String) = engine.previewWorkspaceFileForUi(path)
-    fun backgroundJobOutput(jobId: String): String = engine.backgroundJobOutputForUi(jobId)
-    fun stopBackgroundJob(jobId: String): String = engine.stopBackgroundJobForUi(jobId)
-    fun approve(callId: String) = engine.answerApproval(callId, true)
-    fun deny(callId: String) = engine.answerApproval(callId, false)
-    fun enableAutoApproval() = engine.enableAutoApproval()
-    fun enableAutoApprovalForPending(callId: String) = engine.enableAutoApprovalForPending(callId)
-    fun enableDeviceApprovalLease(callId: String) = engine.enableDeviceApprovalLease(callId)
-    fun disableDeviceApprovalLease() = engine.disableDeviceApprovalLease()
-    fun disableAutoApproval() = engine.disableAutoApproval()
-    fun answerQuestion(callId: String, answer: String) = engine.answerQuestion(callId, answer)
-    fun cancelQuestion(callId: String) = engine.cancelQuestion(callId)
-    fun stop() = engine.stop()
-    fun newSession() = engine.createSession(LocalConversationMode.INDEPENDENT)
-    fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
-    fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
-    fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
-    fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
-    fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
+    fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
+    suspend fun deleteSessions(ids: Set<String>): Int = runtime.session.deleteSessions(ids)
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
+    suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
+    suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+    fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
+    fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
+    fun approve(callId: String) = runtime.work.answerApproval(callId, true)
+    fun deny(callId: String) = runtime.work.answerApproval(callId, false)
+    fun enableAutoApproval() = runtime.work.enableAutoApproval()
+    fun enableAutoApprovalForPending(callId: String) = runtime.work.enableAutoApprovalForPending(callId)
+    fun enableDeviceApprovalLease(callId: String) = runtime.work.enableDeviceApprovalLease(callId)
+    fun disableDeviceApprovalLease() = runtime.work.disableDeviceApprovalLease()
+    fun disableAutoApproval() = runtime.work.disableAutoApproval()
+    fun answerQuestion(callId: String, answer: String) = runtime.work.answerQuestion(callId, answer)
+    fun cancelQuestion(callId: String) = runtime.work.cancelQuestion(callId)
+    fun stop() = runtime.work.stop()
+    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT)
+    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode)
+    fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
+    fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
+    fun configureChatPersona(profile: PersonaProfile) = runtime.chat.configureChatPersona(profile)
+    fun selectChatDirection(direction: String?) = runtime.chat.selectChatDirection(direction)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
-        engine.undoChatPersonaCorrection(noticeId, personaId, correction)
+        runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value
@@ -639,7 +640,7 @@ class LocalHarnessViewModel @Inject constructor(
         }
         return runCatching {
             val recentMessages = withContext(Dispatchers.IO) {
-                engine.transcriptTailForUi(snapshot.sessionId, PERSONA_AUTOFILL_RECENT_MESSAGES)
+                runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_AUTOFILL_RECENT_MESSAGES)
             }
             val generated = personaAutoFillService.generate(
                 model = snapshot.model,
@@ -648,9 +649,9 @@ class LocalHarnessViewModel @Inject constructor(
                 recentMessages = recentMessages,
                 description = description,
             )
-            engine.syncDefaultChatPersona(generated)
+            runtime.chat.syncDefaultChatPersona(generated)
         }
     }
-    fun switchSession(sessionId: String) = engine.switchSession(sessionId)
-    fun clearCredential() = engine.clearCredential()
+    fun switchSession(sessionId: String) = runtime.session.switchSession(sessionId)
+    fun clearCredential() = runtime.model.clearCredential()
 }
