@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -305,17 +307,26 @@ class TasksViewModel @Inject constructor(
 fun TasksScreen(
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit = {},
+    initialMode: AutomationMode? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val harnessState by viewModel.harnessState.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
-    val taskMode = if (harnessState.usageMode == LocalUsageMode.CHAT) {
+    val harnessTaskMode = if (harnessState.usageMode == LocalUsageMode.CHAT) {
         AutomationMode.CHAT
     } else {
         AutomationMode.WORK
     }
+    var selectedModeName by rememberSaveable {
+        mutableStateOf((initialMode ?: harnessTaskMode).name)
+    }
+    val taskMode = runCatching { AutomationMode.valueOf(selectedModeName) }
+        .getOrDefault(harnessTaskMode)
     val chatMode = taskMode == AutomationMode.CHAT
+    val canCreateChatInteraction = harnessState.usageMode == LocalUsageMode.CHAT &&
+        !harnessState.groupChat.enabled &&
+        harnessState.sessionId.isNotBlank()
     val visibleTasks = state.tasks.filter { it.mode == taskMode }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by rememberSaveable { mutableStateOf(false) }
@@ -396,7 +407,9 @@ fun TasksScreen(
                 ),
                 onBack = navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
-                actionIcon = if (showCreate) null else Icons.Filled.Add,
+                actionIcon = if (
+                    showCreate || (chatMode && !canCreateChatInteraction)
+                ) null else Icons.Filled.Add,
                 actionContentDescription = stringResource(
                     if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
                 ),
@@ -417,6 +430,41 @@ fun TasksScreen(
                     createError = null
                 },
             )
+
+            if (!showCreate) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.tasks_mode_work),
+                        onClick = { selectedModeName = AutomationMode.WORK.name },
+                        modifier = Modifier.weight(1f),
+                        variant = if (taskMode == AutomationMode.WORK) {
+                            DsButtonVariant.Info
+                        } else {
+                            DsButtonVariant.Ghost
+                        },
+                    )
+                    DsButton(
+                        text = stringResource(R.string.tasks_mode_chat),
+                        onClick = { selectedModeName = AutomationMode.CHAT.name },
+                        modifier = Modifier.weight(1f),
+                        variant = if (taskMode == AutomationMode.CHAT) {
+                            DsButtonVariant.Info
+                        } else {
+                            DsButtonVariant.Ghost
+                        },
+                    )
+                }
+                if (chatMode && !canCreateChatInteraction) {
+                    Text(
+                        stringResource(R.string.tasks_chat_mode_unavailable),
+                        style = DsType.small13,
+                        color = colors.labelSecondary,
+                    )
+                }
+            }
 
             if (showCreate) {
                 TaskEditorPane(
@@ -1129,6 +1177,7 @@ private fun TaskCard(
     onOpenSession: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    var confirmDelete by remember(task.id) { mutableStateOf(false) }
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.scheduleType) {
@@ -1204,7 +1253,7 @@ private fun TaskCard(
             }
             DsButton(
                 text = stringResource(R.string.tasks_cancel),
-                onClick = onCancel,
+                onClick = { confirmDelete = true },
                 size = DsButtonSize.Small,
                 variant = DsButtonVariant.Ghost,
             )
@@ -1308,6 +1357,37 @@ private fun TaskCard(
                     onClick = { onOpenSession(sessionId) },
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Outline,
+                )
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        DsDialog(
+            title = stringResource(R.string.tasks_delete_confirm_title),
+            onDismiss = { confirmDelete = false },
+        ) {
+            Text(
+                stringResource(R.string.tasks_delete_confirm_body),
+                style = DsType.std14,
+                color = colors.labelSecondary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmDelete = false },
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.tasks_delete_confirm),
+                    onClick = {
+                        confirmDelete = false
+                        onCancel()
+                    },
+                    variant = DsButtonVariant.Danger,
                 )
             }
         }

@@ -3,9 +3,6 @@ import com.labteto.dshmobile.local.LocalChatUserEditResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -22,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -727,6 +723,8 @@ private fun LocalConversationSurface(
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
+    val transcriptPrefixItemCount = if (hiddenTranscriptCount > 0 || hasOlderTranscript) 1 else 0
+    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
     val messageEditingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageBranchingEnabled = messageEditingEnabled
     val messageActionsEnabled =
@@ -811,15 +809,15 @@ private fun LocalConversationSurface(
         attachmentError = null
         showReplySuggestions = false
         if (transcriptItems.isNotEmpty()) {
-            listState.scrollToItem(transcriptItems.lastIndex)
+            listState.scrollToItem(transcriptLastListIndex)
         }
     }
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
         if (transcriptItems.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            if (lastVisible >= transcriptItems.lastIndex - 2) {
-                listState.animateScrollToItem(transcriptItems.lastIndex)
+            if (lastVisible >= transcriptLastListIndex - 2) {
+                listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
     }
@@ -1640,73 +1638,6 @@ private fun LocalConversationSurface(
         }
     }
 
-}
-
-@Composable
-internal fun LocalUsageModePill(
-    selected: LocalUsageMode,
-    enabled: Boolean,
-    onSelect: (LocalUsageMode) -> Unit,
-) {
-    val colors = DsTheme.colors
-    val backgroundState = LocalAppBackgroundState.current
-    val containerColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
-        backgroundState.surfaceColor(
-            base = colors.bgModulePlatform,
-            region = BackgroundRegion.TOP,
-            minAlpha = 0.28f,
-            maxAlpha = 0.48f,
-        )
-    } else if (backgroundState.hasImage) {
-        colors.bgModulePlatform.copy(alpha = 0.28f)
-    } else {
-        colors.bgModulePlatform
-    }
-    val indicatorOffset by animateDpAsState(
-        targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else 126.dp,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "usage mode indicator",
-    )
-    Surface(
-        modifier = Modifier.width(264.dp).height(52.dp),
-        shape = DsShapes.pillFull,
-        color = containerColor,
-        border = BorderStroke(1.dp, colors.borderL2),
-        tonalElevation = 0.dp,
-        shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
-    ) {
-        Box(Modifier.padding(4.dp)) {
-            Surface(
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .size(width = 126.dp, height = 44.dp),
-                shape = DsShapes.pillFull,
-                color = colors.bgLayer1,
-                border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 2.dp,
-            ) {}
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                listOf(
-                    LocalUsageMode.CHAT to R.string.local_usage_chat,
-                    LocalUsageMode.WORK to R.string.local_usage_work,
-                ).forEach { (mode, labelRes) ->
-                    Box(
-                        modifier = Modifier
-                            .size(width = 126.dp, height = 44.dp)
-                            .clip(DsShapes.pillFull)
-                            .clickable(enabled = enabled) { onSelect(mode) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            stringResource(labelRes),
-                            style = DsType.std14,
-                            color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

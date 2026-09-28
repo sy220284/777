@@ -147,7 +147,11 @@ internal fun PlanReviewPanel(
     // by the chat column, then give only the plan body the flexible/scrollable portion so the
     // decision controls stay reachable at all times.
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val cap = questionCardMaxHeight(maxHeight)
+        // Plan review can expose three actions. With large fonts they wrap to multiple rows, so the
+        // generic 60% question-card cap can clip the last decision even though the control still
+        // exists in semantics. Give decision-heavy cards more of the *offered* height while
+        // retaining the same 360dp ceiling used by the ordinary question flow.
+        val cap = minOf(maxHeight * 0.8f, 360.dp)
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,13 +176,15 @@ internal fun PlanReviewPanel(
                     )
                 }
                 Column(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = false)
+                            .weight(1f)
                             .verticalScroll(bodyScroll),
                     ) {
                         MarkdownText(review.plan)

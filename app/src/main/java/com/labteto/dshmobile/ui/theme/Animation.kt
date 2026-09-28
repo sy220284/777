@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 
@@ -50,6 +51,9 @@ object DsAnimations {
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
+
+    /** Sliding indicator used by compact segmented controls. */
+    val segmentSlide: FiniteAnimationSpec<Dp> = tween(220, easing = FastOutSlowInEasing)
 
     /** Item placement inside a lazy list when rows are inserted, removed, or reordered. */
     val listItem: FiniteAnimationSpec<IntOffset> = spring(
