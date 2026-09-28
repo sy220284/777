@@ -42,11 +42,11 @@ internal fun ChatContextState.normalized(): ChatContextState = copy(
         lastSceneChange = "",
     ),
     continuity = continuity.copy(
-        recentEvents = continuity.recentEvents.cleanContextLines(5, 180),
+        recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180),
         // Repeated-event history is folded into the latest decision/event instead of growing forever.
         recurringEvents = emptyList(),
-        decisions = continuity.decisions.cleanContextLines(4, 180),
-        unfinished = continuity.unfinished.cleanContextLines(4, 180),
+        decisions = continuity.decisions.cleanRecentContextLines(4, 180),
+        unfinished = continuity.unfinished.cleanRecentContextLines(4, 180),
     ),
     sceneEvents = sceneEvents
         .sortedBy(ChatSceneEvent::sequence)
@@ -141,9 +141,26 @@ internal fun ChatContextState.hasUsefulFacts(): Boolean =
         sceneEvents.isNotEmpty()
 
 internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): ChatContextState {
-    if (hasUsefulFacts()) return normalized()
-    val legacy = copy(scene = state.scene, continuity = state.continuity).normalized()
-    return if (legacy.hasUsefulFacts()) legacy else this
+    val current = normalized()
+    val legacy = ChatContextState(
+        scene = ChatSceneState(
+            sceneTime = state.scene.sceneTime,
+            location = state.scene.location,
+        ),
+        continuity = state.continuity,
+    ).normalized()
+
+    return current.copy(
+        scene = current.scene.copy(
+            sceneTime = current.scene.sceneTime.ifBlank { legacy.scene.sceneTime },
+            location = current.scene.location.ifBlank { legacy.scene.location },
+        ),
+        continuity = current.continuity.copy(
+            recentEvents = current.continuity.recentEvents.ifEmpty { legacy.continuity.recentEvents },
+            decisions = current.continuity.decisions.ifEmpty { legacy.continuity.decisions },
+            unfinished = current.continuity.unfinished.ifEmpty { legacy.continuity.unfinished },
+        ),
+    ).normalized()
 }
 
 internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState): ChatCharacterState =
@@ -173,6 +190,16 @@ private fun List<String>.cleanContextLines(limit: Int, maxChars: Int): List<Stri
         .distinct()
         .take(limit)
         .toList()
+
+private fun List<String>.cleanRecentContextLines(limit: Int, maxChars: Int): List<String> =
+    asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .map { it.take(maxChars) }
+        .distinct()
+        .toList()
+        .takeLast(limit)
+
 
 internal fun ChatContextState.canonicalFactLines(): List<String> {
     val normalized = normalized()
