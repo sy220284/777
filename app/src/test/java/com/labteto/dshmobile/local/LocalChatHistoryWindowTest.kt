@@ -205,7 +205,7 @@ class LocalChatHistoryWindowTest {
             history = history,
             recentMessages = 20,
             compactionBatch = 8,
-            currentFacts = listOf("明早九点去城南"),
+            currentFacts = listOf("明早十点去城南"),
         )
         val checkpoint = bounded[1]
 
@@ -265,6 +265,28 @@ class LocalChatHistoryWindowTest {
         val checkpoint = bounded.first { it.toString().contains("<compacted-summary>") }
 
         assertEquals("system", checkpoint["role"]?.jsonPrimitive?.content)
+    }
+
+
+    @Test
+    fun oldScheduleWithDifferentClockIsRemovedByCurrentDecision() {
+        val history = buildList {
+            add(message("system", "系统"))
+            repeat(15) { index ->
+                add(message("user", if (index == 0) "明早九点去城南" else "旧事件$index"))
+                add(message("assistant", "角色旧回复$index"))
+            }
+        }
+
+        val bounded = boundedChatRequestHistory(
+            history = history,
+            recentMessages = 10,
+            compactionBatch = 4,
+            currentFacts = listOf("明早十点去城南"),
+        )
+        val checkpoint = bounded.first { it.toString().contains("<chat-continuity>") }
+
+        assertFalse(checkpoint.toString().contains("明早九点去城南"))
     }
 
     private fun message(role: String, content: String) = buildJsonObject {
