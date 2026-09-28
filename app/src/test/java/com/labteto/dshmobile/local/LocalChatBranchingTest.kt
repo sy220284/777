@@ -144,6 +144,78 @@ class LocalChatBranchingTest {
     }
 
     @Test
+    fun historicalEditMergesDurablePrefixWithVisibleHotTailWhenArchiveLags() {
+        val durable = (1..40).map { index ->
+            message("m$index", "user", "消息$index", index.toLong())
+        }
+        val hotTail = (41..60).map { index ->
+            message("m$index", "user", "消息$index", index.toLong())
+        }
+
+        val active = activeTranscriptForUserEdit(
+            messageId = "m50",
+            activeBranch = emptyList(),
+            hotMessages = hotTail,
+            totalMessageCount = 60,
+            loadDurableTranscript = { durable },
+        )
+        val rewritten = rewriteChatTranscriptFromUserEdit(
+            activeMessages = active,
+            originalMessageId = "m50",
+            editedMessage = message("edited", "user", "修改后的第50条", 61),
+        )!!
+
+        assertEquals((1..60).map { "m$it" }, active.map { it.id })
+        assertEquals((1..49).map { "m$it" } + "edited", rewritten.map { it.id })
+    }
+
+    @Test
+    fun historicalEditUsesLiveTailOverStaleDurableOverlap() {
+        val durable = (1..55).map { index ->
+            message("m$index", "user", "旧消息$index", index.toLong())
+        }
+        val hotTail = (51..60).map { index ->
+            message("m$index", "user", "当前消息$index", index.toLong())
+        }
+
+        val active = activeTranscriptForUserEdit(
+            messageId = "m58",
+            activeBranch = emptyList(),
+            hotMessages = hotTail,
+            totalMessageCount = 60,
+            loadDurableTranscript = { durable },
+        )
+
+        assertEquals((1..60).map { "m$it" }, active.map { it.id })
+        assertEquals("当前消息51", active.first { it.id == "m51" }.content)
+        assertEquals("当前消息55", active.first { it.id == "m55" }.content)
+    }
+
+    @Test
+    fun historicalEditDoesNotRetainStaleDurableFutureWhenIdsDoNotOverlap() {
+        val durable = (1..80).map { index ->
+            message("old-$index", "user", "旧时间线$index", index.toLong())
+        }
+        val liveTail = (41..60).map { index ->
+            message("live-$index", "user", "当前时间线$index", index.toLong())
+        }
+
+        val active = activeTranscriptForUserEdit(
+            messageId = "live-50",
+            activeBranch = emptyList(),
+            hotMessages = liveTail,
+            totalMessageCount = 60,
+            loadDurableTranscript = { durable },
+        )
+
+        assertEquals(
+            (1..40).map { "old-$it" } + (41..60).map { "live-$it" },
+            active.map { it.id },
+        )
+        assertTrue(active.none { it.id in (41..80).map { n -> "old-$n" }.toSet() })
+    }
+
+    @Test
     fun historicalEditReplayDoesNotKeepDeletedFutureLocation() {
         val retained = listOf(
             message("u1", "user", "进去说吧。", 1),
