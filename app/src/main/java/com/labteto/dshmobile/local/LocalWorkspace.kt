@@ -279,6 +279,7 @@ class LocalWorkspace(
         command: String,
         timeoutSeconds: Int,
         onProgress: ((String) -> Unit)? = null,
+        throwOnFailure: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         require(command.isNotBlank()) { "命令不能为空" }
         val builder = ProcessBuilder(shellExecutable, "-c", command)
@@ -305,10 +306,23 @@ class LocalWorkspace(
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,
         )
-        if (result.timedOut) {
-            "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}"
-        } else {
-            "退出码：${result.exitCode}\n${result.stdout}"
+        when {
+            result.timedOut && throwOnFailure -> {
+                throw IllegalStateException(
+                    "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}",
+                )
+            }
+            result.timedOut -> {
+                "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}"
+            }
+            result.exitCode != 0 && throwOnFailure -> {
+                throw IllegalStateException(
+                    "[shell][PROCESS_EXIT_${result.exitCode}] 后台命令异常结束。\n已产生输出：\n${result.stdout}",
+                )
+            }
+            else -> {
+                "退出码：${result.exitCode}\n${result.stdout}"
+            }
         }
     }
 
