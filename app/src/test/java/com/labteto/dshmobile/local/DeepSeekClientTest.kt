@@ -204,4 +204,50 @@ class DeepSeekClientTest {
     }
 
 
+    @Test
+    fun gpt6SolToolCallingUsesNoReasoningInChatCompletions() = runBlocking {
+        val body = listOf(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"完成\"}}]}",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+            "data: [DONE]",
+        ).joinToString("\n")
+        var requestBody = ""
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            requestBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body(body.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+
+        streamingClient.completeStreaming(
+            apiKey = "test",
+            baseUrl = "https://api.openai.com/v1",
+            model = "gpt-6-sol",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+        )
+
+        assertTrue(requestBody.contains("\"reasoning_effort\":\"none\""))
+        assertTrue(requestBody.contains("\"tool_choice\":\"auto\""))
+    }
+
+    @Test
+    fun gpt6AstraReturnsExplicitUnsupportedErrorForWorkTools() = runBlocking {
+        val error = runCatching {
+            client.complete(
+                apiKey = "test",
+                baseUrl = "https://api.openai.com/v1",
+                model = "gpt-6-astra",
+                messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("MODEL_TOOL_CALLING_UNSUPPORTED", error?.code)
+        assertTrue(error?.message.orEmpty().contains("Responses API"))
+    }
+
 }

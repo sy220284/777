@@ -19,6 +19,12 @@ enum class LocalModelCapability {
     MUSIC,
 }
 
+enum class LocalModelToolCallingMode {
+    CHAT_COMPLETIONS,
+    CHAT_COMPLETIONS_NO_REASONING,
+    RESPONSES_ONLY,
+}
+
 data class LocalModelPreset(
     val provider: String,
     val model: String,
@@ -26,6 +32,7 @@ data class LocalModelPreset(
     val capabilities: Set<LocalModelCapability> = setOf(LocalModelCapability.TEXT),
     val imageInputSupported: Boolean? = null,
     val modelsEndpoint: String? = null,
+    val toolCallingMode: LocalModelToolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS,
 ) {
     val chatEndpoint: String
         get() = baseUrl.trimEnd('/') + "/chat/completions"
@@ -41,22 +48,27 @@ data class LocalModelPreset(
  */
 object LocalModelPresets {
     val entries = listOf(
-        LocalModelPreset("DeepSeek", "deepseek-flash", "https://api.deepseek.com"),
-        LocalModelPreset("DeepSeek", "deepseek-v4-pro", "https://api.deepseek.com"),
         LocalModelPreset(
-            provider = "MiniMax（国际）",
-            model = "MiniMax-M3",
-            baseUrl = "https://api.minimax.io/v1",
+            provider = "DeepSeek",
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
-            modelsEndpoint = "https://api.minimax.io/v1/models",
+            modelsEndpoint = "https://api.deepseek.com/models",
         ),
         LocalModelPreset(
-            provider = "MiniMax（中国）",
+            provider = "DeepSeek",
+            model = "deepseek-v4-pro",
+            baseUrl = "https://api.deepseek.com",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+            modelsEndpoint = "https://api.deepseek.com/models",
+        ),
+        LocalModelPreset(
+            provider = "MiniMax",
             model = "MiniMax-M3",
             baseUrl = "https://api.minimaxi.com/v1",
             capabilities = setOf(
@@ -68,18 +80,23 @@ object LocalModelPresets {
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
         ),
         LocalModelPreset(
-            provider = "Kimi Code（海外）",
-            model = "k3",
-            baseUrl = "https://api.kimi.ai/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
+            provider = "MiniMax",
+            model = "MiniMax-M2.7",
+            baseUrl = "https://api.minimaxi.com/v1",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+            modelsEndpoint = "https://api.minimaxi.com/v1/models",
         ),
         LocalModelPreset(
-            provider = "Kimi Code（中国）",
+            provider = "MiniMax",
+            model = "MiniMax-M2.7-highspeed",
+            baseUrl = "https://api.minimaxi.com/v1",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+            modelsEndpoint = "https://api.minimaxi.com/v1/models",
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
             model = "k3",
             baseUrl = "https://api.kimi.com/coding/v1",
             capabilities = setOf(
@@ -90,17 +107,7 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Kimi Code（海外）",
-            model = "k3-256k",
-            baseUrl = "https://api.kimi.ai/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-            ),
-            imageInputSupported = true,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code（中国）",
+            provider = "Kimi Code",
             model = "k3-256k",
             baseUrl = "https://api.kimi.com/coding/v1",
             capabilities = setOf(
@@ -110,18 +117,7 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Kimi Code（海外）",
-            model = "kimi-for-coding",
-            baseUrl = "https://api.kimi.ai/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code（中国）",
+            provider = "Kimi Code",
             model = "kimi-for-coding",
             baseUrl = "https://api.kimi.com/coding/v1",
             capabilities = setOf(
@@ -132,18 +128,7 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Kimi Code（海外）",
-            model = "kimi-for-coding-highspeed",
-            baseUrl = "https://api.kimi.ai/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code（中国）",
+            provider = "Kimi Code",
             model = "kimi-for-coding-highspeed",
             baseUrl = "https://api.kimi.com/coding/v1",
             capabilities = setOf(
@@ -152,6 +137,33 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "智谱 GLM",
+            model = "glm-5.3-flash",
+            baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://open.bigmodel.cn/api/paas/v4/models",
+        ),
+        LocalModelPreset(
+            provider = "智谱 GLM",
+            model = "glm-5.3",
+            baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+            modelsEndpoint = "https://open.bigmodel.cn/api/paas/v4/models",
+        ),
+        LocalModelPreset(
+            provider = "智谱 GLM",
+            model = "glm-5.2",
+            baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+            modelsEndpoint = "https://open.bigmodel.cn/api/paas/v4/models",
         ),
         LocalModelPreset(
             provider = "智谱 GLM",
@@ -165,7 +177,48 @@ object LocalModelPresets {
             provider = "OpenAI",
             model = "gpt-5.6",
             baseUrl = "https://api.openai.com/v1",
-            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+        ),
+        LocalModelPreset(
+            provider = "OpenAI",
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+            toolCallingMode = LocalModelToolCallingMode.RESPONSES_ONLY,
+        ),
+        LocalModelPreset(
+            provider = "OpenAI",
+            model = "gpt-6-sol",
+            baseUrl = "https://api.openai.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+            toolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING,
+        ),
+        LocalModelPreset(
+            provider = "OpenAI",
+            model = "gpt-6-luna",
+            baseUrl = "https://api.openai.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+            toolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING,
         ),
         LocalModelPreset(
             provider = "Google Gemini",
@@ -177,13 +230,113 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
                 LocalModelCapability.AUDIO,
             ),
+            imageInputSupported = true,
         ),
-        LocalModelPreset("通义千问", "qwen-plus", "https://dashscope-us.aliyuncs.com/compatible-mode/v1"),
+        LocalModelPreset(
+            provider = "Google Gemini",
+            model = "gemini-3.7-flash",
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+                LocalModelCapability.AUDIO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "Google Gemini",
+            model = "gemini-3.5-flash-lite",
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+                LocalModelCapability.AUDIO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "通义千问",
+            model = "qwen3.8-omni-flash",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+                LocalModelCapability.AUDIO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "通义千问",
+            model = "qwen3.8-max",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "通义千问",
+            model = "qwen3.8-flash",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "通义千问",
+            model = "qwen3.7-plus",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "通义千问",
+            model = "qwen-plus",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            capabilities = setOf(LocalModelCapability.TEXT),
+            imageInputSupported = false,
+        ),
         LocalModelPreset(
             provider = "Claude（兼容接口）",
             model = "claude-opus-5-5",
             baseUrl = "https://api.anthropic.com/v1",
-            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "Claude（兼容接口）",
+            model = "claude-sonnet-5",
+            baseUrl = "https://api.anthropic.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+        ),
+        LocalModelPreset(
+            provider = "Claude（兼容接口）",
+            model = "claude-fable-5-1",
+            baseUrl = "https://api.anthropic.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
         ),
     )
 
@@ -202,4 +355,7 @@ object LocalModelPresets {
 
     fun documentedImageInputSupport(model: String, baseUrl: String): Boolean? =
         find(model, baseUrl)?.imageInputSupported
+
+    fun toolCallingModeFor(model: String, baseUrl: String): LocalModelToolCallingMode =
+        find(model, baseUrl)?.toolCallingMode ?: LocalModelToolCallingMode.CHAT_COMPLETIONS
 }
