@@ -19,6 +19,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.decodeFromJsonElement
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -56,9 +58,13 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             Box {
                 TextButton(onClick = { shellMenu = true }, enabled = !busy) { Text(state.shells.firstOrNull { it.path == state.shellPath }?.name ?: stringResource(R.string.terminal_shell)) }
-                DropdownMenu(shellMenu, { shellMenu = false }) {
-                    state.shells.forEach { shell -> DropdownMenuItem(text = { Text(shell.name) }, onClick = { state.shellPath = shell.path; shellMenu = false }) }
-                }
+                DsPopupMenu(
+                    expanded = shellMenu,
+                    onDismiss = { shellMenu = false },
+                    items = state.shells.map { shell ->
+                        MenuItem(shell.name) { state.shellPath = shell.path }
+                    },
+                )
             }
             TextButton(enabled = !busy, onClick = { operation {
                 val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
