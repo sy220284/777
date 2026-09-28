@@ -88,63 +88,46 @@ internal fun LocalStreamingWorkPreview(
     surfaceColor: Color,
 ) {
     val stream by streamingState.collectAsStateWithLifecycle()
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    val preview = when {
+        stream.assistant.isNotBlank() -> stream.assistant
+        stream.reasoning.isNotBlank() -> stream.reasoning
+        else -> ""
+    }.let { text ->
+        if (text.length > 480) "…" + text.takeLast(480) else text
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+        shape = RoundedCornerShape(18.dp),
+        color = surfaceColor,
     ) {
-        if (stream.reasoning.isNotBlank()) {
-            WorkProcessRow(
-                messages = listOf(
-                    LocalHarnessMessage(
-                        id = "streaming-work-reasoning",
-                        role = "reasoning",
-                        content = stream.reasoning,
-                        createdAt = 0L,
-                    ),
-                ),
-                running = true,
-            )
-        }
-        if (stream.assistant.isNotBlank()) {
-            val preview = stream.assistant
-            Surface(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                shape = RoundedCornerShape(18.dp),
-                color = surfaceColor,
-            ) {
-                Column(
-                    Modifier.padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                ) {
-                    Text(
-                        stringResource(R.string.local_streaming_status),
-                        style = DsType.caption11,
-                        color = DsTheme.colors.labelTertiary,
-                    )
-                    Text(
-                        if (preview.length > 1_200) "…" + preview.takeLast(1_200) else preview,
-                        style = DsType.std14,
-                        color = DsTheme.colors.labelPrimary,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+        Column(
+            Modifier.padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (preview.isBlank()) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(DsSpacing.small))
                 }
-            }
-        }
-        if (stream.reasoning.isBlank() && stream.assistant.isBlank()) {
-            Row(
-                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(DsSpacing.small))
                 Text(
                     stringResource(R.string.local_streaming_status),
-                    style = DsType.small13,
+                    style = DsType.caption11,
                     color = DsTheme.colors.labelTertiary,
                 )
             }
+            Text(
+                preview.ifBlank { stringResource(R.string.local_work_process) },
+                style = DsType.std14,
+                color = if (preview.isBlank()) {
+                    DsTheme.colors.labelTertiary
+                } else {
+                    DsTheme.colors.labelPrimary
+                },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
