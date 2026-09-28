@@ -608,4 +608,39 @@ class MemoryStoreTest {
         assertTrue(active.isEmpty())
     }
 
+
+    @Test fun broadRecallDoesNotLoseLowLexicalEpisodeBehindHighImportanceDistractors() {
+        val memoryStore = store()
+        val episode = memoryStore.remember(
+            content = "关系对象稳定信息：她平时喜欢海边看日落",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+            lineageId = "lineage",
+            importance = 80,
+        )
+        repeat(24) { index ->
+            memoryStore.remember(
+                content = "关系状态：我和她｜历史状态$index",
+                scope = MemoryScope.LINEAGE,
+                kind = MemoryKind.RELATIONSHIP_STATE,
+                lineageId = "lineage",
+                importance = 100,
+            )
+        }
+
+        val recalled = memoryStore.search(
+            query = "你还记得我们第一次出去那天吗",
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = "lineage",
+            allowedKinds = setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+            ),
+            maxItems = 1,
+        )
+
+        assertEquals(listOf(episode.id), recalled.map { it.id })
+    }
+
 }
