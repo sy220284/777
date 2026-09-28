@@ -637,6 +637,8 @@
     <string name="advanced_not_authorized">未授权</string>
     <string name="advanced_notification_access">通知读取</string>
     <string name="advanced_pin">置顶</string>
+    <string name="local_unpin_session">取消置顶</string>
+    <string name="local_session_actions">对话操作</string>
     <string name="advanced_pin_hint">提高自动召回优先级</string>
     <string name="advanced_pinned_suffix"> · 已置顶</string>
     <string name="advanced_project_config">项目配置</string>

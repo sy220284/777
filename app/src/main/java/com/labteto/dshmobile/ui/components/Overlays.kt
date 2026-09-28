@@ -38,9 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -63,7 +66,11 @@ fun DsDialog(
     val colors = DsTheme.colors
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -157,47 +164,89 @@ data class MenuItem(
  */
 @Composable
 fun DsMenu(anchor: @Composable () -> Unit, items: List<MenuItem>) {
-    val colors = DsTheme.colors
     var expanded by remember { mutableStateOf(false) }
     Box {
         Box(Modifier.clickable { expanded = true }) { anchor() }
-        DropdownMenu(
+        DsPopupMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            shape = DsShapes.menu,
-            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
-            tonalElevation = 0.dp,
-            border = BorderStroke(1.dp, colors.borderL1),
-        ) {
-            items.forEach { item ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            item.text,
-                            style = DsType.std14,
-                            color = if (item.danger) colors.error else colors.labelPrimary,
+            onDismiss = { expanded = false },
+            items = items,
+        )
+    }
+}
+
+/**
+ * Shared anchored popup primitive. All dropdown-style overlays route through this function so
+ * tapping anywhere outside the menu always dismisses it.
+ */
+@Composable
+fun DsPopupMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    items: List<MenuItem>,
+) {
+    val colors = DsTheme.colors
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = DsShapes.menu,
+        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+        tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, colors.borderL1),
+    ) {
+        items.forEach { item ->
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        item.text,
+                        style = DsType.std14,
+                        color = if (item.danger) colors.error else colors.labelPrimary,
+                    )
+                },
+                leadingIcon = item.icon?.let { icon ->
+                    {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (item.danger) colors.error else colors.labelSecondary,
                         )
-                    },
-                    leadingIcon = item.icon?.let { icon ->
-                        {
-                            Icon(
-                                icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = if (item.danger) colors.error else colors.labelSecondary,
-                            )
-                        }
-                    },
-                    onClick = {
-                        expanded = false
-                        item.onClick()
-                    },
-                    modifier = Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
+                    }
+                },
+                onClick = {
+                    onDismiss()
+                    item.onClick()
+                },
+                modifier = Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
     }
+}
+
+/**
+ * Shared free-floating popup primitive. Focusable popups receive outside-pointer dismissal from
+ * Compose, which keeps drag/select overlays consistent with dropdown menus and future popups.
+ */
+@Composable
+fun DsFloatingPopup(
+    onDismiss: () -> Unit,
+    alignment: Alignment = Alignment.TopStart,
+    offset: IntOffset = IntOffset.Zero,
+    content: @Composable () -> Unit,
+) {
+    Popup(
+        alignment = alignment,
+        offset = offset,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(
+            focusable = true,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            clippingEnabled = true,
+        ),
+        content = content,
+    )
 }
 
 @Preview(showBackground = true, widthDp = 360)

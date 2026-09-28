@@ -3,10 +3,13 @@ package com.labteto.dshmobile.ui.screens.local
 import android.graphics.BitmapFactory
 import android.widget.Toast
 import java.io.File
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +46,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -63,12 +67,14 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -110,6 +116,7 @@ internal fun localJobStatusLabel(status: String): String = when (status) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
@@ -148,41 +155,63 @@ internal fun LocalMessageRow(
     }
 
     when (message.role) {
-        "user" -> Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
-            UserBubble(message.content)
-            if (chatMode) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    MessageVariantControls(
-                        messageId = message.id,
-                        branchInfo = branchInfo,
-                        enabled = canSelectVariant && !selectingVariant,
-                        onSelectVariant = selectVariantWithFeedback,
+        "user" -> {
+            var actionsOpen by remember(message.id) { mutableStateOf(false) }
+            val copyText = editableChatUserText(message)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Box {
+                    Box(
+                        modifier = Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = { actionsOpen = true },
+                        ),
+                    ) {
+                        UserBubble(message.content)
+                    }
+                    DsPopupMenu(
+                        expanded = actionsOpen,
+                        onDismiss = { actionsOpen = false },
+                        items = buildList {
+                            if (canEdit) {
+                                add(
+                                    MenuItem(
+                                        text = stringResource(R.string.local_edit_user_message),
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = { onEdit(message) },
+                                    ),
+                                )
+                            }
+                            if (copyText.isNotBlank()) {
+                                add(
+                                    MenuItem(
+                                        text = stringResource(R.string.common_copy),
+                                        icon = Icons.Outlined.ContentCopy,
+                                        onClick = {
+                                            clipboard.setText(AnnotatedString(copyText))
+                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                        },
+                                    ),
+                                )
+                            }
+                        },
                     )
-                    editableChatUserText(message).takeIf(String::isNotBlank)?.let { copyText ->
-                        DsIconButton(
-                            icon = Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(R.string.common_copy),
-                            onClick = {
-                                clipboard.setText(AnnotatedString(copyText))
-                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                            },
-                            tint = colors.labelTertiary.copy(alpha = 0.78f),
+                }
+                if (chatMode) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        MessageVariantControls(
+                            messageId = message.id,
+                            branchInfo = branchInfo,
+                            enabled = canSelectVariant && !selectingVariant,
+                            onSelectVariant = selectVariantWithFeedback,
                         )
                     }
-                    DsIconButton(
-                        icon = FeatherIcons.Edit3,
-                        contentDescription = stringResource(R.string.local_edit_user_message),
-                        onClick = { onEdit(message) },
-                        enabled = canEdit,
-                        tint = colors.labelTertiary.copy(alpha = if (canEdit) 0.78f else 0.38f),
-                    )
                 }
             }
         }
@@ -236,16 +265,15 @@ internal fun LocalMessageRow(
                             onSelectVariant = selectVariantWithFeedback,
                         )
                     }
-                    DsIconButton(
+                    CompactMessageAction(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.chat_copy_answer),
                         onClick = {
                             clipboard.setText(AnnotatedString(visibleContent))
                             Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                         },
-                        tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
-                    if (canRegenerate) DsIconButton(
+                    if (canRegenerate) CompactMessageAction(
                         icon = Icons.Outlined.Refresh,
                         contentDescription = stringResource(R.string.local_regenerate_reply),
                         onClick = {
@@ -253,7 +281,6 @@ internal fun LocalMessageRow(
                                 Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show()
                             }
                         },
-                        tint = colors.labelTertiary.copy(alpha = 0.78f),
                     )
                 }
             }
@@ -270,25 +297,49 @@ private fun MessageVariantControls(
 ) {
     val info = branchInfo ?: return
     val colors = DsTheme.colors
-    DsIconButton(
+    CompactMessageAction(
         icon = Icons.Filled.KeyboardArrowLeft,
         contentDescription = stringResource(R.string.local_previous_variant),
         onClick = { onSelectVariant(messageId, info.index - 1) },
         enabled = enabled && info.hasPrevious,
-        tint = colors.labelTertiary.copy(alpha = 0.78f),
     )
     Text(
         text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
         style = DsType.caption11,
         color = colors.labelTertiary,
     )
-    DsIconButton(
+    CompactMessageAction(
         icon = Icons.Filled.KeyboardArrowRight,
         contentDescription = stringResource(R.string.local_next_variant),
         onClick = { onSelectVariant(messageId, info.index + 1) },
         enabled = enabled && info.hasNext,
-        tint = colors.labelTertiary.copy(alpha = 0.78f),
     )
+}
+
+@Composable
+private fun CompactMessageAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(36.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = androidx.compose.ui.graphics.Color.Transparent,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = colors.labelTertiary.copy(alpha = if (enabled) 0.82f else 0.34f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
 }
 
 internal data class LocalWorkProcessNode(

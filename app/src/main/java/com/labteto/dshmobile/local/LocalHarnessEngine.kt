@@ -1336,9 +1336,7 @@ class LocalHarnessEngine @Inject constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
-        if (state.usageMode != LocalUsageMode.CHAT || !state.configured) {
-            return@synchronized LocalChatUserEditResult.UNAVAILABLE
-        }
+        if (!state.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
         if (
             state.loading ||
             state.running ||
@@ -1346,6 +1344,12 @@ class LocalHarnessEngine @Inject constructor(
             activeJob?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
+        if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
+            messageId, requestedText, eventLog, memoryStore, modelHistory, modelHistoryCheckpointCodec, _state,
+            ::updateContextMetrics, { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
+            ::checkpointModelHistory, ::persist,
+        ) { content, memoryInput, modelMessage -> queueTurnLocked(content, memoryInput, modelMessage).start() }
+        if (state.usageMode != LocalUsageMode.CHAT) return@synchronized LocalChatUserEditResult.UNAVAILABLE
 
         val activeTranscript = activeTranscriptForUserEdit(
             messageId = messageId,
@@ -5291,9 +5295,5 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { it.copy(error = future.message) }
         emptyList()
     }
-
-
-
-
 
 }
