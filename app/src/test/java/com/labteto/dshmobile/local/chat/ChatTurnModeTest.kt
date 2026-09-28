@@ -26,4 +26,18 @@ class ChatTurnModeTest {
         assertEquals(ChatTurnMode.FOLLOW_UP, inferChatTurnMode("为什么呢"))
         assertTrue(renderChatTurnModeForModel("为什么呢").contains("不额外开启新剧情"))
     }
+
+    @Test
+    fun negatedMovementDoesNotForceSceneTransition() {
+        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("我不想去外面"))
+        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("别出去，外面太冷了"))
+        assertEquals(ChatTurnMode.SCENE_TRANSITION, inferChatTurnMode("我们去外面说吧"))
+    }
+
+    @Test
+    fun resetWordDoesNotMatchInsideUnrelatedWord() {
+        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("预算了三万，接下来怎么安排"))
+        assertEquals(ChatTurnMode.RESET, inferChatTurnMode("算了，换个话题"))
+    }
+
 }
