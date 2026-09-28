@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,15 +11,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.MIN_GROUP_CHAT_MEMBERS
@@ -37,8 +46,20 @@ internal fun GroupChatMemberPickerSheet(
     onDismiss: () -> Unit,
 ) {
     val selected = remember { mutableStateListOf<String>() }
+    var query by rememberSaveable { mutableStateOf("") }
     val avatarFallback = stringResource(R.string.persona_gallery_avatar_fallback)
     val availableIds = entries.mapTo(hashSetOf(), PersonaGalleryEntry::id)
+    val filteredEntries = remember(entries, query) {
+        val needle = query.trim()
+        if (needle.isBlank()) {
+            entries
+        } else {
+            entries.filter { entry ->
+                entry.persona.name.contains(needle, ignoreCase = true) ||
+                    entry.persona.identity.contains(needle, ignoreCase = true)
+            }
+        }
+    }
     LaunchedEffect(currentIds, entries) {
         selected.clear()
         selected.addAll(
@@ -70,64 +91,87 @@ internal fun GroupChatMemberPickerSheet(
                 color = DsTheme.colors.labelSecondary,
             )
         } else {
-            Column(
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
-                entries.forEach { entry ->
-                    val checked = entry.id in selected
-                    val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = enabled && canAdd) {
-                                if (checked) selected.remove(entry.id)
-                                else if (selected.size < MAX_GROUP_CHAT_MEMBERS) selected.add(entry.id)
-                            },
-                        color = if (checked) {
-                            DsTheme.colors.accent.copy(alpha = 0.08f)
-                        } else {
-                            DsTheme.colors.bgLayer1
-                        },
-                    ) {
-                        Row(
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.local_group_chat_search_members)) },
+            )
+            if (filteredEntries.isEmpty()) {
+                Text(
+                    stringResource(R.string.persona_gallery_no_match),
+                    style = DsType.small13,
+                    color = DsTheme.colors.labelSecondary,
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
+                        val checked = entry.id in selected
+                        val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                .toggleable(
+                                    value = checked,
+                                    enabled = enabled && canAdd,
+                                    role = Role.Checkbox,
+                                    onValueChange = { shouldCheck ->
+                                        if (shouldCheck) {
+                                            if (selected.size < MAX_GROUP_CHAT_MEMBERS) selected.add(entry.id)
+                                        } else {
+                                            selected.remove(entry.id)
+                                        }
+                                    },
+                                ),
+                            color = if (checked) {
+                                DsTheme.colors.accent.copy(alpha = 0.08f)
+                            } else {
+                                DsTheme.colors.bgLayer1
+                            },
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = DsTheme.colors.accent.copy(alpha = 0.12f),
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
-                                Text(
-                                    entry.persona.name.trim().take(1).ifBlank { avatarFallback },
-                                    style = DsType.std14Strong,
-                                    color = DsTheme.colors.accent,
-                                    modifier = Modifier.padding(DsSpacing.small),
-                                )
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    entry.persona.name,
-                                    style = DsType.std14Strong,
-                                    color = DsTheme.colors.labelPrimary,
-                                )
-                                entry.persona.identity.takeIf(String::isNotBlank)?.let {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = DsTheme.colors.accent.copy(alpha = 0.12f),
+                                ) {
                                     Text(
-                                        it,
-                                        style = DsType.caption11,
-                                        color = DsTheme.colors.labelSecondary,
-                                        maxLines = 1,
+                                        entry.persona.name.trim().take(1).ifBlank { avatarFallback },
+                                        style = DsType.std14Strong,
+                                        color = DsTheme.colors.accent,
+                                        modifier = Modifier.padding(DsSpacing.small),
                                     )
                                 }
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        entry.persona.name,
+                                        style = DsType.std14Strong,
+                                        color = DsTheme.colors.labelPrimary,
+                                    )
+                                    entry.persona.identity.takeIf(String::isNotBlank)?.let {
+                                        Text(
+                                            it,
+                                            style = DsType.caption11,
+                                            color = DsTheme.colors.labelSecondary,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = null,
+                                    enabled = enabled && canAdd,
+                                )
                             }
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = null,
-                                enabled = enabled && canAdd,
-                            )
                         }
                     }
                 }
