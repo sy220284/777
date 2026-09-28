@@ -21,6 +21,8 @@ internal fun classifyProbeStatus(code: Int): Pair<Boolean, String> = when (code)
     else -> true to "已建立目标 HTTP/TLS 连接（HTTP $code）"
 }
 
+internal fun shouldRetryProbeStatus(code: Int): Boolean = code in setOf(502, 503, 504)
+
 internal fun isTextualWebMediaType(mediaType: String): Boolean {
     val type = mediaType.substringBefore(';').trim().lowercase()
     return type.startsWith("text/") ||

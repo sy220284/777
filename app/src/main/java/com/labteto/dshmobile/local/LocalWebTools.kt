@@ -93,6 +93,10 @@ internal class LocalWebTools(
             appendLine("URL: ${result.url}")
             appendLine("HTTP: ${result.status}")
             appendLine("Content-Type: ${result.mediaType.ifBlank { "unknown" }}")
+            if (result.headers.isNotEmpty()) {
+                appendLine("响应头：")
+                result.headers.forEach { (name, value) -> appendLine("$name: $value") }
+            }
             appendLine("读取：${result.bytesRead} 字节${if (result.truncated) "（已截断）" else ""}")
             if (result.content.isNotBlank()) {
                 appendLine()

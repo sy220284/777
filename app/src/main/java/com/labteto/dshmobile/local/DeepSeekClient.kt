@@ -442,7 +442,7 @@ object LocalToolCatalog {
             },
             "run_in_background" to boolean("是否转为后台抓取任务；后台模式使用更长网络时限，默认 false"),
         ), listOf("url")))
-        add(tool("http_request", "向公网 HTTP/HTTPS API 发起受限请求；支持 GET/HEAD/POST/PUT/PATCH/DELETE，认证类请求头禁止写入工具参数", properties(
+        add(tool("http_request", "向公网 HTTP/HTTPS API 发起受限请求；支持 GET/HEAD/POST/PUT/PATCH/DELETE；GET/HEAD 对瞬时传输失败自动最多重试 3 次并返回白名单限流响应头；认证类请求头禁止写入工具参数", properties(
             "method" to string("GET、HEAD、POST、PUT、PATCH 或 DELETE"),
             "url" to string("完整公网 HTTP/HTTPS 地址"),
             "headers" to buildJsonObject {
@@ -462,7 +462,7 @@ object LocalToolCatalog {
             "path" to string("JSON 文件的工作区相对路径"),
             "query" to string("字段路径，例如 items[0].name；留空返回根节点摘要"),
         ), listOf("path")))
-        add(tool("network_diagnose", "诊断域名解析、系统代理、VPN/TUN、安全策略并实际探测 HTTP/TLS 连通性", properties(
+        add(tool("network_diagnose", "诊断域名解析、系统代理、VPN/TUN、安全策略并最多连续 3 次探测 HTTP/TLS 连通性；单次 EOF/超时不会直接判定为阻断", properties(
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))

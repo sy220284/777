@@ -14,6 +14,7 @@ LIFECYCLE_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/Lo
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
+WEB_PROVIDER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
 CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt"
 COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt"
 RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalAgentRunCoordinator.kt"
@@ -55,6 +56,7 @@ if session_store_lines > 2_050:
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
+web_provider = WEB_PROVIDER.read_text(encoding="utf-8")
 context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
 coordinator = COORDINATOR.read_text(encoding="utf-8")
 run_coordinator = RUN_COORDINATOR.read_text(encoding="utf-8")
@@ -194,6 +196,12 @@ if "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" not in eng
     violations.append("Single chat must remain a one-step primary-agent reply")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
+if "GitHub API：" not in engine or "X-RateLimit-*" not in engine or "compare/main...<branch>?expand=1" not in engine:
+    violations.append("Work prompt must distinguish GitHub API jitter, auth/rate limits, and compare-link fallback")
+if "const val PROBE_ATTEMPTS = 3" not in web_provider or "const val SAFE_HTTP_RETRY_ATTEMPTS = 3" not in web_provider:
+    violations.append("Network diagnosis and safe HTTP reads must keep bounded three-attempt retry resilience")
+if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_provider:
+    violations.append("HTTP tooling must expose safe rate-limit response headers for error classification")
 
 if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
