@@ -33,7 +33,7 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 - Android 16 是唯一目标平台，不为 Android 8～15 增加兼容债务。
 - Harness Core 使用 Kotlin 原生实现。
 - UI、Android 能力和 Harness Core 必须解耦。
-- Harness Core 不直接依赖 Compose、Activity、Service、Shizuku 或无障碍服务。
+- Harness Core 不直接依赖 Compose、Activity、Service 或无障碍服务。
 - 模型可见的状态必须来自可持久化的 Session Event。
 - 文件、进程、终端、网络、设备控制全部通过能力接口接入。
 - 官方行为兼容以“输入/事件/状态/输出一致”为准，不追求类名或代码结构逐行相似。
@@ -95,7 +95,6 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 │  └─ 后台任务
 │
 ├─ harness-device-android
-│  ├─ Shizuku
 │  ├─ 无障碍
 │  ├─ 截图 / 视觉
 │  ├─ App 控制
@@ -483,12 +482,10 @@ android_home
 android_app_list
 android_app_info
 android_app_launch
-android_app_stop
 android_app_install
 android_app_uninstall
 
 android_settings_get
-android_settings_set
 android_permissions
 
 android_notification_list
@@ -707,7 +704,7 @@ Official reference runner
 Differential conformance suite
 ```
 
-涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代 Shizuku、无障碍、厂商 ROM 行为。
+涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代 无障碍、厂商 ROM 行为。
 
 ---
 
