@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -162,6 +163,10 @@ internal class LocalToolExecutionCoordinator(
             else -> "TOOL_REPORTED_ERROR"
         }
         val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        AppLog.warn(
+            "LocalToolExecution",
+            "工具执行失败 tool=${call.name} code=$errorCode retryable=${timedOut && readLike}",
+        )
         return AgentToolResult(
             content = result.content,
             isError = true,
