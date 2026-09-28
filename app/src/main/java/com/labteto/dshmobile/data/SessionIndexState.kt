@@ -85,6 +85,7 @@ internal class SessionIndexState {
         sessionRows.remove(sessionId)
         pendingKinds.remove(sessionId)
         runningBySession.remove(sessionId)
+        titleBySession.remove(sessionId)
     }
 
     fun setRunning(sessionId: String, running: Boolean) {

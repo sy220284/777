@@ -83,6 +83,22 @@ class ProcessRuntimeTest {
     }
 
     @Test(timeout = 5000)
+    fun persistentTerminalRetainsFinalOutputAfterFastExit() = kotlinx.coroutines.runBlocking {
+        val terminal = PersistentPipeTerminalProvider()
+
+        val sessionId = terminal.open(
+            command = listOf("sh", "-c", "printf terminal-tail"),
+            workingDirectory = null,
+        )
+
+        while (terminal.isAlive(sessionId)) {
+            kotlinx.coroutines.delay(10)
+        }
+
+        assertEquals("terminal-tail", terminal.read(sessionId))
+    }
+
+    @Test(timeout = 5000)
     fun cancellationCompletesWhileProcessIsStillRunning() = kotlinx.coroutines.runBlocking {
         val running = async(kotlinx.coroutines.Dispatchers.IO) {
             AndroidProcessRuntime().execute(ProcessRequest(listOf("sh", "-c", "sleep 30")))
