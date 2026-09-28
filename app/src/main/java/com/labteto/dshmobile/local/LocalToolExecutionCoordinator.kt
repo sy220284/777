@@ -35,6 +35,15 @@ internal class LocalToolExecutionCoordinator(
     fun enabledOptionalSnapshot(): Set<String> =
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
+    fun enableOptionalTools(names: Collection<String>) {
+        val registered = registry.names().toSet()
+        synchronized(enabledOptionalTools) {
+            enabledOptionalTools += names.filter { name ->
+                name in registered && LocalToolRouter.isOptional(name)
+            }
+        }
+    }
+
     fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
         val tools = registry.names().mapNotNull(registry::get)
