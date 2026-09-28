@@ -172,13 +172,15 @@ internal fun PlanReviewPanel(
                     )
                 }
                 Column(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = false)
+                            .weight(1f)
                             .verticalScroll(bodyScroll),
                     ) {
                         MarkdownText(review.plan)
