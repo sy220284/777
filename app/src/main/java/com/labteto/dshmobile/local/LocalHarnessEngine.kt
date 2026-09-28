@@ -3408,18 +3408,27 @@ class LocalHarnessEngine @Inject constructor(
         persona: PersonaProfile,
         userMessage: String,
         assistantMessage: String,
+        sharedPending: List<ChatPendingTurn>,
         step: Int,
     ): ChatCharacterState? {
         val snapshot = _state.value
         val key = apiKeys.get() ?: return null
         val sharedContext = _state.value.groupChat.context.withLegacyFallback(member.chatState)
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
-        val prompt = chatTurnCoordinator.postTurnPrompt(
-            persona = persona,
-            state = plannerState,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
+        val prompt = buildString {
+            appendLine(
+                chatTurnCoordinator.postTurnPrompt(
+                    persona = persona,
+                    state = plannerState,
+                    userMessage = userMessage,
+                    assistantMessage = assistantMessage,
+                ),
+            )
+            appendLine()
+            appendLine("【群聊共享待归并回合】")
+            appendLine(renderPendingTurnsForPlanner(sharedPending))
+            append("continuity 只能根据以上共享待归并回合更新；角色私有情绪、关系与互动状态仍只根据当前角色自己的本轮对话更新。")
+        }
         return try {
             val plannerReply = completeWithRetry(
                 key = key,
@@ -3457,6 +3466,7 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun refreshGroupMemberStates(
         replies: List<GroupReplyForStateUpdate>,
         userMessage: String,
+        sharedPending: List<ChatPendingTurn>,
     ): GroupStateRefreshBatch {
         if (replies.isEmpty()) return GroupStateRefreshBatch(emptyMap(), complete = true)
         if (replies.size == 1) {
@@ -3466,6 +3476,7 @@ class LocalHarnessEngine @Inject constructor(
                 persona = reply.persona,
                 userMessage = userMessage,
                 assistantMessage = reply.content,
+                sharedPending = sharedPending,
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
             )
             return GroupStateRefreshBatch(
@@ -3481,6 +3492,9 @@ class LocalHarnessEngine @Inject constructor(
         )
         val prompt = buildString {
             appendLine("你要一次整理多个群聊角色各自的隐藏状态。每个角色的私有状态完全隔离，禁止把甲角色的判断、关系或经历写进乙角色。")
+            appendLine("【群聊共享待归并回合】")
+            appendLine(renderPendingTurnsForPlanner(sharedPending))
+            appendLine("每个角色 plan 的 continuity 只能根据以上共享待归并回合更新；私有情绪、关系与互动状态只根据该角色自己的本轮对话更新。")
             appendLine("最终只输出一个 JSON 对象，格式为：")
             appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
@@ -3751,9 +3765,17 @@ class LocalHarnessEngine @Inject constructor(
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
+            val sharedPendingForRefresh = currentGroup.context.pendingTurns
+                .asSequence()
+                .filter { it.sequence > currentGroup.context.processedThroughSequence }
+                .filter { it.generation == currentGroup.context.generation }
+                .sortedBy(ChatPendingTurn::sequence)
+                .take(GROUP_POST_TURN_PENDING_BATCH)
+                .toList()
             val refreshBatch = refreshGroupMemberStates(
                 replies = repliesForStateUpdate,
                 userMessage = input,
+                sharedPending = sharedPendingForRefresh,
             )
             val refreshedStates = refreshBatch.states
             val refreshedInReplyOrder = repliesForStateUpdate
@@ -3761,6 +3783,7 @@ class LocalHarnessEngine @Inject constructor(
             val nextSharedContext = finalizeGroupContextAfterRefresh(
                 context = currentGroup.context,
                 statesInReplyOrder = refreshedInReplyOrder,
+                processedPending = sharedPendingForRefresh,
                 complete = refreshBatch.complete,
             )
             if (!refreshBatch.complete) {
@@ -6457,6 +6480,7 @@ class LocalHarnessEngine @Inject constructor(
         const val PERSONA_CORRECTION_UNDO_MILLIS = 10_000L
         const val STREAM_PREVIEW_INTERVAL_MS = 50L
         const val CHAT_POST_TURN_MODEL_STEP = 10_000
+        const val GROUP_POST_TURN_PENDING_BATCH = 8
         const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
         const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         const val LOCAL_PROJECT_ID = "local-workspace"
