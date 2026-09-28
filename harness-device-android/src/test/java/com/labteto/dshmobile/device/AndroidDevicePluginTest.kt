@@ -22,7 +22,7 @@ class AndroidDevicePluginTest {
 
         val names = registry.context.tools.names().toSet()
         assertTrue("android_device_info" in names)
-        assertTrue("android_settings_set" in names)
+        assertTrue("android_settings_get" in names)
         assertTrue("android_vscreen_create" in names)
         assertTrue("android_vscreen_screenshot" in names)
         assertTrue("android_find" in names)
@@ -33,14 +33,6 @@ class AndroidDevicePluginTest {
         val info = requireNotNull(registry.context.tools.get("android_device_info"))
         assertEquals(ToolAccess.READ_ONLY, info.access)
         assertEquals(ToolApprovalPolicy.MUTATION, info.approvalPolicy)
-
-        val settingsSet = requireNotNull(registry.context.tools.get("android_settings_set"))
-        assertEquals(ToolAccess.PRIVILEGED, settingsSet.access)
-        assertEquals(ToolApprovalPolicy.ALWAYS, settingsSet.approvalPolicy)
-
-        val appStop = requireNotNull(registry.context.tools.get("android_app_stop"))
-        assertEquals(ToolAccess.PRIVILEGED, appStop.access)
-        assertEquals(ToolApprovalPolicy.ALWAYS, appStop.approvalPolicy)
 
         val tap = requireNotNull(registry.context.tools.get("android_tap"))
         assertEquals(ToolAccess.DEVICE, tap.access)
@@ -62,8 +54,8 @@ class AndroidDevicePluginTest {
         registry.install(AndroidDevicePlugin(RecordingProvider()))
 
         val names = registry.context.tools.names()
-        assertEquals(36, names.size)
-        assertEquals(36, names.toSet().size)
+        assertEquals(31, names.size)
+        assertEquals(31, names.toSet().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
@@ -101,56 +93,12 @@ class AndroidDevicePluginTest {
     }
 
     @Test
-    fun privilegedToolCannotReachProviderWithoutApproval() = runTest {
-        val provider = RecordingProvider()
-        val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(provider))
-
-        val denied = registry.context.tools.execute(
-            name = "android_settings_set",
-            input = buildJsonObject {
-                put("namespace", "secure")
-                put("key", "demo")
-                put("value", "1")
-            },
-        )
-
-        assertTrue(denied.isError)
-        assertTrue(provider.calls.isEmpty())
-    }
-
-    @Test
-    fun approvedPrivilegedToolReceivesArgumentsExactlyOnce() = runTest {
-        val provider = RecordingProvider()
-        val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(provider))
-
-        val result = registry.context.tools.execute(
-            name = "android_settings_set",
-            input = buildJsonObject {
-                put("namespace", "secure")
-                put("key", "demo")
-                put("value", "1")
-            },
-            context = ToolContext(approval = { true }),
-        )
-
-        assertFalse(result.isError)
-        assertEquals("ok:settings_set", result.content)
-        assertEquals(1, provider.calls.size)
-        assertEquals("settings_set", provider.calls.single().first)
-        assertEquals("secure", provider.calls.single().second["namespace"])
-        assertEquals("demo", provider.calls.single().second["key"])
-        assertEquals("1", provider.calls.single().second["value"])
-    }
-
-    @Test
     fun sensitiveReadsRequireFreshApprovalBeforeProviderInvocation() = runTest {
         val provider = RecordingProvider()
         val registry = PluginRegistry()
         registry.install(AndroidDevicePlugin(provider))
         val names = listOf("android_screen", "android_find", "android_wait", "android_screenshot",
-            "android_notification_list", "android_clipboard_get", "android_vscreen_screenshot", "android_dumpsys")
+            "android_notification_list", "android_clipboard_get", "android_vscreen_screenshot")
         for (name in names) {
             assertTrue(registry.context.tools.execute(name, buildJsonObject {}).isError)
             assertTrue(provider.calls.isEmpty())
