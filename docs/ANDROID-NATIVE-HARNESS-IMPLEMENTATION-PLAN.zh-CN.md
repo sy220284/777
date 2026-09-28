@@ -646,7 +646,7 @@ Harness Core 升级比普通 UI 升级风险更高。
 - 普通进程执行；
 - 网络；
 - Android 界面操作；
-- Shizuku 系统操作；
+- Android 系统高权限操作；
 - 安装 / 卸载；
 - 外部目录访问。
 
@@ -658,7 +658,7 @@ Harness Core 升级比普通 UI 升级风险更高。
 - write/edit：审批；
 - shell：审批；
 - 安装/卸载：强审批；
-- Shizuku 修改系统设置：强审批；
+- Android 高权限系统设置修改：强审批；
 - 无障碍点击涉及付款、账号、安全设置：阻断或二次确认；
 - 外部应用私有数据：普通 App 权限下不可访问；
 - API Key：Keystore；
@@ -793,7 +793,7 @@ app
 4. `feat: add process runtime and persistent PTY`
 5. `feat: add native MCP client`
 6. `feat: add native LSP client`
-7. `feat: add Shizuku Android provider`
+7. `feat: add Android device provider`
 8. `feat: add accessibility and screen provider`
 9. `feat: add vision interaction loop`
 10. `feat: add virtual display agent runtime`
