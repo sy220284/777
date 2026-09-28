@@ -372,4 +372,28 @@ class AutomationReceiptTest {
         assertTrue(failure is IllegalArgumentException)
     }
 
+
+    @Test
+    fun malformedAutomationIntegerIsRejectedInsteadOfDefaultingToZero() {
+        val failure = runCatching {
+            parseOptionalAutomationLong("999999999999999999999999999", "delay_minutes")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun missingAutomationIntegerRemainsOptional() {
+        assertEquals(null, parseOptionalAutomationLong(null, "delay_minutes"))
+    }
+
+    @Test
+    fun checkedAutomationAddRejectsWindowOverflow() {
+        val failure = runCatching {
+            checkedAutomationAddMillis(Long.MAX_VALUE - 10L, 60_000L, "时间窗起点")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
 }
