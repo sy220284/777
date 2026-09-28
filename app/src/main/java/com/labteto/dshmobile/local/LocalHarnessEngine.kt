@@ -21,6 +21,7 @@ import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
+import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
@@ -3771,7 +3772,7 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.TurnStepLimit -> {
                         val transcriptMessage = transcriptRuntime.newMessage(
                             "system",
-                            "本轮达到 $mainMaxSteps 步安全上限，请继续发送消息以恢复任务。",
+                            "当前任务已无法继续扩展执行预算，已在第 ${event.steps} 步暂停；已有进度已保留。",
                         )
                         val turnEnd = eventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
@@ -3813,6 +3814,33 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
+            stepLimitExtender = if (runPolicy.allowToolExecution) {
+                AgentStepLimitExtender { currentLimit, stepsUsed ->
+                    val current = _state.value
+                    val next = nextAdaptiveAgentStepLimit(
+                        currentLimit = currentLimit,
+                        configuredBase = mainMaxSteps,
+                        task = input,
+                        contextChars = current.contextChars,
+                        contextBudgetChars = current.contextBudgetChars,
+                        pressure = resourceScheduler.snapshot().pressure,
+                        kind = LocalAgentRunKind.FOREGROUND,
+                    )
+                    if (next != null && next > currentLimit) {
+                        eventLog.append("turn/budget-extended", buildJsonObject {
+                            put("steps_used", stepsUsed)
+                            put("previous_limit", currentLimit)
+                            put("next_limit", next)
+                            put("context_chars", current.contextChars)
+                            put("context_budget_chars", current.contextBudgetChars)
+                            put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
+                        })
+                    }
+                    next
+                }
+            } else {
+                null
+            },
             idFactory = { runContext.runId },
         )
 
