@@ -48,7 +48,15 @@ internal fun boundedChatRequestHistory(
         .toList()
 
     val maximumHotMessages = recentMessages + compactionBatch
-    if (dialogue.size <= maximumHotMessages) return history
+    if (dialogue.size <= maximumHotMessages) {
+        if (existingSummaryIndex < 0 || existingSummary == null) return history
+        val rebuiltBody = body.toMutableList()
+        rebuiltBody[existingSummaryIndex] = existingSummary
+        return buildList {
+            leadingSystem?.let(::add)
+            addAll(rebuiltBody)
+        }
+    }
 
     val overflow = dialogue.size - maximumHotMessages
     val summarizedCount = ((overflow + compactionBatch - 1) / compactionBatch) * compactionBatch
@@ -187,7 +195,7 @@ internal fun buildChatContinuationHandoff(
         }
     }.trim().take(1_000)
 
-    val body = listOf(sceneBlock, pendingBlock, recentUserBlock, continuityBlock)
+    val body = listOf(sceneBlock, pendingBlock, continuityBlock, recentUserBlock)
         .filter(String::isNotBlank)
         .joinToString("\n")
         .take(3_300)
