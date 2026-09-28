@@ -117,17 +117,49 @@ internal fun activeTranscriptForUserEdit(
     messageId: String,
     activeBranch: List<LocalHarnessMessage>,
     hotMessages: List<LocalHarnessMessage>,
-    totalMessageCount: Long,
     loadDurableTranscript: () -> List<LocalHarnessMessage>,
 ): List<LocalHarnessMessage> {
-    if (activeBranch.any { it.id == messageId } &&
-        activeBranch.size.toLong() >= totalMessageCount
-    ) return activeBranch
-    if (activeBranch.isEmpty() &&
-        hotMessages.any { it.id == messageId } &&
-        hotMessages.size.toLong() >= totalMessageCount
-    ) return hotMessages
-    return loadDurableTranscript()
+    val branchContainsTarget = activeBranch.any { it.id == messageId }
+    val hotContainsTarget = hotMessages.any { it.id == messageId }
+
+    // Never infer that a bounded runtime window is the whole conversation from the runtime count.
+    // Legacy migrations and interrupted projection updates can leave that count stale. The durable
+    // projection supplies the prefix; a currently visible/selected tail remains authoritative.
+    val durable = loadDurableTranscript()
+    return when {
+        branchContainsTarget -> mergeDurableTranscriptWithLiveTail(durable, activeBranch)
+        hotContainsTarget -> mergeDurableTranscriptWithLiveTail(durable, hotMessages)
+        else -> durable
+    }
+}
+
+private fun mergeDurableTranscriptWithLiveTail(
+    durable: List<LocalHarnessMessage>,
+    liveTail: List<LocalHarnessMessage>,
+): List<LocalHarnessMessage> {
+    if (durable.isEmpty()) return liveTail
+    if (liveTail.isEmpty()) return durable
+
+    val liveIds = liveTail.mapTo(hashSetOf(), LocalHarnessMessage::id)
+    val firstOverlap = durable.indexOfFirst { message -> message.id in liveIds }
+    val firstLiveCreatedAt = liveTail.first().createdAt
+    val durablePrefix = if (firstOverlap >= 0) {
+        durable.take(firstOverlap)
+    } else {
+        // Different snapshots can carry the same visible turn under regenerated ids. In that case
+        // time is only a fallback boundary: keep facts strictly before the live tail, never a stale
+        // durable "future" that would survive the destructive edit.
+        durable.takeWhile { message -> message.createdAt < firstLiveCreatedAt }
+    }
+    val seen = hashSetOf<String>()
+    return buildList(durablePrefix.size + liveTail.size) {
+        durablePrefix.forEach { message ->
+            if (seen.add(message.id)) add(message)
+        }
+        liveTail.forEach { message ->
+            if (seen.add(message.id)) add(message)
+        }
+    }
 }
 
 internal fun replayHardChatContextFromTranscript(

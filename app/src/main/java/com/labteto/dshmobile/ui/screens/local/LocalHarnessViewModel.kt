@@ -444,18 +444,30 @@ class LocalHarnessViewModel @Inject constructor(
             loading = true,
         )
         try {
+            val liveMessagesAtBootstrap = state.value
+                .takeIf { snapshot -> snapshot.sessionId == sessionId }
+                ?.messages
+                .orEmpty()
             val firstPage = withContext(Dispatchers.IO) {
                 engine.transcriptPageForUi(
                     sessionId = sessionId,
                     cursor = null,
-                    limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+                    limit = transcriptHistoryBootstrapLimit(
+                        liveMessageCount = liveMessagesAtBootstrap.size,
+                        maxPageSize = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+                    ),
                 )
             }
             if (state.value.sessionId != sessionId) return
+            val pageExtras = transcriptHistoryPageExtras(
+                pageMessages = firstPage.messages,
+                liveMessages = state.value.messages,
+            )
             transcriptHistoryCursor = firstPage.nextCursor
             transcriptHistoryInitializedSessionId = sessionId
             _transcriptHistory.value = LocalTranscriptHistoryState(
                 sessionId = sessionId,
+                olderMessages = pageExtras,
                 hasMore = firstPage.nextCursor != null,
             )
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -505,6 +517,7 @@ class LocalHarnessViewModel @Inject constructor(
             val latest = _transcriptHistory.value
             if (latest.sessionId != sessionId) return Result.success(0)
             val existingIds = latest.olderMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+            state.value.messages.mapTo(existingIds, LocalHarnessMessage::id)
             val newlyLoaded = page.messages.filterNot { message -> message.id in existingIds }
             transcriptHistoryCursor = page.nextCursor
             _transcriptHistory.value = latest.copy(
@@ -557,10 +570,25 @@ class LocalHarnessViewModel @Inject constructor(
             current = snapshot.groupChat.announcement,
         )
     }
-    fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
-        val result = engine.editAndResendUserMessage(messageId, text)
-        if (result != LocalChatUserEditResult.SENT) return result
+    suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
+        val result = withContext(Dispatchers.IO) {
+            engine.editAndResendUserMessage(messageId, text)
+        }
+        if (result == LocalChatUserEditResult.SENT) {
+            refreshTranscriptHistoryAfterTimelineRewrite()
+        }
+        return result
+    }
 
+    suspend fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean {
+        val selected = withContext(Dispatchers.IO) {
+            engine.selectChatMessageVariant(messageId, targetIndex)
+        }
+        if (selected) refreshTranscriptHistoryAfterTimelineRewrite()
+        return selected
+    }
+
+    private fun refreshTranscriptHistoryAfterTimelineRewrite() {
         val sessionId = state.value.sessionId
         transcriptHistoryCursor = null
         transcriptHistoryInitializedSessionId = null
@@ -568,10 +596,7 @@ class LocalHarnessViewModel @Inject constructor(
         viewModelScope.launch {
             prepareTranscriptHistory(sessionId, force = true)
         }
-        return result
     }
-    fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
-        engine.selectChatMessageVariant(messageId, targetIndex)
     fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
     suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
