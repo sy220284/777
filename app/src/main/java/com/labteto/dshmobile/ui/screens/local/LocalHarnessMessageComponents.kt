@@ -29,6 +29,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -118,11 +120,19 @@ internal fun LocalMessageRow(
     val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
     val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
     val variantScope = rememberCoroutineScope()
+    var selectingVariant by remember(message.id) { mutableStateOf(false) }
     val selectVariantWithFeedback: (String, Int) -> Unit = { id, index ->
-        variantScope.launch {
-            val selected = onSelectVariant(id, index)
-            if (!selected) {
-                Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+        if (!selectingVariant) {
+            selectingVariant = true
+            variantScope.launch {
+                try {
+                    val selected = onSelectVariant(id, index)
+                    if (!selected) {
+                        Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+                    }
+                } finally {
+                    selectingVariant = false
+                }
             }
         }
     }
@@ -142,7 +152,7 @@ internal fun LocalMessageRow(
                     MessageVariantControls(
                         messageId = message.id,
                         branchInfo = branchInfo,
-                        enabled = canSelectVariant,
+                        enabled = canSelectVariant && !selectingVariant,
                         onSelectVariant = selectVariantWithFeedback,
                     )
                     editableChatUserText(message).takeIf(String::isNotBlank)?.let { copyText ->
@@ -212,7 +222,7 @@ internal fun LocalMessageRow(
                         MessageVariantControls(
                             messageId = message.id,
                             branchInfo = branchInfo,
-                            enabled = canSelectVariant,
+                            enabled = canSelectVariant && !selectingVariant,
                             onSelectVariant = selectVariantWithFeedback,
                         )
                     }
