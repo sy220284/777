@@ -34,6 +34,9 @@ internal class LocalWorkRunBinding(
     var job: Job? = null
 
     @Volatile
+    var mirrorJob: Job? = null
+
+    @Volatile
     var turnsSinceModelHistoryCheckpoint: Int = 0
 
     val transcriptRuntime = LocalTranscriptRuntime(
