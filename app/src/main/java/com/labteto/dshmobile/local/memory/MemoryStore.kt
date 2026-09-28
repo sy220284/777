@@ -112,18 +112,20 @@ internal fun consolidateMemoryRecords(
                 .thenBy { it.id },
         )
         group.filter { it.id != winner.id }.forEach { loser -> loserToWinner[loser.id] = winner.id }
-        val mergedSources = group.asSequence()
+        val allMergedSources = group.asSequence()
             .flatMap { it.sourceMessages.asSequence() }
             .distinct()
             .toList()
-            .takeLast(maxSourceMessages.coerceAtLeast(1))
+        val boundedSourceLimit = maxSourceMessages.coerceAtLeast(1)
+        val sourcesTruncated = allMergedSources.size > boundedSourceLimit
+        val mergedSources = allMergedSources.takeLast(boundedSourceLimit)
         mergedWinners[winner.id] = winner.copy(
             sourceSessionId = winner.sourceSessionId
                 ?: group.asSequence().sortedByDescending(MemoryRecord::updatedAt)
                     .mapNotNull(MemoryRecord::sourceSessionId)
                     .firstOrNull(),
             sourceMessages = mergedSources,
-            hasUnboundSource = group.any(MemoryRecord::hasUnboundSource),
+            hasUnboundSource = group.any(MemoryRecord::hasUnboundSource) || sourcesTruncated,
             importance = group.maxOf(MemoryRecord::importance),
             pinned = group.any(MemoryRecord::pinned),
             createdAt = group.minOf(MemoryRecord::createdAt),
@@ -197,17 +199,20 @@ class MemoryStore internal constructor(
                 it.content.equals(clean, ignoreCase = true)
         }
         if (duplicateIndex >= 0) {
+            val incomingSource = sourceRef(sourceSessionId, sourceMessageId)
+            val mergedSources = mergeSourceMessages(
+                records[duplicateIndex].sourceMessages,
+                incomingSource,
+            )
             val refreshed = records[duplicateIndex].copy(
                 kind = kind,
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
                 sourceSessionId = sourceSessionId ?: records[duplicateIndex].sourceSessionId,
-                sourceMessages = mergeSourceMessages(
-                    records[duplicateIndex].sourceMessages,
-                    sourceRef(sourceSessionId, sourceMessageId),
-                ),
+                sourceMessages = mergedSources.sources,
                 hasUnboundSource = records[duplicateIndex].hasUnboundSource ||
-                    sourceMessageId.isNullOrBlank(),
+                    incomingSource == null ||
+                    mergedSources.truncated,
                 subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
                 updatedAt = now,
             )
@@ -593,13 +598,21 @@ class MemoryStore internal constructor(
         if (sessionId.isNullOrBlank() || messageId.isNullOrBlank()) null
         else MemorySourceRef(sessionId = sessionId, messageId = messageId)
 
+    private data class SourceMergeResult(
+        val sources: List<MemorySourceRef>,
+        val truncated: Boolean,
+    )
+
     private fun mergeSourceMessages(
         current: List<MemorySourceRef>,
         incoming: MemorySourceRef?,
-    ): List<MemorySourceRef> =
-        (current + listOfNotNull(incoming))
-            .distinct()
-            .takeLast(MAX_SOURCE_MESSAGES)
+    ): SourceMergeResult {
+        val all = (current + listOfNotNull(incoming)).distinct()
+        return SourceMergeResult(
+            sources = all.takeLast(MAX_SOURCE_MESSAGES),
+            truncated = all.size > MAX_SOURCE_MESSAGES,
+        )
+    }
 
     private fun readDocument(): MemoryDocument {
         val stamp = documentStamp()
