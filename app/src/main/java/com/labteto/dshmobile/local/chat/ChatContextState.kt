@@ -396,7 +396,7 @@ private fun continuityBigrams(text: String): Set<String> =
 private fun normalizeContinuityFact(text: String): String =
     text.trim()
         .lowercase()
-        .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）\\[\\]【】|｜=_-]+"""), "")
+        .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
         .take(360)
 
 
