@@ -377,4 +377,53 @@ class ChatContextStateTest {
         assertEquals("a7", pending.assistantMessageId)
     }
 
+
+    @Test
+    fun nearMatchDecisionWithDifferentDestinationIsRejected() {
+        val pending = listOf(
+            ChatPendingTurn(
+                sequence = 51L,
+                userMessageId = "u51",
+                assistantMessageId = "a51",
+                userMessage = "明天九点去城南。",
+                assistantMessage = "好，明天九点去城南。",
+            ),
+        )
+
+        val grounded = groundContinuityEvidence(
+            previous = ChatContinuityState(),
+            candidate = ChatContinuityState(
+                decisions = listOf("明天九点去城北"),
+            ),
+            pendingTurns = pending,
+        )
+
+        assertTrue(grounded.decisions.isEmpty())
+        assertTrue(grounded.evidence.isEmpty())
+    }
+
+    @Test
+    fun harmlessTimeWordingParaphraseCanStillGroundDecision() {
+        val pending = listOf(
+            ChatPendingTurn(
+                sequence = 52L,
+                userMessageId = "u52",
+                assistantMessageId = "a52",
+                userMessage = "那就定了，明天九点去城南。",
+                assistantMessage = "好，九点出发。",
+            ),
+        )
+
+        val grounded = groundContinuityEvidence(
+            previous = ChatContinuityState(),
+            candidate = ChatContinuityState(
+                decisions = listOf("明早九点去城南"),
+            ),
+            pendingTurns = pending,
+        )
+
+        assertEquals(listOf("明早九点去城南"), grounded.decisions)
+        assertEquals("u52", grounded.evidence.single().sourceUserMessageId)
+    }
+
 }
