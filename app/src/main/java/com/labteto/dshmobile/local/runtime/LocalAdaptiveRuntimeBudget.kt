@@ -43,6 +43,56 @@ internal fun adaptiveAgentStepLimit(
 }
 
 /**
+ * Extends an exhausted soft step budget without resetting the current turn.
+ *
+ * The configured value remains the baseline. Once the task reaches it, continuation grows from the
+ * amount of work already spent, task complexity, context pressure and resource pressure. There is no
+ * normal fixed ceiling here: a healthy task keeps receiving budget until the model finishes, while
+ * cancellation and unrecoverable failures remain the actual stop conditions.
+ */
+internal fun nextAdaptiveAgentStepLimit(
+    currentLimit: Int,
+    configuredBase: Int,
+    task: String,
+    contextChars: Int,
+    contextBudgetChars: Int,
+    pressure: HarnessResourcePressure,
+    kind: LocalAgentRunKind,
+): Int? {
+    if (currentLimit <= 0 || currentLimit == Int.MAX_VALUE) return null
+
+    val base = configuredBase.coerceAtLeast(1)
+    val normalized = task.lowercase()
+    val complexityHits = ADAPTIVE_COMPLEXITY_CUES.count(normalized::contains).coerceAtMost(6)
+    val contextRatio = if (contextBudgetChars > 0) {
+        contextChars.toDouble() / contextBudgetChars.toDouble()
+    } else 0.0
+
+    val complexityFactor = 1.0 + complexityHits * 0.08 +
+        if (kind == LocalAgentRunKind.SUBAGENT || kind == LocalAgentRunKind.AUTOMATION) 0.08 else 0.0
+    val contextFactor = when {
+        contextRatio >= 1.0 -> 0.55
+        contextRatio >= 0.85 -> 0.7
+        contextRatio >= 0.65 -> 0.85
+        else -> 1.0
+    }
+    val pressureFactor = when (pressure) {
+        HarnessResourcePressure.LOW -> 1.0
+        HarnessResourcePressure.MEDIUM -> 0.85
+        HarnessResourcePressure.HIGH -> 0.7
+    }
+
+    val growth = ceil(
+        maxOf(base.toDouble(), currentLimit * 0.5) *
+            complexityFactor *
+            contextFactor *
+            pressureFactor,
+    ).toLong().coerceAtLeast(1L)
+    val next = currentLimit.toLong() + growth
+    return next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+}
+
+/**
  * Continuously shrinks the model-visible copy of tool output as history fills up.
  *
  * The complete output remains in LocalToolOutputStore and can be paged with tool_output_read.
