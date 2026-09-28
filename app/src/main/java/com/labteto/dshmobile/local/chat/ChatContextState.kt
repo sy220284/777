@@ -358,15 +358,18 @@ internal fun groundContinuityEvidence(
         }
         if (!preserveUnrelatedPrevious) return accepted.takeLast(limit)
 
-        // Decisions are independent slots: a newly grounded decision replaces only an older
-        // conflicting decision. Unrelated commitments stay active even if the planner omitted them.
+        // Grounded soft facts are independent slots. A fresh fact replaces only the same
+        // subject/slot; unrelated commitments and open threads stay active if the planner omitted them.
         val preserved = retainedPrevious.filter { old ->
             accepted.none { fresh ->
                 normalizeContinuityFact(old) == normalizeContinuityFact(fresh) ||
-                    (
-                        kind == ChatContinuityFactKind.DECISION &&
+                    when (kind) {
+                        ChatContinuityFactKind.DECISION ->
                             ChatContextAssembler.factConflicts(old, fresh)
-                    )
+                        ChatContinuityFactKind.OPEN_THREAD ->
+                            continuityOpenThreadsShareSubject(old, fresh)
+                        ChatContinuityFactKind.EVENT -> false
+                    }
             }
         }
         return (preserved + accepted)
@@ -462,14 +465,36 @@ private fun continuityRemovalAnchorMatches(
 }
 
 private fun continuityRemovalAnchors(fact: String): Set<String> {
-    val core = normalizeContinuityEvidenceText(fact)
-        .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
-        .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
+    val core = continuityAnchorCore(fact)
     if (core.length < 2) return emptySet()
     return continuityBigrams(core)
         .filterTo(linkedSetOf()) { anchor ->
             anchor.length >= 2 && anchor !in GENERIC_CONTINUITY_ANCHORS
         }
+}
+
+private fun continuityAnchorCore(fact: String): String =
+    normalizeContinuityEvidenceText(fact)
+        .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
+        .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
+
+private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean {
+    if (ChatContextAssembler.semanticallySimilar(left, right)) return true
+    val a = continuityAnchorCore(left)
+    val b = continuityAnchorCore(right)
+    if (a.length < 2 || b.length < 2) return false
+    if (a == b) return true
+    val shorter = if (a.length <= b.length) a else b
+    val longer = if (a.length <= b.length) b else a
+    if (shorter.length >= 2 && longer.contains(shorter)) return true
+
+    val aa = continuityBigrams(a)
+    val bb = continuityBigrams(b)
+    if (aa.isEmpty() || bb.isEmpty()) return false
+    val shared = aa.count(bb::contains)
+    if (shared < 2) return false
+    val containment = shared.toDouble() / minOf(aa.size, bb.size).toDouble()
+    return containment >= 0.6
 }
 
 private val GENERIC_CONTINUITY_ANCHORS = setOf(
