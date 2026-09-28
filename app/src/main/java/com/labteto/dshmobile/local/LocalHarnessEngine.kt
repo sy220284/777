@@ -4306,8 +4306,46 @@ class LocalHarnessEngine @Inject constructor(
         return LocalToolRouter.visibleSchemas(tools, enabled)
     }
 
-    private fun modelToolSchemas(runPolicy: LocalAgentRunPolicy): JsonArray =
-        toolExecutionCoordinator.visibleSchemas(runPolicy)
+    private fun modelToolSchemas(
+        runPolicy: LocalAgentRunPolicy,
+        binding: LocalWorkRunBinding? = null,
+    ): JsonArray {
+        if (binding == null) return toolExecutionCoordinator.visibleSchemas(runPolicy)
+        if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
+        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
+        return LocalToolRouter.visibleSchemas(tools, binding.enabledOptionalTools.toSet())
+    }
+
+    private fun runToolNames(
+        runPolicy: LocalAgentRunPolicy,
+        binding: LocalWorkRunBinding?,
+    ): List<String> = modelToolSchemas(runPolicy, binding).mapNotNull { element ->
+        val function = (element as? JsonObject)?.get("function") as? JsonObject
+        (function?.get("name") as? JsonPrimitive)?.contentOrNull
+    }
+
+    private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
+        if (binding == null) {
+            toolExecutionCoordinator.clearTurnCapabilities()
+        } else {
+            synchronized(binding.enabledOptionalTools) { binding.enabledOptionalTools.clear() }
+        }
+    }
+
+    private fun enableRunGitHubCapabilities(binding: LocalWorkRunBinding?) {
+        if (binding == null) {
+            toolExecutionCoordinator.enableGitHubConnectorTools()
+        } else {
+            val registered = toolRegistry.names().toSet()
+            synchronized(binding.enabledOptionalTools) {
+                binding.enabledOptionalTools += setOf(
+                    "github_status",
+                    "github_api_get",
+                    "github_api_request",
+                ).filter { it in registered }
+            }
+        }
+    }
 
     private fun searchCapabilities(query: String): String =
         toolExecutionCoordinator.searchCapabilities(query)
@@ -4727,6 +4765,46 @@ class LocalHarnessEngine @Inject constructor(
             return true
         }
         return interactions.awaitApproval(
+            LocalApproval(
+                callId = call.id,
+                toolName = call.name,
+                summary = summary,
+                arguments = call.rawArguments,
+                access = tool.access.name.lowercase(),
+                impact = approvalImpact(tool),
+                canAutoApproveSafely = canAutoApprove(tool, call.arguments),
+                canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
+            ),
+        )
+    }
+
+    private suspend fun approve(
+        binding: LocalWorkRunBinding,
+        call: LocalToolCall,
+        summary: String,
+        tool: HarnessTool,
+    ): Boolean {
+        val snapshot = binding.state.value
+        if (snapshot.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
+            binding.eventLog.append("approval/auto", buildJsonObject {
+                put("tool", call.name)
+                put("summary", summary)
+                put("access", tool.access.name.lowercase())
+                put("mode", "device-turn-lease")
+            })
+            return true
+        }
+        if (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) {
+            binding.eventLog.append("approval/auto", buildJsonObject {
+                put("tool", call.name)
+                put("summary", summary)
+                put("access", tool.access.name.lowercase())
+                put("impact", approvalImpact(tool).name.lowercase())
+                put("mode", "global")
+            })
+            return true
+        }
+        return binding.interactions.awaitApproval(
             LocalApproval(
                 callId = call.id,
                 toolName = call.name,
