@@ -305,6 +305,37 @@ class MemoryStoreTest {
     }
 
 
+    @Test fun laterUnboundConfirmationProtectsEarlierExactFactFromRollback() {
+        val memoryStore = store()
+        val exact = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u1",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+
+        assertEquals(exact.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u1"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(exact.id, remaining.id)
+        assertTrue(remaining.hasUnboundSource)
+        assertTrue(remaining.sourceMessages.isEmpty())
+    }
+
     @Test fun searchFiltersRelationshipOwnerBeforeResultLimit() {
         val memoryStore = store()
         repeat(6) { index ->
