@@ -426,7 +426,7 @@ class MemoryStore internal constructor(
                 MemoryDocument()
             }
         }
-        cachedDocument = boundedDocument
+        cachedDocument = document
         cachedStamp = documentStamp()
         return document
     }
@@ -462,7 +462,7 @@ class MemoryStore internal constructor(
         if (decodeDocument(backup) == null && decodeDocument(file) != null) {
             runCatching { file.copyTo(backup, overwrite = true) }
         }
-        cachedDocument = document
+        cachedDocument = boundedDocument
         cachedStamp = documentStamp()
     }
 
