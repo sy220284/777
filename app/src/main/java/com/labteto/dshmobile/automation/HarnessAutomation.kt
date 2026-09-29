@@ -1,7 +1,8 @@
 package com.labteto.dshmobile.automation
 
 import android.content.Context
-import com.labteto.dshmobile.R\nimport com.labteto.dshmobile.notify.stableNotificationId
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
