@@ -365,13 +365,15 @@ internal class LocalSessionLifecycleCoordinator(
         state.update { it.copy(loading = true) }
         return try {
             transitionMutex.withLock {
-                cancelActiveRunAndJoin()
-                cancelWorkRunsAndJoin(requestedIds)
-                jobs.stopOwnedAndJoin(requestedIds)
-                persist()
                 val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
-                if (currentSessionId() in ids) {
+                if (ids.isEmpty()) return@withLock 0
+                val deletingCurrentSession = currentSessionId() in ids
+                if (deletingCurrentSession) cancelActiveRunAndJoin()
+                cancelWorkRunsAndJoin(ids)
+                jobs.stopOwnedAndJoin(ids)
+                if (!deletingCurrentSession) persist()
+                if (deletingCurrentSession) {
                     val previous = state.value
                     val replacement = available.firstOrNull {
                         it.id !in ids && it.usageMode == previous.usageMode
