@@ -203,7 +203,6 @@ class LocalExecutionService : Service() {
         private const val EXTRA_JOB_LABELS = "job_labels"
         private const val EXTRA_JOB_SESSION_IDS = "job_session_ids"
         private const val NOTIFICATION_ID = 7720
-        private const val COMPLETION_ID_BASE = 23_000
 
         const val OUTCOME_COMPLETED = "completed"
         const val OUTCOME_FAILED = "failed"
