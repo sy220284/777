@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local.runtime
 
-import java.nio.file.Files\nimport java.security.MessageDigest\nimport org.junit.Assert.assertEquals\nimport org.junit.Assert.assertFalse\nimport org.junit.Assert.assertTrue
+import java.nio.file.Files
+import java.security.MessageDigest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BundledRuntimeLibraryStoreTest {
