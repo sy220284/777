@@ -81,7 +81,7 @@ internal suspend fun cancelWorkRunsForDeletedSessions(
                 deviceApprovalLease = false,
             )
         }
-        binding.job?.also(Job::cancel)
+        binding.job?.also { it.cancel() }
     }
     jobs.forEach { it.join() }
 
