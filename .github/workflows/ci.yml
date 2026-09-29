@@ -37,6 +37,8 @@ jobs:
           git diff --exit-code -- reference-validation/src/test/resources/official
       - name: Guard hard-coded UI text
         run: python3 .github/scripts/check-ui-hardcoded-cjk.py
+      - name: Guard UI design-system boundaries
+        run: python3 .github/scripts/check-ui-design-system-boundaries.py
       - name: Guard Kotlin risk patterns
         run: python3 .github/scripts/check-kotlin-risk-patterns.py
       - name: Guard local performance invariants
