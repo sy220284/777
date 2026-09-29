@@ -17,23 +17,45 @@ import org.junit.Test
 
 class WebhookListenerTest {
     @Test
-    fun repeatedRestartRebindsSamePortAndStopsAfterClose() {
+    fun repeatedRestartStopsPreviousListenerAndServesOnlyCurrentListener() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val listener = WebhookListener(scope) { it.getOutputStream().write(42) }
+        var previousPort: Int? = null
+        try {
+            repeat(100) {
+                val currentPort = ServerSocket(0).use { it.localPort }
+                listener.restart(InetSocketAddress("127.0.0.1", currentPort))
+
+                previousPort?.let(::assertConnectionRejected)
+                Socket("127.0.0.1", currentPort).use { client ->
+                    client.soTimeout = 3000
+                    assertEquals(42, client.getInputStream().read())
+                }
+                previousPort = currentPort
+            }
+
+            listener.close()
+            previousPort?.let(::assertConnectionRejected)
+        } finally {
+            listener.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun repeatedSameAddressRestartIsIdempotent() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val listener = WebhookListener(scope) { it.getOutputStream().write(42) }
         val port = ServerSocket(0).use { it.localPort }
         try {
+            listener.restart(InetSocketAddress("127.0.0.1", port))
             repeat(100) {
-                // Rebinding the exact same address is the real restart contract. If the previous
-                // generation still owns its listening socket, restart() itself fails here.
                 listener.restart(InetSocketAddress("127.0.0.1", port))
-                Socket("127.0.0.1", port).use { client ->
-                    client.soTimeout = 3000
-                    assertEquals(42, client.getInputStream().read())
-                }
             }
-
-            listener.close()
-            assertConnectionRejected(port)
+            Socket("127.0.0.1", port).use { client ->
+                client.soTimeout = 3000
+                assertEquals(42, client.getInputStream().read())
+            }
         } finally {
             listener.close()
             scope.cancel()
@@ -46,7 +68,7 @@ class WebhookListenerTest {
                 client.connect(InetSocketAddress("127.0.0.1", port), 300)
             }
         }.isSuccess
-        assertFalse("关闭后的 Webhook 端口仍可建立新连接：$port", connected)
+        assertFalse("已替换或关闭的 Webhook 端口仍可建立新连接：$port", connected)
     }
 
     @Test
