@@ -57,6 +57,46 @@ class LocalToolRouterTest {
         assertEquals("github_api_get", LocalToolRouter.search(tools, "GitHub PR").first().name)
     }
 
+
+    @Test
+    fun capabilitySearchHardCapsLargeOptionalCatalogDeterministically() {
+        val tools = (0 until 1_000).map { index ->
+            tool("mcp_tool_" + index.toString().padStart(4, '0'), "MCP 外部工具 批量测试")
+        }
+
+        val first = LocalToolRouter.search(tools, "MCP 外部工具", limit = Int.MAX_VALUE)
+        val second = LocalToolRouter.search(tools.reversed(), "MCP 外部工具", limit = Int.MAX_VALUE)
+
+        assertEquals(48, first.size)
+        assertEquals(first.map(HarnessTool::name), second.map(HarnessTool::name))
+        assertEquals("mcp_tool_0000", first.first().name)
+    }
+
+    @Test
+    fun staleEnabledNameCannotResurrectAnUnregisteredTool() {
+        val core = tool("read", "读取文件")
+        val removed = tool("mcp_removed", "MCP 已卸载工具")
+        val enabled = setOf("mcp_removed")
+
+        assertTrue("mcp_removed" in names(LocalToolRouter.visibleSchemas(listOf(core, removed), enabled)))
+        val afterUninstall = names(LocalToolRouter.visibleSchemas(listOf(core), enabled))
+
+        assertEquals(listOf("read"), afterUninstall)
+    }
+
+    @Test
+    fun capabilitySearchConsumesOnlyBoundedQueryTerms() {
+        val tool = tool("mcp_target", "MCP target capability")
+        val hugeQuery = buildString {
+            repeat(10_000) { append("noise").append(it).append(' ') }
+            append("mcp")
+        }
+
+        // The router intentionally considers only the first 24 tokens; a huge prompt cannot
+        // force unbounded matching work or unexpectedly enable a trailing capability.
+        assertTrue(LocalToolRouter.search(listOf(tool), hugeQuery).isEmpty())
+    }
+
     private fun tool(name: String, description: String): HarnessTool = HarnessTool(
         name = name,
         schema = buildJsonObject {
