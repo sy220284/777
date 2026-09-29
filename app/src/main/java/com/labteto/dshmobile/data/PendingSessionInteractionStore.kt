@@ -13,6 +13,11 @@ internal class PendingSessionInteractionStore {
         val sessionStillPending: Boolean,
     )
 
+    internal data class EventRemoval(
+        val sessionId: String,
+        val pendingKinds: Set<String>,
+    )
+
     private val approvalsByEvent = HashMap<String, PendingApproval>()
     private val approvalsBySession = LinkedHashMap<String, PendingApproval>()
     private val questionEvents = PendingQuestionRegistry()
@@ -22,6 +27,22 @@ internal class PendingSessionInteractionStore {
     fun installApproval(card: PendingApproval) {
         approvalsByEvent[card.approvalId] = card
         approvalsBySession[card.sessionId] = card
+    }
+
+    fun installApproval(
+        eventId: String,
+        sessionId: String,
+        request: ApprovalRequestEvent,
+    ) {
+        installApproval(
+            PendingApproval(
+                sessionId = sessionId,
+                approvalId = eventId,
+                rpcId = eventId,
+                toolName = request.toolName,
+                reason = request.reason,
+            ),
+        )
     }
 
     fun approvalForEvent(eventId: String): PendingApproval? = approvalsByEvent[eventId]
@@ -39,9 +60,35 @@ internal class PendingSessionInteractionStore {
         )
     }
 
+    fun forgetEvent(eventId: String): EventRemoval? {
+        val approval = forgetApproval(eventId)
+        if (approval != null) {
+            return EventRemoval(
+                sessionId = approval.request.sessionId,
+                pendingKinds = if (approval.sessionStillPending) emptySet() else setOf("approval"),
+            )
+        }
+        val sessionId = questionEvents.sessionFor(eventId) ?: return null
+        if (!forgetQuestions(sessionId, eventId)) return null
+        return EventRemoval(sessionId, setOf("question", "plan-review"))
+    }
+
     fun installQuestions(card: PendingQuestions) {
         questionEvents.install(card.sessionId, card.rpcId)
         questionsBySession[card.sessionId] = card
+    }
+
+    fun installQuestions(
+        eventId: String,
+        sessionId: String,
+        questions: List<AskUserQuestionItem>,
+    ): String {
+        installQuestions(PendingQuestions(sessionId, eventId, questions))
+        return if (questions.any { it.intent is AskUserQuestionIntent.PlanReview }) {
+            "plan-review"
+        } else {
+            "question"
+        }
     }
 
     fun questionSessionForEvent(eventId: String): String? = questionEvents.sessionFor(eventId)
