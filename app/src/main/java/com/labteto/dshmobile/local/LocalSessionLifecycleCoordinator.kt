@@ -163,7 +163,7 @@ internal class LocalSessionLifecycleCoordinator(
                         usageMode == LocalUsageMode.CHAT &&
                         !freshGalleryStory
                     ) {
-                        selectedGalleryStory?.chatState ?: ChatCharacterState()
+                        selectedGalleryStory?.chatState ?: ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
                     } else if (
                         usageMode == LocalUsageMode.CHAT &&
                         mode == LocalConversationMode.CONTINUATION &&
@@ -171,7 +171,7 @@ internal class LocalSessionLifecycleCoordinator(
                     ) {
                         sourceState.chatState
                     } else {
-                        ChatCharacterState()
+                        ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
                     }
 
                     val chatContext = when {
