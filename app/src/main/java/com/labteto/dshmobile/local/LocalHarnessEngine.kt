@@ -295,6 +295,18 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             executeBuiltin = ::executeBuiltin,
+            usageContextProvider = { sessionId, callId ->
+                val resolvedSessionId = sessionId?.takeIf(String::isNotBlank) ?: currentSessionId
+                val snapshot = activeWorkRuns[resolvedSessionId]?.state?.value
+                    ?: _state.value.copy(sessionId = resolvedSessionId)
+                buildToolTokenUsageContext(
+                    snapshot = snapshot,
+                    eventLog = eventLogFor(resolvedSessionId),
+                    sessionId = resolvedSessionId,
+                    callId = callId,
+                    action = TokenUsageAction.VISION,
+                )
+            },
         )
     }
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
@@ -4024,7 +4036,18 @@ class LocalHarnessEngine @Inject constructor(
             "web_search" -> {
                 val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                web.search(key, queries)
+                web.search(
+                    key,
+                    queries,
+                    buildToolTokenUsageContext(
+                        snapshot = executionState.value,
+                        eventLog = eventLogFor(boundSessionId),
+                        sessionId = boundSessionId,
+                        callId = call.id,
+                        action = TokenUsageAction.WEB_SEARCH,
+                        fallbackTaskLabel = queries.firstOrNull(),
+                    ),
+                )
             }
             "web_fetch" -> {
                 val input = args.string("url")
