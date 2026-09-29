@@ -39,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,8 +49,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,7 +90,6 @@ internal fun LocalModeDrawer(
     sessionTitleOverrides: Map<String, String>,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
-    onClose: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
@@ -101,8 +104,18 @@ internal fun LocalModeDrawer(
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    var historyQuery by rememberSaveable { mutableStateOf("") }
+    var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
+    var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
     val selectedIds = remember { mutableStateListOf<String>() }
     val visibleSessions = remember(sessions, usageMode, pinnedSessionIds) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
@@ -148,10 +161,18 @@ internal fun LocalModeDrawer(
                         tint = colors.labelPrimary,
                     )
                     DsIconButton(
-                        icon = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.common_close),
-                        onClick = onClose,
-                        tint = colors.labelPrimary,
+                        icon = Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.chatlist_search_hint),
+                        onClick = {
+                            if (searchOpen) {
+                                searchOpen = false
+                                historyQuery = ""
+                                keyboardController?.hide()
+                            } else {
+                                searchOpen = true
+                            }
+                        },
+                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
                     )
                 }
                 Box(
@@ -165,23 +186,26 @@ internal fun LocalModeDrawer(
                     )
                 }
 
-                OutlinedTextField(
-                    value = historyQuery,
-                    onValueChange = { historyQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = DsSpacing.small),
-                    placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Search,
-                            contentDescription = null,
-                            tint = colors.labelTertiary,
-                        )
-                    },
-                    singleLine = true,
-                    shape = DsShapes.block,
-                )
+                if (searchOpen) {
+                    OutlinedTextField(
+                        value = historyQuery,
+                        onValueChange = { historyQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(searchFocusRequester)
+                            .padding(bottom = DsSpacing.small),
+                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = colors.labelTertiary,
+                            )
+                        },
+                        singleLine = true,
+                        shape = DsShapes.block,
+                    )
+                }
             }
 
             LazyColumn(
