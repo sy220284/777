@@ -52,6 +52,7 @@ internal object BundledRuntimeLibraryStore {
         targetDir: File,
     ) {
         require(runtime in runtimeNames) { "未知内置运行时：" + runtime }
+        verifyLayoutVersion(context)
         val entries = readManifest(context, runtime, abi)
         val sharedDir = File(context.noBackupFilesDir, "runtime/shared/$abi/lib")
         sharedDir.mkdirs()
@@ -82,6 +83,15 @@ internal object BundledRuntimeLibraryStore {
             "materialized " + runtime + "/" + abi +
                 ": aliases=" + entries.size + ", hardlinks=" + linked + ", copies=" + copied,
         )
+    }
+
+    private fun verifyLayoutVersion(context: Context) {
+        val version = context.assets.open("runtime/shared/schema-version.txt")
+            .bufferedReader()
+            .use { it.readText().trim() }
+        require(version == LAYOUT_VERSION) {
+            "共享运行时布局版本不匹配：期望 " + LAYOUT_VERSION + "，实际 " + version
+        }
     }
 
     private fun readManifest(
