@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -63,6 +64,7 @@ class VisionClient @Inject constructor(
         model = route.model,
         prompt = prompt,
         imageDataUrl = imageDataUrl,
+        usageContext = route.usageContext,
     )
 
     suspend fun analyze(
@@ -71,6 +73,7 @@ class VisionClient @Inject constructor(
         model: String,
         prompt: String,
         imageDataUrl: String,
+        usageContext: TokenUsageContext? = null,
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "当前模型密钥为空" }
         require(model.isNotBlank()) { "当前模型名称为空" }
@@ -101,7 +104,19 @@ class VisionClient @Inject constructor(
                 val root = json.parseToJsonElement(body).jsonObject
                 val result = parseRoot(root)
                 if (isDeepSeekEndpoint(baseUrl)) {
-                    usageTracker.get().record(model, parseDeepSeekOpenAiUsage(root))
+                    usageTracker.get().record(
+                        model = model,
+                        usage = parseDeepSeekOpenAiUsage(root),
+                        requestId = UUID.randomUUID().toString(),
+                        context = usageContext?.copy(
+                            action = TokenUsageAction.VISION,
+                            taskLabel = usageContext.taskLabel ?: prompt.take(120),
+                        ) ?: TokenUsageContext(
+                            mode = LocalUsageMode.WORK,
+                            action = TokenUsageAction.VISION,
+                            taskLabel = prompt.take(120),
+                        ),
+                    )
                 }
                 result
             }

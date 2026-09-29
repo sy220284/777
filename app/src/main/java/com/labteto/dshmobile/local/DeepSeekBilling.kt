@@ -301,29 +301,73 @@ class DeepSeekPricingRepository @Inject constructor(
 class DeepSeekUsageTracker @Inject constructor(
     @ApplicationContext context: Context,
     private val pricingRepository: DeepSeekPricingRepository,
+    private val analyticsStore: TokenUsageAnalyticsStore,
 ) {
     private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val lock = Any()
     private val _state = MutableStateFlow(load())
     val state: StateFlow<DeepSeekUsageSnapshot> = _state.asStateFlow()
+    val analyticsRevision: StateFlow<Long> = analyticsStore.revision
 
     fun record(
         model: String,
         usage: DeepSeekTokenUsage,
         epochMillis: Long = System.currentTimeMillis(),
+        requestId: String = "",
+        context: TokenUsageContext = TokenUsageContext(),
+        promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
     ) {
+        val miss = usage.cacheMissTokens.takeIf { it > 0L }
+            ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
+        val normalized = usage.copy(cacheMissTokens = miss)
+        val cost = if (usage.reported) {
+            DeepSeekCostCalculator.estimateCny(
+                model = model,
+                usage = normalized,
+                pricing = pricingRepository.state.value,
+                epochMillis = epochMillis,
+            )
+        } else {
+            null
+        }
         synchronized(lock) {
             val next = accumulateDeepSeekUsage(
                 current = _state.value,
                 model = model,
-                usage = usage,
+                usage = normalized,
                 pricing = pricingRepository.state.value,
                 epochMillis = epochMillis,
             )
             persist(next)
             _state.value = next
         }
+        analyticsStore.append(
+            TokenUsageRecord(
+                requestId = requestId,
+                timestamp = epochMillis,
+                model = model,
+                context = context,
+                inputTokens = if (usage.reported) usage.promptTokens else 0L,
+                cacheHitTokens = if (usage.reported) usage.cacheHitTokens else 0L,
+                cacheMissTokens = if (usage.reported) miss else 0L,
+                outputTokens = if (usage.reported) usage.completionTokens else 0L,
+                reasoningTokens = if (usage.reported) usage.reasoningTokens else 0L,
+                estimatedCostCny = cost ?: 0.0,
+                reported = usage.reported,
+                promptBreakdown = promptBreakdown,
+            ),
+        )
     }
+
+    fun analyticsSnapshot(): TokenUsageAnalyticsSnapshot = analyticsStore.snapshot()
+
+    fun analyticsGroupDetail(
+        kind: TokenUsageGroupKind,
+        key: String,
+    ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key)
+
+    fun analyticsRecord(requestId: String): TokenUsageRecord? =
+        analyticsStore.recordById(requestId)
 
     private fun load(): DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(
         inputTokens = preferences.getLong(KEY_INPUT, 0L),

@@ -50,6 +50,7 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
+import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
@@ -276,6 +277,7 @@ class LocalHarnessEngine @Inject constructor(
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
     }
+    private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, activeWorkRuns, ::eventLogFor) { currentSessionId } }
     private val pluginComposition by lazy {
         pluginCompositionFactory.create(
             workspaceRoot = File(workspace.path),
@@ -296,6 +298,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             executeBuiltin = ::executeBuiltin,
+            usageContextProvider = { sessionId, callId -> tokenUsageBridge.resolve(sessionId, callId, TokenUsageAction.VISION) },
         )
     }
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
@@ -367,7 +370,7 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 }
             },
-            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordUsage = { snapshot, reply -> usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH) },
             persistBranchState = ::persistChatBranchState,
             persist = ::persist,
         )
@@ -376,7 +379,7 @@ class LocalHarnessEngine @Inject constructor(
     private val chatReplyCoordinator by lazy {
         LocalChatReplyCoordinator(
             chatTurnCoordinator = chatTurnCoordinator,
-            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordUsage = { snapshot, reply, usageContext -> usageTracker.record(snapshot, reply, usageContext) },
             recordStyleGuardHits = ::recordStyleGuardHits,
         )
     }
@@ -1241,7 +1244,7 @@ class LocalHarnessEngine @Inject constructor(
             })
             return false
         }
-        usageTracker.record(snapshot.model, reply.usage)
+        usageTracker.recordForeground(snapshot, reply, TokenUsageAction.REPLY_SUGGESTIONS, turnId = snapshot.transcriptIndex.latestUserMessageId, step = CHAT_POST_TURN_MODEL_STEP + 1)
         val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
             boundEventLog.append("chat/reply-suggestions", buildJsonObject {
@@ -1668,7 +1671,7 @@ class LocalHarnessEngine @Inject constructor(
                 persistOverflowHistory = true,
             )
             val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
-            usageTracker.record(snapshot.model, reply.usage)
+            usageTracker.recordForeground(snapshot, reply, TokenUsageAction.WORK_MAIN, turnId = messageId, taskLabel = "regenerate", step = 1)
             val transcript = listOf(transcriptRuntime.newMessage("assistant", content))
             val data = transcriptRuntime.withTranscript(reply.message, transcript)
             val event = eventLog.append("assistant/message", JsonObject(
@@ -2725,10 +2728,6 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-
-
-
-
     private suspend fun runChatTurn(
         input: String,
         replacingMessageId: String? = null,
@@ -2800,10 +2799,9 @@ class LocalHarnessEngine @Inject constructor(
             )
 
             val reply = chatReplyCoordinator.finalizeDirect(
-                snapshot = snapshot,
-                reply = rawReply,
+                snapshot = snapshot, reply = rawReply,
                 userMessage = input,
-                step = 1,
+                step = 1, usage = ForegroundTokenUsageSeed(turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId),
                 retryRaw = { repairHint ->
                     completeWithRetry(
                         key = key,
@@ -3194,7 +3192,7 @@ class LocalHarnessEngine @Inject constructor(
                     messages = requestMessages,
                     step = modelStep + 1,
                     reply = rawReply,
-                    userMessage = memoryInput,
+                    userMessage = memoryInput, usage = ForegroundTokenUsageSeed(sourceMessageId ?: runContext.runId, runContext.runId, input),
                 )
                 val effectiveReply = if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
                     runEventLog.append("chat/tool-call-blocked", buildJsonObject {
@@ -4011,7 +4009,7 @@ class LocalHarnessEngine @Inject constructor(
             "web_search" -> {
                 val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                web.search(key, queries)
+                web.search(key, queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
             }
             "web_fetch" -> {
                 val input = args.string("url")
@@ -4665,12 +4663,12 @@ class LocalHarnessEngine @Inject constructor(
         messages: List<JsonObject>,
         step: Int,
         reply: LocalModelReply,
-        userMessage: String,
+        userMessage: String, usage: ForegroundTokenUsageSeed,
     ): LocalModelReply = chatReplyCoordinator.finalizeDirect(
         snapshot = snapshot,
         reply = reply,
         userMessage = userMessage,
-        step = step,
+        step = step, usage = usage,
         retryRaw = { repairHint ->
             completeWithRetry(
                 key = key,

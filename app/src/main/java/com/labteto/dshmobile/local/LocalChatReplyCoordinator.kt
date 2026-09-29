@@ -19,7 +19,7 @@ import kotlinx.serialization.json.put
  */
 internal class LocalChatReplyCoordinator(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
+    private val recordUsage: (LocalHarnessState, LocalModelReply, TokenUsageContext) -> Unit,
     private val recordStyleGuardHits: (List<String>) -> Unit,
 ) {
     suspend fun finalizeDirect(
@@ -27,19 +27,36 @@ internal class LocalChatReplyCoordinator(
         reply: LocalModelReply,
         userMessage: String,
         step: Int,
+        usage: ForegroundTokenUsageSeed = ForegroundTokenUsageSeed(),
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
+        val usageContext = buildForegroundTokenUsageContext(
+            snapshot = snapshot,
+            action = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                TokenUsageAction.CHAT_REPLY
+            } else {
+                TokenUsageAction.WORK_MAIN
+            },
+            turnId = usage.turnId,
+            runId = usage.runId,
+            taskLabel = usage.taskLabel ?: userMessage,
+            step = step,
+        )
         if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
-            recordUsage(snapshot, reply)
+            recordUsage(snapshot, reply, usageContext)
             return reply
         }
         val persona = chatTurnCoordinator.persona(snapshot)
-        suspend fun finalizeCandidate(candidate: LocalModelReply): LocalModelReply =
+        suspend fun finalizeCandidate(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): LocalModelReply =
             finalizeStyled(
                 snapshot = snapshot,
                 persona = persona,
                 reply = candidate,
+                usageContext = candidateUsageContext,
                 onStyleGuard = { action, violations ->
                     appendEvent("chat/style-guard", buildJsonObject {
                         put("step", step)
@@ -53,10 +70,15 @@ internal class LocalChatReplyCoordinator(
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = userMessage,
-            initial = finalizeCandidate(reply),
+            initial = finalizeCandidate(reply, usageContext),
             mode = ChatContinuityGuardMode.DIRECT,
             contentOf = { candidate -> candidate.content.orEmpty() },
-            retry = { repairHint -> finalizeCandidate(retryRaw(repairHint)) },
+            retry = { repairHint ->
+                finalizeCandidate(
+                    retryRaw(repairHint),
+                    usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
+                )
+            },
             onEvent = { action, check ->
                 appendEvent("chat/continuity-guard", buildJsonObject {
                     put("step", step)
@@ -120,14 +142,19 @@ internal class LocalChatReplyCoordinator(
         index: Int,
         rawReply: LocalModelReply,
         sharedContext: ChatContextState,
+        usageContext: TokenUsageContext,
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): String {
-        suspend fun finalizeCandidate(candidate: LocalModelReply): String {
+        suspend fun finalizeCandidate(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): String {
             val guarded = finalizeStyled(
                 snapshot = snapshot,
                 persona = persona,
                 reply = candidate,
+                usageContext = candidateUsageContext,
                 onStyleGuard = { action, violations ->
                     appendEvent("chat/style-guard", buildJsonObject {
                         put("step", 100 + index)
@@ -148,10 +175,15 @@ internal class LocalChatReplyCoordinator(
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = input,
-            initial = finalizeCandidate(rawReply),
+            initial = finalizeCandidate(rawReply, usageContext),
             mode = ChatContinuityGuardMode.GROUP,
             contentOf = { content -> content },
-            retry = { repairHint -> finalizeCandidate(retryRaw(repairHint)) },
+            retry = { repairHint ->
+                finalizeCandidate(
+                    retryRaw(repairHint),
+                    usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
+                )
+            },
             onEvent = { action, check ->
                 appendEvent("chat/continuity-guard", buildJsonObject {
                     put("step", 100 + index)
@@ -169,6 +201,11 @@ internal class LocalChatReplyCoordinator(
         persona: PersonaProfile,
         scene: ChatSceneState,
         initial: LocalModelReply,
+        usageContext: TokenUsageContext = buildTokenUsageContext(
+            snapshot = snapshot,
+            action = TokenUsageAction.AUTOMATION_CHAT,
+            runKind = LocalAgentRunKind.AUTOMATION,
+        ),
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply = ChatReplyContinuityGuard.enforce(
@@ -182,6 +219,7 @@ internal class LocalChatReplyCoordinator(
                 snapshot = snapshot,
                 persona = persona,
                 reply = retryRaw(repairHint),
+                usageContext = usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 onStyleGuard = { action, violations ->
                     appendEvent("chat/style-guard", buildJsonObject {
                         put("action", action)
@@ -208,14 +246,15 @@ internal class LocalChatReplyCoordinator(
         snapshot: LocalHarnessState,
         persona: PersonaProfile,
         reply: LocalModelReply,
+        usageContext: TokenUsageContext,
         onStyleGuard: (action: String, violations: List<String>) -> Unit,
     ): LocalModelReply = chatTurnCoordinator.finalize(
         snapshot = snapshot,
         persona = persona,
         reply = reply,
-        recordUsage = {
-            // The finalized candidate owns the same request usage passed by ChatTurnCoordinator.
-            recordUsage(snapshot, reply)
+        recordUsage = { finalizedReply ->
+            // Preserve request id and diagnostic prompt composition through the finalization boundary.
+            recordUsage(snapshot, finalizedReply, usageContext)
         },
         onGuardEvent = { action, violations ->
             recordStyleGuardHits(violations)

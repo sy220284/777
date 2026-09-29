@@ -119,6 +119,7 @@ internal class LocalGroupChatTurnExecutor(
         allMembers: List<LocalGroupChatMember>,
         member: LocalGroupChatMember,
         index: Int,
+        turnId: String?,
     ): GroupGeneratedReply {
         val persona = member.persona.takeUnless {
             it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
@@ -173,6 +174,15 @@ internal class LocalGroupChatTurnExecutor(
                 index = index,
                 rawReply = rawReply,
                 sharedContext = snapshot.groupChat.context,
+                usageContext = buildTokenUsageContext(
+                    snapshot = snapshot,
+                    action = TokenUsageAction.GROUP_REPLY,
+                    turnId = turnId,
+                    runKind = LocalAgentRunKind.FOREGROUND,
+                    agentId = member.galleryId,
+                    taskLabel = input,
+                    step = 100 + index,
+                ),
                 retryRaw = { repairHint ->
                     completeWithRetry(
                         key = key,
@@ -266,7 +276,16 @@ internal class LocalGroupChatTurnExecutor(
                 publishPreview = false,
                 maxAttemptsOverride = 1,
             )
-            usageTracker.record(snapshot.model, plannerReply.usage)
+            usageTracker.record(
+                snapshot = snapshot,
+                reply = plannerReply,
+                action = TokenUsageAction.GROUP_STATE_REFRESH,
+                turnId = snapshot.transcriptIndex.latestUserMessageId,
+                runKind = LocalAgentRunKind.FOREGROUND,
+                agentId = member.galleryId,
+                taskLabel = userMessage,
+                step = step,
+            )
             chatTurnCoordinator.parsePostTurn(
                 plannerReply.content.orEmpty(),
                 previous = plannerState,
@@ -353,7 +372,15 @@ internal class LocalGroupChatTurnExecutor(
                 publishPreview = false,
                 maxAttemptsOverride = 1,
             )
-            usageTracker.record(snapshot.model, plannerReply.usage)
+            usageTracker.record(
+                snapshot = snapshot,
+                reply = plannerReply,
+                action = TokenUsageAction.GROUP_STATE_REFRESH,
+                turnId = snapshot.transcriptIndex.latestUserMessageId,
+                runKind = LocalAgentRunKind.FOREGROUND,
+                taskLabel = userMessage,
+                step = CHAT_POST_TURN_MODEL_STEP + 100,
+            )
             val root = json.parseToJsonElement(plannerReply.content.orEmpty()).jsonObject
             val plans = root["plans"]?.jsonArray.orEmpty()
             val result = linkedMapOf<String, ChatCharacterState>()
@@ -453,6 +480,7 @@ internal class LocalGroupChatTurnExecutor(
                 put("responder_count", responders.size)
             })
 
+            val turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId
             var currentGroup = snapshot.groupChat
             var deliveredReplies = 0
             val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
@@ -472,6 +500,7 @@ internal class LocalGroupChatTurnExecutor(
                             allMembers = members,
                             member = member,
                             index = index,
+                            turnId = turnId,
                         )
                     }
                 }

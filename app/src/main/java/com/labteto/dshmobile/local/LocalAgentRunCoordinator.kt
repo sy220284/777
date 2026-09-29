@@ -71,6 +71,8 @@ internal data class LocalAgentRunContext(
     val input: String,
     val memoryInput: String,
     val startedAt: Long,
+    val parentRunId: String? = null,
+    val agentId: String? = null,
 )
 
 internal data class LocalAgentRunRecoveryDecision(
@@ -108,6 +110,8 @@ internal class LocalAgentRunCoordinator(
         resourceBudget: LocalAgentRunResourceBudget? = null,
         toolNames: List<String> = emptyList(),
         contextChars: Int = 0,
+        parentRunId: String? = null,
+        agentId: String? = null,
     ): LocalAgentRunContext {
         val context = LocalAgentRunContext(
             runId = idFactory(),
@@ -127,6 +131,8 @@ internal class LocalAgentRunCoordinator(
             input = input.take(MAX_RECOVERY_INPUT_CHARS),
             memoryInput = memoryInput.take(MAX_RECOVERY_INPUT_CHARS),
             startedAt = now(),
+            parentRunId = parentRunId,
+            agentId = agentId,
         )
         append(
             context = context,
@@ -359,6 +365,8 @@ internal class LocalAgentRunCoordinator(
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", context.runId)
                 put("run_kind", context.kind.name.lowercase())
+                context.parentRunId?.takeIf(String::isNotBlank)?.let { put("parent_run_id", it) }
+                context.agentId?.takeIf(String::isNotBlank)?.let { put("agent_id", it) }
                 put("session_id", context.sessionId)
                 put("status", status.name.lowercase())
                 put("phase", phase.name.lowercase())
