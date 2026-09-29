@@ -332,7 +332,15 @@ internal class LocalAutomationChatCoordinator(
                     snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
-                    recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                    recordUsage = { candidate ->
+                        usageTracker.record(
+                            snapshot = boundState,
+                            reply = candidate,
+                            action = TokenUsageAction.AUTOMATION_CHAT,
+                            runKind = LocalAgentRunKind.AUTOMATION,
+                            taskLabel = proactiveDirective,
+                        )
+                    },
                     onGuardEvent = { action, violations ->
                         recordStyleGuardHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
@@ -363,7 +371,15 @@ internal class LocalAutomationChatCoordinator(
                         snapshot = boundState,
                         persona = persona,
                         reply = retryRawReply,
-                        recordUsage = { usage -> usageTracker.record(boundState.model, usage) },
+                        recordUsage = { candidate ->
+                            usageTracker.record(
+                                snapshot = boundState,
+                                reply = candidate,
+                                action = TokenUsageAction.CHAT_REPAIR,
+                                runKind = LocalAgentRunKind.AUTOMATION,
+                                taskLabel = proactiveDirective,
+                            )
+                        },
                         onGuardEvent = { action, violations ->
                             recordStyleGuardHits(violations)
                             boundEventLog.append("chat/style-guard", buildJsonObject {
