@@ -103,9 +103,7 @@ internal class LocalSubagentRunnerFactory(
         eventLog = eventLogProvider,
         schemas = schemasProvider,
         execute = executeTool,
-        spillToolOutput = { callId, output ->
-            toolOutputStore.store(toolOutputSessionId(), callId, output) != null
-        },
+        spillToolOutput = { callId, output -> toolOutputStore.store(toolOutputSessionId(), callId, output) != null },
         prepareMessages = { messages, mode, _, _ ->
             prepareLocalMultimodalMessages(
                 messages = messages,
@@ -114,9 +112,7 @@ internal class LocalSubagentRunnerFactory(
                 budget = imageRequestBudget,
             )
         },
-        resolveImageMode = { mode, baseUrl, model ->
-            resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
-        },
+        resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },
         onNativeImageAccepted = { baseUrl, model -> imageCapabilities.markSupported(baseUrl, model) },
         onUsage = { model, usage -> usageTracker.record(model, usage) },
         onNativeImageRejected = { baseUrl, model -> imageCapabilities.markUnsupported(baseUrl, model) },
