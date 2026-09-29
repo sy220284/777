@@ -366,8 +366,7 @@ class SessionStore @Inject constructor(
             permissions.collect { select ->
                 synchronized(lock) {
                     val sessionId = currentId ?: return@synchronized
-                    val pending = pendingInteractions.permissionForSession(sessionId)
-                        ?: return@synchronized
+                    val pending = pendingInteractions.permissionForSession(sessionId) ?: return@synchronized
                     if (select?.currentValue == pending) {
                         pendingInteractions.forgetPermission(sessionId, pending)
                         syncCurrentInteractionCardsLocked()
@@ -1791,11 +1790,7 @@ class SessionStore @Inject constructor(
             pendingInteractions.installPermission(sessionId, value)
             syncCurrentInteractionCardsLocked()
         }
-        val outcome = runCommand(
-            line = "/permission $value",
-            targetSessionId = sessionId,
-            targetHost = host,
-        )
+        val outcome = runCommand("/permission $value", targetSessionId = sessionId, targetHost = host)
         if (outcome !is CommandOutcome.Ok) {
             synchronized(lock) {
                 pendingInteractions.forgetPermission(sessionId, value)
