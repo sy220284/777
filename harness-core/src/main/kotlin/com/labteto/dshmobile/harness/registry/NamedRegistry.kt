@@ -28,4 +28,13 @@ class NamedRegistry<T : Any> {
 
     @Synchronized
     fun clear() = entries.clear()
+
+    @Synchronized
+    internal fun snapshot(): Map<String, T> = LinkedHashMap(entries)
+
+    @Synchronized
+    internal fun restore(snapshot: Map<String, T>) {
+        entries.clear()
+        entries.putAll(snapshot)
+    }
 }
