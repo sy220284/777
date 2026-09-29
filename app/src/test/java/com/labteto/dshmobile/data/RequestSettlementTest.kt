@@ -47,4 +47,11 @@ class RequestSettlementTest {
         // no way to retry — the failure the user can see is the one they can act on.
         assertFalse(settlesRequest(QuestionOutcome.Unsent))
     }
+
+    @Test
+    fun `approval response cannot target another session`() {
+        assertTrue(approvalResponseMatchesSession("session-a", "session-a"))
+        assertFalse(approvalResponseMatchesSession("session-a", "session-b"))
+    }
+
 }
