@@ -150,7 +150,7 @@ class McpToolBridgePluginTest {
                         buildJsonObject {
                             put("result", buildJsonObject {
                                 put("isError", false)
-                                put("content", buildJsonArray())
+                                put("content", buildJsonArray { })
                             })
                         }
                     }
