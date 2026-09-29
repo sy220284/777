@@ -167,6 +167,59 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun removingOneSessionsJobsDoesNotCancelAnotherSessionsWork() = runTest {
+        val firstGate = CompletableDeferred<Unit>()
+        val secondGate = CompletableDeferred<Unit>()
+        val manager = HarnessJobManager(scope = this, onChanged = { })
+
+        val first = manager.start(label = "first", ownerId = "session-a") { _, _ ->
+            firstGate.await()
+            "first done"
+        }.substringAfterLast('：')
+        val second = manager.start(label = "second", ownerId = "session-b") { _, _ ->
+            secondGate.await()
+            "second done"
+        }.substringAfterLast('：')
+        runCurrent()
+
+        manager.removeOwnedAndJoin(setOf("session-a"))
+
+        assertTrue(manager.output(first).contains("不存在"))
+        assertTrue(manager.output(second).contains("[running]"))
+
+        secondGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(manager.output(second).contains("[completed]"))
+    }
+
+    @Test
+    fun persistentJobSnapshotKeepsOwningSessionAcrossRestart() = runTest {
+        var snapshots = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            onSnapshotsChanged = { snapshots = it },
+        )
+        val gate = CompletableDeferred<Unit>()
+
+        manager.startPersistent(
+            label = "durable",
+            resumeKind = "web_fetch",
+            resumePayload = "{\"session_id\":\"session-a\"}",
+            ownerId = "session-a",
+        ) { _, _ ->
+            gate.await()
+            "done"
+        }
+        runCurrent()
+
+        assertTrue(snapshots.single().ownerId == "session-a")
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
     fun persistentTaskKilledDuringDurablePreflightNeverStartsLater() = runTest {
         var ran = false
         var killedDuringPreflight = false

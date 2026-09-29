@@ -1,8 +1,5 @@
 package com.labteto.dshmobile.ui.screens.main
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -59,6 +57,7 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.AttachmentImage
 import com.labteto.dshmobile.ui.components.DisclosureRow
+import com.labteto.dshmobile.ui.components.DsDeliverableCard
 import com.labteto.dshmobile.ui.components.DisclosureState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -69,7 +68,6 @@ import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -207,15 +205,11 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
                 val obj = file as? JsonObject
                 val path = obj?.get("path").asString()
                 if (!path.isNullOrBlank()) {
-                    androidx.compose.material3.OutlinedCard(
+                    DsDeliverableCard(
+                        title = basename(path),
+                        description = obj?.get("description").asString(),
                         onClick = { open(path) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(basename(path), style = DsType.std14)
-                            obj?.get("description").asString()?.let { Text(it, style = DsType.small13) }
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -270,7 +264,6 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     val isLast = context.nodes.lastOrNull()?.seq == node.seq
     val streaming = context.running && isLast && !node.interrupted
     val isWorkProcess = node.isWorkProcess(context.nodes)
-    var actionsVisible by remember(node.seq) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
     if (isWorkProcess) return
@@ -280,72 +273,47 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
     if (!streaming && !node.interrupted && !node.isFinalAnswerAnchor(context.nodes)) return
     val finalText = node.finalAnswerText(context.nodes).ifBlank { node.plainText }
 
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL2),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = !streaming) { actionsVisible = !actionsVisible }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.chat_final_answer),
-                    style = DsType.small13Strong,
-                    color = colors.labelSecondary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (!streaming && finalText.isNotBlank()) {
-                    DsButton(
-                        text = stringResource(R.string.chat_copy_answer),
-                        onClick = {
-                            clipboard.setText(AnnotatedString(finalText))
-                            context.onCopied()
-                        },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+        node.blocks.forEach { block ->
+            when (block.kind) {
+                "reasoning" -> Unit
+                "image" -> parseImageRef(block)?.let { ref ->
+                    AttachmentImage(
+                        attachmentId = ref.attachmentId,
+                        intrinsicWidth = ref.width,
+                        intrinsicHeight = ref.height,
+                        contentDescription = ref.name,
                     )
                 }
-            }
-
-            node.blocks.forEach { block ->
-                when (block.kind) {
-                    "reasoning" -> Unit
-                    "image" -> parseImageRef(block)?.let { ref ->
-                        AttachmentImage(
-                            attachmentId = ref.attachmentId,
-                            intrinsicWidth = ref.width,
-                            intrinsicHeight = ref.height,
-                            contentDescription = ref.name,
-                        )
-                    }
-                    "file" -> parseFileRef(block)?.let { ref ->
-                        FileChip(name = ref.name, bytes = ref.bytes)
-                    }
-                    else -> Unit
+                "file" -> parseFileRef(block)?.let { ref ->
+                    FileChip(name = ref.name, bytes = ref.bytes)
                 }
+                else -> Unit
             }
+        }
 
-            if (finalText.isNotBlank()) {
-                MarkdownText(finalText)
-            }
-            if (node.interrupted) {
-                DsPill(text = stringResource(R.string.chat_stopped), warn = true)
-            }
-            AnimatedVisibility(
-                visible = actionsVisible && !streaming,
-                enter = fadeIn(DsAnimations.fade),
-                exit = fadeOut(DsAnimations.fade),
+        if (finalText.isNotBlank()) {
+            MarkdownText(finalText)
+        }
+        if (node.interrupted) {
+            DsPill(text = stringResource(R.string.chat_stopped), warn = true)
+        }
+        if (!streaming && finalText.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                ActionIcon(
+                    Icons.Outlined.ContentCopy,
+                    stringResource(R.string.chat_copy_answer),
+                ) {
+                    clipboard.setText(AnnotatedString(finalText))
+                    context.onCopied()
+                }
                 MessageActionsRow(node, context)
             }
         }

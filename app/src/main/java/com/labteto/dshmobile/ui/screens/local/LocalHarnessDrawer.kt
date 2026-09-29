@@ -5,7 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
@@ -42,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,12 +50,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalSessionSummary
@@ -66,7 +69,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsFloatingPopup
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsIconFamily
@@ -79,7 +81,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import kotlin.math.roundToInt
 
 @Composable
 internal fun LocalModeDrawer(
@@ -92,7 +93,6 @@ internal fun LocalModeDrawer(
     sessionTitleOverrides: Map<String, String>,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
-    onClose: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
@@ -107,8 +107,18 @@ internal fun LocalModeDrawer(
     onSettings: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    var historyQuery by rememberSaveable { mutableStateOf("") }
+    var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
+    var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
     val selectedIds = remember { mutableStateListOf<String>() }
     val visibleSessions = remember(sessions, usageMode, pinnedSessionIds) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
@@ -154,10 +164,18 @@ internal fun LocalModeDrawer(
                         tint = colors.labelPrimary,
                     )
                     DsIconButton(
-                        icon = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.common_close),
-                        onClick = onClose,
-                        tint = colors.labelPrimary,
+                        icon = Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.chatlist_search_hint),
+                        onClick = {
+                            if (searchOpen) {
+                                searchOpen = false
+                                historyQuery = ""
+                                keyboardController?.hide()
+                            } else {
+                                searchOpen = true
+                            }
+                        },
+                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
                     )
                 }
                 Box(
@@ -171,23 +189,26 @@ internal fun LocalModeDrawer(
                     )
                 }
 
-                OutlinedTextField(
-                    value = historyQuery,
-                    onValueChange = { historyQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = DsSpacing.small),
-                    placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Search,
-                            contentDescription = null,
-                            tint = colors.labelTertiary,
-                        )
-                    },
-                    singleLine = true,
-                    shape = DsShapes.block,
-                )
+                if (searchOpen) {
+                    OutlinedTextField(
+                        value = historyQuery,
+                        onValueChange = { historyQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(searchFocusRequester)
+                            .padding(bottom = DsSpacing.small),
+                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = colors.labelTertiary,
+                            )
+                        },
+                        singleLine = true,
+                        shape = DsShapes.block,
+                    )
+                }
             }
 
             LazyColumn(
@@ -281,88 +302,75 @@ internal fun LocalModeDrawer(
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                DsGroupCard {
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(
-                            if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
-                            else R.string.tasks_title,
-                        ),
-                        onClick = onTasks,
-                    )
-                    if (usageMode == LocalUsageMode.WORK) {
+                if (selectionOpen) {
+                    Surface(
+                        shape = DsShapes.block,
+                        color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            Text(
+                                stringResource(R.string.local_selected_count, selectedIds.size),
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_delete_session),
+                                onClick = {
+                                    val ids = selectedIds.toSet()
+                                    selectionOpen = false
+                                    selectedIds.clear()
+                                    if (ids.isNotEmpty()) onDeleteSessions(ids)
+                                },
+                                enabled = selectedIds.isNotEmpty(),
+                                variant = DsButtonVariant.Danger,
+                                size = DsButtonSize.Small,
+                            )
+                            DsIconButton(
+                                icon = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.common_close),
+                                onClick = {
+                                    selectionOpen = false
+                                    selectedIds.clear()
+                                },
+                                tint = colors.labelSecondary,
+                            )
+                        }
+                    }
+                } else {
+                    DsGroupCard {
                         DrawerPrimaryAction(
-                            icon = Icons.Outlined.Extension,
-                            title = stringResource(R.string.tools_title),
-                            onClick = onTools,
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(
+                                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
+                                else R.string.tasks_title,
+                            ),
+                            onClick = onTasks,
                         )
+                        if (usageMode == LocalUsageMode.WORK) {
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Extension,
+                                title = stringResource(R.string.tools_title),
+                                onClick = onTools,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.QrCodeScanner,
+                                title = stringResource(R.string.local_remote_control),
+                                onClick = onRemote,
+                            )
+                        }
                         DrawerPrimaryAction(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            onClick = onRemote,
+                            icon = Icons.Outlined.Settings,
+                            title = stringResource(R.string.settings_title),
+                            onClick = onSettings,
                         )
                     }
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Settings,
-                        title = stringResource(R.string.settings_title),
-                        onClick = onSettings,
-                    )
-                }
-            }
-        }
-    }
-
-    if (selectionOpen) {
-        var position by remember { mutableStateOf(IntOffset(24, 160)) }
-        DsFloatingPopup(
-            alignment = Alignment.TopStart,
-            offset = position,
-            onDismiss = {
-                selectionOpen = false
-                selectedIds.clear()
-            },
-        ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
-                shadowElevation = 10.dp,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectDragGestures { change, drag ->
-                        change.consume()
-                        position = IntOffset(
-                            (position.x + drag.x.roundToInt()).coerceAtLeast(0),
-                            (position.y + drag.y.roundToInt()).coerceAtLeast(0),
-                        )
-                    }
-                },
-            ) {
-                Row(
-                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    Text(stringResource(R.string.local_selected_count, selectedIds.size), color = colors.labelPrimary)
-                    DsButton(
-                        text = stringResource(R.string.local_delete_session),
-                        onClick = {
-                            val ids = selectedIds.toSet()
-                            selectionOpen = false
-                            selectedIds.clear()
-                            if (ids.isNotEmpty()) onDeleteSessions(ids)
-                        },
-                        enabled = selectedIds.isNotEmpty(),
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
-                    DsIconButton(
-                        icon = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.common_close),
-                        onClick = {
-                            selectionOpen = false
-                            selectedIds.clear()
-                        },
-                        tint = colors.labelSecondary,
-                    )
                 }
             }
         }

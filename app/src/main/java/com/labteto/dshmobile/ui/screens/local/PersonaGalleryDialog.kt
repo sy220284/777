@@ -589,7 +589,7 @@ internal fun PersonaGalleryScreen(
             } else {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = DsTheme.colors.accent.copy(alpha = 0.08f),
+                    color = DsTheme.colors.characterAccentTertiary,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -756,7 +756,7 @@ internal fun PersonaGalleryScreen(
 
             notice?.let {
                 Surface(
-                    color = DsTheme.colors.accent.copy(alpha = 0.10f),
+                    color = DsTheme.colors.characterAccentTertiary,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {

@@ -79,8 +79,6 @@ internal fun ChatTopBar(
                 onClick = onOpenDrawer,
                 tint = colors.labelSecondary,
                 iconSize = 18.dp,
-                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 2.dp,
             )
             Spacer(Modifier.width(DsSpacing.medium))
             Text(
@@ -98,8 +96,6 @@ internal fun ChatTopBar(
                 onClick = onOpenFiles,
                 tint = colors.labelTertiary,
                 iconSize = 18.dp,
-                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 2.dp,
             )
             if (!detailsOpen) {
                 Spacer(Modifier.width(DsSpacing.small))
@@ -109,8 +105,6 @@ internal fun ChatTopBar(
                     onClick = onOpenDetails,
                     tint = colors.labelTertiary,
                     iconSize = 18.dp,
-                    containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                    shadowElevation = 2.dp,
                 )
             }
         }

@@ -409,14 +409,14 @@ internal fun GalleryOverviewHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = CircleShape,
-                color = DsTheme.colors.accent.copy(alpha = 0.12f),
+                color = DsTheme.colors.characterAccentTertiary,
                 modifier = Modifier.size(46.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Outlined.AutoAwesome,
                         contentDescription = null,
-                        tint = DsTheme.colors.accent,
+                        tint = DsTheme.colors.characterAccent,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -948,7 +948,7 @@ internal fun PersonaInspectionPanel(
                 Icon(
                     Icons.Outlined.PersonSearch,
                     contentDescription = null,
-                    tint = DsTheme.colors.accent,
+                    tint = DsTheme.colors.characterAccent,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))

@@ -22,15 +22,17 @@ internal class LocalJobManager(
     fun start(
         label: String,
         expectedDurationMillis: Long? = null,
+        ownerSessionId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.start(label, expectedDurationMillis, block)
+    ): String = delegate.start(label, expectedDurationMillis, ownerSessionId, block)
 
     fun startPersistent(
         label: String,
         resumeKind: String,
         resumePayload: String,
+        ownerSessionId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.startPersistent(label, resumeKind, resumePayload, block)
+    ): String = delegate.startPersistent(label, resumeKind, resumePayload, ownerSessionId, block)
 
     fun interruptedSnapshots(): List<JobSnapshot> = delegate.interruptedSnapshots()
 
@@ -40,8 +42,9 @@ internal class LocalJobManager(
 
     fun resumePersistent(
         id: String,
+        ownerSessionId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.resumePersistent(id, block)
+    ): String = delegate.resumePersistent(id, ownerSessionId, block)
 
     fun snapshotInfos(): List<LocalJobInfo> = delegate.snapshots().map {
         LocalJobInfo(it.id, it.label, it.status)
@@ -64,4 +67,6 @@ internal class LocalJobManager(
     suspend fun stopAllAndJoin() = delegate.stopAllAndJoin()
 
     suspend fun stopNonPersistentAndJoin() = delegate.stopNonPersistentAndJoin()
+
+    suspend fun removeOwnedAndJoin(sessionIds: Set<String>) = delegate.removeOwnedAndJoin(sessionIds)
 }

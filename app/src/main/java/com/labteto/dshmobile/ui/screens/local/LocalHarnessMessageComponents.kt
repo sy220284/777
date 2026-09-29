@@ -75,6 +75,8 @@ import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.components.StateDot
+import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -246,7 +248,7 @@ internal fun LocalMessageRow(
                         Text(
                             speaker,
                             style = DsType.small13Strong,
-                            color = colors.accent,
+                            color = colors.characterAccent,
                         )
                     }
                 }
@@ -343,59 +345,18 @@ private fun CompactMessageAction(
 }
 
 internal data class LocalWorkProcessNode(
-    val kind: AgentOperationKind? = null,
-    val thinkingSummary: String? = null,
+    val kind: AgentOperationKind = AgentOperationKind.Generic,
     val failed: Boolean = false,
     val count: Int = 1,
-) {
-    val isThinking: Boolean get() = thinkingSummary != null
-}
-
-internal fun compactProcessSummary(
-    text: String,
-    maxChars: Int = 180,
-): String? {
-    val bounded = if (text.length > 1_200) text.takeLast(1_200) else text
-    val normalized = bounded
-        .replace(Regex("`[^`]*`"), " ")
-        .replace(Regex("https?://\\S+"), " ")
-        .replace(Regex("(?:(?:[A-Za-z]:\\\\)|/)(?:[^\\s/]+[/\\\\]){1,}[^\\s]+"), " ")
-        .replace(
-            Regex(
-                "\\b[^\\s/\\\\]+\\.(?:kt|kts|java|xml|json|md|txt|py|js|ts|tsx|jsx|swift|gradle|toml|yaml|yml)\\b",
-                RegexOption.IGNORE_CASE,
-            ),
-            " ",
-        )
-        .lineSequence()
-        .joinToString(" ") { it.trim() }
-        .replace(Regex("\\s+"), " ")
-        .trim()
-    if (normalized.isBlank() || normalized.startsWith("{") || normalized.startsWith("[")) return null
-    if (normalized.length <= maxChars) return normalized
-    return "…" + normalized.takeLast((maxChars - 1).coerceAtLeast(1)).trimStart()
-}
+)
 
 internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<LocalWorkProcessNode> {
     if (messages.isEmpty()) return emptyList()
     val nodes = mutableListOf<LocalWorkProcessNode>()
 
-    fun appendThinking(text: String) {
-        val summary = compactProcessSummary(text) ?: return
-        val last = nodes.lastOrNull()
-        if (last?.isThinking == true) {
-            val combined = compactProcessSummary(
-                listOfNotNull(last.thinkingSummary, summary).joinToString(" · "),
-            ) ?: summary
-            nodes[nodes.lastIndex] = last.copy(thinkingSummary = combined)
-        } else {
-            nodes += LocalWorkProcessNode(thinkingSummary = summary)
-        }
-    }
-
     fun appendOperation(kind: AgentOperationKind, failed: Boolean) {
         val last = nodes.lastOrNull()
-        if (last != null && !last.isThinking && last.kind == kind) {
+        if (last?.kind == kind) {
             nodes[nodes.lastIndex] = last.copy(
                 failed = last.failed || failed,
                 count = last.count + 1,
@@ -406,21 +367,15 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
     }
 
     messages.forEach { message ->
-        when (message.role) {
-            "reasoning" -> appendThinking(message.content)
-            // Older sessions can contain assistant narration immediately before a tool step.
-            "assistant" -> appendThinking(message.content)
-            "tool" -> appendOperation(
+        if (message.role == "tool") {
+            appendOperation(
                 kind = agentOperationKind(message.toolName),
                 failed = toolResultFailed(message.content),
             )
-            // Progress rows are intentionally omitted: the semantic operation nodes already say
-            // what happened without repeating raw file/tool narration.
-            "progress" -> Unit
         }
     }
 
-    return if (nodes.isNotEmpty()) nodes else listOf(LocalWorkProcessNode(kind = AgentOperationKind.Generic))
+    return nodes
 }
 
 internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
@@ -434,49 +389,23 @@ internal fun visibleWorkProcessNodes(
     return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
 }
 
-internal fun compactReasoningSummary(
-    messages: List<LocalHarnessMessage>,
-    maxChars: Int = 180,
-): String? = compactProcessSummary(
-    messages.asSequence()
-        .filter { it.role == "reasoning" }
-        .mapNotNull { compactProcessSummary(it.content, maxChars = 120) }
-        .distinct()
-        .take(2)
-        .joinToString(" · "),
-    maxChars = maxChars,
-)
-
 @Composable
 internal fun ChatThinkingRow(
     messages: List<LocalHarnessMessage>,
     streaming: Boolean = false,
 ) {
-    if (messages.isEmpty()) return
-    val colors = DsTheme.colors
-    val fullSummary = remember(messages) { compactReasoningSummary(messages, maxChars = 180) } ?: return
-    val compactSummary = remember(messages) { compactReasoningSummary(messages, maxChars = 84) } ?: fullSummary
-    var expanded by remember(messages.first().id, streaming) { mutableStateOf(false) }
-
-    Column(
+    if (messages.isEmpty() || !streaming) return
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        ThinkingRow(
-            summary = stringResource(R.string.local_process_thinking) + " · " + compactSummary,
-            expanded = expanded,
-            onToggle = { expanded = !expanded },
-            streaming = streaming,
+        StateDot(StateDotState.Running, size = 8.dp)
+        Text(
+            stringResource(R.string.local_process_thinking),
+            style = DsType.small13,
+            color = DsTheme.colors.labelTertiary,
         )
-        if (expanded) {
-            Text(
-                fullSummary,
-                style = DsType.small13,
-                color = colors.labelSecondary,
-                modifier = Modifier.padding(start = DsSpacing.small, end = DsSpacing.medium),
-                maxLines = 4,
-            )
-        }
     }
 }
 
@@ -489,12 +418,10 @@ internal fun WorkProcessRow(
 
     val colors = DsTheme.colors
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
+    if (nodes.isEmpty()) return
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    val thinkingPreview = nodes.lastOrNull { it.isThinking }?.thinkingSummary
-    val latestOperation = nodes.lastOrNull { !it.isThinking }?.kind
-    val preview = thinkingPreview?.let { compactProcessSummary(it, maxChars = 86) }
-        ?: latestOperation?.let { stringResource(agentOperationLabelRes(it)) }
+    val preview = nodes.lastOrNull()?.kind?.let { stringResource(agentOperationLabelRes(it)) }
     val collapsedHiddenCount = (nodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(nodes, showAllNodes)
     val disclosureState = stringResource(
@@ -556,15 +483,11 @@ internal fun WorkProcessRow(
 
             if (expanded) {
                 visibleNodes.forEach { node ->
-                    if (node.isThinking) {
-                        WorkThinkingNodeRow(node.thinkingSummary.orEmpty())
-                    } else {
-                        WorkProcessOperationRow(
-                            kind = node.kind ?: AgentOperationKind.Generic,
-                            failed = node.failed,
-                            count = node.count,
-                        )
-                    }
+                    WorkProcessOperationRow(
+                        kind = node.kind,
+                        failed = node.failed,
+                        count = node.count,
+                    )
                 }
                 if (collapsedHiddenCount > 0) {
                     DsButton(
@@ -580,34 +503,6 @@ internal fun WorkProcessRow(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun WorkThinkingNodeRow(summary: String) {
-    val colors = DsTheme.colors
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-    ) {
-        DsIconBox(icon = Icons.Outlined.Tune, family = DsIconFamily.Neutral)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                stringResource(R.string.local_process_thinking),
-                style = DsType.std14,
-                color = colors.labelSecondary,
-            )
-            Text(
-                summary,
-                style = DsType.caption11,
-                color = colors.labelTertiary,
-                maxLines = 3,
-            )
         }
     }
 }

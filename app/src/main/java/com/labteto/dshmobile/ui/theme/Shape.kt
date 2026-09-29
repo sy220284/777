@@ -5,19 +5,18 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * DeepSeek Harness radius tokens:
- * capsules r18/r22/r24, cards r12, dialogs r24, bubbles r22, code blocks r12,
- * pills r12, tooltips r8, toasts r14, chips r6, tree rows r8.
+ * Radius tokens intentionally collapse to six visual levels: 6 / 8 / 12 / 16 / 20 / full.
+ * Semantic names remain so components describe intent without inventing new radii.
  */
 object DsShapes {
     val buttonCapsule = RoundedCornerShape(16.dp)
     val buttonSmall = RoundedCornerShape(12.dp)
     val bubble = RoundedCornerShape(20.dp)
-    val composer = RoundedCornerShape(22.dp)
+    val composer = RoundedCornerShape(20.dp)
     val approvalCard = RoundedCornerShape(20.dp)
     val dialog = RoundedCornerShape(20.dp)
     val menu = RoundedCornerShape(16.dp)
-    val toast = RoundedCornerShape(14.dp)
+    val toast = RoundedCornerShape(12.dp)
     val tooltip = RoundedCornerShape(8.dp)
     val block = RoundedCornerShape(16.dp)
     val pill = RoundedCornerShape(12.dp)

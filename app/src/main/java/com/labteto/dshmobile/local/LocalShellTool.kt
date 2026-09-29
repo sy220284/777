@@ -12,6 +12,7 @@ internal object LocalShellTool {
         args: JsonObject,
         workspace: LocalWorkspace,
         jobs: LocalJobManager,
+        ownerSessionId: String? = null,
     ): String {
         val command = args.string("command")
         val background = args.boolean("run_in_background", false)
@@ -27,6 +28,7 @@ internal object LocalShellTool {
             jobs.start(
                 label = "后台命令",
                 expectedDurationMillis = timeout * 1_000L,
+                ownerSessionId = ownerSessionId,
             ) { _, report ->
                 workspace.shell(command, timeout, report, throwOnFailure = true)
             }

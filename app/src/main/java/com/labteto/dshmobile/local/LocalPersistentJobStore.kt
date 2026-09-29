@@ -66,6 +66,7 @@ internal class LocalPersistentJobStore(
                     put("output", snapshot.output.takeLast(MAX_PERSISTED_OUTPUT_CHARS))
                     snapshot.resumeKind?.let { put("resume_kind", it) }
                     snapshot.resumePayload?.let { put("resume_payload", it) }
+                    snapshot.ownerId?.let { put("owner_session_id", it) }
                     if (snapshot.startedAt > 0L) put("started_at", snapshot.startedAt)
                     if (snapshot.deadlineAt > 0L) put("deadline_at", snapshot.deadlineAt)
                     put("updated_at", snapshot.updatedAt)
@@ -100,6 +101,7 @@ internal class LocalPersistentJobStore(
                 output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull,
                 resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull,
+                ownerId = item["owner_session_id"]?.jsonPrimitive?.contentOrNull,
                 startedAt = item["started_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 deadlineAt = item["deadline_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,

@@ -88,11 +88,7 @@ internal fun LocalStreamingWorkPreview(
     surfaceColor: Color,
 ) {
     val stream by streamingState.collectAsStateWithLifecycle()
-    val preview = when {
-        stream.assistant.isNotBlank() -> stream.assistant
-        stream.reasoning.isNotBlank() -> stream.reasoning
-        else -> ""
-    }.let { text ->
+    val preview = stream.assistant.let { text ->
         if (text.length > 480) "…" + text.takeLast(480) else text
     }
 
