@@ -149,8 +149,6 @@ class PairViewModel @Inject constructor(
 
     fun setDeviceName(value: String) = _state.update { it.copy(deviceName = value) }
 
-    fun clearFailure() = _state.update { it.copy(failure = null) }
-
     /**
      * A QR was decoded.
      *

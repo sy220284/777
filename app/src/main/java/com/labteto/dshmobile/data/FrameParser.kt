@@ -2,7 +2,6 @@ package com.labteto.dshmobile.data
 
 import com.labteto.dshmobile.core.session.QueueItem
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
-import com.labteto.dshmobile.core.wire.decodeFromJsonElement
 import com.labteto.dshmobile.core.wire.encodeToJsonElement
 import com.labteto.dshmobile.core.wire.dto.ContentBlock
 import com.labteto.dshmobile.core.wire.dto.MessageData
@@ -62,11 +61,6 @@ fun sessionEventToEnvelope(event: SessionEvent): SessionEventEnvelope {
         ignorable = event.ignorable,
     )
 }
-
-/** Decode a raw `session/event` event object into a [SessionEventEnvelope], or null on drift. */
-fun parseSessionEventEnvelope(eventJson: JsonElement): SessionEventEnvelope? =
-    runCatching { sessionEventToEnvelope(decodeFromJsonElement(SessionEventSerializer, eventJson)) }
-        .getOrNull()
 
 /** Convert one authoritative queue snapshot item into the renderer-facing [QueueItem]. */
 fun queuedInboxItemToQueueItem(item: QueuedInboxItem): QueueItem {
