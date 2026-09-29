@@ -364,8 +364,15 @@ class SessionStore @Inject constructor(
     private fun observePermissionSettlement() {
         scope.launch {
             permissions.collect { select ->
-                val pending = _pendingPermission.value ?: return@collect
-                if (select?.currentValue == pending) _pendingPermission.value = null
+                synchronized(lock) {
+                    val sessionId = currentId ?: return@synchronized
+                    val pending = pendingInteractions.permissionForSession(sessionId)
+                        ?: return@synchronized
+                    if (select?.currentValue == pending) {
+                        pendingInteractions.forgetPermission(sessionId, pending)
+                        syncCurrentInteractionCardsLocked()
+                    }
+                }
             }
         }
     }
@@ -428,6 +435,7 @@ class SessionStore @Inject constructor(
     private fun syncCurrentInteractionCardsLocked() {
         _pendingApproval.value = pendingInteractions.approvalForSession(currentId)
         _pendingQuestions.value = pendingInteractions.questionsForSession(currentId)
+        _pendingPermission.value = pendingInteractions.permissionForSession(currentId)
     }
 
     private fun observeEvents() {
@@ -977,7 +985,6 @@ class SessionStore @Inject constructor(
                 _subagentConversation.value = null
                 _subagentMode.value = null
                 _commands.value = emptyList()
-                _pendingPermission.value = null
             }
         }
         startFollow(sessionId)
@@ -1778,9 +1785,23 @@ class SessionStore @Inject constructor(
         if (value == CUSTOM_PRESET) {
             return CommandOutcome.Failed("`$CUSTOM_PRESET` is a derived state, not a preset")
         }
-        _pendingPermission.value = value
-        val outcome = runCommand("/permission $value")
-        if (outcome !is CommandOutcome.Ok) _pendingPermission.value = null
+        val sessionId = currentSessionId.value ?: return CommandOutcome.Failed("no open session")
+        val host = activeHostKey
+        synchronized(lock) {
+            pendingInteractions.installPermission(sessionId, value)
+            syncCurrentInteractionCardsLocked()
+        }
+        val outcome = runCommand(
+            line = "/permission $value",
+            targetSessionId = sessionId,
+            targetHost = host,
+        )
+        if (outcome !is CommandOutcome.Ok) {
+            synchronized(lock) {
+                pendingInteractions.forgetPermission(sessionId, value)
+                syncCurrentInteractionCardsLocked()
+            }
+        }
         return outcome
     }
 
