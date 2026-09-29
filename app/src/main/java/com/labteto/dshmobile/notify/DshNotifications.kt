@@ -85,7 +85,8 @@ class DshNotifications @Inject constructor(
         if (actionLabel != null) {
             builder.addAction(0, actionLabel, pending)
         }
-        NotificationManagerCompat.from(context).notify(id, builder.build())
+        val tag = "session:$channel:${sessionId.orEmpty()}"
+        NotificationManagerCompat.from(context).notify(tag, id, builder.build())
     }
 
     @android.annotation.SuppressLint("MissingPermission")
@@ -94,10 +95,17 @@ class DshNotifications @Inject constructor(
         title: String,
         text: String,
         sessionId: String?,
+        notificationKey: String = sessionId?.takeIf(String::isNotBlank)?.let { "session:$it" } ?: "id:$id",
     ) {
         if (!canPost()) return
         val open = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.Builder()
+                .scheme("dshmobile")
+                .authority("host")
+                .appendPath("local-notification")
+                .appendPath(notificationKey)
+                .build()
             sessionId?.takeIf(String::isNotBlank)?.let {
                 putExtra(EXTRA_LOCAL_SESSION_ID, it)
             }
@@ -109,6 +117,7 @@ class DshNotifications @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         NotificationManagerCompat.from(context).notify(
+            "local:$notificationKey",
             id,
             NotificationCompat.Builder(context, CHANNEL_LOCAL_JOBS)
                 .setSmallIcon(R.drawable.ic_notification_butterfly)
