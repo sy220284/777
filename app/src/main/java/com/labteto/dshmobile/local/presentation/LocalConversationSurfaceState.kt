@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalQuestion
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -37,6 +38,8 @@ data class LocalConversationSurfaceState(
     val messages: List<LocalHarnessMessage> = emptyList(),
     val workspacePath: String = "",
     val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
+    val sendRejectReason: LocalSendRejectReason? = null,
+    val sendRejectLimit: Int? = null,
     val error: String? = null,
 
     val galleryId: String? = null,
@@ -73,6 +76,8 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
         running = running,
         messages = messages,
         workspacePath = workspacePath,
+        sendRejectReason = sendRejectReason,
+        sendRejectLimit = sendRejectLimit,
         error = error,
         galleryId = galleryId,
         galleryStoryId = galleryStoryId,
@@ -96,6 +101,8 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceS
         messages = messages,
         workspacePath = workspacePath,
         imageInputMode = imageInputMode,
+        sendRejectReason = sendRejectReason,
+        sendRejectLimit = sendRejectLimit,
         error = error,
         sessions = sessions,
         model = model,
