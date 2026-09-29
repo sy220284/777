@@ -154,6 +154,12 @@ class ToolRegistry {
             }
             "array" -> {
                 val array = value as? JsonArray ?: return "$path 必须是数组"
+                schema["minItems"]?.jsonPrimitive?.longOrNull?.let { minimum ->
+                    if (array.size < minimum) return "$path 至少需要 $minimum 项"
+                }
+                schema["maxItems"]?.jsonPrimitive?.longOrNull?.let { maximum ->
+                    if (array.size > maximum) return "$path 最多允许 $maximum 项"
+                }
                 val itemSchema = schema["items"] as? JsonObject
                 if (itemSchema != null) {
                     array.forEachIndexed { index, child ->
@@ -164,17 +170,34 @@ class ToolRegistry {
             "string" -> {
                 val primitive = value as? JsonPrimitive
                 if (primitive == null || !primitive.isString) return "$path 必须是字符串"
+                schema["minLength"]?.jsonPrimitive?.longOrNull?.let { minimum ->
+                    if (primitive.content.length < minimum) return "$path 长度不能小于 $minimum"
+                }
+                schema["maxLength"]?.jsonPrimitive?.longOrNull?.let { maximum ->
+                    if (primitive.content.length > maximum) return "$path 长度不能大于 $maximum"
+                }
             }
             "integer" -> {
                 val primitive = value as? JsonPrimitive
-                if (primitive == null || primitive.isString || primitive.longOrNull == null) {
-                    return "$path 必须是整数"
+                val number = primitive?.takeIf { !it.isString }?.longOrNull
+                    ?: return "$path 必须是整数"
+                schema["minimum"]?.jsonPrimitive?.longOrNull?.let { minimum ->
+                    if (number < minimum) return "$path 不能小于 $minimum"
+                }
+                schema["maximum"]?.jsonPrimitive?.longOrNull?.let { maximum ->
+                    if (number > maximum) return "$path 不能大于 $maximum"
                 }
             }
             "number" -> {
                 val primitive = value as? JsonPrimitive
                 val number = primitive?.takeIf { !it.isString }?.doubleOrNull
                 if (number == null || !number.isFinite()) return "$path 必须是有限数字"
+                schema["minimum"]?.jsonPrimitive?.doubleOrNull?.let { minimum ->
+                    if (number < minimum) return "$path 不能小于 $minimum"
+                }
+                schema["maximum"]?.jsonPrimitive?.doubleOrNull?.let { maximum ->
+                    if (number > maximum) return "$path 不能大于 $maximum"
+                }
             }
             "boolean" -> {
                 val primitive = value as? JsonPrimitive
