@@ -244,17 +244,19 @@ internal fun Composer(
                 maxLines = 8,
             )
 
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(DsComposerMetrics.actionTouchTarget),
-                contentAlignment = Alignment.Center,
-            ) {
-                ContextMeter(
-                    contextBreakdown,
-                    contextPressure,
-                    barWidth = 24,
-                )
+            if (contextPressure != null) {
+                Box(
+                    modifier = Modifier
+                        .width(24.dp)
+                        .height(DsComposerMetrics.actionTouchTarget),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ContextMeter(
+                        contextBreakdown,
+                        contextPressure,
+                        barWidth = 24,
+                    )
+                }
             }
 
             DsComposerAction(
