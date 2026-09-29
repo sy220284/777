@@ -91,8 +91,12 @@ class AndroidDevicePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        specs.forEach { context.tools.unregister(it.toolName) }
-        context.capabilities.unregister("android-device")
+        try {
+            specs.forEach { context.tools.unregister(it.toolName) }
+            context.capabilities.unregister("android-device")
+        } finally {
+            provider.close()
+        }
     }
 
     private fun toolSchema(spec: Spec): JsonObject = buildJsonObject {
