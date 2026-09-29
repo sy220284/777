@@ -11,7 +11,13 @@ import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.plugin.HarnessPluginFactory
+import com.labteto.dshmobile.harness.plugin.PluginCatalog
+import com.labteto.dshmobile.harness.plugin.PluginDefinition
+import com.labteto.dshmobile.harness.plugin.PluginDependency
+import com.labteto.dshmobile.harness.plugin.PluginDescriptor
 import com.labteto.dshmobile.harness.plugin.PluginLifecycleSnapshot
+import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolRegistry
@@ -157,23 +163,67 @@ internal class LocalPluginComposition(
     val virtualDisplayProvider: HarnessVirtualDisplayProvider
         get() = deviceProvider
 
-    private val startupPlugins: List<HarnessPlugin> = listOf(
-        builtinPlugin,
-        runtimePlugin,
-        mcpPlugin,
-        githubPlugin,
-        lspPlugin,
-        devicePlugin,
-        visionPlugin,
-        automationPlugin,
-        webhookPlugin,
+    private val pluginCatalog = PluginCatalog(
+        listOf(
+            pluginDefinition(
+                builtinPlugin,
+                capabilities = setOf("local.tools.builtin"),
+            ),
+            pluginDefinition(
+                runtimePlugin,
+                capabilities = setOf("runtime.process", "runtime.terminal"),
+            ),
+            pluginDefinition(
+                mcpPlugin,
+                dependencies = listOf(PluginDependency("android-runtime")),
+                capabilities = setOf("interop.mcp"),
+            ),
+            pluginDefinition(
+                githubPlugin,
+                capabilities = setOf("interop.github"),
+            ),
+            pluginDefinition(
+                lspPlugin,
+                dependencies = listOf(PluginDependency("android-runtime")),
+                capabilities = setOf("interop.lsp"),
+            ),
+            pluginDefinition(
+                devicePlugin,
+                capabilities = setOf("device.android"),
+            ),
+            pluginDefinition(
+                visionPlugin,
+                dependencies = listOf(PluginDependency("android-device")),
+                capabilities = setOf("vision.local"),
+            ),
+            pluginDefinition(
+                automationPlugin,
+                capabilities = setOf("automation.local"),
+            ),
+            pluginDefinition(
+                webhookPlugin,
+                capabilities = setOf("automation.webhook"),
+            ),
+        ),
+    )
+    private val pluginManager = PluginManager(
+        catalog = pluginCatalog,
+        registry = registry,
     )
 
-    suspend fun installStartup() = registry.installAll(startupPlugins)
+    suspend fun installStartup() = pluginManager.installAll(pluginCatalog.ids())
 
-    fun installedPluginIds(): List<String> = registry.ids()
+    suspend fun enablePlugin(id: String): List<String> = pluginManager.enable(id)
 
-    fun lifecycleSnapshots(): List<PluginLifecycleSnapshot> = registry.lifecycleSnapshots()
+    suspend fun disablePlugin(id: String): Boolean = pluginManager.disable(id)
+
+    suspend fun replacePlugin(definition: PluginDefinition) = pluginManager.replace(definition)
+
+    fun installedPluginIds(): List<String> = pluginManager.installedPluginIds()
+
+    fun pluginDescriptors(): List<PluginDescriptor> = pluginManager.descriptors()
+
+    fun lifecycleSnapshots(): List<PluginLifecycleSnapshot> = pluginManager.lifecycleSnapshots()
 
     suspend fun validateGitHubCredential(token: String): GitHubConnectorStatus =
         githubPlugin.validateCredential(token)
@@ -197,3 +247,19 @@ internal class LocalPluginComposition(
     suspend fun disconnectMcp(serverId: String): String =
         mcpPlugin.disconnectFromUi(registry.context, serverId)
 }
+
+private fun pluginDefinition(
+    plugin: HarnessPlugin,
+    version: Int = 1,
+    dependencies: List<PluginDependency> = emptyList(),
+    capabilities: Set<String> = emptySet(),
+): PluginDefinition = PluginDefinition(
+    descriptor = PluginDescriptor(
+        id = plugin.id,
+        version = version,
+        dependencies = dependencies,
+        capabilities = capabilities,
+        entryPoint = plugin::class.java.name,
+    ),
+    factory = HarnessPluginFactory { plugin },
+)

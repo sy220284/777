@@ -29,6 +29,7 @@ interface HarnessPlugin {
 enum class PluginLifecycleState {
     INSTALLING,
     ACTIVE,
+    REPLACING,
     UNINSTALLING,
     FAILED,
 }
@@ -140,6 +141,17 @@ class PluginRegistry(
         }
     }
 
+    /**
+     * Replaces an active plugin without exposing a partially-mutated registry surface.
+     *
+     * External resources cannot be snapshotted generically, so rollback re-runs the previous
+     * plugin's installer after restoring the clean post-uninstall registry baseline. If either
+     * replacement cleanup or previous-plugin restoration fails, the lifecycle remains FAILED.
+     */
+    suspend fun replace(plugin: HarnessPlugin) = lifecycleMutex.withLock {
+        replaceLocked(plugin)
+    }
+
     suspend fun uninstall(id: String): Boolean = lifecycleMutex.withLock {
         val plugin = synchronized(this) { installed[id] } ?: return@withLock false
         val registryBefore = context.snapshotRegistries()
@@ -178,6 +190,80 @@ class PluginRegistry(
 
     @Synchronized
     fun lifecycleSnapshot(id: String): PluginLifecycleSnapshot? = lifecycle[id]
+
+    private suspend fun replaceLocked(plugin: HarnessPlugin) {
+        require(plugin.id.isNotBlank()) { "插件编号不能为空" }
+        val previous = synchronized(this) { installed[plugin.id] }
+            ?: error("插件未安装：${plugin.id}")
+        if (previous === plugin) return
+
+        val registryBefore = context.snapshotRegistries()
+        var removedPrevious = false
+        var replacementStarted = false
+        var registryWithoutPrevious: HarnessRegistrySnapshot? = null
+        synchronized(this) {
+            lifecycle[plugin.id] = PluginLifecycleSnapshot(
+                id = plugin.id,
+                state = PluginLifecycleState.REPLACING,
+            )
+        }
+
+        try {
+            previous.uninstall(context)
+            removedPrevious = true
+            registryWithoutPrevious = context.snapshotRegistries()
+
+            replacementStarted = true
+            plugin.install(context)
+            synchronized(this) {
+                installed[plugin.id] = plugin
+                lifecycle[plugin.id] = PluginLifecycleSnapshot(
+                    id = plugin.id,
+                    state = PluginLifecycleState.ACTIVE,
+                )
+            }
+        } catch (error: Throwable) {
+            var cleanupFailure: Throwable? = null
+            var restoreFailure: Throwable? = null
+            withContext(NonCancellable) {
+                if (replacementStarted) {
+                    cleanupFailure = runCatching { plugin.uninstall(context) }.exceptionOrNull()
+                }
+                if (removedPrevious) {
+                    context.restoreRegistries(checkNotNull(registryWithoutPrevious))
+                    restoreFailure = runCatching { previous.install(context) }.exceptionOrNull()
+                }
+                context.restoreRegistries(registryBefore)
+            }
+
+            cleanupFailure?.let(error::addSuppressed)
+            restoreFailure?.let(error::addSuppressed)
+            val restored = removedPrevious && cleanupFailure == null && restoreFailure == null
+            synchronized(this) {
+                installed[plugin.id] = previous
+                lifecycle[plugin.id] = PluginLifecycleSnapshot(
+                    id = plugin.id,
+                    state = if (restored) PluginLifecycleState.ACTIVE else PluginLifecycleState.FAILED,
+                    lastError = if (restored) {
+                        null
+                    } else {
+                        buildString {
+                            append(error.message ?: error::class.java.simpleName)
+                            cleanupFailure?.let {
+                                append("; 替换插件清理失败：")
+                                append(it.message ?: it::class.java.simpleName)
+                            }
+                            restoreFailure?.let {
+                                append("; 原插件恢复失败：")
+                                append(it.message ?: it::class.java.simpleName)
+                            }
+                        }
+                    },
+                )
+            }
+            throw error
+        }
+    }
 
     private suspend fun installLocked(plugin: HarnessPlugin) {
         require(plugin.id.isNotBlank()) { "插件编号不能为空" }
