@@ -27,10 +27,24 @@ internal class LocalChatReplyCoordinator(
         reply: LocalModelReply,
         userMessage: String,
         step: Int,
-        usageContext: TokenUsageContext,
+        usageTurnId: String? = null,
+        usageRunId: String? = null,
+        usageTaskLabel: String? = null,
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
+        val usageContext = buildForegroundTokenUsageContext(
+            snapshot = snapshot,
+            action = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                TokenUsageAction.CHAT_REPLY
+            } else {
+                TokenUsageAction.WORK_MAIN
+            },
+            turnId = usageTurnId,
+            runId = usageRunId,
+            taskLabel = usageTaskLabel ?: userMessage,
+            step = step,
+        )
         if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
             recordUsage(snapshot, reply, usageContext)
             return reply
