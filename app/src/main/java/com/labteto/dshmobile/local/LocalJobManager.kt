@@ -13,7 +13,7 @@ internal class LocalJobManager(
     private val delegate = HarnessJobManager(
         scope = scope,
         onChanged = { jobs ->
-            onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status) })
+            onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status, it.ownerId) })
         },
         initialSnapshots = store?.read().orEmpty(),
         onSnapshotsChanged = { snapshots -> store?.write(snapshots) },
@@ -46,7 +46,7 @@ internal class LocalJobManager(
     ): String = delegate.resumePersistent(id, block)
 
     fun snapshotInfos(): List<LocalJobInfo> = delegate.snapshots().map {
-        LocalJobInfo(it.id, it.label, it.status)
+        LocalJobInfo(it.id, it.label, it.status, it.ownerId)
     }
 
     fun list(): String = delegate.list()
