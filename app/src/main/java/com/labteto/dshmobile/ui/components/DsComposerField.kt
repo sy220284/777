@@ -7,7 +7,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.Text
@@ -18,9 +17,8 @@ import com.labteto.dshmobile.ui.theme.DsType
 /**
  * Compact multiline field shared by all conversation composers.
  *
- * The field itself stays one row tall while idle. Its parent composer decides when secondary
- * actions appear; text then grows naturally until [maxLines]. Keeping the text editor instance
- * stable avoids focus/IME loss when the surrounding composer expands or collapses.
+ * Focus alone never changes composer geometry. Text grows naturally until [maxLines], while the
+ * shared composer shell keeps idle and focused states at the same compact height.
  */
 @Composable
 fun DsComposerField(
@@ -30,7 +28,6 @@ fun DsComposerField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     maxLines: Int = 6,
-    onFocusedChange: (Boolean) -> Unit = {},
 ) {
     val colors = DsTheme.colors
     BasicTextField(
@@ -38,8 +35,7 @@ fun DsComposerField(
         onValueChange = onValueChange,
         modifier = modifier
             .heightIn(min = DsSpacing.touchTarget)
-            .onFocusChanged { onFocusedChange(it.isFocused) }
-            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
         enabled = enabled,
         textStyle = DsType.std14.copy(
             color = if (enabled) colors.labelPrimary else colors.labelTertiary,
