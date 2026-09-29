@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -74,6 +75,62 @@ class LocalJobManagerTest {
         assertTrue(manager.output(secondId).contains("second done"))
     }
 
+
+    @Test
+    fun stoppingOwnedJobsDoesNotCancelOtherSessionJobs() = runTest {
+        val otherGate = CompletableDeferred<Unit>()
+        val manager = LocalJobManager(this) { }
+
+        val first = manager.start("first", ownerSessionId = "session-a") { _, _ ->
+            awaitCancellation()
+        }
+        val second = manager.start("second", ownerSessionId = "session-b") { _, _ ->
+            otherGate.await()
+            "second done"
+        }
+        val firstId = first.substringAfterLast('：')
+        val secondId = second.substringAfterLast('：')
+        runCurrent()
+
+        manager.stopOwnedAndJoin(setOf("session-a"))
+        runCurrent()
+
+        assertTrue(manager.output(firstId).contains("[cancelled]"))
+        assertTrue(manager.output(secondId).contains("[running]"))
+
+        otherGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(manager.output(secondId).contains("[completed]"))
+    }
+
+    @Test
+    fun persistentStoreRoundTripsOwnerSessionId() = runTest {
+        val root = createTempDir(prefix = "persistent-job-owner-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-owned",
+                        label = "网页抓取",
+                        status = "interrupted",
+                        ownerId = "session-owned",
+                        resumeKind = "web_fetch",
+                        resumePayload = "{}",
+                    ),
+                ),
+            )
+
+            assertEquals("session-owned", store.read().single().ownerId)
+            val restarted = LocalJobManager(this, store) { }
+            assertEquals("session-owned", restarted.interruptedSnapshots().single().ownerId)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     @Test
     fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {
