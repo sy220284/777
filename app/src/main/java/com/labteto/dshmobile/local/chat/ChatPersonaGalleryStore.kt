@@ -171,7 +171,7 @@ internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile
         internalContradictions = mergePersonaLines(base.internalContradictions, incoming.internalContradictions, 12),
         knowledgeBoundary = mergePersonaLines(base.knowledgeBoundary, incoming.knowledgeBoundary, 20),
         loreEntries = mergeLoreEntries(base.loreEntries, incoming.loreEntries, 80),
-        presetId = base.presetId.ifBlank { incoming.presetId }.take(120),
+        presetId = base.presetId.ifBlank { incoming.presetId }.take(120), behaviorTuning = mergeCharacterBehaviorTuning(base.behaviorTuning, incoming.behaviorTuning),
         hardConstraints = mergePersonaLines(base.hardConstraints, incoming.hardConstraints, 20),
         exampleDialogues = mergePersonaLines(base.exampleDialogues, incoming.exampleDialogues, 12),
         bannedPhrases = mergePersonaLines(base.bannedPhrases, incoming.bannedPhrases, 30),
@@ -387,7 +387,7 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
             entry.priority.toString(), entry.alwaysOn.toString(), entry.spoilerLevel.toString(),
         ).joinToString("~")
     },
-    persona.presetId,
+    persona.presetId + "|" + persona.behaviorTuning.signature(),
     persona.hardConstraints.joinToString("\u0000"),
     persona.exampleDialogues.joinToString("\u0000"),
     persona.bannedPhrases.joinToString("\u0000"),
