@@ -73,7 +73,7 @@ internal class LocalChatTurnCoordinator(
         snapshot: LocalHarnessState,
         persona: PersonaProfile,
         reply: LocalModelReply,
-        recordUsage: (DeepSeekTokenUsage) -> Unit,
+        recordUsage: (LocalModelReply) -> Unit,
         onGuardEvent: (String, List<String>) -> Unit,
     ): LocalModelReply = runner.finalizeReply(
         persona = persona,
