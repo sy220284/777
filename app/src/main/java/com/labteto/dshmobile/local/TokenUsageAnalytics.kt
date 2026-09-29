@@ -21,6 +21,8 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+private const val RECENT_TOKEN_LOG_RECORDS = 200
+
 @Serializable
 enum class TokenUsageAction {
     CHAT_REPLY,
@@ -369,9 +371,16 @@ class TokenUsageAnalyticsStore @Inject constructor(
             }.aggregate.add(record)
         }
         val latest = records.maxByOrNull(TokenUsageRecord::timestamp) ?: return null
+        val mainTaskRecord = records
+            .asSequence()
+            .filter { it.context.runKind != LocalAgentRunKind.SUBAGENT.name.lowercase() }
+            .filter { !it.context.taskLabel.isNullOrBlank() }
+            .maxByOrNull(TokenUsageRecord::timestamp)
         val title = when (kind) {
             TokenUsageGroupKind.SESSION -> latest.context.sessionTitle?.takeIf(String::isNotBlank) ?: "对话"
-            TokenUsageGroupKind.TASK -> latest.context.taskLabel?.takeIf(String::isNotBlank) ?: "工作任务"
+            TokenUsageGroupKind.TASK -> mainTaskRecord?.context?.taskLabel
+                ?: latest.context.taskLabel?.takeIf(String::isNotBlank)
+                ?: "工作任务"
         }
         return TokenUsageGroupDetail(
             kind = kind,
@@ -416,7 +425,6 @@ class TokenUsageAnalyticsStore @Inject constructor(
     private companion object {
         const val USAGE_EVENT_TYPE = "usage/request"
         const val RECENT_DEDUPE_IDS = 1_024
-        const val RECENT_LOG_RECORDS = 200
         const val DETAIL_RECORDS = 300
         const val MAX_LEDGER_SEGMENT_BYTES = 8L * 1024L * 1024L
     }
@@ -443,6 +451,8 @@ internal fun aggregateTokenUsageRecords(
         var chatTurnOutputTokens = 0L
         var workMainTokens = 0L
         var workSubagentTokens = 0L
+        var workTaskInputTokens = 0L
+        var workTaskOutputTokens = 0L
 
         records.forEach { record ->
             if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
@@ -478,6 +488,8 @@ internal fun aggregateTokenUsageRecords(
                         ?: record.context.runId?.takeIf(String::isNotBlank)
                     taskRunId?.let { runId ->
                         workRuns += runId
+                        workTaskInputTokens += record.inputTokens
+                        workTaskOutputTokens += record.outputTokens
                         taskGroups.getOrPut(runId) {
                             MutableGroup(
                                 key = runId,
@@ -486,16 +498,15 @@ internal fun aggregateTokenUsageRecords(
                             )
                         }.add(record)
                     }
-                    if (record.context.runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) {
-                        workSubagentTokens += record.totalTokens
-                    } else {
-                        workMainTokens += record.totalTokens
+                    when (record.context.runKind) {
+                        LocalAgentRunKind.FOREGROUND.name.lowercase() -> workMainTokens += record.totalTokens
+                        LocalAgentRunKind.SUBAGENT.name.lowercase() -> workSubagentTokens += record.totalTokens
                     }
                 }
                 null -> day.other.add(record)
             }
             recent.addLast(record)
-            if (recent.size > RECENT_LOG_RECORDS) recent.removeFirst()
+            if (recent.size > RECENT_TOKEN_LOG_RECORDS) recent.removeFirst()
         }
 
         val chatTurnCount = chatTurns.size
@@ -513,8 +524,8 @@ internal fun aggregateTokenUsageRecords(
             work = TokenUsageModeAnalytics(
                 aggregate = work.freeze(),
                 turnCount = workRuns.size,
-                averageInputPerTurn = average(work.inputTokens, workRuns.size),
-                averageOutputPerTurn = average(work.outputTokens, workRuns.size),
+                averageInputPerTurn = average(workTaskInputTokens, workRuns.size),
+                averageOutputPerTurn = average(workTaskOutputTokens, workRuns.size),
                 mainTokens = workMainTokens,
                 subagentTokens = workSubagentTokens,
                 actions = workActions.freezeActions(),
@@ -601,10 +612,9 @@ private class MutableGroup(
         }
         record.context.turnId?.takeIf(String::isNotBlank)?.let(turns::add)
         lastUsedAt = maxOf(lastUsedAt, record.timestamp)
-        if (record.context.runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) {
-            subagentTokens += record.totalTokens
-        } else {
-            mainTokens += record.totalTokens
+        when (record.context.runKind) {
+            LocalAgentRunKind.FOREGROUND.name.lowercase() -> mainTokens += record.totalTokens
+            LocalAgentRunKind.SUBAGENT.name.lowercase() -> subagentTokens += record.totalTokens
         }
     }
 
