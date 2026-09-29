@@ -67,8 +67,7 @@ internal fun agentOperationKind(toolName: String?): AgentOperationKind {
             name.startsWith("web_") ->
             AgentOperationKind.Web
 
-        name.startsWith("android_") || name.startsWith("device_") ||
-            name.startsWith("shizuku_") ->
+        name.startsWith("android_") || name.startsWith("device_") ->
             AgentOperationKind.Device
 
         name.startsWith("vision_") || name.contains("image") || name.contains("screenshot") ->
