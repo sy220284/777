@@ -363,13 +363,7 @@ class ChatInteractionPlanner @Inject constructor(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
-        val evolvedState = continuityState.copy(
-            evolution = evolveCharacterEvolution(
-                previous = agedPrevious,
-                current = continuityState,
-                significance = significance,
-            ),
-        )
+        val evolvedState = continuityState.copy(evolution = evolveCharacterEvolution(agedPrevious, continuityState, significance))
         return decoded.copy(
             state = applyInteractionPerformance(
                 state = applyInteractionIntent(
