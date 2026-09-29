@@ -9,13 +9,7 @@ import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
-import com.labteto.dshmobile.automation.AutomationPlugin
-import com.labteto.dshmobile.automation.AutomationStore
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
-import com.labteto.dshmobile.automation.WebhookController
-import com.labteto.dshmobile.automation.WebhookPlugin
-import com.labteto.dshmobile.device.AndroidDevicePlugin
-import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.AgentEventSink
@@ -34,9 +28,6 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
-import com.labteto.dshmobile.harness.plugin.HarnessContext
-import com.labteto.dshmobile.harness.plugin.HarnessPlugin
-import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -54,13 +45,11 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
-import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
+import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
-import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -94,7 +83,6 @@ import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
-import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -141,7 +129,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import okhttp3.OkHttpClient
 
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
@@ -158,17 +145,14 @@ class LocalHarnessEngine @Inject constructor(
     private val modelClient: DeepSeekClient,
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
-    private val visionClient: VisionClient,
     private val githubCredentials: LocalGitHubCredentialStore,
     private val bundledNodeRuntime: BundledNodeRuntime,
     private val bundledPythonRuntime: BundledPythonRuntime,
     private val bundledGitRuntime: BundledGitRuntime,
-    private val http: OkHttpClient,
     private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
-    private val automationStore: AutomationStore,
-    private val webhookController: WebhookController,
+    private val pluginCompositionFactory: LocalPluginCompositionFactory,
     private val userProfileStore: UserProfileStore,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
@@ -238,8 +222,8 @@ class LocalHarnessEngine @Inject constructor(
     private val agentRunCoordinator by lazy {
         LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
     }
-    private val toolRegistry = ToolRegistry()
-    private val pluginRegistry = PluginRegistry(HarnessContext(tools = toolRegistry))
+    private val toolRegistry
+        get() = pluginComposition.tools
     private val enabledOptionalTools = linkedSetOf<String>()
     private val toolExecutionCoordinator by lazy {
         LocalToolExecutionCoordinator(
@@ -290,51 +274,18 @@ class LocalHarnessEngine @Inject constructor(
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
     }
-    private val runtimePlugin by lazy {
-        AndroidRuntimePlugin(
+    private val pluginComposition by lazy {
+        pluginCompositionFactory.create(
             workspaceRoot = File(workspace.path),
-            processRuntime = runtimeProcess,
-            terminalProvider = runtimeTerminal,
+            runtimeProcess = runtimeProcess,
+            runtimeTerminal = runtimeTerminal,
+            languageServerCommand = automaticLanguageServerResolver::resolve,
             resourceScheduler = resourceScheduler,
-        )
-    }
-    private val mcpPlugin = McpToolBridgePlugin(
-        http = http,
-        json = json,
-        workspaceRoot = File(workspace.path),
-        stdioCommandResolver = runtimeProcess::resolveCommand,
-        stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
-    )
-    private val githubPlugin = GitHubConnectorPlugin(
-        http = http,
-        json = json,
-        credentialProvider = githubCredentials::get,
-    )
-    private val lspPlugin by lazy {
-        com.labteto.dshmobile.interop.lsp.LspPlugin(
-            root = File(workspace.path),
-            json = json,
-            command = automaticLanguageServerResolver::resolve,
-            commandResolver = runtimeProcess::resolveCommand,
-            environment = { runtimeProcess.processEnvironment() },
-            resourceScheduler = resourceScheduler,
-        )
-    }
-    private val deviceProvider by lazy {
-        AndroidDeviceProvider(context, resourceScheduler = resourceScheduler)
-    }
-    private val devicePlugin by lazy { AndroidDevicePlugin(deviceProvider) }
-    private val visionPlugin by lazy {
-        LocalVisionPlugin(
-            device = deviceProvider,
-            keyProvider = apiKeys::get,
             routeProvider = {
                 val current = _state.value
                 if (!current.configured) null
                 else LocalVisionRoute(baseUrl = current.baseUrl, model = current.model)
             },
-            analyzer = visionClient,
-            workspaceRoot = File(workspace.path),
             imageSupportProvider = { route ->
                 when (imageCapabilities.state(route.baseUrl, route.model)) {
                     LocalImageCapability.SUPPORTED -> true
@@ -342,11 +293,9 @@ class LocalHarnessEngine @Inject constructor(
                     LocalImageCapability.UNKNOWN -> null
                 }
             },
+            executeBuiltin = ::executeBuiltin,
         )
     }
-    private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
-    private val webhookPlugin = WebhookPlugin(webhookController)
-    private val builtinPlugin = LocalBuiltinPlugin(::executeBuiltin)
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
@@ -544,7 +493,7 @@ class LocalHarnessEngine @Inject constructor(
             imageCapabilities = imageCapabilities,
             usageTracker = usageTracker,
             resourceScheduler = resourceScheduler,
-            virtualDisplayProvider = deviceProvider,
+            virtualDisplayProvider = pluginComposition.virtualDisplayProvider,
             memoryClassMb = memoryClassMb,
             agentRunCoordinator = agentRunCoordinator,
             contextComposer = contextComposer,
@@ -768,19 +717,7 @@ class LocalHarnessEngine @Inject constructor(
                 bundledNodeRuntime.prepare()
                 bundledPythonRuntime.prepare()
                 bundledGitRuntime.prepare()
-                pluginRegistry.installAll(
-                    listOf(
-                        builtinPlugin,
-                        runtimePlugin,
-                        mcpPlugin,
-                        githubPlugin,
-                        lspPlugin,
-                        devicePlugin,
-                        visionPlugin,
-                        automationPlugin,
-                        webhookPlugin,
-                    ),
-                )
+                pluginComposition.installStartup()
                 load()
                 startNextQueuedTurnIfIdle()?.start()
                 scheduleInterruptedSafeJobs()
@@ -2216,29 +2153,28 @@ class LocalHarnessEngine @Inject constructor(
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
     internal suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
-        githubPlugin.validateCredential(token).also { githubCredentials.put(token) }
+        pluginComposition.validateGitHubCredential(token).also { githubCredentials.put(token) }
     internal suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
 
-    internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
+    internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = pluginComposition.mcpServers()
 
     internal suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
-        mcpPlugin.connectHttpFromUi(pluginRegistry.context, serverId, endpoint)
+        pluginComposition.connectMcpHttp(serverId, endpoint)
 
     internal suspend fun connectMcpStdioForUi(
         serverId: String,
         command: List<String>,
         workingDirectory: String? = null,
-    ): String = mcpPlugin.connectStdioFromUi(
-        pluginRegistry.context,
+    ): String = pluginComposition.connectMcpStdio(
         serverId,
         command,
         workingDirectory,
     )
 
     internal suspend fun disconnectMcpForUi(serverId: String): String =
-        mcpPlugin.disconnectFromUi(pluginRegistry.context, serverId)
+        pluginComposition.disconnectMcp(serverId)
 
-    internal fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
+    internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
 
     internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId, currentSessionId)
 
