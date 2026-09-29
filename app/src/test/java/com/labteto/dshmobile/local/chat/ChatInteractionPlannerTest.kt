@@ -111,11 +111,51 @@ class ChatInteractionPlannerTest {
 
         assertTrue(plannerPrompt.contains("用户纠正（最高优先）"))
         assertTrue(plannerPrompt.contains("不善于拒绝，会服软"))
-        assertTrue(plannerPrompt.contains("表达解释：角色存在含蓄、嘴硬"))
-        assertTrue(plannerPrompt.contains("字面推辞不得单独触发关系降温"))
+        assertTrue(plannerPrompt.contains("表达解释：角色存在嘴硬"))
+        assertTrue(plannerPrompt.contains("模糊或习惯性推辞不得单独触发关系降温"))
         assertTrue(suggestionsPrompt.contains("用户纠正（最高优先）"))
-        assertTrue(suggestionsPrompt.contains("不把表面推辞自动解释为关系拒绝"))
-        assertTrue(suggestionsPrompt.contains("清晰持续的停止、退出或拒绝继续除外"))
+        assertTrue(suggestionsPrompt.contains("不把模糊或习惯性推辞自动解释为关系拒绝"))
+        assertTrue(suggestionsPrompt.contains("清晰明确停止、退出或拒绝继续一次即生效"))
+    }
+
+    @Test
+    fun genericRestraintAloneDoesNotEnableIndirectRefusalSemantics() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            personality = "克制谨慎",
+            speechStyle = "表达含蓄",
+        )
+        val prompt = planner.prompt(
+            persona = persona,
+            state = ChatCharacterState(),
+            userMessage = "今晚聊聊吗",
+            assistantMessage = "可以。",
+        )
+
+        assertTrue(!prompt.contains("表达解释：角色存在"))
+    }
+
+    @Test
+    fun explicitCurrentBoundaryIsOneShotAndDoesNotRequireRepetition() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            personality = "嘴硬心软",
+        )
+        val plannerPrompt = planner.prompt(
+            persona = persona,
+            state = ChatCharacterState(),
+            userMessage = "停下",
+            assistantMessage = "好。",
+        )
+        val suggestionsPrompt = planner.suggestionsPrompt(
+            persona = persona,
+            state = ChatCharacterState(),
+            userMessage = "停下",
+            assistantMessage = "好。",
+        )
+
+        assertTrue(plannerPrompt.contains("一次表达即生效，不要求重复"))
+        assertTrue(suggestionsPrompt.contains("一次即生效"))
     }
 
     @Test
