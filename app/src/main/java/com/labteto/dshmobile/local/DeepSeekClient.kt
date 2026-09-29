@@ -149,6 +149,7 @@ class DeepSeekClient @Inject constructor(
                 var streamUsage: JsonObject? = null
                 var totalBytes = 0
                 var sawStreamData = false
+                var sawTerminalFrame = false
                 responseBody.charStream().buffered().use { reader ->
                     while (true) {
                         val line = reader.readLine() ?: break
@@ -167,33 +168,58 @@ class DeepSeekClient @Inject constructor(
                         sawStreamData = true
                         val data = line.removePrefix("data:").trim()
                         if (data.isBlank()) continue
-                        if (data == "[DONE]") break
-                        val root = json.parseToJsonElement(data).jsonObject
+                        if (data == "[DONE]") {
+                            sawTerminalFrame = true
+                            break
+                        }
+                        val root = try {
+                            json.parseToJsonElement(data) as? JsonObject
+                                ?: throw streamProtocolError("模型流式响应数据帧不是 JSON 对象")
+                        } catch (error: LocalModelException) {
+                            throw error
+                        } catch (error: Exception) {
+                            throw streamProtocolError("模型流式响应包含无法解析的数据帧", error)
+                        }
                         (root["usage"] as? JsonObject)?.let { streamUsage = it }
-                        val delta = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-                            ?.get("delta") as? JsonObject
+                        val firstChoice = (root["choices"] as? JsonArray)
+                            ?.firstOrNull() as? JsonObject
+                        val finishReason = (firstChoice?.get("finish_reason") as? JsonPrimitive)
+                            ?.contentOrNull
+                        if (!finishReason.isNullOrBlank()) sawTerminalFrame = true
+                        val delta = firstChoice?.get("delta") as? JsonObject
                         if (delta == null) continue
                         val textDelta = assistantText(delta["content"]).orEmpty()
-                        val reasoningDelta = delta["reasoning_content"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                        val reasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
+                            ?.contentOrNull.orEmpty()
                         if (textDelta.isNotEmpty()) content.append(textDelta)
                         if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
                         if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
                             onDelta(LocalModelDelta(textDelta, reasoningDelta))
                         }
-                        delta["tool_calls"]?.jsonArray.orEmpty().forEach { element ->
-                            val item = element.jsonObject
-                            val index = item["index"]?.jsonPrimitive?.intOrNull ?: 0
+                        (delta["tool_calls"] as? JsonArray).orEmpty().forEach { element ->
+                            val item = element as? JsonObject
+                                ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")
+                            val index = (item["index"] as? JsonPrimitive)?.intOrNull ?: 0
                             val acc = toolCalls.getOrPut(index) { StreamToolCall() }
-                            item["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)?.let { acc.id = it }
+                            (item["id"] as? JsonPrimitive)?.contentOrNull
+                                ?.takeIf(String::isNotBlank)?.let { acc.id = it }
                             val function = item["function"] as? JsonObject
-                            function?.get("name")?.jsonPrimitive?.contentOrNull
+                            (function?.get("name") as? JsonPrimitive)?.contentOrNull
                                 ?.takeIf(String::isNotBlank)?.let { acc.name = it }
-                            function?.get("arguments")?.jsonPrimitive?.contentOrNull?.let(acc.arguments::append)
+                            (function?.get("arguments") as? JsonPrimitive)?.contentOrNull
+                                ?.let(acc.arguments::append)
                         }
                     }
                 }
                 if (!sawStreamData && fallback.isNotBlank()) {
                     return@withContext parse(fallback.toString())
+                }
+                if (sawStreamData && !sawTerminalFrame) {
+                    throw LocalModelException(
+                        code = "MODEL_STREAM_INCOMPLETE",
+                        message = "模型流式响应提前结束，未收到完成标记",
+                        retryable = true,
+                    )
                 }
                 val message = buildJsonObject {
                     put("role", "assistant")
@@ -203,10 +229,10 @@ class DeepSeekClient @Inject constructor(
                         put("tool_calls", buildJsonArray {
                             toolCalls.toSortedMap().values.forEach { call ->
                                 add(buildJsonObject {
-                                    put("id", call.id ?: error("流式工具调用缺少 id"))
+                                    put("id", call.id ?: throw streamProtocolError("流式工具调用缺少 id"))
                                     put("type", "function")
                                     put("function", buildJsonObject {
-                                        put("name", call.name ?: error("流式工具调用缺少 name"))
+                                        put("name", call.name ?: throw streamProtocolError("流式工具调用缺少 name"))
                                         put("arguments", call.arguments.toString().ifBlank { "{}" })
                                     })
                                 })
@@ -217,10 +243,15 @@ class DeepSeekClient @Inject constructor(
                 val calls = toolCalls.toSortedMap().values.map { call ->
                     val raw = call.arguments.toString().ifBlank { "{}" }
                     LocalToolCall(
-                        id = call.id ?: error("流式工具调用缺少 id"),
-                        name = call.name ?: error("流式工具调用缺少 name"),
-                        arguments = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrElse {
-                            error("工具参数不是合法对象：${it.message}")
+                        id = call.id ?: throw streamProtocolError("流式工具调用缺少 id"),
+                        name = call.name ?: throw streamProtocolError("流式工具调用缺少 name"),
+                        arguments = try {
+                            json.parseToJsonElement(raw) as? JsonObject
+                                ?: throw streamProtocolError("工具参数不是合法对象")
+                        } catch (error: LocalModelException) {
+                            throw error
+                        } catch (error: Exception) {
+                            throw streamProtocolError("工具参数不是合法对象：${error.message}", error)
                         },
                         rawArguments = raw,
                     )
@@ -380,6 +411,16 @@ internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {
     )
     return !(officialDeepSeek && thinkingModel)
 }
+
+private fun streamProtocolError(
+    detail: String,
+    cause: Throwable? = null,
+): LocalModelException = LocalModelException(
+    code = "MODEL_STREAM_PROTOCOL",
+    message = detail,
+    retryable = true,
+    cause = cause,
+)
 
 internal fun providerErrorDetail(body: String, json: Json): String? = runCatching {
     val root = json.parseToJsonElement(body).jsonObject
