@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
 import com.labteto.dshmobile.local.send.prepareLocalSend
@@ -327,8 +328,10 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
+    private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
+    internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -1717,8 +1720,17 @@ class LocalHarnessEngine @Inject constructor(
             coordinateLocalSend(
                 state.configured, state.loading, sessionTransitioning, activeRun,
                 targetPending.size(), MAX_PENDING_INPUTS,
-                onRejected = { rejected -> targetState.update { it.copy(error = rejected.message) } },
-                onAccepted = ::cancelChatPostTurn,
+                onRejected = { rejected ->
+                    _sendFeedbackState.value = LocalSendFeedbackState(
+                        sessionId = state.sessionId,
+                        rejectReason = rejected.rejectReason,
+                        rejectLimit = rejected.rejectLimit,
+                    )
+                },
+                onAccepted = {
+                    _sendFeedbackState.value = LocalSendFeedbackState()
+                    cancelChatPostTurn()
+                },
                 enqueue = { targetPending.offer(queuedInput) },
                 onQueued = {
                     recordUserTranscript(content, modelMessage, true, queuedInput, binding)
@@ -1742,32 +1754,6 @@ class LocalHarnessEngine @Inject constructor(
         modelMessage: JsonObject?,
     ): Job? {
         val sessionId = currentSessionId
-        val existing = activeWorkRuns[sessionId]
-        if (existing?.job?.isCompleted == false) {
-            val queuedInput = QueuedAgentInput(
-                content = content,
-                memoryInput = memoryInput,
-                modelMessage = modelMessage,
-                id = UUID.randomUUID().toString(),
-            )
-            if (!existing.pendingInputs.offer(queuedInput)) {
-                existing.state.update {
-                    it.copy(error = "当前执行中的补充消息已达到 ${MAX_PENDING_INPUTS} 条上限")
-                }
-                return null
-            }
-            recordUserTranscript(
-                content = content,
-                modelMessage = modelMessage,
-                queued = true,
-                queuedInput = queuedInput,
-                binding = existing,
-            )
-            existing.state.update { it.copy(queuedInputCount = existing.pendingInputs.size()) }
-            persist(existing)
-            return null
-        }
-
         val durableMessage = modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", content)

@@ -82,6 +82,8 @@ import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -131,6 +133,20 @@ internal fun localHarnessShowsBlockingLoading(
     loading: Boolean,
     hasRenderedSurface: Boolean,
 ): Boolean = loading && !hasRenderedSurface
+
+@Composable
+private fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
+    LocalSendRejectReason.EMPTY -> stringResource(R.string.local_send_rejected_empty)
+    LocalSendRejectReason.LOADING -> stringResource(R.string.local_send_rejected_loading)
+    LocalSendRejectReason.UNCONFIGURED -> stringResource(R.string.local_send_rejected_unconfigured)
+    LocalSendRejectReason.SESSION_TRANSITION -> stringResource(R.string.local_send_rejected_session_transition)
+    LocalSendRejectReason.QUEUE_FULL -> stringResource(
+        R.string.local_send_rejected_queue_full,
+        limit ?: 0,
+    )
+    LocalSendRejectReason.QUEUE_UNAVAILABLE -> stringResource(R.string.local_send_rejected_queue_unavailable)
+}
+
 /** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
 @Composable
 fun LocalHarnessScreen(
@@ -143,6 +159,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
@@ -326,6 +343,7 @@ fun LocalHarnessScreen(
                 )
                 else -> LocalConversationSurface(
                     state = state,
+                    sendFeedback = sendFeedback,
                     streamingState = viewModel.streamingState,
                     gallery = gallery,
                     transcriptHistory = transcriptHistory,
@@ -602,6 +620,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
@@ -1172,7 +1191,10 @@ private fun LocalConversationSurface(
             )
         }
 
-        state.error?.let { error ->
+        val sendRejectMessage = sendFeedback.rejectReason
+            ?.takeIf { sendFeedback.sessionId == state.sessionId }
+            ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
+        if (sendRejectMessage != null || state.error != null) {
             Surface(
                 color = colors.warnTertiary,
                 shape = RoundedCornerShape(12.dp),
@@ -1184,19 +1206,23 @@ private fun LocalConversationSurface(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Text(
-                        stringResource(R.string.agent_operation_generic) + " · " +
-                            stringResource(R.string.agent_operation_status_failed),
+                        sendRejectMessage ?: (
+                            stringResource(R.string.agent_operation_generic) + " · " +
+                                stringResource(R.string.agent_operation_status_failed)
+                            ),
                         style = DsType.small13,
                         color = colors.error,
                         modifier = Modifier.weight(1f),
                     )
-                    state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
-                        DsButton(
-                            stringResource(R.string.local_restore_request),
-                            { drafts[state.sessionId] = lastRequest.content },
-                            variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
-                        )
+                    if (sendRejectMessage == null) {
+                        state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
+                            DsButton(
+                                stringResource(R.string.local_restore_request),
+                                { drafts[state.sessionId] = lastRequest.content },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                            )
+                        }
                     }
                 }
             }

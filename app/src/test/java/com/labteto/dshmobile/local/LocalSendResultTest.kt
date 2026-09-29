@@ -24,7 +24,7 @@ class LocalSendResultTest {
 
         assertEquals(LocalSendRejectReason.SESSION_TRANSITION, result?.rejectReason)
         assertFalse(result?.accepted ?: true)
-        assertTrue(result?.message.orEmpty().contains("输入已保留"))
+        assertNull(result?.rejectLimit)
     }
 
     @Test
@@ -40,7 +40,7 @@ class LocalSendResultTest {
 
         assertEquals(LocalSendRejectReason.QUEUE_FULL, result?.rejectReason)
         assertFalse(result?.accepted ?: true)
-        assertTrue(result?.message.orEmpty().contains("16"))
+        assertEquals(16, result?.rejectLimit)
     }
 
     @Test
@@ -104,7 +104,7 @@ class LocalSendResultTest {
         )
 
         assertFalse(result.accepted)
-        assertEquals(LocalSendRejectReason.QUEUE_FULL, result.rejectReason)
+        assertEquals(LocalSendRejectReason.QUEUE_UNAVAILABLE, result.rejectReason)
         assertEquals(0, accepted)
         assertEquals(0, queued)
         assertEquals(0, started)

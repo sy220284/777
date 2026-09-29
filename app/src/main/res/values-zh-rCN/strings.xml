@@ -1150,6 +1150,12 @@
     <string name="local_endpoint_hint">兼容 OpenAI 聊天补全协议的服务也可使用。</string>
     <string name="local_model_save_enter">保存并进入本机 Harness</string>
     <string name="local_file_import_failed">文件导入失败</string>
+    <string name="local_send_rejected_empty">请输入消息或添加附件。</string>
+    <string name="local_send_rejected_loading">会话仍在加载，请稍后重试；当前输入已保留。</string>
+    <string name="local_send_rejected_unconfigured">当前模型尚未配置，请先完成模型设置。</string>
+    <string name="local_send_rejected_session_transition">会话正在切换，请稍后重试；当前输入已保留。</string>
+    <string name="local_send_rejected_queue_full">当前执行中的补充消息已达到 %1$d 条上限；当前输入已保留。</string>
+    <string name="local_send_rejected_queue_unavailable">当前执行中的补充消息队列暂时不可用；当前输入已保留。</string>
     <string name="local_restore_request">恢复请求</string>
     <string name="local_manage_model_config">管理模型配置</string>
     <string name="local_attachment_image">图片</string>

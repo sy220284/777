@@ -1152,6 +1152,12 @@
     <string name="local_endpoint_hint">OpenAI-compatible chat completion services are supported.</string>
     <string name="local_model_save_enter">Save and enter on-device Harness</string>
     <string name="local_file_import_failed">File import failed</string>
+    <string name="local_send_rejected_empty">Enter a message or add an attachment.</string>
+    <string name="local_send_rejected_loading">This conversation is still loading. Your draft was kept.</string>
+    <string name="local_send_rejected_unconfigured">Configure the current model before sending.</string>
+    <string name="local_send_rejected_session_transition">The conversation is switching. Try again shortly; your draft was kept.</string>
+    <string name="local_send_rejected_queue_full">The running task already has %1$d queued follow-up messages. Your draft was kept.</string>
+    <string name="local_send_rejected_queue_unavailable">The follow-up queue is temporarily unavailable. Your draft was kept.</string>
     <string name="local_restore_request">Restore request</string>
     <string name="local_manage_model_config">Manage model settings</string>
     <string name="local_attachment_image">Image</string>
