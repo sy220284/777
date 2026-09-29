@@ -269,8 +269,8 @@ if "cancelWorkRunsForDeletedSessions(activeWorkRuns, ids, runStateLock)" not in 
     violations.append("LocalHarnessEngine must route session deletion through the bound Work-run cancellation helper")
 if "jobs.stopNonPersistentAndJoin()" in lifecycle_coordinator:
     violations.append("Session lifecycle must not globally cancel unrelated background jobs")
-if "jobs.stopOwnedAndJoin(setOf(sourceId))" not in lifecycle_coordinator:
-    violations.append("Creating a session must only stop background jobs owned by the source session")
+if "jobs.stopOwnedNonPersistentAndJoin(setOf(sourceId))" not in lifecycle_coordinator:
+    violations.append("Creating a session must only stop non-persistent background jobs owned by the source session")
 if "jobs.stopOwnedAndJoin(ids)" not in lifecycle_coordinator:
     violations.append("Deleting sessions must only stop background jobs owned by the resolved sessions")
 if "if (deletingCurrentSession) cancelActiveRunAndJoin()" not in lifecycle_coordinator:
