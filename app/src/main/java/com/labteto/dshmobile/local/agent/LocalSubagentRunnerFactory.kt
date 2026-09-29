@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -26,7 +27,7 @@ internal class LocalSubagentRunnerFactory(
     private val imageCapabilities: LocalImageCapabilityRegistry,
     private val usageTracker: DeepSeekUsageTracker,
     private val resourceScheduler: HarnessResourceScheduler,
-    private val deviceProvider: com.labteto.dshmobile.device.AndroidDeviceProvider,
+    private val virtualDisplayProvider: HarnessVirtualDisplayProvider,
     private val memoryClassMb: Int,
     private val agentRunCoordinator: LocalAgentRunCoordinator,
     private val contextComposer: ContextComposer,
@@ -125,8 +126,8 @@ internal class LocalSubagentRunnerFactory(
         },
         onNativeImageRejected = { baseUrl, model -> imageCapabilities.markUnsupported(baseUrl, model) },
         resourceScheduler = resourceScheduler,
-        acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
-        releaseVirtualScreen = deviceProvider::releaseAgentVirtualDisplay,
+        acquireVirtualScreen = { owner -> virtualDisplayProvider.acquireAgentVirtualDisplay(owner) },
+        releaseVirtualScreen = virtualDisplayProvider::releaseAgentVirtualDisplay,
         historyBudget = { baseUrl, model ->
             localHistoryBudgetFor(
                 memoryClassMb = memoryClassMb,
