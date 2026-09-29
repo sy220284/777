@@ -14,7 +14,9 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -66,6 +68,78 @@ class CoreArchitectureTest {
         registry.uninstall("test-plugin")
         assertFalse(registry.isInstalled("test-plugin"))
         assertEquals(null, registry.context.tools.get("echo"))
+    }
+
+
+    @Test
+    fun concurrentDuplicatePluginInstallRunsOnlyOneInstaller() = runTest {
+        val registry = PluginRegistry()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var firstInstalls = 0
+        var secondInstalls = 0
+
+        val firstPlugin = object : HarnessPlugin {
+            override val id = "same-id"
+            override suspend fun install(context: HarnessContext) {
+                firstInstalls += 1
+                entered.complete(Unit)
+                release.await()
+            }
+        }
+        val secondPlugin = object : HarnessPlugin {
+            override val id = "same-id"
+            override suspend fun install(context: HarnessContext) {
+                secondInstalls += 1
+            }
+        }
+
+        val first = async { registry.install(firstPlugin) }
+        entered.await()
+        val second = async { runCatching { registry.install(secondPlugin) } }
+        yield()
+
+        assertFalse(second.isCompleted)
+        release.complete(Unit)
+        first.await()
+        val duplicate = second.await()
+
+        assertTrue(duplicate.isFailure)
+        assertEquals(1, firstInstalls)
+        assertEquals(0, secondInstalls)
+        assertTrue(registry.isInstalled("same-id"))
+    }
+
+    @Test
+    fun uninstallWaitsForInFlightInstallBeforeRunningCleanup() = runTest {
+        val registry = PluginRegistry()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var cleaned = false
+        val plugin = object : HarnessPlugin {
+            override val id = "ordered-plugin"
+            override suspend fun install(context: HarnessContext) {
+                entered.complete(Unit)
+                release.await()
+            }
+
+            override suspend fun uninstall(context: HarnessContext) {
+                cleaned = true
+            }
+        }
+
+        val installing = async { registry.install(plugin) }
+        entered.await()
+        val uninstalling = async { registry.uninstall(plugin.id) }
+        yield()
+
+        assertFalse(uninstalling.isCompleted)
+        release.complete(Unit)
+        installing.await()
+
+        assertTrue(uninstalling.await())
+        assertTrue(cleaned)
+        assertFalse(registry.isInstalled(plugin.id))
     }
 
     @Test
