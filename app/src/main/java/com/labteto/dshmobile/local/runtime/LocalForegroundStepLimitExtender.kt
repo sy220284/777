@@ -16,9 +16,11 @@ internal fun localForegroundStepLimitExtender(
     state: () -> LocalHarnessState,
     pressure: () -> HarnessResourcePressure,
     onExtended: (JsonObject) -> Unit,
+    maxTotalSteps: Int = 512,
 ): AgentStepLimitExtender? {
     if (!enabled) return null
     return AgentStepLimitExtender { currentLimit, stepsUsed ->
+        if (currentLimit >= maxTotalSteps) return@AgentStepLimitExtender null
         val current = state()
         val livePressure = pressure()
         val next = nextAdaptiveAgentStepLimit(
@@ -30,18 +32,19 @@ internal fun localForegroundStepLimitExtender(
             pressure = livePressure,
             kind = LocalAgentRunKind.FOREGROUND,
         )
-        if (next != null && next > currentLimit) {
+        val boundedNext = next?.coerceAtMost(maxTotalSteps)
+        if (boundedNext != null && boundedNext > currentLimit) {
             onExtended(
                 buildJsonObject {
                     put("steps_used", stepsUsed)
                     put("previous_limit", currentLimit)
-                    put("next_limit", next)
+                    put("next_limit", boundedNext)
                     put("context_chars", current.contextChars)
                     put("context_budget_chars", current.contextBudgetChars)
                     put("resource_pressure", livePressure.name.lowercase())
                 },
             )
         }
-        next
+        boundedNext
     }
 }

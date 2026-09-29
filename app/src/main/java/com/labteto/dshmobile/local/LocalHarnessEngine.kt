@@ -3572,13 +3572,21 @@ class LocalHarnessEngine @Inject constructor(
             },
             maxSteps = mainStepLimit,
             stepLimitExtender = localForegroundStepLimitExtender(
-                runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure },
-            ) { runEventLog.append("turn/budget-extended", it) },
+                enabled = runPolicy.allowToolExecution,
+                configuredBase = mainMaxSteps,
+                task = input,
+                state = { runState.value },
+                pressure = { resourceScheduler.snapshot().pressure },
+                onExtended = { runEventLog.append("turn/budget-extended", it) },
+                maxTotalSteps = MAX_FOREGROUND_DYNAMIC_STEPS,
+            ),
             idFactory = { runContext.runId },
         )
 
         try {
-            loop.run(input)
+            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
+                loop.run(input)
+            }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
                 finalChatAssistant?.let { assistantMessage ->
@@ -3593,6 +3601,11 @@ class LocalHarnessEngine @Inject constructor(
                             ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
+            }
+        } catch (timeout: TimeoutCancellationException) {
+            foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
+            runState.update {
+                it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度")
             }
         } catch (_: CancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED

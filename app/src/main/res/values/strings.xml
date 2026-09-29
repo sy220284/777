@@ -177,6 +177,10 @@
     <string name="goal_max_rounds">Max rounds: %1$s</string>
     <string name="plan_mode_on">Plan mode: on</string>
     <string name="plan_mode_off">Plan mode: off</string>
+    <string name="local_plan_review_copy">Copy plan</string>
+    <string name="local_plan_review_regenerate">Regenerate plan</string>
+    <string name="local_plan_review_confirm">Confirm and execute</string>
+    <string name="local_plan_review_decline">Reject plan</string>
     <string name="plan_review_title">Plan ready for review</string>
     <string name="plan_review_approve">Approve</string>
     <string name="plan_review_decline">Decline</string>
