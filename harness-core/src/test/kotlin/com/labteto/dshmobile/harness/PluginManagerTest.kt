@@ -262,6 +262,50 @@ class PluginManagerTest {
     }
 
     @Test
+    fun failedPluginDoesNotPoisonUnrelatedPluginInstallation() = runTest {
+        val registry = PluginRegistry()
+        val manager = manager(
+            definition(
+                id = "broken",
+                version = 1,
+                onInstall = { it.events.register("broken-owner", "old") },
+                onUninstall = { it.events.unregister("broken-owner") },
+            ),
+            definition(
+                id = "independent",
+                onInstall = { it.events.register("independent-owner", "ready") },
+                onUninstall = { it.events.unregister("independent-owner") },
+            ),
+            registry = registry,
+        )
+        manager.install("broken")
+
+        runCatching {
+            manager.replace(
+                definition(
+                    id = "broken",
+                    version = 2,
+                    onInstall = {
+                        it.events.register("broken-owner", "candidate")
+                        error("replacement failed")
+                    },
+                    onUninstall = {
+                        it.events.unregister("broken-owner")
+                        error("cleanup failed")
+                    },
+                ),
+            )
+        }
+
+        assertEquals(
+            PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("broken")?.state,
+        )
+        assertEquals(listOf("independent"), manager.install("independent"))
+        assertEquals("ready", registry.context.events.get("independent-owner"))
+    }
+
+    @Test
     fun replacementCleanupFailureLeavesLifecycleFailedInsteadOfPretendingHealthy() = runTest {
         val registry = PluginRegistry()
         val manager = manager(

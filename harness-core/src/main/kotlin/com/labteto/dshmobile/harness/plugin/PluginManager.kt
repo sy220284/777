@@ -101,12 +101,11 @@ class PluginManager(
 
     fun lifecycleSnapshot(id: String): PluginLifecycleSnapshot? = registry.lifecycleSnapshot(id)
 
-    private fun installedVersions(): Map<String, Int> = registry.ids().associateWith { id ->
-        require(registry.lifecycleSnapshot(id)?.state == PluginLifecycleState.ACTIVE) {
-            "插件运行态异常，不能视为已启用：$id"
+    private fun installedVersions(): Map<String, Int> = registry.ids()
+        .filter { id -> registry.lifecycleSnapshot(id)?.state == PluginLifecycleState.ACTIVE }
+        .associateWith { id ->
+            catalog.descriptor(id)?.version ?: error("已安装插件未登记：$id")
         }
-        catalog.descriptor(id)?.version ?: error("已安装插件未登记：$id")
-    }
 
     private fun activeDependents(id: String): List<String> = registry.ids()
         .filterNot { it == id }
