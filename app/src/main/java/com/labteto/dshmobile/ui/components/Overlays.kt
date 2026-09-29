@@ -193,6 +193,7 @@ fun DsPopupMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     items: List<MenuItem>,
+    focusable: Boolean = true,
 ) {
     val colors = DsTheme.colors
     DropdownMenu(
@@ -202,6 +203,7 @@ fun DsPopupMenu(
         containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, colors.borderL1),
+        properties = PopupProperties(focusable = focusable),
     ) {
         items.forEach { item ->
             DropdownMenuItem(
