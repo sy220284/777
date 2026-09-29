@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
 import java.net.URI
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -56,13 +57,66 @@ class McpToolBridgePlugin(
 ) : HarnessPlugin {
     override val id: String = "mcp-bridge"
 
-    private data class ServerBinding(
+    private class ServerBinding(
         val id: String,
         val transport: String,
         val displayTarget: String,
         val client: McpClient,
         val toolNames: List<String>,
-    )
+    ) {
+        data class DisconnectTicket(
+            val started: Boolean,
+            val drained: CompletableDeferred<Unit>?,
+        )
+
+        private var acceptingCalls = true
+        private var activeCalls = 0
+        private var drained: CompletableDeferred<Unit>? = null
+        private var clientClosed = false
+
+        fun beginCall(): Boolean = synchronized(this) {
+            if (!acceptingCalls) {
+                false
+            } else {
+                activeCalls += 1
+                true
+            }
+        }
+
+        fun endCall() {
+            val completion = synchronized(this) {
+                check(activeCalls > 0) { "MCP 活跃调用计数失衡：$id" }
+                activeCalls -= 1
+                if (activeCalls == 0) drained.also { drained = null } else null
+            }
+            completion?.complete(Unit)
+        }
+
+        fun beginDisconnect(): DisconnectTicket = synchronized(this) {
+            if (!acceptingCalls) {
+                return@synchronized DisconnectTicket(started = false, drained = drained)
+            }
+            acceptingCalls = false
+            val waitForDrain = if (activeCalls == 0) {
+                null
+            } else {
+                CompletableDeferred<Unit>().also { drained = it }
+            }
+            DisconnectTicket(started = true, drained = waitForDrain)
+        }
+
+        fun closeClientOnce() {
+            val shouldClose = synchronized(this) {
+                if (clientClosed) {
+                    false
+                } else {
+                    clientClosed = true
+                    true
+                }
+            }
+            if (shouldClose) client.close()
+        }
+    }
 
     private val mutex = Mutex()
     private val servers = linkedMapOf<String, ServerBinding>()
@@ -157,13 +211,20 @@ class McpToolBridgePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        mutex.withLock {
-            servers.values.toList().forEach { binding ->
-                binding.toolNames.forEach(context.tools::unregister)
-                binding.client.close()
-            }
-            servers.clear()
+        val draining = mutex.withLock {
+            servers.values.toList().map { binding -> binding to binding.beginDisconnect() }
         }
+        draining.forEach { (_, ticket) -> ticket.drained?.await() }
+
+        val owned = mutex.withLock {
+            servers.values.toList().also { bindings ->
+                bindings.forEach { binding ->
+                    binding.toolNames.forEach(context.tools::unregister)
+                }
+                servers.clear()
+            }
+        }
+        owned.forEach(ServerBinding::closeClientOnce)
         MANAGEMENT_TOOLS.forEach(context.tools::unregister)
     }
 
@@ -239,6 +300,14 @@ class McpToolBridgePlugin(
                 "MCP 工具名规范化后发生冲突，请调整服务端工具名"
             }
 
+            val binding = ServerBinding(
+                id = serverId,
+                transport = transport,
+                displayTarget = displayTarget,
+                client = client,
+                toolNames = names,
+            )
+
             definitions.zip(names).forEach { (definition, localName) ->
                 context.tools.register(
                     HarnessTool(
@@ -256,24 +325,28 @@ class McpToolBridgePlugin(
                         approvalPolicy = ToolApprovalPolicy.ALWAYS,
                         timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
                         executor = HarnessToolExecutor { _, input, _ ->
-                            val result = client.callTool(definition.name, input)
-                            ToolResult(
-                                content = result.toString(),
-                                isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
-                            )
+                            if (!binding.beginCall()) {
+                                ToolResult(
+                                    content = "MCP 服务正在断开：$serverId",
+                                    isError = true,
+                                )
+                            } else {
+                                try {
+                                    val result = client.callTool(definition.name, input)
+                                    ToolResult(
+                                        content = result.toString(),
+                                        isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
+                                    )
+                                } finally {
+                                    binding.endCall()
+                                }
+                            }
                         },
                     ),
                 )
                 registered += localName
             }
 
-            val binding = ServerBinding(
-                id = serverId,
-                transport = transport,
-                displayTarget = displayTarget,
-                client = client,
-                toolNames = registered.toList(),
-            )
             servers[serverId] = binding
             buildString {
                 append("已连接 MCP 服务：").append(serverId)
@@ -290,12 +363,29 @@ class McpToolBridgePlugin(
             throw error
         }
     }
-    private suspend fun disconnect(context: HarnessContext, rawId: String): String = mutex.withLock {
+
+    private suspend fun disconnect(context: HarnessContext, rawId: String): String {
         val serverId = validateServerId(rawId)
-        val binding = servers.remove(serverId) ?: return@withLock "MCP 服务未连接：$serverId"
-        binding.toolNames.forEach(context.tools::unregister)
-        binding.client.close()
-        "已断开 MCP 服务：$serverId；卸载工具 ${binding.toolNames.size} 个"
+        val prepared = mutex.withLock {
+            val binding = servers[serverId] ?: return@withLock null
+            binding to binding.beginDisconnect()
+        } ?: return "MCP 服务未连接：$serverId"
+
+        val (binding, ticket) = prepared
+        if (!ticket.started) {
+            ticket.drained?.await()
+            return "MCP 服务正在断开：$serverId"
+        }
+
+        ticket.drained?.await()
+        mutex.withLock {
+            if (servers[serverId] === binding) {
+                binding.toolNames.forEach(context.tools::unregister)
+                servers.remove(serverId)
+            }
+        }
+        binding.closeClientOnce()
+        return "已断开 MCP 服务：$serverId；卸载工具 ${binding.toolNames.size} 个"
     }
 
     private suspend fun listServers(): String = mutex.withLock {
