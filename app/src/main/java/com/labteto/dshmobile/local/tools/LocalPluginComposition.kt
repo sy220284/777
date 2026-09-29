@@ -25,6 +25,7 @@ import com.labteto.dshmobile.local.LocalBuiltinPlugin
 import com.labteto.dshmobile.local.LocalToolCall
 import com.labteto.dshmobile.local.LocalVisionPlugin
 import com.labteto.dshmobile.local.LocalVisionRoute
+import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.VisionClient
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
@@ -63,6 +64,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider: () -> LocalVisionRoute?,
         imageSupportProvider: (LocalVisionRoute) -> Boolean?,
         executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> String,
+        usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
     ): LocalPluginComposition = LocalPluginComposition(
         context = context,
         apiKeys = apiKeys,
@@ -81,6 +83,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider = routeProvider,
         imageSupportProvider = imageSupportProvider,
         executeBuiltin = executeBuiltin,
+        usageContextProvider = usageContextProvider,
     )
 }
 
@@ -102,6 +105,7 @@ internal class LocalPluginComposition(
     routeProvider: () -> LocalVisionRoute?,
     imageSupportProvider: (LocalVisionRoute) -> Boolean?,
     executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> String,
+    usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
 ) {
     val tools = ToolRegistry()
     private val registry = PluginRegistry(HarnessContext(tools = tools))
@@ -144,6 +148,7 @@ internal class LocalPluginComposition(
         analyzer = visionClient,
         workspaceRoot = workspaceRoot,
         imageSupportProvider = imageSupportProvider,
+        usageContextProvider = usageContextProvider,
     )
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)

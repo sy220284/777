@@ -1217,4 +1217,6 @@
     <string name="local_attachment_image">图片</string>
     <string name="local_attachment_file">文件</string>
     <string name="local_run_agents">智能体 %1$d</string>
+    <string name="usage_show_all">查看全部 %1$d 项</string>
+    <string name="usage_show_recent">只看最近项目</string>
 </resources>

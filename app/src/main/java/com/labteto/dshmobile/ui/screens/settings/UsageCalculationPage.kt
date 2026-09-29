@@ -96,6 +96,9 @@ internal fun UsageCalculationPage(
 ) {
     var modeIndex by rememberSaveable { mutableIntStateOf(0) }
     var rangeIndex by rememberSaveable { mutableIntStateOf(0) }
+    var showAllGroups by rememberSaveable(modeIndex) {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
     var selectedEpochDay by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
     val mode = if (modeIndex == 0) LocalUsageMode.CHAT else LocalUsageMode.WORK
     val modeAnalytics = if (mode == LocalUsageMode.CHAT) analytics.chat else analytics.work
@@ -198,7 +201,7 @@ internal fun UsageCalculationPage(
             color = colors.bgLayer1,
         ) {
             Column {
-                val visibleGroups = groups.take(12)
+                val visibleGroups = if (showAllGroups) groups else groups.take(12)
                 visibleGroups.forEachIndexed { index, group ->
                     UsageGroupRow(
                         group = group,
@@ -217,6 +220,18 @@ internal fun UsageCalculationPage(
                     if (index != visibleGroups.lastIndex) UsageDivider()
                 }
             }
+        }
+        if (groups.size > 12) {
+            DsButton(
+                text = if (showAllGroups) {
+                    stringResource(R.string.usage_show_recent)
+                } else {
+                    stringResource(R.string.usage_show_all, groups.size)
+                },
+                onClick = { showAllGroups = !showAllGroups },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
