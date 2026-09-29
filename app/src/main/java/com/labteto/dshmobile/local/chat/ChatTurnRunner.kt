@@ -45,11 +45,19 @@ class ChatTurnRunner @Inject constructor(
         storyContext: String? = null,
     ): ChatTurnContext {
         if (persona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
+            val continuationPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
+                """
+                【对话连续性摘要｜已发生】
+                ${it.take(MAX_STORY_CONTEXT_CHARS)}
+                以上只用于衔接当前对话；除非用户追问，不主动复述旧内容。
+                """.trimIndent()
+            }.orEmpty()
             return ChatTurnContext(
                 persona = persona,
                 stablePrompt = UNBOUND_CHAT_PROMPT,
                 dynamicPrompt = listOf(
                     renderChatContextForModel(context),
+                    continuationPrompt,
                     renderChatTurnModeForModel(userInput),
                 ).filter(String::isNotBlank).joinToString("\n\n"),
             )
