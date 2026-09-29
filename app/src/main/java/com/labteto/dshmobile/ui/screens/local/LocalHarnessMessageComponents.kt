@@ -67,14 +67,12 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
@@ -165,42 +163,45 @@ internal fun LocalMessageRow(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                Box {
-                    Box(
-                        modifier = Modifier.combinedClickable(
-                            onClick = {},
-                            onLongClick = { actionsOpen = true },
-                        ),
+                Box(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { actionsOpen = false },
+                        onLongClick = { actionsOpen = true },
+                    ),
+                ) {
+                    UserBubble(message.content)
+                }
+                if (actionsOpen) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        UserBubble(message.content)
+                        if (canEdit) {
+                            DsButton(
+                                text = stringResource(R.string.local_edit_user_message),
+                                onClick = {
+                                    actionsOpen = false
+                                    onEdit(message)
+                                },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                                icon = FeatherIcons.Edit3,
+                            )
+                        }
+                        if (copyText.isNotBlank()) {
+                            DsButton(
+                                text = stringResource(R.string.common_copy),
+                                onClick = {
+                                    actionsOpen = false
+                                    clipboard.setText(AnnotatedString(copyText))
+                                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                                icon = Icons.Outlined.ContentCopy,
+                            )
+                        }
                     }
-                    DsPopupMenu(
-                        expanded = actionsOpen,
-                        onDismiss = { actionsOpen = false },
-                        items = buildList {
-                            if (canEdit) {
-                                add(
-                                    MenuItem(
-                                        text = stringResource(R.string.local_edit_user_message),
-                                        icon = FeatherIcons.Edit3,
-                                        onClick = { onEdit(message) },
-                                    ),
-                                )
-                            }
-                            if (copyText.isNotBlank()) {
-                                add(
-                                    MenuItem(
-                                        text = stringResource(R.string.common_copy),
-                                        icon = Icons.Outlined.ContentCopy,
-                                        onClick = {
-                                            clipboard.setText(AnnotatedString(copyText))
-                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                                        },
-                                    ),
-                                )
-                            }
-                        },
-                    )
                 }
                 if (chatMode) {
                     Row(
