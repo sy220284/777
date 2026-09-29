@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +38,7 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -228,41 +234,49 @@ internal fun ExecutionStatusCard(
                                         size = DsButtonSize.Small,
                                     )
                                 }
-                                if (expanded) {
-                                    Text(
-                                        stringResource(R.string.local_run_job_output),
-                                        style = DsType.caption11Strong,
-                                        color = colors.labelTertiary,
-                                    )
-                                    Text(
-                                        expandedJobOutput.ifBlank {
-                                            stringResource(R.string.local_run_job_output_empty)
-                                        },
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                        maxLines = 12,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End,
+                                AnimatedVisibility(
+                                    visible = expanded,
+                                    enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
+                                    exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+                                ) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                                     ) {
-                                        DsButton(
-                                            text = stringResource(R.string.local_run_job_refresh),
-                                            onClick = { expandedJobOutput = onJobOutput(job.id) },
-                                            variant = DsButtonVariant.Ghost,
-                                            size = DsButtonSize.Small,
+                                        Text(
+                                            stringResource(R.string.local_run_job_output),
+                                            style = DsType.caption11Strong,
+                                            color = colors.labelTertiary,
                                         )
-                                        if (job.status == "running") {
+                                        Text(
+                                            expandedJobOutput.ifBlank {
+                                                stringResource(R.string.local_run_job_output_empty)
+                                            },
+                                            style = DsType.caption11,
+                                            color = colors.labelSecondary,
+                                            maxLines = 12,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                        ) {
                                             DsButton(
-                                                text = stringResource(R.string.local_run_job_stop),
-                                                onClick = {
-                                                    onStopJob(job.id)
-                                                    expandedJobOutput = onJobOutput(job.id)
-                                                },
-                                                variant = DsButtonVariant.Danger,
+                                                text = stringResource(R.string.local_run_job_refresh),
+                                                onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                                variant = DsButtonVariant.Ghost,
                                                 size = DsButtonSize.Small,
                                             )
+                                            if (job.status == "running") {
+                                                DsButton(
+                                                    text = stringResource(R.string.local_run_job_stop),
+                                                    onClick = {
+                                                        onStopJob(job.id)
+                                                        expandedJobOutput = onJobOutput(job.id)
+                                                    },
+                                                    variant = DsButtonVariant.Danger,
+                                                    size = DsButtonSize.Small,
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -294,7 +308,11 @@ internal fun ExecutionStatusCard(
                 variant = DsButtonVariant.Ghost,
                 size = DsButtonSize.Small,
             )
-            if (technicalDetailsExpanded) {
+            AnimatedVisibility(
+                visible = technicalDetailsExpanded,
+                enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
+                exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
                     Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
