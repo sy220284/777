@@ -82,6 +82,11 @@ sealed interface QuestionOutcome {
 /** The refusal that means the request this answer addressed is already over. */
 internal const val NOT_PENDING: String = "not-pending"
 
+internal fun approvalResponseMatchesSession(
+    requestSessionId: String,
+    responseSessionId: String,
+): Boolean = requestSessionId == responseSessionId
+
 /**
  * Whether [outcome] means this client is done holding the request it answered.
  *
