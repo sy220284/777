@@ -1484,7 +1484,6 @@ class LocalHarnessEngine @Inject constructor(
             previousGeneration = previousGeneration,
         )
         val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity)
-
         val editedModelMessage = editedChatUserModelMessage(
             eventLog = eventLog,
             originalMessageId = messageId,
