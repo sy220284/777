@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
-import android.util.Log
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -77,7 +77,7 @@ internal object BundledRuntimeLibraryStore {
         }
 
         pruneUnusedSharedBlobs(context, abi, sharedDir)
-        Log.i(
+        AppLog.info(
             TAG,
             "materialized " + runtime + "/" + abi +
                 ": aliases=" + entries.size + ", hardlinks=" + linked + ", copies=" + copied,
