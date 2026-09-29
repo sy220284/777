@@ -302,27 +302,32 @@ class HarnessJobManager(
         }
     }
 
-    fun list(): String = snapshotRecords().let { snapshot ->
+    fun list(ownerId: String? = null): String = snapshotRecords(ownerId).let { snapshot ->
         if (snapshot.isEmpty()) "没有后台任务"
         else snapshot.joinToString("\n") { "${it.id} [${it.status}] ${publicLabel(it.label)}" }
     }
 
-    fun listAgents(): String = synchronized(lock) {
-        records.values.filter { it.label.startsWith(AGENT_PREFIX) }.map {
-            "${it.id} [${it.status}] ${it.label.removePrefix(AGENT_PREFIX)}"
-        }
+    fun listAgents(ownerId: String? = null): String = synchronized(lock) {
+        records.values
+            .filter { ownerId == null || it.ownerId == ownerId }
+            .filter { it.label.startsWith(AGENT_PREFIX) }
+            .map { "${it.id} [${it.status}] ${it.label.removePrefix(AGENT_PREFIX)}" }
     }.let { if (it.isEmpty()) "没有后台代理" else it.joinToString("\n") }
 
-    fun output(id: String): String {
+    fun output(id: String, ownerId: String? = null): String {
         return synchronized(lock) {
-            val record = records[id] ?: return "后台任务不存在：$id"
+            val record = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: return "后台任务不存在：$id"
             "${record.id} [${record.status}] ${publicLabel(record.label)}\n${record.output.ifBlank { "暂无输出" }}"
         }
     }
 
-    fun kill(id: String): String {
+    fun kill(id: String, ownerId: String? = null): String {
         val job = synchronized(lock) {
-            val record = records[id] ?: return "后台任务不存在：$id"
+            val record = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: return "后台任务不存在：$id"
             if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
             record.status = "cancelled"
             record.output = "任务已取消"
@@ -334,11 +339,13 @@ class HarnessJobManager(
         return "已停止后台任务：$id"
     }
 
-    fun send(id: String, message: String): String {
+    fun send(id: String, message: String, ownerId: String? = null): String {
         val clean = message.trim()
         require(clean.isNotEmpty()) { "消息不能为空" }
         synchronized(lock) {
-            val record = records[id] ?: return "后台代理不存在：$id"
+            val record = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: return "后台代理不存在：$id"
             if (record.status != "running" || !record.label.startsWith(AGENT_PREFIX)) {
                 return "目标不是正在运行的后台代理：$id"
             }
@@ -416,8 +423,10 @@ class HarnessJobManager(
         }
     }
 
-    private fun snapshotRecords(): List<JobInfo> = synchronized(lock) {
-        records.values.map { JobInfo(it.id, it.label, it.status, it.ownerId) }
+    private fun snapshotRecords(ownerId: String? = null): List<JobInfo> = synchronized(lock) {
+        records.values
+            .filter { ownerId == null || it.ownerId == ownerId }
+            .map { JobInfo(it.id, it.label, it.status, it.ownerId) }
     }
 
     // Old snapshots may still contain a full shell command, including credentials.
