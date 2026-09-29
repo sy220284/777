@@ -33,13 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationFiles
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.components.DsFullScreenDialog
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -98,9 +97,8 @@ internal fun LocalWorkspaceFilesDialog(
 
     LaunchedEffect(mode, sessionId) { reload() }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    DsFullScreenDialog(
+        onDismiss = onDismiss,
     ) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
