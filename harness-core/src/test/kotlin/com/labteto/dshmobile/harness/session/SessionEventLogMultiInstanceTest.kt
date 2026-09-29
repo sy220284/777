@@ -110,4 +110,26 @@ class SessionEventLogMultiInstanceTest {
         }
     }
 
+    @Test
+    fun latestSequenceTracksOtherLiveInstancesAndClear() {
+        val root = createTempDir(prefix = "session-log-latest-sequence-")
+        try {
+            val file = File(root, "session.events.jsonl")
+            val first = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })
+            val second = SessionEventLog(file, json, maxBytes = 4_096, clock = { 2L })
+
+            assertEquals(-1L, first.latestSequence())
+            assertEquals(0L, second.append("test/one", buildJsonObject { put("value", 1) }).sequence)
+            assertEquals(0L, first.latestSequence())
+
+            assertEquals(1L, first.append("test/two", buildJsonObject { put("value", 2) }).sequence)
+            assertEquals(1L, second.latestSequence())
+
+            first.clear()
+            assertEquals(-1L, second.latestSequence())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 }
