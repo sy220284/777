@@ -1150,7 +1150,7 @@
 
     <string name="local_character_tuning_open">角色调节</string>
     <string name="local_character_tuning_title">角色调节</string>
-    <string name="local_character_tuning_subtitle">调节她在当前故事里的相处方式，不会改写已经发生的关系和共同经历。</string>
+    <string name="local_character_tuning_subtitle">调节角色在当前故事里的相处方式，不会改写已经发生的关系和共同经历。</string>
     <string name="local_character_tuning_preset_title">相处模式</string>
     <string name="local_character_tuning_preset_natural">自然相处</string>
     <string name="local_character_tuning_preset_slow">慢热</string>
@@ -1183,7 +1183,7 @@
     <string name="local_character_tuning_mood">心情</string>
     <string name="local_character_tuning_growth_initiative">长期主动</string>
     <string name="local_character_tuning_growth_openness">表达开放</string>
-    <string name="local_character_tuning_growth_security">关系安全感</string>
+    <string name="local_character_tuning_growth_security">关系安全感</string>\n    <string name="local_character_tuning_security_low">谨慎</string>\n    <string name="local_character_tuning_security_high">安稳</string>
     <string name="local_character_tuning_advanced">高级调节</string>
     <string name="local_character_tuning_novelty">互动新鲜度</string>
     <string name="local_character_tuning_novelty_low">保持习惯</string>
