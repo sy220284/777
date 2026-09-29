@@ -383,7 +383,9 @@ class TokenUsageAnalyticsStore @Inject constructor(
                     work.add(record)
                     day.work.add(record)
                     workActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-                    record.context.runId?.takeIf(String::isNotBlank)?.let { runId ->
+                    val taskRunId = record.context.parentRunId?.takeIf(String::isNotBlank)
+                        ?: record.context.runId?.takeIf(String::isNotBlank)
+                    taskRunId?.let { runId ->
                         workRuns += runId
                         taskGroups.getOrPut(runId) {
                             MutableGroup(
@@ -446,7 +448,8 @@ class TokenUsageAnalyticsStore @Inject constructor(
         val records = allRecords().filter { record ->
             when (kind) {
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
-                TokenUsageGroupKind.TASK -> record.context.runId == key
+                TokenUsageGroupKind.TASK ->
+                    record.context.parentRunId == key || record.context.runId == key
             }
         }.toList()
         if (records.isEmpty()) return null
@@ -578,9 +581,16 @@ private class MutableGroup(
 
     fun add(record: TokenUsageRecord) {
         aggregate.add(record)
-        if (title.isBlank()) {
+        val preferredTaskTitle = record.context.taskLabel?.takeIf(String::isNotBlank)
+        if (
+            mode == LocalUsageMode.WORK &&
+            record.context.runKind != LocalAgentRunKind.SUBAGENT.name.lowercase() &&
+            preferredTaskTitle != null
+        ) {
+            title = preferredTaskTitle
+        } else if (title.isBlank()) {
             title = record.context.sessionTitle?.takeIf(String::isNotBlank)
-                ?: record.context.taskLabel?.takeIf(String::isNotBlank)
+                ?: preferredTaskTitle
                 ?: title
         }
         record.context.turnId?.takeIf(String::isNotBlank)?.let(turns::add)
