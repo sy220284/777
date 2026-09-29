@@ -102,7 +102,7 @@ internal class LocalSessionLifecycleCoordinator(
                         sourceState.usageMode == LocalUsageMode.WORK && sourceState.running
                     if (!preserveWorkRun) {
                         cancelActiveRunAndJoin()
-                        jobs.stopNonPersistentAndJoin()
+                        jobs.stopOwnedAndJoin(setOf(sourceId))
                     }
                     persist()
 
@@ -367,7 +367,7 @@ internal class LocalSessionLifecycleCoordinator(
             transitionMutex.withLock {
                 cancelActiveRunAndJoin()
                 cancelWorkRunsAndJoin(requestedIds)
-                jobs.stopNonPersistentAndJoin()
+                jobs.stopOwnedAndJoin(requestedIds)
                 persist()
                 val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
