@@ -181,6 +181,15 @@ internal object FeatherIcons {
         }
     }
 
+    /** `user` — simple character/person affordance used by roleplay controls. */
+    val User: ImageVector by lazy {
+        feather("User") {
+            circle(12f, 8f, 4f)
+            moveTo(4f, 21f)
+            arcToRelative(8f, 8f, 0f, isMoreThanHalf = false, isPositiveArc = true, 16f, 0f)
+        }
+    }
+
     /** `chevron-right` — disclosure affordance; rotates to 90° when open. */
     val ChevronRight: ImageVector by lazy {
         feather("ChevronRight") {

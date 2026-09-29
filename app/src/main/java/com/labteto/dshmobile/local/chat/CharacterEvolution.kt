@@ -37,12 +37,14 @@ internal fun evolveCharacterEvolution(
         target = current.initiative,
         momentum = seeded.initiativeMomentum,
         weight = weight,
+        tuning = previous.behaviorTuning,
     )
     val openness = evolveAxis(
         baseline = seeded.opennessBaseline,
         target = current.shareDesire,
         momentum = seeded.opennessMomentum,
         weight = weight,
+        tuning = previous.behaviorTuning,
     )
     val currentSecurity = relationshipSecurity(current.dynamics)
     val security = evolveAxis(
@@ -50,6 +52,7 @@ internal fun evolveCharacterEvolution(
         target = currentSecurity,
         momentum = seeded.securityMomentum,
         weight = weight,
+        tuning = previous.behaviorTuning,
     )
 
     val hasEvolutionSignal =
@@ -122,6 +125,7 @@ private fun evolveAxis(
     target: Int,
     momentum: Int,
     weight: Int,
+    tuning: CharacterBehaviorTuning,
 ): EvolutionAxis {
     val safeBaseline = baseline.coerceIn(0, 100)
     val safeTarget = target.coerceIn(0, 100)
@@ -134,12 +138,14 @@ private fun evolveAxis(
     val alignedMomentum = if (momentum == 0 || momentum.sign() == direction) momentum else 0
     val nextMomentum = (alignedMomentum + direction * weight)
         .coerceIn(-MAX_EVOLUTION_MOMENTUM, MAX_EVOLUTION_MOMENTUM)
-    val threshold = if (weight >= 2) MAJOR_EVOLUTION_THRESHOLD else MINOR_EVOLUTION_THRESHOLD
+    val threshold = ((if (weight >= 2) MAJOR_EVOLUTION_THRESHOLD else MINOR_EVOLUTION_THRESHOLD) +
+        tuning.evolutionThresholdOffset()).coerceAtLeast(1)
     if (abs(nextMomentum) < threshold) {
         return EvolutionAxis(safeBaseline, nextMomentum)
     }
 
-    val maxStep = if (weight >= 2) MAJOR_EVOLUTION_STEP else MINOR_EVOLUTION_STEP
+    val maxStep = ((if (weight >= 2) MAJOR_EVOLUTION_STEP else MINOR_EVOLUTION_STEP) +
+        tuning.evolutionStepBonus()).coerceAtLeast(1)
     val step = minOf(abs(gap), maxStep)
     return EvolutionAxis(
         baseline = (safeBaseline + direction * step).coerceIn(0, 100),

@@ -50,7 +50,9 @@ internal fun ChatSurfaceHeader(
     groupMembers: List<LocalGroupChatMember>,
     activeSpeakerName: String?,
     running: Boolean,
+    behaviorTuningCustomized: Boolean,
     onContextClick: () -> Unit,
+    onOpenCharacterTuning: () -> Unit,
     onExitGroupChat: () -> Unit,
     onNewSession: () -> Unit,
     sessionPinned: Boolean,
@@ -64,65 +66,81 @@ internal fun ChatSurfaceHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = DsSpacing.touchTarget)
-                .clip(DsShapes.row)
-                .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
-                .semantics(mergeDescendants = true) { }
-                .padding(horizontal = DsSpacing.small),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            if (!groupEnabled) {
-                LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
-                    style = DsType.base16Strong,
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (groupEnabled) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        groupMembers.take(6).forEach { member ->
-                            GroupChatMemberAvatar(
-                                member = member,
-                                active = activeSpeakerName == member.displayName,
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = DsSpacing.touchTarget)
+                    .clip(DsShapes.row)
+                    .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
+                    .semantics(mergeDescendants = true) { }
+                    .padding(horizontal = DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                if (!groupEnabled) {
+                    LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
+                        style = DsType.base16Strong,
+                        color = colors.labelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (groupEnabled) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            groupMembers.take(6).forEach { member ->
+                                GroupChatMemberAvatar(
+                                    member = member,
+                                    active = activeSpeakerName == member.displayName,
+                                )
+                            }
+                            Text(
+                                activeSpeakerName?.let { speaker ->
+                                    stringResource(R.string.local_group_chat_active_speaker, speaker)
+                                } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
+                                style = DsType.caption11,
+                                color = colors.labelSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
                             )
                         }
+                    } else if (secondary.isNotBlank()) {
                         Text(
-                            activeSpeakerName?.let { speaker ->
-                                stringResource(R.string.local_group_chat_active_speaker, speaker)
-                            } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
+                            secondary,
                             style = DsType.caption11,
                             color = colors.labelSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
                         )
                     }
-                } else if (secondary.isNotBlank()) {
-                    Text(
-                        secondary,
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 }
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = colors.labelSecondary,
+                    modifier = Modifier.size(16.dp),
+                )
             }
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = null,
-                tint = colors.labelSecondary,
-                modifier = Modifier.size(16.dp),
-            )
+            if (!groupEnabled) {
+                DsIconButton(
+                    icon = FeatherIcons.User,
+                    contentDescription = stringResource(R.string.local_character_tuning_open),
+                    onClick = onOpenCharacterTuning,
+                    enabled = !running,
+                    tint = if (behaviorTuningCustomized) colors.characterAccent else colors.labelSecondary,
+                    iconSize = 18.dp,
+                    containerColor = if (behaviorTuningCustomized) colors.characterAccentTertiary else androidx.compose.ui.graphics.Color.Transparent,
+                )
+            }
         }
         if (groupEnabled) {
             DsButton(
