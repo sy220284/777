@@ -553,7 +553,7 @@ class LocalHarnessEngine @Inject constructor(
             imageCapabilities = imageCapabilities,
             usageTracker = usageTracker,
             resourceScheduler = resourceScheduler,
-            deviceProvider = deviceProvider,
+            virtualDisplayProvider = deviceProvider,
             memoryClassMb = memoryClassMb,
             agentRunCoordinator = agentRunCoordinator,
             contextComposer = contextComposer,
@@ -777,15 +777,19 @@ class LocalHarnessEngine @Inject constructor(
                 bundledNodeRuntime.prepare()
                 bundledPythonRuntime.prepare()
                 bundledGitRuntime.prepare()
-                pluginRegistry.install(builtinPlugin)
-                pluginRegistry.install(runtimePlugin)
-                pluginRegistry.install(mcpPlugin)
-                pluginRegistry.install(githubPlugin)
-                pluginRegistry.install(lspPlugin)
-                pluginRegistry.install(devicePlugin)
-                pluginRegistry.install(visionPlugin)
-                pluginRegistry.install(automationPlugin)
-                pluginRegistry.install(webhookPlugin)
+                pluginRegistry.installAll(
+                    listOf(
+                        builtinPlugin,
+                        runtimePlugin,
+                        mcpPlugin,
+                        githubPlugin,
+                        lspPlugin,
+                        devicePlugin,
+                        visionPlugin,
+                        automationPlugin,
+                        webhookPlugin,
+                    ),
+                )
                 load()
                 startNextQueuedTurnIfIdle()?.start()
                 scheduleInterruptedSafeJobs()
