@@ -95,3 +95,23 @@ internal suspend fun cancelWorkRunsForDeletedSessions(
         }
     }
 }
+
+
+internal fun projectJobSnapshotToSessionStates(
+    jobs: List<LocalJobInfo>,
+    visibleState: MutableStateFlow<LocalHarnessState>,
+    activeRuns: ConcurrentHashMap<String, LocalWorkRunBinding>,
+) {
+    visibleState.update { current ->
+        current.copy(
+            jobs = projectExecutionJobs(current.usageMode, current.sessionId, jobs),
+        )
+    }
+    activeRuns.forEach { (sessionId, binding) ->
+        binding.state.update { current ->
+            current.copy(
+                jobs = projectExecutionJobs(current.usageMode, sessionId, jobs),
+            )
+        }
+    }
+}
