@@ -140,6 +140,14 @@ new UI/worker code may not depend on it directly. High-frequency streaming previ
 `StateFlow`, so token updates do not rewrite the aggregate runtime snapshot. Settings, Tasks and
 the app shell consume narrow projections with `distinctUntilChanged`.
 
+Startup plugins are installed as one atomic lifecycle batch: a failed plugin rolls the registries
+and already-installed members of that batch back to the pre-startup surface. Individual lifecycle
+failures also restore registry state and remain observable through `PluginLifecycleSnapshot`.
+Platform-specific providers may be constructed in the composition root, but downstream agent code
+depends on capability contracts such as `HarnessVirtualDisplayProvider`, not Android classes.
+Dynamic MCP disconnects first stop admitting new calls, drain in-flight calls, then unregister tools
+and close the transport so hot-unplug cannot invalidate an executing tool.
+
 The remote `SessionStore` remains the single lock/stream orchestration owner by design. Mutable
 session index, open-session fold state and remote stream lifetime already live in
 `SessionIndexState`, `OpenSessionFoldState` and `SessionRemoteStreamCoordinator`; splitting the
