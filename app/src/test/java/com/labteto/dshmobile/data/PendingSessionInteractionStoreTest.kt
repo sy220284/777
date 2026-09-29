@@ -74,4 +74,27 @@ class PendingSessionInteractionStoreTest {
         toolName = "write",
         reason = null,
     )
+
+    @Test
+    fun permissionChangesStayOwnedByTheirSessions() {
+        val store = PendingSessionInteractionStore()
+        store.installPermission("session-a", "safe")
+        store.installPermission("session-b", "full")
+
+        assertEquals("safe", store.permissionForSession("session-a"))
+        assertEquals("full", store.permissionForSession("session-b"))
+    }
+
+    @Test
+    fun latePermissionFailureCannotClearNewerPermissionForSameSession() {
+        val store = PendingSessionInteractionStore()
+        store.installPermission("session-a", "safe")
+        store.installPermission("session-a", "full")
+
+        assertFalse(store.forgetPermission("session-a", "safe"))
+        assertEquals("full", store.permissionForSession("session-a"))
+        assertTrue(store.forgetPermission("session-a", "full"))
+        assertNull(store.permissionForSession("session-a"))
+    }
+
 }
