@@ -280,4 +280,25 @@ class LocalMultimodalTest {
             0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
         )
     }
+
+    @Test
+    fun boundedImageReadRejectsBytesBeyondFinalStreamLimit() {
+        val root = createTempDir(prefix = "multimodal-bounded-read-")
+        try {
+            val file = File(root, "image.bin").apply {
+                writeBytes(ByteArray(33) { 1 })
+            }
+
+            val failure = runCatching {
+                readLocalImageBytesBounded(file, 32)
+            }.exceptionOrNull()
+
+            assertTrue(failure is IllegalArgumentException)
+            assertTrue(failure?.message.orEmpty().contains("直传上限"))
+            assertEquals(33L, file.length())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 }
