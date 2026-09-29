@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.runtime
 
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolContext
 import java.io.File
 import kotlinx.coroutines.delay
@@ -140,4 +142,54 @@ class AndroidRuntimePluginTest {
             outside.deleteRecursively()
         }
     }
+
+    @Test
+    fun readingFinalOutputReleasesTerminalLeaseWithoutStatusOrExplicitClose() = runBlocking {
+        val root = createTempDir(prefix = "runtime-terminal-lease-")
+        try {
+            val scheduler = HarnessResourceScheduler(
+                HarnessResourceBudget(
+                    maxModelRequests = 1,
+                    maxAgents = 1,
+                    maxTerminals = 1,
+                ),
+            )
+            val registry = PluginRegistry()
+            registry.install(AndroidRuntimePlugin(root, resourceScheduler = scheduler))
+            val approval = ToolContext(approval = { true })
+
+            val opened = registry.context.tools.execute(
+                "terminal_open",
+                buildJsonObject {
+                    put("command", buildJsonArray {
+                        add("sh")
+                        add("-c")
+                        add("printf lease-tail")
+                    })
+                },
+                context = approval,
+            )
+            assertFalse(opened.isError)
+            val sessionId = opened.content.trim()
+            assertTrue(scheduler.snapshot().activeTerminals == 1)
+
+            var output = ""
+            repeat(100) {
+                val read = registry.context.tools.execute(
+                    "terminal_read",
+                    buildJsonObject { put("session_id", sessionId) },
+                )
+                if (!read.isError) output += read.content
+                if (output.contains("lease-tail") && scheduler.snapshot().activeTerminals == 0) return@repeat
+                delay(10)
+            }
+
+            assertTrue(output.contains("lease-tail"))
+            assertTrue(scheduler.snapshot().activeTerminals == 0)
+            assertTrue(scheduler.snapshot().leases.isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 }
