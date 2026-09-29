@@ -227,6 +227,32 @@ class LocalVisionPluginTest {
     }
 
     @Test
+    fun workspaceImageMissingConfigurationUsesCurrentModelWording() = runTest {
+        val registry = PluginRegistry()
+        registry.install(
+            LocalVisionPlugin(
+                device = RecordingDevice(),
+                keyProvider = { null },
+                routeProvider = { null },
+                analyzer = RecordingAnalyzer(),
+            ),
+        )
+
+        val result = registry.context.tools.execute(
+            name = "vision_analyze_file",
+            input = buildJsonObject {
+                put("path", "shot.png")
+                put("prompt", "分析")
+            },
+            context = ToolContext(approval = { true }),
+        )
+
+        assertTrue(result.isError)
+        assertTrue(result.content.contains("当前模型尚未配置"))
+        assertFalse(result.content.contains("视觉模型"))
+    }
+
+    @Test
     fun virtualScreenCannotUploadWithoutApproval() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()
