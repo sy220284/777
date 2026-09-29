@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -37,6 +38,8 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
  * Chat, group chat, work and remote sessions all use this shell so their idle/focused height,
  * outer margins, radius, border and action sizing cannot drift independently.
  */
+const val DS_CONVERSATION_COMPOSER_TAG = "ds-conversation-composer"
+
 object DsComposerMetrics {
     val actionTouchTarget = 40.dp
     val actionVisualSize = 32.dp
@@ -58,6 +61,7 @@ fun DsConversationComposer(
     val colors = DsTheme.colors
     Surface(
         modifier = modifier
+            .testTag(DS_CONVERSATION_COMPOSER_TAG)
             .fillMaxWidth()
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
             .animateContentSize(),
