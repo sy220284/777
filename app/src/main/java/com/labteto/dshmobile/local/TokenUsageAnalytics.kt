@@ -80,6 +80,12 @@ data class TokenUsageContext(
     val action: TokenUsageAction = TokenUsageAction.OTHER,
 )
 
+data class ForegroundTokenUsageSeed(
+    val turnId: String? = null,
+    val runId: String? = null,
+    val taskLabel: String? = null,
+)
+
 @Serializable
 data class TokenUsageRecord(
     val requestId: String,
