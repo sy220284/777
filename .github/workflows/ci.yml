@@ -192,8 +192,8 @@ jobs:
           adb install -r app/build/outputs/apk/optimized/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-  # This job is the single required status for protected main merges.
-  # Repository settings must require "CI / merge-gate"; skipped or cancelled dependencies fail here.
+  # 统一合并门禁：main 分支保护只需依赖这一项状态检查。
+  # 仓库设置需将 “CI / merge-gate” 设为必需检查；任何失败、取消或跳过都会在这里收口为失败。
   merge-gate:
     if: always()
     needs:
