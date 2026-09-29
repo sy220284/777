@@ -195,6 +195,25 @@ if "fun pageBefore(" not in event_log or "forEachEventReverseUnsafe" not in even
 if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")
 
+persist_match = re.search(
+    r"private fun persist\(binding: LocalWorkRunBinding\? = null\) \{(.*?)\n    \}",
+    engine,
+    re.S,
+)
+if persist_match is None:
+    violations.append("LocalHarnessEngine must keep the session snapshot persistence boundary")
+else:
+    persist_body = persist_match.group(1)
+    control_pos = persist_body.find("val controlProjectedThroughSequence = log.latestSequence()")
+    transcript_pos = persist_body.find("val transcriptProjectedThroughSequence")
+    state_pos = persist_body.find("val state = binding?.state?.value ?: _state.value")
+    if min(control_pos, transcript_pos, state_pos) < 0 or not (
+        control_pos < state_pos and transcript_pos < state_pos
+    ):
+        violations.append(
+            "Session snapshot persistence must capture durable projection cursors before reading mutable state"
+        )
+
 if "parse(synthetic.toString())" in deepseek:
     violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
 
