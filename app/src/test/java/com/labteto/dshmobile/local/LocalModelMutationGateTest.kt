@@ -12,7 +12,7 @@ import org.junit.Test
 class LocalModelMutationGateTest {
     @Test
     fun secondMutationCannotEnterBeforeFirstLeaves() = runTest {
-        val gate = LocalModelMutationGate()
+        val gate = LocalModelMutationGate
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         var secondEntered = false
@@ -40,7 +40,7 @@ class LocalModelMutationGateTest {
 
     @Test
     fun mutationStormNeverOverlapsCriticalSection() = runTest {
-        val gate = LocalModelMutationGate()
+        val gate = LocalModelMutationGate
         var active = 0
         var maxActive = 0
         var completed = 0
