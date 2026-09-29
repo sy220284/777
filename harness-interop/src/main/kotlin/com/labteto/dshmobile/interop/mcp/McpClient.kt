@@ -156,61 +156,6 @@ class McpStreamableHttpTransport(
     }
 }
 
-class McpStdioTransport(
-    private val command: List<String>,
-    private val json: Json,
-    private val workingDirectory: File? = null,
-    private val protocolVersion: String = CURRENT_MCP_PROTOCOL_VERSION,
-    private val clientName: String = "777-android",
-    private val clientVersion: String = "1",
-    private val commandResolver: (List<String>) -> List<String> = { it },
-    private val environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport {
-    private val ids = AtomicLong(1L)
-    private val mutex = Mutex()
-    private val lineProcess = McpLineProcess(
-        command = command,
-        workingDirectory = workingDirectory,
-        commandResolver = commandResolver,
-        environmentProvider = environmentProvider,
-    )
-
-    override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
-        try {
-            lineProcess.ensureStarted()
-            val id = ids.getAndIncrement()
-            val payload = buildJsonObject {
-                put("jsonrpc", "2.0")
-                put("id", id)
-                put("method", method)
-                put(
-                    "params",
-                    params.withMetadata(
-                        protocolVersion = protocolVersion,
-                        clientName = clientName,
-                        clientVersion = clientVersion,
-                        clientCapabilities = JsonObject(emptyMap()),
-                    ),
-                )
-            }
-            lineProcess.writeLine(json.encodeToString(JsonObject.serializer(), payload))
-            while (true) {
-                val line = lineProcess.readLine()
-                if (line.isBlank()) continue
-                val message = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                    ?: continue
-                if (message["id"]?.jsonPrimitive?.content == id.toString()) return@withLock message
-            }
-            error("不可达")
-        } catch (error: CancellationException) {
-            lineProcess.abort()
-            throw error
-        }
-    }
-
-    override fun close() = lineProcess.close()
-}
-
 internal class McpLineProcess(
     private val command: List<String>,
     private val workingDirectory: File? = null,

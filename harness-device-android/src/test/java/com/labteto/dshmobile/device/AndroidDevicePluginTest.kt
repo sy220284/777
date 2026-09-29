@@ -60,8 +60,9 @@ class AndroidDevicePluginTest {
 
     @Test
     fun exposesCompleteCatalogAndUninstallsWithoutLeakingTools() = runTest {
+        val provider = RecordingProvider()
         val registry = PluginRegistry()
-        registry.install(AndroidDevicePlugin(RecordingProvider()))
+        registry.install(AndroidDevicePlugin(provider))
 
         val names = registry.context.tools.names()
         assertEquals(31, names.size)
@@ -71,6 +72,7 @@ class AndroidDevicePluginTest {
         assertTrue(registry.uninstall("android-device"))
         assertFalse(registry.isInstalled("android-device"))
         assertTrue(registry.context.tools.names().isEmpty())
+        assertTrue(provider.closed)
     }
 
     @Test
@@ -119,6 +121,7 @@ class AndroidDevicePluginTest {
     private class RecordingProvider : HarnessDeviceProvider {
         override val capabilities: Set<String> = emptySet()
         val calls = mutableListOf<Pair<String, Map<String, String>>>()
+        var closed: Boolean = false
 
         override suspend fun invoke(
             capability: String,
@@ -126,6 +129,10 @@ class AndroidDevicePluginTest {
         ): String {
             calls += capability to arguments
             return "ok:$capability"
+        }
+
+        override fun close() {
+            closed = true
         }
     }
 

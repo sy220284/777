@@ -197,6 +197,15 @@ class AndroidDeviceProvider(
         virtualDisplayLeases.remove(id)?.close()
     }
 
+    override fun close() {
+        try {
+            virtualDisplays.closeAll()
+        } finally {
+            virtualDisplayLeases.values.forEach { lease -> runCatching { lease.close() } }
+            virtualDisplayLeases.clear()
+        }
+    }
+
     private fun deviceInfo(): String = buildString {
         appendLine("manufacturer=${Build.MANUFACTURER}")
         appendLine("model=${Build.MODEL}")

@@ -85,11 +85,6 @@ internal class SessionRemoteStreamCoordinator(
         return true
     }
 
-    fun cancelSessionFollow() {
-        followJob?.cancel()
-        followJob = null
-    }
-
     fun followSubagent(
         parentSessionId: String,
         childSessionId: String,
