@@ -320,7 +320,11 @@ class AndroidRuntimePlugin(
                 },
             )
             put("stdin", buildJsonObject { put("type", "string") })
-            put("timeout_ms", buildJsonObject { put("type", "integer") })
+            put("timeout_ms", buildJsonObject {
+                put("type", "integer")
+                put("minimum", MIN_PROCESS_TIMEOUT_MILLIS)
+                put("maximum", MAX_PROCESS_TIMEOUT_MILLIS)
+            })
         },
         required = setOf("command"),
     )
