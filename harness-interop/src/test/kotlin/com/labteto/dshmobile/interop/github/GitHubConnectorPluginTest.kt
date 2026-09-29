@@ -309,4 +309,50 @@ class GitHubConnectorPluginTest {
     private companion object {
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     }
+
+    @Test
+    fun pathNormalizationCannotEscapeAllowedGithubApiScopes() = runBlocking {
+        var calls = 0
+        val http = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                calls += 1
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body("{}".toResponseBody(JSON_MEDIA))
+                    .build()
+            }
+            .build()
+        val registry = PluginRegistry()
+        registry.install(
+            GitHubConnectorPlugin(
+                http = http,
+                json = Json,
+                credentialProvider = { "github_pat_test_secret_1234567890" },
+                apiBaseUrl = "https://api.github.test",
+            ),
+        )
+
+        val candidates = listOf(
+            "//evil.example/repos/owner/repo",
+            "/repos/owner/repo/../../user",
+            "/repos/owner/repo/%2e%2e/%2e%2e/user",
+            "/repos/owner/repo/actions/%2e%2e/secrets/SECRET",
+        )
+        candidates.forEach { path ->
+            val result = registry.context.tools.execute(
+                "github_api_request",
+                buildJsonObject {
+                    put("method", "DELETE")
+                    put("path", path)
+                },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue("path unexpectedly accepted: $path", result.isError)
+        }
+        assertEquals(0, calls)
+    }
+
 }

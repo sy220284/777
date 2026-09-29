@@ -163,7 +163,17 @@ internal class SessionRemoteStreamCoordinator(
     ): Job = scope.launch {
         try {
             flow.collect { item ->
-                decodeOrNull(serializer, item)?.let(onFrame)
+                val frame = decodeOrNull(serializer, item)
+                if (frame == null) {
+                    onFailure(
+                        SessionRemoteStreamFailure(
+                            endpoint = endpoint,
+                            undecodable = true,
+                        ),
+                    )
+                } else {
+                    onFrame(frame)
+                }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled

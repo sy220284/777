@@ -69,17 +69,22 @@ class VirtualDisplayController(
 
     fun status(id: String): VirtualDisplayStatus {
         val session = sessions[id] ?: error("虚拟屏不存在：$id")
-        return VirtualDisplayStatus(
-            id = id,
-            displayId = session.display.display.displayId,
-            width = session.width,
-            height = session.height,
-            densityDpi = session.densityDpi,
-            valid = session.display.display.isValid,
-        )
+        return statusOf(session)
     }
 
-    fun list(): List<VirtualDisplayStatus> = sessions.keys.sorted().map(::status)
+    fun list(): List<VirtualDisplayStatus> =
+        sessions.values.toList()
+            .sortedBy(Session::id)
+            .map(::statusOf)
+
+    private fun statusOf(session: Session): VirtualDisplayStatus = VirtualDisplayStatus(
+        id = session.id,
+        displayId = session.display.display.displayId,
+        width = session.width,
+        height = session.height,
+        densityDpi = session.densityDpi,
+        valid = session.display.display.isValid,
+    )
 
     fun launch(id: String, packageName: String): String {
         val session = sessions[id] ?: error("虚拟屏不存在：$id")

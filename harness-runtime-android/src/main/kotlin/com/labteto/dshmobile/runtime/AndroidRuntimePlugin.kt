@@ -153,8 +153,13 @@ class AndroidRuntimePlugin(
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 10_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
-                    terminalProvider.write(input.requiredString("session_id"), input.requiredString("input"))
-                    ToolResult("已写入终端会话")
+                    val sessionId = input.requiredString("session_id")
+                    try {
+                        terminalProvider.write(sessionId, input.requiredString("input"))
+                        ToolResult("已写入终端会话")
+                    } finally {
+                        releaseTerminalLeaseIfFinished(sessionId)
+                    }
                 },
             ),
         )
@@ -166,7 +171,12 @@ class AndroidRuntimePlugin(
                 access = ToolAccess.READ_ONLY,
                 timeoutMillis = 10_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(terminalProvider.read(input.requiredString("session_id")))
+                    val sessionId = input.requiredString("session_id")
+                    try {
+                        ToolResult(terminalProvider.read(sessionId))
+                    } finally {
+                        releaseTerminalLeaseIfFinished(sessionId)
+                    }
                 },
             ),
         )
@@ -235,6 +245,12 @@ class AndroidRuntimePlugin(
         TOOL_NAMES.forEach(context.tools::unregister)
         context.capabilities.unregister("android-process-runtime")
         context.capabilities.unregister("android-terminal-provider")
+    }
+
+    private fun releaseTerminalLeaseIfFinished(sessionId: String) {
+        if (!terminalProvider.isAlive(sessionId)) {
+            terminalLeases.remove(sessionId)?.close()
+        }
     }
 
     private fun resolveWorkingDirectory(requested: String?): String {
@@ -320,7 +336,11 @@ class AndroidRuntimePlugin(
                 },
             )
             put("stdin", buildJsonObject { put("type", "string") })
-            put("timeout_ms", buildJsonObject { put("type", "integer") })
+            put("timeout_ms", buildJsonObject {
+                put("type", "integer")
+                put("minimum", MIN_PROCESS_TIMEOUT_MILLIS)
+                put("maximum", MAX_PROCESS_TIMEOUT_MILLIS)
+            })
         },
         required = setOf("command"),
     )

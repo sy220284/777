@@ -330,13 +330,28 @@ class LocalWorkspace(
     fun skills(): List<String> {
         val directory = resolve(".dsh/skills")
         return directory.listFiles().orEmpty()
-            .filter { File(it, "SKILL.md").isFile }
+            .filter { child ->
+                child.isDirectory &&
+                    !Files.isSymbolicLink(child.toPath()) &&
+                    File(child, "SKILL.md").isFile
+            }
             .map { it.name }
             .sorted()
     }
 
     /** Read one installed skill instruction file. */
-    fun readSkill(name: String): String = read(".dsh/skills/$name/SKILL.md", 1, 800)
+    fun readSkill(name: String): String {
+        val normalized = name.trim()
+        require(
+            normalized.isNotEmpty() &&
+                normalized != "." &&
+                normalized != ".." &&
+                File.separatorChar !in normalized &&
+                '/' !in normalized &&
+                '\\' !in normalized,
+        ) { "技能名称只能是 .dsh/skills 下的直接子目录名" }
+        return read(".dsh/skills/$normalized/SKILL.md", 1, 800)
+    }
 
     /** Validate a deliverable before the model presents it. */
     fun present(relativePath: String): String {

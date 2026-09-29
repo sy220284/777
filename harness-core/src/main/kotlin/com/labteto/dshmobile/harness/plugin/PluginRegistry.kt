@@ -3,6 +3,8 @@ package com.labteto.dshmobile.harness.plugin
 import com.labteto.dshmobile.harness.capability.CapabilityRegistry
 import com.labteto.dshmobile.harness.registry.NamedRegistry
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class HarnessContext(
     val tools: ToolRegistry = ToolRegistry(),
@@ -24,8 +26,9 @@ class PluginRegistry(
     val context: HarnessContext = HarnessContext(),
 ) {
     private val installed = linkedMapOf<String, HarnessPlugin>()
+    private val lifecycleMutex = Mutex()
 
-    suspend fun install(plugin: HarnessPlugin) {
+    suspend fun install(plugin: HarnessPlugin) = lifecycleMutex.withLock {
         require(plugin.id.isNotBlank()) { "插件编号不能为空" }
         synchronized(this) {
             require(plugin.id !in installed) { "插件已安装：${plugin.id}" }
@@ -36,13 +39,13 @@ class PluginRegistry(
         }
     }
 
-    suspend fun uninstall(id: String): Boolean {
-        val plugin = synchronized(this) { installed[id] } ?: return false
+    suspend fun uninstall(id: String): Boolean = lifecycleMutex.withLock {
+        val plugin = synchronized(this) { installed[id] } ?: return@withLock false
         plugin.uninstall(context)
         synchronized(this) {
             installed.remove(id)
         }
-        return true
+        true
     }
 
     @Synchronized
