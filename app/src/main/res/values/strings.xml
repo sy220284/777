@@ -436,6 +436,7 @@
     <string name="tasks_missing">That task no longer exists</string>
     <string name="tasks_delete_confirm_title">Delete this task?</string>
     <string name="tasks_delete_confirm_body">Deleting it stops future runs and removes it from the automation list.</string>
+    <string name="tasks_chat_delete_confirm_body">Deleting it stops this scheduled interaction and removes it from the interaction list.</string>
     <string name="tasks_delete_confirm">Delete</string>
     <string name="tasks_mode_work">Work automation</string>
     <string name="tasks_mode_chat">Character interaction</string>
