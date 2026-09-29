@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -128,7 +129,7 @@ class SessionRemoteStreamCoordinatorTest {
         val coordinator = coordinator(
             scope = backgroundScope,
             streamProvider = { _, _ ->
-                flowOf(buildJsonObject { put("unexpected", true) })
+                flowOf(JsonPrimitive("undecodable"))
             },
             onFailure = failures::add,
         )
