@@ -6,6 +6,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
+internal const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
+
 /**
  * Builds the foreground soft-step extender without making LocalHarnessEngine own budget policy.
  */
