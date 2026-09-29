@@ -401,3 +401,39 @@ internal fun Map<String, String>.deviceOptionalBoolean(key: String): Boolean? {
     return raw.toBooleanStrictOrNull()
         ?: throw IllegalArgumentException("$key 必须是 true 或 false")
 }
+
+internal fun Map<String, String>.deviceRequiredInt(key: String): Int {
+    val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
+    return raw.toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+}
+
+internal fun Map<String, String>.deviceRequiredFiniteFloat(key: String): Float {
+    val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
+    val value = raw.toFloatOrNull() ?: throw IllegalArgumentException("$key 必须是数字")
+    require(value.isFinite()) { "$key 必须是有限数字" }
+    return value
+}
+
+internal fun Map<String, String>.deviceOptionalInt(key: String, default: Int): Int {
+    val raw = this[key] ?: return default
+    require(raw.isNotBlank()) { "$key 不能为空" }
+    return raw.toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+}
+
+internal fun Map<String, String>.deviceOptionalLong(
+    key: String,
+    default: Long,
+    range: LongRange,
+): Long {
+    val raw = this[key] ?: return default
+    require(raw.isNotBlank()) { "$key 不能为空" }
+    val value = raw.toLongOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+    require(value in range) { "$key 必须在 ${range.first}..${range.last} 之间" }
+    return value
+}
+
+internal fun Map<String, String>.deviceOptionalBoolean(key: String): Boolean? {
+    val raw = this[key] ?: return null
+    return raw.toBooleanStrictOrNull()
+        ?: throw IllegalArgumentException("$key 必须是 true 或 false")
+}
