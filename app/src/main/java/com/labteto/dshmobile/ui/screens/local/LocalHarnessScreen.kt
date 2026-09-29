@@ -82,6 +82,7 @@ import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -605,7 +606,7 @@ private fun LocalConversationSurface(
     modeIntro: LocalUsageMode?,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
-    onSend: (String, List<LocalImportedAttachment>) -> Unit,
+    onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
@@ -1207,7 +1208,9 @@ private fun LocalConversationSurface(
         val composerExpanded =
             composerFocused || input.contains('\n') || attachments.isNotEmpty()
         val composerCanSend =
-            groupChatReady && (input.isNotBlank() || attachments.isNotEmpty())
+            !state.loading &&
+                groupChatReady &&
+                (input.isNotBlank() || attachments.isNotEmpty())
         val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
         val composerReplySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
         val replySuggestionsAvailable =
@@ -1238,7 +1241,8 @@ private fun LocalConversationSurface(
                 return
             }
             val selected = attachments.toList()
-            onSend(input, selected)
+            val result = onSend(input, selected)
+            if (!result.accepted) return
             drafts[state.sessionId] = ""
             attachments.clear()
             focusManager.clearFocus(force = true)
