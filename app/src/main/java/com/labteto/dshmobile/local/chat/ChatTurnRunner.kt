@@ -74,13 +74,13 @@ class ChatTurnRunner @Inject constructor(
     suspend fun finalizeReply(
         persona: PersonaProfile,
         reply: LocalModelReply,
-        recordUsage: (DeepSeekTokenUsage) -> Unit,
+        recordUsage: (LocalModelReply) -> Unit,
         guardEnabled: Boolean = true,
         additionalBannedPhrases: List<String> = emptyList(),
         recentAssistantReplies: List<String> = emptyList(),
         onGuardEvent: (String, List<String>) -> Unit = { _, _ -> },
     ): LocalModelReply {
-        recordUsage(reply.usage)
+        recordUsage(reply)
         if (reply.toolCalls.isNotEmpty()) return reply
 
         var content = reply.content.orEmpty()
