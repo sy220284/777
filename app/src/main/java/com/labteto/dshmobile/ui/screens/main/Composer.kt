@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,11 +26,9 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.input.key.*
 import androidx.compose.runtime.Composable
@@ -69,14 +66,10 @@ import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
-import com.labteto.dshmobile.ui.components.skeleton
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /**
  * Something picked and waiting to be sent with the next message.
@@ -251,11 +244,18 @@ internal fun Composer(
                 maxLines = 8,
             )
 
-            ContextMeter(
-                contextBreakdown,
-                contextPressure,
-                barWidth = 24,
-            )
+            Box(
+                modifier = Modifier
+                    .width(24.dp)
+                    .height(DsComposerMetrics.actionTouchTarget),
+                contentAlignment = Alignment.Center,
+            ) {
+                ContextMeter(
+                    contextBreakdown,
+                    contextPressure,
+                    barWidth = 24,
+                )
+            }
 
             DsComposerAction(
                 icon = Icons.Filled.ArrowUpward,
