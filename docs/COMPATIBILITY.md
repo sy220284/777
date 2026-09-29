@@ -8,7 +8,8 @@ checked against.
 
 | DSH Mobile | Harness version | Status |
 |---|---|---|
-| 0.11.4 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | Current target |
+| 0.12.0-777.22 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | Current remote protocol target |
+| 0.11.4 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | Previous remote target |
 | 0.11.3 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | Every answered, dismissed or skipped question card sticks: the host never tells the answering client its request resolved, and the card waited for that frame |
 | 0.11.1 – 0.11.2 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | Question answers and approvals are refused by any harness ≥ 0.1.2: `$events/result` was posted without its `args` wrapper |
 | 0.11.0 | 0.1.6-alpha.1 + master `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` | See [validation](VALIDATION-0.11.0.md) |
@@ -39,9 +40,14 @@ handshake rather than partway through a session (see 0.9.0 in the changelog).
 
 ## Current-master scope
 
-The release label alone does not identify this target: the exact commit above includes
-subsequent master changes inspected on September 15, 2026. Version 0.11.0 adds no new
-compatibility guarantee for older harnesses. Optional endpoints may be unavailable in a
+The remote client pins `DshCore.PROTOCOL_BASELINE = 0.1.6-alpha.1` and
+`PROTOCOL_COMMIT = 0d1f50007f9bca3f52b06e1c3074fa14d5fb0720`.
+The app has advanced independently to `0.12.0-777.22`; that does not create a new
+compatibility guarantee for older Harness releases.
+
+This remote wire baseline is separate from the local-native semantic reference:
+`upstream/deepseek-harness.lock.json` pins `0.1.7-rc.2 / 477b4f420...` for
+differential validation of the on-device Harness. Optional endpoints may be unavailable in a
 particular host composition; failures remain visible and unknown event payloads remain
 inspectable. Host-owned model adapters, SSH, MCP, Browser/Computer Use, subprocesses and
 session-log migrations remain in the harness.
@@ -54,6 +60,7 @@ mounted beside the harness rather than part of it.
 
 | DSH Mobile | [dsh-relay](https://github.com/sorsama/deepseek-harness-relay) | Notes |
 |---|---|---|
+| 0.12.0-777.22 | 0.2.1 | Current relay target; HTTPS pairing only |
 | 0.11.0 – 0.11.4 | 0.2.1 | As 0.10.x. From 0.11.2 the `Host` header brackets an IPv6 literal, without which the relay's fence refuses every `/api` call as `unparsable-host` |
 | 0.10.0 – 0.10.1 | 0.2.1 | Pairing payload `v: 1`; mDNS TXT `v: 1`. File uploads need the relay to proxy `/api/session/uploadFileBinary`, or the app falls back to the `fileUploads/upload` Remote |
 | 0.9.2 – 0.9.3 | 0.2.1 | |

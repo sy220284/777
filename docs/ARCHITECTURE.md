@@ -1,161 +1,197 @@
 # Architecture
 
-DSH Mobile is an eight-module Gradle project (Kotlin 2.0, Compose, Hilt).
+777 is an eight-module Android project built with Kotlin 2.2.10, Jetpack Compose, Hilt and Java 17.
 
-```
-core/           pure JVM — no Android imports
-  wire/         the DeepSeek Harness web-client protocol:
-                  envelopes (client-request / server-response), the
-                  lenient WireJson codec, RpcTransport (OkHttp: unary POST,
-                  the session-log download, the raw-byte file upload),
-                  WsChannel (the bidirectional /api/remote.mux socket),
-                  RemoteStreamMux (logical streams over it),
-                  DshApiClient (typed unary methods, namespace/method),
-                  ConnectionLoop (readiness handshake: mux open + the
-                  $events ready frame, exponential backoff)
-  wire/dto/     kotlinx.serialization ports of the harness schemas
-                  (sessions, session history/follow incl. the assistant
-                  stream frames, control, host, workspace, skills, goals,
-                  settings, credentials, llm, subagents, agent presets,
-                  events, stream protocol, commands, file uploads) —
-                  lenient, merge-extensible
-  session/      EventFold: raw session events → ConversationSnapshot
-                  (turn/step/message/tool nodes, streaming block assembly,
-                  a provisional `streaming` node for the attempt being
-                  written, interruption marking, gap detection);
-                  AssistantLiveState: the open model attempt as the follow
-                  stream's assistant frames show it, retired by its durable
-                  settlement; AssistantStream: expands the compact stream a
-                  settlement or a reconnect baseline embeds
-  notify/       CompletionClassifier: turn/goal/approval/question/idle
-                  events with dedup keys
+The repository uses two levels of boundary:
 
-app/            Android UI
-  connection/   HostsStore (remembered relay endpoints + settings, DataStore),
-                  ConnectionManager (owns the ConnectionLoop, exposes the host
-                  event flow and the current generation), ConnectionService
-                  (foreground service), KeepAliveWorker (15-min fallback)
-  data/         SessionStore — the live mirror of the harness: session
-                  list/workspaces/folds per session, queue/jobs/
-                  projections, approvals/questions, subagent catalog,
-                  the live assistant attempt, file uploads
-  notify/       NotificationObserver — classifier → channels, dedup,
-                  deep links
-  media/        AttachmentImages — LruCache + BitmapFactory decoding of
-                  session attachments (no image library: the bytes arrive
-                  through session/attachment, not a URL)
-  ui/           theme (exact DSH design tokens + motion specs), components
-                  (buttons, disclosure rows, state dots, tool cards,
-                  markdown, overlays, bottom sheets, context meter),
-                  screens (connect, main shell with Discord-style drawer +
-                  details panel, chat, settings)
+- **Gradle modules** for binary, platform and protocol boundaries.
+- **Capability packages inside `app`** for product evolution without turning every feature into a new module.
 
-The chat surface is split by responsibility rather than living in one file:
-ChatScreen (shell, pickers, send path) · ChatTopBar (two-row chrome +
-Chat/Trajectory tabs) · ChatTranscript · ChatNodeItem · ToolRowModel (verb +
-cwd-relative summary) · Composer (draft, attachment strip: image tiles and
-file chips with upload state) · Docks · TrajectoryTab · Sheet*.kt (commands,
-models, presets, subagents, permission) · ChatProjections (defensive readers).
+## Gradle modules
 
-harness-core/   platform-agnostic agent loop, tools, jobs, capabilities, plugins and versioned local sessions
-harness-runtime-android/
-                Android process runtime + persistent pipe terminal provider
-harness-interop/
-                MCP HTTP/stdio transports and LSP process client/framing
-harness-device-android/
-                Android device capabilities (accessibility, notifications, virtual display)
-mock-harness/   Ktor implementation of the /api protocol for tests
-reference-validation/
-                official Harness semantic/conformance validation
-tools/capture/  Node recorder of real harness traffic → conformance fixtures
+```text
+app/                      Android composition root, local Chat / Work UI and orchestration
+core/                     pure JVM remote Harness web-client protocol
+harness-core/             platform-agnostic Agent loop, tools, jobs, capabilities and sessions
+harness-runtime-android/  Android process runtime and persistent pipe terminal
+harness-interop/          MCP HTTP / stdio and LSP
+harness-device-android/   accessibility, notifications and virtual display
+mock-harness/             Ktor Harness /api test server
+reference-validation/     official Harness semantic / conformance validation
 ```
 
-## Data flow
+Main dependency direction:
 
-1. `ConnectionManager` performs the readiness handshake and pumps the mux;
-   frames fan out as SharedFlows.
-2. `SessionStore` folds session events into `ConversationSnapshot`s from that
-   session's `session/follow` stream (opened with `assistantStream: true`),
-   keeps the workspace registry from `workspace/follow`, and merges queue/jobs/
-   projection snapshots from `session/control`. Typed projection views
-   (permissions, stats, usage, context, image limits) are *derived* from
-   that snapshot rather than fetched, so they stay in lockstep with the
-   transcript and cost no round trips.
-2a. The reply being written never enters the durable window. Its
-   `assistant-stream` frames are folded by `AssistantLiveState`, whose
-   transient chunks are handed to the fold beside the durable events and
-   rendered as one provisional `streaming` message; the settlement event
-   (`assistant/message` or `assistant/attempt`) retires it the moment it
-   lands. A reconnect seeds the state from the snapshot's baseline, so a
-   partial answer survives the socket.
-2b. On first connect `baseline()` resolves a landing session
-   (`data/InitialSession.kt`): the session last opened on this harness,
-   else the most recently active one. Reconnects keep whatever was open.
-3. Screens observe `StateFlow`s and render; user actions go back through
-   `SessionStore` → `DshApiClient` (`POST /api/<namespace>/<method>`), and
-   pending approvals/questions are answered through `$events/result`. A
-   picked file is streamed to `/api/session/uploadFileBinary` as soon as it is
-   picked, and the message cites the receipt that came back.
-4. `NotificationObserver` classifies host events into completion events and
-   posts channel-notifications that deep-link into sessions. Turn and goal
-   completions reach it from `SessionStore`, which owns the only stream
-   they travel on.
+```text
+app
+├─ harness-device-android
+├─ harness-interop
+├─ harness-runtime-android
+└─ harness-core
 
-## Key invariants
-
-- The wire layer never crashes on unknown data: unknown keys are ignored,
-  unknown event/frame/card types fall back to `Unknown*` passthroughs.
-- HTTP status is carrier-only; business failures arrive as `ok: false`
-  with a typed, namespaced error code (see `docs/PROTOCOL.md`).
-- The mux socket is **bidirectional** — the client opens and cancels
-  logical streams on it. (Its two predecessors were downlink-only.)
-- Every `/api` request needs a harness browser session; 401 and 403 are
-  different facts and are reported separately.
-- There is no loopback-only method tier: harness 0.1.2 deleted it, and one
-  authenticated caller reaches the whole API (see `docs/COMPATIBILITY.md`).
-- Tool cards are derived in the app from raw call/result data; the host
-  sends no render intent.
-- Transient assistant rows never touch the durable cursor, never count as a
-  gap, and are never paged; only the settlement is history.
-- Protocol baseline: harness `0.1.3-alpha.1` (`core.DshCore.PROTOCOL_BASELINE`).
-
-
-## Local runtime growth boundary
-
-The on-device runtime is a modular monolith. Existing Gradle modules remain the binary/runtime
-boundary; feature responsibilities inside `app` are separated by capability packages so adding a
-feature does not require another process-wide dependency or another Gradle module.
-
-Local UI dependencies flow through capability runtimes:
-
-```
-UI / ViewModels
-  -> local.presentation / local.chat / local.work / local.session / local.model / local.tools
-  -> LocalHarnessEngine (orchestration kernel)
-  -> coordinators / repositories / harness-core
+core  ← remote Harness protocol path; independent from the local Agent kernel
 ```
 
-`LocalHarnessEngine` owns cross-capability turn consistency, but its methods are module-internal and
-new UI/worker code may not depend on it directly. High-frequency streaming preview is a separate
-`StateFlow`, so token updates do not rewrite the aggregate runtime snapshot. Settings, Tasks and
-the app shell consume narrow projections with `distinctUntilChanged`.
+A new Gradle module is added only when a capability can own a meaningfully smaller dependency set. Otherwise, package boundaries and CI ratchets are preferred.
 
-Startup plugins are installed as one atomic lifecycle batch: a failed plugin rolls the registries
-and already-installed members of that batch back to the pre-startup surface. Individual lifecycle
-failures also restore registry state and remain observable through `PluginLifecycleSnapshot`.
-Platform-specific providers are constructed by `LocalPluginCompositionFactory` /
-`LocalPluginComposition`, not by `LocalHarnessEngine`. The engine owns turn/session orchestration
-and passes only runtime environment inputs into that composition root. Downstream agent code depends
-on capability contracts such as `HarnessVirtualDisplayProvider`, not Android classes. Dynamic MCP
-disconnects first stop admitting new calls, drain in-flight calls, then unregister tools and close
-the transport so hot-unplug cannot invalidate an executing tool.
+## Local Android architecture
 
-The remote `SessionStore` remains the single lock/stream orchestration owner by design. Mutable
-session index, open-session fold state and remote stream lifetime already live in
-`SessionIndexState`, `OpenSessionFoldState` and `SessionRemoteStreamCoordinator`; splitting the
-lock owner further would add synchronization and allocation cost without reducing the wire-domain
-coupling. Its file-size ratchet prevents new responsibilities from returning there.
+```text
+Compose UI / ViewModels
+        │
+        ▼
+local.presentation
+  ├─ LocalUiRuntime
+  ├─ Chat / Work surface projections
+  ├─ Settings projection
+  └─ Task projection
+        │
+        ▼
+capability runtimes
+  ├─ local.chat
+  ├─ local.work
+  ├─ local.session
+  ├─ local.model
+  ├─ local.tools
+  ├─ local.automation
+  └─ local.usage
+        │
+        ▼
+LocalHarnessEngine
+  cross-capability turn/session orchestration
+        │
+        ▼
+Coordinators / Stores / Repositories
+        │
+        ▼
+harness-core / Android runtime / MCP / device providers
+```
 
-Physical feature Gradle modules should be added only when a capability can depend on a smaller
-dependency set than `:app`; package boundaries and CI ratchets are preferred until then to avoid
-extra configuration/build overhead and duplicated DI surfaces.
+### UI projections
+
+Chat and Work are projections of one runtime, not two independent engines.
+
+`LocalConversationSurfaceState` exposes only the fields relevant to the product surface. Fields owned by the other mode stay at stable defaults, and projections use `distinctUntilChanged`, so Chat-only churn does not wake Work UI and vice versa.
+
+High-frequency streaming preview is kept separate from aggregate state, avoiding full state rewrites for token-by-token output.
+
+### Capability runtimes
+
+`LocalUiRuntime` is a dependency-only aggregator. Ownership remains in narrow runtimes such as `LocalChatRuntime`, `LocalWorkRuntime`, `LocalSessionRuntime`, `LocalModelRuntime`, `LocalToolsRuntime` and `LocalAutomationRuntime`.
+
+New UI and worker code should enter through the relevant capability runtime instead of calling `LocalHarnessEngine` directly.
+
+### Orchestration boundaries
+
+`LocalHarnessEngine` owns consistency across a local turn/session. Focused behavior lives in extracted coordinators for model transport, tool execution, Chat preparation/finalization, Session persistence, Agent run recovery, automation, group Chat and sending.
+
+The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
+
+### Send path
+
+`LocalSendCoordinator` is the single local admission policy:
+
+```text
+draft
+→ validate configuration / transition / queue capacity
+→ STARTED | QUEUED | REJECTED
+→ explicit UI feedback
+```
+
+The composer keeps the draft when runtime rejects a send. Queue-full, session-transition, loading and unconfigured states remain distinct facts.
+
+### Agent run context and recovery
+
+Foreground, subagent and automation execution share `LocalAgentRunCoordinator` checkpoints.
+
+```text
+sessionId
+→ turnId / runId
+→ parentRunId
+→ agentId
+→ tool call
+```
+
+Recovery does not blindly replay side effects. A started tool whose result is unknown becomes `TOOL_OUTCOME_UNKNOWN`; one that never started becomes `TOOL_NOT_STARTED`.
+
+### Tool and plugin composition
+
+Platform-specific providers are built by `LocalPluginCompositionFactory` / `LocalPluginComposition`, not by the Engine.
+
+Startup plugin installation is atomic. Dynamic MCP disconnect stops new admission, drains in-flight calls, unregisters tools, then closes transport. Downstream Agent code depends on capability contracts rather than Android UI classes.
+
+### Chat continuity and memory
+
+Chat keeps persona definition, relationship memory, scene continuity, character evolution and user behavior tuning as separate concerns.
+
+Relationship memory uses a stable subject key; Gallery identity wins over copied persona identity. `CharacterBehaviorTuning` changes expression and pacing but cannot rewrite trust, shared events or other historical facts.
+
+### Token usage and observability
+
+`TokenUsageAnalyticsStore` keeps a request-level ledger. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.
+
+`LocalTokenUsageContextBridge` maps internal model-consuming actions such as Web and Vision back to their parent run.
+
+```text
+requestId
+→ session / turn
+→ run / parentRun
+→ agent
+→ action
+```
+
+This supports daily, session, task, main-agent/subagent and action-level views without double counting.
+
+## Persistence and performance
+
+The local Session event log is the durable fact stream. Snapshots are bounded materializations, not a second full transcript authority.
+
+Important invariants:
+
+- historical reads use paging;
+- runtime transcript windows stay bounded;
+- model-history writes go through the dedicated buffer;
+- tool output is bounded in model context, with recoverable spill storage where required;
+- streaming updates do not rebuild aggregate state;
+- caches and logs have explicit limits.
+
+CI performance guards reject known hot-path regressions and full-history scans.
+
+## Remote Harness architecture
+
+The remote path stays separate from the local native Agent kernel.
+
+```text
+HTTPS relay
+→ /api/remote.mux
+→ ConnectionManager
+→ SessionStore
+→ ConversationSnapshot / projections
+→ Compose UI
+```
+
+`SessionStore` remains the single remote stream/fold owner. The live assistant attempt is presentation data; durable settlement retires it, while reconnect restores partial output from the follow baseline.
+
+The current **remote protocol baseline** is `0.1.6-alpha.1` at
+`0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` (`DshCore.PROTOCOL_BASELINE`).
+
+The separate **local semantic reference** is pinned by `upstream/deepseek-harness.lock.json` at
+`0.1.7-rc.2 / 477b4f420553e8a52c2fbccc464d7561b239c443`.
+
+Do not confuse the remote wire baseline with the local differential-validation baseline.
+
+## Architecture ratchets
+
+CI treats architectural boundaries as executable constraints, including:
+
+- line-count ratchets for known hotspots;
+- zero public methods on `LocalHarnessEngine`;
+- bounded Engine constructor dependencies;
+- bounded aggregate state;
+- allowlists for direct Engine consumers;
+- capability-package boundaries;
+- streaming, transcript paging and model-history performance invariants.
+
+When a ratchet fails, the fix is to move responsibility to the correct boundary—not to raise the budget.
+
+See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.

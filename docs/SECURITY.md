@@ -17,12 +17,15 @@ Agent tools can read and modify workspace files and run processes. Approving a p
 - Built-in tools use the same registry permission checks as plugin tools. Read-only subagents cannot invoke state-changing tools. Unknown tools fail closed.
 - Safe automatic approval is a persisted local preference. It covers only path-confined workspace writes and read-only tools, including read-only inspection outside the workspace. Process, state-changing network, device and privileged operations keep explicit approval boundaries and are surfaced with an impact level.
 - Background runs stop at interactive approval or question boundaries. External cancellation cancels and waits for the owned agent run.
+- Foreground, subagent and automation runs persist run checkpoints. Recovery never blindly replays a started side effect whose result is unknown; it records `TOOL_OUTCOME_UNKNOWN` / `TOOL_NOT_STARTED` and requires the next run to reason from that fact.
+- Local send admission distinguishes loading, session transition, missing configuration and queue pressure. A rejected send does not silently clear the user's draft.
 - Webhook only listens on `127.0.0.1`, uses a bearer token and limits request sizes. Legacy LAN preferences cannot enable an external plaintext listener.
 - Language intelligence automatically resolves an already-available language server from the project/file type or preserves a legacy explicit command for upgrade compatibility. A new external server process still requires process approval before first launch; no server is downloaded or installed automatically. Server file access stays within the workspace, queries have a response deadline, and notification storage is bounded.
 
 ## Local storage and network requests
 
-- Local conversations, workspace files, user rules and scoped memories are stored in app-private storage. Platform backup and device extraction are disabled.
+- Local conversations, workspace files, user rules, scoped memories and Token usage ledgers are stored in app-private storage. Platform backup and device extraction are disabled.
+- Token diagnostics store usage, model/action identifiers and bounded prompt-size attribution; they do not require persisting full prompt bodies. Request/run identifiers are used for correlation instead of copying conversation text into logs.
 - Memory files keep a recovery backup and preserve corrupt primary files for diagnosis. Sensitive-data filtering reduces accidental credential retention; it is not a complete secret detector.
 - Relay and model credentials are encrypted at rest. Model requests and web tools contact configured services or requested websites. Generic web fetching can use HTTP; this does not permit plaintext remote-control pairing.
 - Updates are requested explicitly from Settings. Downloads are checked for checksum, package identity and signing certificate before opening the Android installer.
