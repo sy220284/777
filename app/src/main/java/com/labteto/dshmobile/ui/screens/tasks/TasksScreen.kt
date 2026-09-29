@@ -1337,7 +1337,10 @@ private fun TaskCard(
             onDismiss = { confirmDelete = false },
         ) {
             Text(
-                stringResource(R.string.tasks_delete_confirm_body),
+                stringResource(
+                    if (task.mode == AutomationMode.CHAT) R.string.tasks_chat_delete_confirm_body
+                    else R.string.tasks_delete_confirm_body,
+                ),
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )
