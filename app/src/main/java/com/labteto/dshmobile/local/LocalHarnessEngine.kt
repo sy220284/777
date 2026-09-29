@@ -3572,14 +3572,8 @@ class LocalHarnessEngine @Inject constructor(
             },
             maxSteps = mainStepLimit,
             stepLimitExtender = localForegroundStepLimitExtender(
-                enabled = runPolicy.allowToolExecution,
-                configuredBase = mainMaxSteps,
-                task = input,
-                state = { runState.value },
-                pressure = { resourceScheduler.snapshot().pressure },
-                onExtended = { runEventLog.append("turn/budget-extended", it) },
-                maxTotalSteps = MAX_FOREGROUND_DYNAMIC_STEPS,
-            ),
+                runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure },
+            ) { runEventLog.append("turn/budget-extended", it) },
             idFactory = { runContext.runId },
         )
 
