@@ -5152,7 +5152,7 @@ class LocalHarnessEngine @Inject constructor(
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
-            jobs = projectExecutionJobs(stored.usageMode, jobs.snapshotInfos()),
+            jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
             queuedInputCount = pendingInputs.size(),
             activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
             activeAgents = projectWorkResourceCount(
