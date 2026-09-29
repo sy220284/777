@@ -223,7 +223,9 @@ internal suspend fun prepareLocalMultimodalMessages(
                 require(storedMediaType == null || storedMediaType == actualMediaType) {
                     "图片附件内容与记录格式不一致：$relative"
                 }
-                val data = Base64.getEncoder().encodeToString(file.readBytes())
+                val data = Base64.getEncoder().encodeToString(
+                    readLocalImageBytesBounded(file, MAX_NATIVE_IMAGE_BYTES),
+                )
                 add(buildJsonObject {
                     put("type", "image_url")
                     put("image_url", buildJsonObject {
@@ -275,6 +277,19 @@ private fun historicalImageReference(image: JsonObject): JsonObject {
             "text",
             "[历史图片引用：$name$dimensions；工作区路径：$path。像素未重复发送；需要重新查看细节时调用 vision_analyze_file。]",
         )
+    }
+}
+
+
+internal fun readLocalImageBytesBounded(file: File, maxBytes: Long): ByteArray {
+    require(maxBytes in 1L..Int.MAX_VALUE.toLong()) { "图片读取上限无效" }
+    val limit = maxBytes.toInt()
+    file.inputStream().use { input ->
+        val bytes = input.readNBytes(limit + 1)
+        require(bytes.size <= limit) {
+            "图片附件超过 ${maxBytes / 1024 / 1024} MB 直传上限：${file.name}"
+        }
+        return bytes
     }
 }
 
