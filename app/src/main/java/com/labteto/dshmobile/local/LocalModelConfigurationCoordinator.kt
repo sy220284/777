@@ -64,21 +64,21 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_MODEL_PROFILES, encodeProfiles(profiles))
             .apply()
         apiKeys.activate(id)
-        return LocalModelConfigurationResult(true, normalizedModel, normalizedBaseUrl, profiles)
+        LocalModelConfigurationResult(true, normalizedModel, normalizedBaseUrl, profiles)
     }
 
     suspend fun select(
         id: String,
         profiles: List<LocalModelProfile>,
     ): LocalModelConfigurationResult? = mutationGate.run {
-        val selected = profiles.firstOrNull { it.id == id } ?: return null
+        val selected = profiles.firstOrNull { it.id == id } ?: return@run null
         require(apiKeys.getFor(id) != null) { "该模型密钥不可用，请编辑配置重新填写" }
         preferences.edit()
             .putString(KEY_MODEL, selected.model)
             .putString(KEY_BASE_URL, selected.baseUrl)
             .apply()
         apiKeys.activate(selected.id)
-        return LocalModelConfigurationResult(true, selected.model, selected.baseUrl, profiles)
+        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, profiles)
     }
 
     suspend fun remove(
@@ -87,7 +87,7 @@ internal class LocalModelConfigurationCoordinator(
         currentBaseUrl: String,
     ): LocalModelConfigurationResult? = mutationGate.run {
         val profiles = readProfiles()
-        if (profiles.none { it.id == id }) return null
+        if (profiles.none { it.id == id }) return@run null
         apiKeys.clearFor(id)
         val remaining = profiles.filterNot { it.id == id }
         val next = remaining.firstOrNull {
@@ -99,7 +99,7 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL)
             .apply()
         apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-        return LocalModelConfigurationResult(
+        LocalModelConfigurationResult(
             configured = next != null,
             model = next?.model ?: DEFAULT_MODEL,
             baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
@@ -121,7 +121,7 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL)
             .apply()
         apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-        return LocalModelConfigurationResult(
+        LocalModelConfigurationResult(
             configured = next != null,
             model = next?.model ?: DEFAULT_MODEL,
             baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
