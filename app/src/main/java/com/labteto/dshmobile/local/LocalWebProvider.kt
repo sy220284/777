@@ -16,6 +16,7 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
 import java.net.Socket
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
@@ -333,10 +334,14 @@ class LocalWebProvider @Inject constructor(
     }
 
     /** Exact DeepSeek auxiliary-search wire format used by the official provider. */
-    suspend fun search(apiKey: String, queries: List<String>): String = withContext(Dispatchers.IO) {
+    suspend fun search(
+        apiKey: String,
+        queries: List<String>,
+        usageContext: TokenUsageContext? = null,
+    ): String = withContext(Dispatchers.IO) {
         val clean = queries.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_QUERIES)
         require(clean.isNotEmpty()) { "至少需要一个搜索词" }
-        val outputs = clean.map { query -> searchOne(apiKey, query) }
+        val outputs = clean.map { query -> searchOne(apiKey, query, usageContext) }
         outputs.joinToString("\n\n")
     }
 
@@ -350,7 +355,11 @@ class LocalWebProvider @Inject constructor(
         }.getOrDefault(normalized)
     }
 
-    private suspend fun searchOne(apiKey: String, query: String): String {
+    private suspend fun searchOne(
+        apiKey: String,
+        query: String,
+        usageContext: TokenUsageContext?,
+    ): String {
         val payload = buildJsonObject {
             put("model", SEARCH_MODEL)
             put("max_tokens", 4096)
@@ -389,7 +398,19 @@ class LocalWebProvider @Inject constructor(
                     throw LocalWebException(code, "网页搜索失败（HTTP ${response.code}）：${body.take(500)}")
                 }
                 val root = json.parseToJsonElement(body).jsonObject
-                usageTracker.record(SEARCH_MODEL, parseDeepSeekAnthropicUsage(root))
+                usageTracker.record(
+                    model = SEARCH_MODEL,
+                    usage = parseDeepSeekAnthropicUsage(root),
+                    requestId = UUID.randomUUID().toString(),
+                    context = usageContext?.copy(
+                        action = TokenUsageAction.WEB_SEARCH,
+                        taskLabel = usageContext.taskLabel ?: query.take(120),
+                    ) ?: TokenUsageContext(
+                        mode = LocalUsageMode.WORK,
+                        action = TokenUsageAction.WEB_SEARCH,
+                        taskLabel = query.take(120),
+                    ),
+                )
                 formatSearch(query, root)
             }
         } catch (error: LocalWebException) {

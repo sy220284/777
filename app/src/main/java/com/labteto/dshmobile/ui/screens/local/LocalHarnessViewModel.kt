@@ -54,7 +54,7 @@ class LocalHarnessViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val state = runtime.session.state
-    val streamingState = runtime.session.streamingState
+    val streamingState = runtime.session.streamingState; internal val sendFeedbackState = runtime.session.sendFeedbackState
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)

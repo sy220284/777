@@ -73,6 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.ChatStyleGuard
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.TokenUsageGroupDetail
+import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
@@ -116,6 +118,8 @@ enum class SettingsDestination {
     MODELS,
     PRICING,
     USAGE,
+    USAGE_LOG,
+    USAGE_DETAIL,
     MEMORY,
     PERMISSIONS,
     NOTIFICATIONS,
@@ -133,6 +137,8 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.CHAT -> SettingsDestination.GENERAL
     SettingsDestination.PRICING,
     SettingsDestination.USAGE -> SettingsDestination.MODELS
+    SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
+    SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
 }
 
 @Composable
@@ -150,6 +156,7 @@ fun SettingsScreen(
     val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
+    val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
@@ -176,6 +183,9 @@ fun SettingsScreen(
         }
     }
     var page by rememberSaveable { mutableStateOf(initialDestination) }
+    var usageDetailSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
+    var usageDetailBackSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
+    var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
@@ -201,9 +211,21 @@ fun SettingsScreen(
     }
     val scrollState = rememberScrollState()
 
-    BackHandler {
-        page.parentDestination()?.let { page = it } ?: onClose()
+    fun navigateBack() {
+        if (page == SettingsDestination.USAGE_DETAIL) {
+            if (usageDetailReturnPage == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
+                usageDetailSelection = usageDetailBackSelection
+                usageDetailBackSelection = null
+                usageDetailReturnPage = SettingsDestination.USAGE
+            } else {
+                page = usageDetailReturnPage
+            }
+        } else {
+            page.parentDestination()?.let { page = it } ?: onClose()
+        }
     }
+
+    BackHandler { navigateBack() }
     LaunchedEffect(initialDestination) {
         page = initialDestination
     }
@@ -232,6 +254,11 @@ fun SettingsScreen(
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
+        SettingsDestination.USAGE_LOG -> stringResource(R.string.usage_log_title)
+        SettingsDestination.USAGE_DETAIL -> when (usageDetailSelection) {
+            is UsageDetailSelection.Request -> stringResource(R.string.usage_request_detail)
+            else -> stringResource(R.string.usage_group_detail)
+        }
         SettingsDestination.MEMORY -> stringResource(R.string.settings_page_memory)
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
@@ -247,11 +274,17 @@ fun SettingsScreen(
             ) {
                 DsTopBar(
                     title = title,
-                    onBack = {
-                        page.parentDestination()?.let { page = it } ?: onClose()
-                    },
+                    onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
+                    actionIcon = Icons.Outlined.History.takeIf { page == SettingsDestination.USAGE },
+                    actionContentDescription = stringResource(R.string.usage_log_open)
+                        .takeIf { page == SettingsDestination.USAGE },
+                    onAction = if (page == SettingsDestination.USAGE) {
+                        { page = SettingsDestination.USAGE_LOG }
+                    } else {
+                        null
+                    },
                 )
 
                 Column(
@@ -534,7 +567,60 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.USAGE -> {
-                        UsageCalculationPage(localHarness.usage) { page = SettingsDestination.PRICING }
+                        UsageCalculationPage(
+                            usage = localHarness.usage,
+                            onOpenPricing = { page = SettingsDestination.PRICING },
+                            analytics = usageAnalytics,
+                            onOpenGroup = { kind, key, title ->
+                                usageDetailSelection = UsageDetailSelection.Group(kind, key, title)
+                                usageDetailReturnPage = SettingsDestination.USAGE
+                                page = SettingsDestination.USAGE_DETAIL
+                            },
+                        )
+                    }
+
+                    SettingsDestination.USAGE_LOG -> {
+                        UsageLogPage(
+                            analytics = usageAnalytics,
+                            onOpenRequest = { requestId ->
+                                usageDetailSelection = UsageDetailSelection.Request(requestId)
+                                usageDetailReturnPage = SettingsDestination.USAGE_LOG
+                                page = SettingsDestination.USAGE_DETAIL
+                            },
+                        )
+                    }
+
+                    SettingsDestination.USAGE_DETAIL -> {
+                        when (val selection = usageDetailSelection) {
+                            is UsageDetailSelection.Group -> {
+                                val detail by produceState<TokenUsageGroupDetail?>(
+                                    initialValue = null,
+                                    selection,
+                                    usageAnalytics,
+                                ) {
+                                    value = viewModel.usageGroupDetail(selection.kind, selection.key)
+                                }
+                                UsageGroupDetailPage(
+                                    detail = detail,
+                                    onOpenRequest = { requestId ->
+                                        usageDetailBackSelection = selection
+                                        usageDetailSelection = UsageDetailSelection.Request(requestId)
+                                        usageDetailReturnPage = SettingsDestination.USAGE_DETAIL
+                                    },
+                                )
+                            }
+                            is UsageDetailSelection.Request -> {
+                                val record by produceState<TokenUsageRecord?>(
+                                    initialValue = null,
+                                    selection,
+                                    usageAnalytics,
+                                ) {
+                                    value = viewModel.usageRecord(selection.requestId)
+                                }
+                                UsageRequestDetailPage(record)
+                            }
+                            null -> UsageRequestDetailPage(null)
+                        }
                     }
 
                     SettingsDestination.MEMORY -> {

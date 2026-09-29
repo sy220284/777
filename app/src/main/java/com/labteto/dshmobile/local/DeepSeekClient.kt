@@ -25,6 +25,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** OpenAI-compatible DeepSeek transport used by the on-device agent loop. */
@@ -48,6 +49,8 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        val requestId = UUID.randomUUID().toString()
+        val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
         val payload = buildJsonObject {
             put("model", model)
@@ -79,7 +82,10 @@ class DeepSeekClient @Inject constructor(
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
-                parse(body)
+                parse(body).copy(
+                    requestId = requestId,
+                    promptBreakdown = promptBreakdown,
+                )
             }
         } catch (error: LocalModelException) {
             throw error
@@ -109,6 +115,8 @@ class DeepSeekClient @Inject constructor(
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
+        val requestId = UUID.randomUUID().toString()
+        val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
         val payload = buildJsonObject {
             put("model", model)
@@ -224,7 +232,10 @@ class DeepSeekClient @Inject constructor(
                         )
                     }
                     return@withContext try {
-                        parse(fallback.toString())
+                        parse(fallback.toString()).copy(
+                            requestId = requestId,
+                            promptBreakdown = promptBreakdown,
+                        )
                     } catch (error: LocalModelException) {
                         throw error
                     } catch (error: Exception) {
@@ -282,6 +293,8 @@ class DeepSeekClient @Inject constructor(
                     reasoning = reasoning.toString().takeIf(String::isNotBlank),
                     toolCalls = calls,
                     usage = usage,
+                    requestId = requestId,
+                    promptBreakdown = promptBreakdown,
                 )
             }
         } catch (error: LocalModelException) {

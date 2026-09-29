@@ -16,12 +16,19 @@ internal enum class LocalSendRejectReason {
     UNCONFIGURED,
     SESSION_TRANSITION,
     QUEUE_FULL,
+    QUEUE_UNAVAILABLE,
 }
+
+internal data class LocalSendFeedbackState(
+    val sessionId: String? = null,
+    val rejectReason: LocalSendRejectReason? = null,
+    val rejectLimit: Int? = null,
+)
 
 internal data class LocalSendResult(
     val disposition: LocalSendDisposition,
     val rejectReason: LocalSendRejectReason? = null,
-    val message: String? = null,
+    val rejectLimit: Int? = null,
 ) {
     val accepted: Boolean
         get() = disposition != LocalSendDisposition.REJECTED
@@ -30,14 +37,14 @@ internal data class LocalSendResult(
         val Started = LocalSendResult(LocalSendDisposition.STARTED)
         val Queued = LocalSendResult(LocalSendDisposition.QUEUED)
 
-        fun rejected(reason: LocalSendRejectReason, message: String): LocalSendResult =
+        fun rejected(reason: LocalSendRejectReason, limit: Int? = null): LocalSendResult =
             LocalSendResult(
                 disposition = LocalSendDisposition.REJECTED,
                 rejectReason = reason,
-                message = message,
+                rejectLimit = limit,
             )
 
-        val Empty = rejected(LocalSendRejectReason.EMPTY, "请输入消息或添加附件")
+        val Empty = rejected(LocalSendRejectReason.EMPTY)
     }
 }
 
@@ -50,28 +57,16 @@ internal fun evaluateLocalSendAdmission(
     pendingLimit: Int,
 ): LocalSendResult? {
     if (sessionTransitioning) {
-        return LocalSendResult.rejected(
-            LocalSendRejectReason.SESSION_TRANSITION,
-            "会话正在切换，请稍后重试；当前输入已保留",
-        )
+        return LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION)
     }
     if (loading) {
-        return LocalSendResult.rejected(
-            LocalSendRejectReason.LOADING,
-            "会话仍在加载，请稍后重试；当前输入已保留",
-        )
+        return LocalSendResult.rejected(LocalSendRejectReason.LOADING)
     }
     if (!configured) {
-        return LocalSendResult.rejected(
-            LocalSendRejectReason.UNCONFIGURED,
-            "当前模型尚未配置，请先完成模型设置",
-        )
+        return LocalSendResult.rejected(LocalSendRejectReason.UNCONFIGURED)
     }
     if (activeRun && pendingCount >= pendingLimit) {
-        return LocalSendResult.rejected(
-            LocalSendRejectReason.QUEUE_FULL,
-            "当前执行中的补充消息已达到 ${pendingLimit} 条上限；当前输入已保留",
-        )
+        return LocalSendResult.rejected(LocalSendRejectReason.QUEUE_FULL, pendingLimit)
     }
     return null
 }
@@ -137,10 +132,7 @@ internal inline fun coordinateLocalSend(
     }
     if (activeRun) {
         if (!enqueue()) {
-            val fallback = LocalSendResult.rejected(
-                LocalSendRejectReason.QUEUE_FULL,
-                "当前执行中的补充消息队列暂时不可用；当前输入已保留",
-            )
+            val fallback = LocalSendResult.rejected(LocalSendRejectReason.QUEUE_UNAVAILABLE)
             onRejected(fallback)
             return fallback
         }

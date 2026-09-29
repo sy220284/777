@@ -22,6 +22,7 @@ import java.io.File
 data class LocalVisionRoute(
     val baseUrl: String,
     val model: String,
+    val usageContext: TokenUsageContext? = null,
 )
 
 fun interface LocalVisionAnalyzer {
@@ -44,6 +45,7 @@ class LocalVisionPlugin(
     private val routeProvider: () -> LocalVisionRoute?,
     private val analyzer: LocalVisionAnalyzer,
     private val workspaceRoot: File? = null,
+    private val usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
     private val imageSupportProvider: (LocalVisionRoute) -> Boolean? = { route ->
         LocalModelPresets.documentedImageInputSupport(route.model, route.baseUrl)
     },
@@ -88,9 +90,13 @@ class LocalVisionPlugin(
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
-                executor = HarnessToolExecutor { _, input, _ ->
+                executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
                         prompt = input.requiredString("prompt"),
+                        usageContext = usageContextProvider(
+                            toolContext.sessionId,
+                            toolContext.attributes["call_id"] as? String,
+                        ),
                         screenshotCapability = "android_screenshot",
                         screenshotArguments = emptyMap(),
                     )
@@ -109,9 +115,13 @@ class LocalVisionPlugin(
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
-                executor = HarnessToolExecutor { _, input, _ ->
+                executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
                         prompt = input.requiredString("prompt"),
+                        usageContext = usageContextProvider(
+                            toolContext.sessionId,
+                            toolContext.attributes["call_id"] as? String,
+                        ),
                         screenshotCapability = "vscreen_screenshot",
                         screenshotArguments = mapOf("id" to input.requiredString("id")),
                     )
@@ -134,7 +144,7 @@ class LocalVisionPlugin(
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
-                executor = HarnessToolExecutor { _, input, _ ->
+                executor = HarnessToolExecutor { toolContext, input, _ ->
                     val route = routeProvider()
                     val key = keyProvider()
                     if (route == null || key.isNullOrBlank()) {
@@ -170,6 +180,10 @@ class LocalVisionPlugin(
                         intro = "分析这张用户工作区图片。",
                         fixedRoute = route,
                         fixedKey = key,
+                        usageContext = usageContextProvider(
+                            toolContext.sessionId,
+                            toolContext.attributes["call_id"] as? String,
+                        ),
                     )
                     if (!result.isError) analysisCache?.put(file, route, prompt, result.content)
                     result
@@ -187,6 +201,7 @@ class LocalVisionPlugin(
 
     private suspend fun analyze(
         prompt: String,
+        usageContext: TokenUsageContext?,
         screenshotCapability: String,
         screenshotArguments: Map<String, String>,
     ): ToolResult {
@@ -206,6 +221,7 @@ class LocalVisionPlugin(
             prompt = prompt,
             imageDataUrl = imageDataUrl,
             intro = "分析这张 Android 界面截图。\n若用户要求点击目标，请给出目标中心的原始截图像素坐标 x/y，并描述用于复核的可见特征。",
+            usageContext = usageContext,
         )
     }
 
@@ -215,6 +231,7 @@ class LocalVisionPlugin(
         intro: String,
         fixedRoute: LocalVisionRoute? = null,
         fixedKey: String? = null,
+        usageContext: TokenUsageContext? = null,
     ): ToolResult {
         val route = fixedRoute ?: routeProvider()
             ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
@@ -230,7 +247,12 @@ class LocalVisionPlugin(
             append(prompt.take(4_000))
         }
         return runCatching {
-            analyzer.analyze(key, route, boundedPrompt, imageDataUrl)
+            analyzer.analyze(
+                key,
+                route.copy(usageContext = usageContext),
+                boundedPrompt,
+                imageDataUrl,
+            )
         }.fold(
             onSuccess = { ToolResult(it) },
             onFailure = { error ->

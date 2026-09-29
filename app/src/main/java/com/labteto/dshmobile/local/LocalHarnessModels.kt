@@ -303,4 +303,6 @@ data class LocalModelReply(
     val reasoning: String?,
     val toolCalls: List<LocalToolCall>,
     val usage: DeepSeekTokenUsage = DeepSeekTokenUsage(),
+    val requestId: String = "",
+    val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
 )
