@@ -71,7 +71,7 @@ class ChatTurnRunnerPromptPartitionTest {
 
         assertTrue(context.dynamicPrompt.contains("【用户纠正｜最高优先】"))
         assertTrue(context.dynamicPrompt.contains("【角色表达解释】"))
-        assertTrue(context.dynamicPrompt.contains("不得仅凭单个"))
+        assertTrue(context.dynamicPrompt.contains("不得仅凭脱离语境的单个"))
         assertTrue(context.dynamicPrompt.contains("明确边界始终优先"))
         assertTrue(context.dynamicPrompt.contains("即使只表达一次"))
         assertTrue(context.dynamicPrompt.contains("无需等待重复确认"))
