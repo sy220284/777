@@ -9,6 +9,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DS_COMPOSER_FIELD_TAG
+import com.labteto.dshmobile.ui.components.DS_COMPOSER_SURFACE_TAG
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Rule
 import org.junit.Test
@@ -77,6 +79,44 @@ class ComposerRegressionTest {
         compose.runOnIdle { assertEquals(1, stops); running = false }
         compose.onNodeWithContentDescription(stop).assertDoesNotExist()
         compose.onNodeWithContentDescription(send).assertExists()
+    }
+
+    @Test fun focusExpandsComposerToSecondaryRow() {
+        var text by mutableStateOf("")
+        compose.setContent {
+            DshTheme {
+                Composer(
+                    text,
+                    { text = it },
+                    emptyList(),
+                    {},
+                    {},
+                    null,
+                    null,
+                    {},
+                    null,
+                    null,
+                    running = false,
+                    enabled = true,
+                    onOpenAttachments = {},
+                    onOpenTools = {},
+                    onStop = {},
+                    onSend = {},
+                )
+            }
+        }
+
+        val composer = compose.onNodeWithTag(DS_COMPOSER_SURFACE_TAG)
+        val toolsLabel = context.getString(R.string.chat_context_tools)
+        compose.onNodeWithContentDescription(toolsLabel).assertDoesNotExist()
+        val collapsedHeight = composer.fetchSemanticsNode().boundsInRoot.height
+
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription(toolsLabel).assertExists()
+        val expandedHeight = composer.fetchSemanticsNode().boundsInRoot.height
+        assertTrue("聚焦后聊天框应展开到第二行", expandedHeight > collapsedHeight)
     }
 
     @Test fun rejectedSendRestoresOriginWithoutDroppingNewAttachments() {

@@ -59,8 +59,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,7 +71,9 @@ import com.labteto.dshmobile.core.wire.dto.FileAttachmentRef
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.ContextMeter
+import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
+import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsComposerSurface
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.skeleton
@@ -199,11 +199,11 @@ internal fun Composer(
 
     @Composable
     fun SendControl() {
-        CircleAction(
+        DsComposerAction(
             icon = Icons.Filled.ArrowUpward,
-            description = stringResource(R.string.chat_composer_send),
-            size = 36,
-            background = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
+            contentDescription = stringResource(R.string.chat_composer_send),
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+            containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
             tint = if (canSend) colors.onAccent else colors.labelTertiary,
             enabled = canSend,
             onClick = {
@@ -215,11 +215,11 @@ internal fun Composer(
 
     @Composable
     fun StopControl() {
-        CircleAction(
+        DsComposerAction(
             icon = null,
-            description = stringResource(R.string.chat_composer_stop),
-            size = 36,
-            background = colors.error,
+            contentDescription = stringResource(R.string.chat_composer_stop),
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+            containerColor = colors.error,
             tint = colors.onAccent,
             enabled = true,
             onClick = {
@@ -248,11 +248,11 @@ internal fun Composer(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
                 if (!composerExpanded) {
-                    CircleAction(
+                    DsComposerAction(
                         icon = Icons.Filled.Add,
-                        description = stringResource(R.string.chat_composer_attach_file),
-                        size = 30,
-                        background = colors.hoverSolid,
+                        contentDescription = stringResource(R.string.chat_composer_attach_file),
+                        visualSize = DsComposerMetrics.actionVisualSize,
+                        containerColor = colors.hoverSolid,
                         tint = colors.labelPrimary,
                         enabled = enabled && !preparing,
                         onClick = onOpenAttachments,
@@ -290,20 +290,20 @@ internal fun Composer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
-                    CircleAction(
+                    DsComposerAction(
                         icon = Icons.Filled.Add,
-                        description = stringResource(R.string.chat_composer_attach_file),
-                        size = 30,
-                        background = colors.hoverSolid,
+                        contentDescription = stringResource(R.string.chat_composer_attach_file),
+                        visualSize = DsComposerMetrics.actionVisualSize,
+                        containerColor = colors.hoverSolid,
                         tint = colors.labelPrimary,
                         enabled = enabled && !preparing,
                         onClick = onOpenAttachments,
                     )
-                    CircleAction(
+                    DsComposerAction(
                         icon = FeatherIcons.Tool,
-                        description = stringResource(R.string.chat_context_tools),
-                        size = 30,
-                        background = Color.Transparent,
+                        contentDescription = stringResource(R.string.chat_context_tools),
+                        visualSize = DsComposerMetrics.actionVisualSize,
+                        containerColor = Color.Transparent,
                         tint = colors.labelTertiary,
                         enabled = enabled,
                         onClick = onOpenTools,
@@ -533,47 +533,6 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Shared circular affordance
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CircleAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector?,
-    description: String,
-    size: Int,
-    background: Color,
-    tint: Color,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    content: (@Composable () -> Unit)? = null,
-) {
-    Surface(
-        onClick = onClick,
-        // Described here rather than on the icon, because not every one of these has an icon: the
-        // stop button draws a plain square through `content`, and while the description hung off
-        // the icon that button announced nothing at all to a screen reader.
-        modifier = Modifier.size(size.dp).semantics { this.contentDescription = description },
-        enabled = enabled,
-        shape = CircleShape,
-        color = background,
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            when {
-                content != null -> content()
-                icon != null -> Icon(
-                    icon,
-                    // The Surface above already carries it; repeating it here would have a screen
-                    // reader say the label twice.
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size((size * 0.46f).dp),
-                )
-            }
         }
     }
 }

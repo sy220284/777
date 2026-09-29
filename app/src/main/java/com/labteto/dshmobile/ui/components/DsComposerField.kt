@@ -9,11 +9,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.Text
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+
+const val DS_COMPOSER_FIELD_TAG = "ds-composer-field"
 
 /**
  * Compact multiline field shared by all conversation composers.
@@ -37,6 +40,7 @@ fun DsComposerField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
+            .testTag(DS_COMPOSER_FIELD_TAG)
             .heightIn(min = DsSpacing.touchTarget)
             .onFocusChanged { onFocusedChange(it.isFocused) }
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),

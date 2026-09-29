@@ -92,6 +92,7 @@ import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerSurface
 import com.labteto.dshmobile.ui.components.DsCard
@@ -1247,7 +1248,7 @@ private fun LocalConversationSurface(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
                     if (!composerExpanded) {
-                        DsIconButton(
+                        DsComposerAction(
                             icon = Icons.Filled.Add,
                             contentDescription = stringResource(R.string.chat_composer_add_attachment),
                             onClick = { showAttachmentPicker = true },
@@ -1277,7 +1278,7 @@ private fun LocalConversationSurface(
 
                     if (!composerExpanded) {
                         if (state.running) {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Filled.Stop,
                                 contentDescription = stringResource(R.string.chat_composer_stop),
                                 onClick = onStop,
@@ -1285,7 +1286,7 @@ private fun LocalConversationSurface(
                                 containerColor = colors.error,
                             )
                         } else {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Filled.ArrowUpward,
                                 contentDescription = stringResource(R.string.chat_composer_send),
                                 onClick = ::submitComposerMessage,
@@ -1307,7 +1308,7 @@ private fun LocalConversationSurface(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                     ) {
-                        DsIconButton(
+                        DsComposerAction(
                             icon = Icons.Filled.Add,
                             contentDescription = stringResource(R.string.chat_composer_add_attachment),
                             onClick = { showAttachmentPicker = true },
@@ -1319,7 +1320,7 @@ private fun LocalConversationSurface(
                             state.usageMode == LocalUsageMode.CHAT &&
                             !state.groupChat.enabled
                         ) {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Outlined.AutoAwesome,
                                 contentDescription = stringResource(R.string.local_reply_suggestions_open),
                                 onClick = {
@@ -1351,7 +1352,7 @@ private fun LocalConversationSurface(
                         }
 
                         if (state.usageMode == LocalUsageMode.WORK) {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = FeatherIcons.CheckSquare,
                                 contentDescription = stringResource(
                                     if (state.planMode) R.string.local_plan_button_on
@@ -1362,7 +1363,7 @@ private fun LocalConversationSurface(
                                 tint = if (state.planMode) colors.accent else colors.labelSecondary,
                                 containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
                             )
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Outlined.Shield,
                                 contentDescription = stringResource(R.string.local_auto_approve_short),
                                 onClick = if (state.safeAutoApprovalEnabled) {
@@ -1382,7 +1383,7 @@ private fun LocalConversationSurface(
                         Spacer(Modifier.weight(1f))
 
                         if (state.running) {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Filled.Stop,
                                 contentDescription = stringResource(R.string.chat_composer_stop),
                                 onClick = onStop,
@@ -1390,7 +1391,7 @@ private fun LocalConversationSurface(
                                 containerColor = colors.error,
                             )
                             if (state.usageMode == LocalUsageMode.WORK) {
-                                DsIconButton(
+                                DsComposerAction(
                                     icon = Icons.Filled.ArrowUpward,
                                     contentDescription = if (state.queuedInputCount > 0) {
                                         stringResource(
@@ -1411,7 +1412,7 @@ private fun LocalConversationSurface(
                                 )
                             }
                         } else {
-                            DsIconButton(
+                            DsComposerAction(
                                 icon = Icons.Filled.ArrowUpward,
                                 contentDescription = stringResource(R.string.chat_composer_send),
                                 onClick = ::submitComposerMessage,
