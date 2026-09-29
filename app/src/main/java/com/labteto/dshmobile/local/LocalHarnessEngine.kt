@@ -823,9 +823,7 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
         val result = modelConfiguration.save(apiKey, model, baseUrl)
-        if (apiKey.isNotBlank()) {
-            imageCapabilities.clearRoute(result.baseUrl, result.model)
-        }
+        imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
                 configured = result.configured,
