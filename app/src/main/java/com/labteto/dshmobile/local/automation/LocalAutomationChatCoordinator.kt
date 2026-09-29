@@ -74,8 +74,7 @@ internal class LocalAutomationChatCoordinator(
         }
         require(state.value.configured) { "本机 Harness 尚未配置模型" }
 
-        val initialSession = sessionCoordinator.read(targetSessionId)
-            ?: error("定时互动绑定的聊天已不存在")
+        val initialSession = sessionCoordinator.read(targetSessionId) ?: error("定时互动绑定的聊天已不存在")
         require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
 
