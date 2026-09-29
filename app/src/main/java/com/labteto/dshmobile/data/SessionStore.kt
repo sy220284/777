@@ -318,7 +318,9 @@ class SessionStore @Inject constructor(
     // which is both what an answer names and what a `cancel` frame withdraws — 0.1.2 mints no
     // separate approval id.
     private val approvalRequests = HashMap<String, ApprovalRequest>() // eventId -> request
+    private val approvalCardsBySession = LinkedHashMap<String, PendingApproval>()
     private val questionEvents = PendingQuestionRegistry()
+    private val questionCardsBySession = LinkedHashMap<String, PendingQuestions>()
 
     // Open-session fold state.
     private var currentId: String? = null
@@ -410,10 +412,46 @@ class SessionStore @Inject constructor(
                 val reconnect = prev.hasConnected &&
                     prev.phase == ConnectionPhase.RECONNECTING &&
                     state.phase == ConnectionPhase.CONNECTED
+                val retiredGeneration =
+                    prev.phase == ConnectionPhase.CONNECTED &&
+                        state.phase != ConnectionPhase.CONNECTED
+                if (retiredGeneration) clearRetiredGenerationInteractions()
                 prev = state
                 if (initialConnect || reconnect) triggerBaseline()
             }
         }
+    }
+
+    private fun clearRetiredGenerationInteractions() {
+        synchronized(lock) {
+            val affectedSessions = linkedSetOf<String>().apply {
+                approvalCardsBySession.keys.forEach(::add)
+                questionCardsBySession.keys.forEach(::add)
+            }
+            approvalRequests.clear()
+            approvalCardsBySession.clear()
+            questionEvents.clear()
+            questionCardsBySession.clear()
+            affectedSessions.forEach { sessionId ->
+                removePendingLocked(sessionId, "approval")
+                removePendingLocked(sessionId, "question")
+                removePendingLocked(sessionId, "plan-review")
+            }
+            emitSessionsLocked()
+            _pendingApproval.value = null
+            _pendingQuestions.value = null
+        }
+    }
+
+    private fun syncCurrentInteractionCardsLocked() {
+        _pendingApproval.value = pendingApprovalForSession(
+            currentId,
+            approvalCardsBySession.values,
+        )
+        _pendingQuestions.value = pendingQuestionsForSession(
+            currentId,
+            questionCardsBySession.values,
+        )
     }
 
     private fun observeEvents() {
@@ -587,10 +625,14 @@ class SessionStore @Inject constructor(
         val approval = synchronized(lock) { approvalRequests.remove(eventId) }
         if (approval != null) {
             synchronized(lock) {
-                removePendingLocked(approval.sessionId, "approval")
+                val currentCard = approvalCardsBySession[approval.sessionId]
+                if (currentCard?.approvalId == eventId) {
+                    approvalCardsBySession.remove(approval.sessionId)
+                    removePendingLocked(approval.sessionId, "approval")
+                }
                 emitSessionsLocked()
+                syncCurrentInteractionCardsLocked()
             }
-            if (_pendingApproval.value?.approvalId == eventId) _pendingApproval.value = null
             return
         }
         val sessionId = synchronized(lock) {
@@ -609,13 +651,14 @@ class SessionStore @Inject constructor(
         // them and lose its card to this call.
         synchronized(lock) {
             if (!questionEvents.forget(sessionId, eventId)) return
-            removePendingLocked(sessionId, "question")
-            removePendingLocked(sessionId, "plan-review")
-            emitSessionsLocked()
-            val shown = _pendingQuestions.value
-            if (shown?.sessionId == sessionId && (eventId == null || shown.rpcId == eventId)) {
-                _pendingQuestions.value = null
+            val currentCard = questionCardsBySession[sessionId]
+            if (currentCard == null || eventId == null || currentCard.rpcId == eventId) {
+                questionCardsBySession.remove(sessionId)
+                removePendingLocked(sessionId, "question")
+                removePendingLocked(sessionId, "plan-review")
             }
+            emitSessionsLocked()
+            syncCurrentInteractionCardsLocked()
         }
     }
 
@@ -752,13 +795,7 @@ class SessionStore @Inject constructor(
     var notificationSink: ((String, SessionEventEnvelope) -> Unit)? = null
 
     private fun handleApprovalRequested(eventId: String, sessionId: String, request: ApprovalRequestEvent) {
-        synchronized(lock) {
-            approvalRequests[eventId] =
-                ApprovalRequest(sessionId, eventId, request.toolName, request.reason)
-            addPendingLocked(sessionId, "approval")
-            emitSessionsLocked()
-        }
-        _pendingApproval.value = PendingApproval(
+        val card = PendingApproval(
             sessionId = sessionId,
             // The event id is the approval id now: 0.1.2 correlates a pending request by the
             // frame's own `eventId` and mints nothing separate.
@@ -767,6 +804,14 @@ class SessionStore @Inject constructor(
             toolName = request.toolName,
             reason = request.reason,
         )
+        synchronized(lock) {
+            approvalRequests[eventId] =
+                ApprovalRequest(sessionId, eventId, request.toolName, request.reason)
+            approvalCardsBySession[sessionId] = card
+            addPendingLocked(sessionId, "approval")
+            emitSessionsLocked()
+            syncCurrentInteractionCardsLocked()
+        }
     }
 
     private fun handleQuestionRequested(
@@ -781,13 +826,14 @@ class SessionStore @Inject constructor(
             } else {
                 "question"
             }
+            removePendingLocked(sessionId, "question")
+            removePendingLocked(sessionId, "plan-review")
             addPendingLocked(sessionId, kind)
+            questionCardsBySession[sessionId] = PendingQuestions(sessionId, eventId, questions)
             emitSessionsLocked()
-            // Inside the lock, with the registration it belongs to: [forgetQuestions] decides
-            // whether to clear the card by reading that registration, so a request that installed
-            // one but not yet the other could have its card taken by an answer to the request it
-            // just replaced.
-            _pendingQuestions.value = PendingQuestions(sessionId, eventId, questions)
+            // Keep every session's card, but only project the currently open session to the UI.
+            // A background session request must not overwrite the visible session's interaction.
+            syncCurrentInteractionCardsLocked()
         }
     }
 
@@ -815,8 +861,12 @@ class SessionStore @Inject constructor(
     private fun onSessionRemoved(sessionId: String) {
         synchronized(lock) {
             indexState.removeSession(sessionId)
+            approvalRequests.entries.removeAll { it.value.sessionId == sessionId }
+            approvalCardsBySession.remove(sessionId)
             questionEvents.discard(sessionId)
+            questionCardsBySession.remove(sessionId)
             emitSessionsLocked()
+            syncCurrentInteractionCardsLocked()
         }
     }
 
@@ -949,6 +999,7 @@ class SessionStore @Inject constructor(
             val same = currentId == sessionId
             currentId = sessionId
             _currentSessionId.value = sessionId
+            syncCurrentInteractionCardsLocked()
             openSessionState.reset(indexState.session(sessionId)?.blank ?: true)
             if (!same) {
                 _currentConversation.value = null
