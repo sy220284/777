@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -723,7 +726,12 @@ private fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
             color = colors.labelPrimary,
         )
         Spacer(Modifier.width(DsSpacing.small))
-        Text("›", style = DsType.large20, color = colors.labelTertiary)
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = colors.labelTertiary,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
