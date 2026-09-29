@@ -96,6 +96,7 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -103,6 +104,7 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -686,6 +688,7 @@ private fun LocalConversationSurface(
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+    var composerMenuOpen by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -699,6 +702,10 @@ private fun LocalConversationSurface(
     var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
         mutableStateOf(state.messages.size)
     }
+    LaunchedEffect(state.running) {
+        if (state.running) composerMenuOpen = false
+    }
+
     LaunchedEffect(state.messages.size) {
         val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
         if (
@@ -1251,13 +1258,57 @@ private fun LocalConversationSurface(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
                 if (!state.running) {
-                    DsComposerAction(
-                        icon = Icons.Filled.Add,
-                        contentDescription = stringResource(R.string.chat_composer_add_attachment),
-                        onClick = { showAttachmentPicker = true },
-                        tint = colors.labelPrimary,
-                        containerColor = colors.hoverSolid,
-                    )
+                    Box {
+                        DsComposerAction(
+                            icon = Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.chat_composer_add_attachment),
+                            onClick = { composerMenuOpen = true },
+                            tint = colors.labelPrimary,
+                            containerColor = colors.hoverSolid,
+                        )
+                        DsPopupMenu(
+                            expanded = composerMenuOpen,
+                            onDismiss = { composerMenuOpen = false },
+                            items = buildList {
+                                add(
+                                    MenuItem(
+                                        text = stringResource(R.string.chat_composer_add_attachment),
+                                        icon = Icons.Outlined.AttachFile,
+                                        onClick = { showAttachmentPicker = true },
+                                    ),
+                                )
+                                if (
+                                    state.usageMode == LocalUsageMode.CHAT &&
+                                    !state.groupChat.enabled &&
+                                    state.messages.any { message ->
+                                        message.role == "assistant" && message.content.isNotBlank()
+                                    }
+                                ) {
+                                    add(
+                                        MenuItem(
+                                            text = stringResource(R.string.local_reply_suggestions_open),
+                                            icon = Icons.Outlined.AutoAwesome,
+                                            onClick = {
+                                                if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                                                    showReplySuggestions = true
+                                                } else if (!replySuggestionsLoading) {
+                                                    replySuggestionsLoading = true
+                                                    scope.launch {
+                                                        val generated = try {
+                                                            onGenerateReplySuggestions()
+                                                        } finally {
+                                                            replySuggestionsLoading = false
+                                                        }
+                                                        if (generated) showReplySuggestions = true
+                                                    }
+                                                }
+                                            },
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                    }
                 }
 
                 if (state.usageMode == LocalUsageMode.WORK) {
@@ -1282,43 +1333,6 @@ private fun LocalConversationSurface(
                         },
                         tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
                         containerColor = if (state.safeAutoApprovalEnabled) {
-                            colors.accentTertiary
-                        } else {
-                            Color.Transparent
-                        },
-                    )
-                } else if (
-                    !state.running &&
-                    !state.groupChat.enabled &&
-                    state.messages.any { message ->
-                        message.role == "assistant" && message.content.isNotBlank()
-                    }
-                ) {
-                    DsComposerAction(
-                        icon = Icons.Outlined.AutoAwesome,
-                        contentDescription = stringResource(R.string.local_reply_suggestions_open),
-                        onClick = {
-                            if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                                showReplySuggestions = true
-                            } else if (!replySuggestionsLoading) {
-                                replySuggestionsLoading = true
-                                scope.launch {
-                                    val generated = try {
-                                        onGenerateReplySuggestions()
-                                    } finally {
-                                        replySuggestionsLoading = false
-                                    }
-                                    if (generated) showReplySuggestions = true
-                                }
-                            }
-                        },
-                        enabled = !state.running && !replySuggestionsLoading,
-                        tint = if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                            colors.accent
-                        } else {
-                            colors.labelSecondary
-                        },
-                        containerColor = if (state.replySuggestions.any { it.text.isNotBlank() }) {
                             colors.accentTertiary
                         } else {
                             Color.Transparent
