@@ -69,6 +69,8 @@ if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" 
     violations.append("Shared composer must own compact action geometry and sizing tokens")
 if "icon = FeatherIcons.CheckSquare" not in local_screen or "icon = Icons.Outlined.Shield" not in local_screen:
     violations.append("Work composer must keep planning and auto-approve as compact in-composer actions")
+if "val result = onSend(input, selected)" not in local_screen or "if (!result.accepted) return" not in local_screen:
+    violations.append("Local Chat/Work composer must preserve the draft until runtime accepts the send")
 
 persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
 if persona_gallery_lines > 1_160:
@@ -84,6 +86,8 @@ if session_store_lines > 2_050:
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
+if "MODEL_STREAM_INCOMPLETE" not in deepseek or "sawTerminalFrame" not in deepseek:
+    violations.append("Model streaming must reject truncated SSE responses instead of accepting partial output")
 web_provider = WEB_PROVIDER.read_text(encoding="utf-8")
 context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
 coordinator = COORDINATOR.read_text(encoding="utf-8")
