@@ -220,6 +220,38 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun legacyPersistentPayloadRecoversSessionOwnershipForDeletion() = runTest {
+        val root = createTempDir(prefix = "legacy-persistent-job-owner-")
+        try {
+            val file = File(root, "jobs.json")
+            val store = LocalPersistentJobStore(
+                file = file,
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-legacy",
+                        label = "网页抓取",
+                        status = "running",
+                        resumeKind = "web_fetch",
+                        resumePayload = """{"session_id":"session-old","url":"https://example.com"}""",
+                    ),
+                ),
+            )
+
+            val restored = store.read().single()
+            assertEquals("session-old", restored.ownerId)
+
+            val manager = LocalJobManager(this, store) { }
+            manager.removeOwnedAndJoin(setOf("session-old"))
+            assertTrue(manager.snapshotInfos().none { it.id == "job-legacy" })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-")
         try {
