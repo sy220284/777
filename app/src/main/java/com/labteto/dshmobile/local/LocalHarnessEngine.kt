@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
 import com.labteto.dshmobile.local.send.prepareLocalSend
@@ -327,8 +328,10 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
+    private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
+    internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -1718,20 +1721,14 @@ class LocalHarnessEngine @Inject constructor(
                 state.configured, state.loading, sessionTransitioning, activeRun,
                 targetPending.size(), MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
-                    targetState.update {
-                        it.copy(
-                            sendRejectReason = rejected.rejectReason,
-                            sendRejectLimit = rejected.rejectLimit,
-                        )
-                    }
+                    _sendFeedbackState.value = LocalSendFeedbackState(
+                        sessionId = state.sessionId,
+                        rejectReason = rejected.rejectReason,
+                        rejectLimit = rejected.rejectLimit,
+                    )
                 },
                 onAccepted = {
-                    targetState.update {
-                        it.copy(
-                            sendRejectReason = null,
-                            sendRejectLimit = null,
-                        )
-                    }
+                    _sendFeedbackState.value = LocalSendFeedbackState()
                     cancelChatPostTurn()
                 },
                 enqueue = { targetPending.offer(queuedInput) },
