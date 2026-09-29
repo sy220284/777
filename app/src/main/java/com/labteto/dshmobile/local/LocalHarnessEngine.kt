@@ -147,6 +147,9 @@ import okhttp3.OkHttpClient
  * providers with Android providers: an app-private filesystem, `/system/bin/sh`, OkHttp and Android
  * Keystore. Remote mode remains separate and unchanged.
  */
+private const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
+private const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
+
 @Singleton
 class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
