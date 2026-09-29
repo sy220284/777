@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
@@ -27,11 +26,9 @@ internal class LocalChatTurnCoordinator(
         relationshipMemory: String = "",
     ): LocalPreparedChatTurn {
         val sharedContext = if (snapshot.groupChat.enabled) {
-            snapshot.groupChat.context.withLegacyFallback(
-                snapshot.groupChat.members.firstOrNull()?.chatState ?: snapshot.chatState,
-            )
+            snapshot.groupChat.context
         } else {
-            snapshot.chatContext.withLegacyFallback(snapshot.chatState)
+            snapshot.chatContext
         }
         val context = if (snapshot.chatPersona.isUnboundChatPersona()) {
             runner.prepareProfile(

@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -218,7 +219,7 @@ internal class LocalSessionLifecycleCoordinator(
                             },
                             gallerySaveSuppressedThrough = 0L,
                             chatPersona = chatPersona,
-                            chatState = chatState,
+                            chatState = chatState.withoutLegacyConversationContext(),
                             chatContext = chatContext,
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),

@@ -10,7 +10,7 @@ import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePending
 import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
-import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -221,7 +221,6 @@ internal class LocalChatContextRefreshCoordinator(
                 current
             } else {
                 val baseContext = current.chatContext
-                    .withLegacyFallback(current.chatState)
                     .applySceneTurn(
                         userMessage = userMessage,
                         assistantMessage = assistantMessage,
@@ -276,7 +275,7 @@ internal class LocalChatContextRefreshCoordinator(
     ) {
         val before = state.value
         if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
-        val baseContext = before.chatContext.withLegacyFallback(before.chatState)
+        val baseContext = before.chatContext
         if (baseContext.generation != expectedGeneration) return
 
         val pending = baseContext.pendingTurns.asSequence()
@@ -332,10 +331,7 @@ internal class LocalChatContextRefreshCoordinator(
             candidate = plan.state.continuity,
             pendingTurns = pending,
         )
-        val deterministicState = plan.state.copy(
-            scene = baseContext.scene,
-            continuity = groundedContinuity,
-        )
+        val deterministicState = plan.state.withoutLegacyConversationContext()
         val nextContext = baseContext.commitProcessed(
             scene = baseContext.scene,
             continuity = groundedContinuity,
@@ -343,7 +339,7 @@ internal class LocalChatContextRefreshCoordinator(
         )
         var applied = false
         state.update { current ->
-            val currentContext = current.chatContext.withLegacyFallback(current.chatState)
+            val currentContext = current.chatContext
             if (
                 current.sessionId != expectedSessionId ||
                 currentContext.generation != expectedGeneration ||

@@ -596,4 +596,28 @@ class ChatContextStateTest {
         assertTrue(grounded.decisions.isEmpty())
     }
 
+    @Test
+    fun activeCharacterStateDropsLegacyConversationMirrors() {
+        val state = ChatCharacterState(
+            mood = "期待",
+            relationshipState = "亲近",
+            scene = ChatSceneState(sceneTime = "夜晚", location = "房间"),
+            continuity = ChatContinuityState(
+                recentEvents = listOf("刚刚回到房间"),
+                decisions = listOf("今晚继续聊"),
+                unfinished = listOf("还没说完"),
+            ),
+        )
+
+        val cleaned = state.withoutLegacyConversationContext()
+
+        assertEquals("期待", cleaned.mood)
+        assertEquals("亲近", cleaned.relationshipState)
+        assertTrue(cleaned.scene.sceneTime.isBlank())
+        assertTrue(cleaned.scene.location.isBlank())
+        assertTrue(cleaned.continuity.recentEvents.isEmpty())
+        assertTrue(cleaned.continuity.decisions.isEmpty())
+        assertTrue(cleaned.continuity.unfinished.isEmpty())
+    }
+
 }
