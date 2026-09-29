@@ -145,72 +145,68 @@ internal class LocalModelRequestCoordinator(
             },
         )
 
-        return try {
-            executor.execute {
-                val streamPreview = LocalStreamPreview(
-                    maxChars = maxStreamPreviewChars,
-                    minIntervalMs = streamPreviewIntervalMs,
-                    clockMs = { System.nanoTime() / 1_000_000 },
-                    publish = { preview ->
-                        if (publishPreviewEnabled && previewGuard()) publishPreview(preview)
-                    },
-                )
-                val streamFilter = streamFilterPhrases
-                    .takeIf { it.isNotEmpty() }
-                    ?.let(::ChatStreamFilter)
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    val reply = modelClient.completeStreaming(
-                        apiKey = key,
-                        baseUrl = snapshot.baseUrl,
-                        model = snapshot.model,
-                        messages = messages,
-                        tools = tools,
-                        temperature = temperature,
-                        onDelta = { delta ->
-                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                            streamPreview.append(visible)
+        var activeMessages = messages
+        var overflowRound = 0
+        while (true) {
+            try {
+                return executor.execute {
+                    val streamPreview = LocalStreamPreview(
+                        maxChars = maxStreamPreviewChars,
+                        minIntervalMs = streamPreviewIntervalMs,
+                        clockMs = { System.nanoTime() / 1_000_000 },
+                        publish = { preview ->
+                            if (publishPreviewEnabled && previewGuard()) publishPreview(preview)
                         },
                     )
-                    streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
-                    streamPreview.flush()
-                    reply
+                    val streamFilter = streamFilterPhrases
+                        .takeIf { it.isNotEmpty() }
+                        ?.let(::ChatStreamFilter)
+                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                        val reply = modelClient.completeStreaming(
+                            apiKey = key,
+                            baseUrl = snapshot.baseUrl,
+                            model = snapshot.model,
+                            messages = activeMessages,
+                            tools = tools,
+                            temperature = temperature,
+                            onDelta = { delta ->
+                                val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                streamPreview.append(visible)
+                            },
+                        )
+                        streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
+                        streamPreview.flush()
+                        reply
+                    }
                 }
+            } catch (error: Throwable) {
+                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+                val summaryMode = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                    LocalHistorySummaryMode.CHAT
+                } else {
+                    LocalHistorySummaryMode.WORK
+                }
+                val compacted = historyCompactor.compactForOverflow(activeMessages, summaryMode)
+                    ?: throw error
+                val madeProgress =
+                    compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                        compacted.messages != activeMessages
+                if (!madeProgress) throw error
+
+                overflowRound += 1
+                if (persistOverflowHistory) {
+                    (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
+                }
+                log.append("request/context-overflow-recovery", buildJsonObject {
+                    put("step", step)
+                    put("round", overflowRound)
+                    put("model", snapshot.model)
+                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                    put("omitted_messages", compacted.omittedMessages)
+                })
+                activeMessages = compacted.messages
             }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val summaryMode = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                LocalHistorySummaryMode.CHAT
-            } else {
-                LocalHistorySummaryMode.WORK
-            }
-            val compacted = historyCompactor.compactForOverflow(messages, summaryMode)
-                ?: throw error
-            if (persistOverflowHistory) {
-                (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
-            }
-            log.append("request/context-overflow-recovery", buildJsonObject {
-                put("step", step)
-                put("model", snapshot.model)
-                put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                put("omitted_messages", compacted.omittedMessages)
-            })
-            complete(
-                key = key,
-                snapshot = snapshot,
-                messages = compacted.messages,
-                step = step,
-                toolsOverride = tools,
-                publishPreviewEnabled = publishPreviewEnabled,
-                maxAttemptsOverride = maxAttemptsOverride,
-                allowContextOverflowRecovery = false,
-                persistOverflowHistory = false,
-                streamFilterPhrases = streamFilterPhrases,
-                requestLog = log,
-                temperature = temperature,
-                previewGuard = previewGuard,
-                overflowPersister = overflowPersister,
-            )
         }
     }
 }
