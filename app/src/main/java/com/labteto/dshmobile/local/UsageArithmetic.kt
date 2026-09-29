@@ -18,6 +18,28 @@ internal fun saturatingUsageCostAdd(left: Double, right: Double): Double {
     return if (safeLeft > Double.MAX_VALUE - safeRight) Double.MAX_VALUE else safeLeft + safeRight
 }
 
+internal fun saturatingUsageCostProduct(tokens: Long, rate: Double): Double {
+    val safeTokens = tokens.coerceAtLeast(0L).toDouble()
+    val safeRate = rate.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+    val value = safeTokens * safeRate
+    return if (value.isFinite() && value >= 0.0) value else Double.MAX_VALUE
+}
+
+internal fun DeepSeekTokenUsage.normalizedForAccounting(): DeepSeekTokenUsage {
+    val prompt = promptTokens.coerceAtLeast(0L)
+    val hit = cacheHitTokens.coerceAtLeast(0L).coerceAtMost(prompt)
+    val miss = cacheMissTokens.coerceAtLeast(0L)
+        .takeIf { it > 0L }
+        ?: nonNegativeUsageDifference(prompt, hit)
+    return copy(
+        promptTokens = prompt,
+        cacheHitTokens = hit,
+        cacheMissTokens = miss,
+        completionTokens = completionTokens.coerceAtLeast(0L),
+        reasoningTokens = reasoningTokens.coerceAtLeast(0L),
+    )
+}
+
 internal fun TokenUsageRecord.normalizedForAccounting(): TokenUsageRecord = copy(
     inputTokens = inputTokens.coerceAtLeast(0L),
     cacheHitTokens = cacheHitTokens.coerceAtLeast(0L),
