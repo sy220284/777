@@ -209,9 +209,6 @@ class DeepSeekPricingRepository @Inject constructor(
     private val _state = MutableStateFlow(loadPersistedState())
     val state: StateFlow<DeepSeekPricingState> = _state.asStateFlow()
 
-    fun pricingFor(model: String): DeepSeekModelPricing? =
-        _state.value.models.firstOrNull { it.matches(model) }
-
     suspend fun refreshFromOfficial() {
         _state.update { it.copy(refreshing = true, error = null) }
         val result = runCatching {
