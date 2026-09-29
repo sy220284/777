@@ -14,6 +14,9 @@ class ChatContextAssemblerTest {
         assertTrue(ChatMemorySelector.shouldRecall("你喜欢我吗"))
         assertTrue(ChatMemorySelector.shouldRecall("还爱我吗"))
         assertTrue(ChatMemorySelector.shouldRecall("我们算什么关系"))
+        assertTrue(ChatMemorySelector.shouldRecall("那件事后来怎么样了"))
+        assertTrue(ChatMemorySelector.shouldRecall("你答应过我的"))
+        assertTrue(ChatMemorySelector.shouldRecall("还是按原来的安排吧"))
         assertFalse(ChatMemorySelector.shouldRecall("喜欢"))
     }
 

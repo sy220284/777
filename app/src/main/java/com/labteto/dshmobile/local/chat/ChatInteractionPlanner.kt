@@ -823,17 +823,16 @@ class ChatInteractionPlanner @Inject constructor(
             ) else previous.facts,
             hypotheses = if (raw.containsKey("hypotheses")) mergeEvidence(
                 previous = previous.hypotheses,
-                incoming = value.hypotheses,
-                minimumConfidence = 10,
-                maximumConfidence = 85,
-                allowedSources = null,
-                limit = 6,
+                incoming = value.hypotheses.filter { evidenceGrounded(it, userMessage, assistantMessage) },
+                minimumConfidence = 10, maximumConfidence = 85, allowedSources = FACT_SOURCES, limit = 6,
             ) else previous.hypotheses,
             unknowns = if (raw.containsKey("unknowns")) {
                 mergeStrings(previous.unknowns, value.unknowns, 6, 160)
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
-                mergeStrings(previous.sharedMoments, value.sharedMoments, 8, 180)
+                mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->
+                    evidenceGrounded(RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"), userMessage, assistantMessage)
+                }, 8, 180)
             } else previous.sharedMoments,
         )
     }
@@ -889,37 +888,6 @@ class ChatInteractionPlanner @Inject constructor(
             updatedAt = System.currentTimeMillis(),
         )
     }
-
-    private fun evidenceGrounded(
-        evidence: RelationshipEvidence,
-        userMessage: String,
-        assistantMessage: String,
-    ): Boolean {
-        val source = evidence.source.trim().lowercase()
-        val evidenceText = normalize(evidence.text)
-        if (evidenceText.length < 2) return false
-
-        val sourceText = when (source) {
-            "user", "explicit" -> normalize(userMessage)
-            "observed", "dialogue" -> normalize(userMessage + assistantMessage)
-            else -> return false
-        }
-        if (sourceText.length < 2) return false
-        if (sourceText.contains(evidenceText) || evidenceText.contains(sourceText)) return true
-
-        val evidenceBigrams = bigrams(evidenceText)
-        val sourceBigrams = bigrams(sourceText)
-        if (evidenceBigrams.isEmpty() || sourceBigrams.isEmpty()) return false
-        val shared = evidenceBigrams.count(sourceBigrams::contains)
-        val ratio = shared.toDouble() / evidenceBigrams.size
-        return shared >= 2 && ratio >= 0.25
-    }
-
-    private fun bigrams(text: String): Set<String> =
-        if (text.length < 2) emptySet()
-        else (0 until text.length - 1).mapTo(linkedSetOf()) { index ->
-            text.substring(index, index + 2)
-        }
 
     private fun mergeEvidence(
         previous: List<RelationshipEvidence>,

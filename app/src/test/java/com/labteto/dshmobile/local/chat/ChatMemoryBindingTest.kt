@@ -54,6 +54,21 @@ class ChatMemoryBindingTest {
     }
 
     @Test
+    fun characterRelationshipPreferenceDoesNotLeakAcrossCharacters() {
+        val preference = relationship(
+            content = "人物特色偏好：只接受她使用这个称呼",
+            kind = MemoryKind.RELATIONSHIP_PREFERENCE,
+            subjectKey = "gallery:one",
+        )
+        assertTrue(
+            relationshipMemoryMatchesSubject(preference, "gallery:one", "lineage", "角色一"),
+        )
+        assertFalse(
+            relationshipMemoryMatchesSubject(preference, "gallery:two", "lineage", "角色二"),
+        )
+    }
+
+    @Test
     fun globalRelationshipPreferenceRemainsUserWide() {
         val preference = relationship(
             content = "用户关系偏好：我不喜欢冷处理",

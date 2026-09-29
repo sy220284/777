@@ -18,8 +18,8 @@ internal fun chatRelationshipSubjectKey(
  * Decide whether a relationship memory is allowed into the current character context.
  *
  * New records use [MemoryRecord.subjectKey]. Legacy records are accepted only when their lineage
- * matches or their text explicitly names the current character. User-wide relationship preferences
- * remain global by design.
+ * matches or their text explicitly names the current character. Relationship preferences without
+ * a subject key are user-wide; preferences carrying a subject key belong only to that character.
  */
 internal fun relationshipMemoryMatchesSubject(
     memory: MemoryRecord,
@@ -27,7 +27,7 @@ internal fun relationshipMemoryMatchesSubject(
     currentLineageId: String?,
     subjectLabel: String?,
 ): Boolean {
-    if (memory.kind == MemoryKind.RELATIONSHIP_PREFERENCE) return true
+    if (memory.kind == MemoryKind.RELATIONSHIP_PREFERENCE && memory.subjectKey == null) return true
     if (memory.subjectKey != null) {
         return currentSubjectKey != null && memory.subjectKey == currentSubjectKey
     }
