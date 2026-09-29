@@ -332,4 +332,57 @@ class DeepSeekClientTest {
         assertEquals("完成", reply.content)
     }
 
+
+    @Test
+    fun emptySuccessfulResponseIsRetryableIncompleteStream() = runBlocking {
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body("".toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+
+        val error = runCatching {
+            streamingClient.completeStreaming(
+                apiKey = "test",
+                baseUrl = "https://example.com",
+                model = "deepseek-chat",
+                messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("MODEL_STREAM_INCOMPLETE", error?.code)
+        assertTrue(error?.retryable == true)
+    }
+
+    @Test
+    fun malformedNonSseFallbackIsRetryableProtocolFailure() = runBlocking {
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body("{not-json".toResponseBody("application/json".toMediaType()))
+                .build()
+        }.build()
+        val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+
+        val error = runCatching {
+            streamingClient.completeStreaming(
+                apiKey = "test",
+                baseUrl = "https://example.com",
+                model = "deepseek-chat",
+                messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
+        assertTrue(error?.retryable == true)
+    }
+
 }
