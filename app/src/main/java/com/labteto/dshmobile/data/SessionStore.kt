@@ -1318,7 +1318,7 @@ class SessionStore @Inject constructor(
             ),
             "question response",
             sessionId,
-        ) { forgetQuestions(sessionId, eventId) }
+        ) { forgetRequest(eventId) }
     }
 
     /**
@@ -1349,11 +1349,11 @@ class SessionStore @Inject constructor(
             ),
             "question dismissal",
             sessionId,
-        ) { forgetQuestions(sessionId, eventId) }
+        ) { forgetRequest(eventId) }
     }
 
     private fun pendingQuestionEvent(sessionId: String): String? {
-        val eventId = synchronized(lock) { questionEvents.eventFor(sessionId) }
+        val eventId = synchronized(lock) { pendingInteractions.questionEventForSession(sessionId) }
         if (eventId == null) log("no pending question for session $sessionId")
         return eventId
     }
@@ -1367,9 +1367,12 @@ class SessionStore @Inject constructor(
      * this client's to settle any more.
      */
     private fun abandonQuestions(sessionId: String): QuestionOutcome {
-        // Null, not an event: the corpse is defined by having no registration, and a request that
-        // arrived in the meantime has one and must be left alone.
-        forgetQuestions(sessionId, null)
+        synchronized(lock) {
+            if (pendingInteractions.forgetQuestions(sessionId, null)) {
+                removePendingLocked(sessionId, "question"); removePendingLocked(sessionId, "plan-review")
+                emitSessionsLocked(); syncCurrentInteractionCardsLocked()
+            }
+        }
         return QuestionOutcome.Refused(NOT_PENDING)
     }
 
