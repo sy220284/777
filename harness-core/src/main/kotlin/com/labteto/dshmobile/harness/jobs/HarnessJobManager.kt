@@ -137,6 +137,7 @@ class HarnessJobManager(
     ): String {
         var previousOutput = ""
         var previousUpdatedAt = 0L
+        var previousOwnerId: String? = null
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
@@ -147,6 +148,7 @@ class HarnessJobManager(
             }
             previousOutput = found.output
             previousUpdatedAt = found.updatedAt
+            previousOwnerId = found.ownerId
             ownerId?.takeIf(String::isNotBlank)?.let { found.ownerId = it.take(MAX_OWNER_ID) }
             found.status = "running"
             found.output = "正在从安全检查点恢复…"
@@ -159,6 +161,7 @@ class HarnessJobManager(
             synchronized(lock) {
                 record.status = "interrupted"
                 record.output = previousOutput
+                record.ownerId = previousOwnerId
                 record.updatedAt = previousUpdatedAt
             }
             notifyChanged()
