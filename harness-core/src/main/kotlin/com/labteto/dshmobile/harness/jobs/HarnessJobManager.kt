@@ -56,7 +56,7 @@ class HarnessJobManager(
         var output: String = "",
         var job: Job? = null,
         val inbox: MutableList<String> = mutableListOf(),
-        val ownerId: String? = null,
+        var ownerId: String? = null,
         val resumeKind: String? = null,
         val resumePayload: String? = null,
         val startedAt: Long = System.currentTimeMillis(),
@@ -132,6 +132,7 @@ class HarnessJobManager(
 
     fun resumePersistent(
         id: String,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         var previousOutput = ""
@@ -146,6 +147,7 @@ class HarnessJobManager(
             }
             previousOutput = found.output
             previousUpdatedAt = found.updatedAt
+            ownerId?.takeIf(String::isNotBlank)?.let { found.ownerId = it.take(MAX_OWNER_ID) }
             found.status = "running"
             found.output = "正在从安全检查点恢复…"
             found.updatedAt = System.currentTimeMillis()
