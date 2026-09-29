@@ -1,7 +1,13 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +26,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -67,12 +77,38 @@ fun DsCategoryRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val hovered by interaction.collectIsHoveredAsState()
+    val feedbackColor by animateColorAsState(
+        targetValue = when {
+            onClick == null -> Color.Transparent
+            pressed -> colors.hoverAccent
+            hovered -> colors.hover
+            else -> Color.Transparent
+        },
+        animationSpec = DsAnimations.interactionColor,
+        label = "categoryRowFeedback",
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = DsMetrics.rowHeight)
             .clip(DsShapes.row)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .background(feedbackColor)
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .hoverable(interaction)
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = LocalIndication.current,
+                            onClick = onClick,
+                        )
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {

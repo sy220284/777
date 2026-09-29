@@ -3,6 +3,12 @@ package com.labteto.dshmobile.ui.screens.local
 import android.graphics.BitmapFactory
 import android.widget.Toast
 import java.io.File
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -46,6 +51,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.Role
@@ -80,6 +86,7 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -427,6 +434,11 @@ internal fun WorkProcessRow(
     val disclosureState = stringResource(
         if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = DsAnimations.chevron,
+        label = "workProcessChevron",
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -472,35 +484,43 @@ internal fun WorkProcessRow(
                 }
                 DsPill(text = stringResource(R.string.local_work_process_nodes, nodes.size))
                 Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowRight,
+                    Icons.Filled.KeyboardArrowRight,
                     contentDescription = stringResource(
                         if (expanded) R.string.local_work_process_collapse else R.string.local_work_process_expand,
                     ),
                     tint = colors.labelTertiary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { rotationZ = chevronRotation },
                 )
             }
 
-            if (expanded) {
-                visibleNodes.forEach { node ->
-                    WorkProcessOperationRow(
-                        kind = node.kind,
-                        failed = node.failed,
-                        count = node.count,
-                    )
-                }
-                if (collapsedHiddenCount > 0) {
-                    DsButton(
-                        text = if (showAllNodes) {
-                            stringResource(R.string.local_work_process_show_recent)
-                        } else {
-                            stringResource(R.string.local_work_process_show_more, collapsedHiddenCount)
-                        },
-                        onClick = { showAllNodes = !showAllNodes },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
+                exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    visibleNodes.forEach { node ->
+                        WorkProcessOperationRow(
+                            kind = node.kind,
+                            failed = node.failed,
+                            count = node.count,
+                        )
+                    }
+                    if (collapsedHiddenCount > 0) {
+                        DsButton(
+                            text = if (showAllNodes) {
+                                stringResource(R.string.local_work_process_show_recent)
+                            } else {
+                                stringResource(R.string.local_work_process_show_more, collapsedHiddenCount)
+                            },
+                            onClick = { showAllNodes = !showAllNodes },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }

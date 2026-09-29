@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.ui.components
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,10 +18,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -26,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -64,7 +71,7 @@ fun DsConversationComposer(
             .testTag(DS_CONVERSATION_COMPOSER_TAG)
             .fillMaxWidth()
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
-            .animateContentSize(),
+            .animateContentSize(DsAnimations.expand),
         shape = DsShapes.composer,
         color = surfaceColor,
         border = BorderStroke(1.dp, colors.borderL1),
@@ -100,6 +107,13 @@ fun DsComposerAction(
 ) {
     val resolvedContainer = if (enabled) containerColor else containerColor.copy(alpha = 0.38f)
     val resolvedTint = if (enabled) tint else tint.copy(alpha = 0.38f)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
+        animationSpec = DsAnimations.pressScale,
+        label = "composerActionScale",
+    )
     Surface(
         onClick = onClick,
         modifier = modifier
@@ -108,11 +122,16 @@ fun DsComposerAction(
         enabled = enabled,
         shape = CircleShape,
         color = Color.Transparent,
+        interactionSource = interaction,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
                     .size(visualSize)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
                     .clip(CircleShape)
                     .background(resolvedContainer),
                 contentAlignment = Alignment.Center,
