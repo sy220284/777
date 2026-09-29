@@ -275,7 +275,6 @@ internal fun ExecutionStatusCard(
                         }
                     }
                 }
-            }
 
             DsButton(
                 text = stringResource(R.string.local_run_open_results),
@@ -328,4 +327,3 @@ internal fun ExecutionStatusCard(
             }
         }
     }
-}
