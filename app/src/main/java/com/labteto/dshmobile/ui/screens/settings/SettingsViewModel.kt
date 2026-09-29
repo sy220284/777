@@ -22,6 +22,11 @@ import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.DeepSeekPricingRepository
 import com.labteto.dshmobile.local.DeepSeekPricingState
+import com.labteto.dshmobile.local.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
+import com.labteto.dshmobile.local.TokenUsageGroupDetail
+import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
@@ -41,6 +46,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -83,6 +89,7 @@ class SettingsViewModel @Inject constructor(
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalSettingsRuntime,
     private val deepSeekPricingRepository: DeepSeekPricingRepository,
+    private val usageTracker: DeepSeekUsageTracker,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     @ApplicationContext context: Context,
@@ -100,6 +107,15 @@ class SettingsViewModel @Inject constructor(
             initialValue = localHarness.initialState,
         )
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = deepSeekPricingRepository.state
+    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = usageTracker.analyticsRevision
+        .mapLatest {
+            withContext(Dispatchers.IO) { usageTracker.analyticsSnapshot() }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = TokenUsageAnalyticsSnapshot(),
+        )
 
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
@@ -446,6 +462,17 @@ class SettingsViewModel @Inject constructor(
     suspend fun environmentInfo(): String = localHarness.environmentInfo()
 
     suspend fun diagnosticReport(): String = localHarness.diagnosticReport()
+
+    suspend fun usageGroupDetail(
+        kind: TokenUsageGroupKind,
+        key: String,
+    ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
+        usageTracker.analyticsGroupDetail(kind, key)
+    }
+
+    suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
+        usageTracker.analyticsRecord(requestId)
+    }
 
     fun clearLocalCredential() {
         localHarness.clearCredential()
