@@ -234,6 +234,11 @@ internal fun LocalModeDrawer(
                                 trailing = galleryCount.toString(),
                                 onClick = onOpenPersonaGallery,
                             )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_chat_title),
+                                onClick = onTasks,
+                            )
                         } else {
                             DrawerPrimaryAction(
                                 icon = FeatherIcons.FileText,
@@ -345,15 +350,12 @@ internal fun LocalModeDrawer(
                     }
                 } else {
                     DsGroupCard {
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Schedule,
-                            title = stringResource(
-                                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
-                                else R.string.tasks_title,
-                            ),
-                            onClick = onTasks,
-                        )
                         if (usageMode == LocalUsageMode.WORK) {
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_title),
+                                onClick = onTasks,
+                            )
                             DrawerPrimaryAction(
                                 icon = Icons.Outlined.Extension,
                                 title = stringResource(R.string.tools_title),
