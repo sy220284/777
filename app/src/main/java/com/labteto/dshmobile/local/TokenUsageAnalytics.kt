@@ -460,7 +460,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
         val aggregate = MutableTokenAggregate()
         val actions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
         val agents = linkedMapOf<String, MutableAgentGroup>()
-        records.distinctForAccounting().forEach { record ->
+        records.forEach { record ->
             aggregate.add(record)
             actions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
             val runKind = record.context.runKind.orEmpty()
