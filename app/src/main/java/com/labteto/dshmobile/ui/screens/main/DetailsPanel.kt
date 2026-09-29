@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -281,7 +280,7 @@ private fun Card(
     content: @Composable () -> Unit,
 ) {
     var expanded by remember(title) { mutableStateOf(initiallyExpanded) }
-    Column(Modifier.fillMaxWidth().animateContentSize()) {
+    Column(Modifier.fillMaxWidth()) {
         DisclosureRow(
             title = title,
             summary = summary,
