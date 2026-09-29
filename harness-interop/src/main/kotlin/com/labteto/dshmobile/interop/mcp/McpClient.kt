@@ -144,7 +144,7 @@ class McpStreamableHttpTransport(
                 if (contentType.startsWith("text/event-stream", ignoreCase = true)) {
                     parseSseResponse(body, id, json)
                 } else {
-                    json.parseToJsonElement(body).jsonObject
+                    parseJsonRpcResponse(body, id, json)
                 }
             }
         }
@@ -409,6 +409,15 @@ private fun JsonObject.withMetadata(
         })
         put("io.modelcontextprotocol/clientCapabilities", clientCapabilities)
     })
+}
+
+
+internal fun parseJsonRpcResponse(body: String, id: Long, json: Json): JsonObject {
+    val response = json.parseToJsonElement(body).jsonObject
+    require(response["id"]?.jsonPrimitive?.content == id.toString()) {
+        "MCP HTTP 响应 id 与请求不匹配"
+    }
+    return response
 }
 
 internal fun parseSseResponse(body: String, id: Long, json: Json): JsonObject {
