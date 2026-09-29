@@ -23,6 +23,14 @@ internal class WebhookListener(
     private val clients = mutableSetOf<Socket>()
 
     @Synchronized fun restart(address: InetSocketAddress) {
+        val current = server
+        if (
+            current != null &&
+            !current.isClosed &&
+            current.localSocketAddress == address
+        ) {
+            return
+        }
         close()
         val socket = ServerSocket()
         try {
