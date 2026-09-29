@@ -687,6 +687,7 @@ private fun LocalConversationSurface(
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
     var showGroupAnnouncement by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
@@ -873,10 +874,12 @@ private fun LocalConversationSurface(
                     groupMembers = state.groupChat.members,
                     activeSpeakerName = state.groupActiveSpeakerName,
                     running = state.running || state.loading,
+                    behaviorTuningCustomized = !state.chatState.behaviorTuning.isNatural(),
                     onContextClick = {
                         if (state.groupChat.enabled) showGroupMemberPicker = true
                         else showPersonaPicker = true
                     },
+                    onOpenCharacterTuning = { showCharacterTuning = true },
                     onExitGroupChat = onExitGroupChat,
                     onNewSession = onNewSession,
                     sessionPinned = sessionPinned,
@@ -1527,6 +1530,11 @@ private fun LocalConversationSurface(
             onDismiss = { showGroupAnnouncement = false },
         )
     }
+    CharacterBehaviorTuningDialogHost(
+        showCharacterTuning && state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled,
+        state.chatPersona, currentGalleryEntry?.portraitPath.orEmpty(), state.chatState,
+        onConfigureChatPersona,
+    ) { showCharacterTuning = false }
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&

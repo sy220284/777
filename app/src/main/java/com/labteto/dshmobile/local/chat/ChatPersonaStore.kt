@@ -44,6 +44,7 @@ data class PersonaProfile(
     val bannedPhrases: List<String> = emptyList(),
     val signaturePhrases: List<String> = emptyList(),
     val corrections: List<String> = emptyList(),
+    val behaviorTuning: CharacterBehaviorTuning = CharacterBehaviorTuning(),
     val updatedAt: Long = 0L,
 ) {
     companion object {
@@ -180,6 +181,7 @@ class ChatPersonaStore internal constructor(
         bannedPhrases = cleanLines(profile.bannedPhrases, 30),
         signaturePhrases = cleanLines(profile.signaturePhrases, 20),
         corrections = cleanLines(profile.corrections, MAX_CORRECTIONS),
+        behaviorTuning = profile.behaviorTuning.normalized(),
     )
 
     private fun cleanLoreEntries(values: List<PersonaLoreEntry>): List<PersonaLoreEntry> =

@@ -893,7 +893,7 @@ class LocalHarnessEngine @Inject constructor(
                         state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
                     },
                     chatPersona = saved,
-                    chatState = if (sameBoundCharacter) state.chatState else ChatCharacterState(),
+                    chatState = if (sameBoundCharacter) state.chatState.copy(behaviorTuning = saved.behaviorTuning) else ChatCharacterState(behaviorTuning = saved.behaviorTuning),
                     replySuggestions = if (sameBoundCharacter) state.replySuggestions else emptyList(),
                     handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
                 )
@@ -928,7 +928,7 @@ class LocalHarnessEngine @Inject constructor(
                     galleryStoryId = null,
                     gallerySaveSuppressedThrough = 0L,
                     chatPersona = saved,
-                    chatState = ChatCharacterState(),
+                    chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
                     replySuggestions = emptyList(),
                     chatBranches = LocalChatBranchState(),
                     handoffSummary = null,
@@ -960,7 +960,7 @@ class LocalHarnessEngine @Inject constructor(
                     galleryStoryId = null,
                     gallerySaveSuppressedThrough = 0L,
                     chatPersona = saved,
-                    chatState = ChatCharacterState(),
+                    chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
                     replySuggestions = emptyList(),
                     chatBranches = LocalChatBranchState(),
                     handoffSummary = null,
