@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.pendingForRequest
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -146,7 +145,7 @@ internal fun buildChatContinuationHandoff(
     messages: List<LocalHarnessMessage>,
     context: ChatContextState = ChatContextState(),
 ): String {
-    val shared = context.withLegacyFallback(state)
+    val shared = context
     val sceneBlock = buildString {
         val scene = shared.scene
         if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
