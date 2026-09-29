@@ -12,7 +12,7 @@ import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
-import com.labteto.dshmobile.notify.NotificationArtwork
+import com.labteto.dshmobile.notify.NotificationArtwork\nimport com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -180,10 +180,11 @@ class LocalExecutionService : Service() {
                 getString(R.string.local_execution_notification_tap)
             }
             notifications.postLocalSession(
-                id = COMPLETION_ID_BASE + (sessionId.hashCode() and Int.MAX_VALUE) % 10_000,
+                id = stableNotificationId("local-execution", sessionId),
                 title = title,
                 text = text,
                 sessionId = sessionId,
+                notificationKey = "completion:$sessionId",
             )
         }
     }
