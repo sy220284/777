@@ -41,7 +41,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 const val DS_CONVERSATION_COMPOSER_TAG = "ds-conversation-composer"
 
 object DsComposerMetrics {
-    val actionTouchTarget = 40.dp
+    val actionTouchTarget = 48.dp
     val actionVisualSize = 32.dp
     val primaryActionVisualSize = 34.dp
     val actionIconSize = 18.dp
@@ -83,8 +83,7 @@ fun DsConversationComposer(
 
 /**
  * Compact composer-only action. The visual circle stays small while the surrounding target keeps a
- * comfortable hit area; using this instead of the global 48dp icon button prevents the composer
- * from becoming taller than the reference compact input.
+ * full 48dp hit area; visual chrome stays compact without shrinking touch accessibility.
  */
 @Composable
 fun DsComposerAction(

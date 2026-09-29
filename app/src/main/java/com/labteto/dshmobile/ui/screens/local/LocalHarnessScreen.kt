@@ -688,6 +688,7 @@ private fun LocalConversationSurface(
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var composerMenuOpen by remember(state.sessionId) { mutableStateOf(false) }
+    var composerFocused by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -1221,6 +1222,8 @@ private fun LocalConversationSurface(
             }
         }
 
+        val composerExpanded =
+            composerFocused || input.contains('\n') || attachments.isNotEmpty()
         val composerCanSend =
             groupChatReady && (input.isNotBlank() || attachments.isNotEmpty())
         val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
@@ -1237,6 +1240,91 @@ private fun LocalConversationSurface(
             attachments.clear()
             focusManager.clearFocus(force = true)
             keyboardController?.hide()
+        }
+
+        @Composable
+        fun ComposerMenuControl() {
+            if (state.running) return
+            Box {
+                DsComposerAction(
+                    icon = Icons.Filled.Add,
+                    contentDescription = composerAttachmentLabel,
+                    onClick = { composerMenuOpen = true },
+                    tint = colors.labelPrimary,
+                    containerColor = colors.hoverSolid,
+                )
+                DsPopupMenu(
+                    expanded = composerMenuOpen,
+                    onDismiss = { composerMenuOpen = false },
+                    items = buildList {
+                        add(
+                            MenuItem(
+                                text = composerAttachmentLabel,
+                                icon = Icons.Outlined.AttachFile,
+                                onClick = { showAttachmentPicker = true },
+                            ),
+                        )
+                        if (
+                            state.usageMode == LocalUsageMode.CHAT &&
+                            !state.groupChat.enabled &&
+                            state.messages.any { it.role == "assistant" && it.content.isNotBlank() }
+                        ) {
+                            add(
+                                MenuItem(
+                                    text = composerReplySuggestionsLabel,
+                                    icon = Icons.Outlined.AutoAwesome,
+                                    onClick = {
+                                        if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                                            showReplySuggestions = true
+                                        } else if (!replySuggestionsLoading) {
+                                            replySuggestionsLoading = true
+                                            scope.launch {
+                                                val generated = try {
+                                                    onGenerateReplySuggestions()
+                                                } finally {
+                                                    replySuggestionsLoading = false
+                                                }
+                                                if (generated) showReplySuggestions = true
+                                            }
+                                        }
+                                    },
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
+        }
+
+        @Composable
+        fun SendControl(queue: Boolean = false) {
+            DsComposerAction(
+                icon = Icons.Filled.ArrowUpward,
+                contentDescription = if (queue && state.queuedInputCount > 0) {
+                    stringResource(R.string.local_queue_message_count, state.queuedInputCount)
+                } else if (queue) {
+                    stringResource(R.string.local_queue_message)
+                } else {
+                    stringResource(R.string.chat_composer_send)
+                },
+                onClick = ::submitComposerMessage,
+                enabled = composerCanSend,
+                tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
+                containerColor = if (composerCanSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
+                visualSize = DsComposerMetrics.primaryActionVisualSize,
+            )
+        }
+
+        @Composable
+        fun StopControl() {
+            DsComposerAction(
+                icon = Icons.Filled.Stop,
+                contentDescription = stringResource(R.string.chat_composer_stop),
+                onClick = onStop,
+                tint = colors.onAccent,
+                containerColor = colors.error,
+                visualSize = DsComposerMetrics.primaryActionVisualSize,
+            )
         }
 
         DsConversationComposer(
@@ -1258,89 +1346,7 @@ private fun LocalConversationSurface(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                if (!state.running) {
-                    Box {
-                        DsComposerAction(
-                            icon = Icons.Filled.Add,
-                            contentDescription = composerAttachmentLabel,
-                            onClick = { composerMenuOpen = true },
-                            tint = colors.labelPrimary,
-                            containerColor = colors.hoverSolid,
-                        )
-                        DsPopupMenu(
-                            expanded = composerMenuOpen,
-                            onDismiss = { composerMenuOpen = false },
-                            items = buildList {
-                                add(
-                                    MenuItem(
-                                        text = composerAttachmentLabel,
-                                        icon = Icons.Outlined.AttachFile,
-                                        onClick = { showAttachmentPicker = true },
-                                    ),
-                                )
-                                if (
-                                    state.usageMode == LocalUsageMode.CHAT &&
-                                    !state.groupChat.enabled &&
-                                    state.messages.any { message ->
-                                        message.role == "assistant" && message.content.isNotBlank()
-                                    }
-                                ) {
-                                    add(
-                                        MenuItem(
-                                            text = composerReplySuggestionsLabel,
-                                            icon = Icons.Outlined.AutoAwesome,
-                                            onClick = {
-                                                if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                                                    showReplySuggestions = true
-                                                } else if (!replySuggestionsLoading) {
-                                                    replySuggestionsLoading = true
-                                                    scope.launch {
-                                                        val generated = try {
-                                                            onGenerateReplySuggestions()
-                                                        } finally {
-                                                            replySuggestionsLoading = false
-                                                        }
-                                                        if (generated) showReplySuggestions = true
-                                                    }
-                                                }
-                                            },
-                                        ),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
-
-                if (state.usageMode == LocalUsageMode.WORK) {
-                    DsComposerAction(
-                        icon = FeatherIcons.CheckSquare,
-                        contentDescription = stringResource(
-                            if (state.planMode) R.string.local_plan_button_on
-                            else R.string.local_plan_button_off,
-                        ),
-                        onClick = { onPlanModeChange(!state.planMode) },
-                        enabled = !state.running,
-                        tint = if (state.planMode) colors.accent else colors.labelSecondary,
-                        containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
-                    )
-                    DsComposerAction(
-                        icon = Icons.Outlined.Shield,
-                        contentDescription = stringResource(R.string.local_auto_approve_short),
-                        onClick = if (state.safeAutoApprovalEnabled) {
-                            onDisableAutoApprove
-                        } else {
-                            onAutoApprove
-                        },
-                        tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
-                        containerColor = if (state.safeAutoApprovalEnabled) {
-                            colors.accentTertiary
-                        } else {
-                            Color.Transparent
-                        },
-                    )
-                }
-
+                if (!composerExpanded) ComposerMenuControl()
                 DsComposerField(
                     value = input,
                     onValueChange = { drafts[state.sessionId] = it },
@@ -1350,60 +1356,51 @@ private fun LocalConversationSurface(
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
                         else ->
-                            stringResource(
-                                R.string.local_chat_composer_persona_hint,
-                                state.chatPersona.name,
-                            )
+                            stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
                     },
                     modifier = Modifier.weight(1f),
                     maxLines = 5,
+                    onFocusedChange = { composerFocused = it },
                 )
+                if (!composerExpanded) {
+                    if (state.running) StopControl() else SendControl()
+                }
+            }
 
-                if (state.running) {
-                    DsComposerAction(
-                        icon = Icons.Filled.Stop,
-                        contentDescription = stringResource(R.string.chat_composer_stop),
-                        onClick = onStop,
-                        tint = colors.onAccent,
-                        containerColor = colors.error,
-                        visualSize = DsComposerMetrics.primaryActionVisualSize,
-                    )
+            if (composerExpanded) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                ) {
+                    ComposerMenuControl()
                     if (state.usageMode == LocalUsageMode.WORK) {
                         DsComposerAction(
-                            icon = Icons.Filled.ArrowUpward,
-                            contentDescription = if (state.queuedInputCount > 0) {
-                                stringResource(
-                                    R.string.local_queue_message_count,
-                                    state.queuedInputCount,
-                                )
-                            } else {
-                                stringResource(R.string.local_queue_message)
-                            },
-                            onClick = ::submitComposerMessage,
-                            enabled = composerCanSend,
-                            tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
-                            containerColor = if (composerCanSend) {
-                                colors.buttonInfoFill
-                            } else {
-                                colors.buttonPrimaryDimmed
-                            },
-                            visualSize = DsComposerMetrics.primaryActionVisualSize,
+                            icon = FeatherIcons.CheckSquare,
+                            contentDescription = stringResource(
+                                if (state.planMode) R.string.local_plan_button_on
+                                else R.string.local_plan_button_off,
+                            ),
+                            onClick = { onPlanModeChange(!state.planMode) },
+                            enabled = !state.running,
+                            tint = if (state.planMode) colors.accent else colors.labelSecondary,
+                            containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
+                        )
+                        DsComposerAction(
+                            icon = Icons.Outlined.Shield,
+                            contentDescription = stringResource(R.string.local_auto_approve_short),
+                            onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                            tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
+                            containerColor = if (state.safeAutoApprovalEnabled) colors.accentTertiary else Color.Transparent,
                         )
                     }
-                } else {
-                    DsComposerAction(
-                        icon = Icons.Filled.ArrowUpward,
-                        contentDescription = stringResource(R.string.chat_composer_send),
-                        onClick = ::submitComposerMessage,
-                        enabled = composerCanSend,
-                        tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
-                        containerColor = if (composerCanSend) {
-                            colors.buttonInfoFill
-                        } else {
-                            colors.buttonPrimaryDimmed
-                        },
-                        visualSize = DsComposerMetrics.primaryActionVisualSize,
-                    )
+                    Spacer(Modifier.weight(1f))
+                    if (state.running) {
+                        StopControl()
+                        if (state.usageMode == LocalUsageMode.WORK) SendControl(queue = true)
+                    } else {
+                        SendControl()
+                    }
                 }
             }
         }
