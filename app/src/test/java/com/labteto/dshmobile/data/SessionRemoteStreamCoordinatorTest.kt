@@ -4,10 +4,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -118,16 +121,37 @@ class SessionRemoteStreamCoordinatorTest {
         assertTrue("workspace/follow#1" in cancelled)
     }
 
+
+    @Test
+    fun undecodableHostFramesAreReportedInsteadOfSilentlyDropped() = runTest {
+        val failures = mutableListOf<SessionRemoteStreamFailure>()
+        val coordinator = coordinator(
+            scope = backgroundScope,
+            streamProvider = { _, _ ->
+                flowOf(buildJsonObject { put("unexpected", true) })
+            },
+            onFailure = failures::add,
+        )
+
+        coordinator.restartHostStreams()
+        runCurrent()
+
+        assertEquals(2, failures.size)
+        assertEquals(setOf("session/control", "workspace/follow"), failures.map { it.endpoint }.toSet())
+        assertTrue(failures.all { it.undecodable })
+    }
+
     private fun coordinator(
         scope: CoroutineScope,
         streamProvider: (String, JsonElement) -> Flow<JsonElement>?,
+        onFailure: (SessionRemoteStreamFailure) -> Unit = {},
     ) = SessionRemoteStreamCoordinator(
         scope = scope,
         streamProvider = streamProvider,
         onControlFrame = {},
         onWorkspaceFrame = {},
         onFollowFrame = { _, _ -> },
-        onFailure = {},
+        onFailure = onFailure,
     )
 
     private fun trackedFlow(
