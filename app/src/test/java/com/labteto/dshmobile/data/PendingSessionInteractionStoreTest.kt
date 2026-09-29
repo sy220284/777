@@ -55,6 +55,23 @@ class PendingSessionInteractionStoreTest {
     }
 
     @Test
+    fun eventSettlementReturnsOnlyKindsThatActuallyBecameIdle() {
+        val store = PendingSessionInteractionStore()
+        store.installApproval(approval("session-a", "approval-old"))
+        store.installApproval(approval("session-a", "approval-new"))
+
+        val old = store.forgetEvent("approval-old")!!
+        assertTrue(old.pendingKinds.isEmpty())
+
+        val current = store.forgetEvent("approval-new")!!
+        assertEquals(setOf("approval"), current.pendingKinds)
+
+        store.installQuestions(PendingQuestions("session-b", "question", emptyList()))
+        val question = store.forgetEvent("question")!!
+        assertEquals(setOf("question", "plan-review"), question.pendingKinds)
+    }
+
+    @Test
     fun retiringGenerationClearsAllSessionCardsTogether() {
         val store = PendingSessionInteractionStore()
         store.installApproval(approval("session-a", "approval-a"))
