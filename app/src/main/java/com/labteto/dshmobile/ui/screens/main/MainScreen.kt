@@ -83,7 +83,6 @@ fun MainScreen(
                     Box(Modifier.weight(1f).fillMaxHeight()) {
                         ChatScreen(
                             onOpenDetails = { detailsOpen = true },
-                            onOpenDrawer = { scope.launch { drawerState.open() } },
                             detailsOpen = detailsOpen,
                         )
                     }
@@ -135,7 +134,6 @@ fun MainScreen(
                 ) {
                     ChatScreen(
                         onOpenDetails = { detailsOpen = true },
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
                         detailsOpen = detailsOpen,
                     )
                     AnimatedVisibility(
