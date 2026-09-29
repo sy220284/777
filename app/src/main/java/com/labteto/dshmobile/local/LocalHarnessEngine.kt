@@ -3565,14 +3565,12 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
-            stepLimitExtender = localForegroundStepLimitExtender(
-                runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure },
-            ) { runEventLog.append("turn/budget-extended", it) },
+            stepLimitExtender = localForegroundStepLimitExtender(runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure }, { runEventLog.append("turn/budget-extended", it) }),
             idFactory = { runContext.runId },
         )
 
         try {
-            loop.run(input)
+            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) { loop.run(input) }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
                 finalChatAssistant?.let { assistantMessage ->
@@ -3588,6 +3586,9 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 }
             }
+        } catch (_: TimeoutCancellationException) {
+            foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
+            runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
         } catch (_: CancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.

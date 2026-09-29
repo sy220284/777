@@ -684,6 +684,7 @@ private fun LocalConversationSurface(
     var transcriptWindowSize by rememberSaveable(state.sessionId) {
         mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
     }
+    var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
     var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
         mutableStateOf(state.messages.size)
     }
@@ -1064,6 +1065,41 @@ private fun LocalConversationSurface(
                         }
                     }
                 }
+                val planReview = state.pendingQuestion
+                    ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+                    ?.let(::localPlanReviewOf)
+                planReview?.let { review ->
+                    item(key = "pending-plan-review") {
+                        LocalPlanReviewCard(
+                            review = review,
+                            busy = planReviewBusy,
+                            onApprove = {
+                                if (!planReviewBusy) {
+                                    planReviewBusy = true
+                                    onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), review.approve)
+                                }
+                            },
+                            onDecline = {
+                                review.decline?.let { decline ->
+                                    if (!planReviewBusy) {
+                                        planReviewBusy = true
+                                        onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), decline)
+                                    }
+                                }
+                            },
+                            onRegenerate = {
+                                val prompt = state.messages.lastOrNull { it.role == "user" }?.content
+                                    ?.takeIf(String::isNotBlank)
+                                val callId = state.pendingQuestion?.callId
+                                if (!planReviewBusy && prompt != null && callId != null) {
+                                    planReviewBusy = true
+                                    onCancelQuestion(callId)
+                                    onSend(prompt, emptyList())
+                                }
+                            },
+                        )
+                    }
+                }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> LocalMessageRow(
@@ -1421,6 +1457,7 @@ private fun LocalConversationSurface(
     }
     state.pendingQuestion
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.takeUnless { localPlanReviewOf(it) != null }
         ?.let { question ->
         QuestionDialog(
             question = question.question,

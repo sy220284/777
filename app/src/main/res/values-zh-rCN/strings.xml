@@ -136,6 +136,10 @@
     <string name="goal_max_rounds">最大轮数：%1$s</string>
     <string name="plan_mode_on">计划模式：开</string>
     <string name="plan_mode_off">计划模式：关</string>
+    <string name="local_plan_review_copy">复制方案</string>
+    <string name="local_plan_review_regenerate">重新生成方案</string>
+    <string name="local_plan_review_confirm">确认方案并执行</string>
+    <string name="local_plan_review_decline">拒绝方案</string>
     <string name="plan_review_title">计划已准备好供审阅</string>
     <string name="plan_review_approve">批准</string>
     <string name="plan_review_decline">拒绝</string>
