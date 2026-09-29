@@ -46,6 +46,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val endTransition: () -> Unit,
     private val runBusy: () -> Boolean,
     private val cancelActiveRunAndJoin: suspend () -> Unit,
+    private val cancelWorkRunsAndJoin: suspend (Set<String>) -> Unit,
     private val resetModelHistory: () -> Unit,
     private val persist: () -> Unit,
     private val loadSession: suspend (String) -> Unit,
@@ -365,6 +366,7 @@ internal class LocalSessionLifecycleCoordinator(
         return try {
             transitionMutex.withLock {
                 cancelActiveRunAndJoin()
+                cancelWorkRunsAndJoin(requestedIds)
                 jobs.stopNonPersistentAndJoin()
                 persist()
                 val available = sessionCoordinator.summaries()
