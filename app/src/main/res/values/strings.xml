@@ -1185,7 +1185,7 @@
     <string name="local_character_tuning_mood">Mood</string>
     <string name="local_character_tuning_growth_initiative">Long-term initiative</string>
     <string name="local_character_tuning_growth_openness">Long-term openness</string>
-    <string name="local_character_tuning_growth_security">Relationship security</string>
+    <string name="local_character_tuning_growth_security">Relationship security</string>\n    <string name="local_character_tuning_security_low">Cautious</string>\n    <string name="local_character_tuning_security_high">Secure</string>
     <string name="local_character_tuning_advanced">Advanced tuning</string>
     <string name="local_character_tuning_novelty">Interaction variety</string>
     <string name="local_character_tuning_novelty_low">Keep habits</string>
