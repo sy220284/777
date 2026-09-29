@@ -295,6 +295,16 @@ class GitHubConnectorPlugin(
         val path = raw.trim()
         require(path.startsWith("/") && !path.startsWith("//")) { "GitHub API path 必须以单个 / 开头" }
         require(path.length <= MAX_PATH_CHARS) { "GitHub API path 过长" }
+        val rawPath = path.substringBefore('?')
+        require(
+            rawPath.split('/').none { segment ->
+                val lower = segment.lowercase()
+                lower == ".." ||
+                    lower == "%2e%2e" ||
+                    lower == ".%2e" ||
+                    lower == "%2e."
+            },
+        ) { "GitHub API path 不允许包含目录穿越片段" }
         val url = baseUrl.resolve(path) ?: error("GitHub API path 无法解析")
         require(
             url.scheme == baseUrl.scheme &&
