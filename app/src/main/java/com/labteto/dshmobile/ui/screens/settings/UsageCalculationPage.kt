@@ -579,7 +579,7 @@ private fun UsageEfficiency(mode: LocalUsageMode, analytics: TokenUsageModeAnaly
             if (analytics.aggregate.cacheMeasuredTokens > 0L) {
                 String.format(Locale.US, "%.1f%%", analytics.aggregate.cacheHitRate * 100.0)
             } else {
-                stringResource(R.string.usage_calculation_no_data)
+                stringResource(R.string.usage_no_measured_cache)
             },
             Modifier.weight(1f),
         )
