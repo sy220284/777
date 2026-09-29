@@ -2,7 +2,15 @@ package com.labteto.dshmobile.harness.tools
 
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 enum class ToolAccess {
     READ_ONLY,
@@ -78,6 +86,12 @@ class ToolRegistry {
             content = "未知工具：$name",
             isError = true,
         )
+        validateToolInput(tool, input)?.let { problem ->
+            return ToolResult(
+                content = "工具参数无效：$name：$problem",
+                isError = true,
+            )
+        }
         if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
             return ToolResult("当前作用域禁止执行会改变状态的工具：$name", isError = true)
         }
@@ -101,4 +115,80 @@ class ToolRegistry {
             isError = true,
         )
     }
+
+    private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
+        val function = tool.schema["function"] as? JsonObject ?: return null
+        val parameters = function["parameters"] as? JsonObject ?: return null
+        return validateJsonValue(input, parameters, "$")
+    }
+
+    private fun validateJsonValue(
+        value: JsonElement,
+        schema: JsonObject,
+        path: String,
+    ): String? {
+        val expectedType = schema["type"]?.let { (it as? JsonPrimitive)?.content }
+        when (expectedType) {
+            "object" -> {
+                val obj = value as? JsonObject ?: return "$path 必须是对象"
+                val properties = schema["properties"] as? JsonObject ?: JsonObject(emptyMap())
+                val required = (schema["required"] as? JsonArray).orEmpty()
+                    .mapNotNull { (it as? JsonPrimitive)?.content }
+                required.firstOrNull { it !in obj }?.let { return "$path 缺少必填字段 $it" }
+
+                val additional = schema["additionalProperties"]
+                if ((additional as? JsonPrimitive)?.booleanOrNull == false) {
+                    obj.keys.firstOrNull { it !in properties }?.let {
+                        return "$path 包含未声明字段 $it"
+                    }
+                }
+
+                obj.forEach { (key, child) ->
+                    val childSchema = properties[key] as? JsonObject
+                    if (childSchema != null) {
+                        validateJsonValue(child, childSchema, "$path.$key")?.let { return it }
+                    } else if (additional is JsonObject) {
+                        validateJsonValue(child, additional, "$path.$key")?.let { return it }
+                    }
+                }
+            }
+            "array" -> {
+                val array = value as? JsonArray ?: return "$path 必须是数组"
+                val itemSchema = schema["items"] as? JsonObject
+                if (itemSchema != null) {
+                    array.forEachIndexed { index, child ->
+                        validateJsonValue(child, itemSchema, "$path[$index]")?.let { return it }
+                    }
+                }
+            }
+            "string" -> {
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || !primitive.isString) return "$path 必须是字符串"
+            }
+            "integer" -> {
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || primitive.isString || primitive.longOrNull == null) {
+                    return "$path 必须是整数"
+                }
+            }
+            "number" -> {
+                val primitive = value as? JsonPrimitive
+                val number = primitive?.takeIf { !it.isString }?.doubleOrNull
+                if (number == null || !number.isFinite()) return "$path 必须是有限数字"
+            }
+            "boolean" -> {
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || primitive.isString || primitive.booleanOrNull == null) {
+                    return "$path 必须是布尔值"
+                }
+            }
+        }
+
+        val enumValues = schema["enum"] as? JsonArray
+        if (enumValues != null && enumValues.none { it == value }) {
+            return "$path 不在允许枚举值中"
+        }
+        return null
+    }
+
 }
