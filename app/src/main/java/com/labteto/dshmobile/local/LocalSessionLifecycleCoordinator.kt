@@ -46,6 +46,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val endTransition: () -> Unit,
     private val runBusy: () -> Boolean,
     private val cancelActiveRunAndJoin: suspend () -> Unit,
+    private val cancelWorkRunsForSessions: suspend (Set<String>) -> Unit,
     private val resetModelHistory: () -> Unit,
     private val persist: () -> Unit,
     private val loadSession: suspend (String) -> Unit,
@@ -369,6 +370,7 @@ internal class LocalSessionLifecycleCoordinator(
                 persist()
                 val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
+                cancelWorkRunsForSessions(ids)
                 if (currentSessionId() in ids) {
                     val previous = state.value
                     val replacement = available.firstOrNull {
