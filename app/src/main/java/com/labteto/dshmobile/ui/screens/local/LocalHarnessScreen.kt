@@ -93,6 +93,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsComposerField
+import com.labteto.dshmobile.ui.components.DsComposerSurface
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -657,7 +658,6 @@ private fun LocalConversationSurface(
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
-    val composerSurfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -1231,20 +1231,7 @@ private fun LocalConversationSurface(
             keyboardController?.hide()
         }
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
-                .animateContentSize(),
-            shape = DsShapes.composer,
-            color = composerSurfaceColor,
-            border = BorderStroke(1.dp, colors.borderL1),
-            shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
-        ) {
-            Column(
-                Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
+        DsComposerSurface {
                 if (attachments.isNotEmpty()) {
                     attachments.forEachIndexed { index, attachment ->
                         ImportedAttachmentRow(
@@ -1440,7 +1427,6 @@ private fun LocalConversationSurface(
                         }
                     }
                 }
-            }
         }
     }
 

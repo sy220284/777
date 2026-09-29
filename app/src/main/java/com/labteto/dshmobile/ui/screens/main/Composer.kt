@@ -74,6 +74,7 @@ import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.ContextMeter
 import com.labteto.dshmobile.ui.components.DsComposerField
+import com.labteto.dshmobile.ui.components.DsComposerSurface
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.skeleton
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -235,24 +236,7 @@ internal fun Composer(
         }
     }
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small)
-            .shadow(2.dp, DsShapes.composer, clip = false)
-            .animateContentSize(),
-        shape = DsShapes.composer,
-        color = colors.wallpaperSurface(
-            WallpaperSurfaceLevel.INPUT,
-            BackgroundRegion.BOTTOM,
-            colors.composerCard,
-        ),
-        border = BorderStroke(1.dp, colors.borderL1),
-    ) {
-        Column(
-            Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
+    DsComposerSurface(modifier = modifier) {
             if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
             AnimatedVisibility(visible = attachments.isNotEmpty()) {
                 AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
@@ -338,7 +322,6 @@ internal fun Composer(
                     if (running) StopControl()
                 }
             }
-        }
     }
 }
 
