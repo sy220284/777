@@ -56,6 +56,7 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.AttachmentImage
 import com.labteto.dshmobile.ui.components.DisclosureRow
+import com.labteto.dshmobile.ui.components.DsDeliverableCard
 import com.labteto.dshmobile.ui.components.DisclosureState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -203,15 +204,11 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
                 val obj = file as? JsonObject
                 val path = obj?.get("path").asString()
                 if (!path.isNullOrBlank()) {
-                    androidx.compose.material3.OutlinedCard(
+                    DsDeliverableCard(
+                        title = basename(path),
+                        description = obj?.get("description").asString(),
                         onClick = { open(path) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(basename(path), style = DsType.std14)
-                            obj?.get("description").asString()?.let { Text(it, style = DsType.small13) }
-                        }
-                    }
+                    )
                 }
             }
         }

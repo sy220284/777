@@ -8,8 +8,12 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
@@ -73,58 +77,80 @@ fun MainScreen(
             )
         },
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(detailsOpen) {
-                    if (!detailsOpen) return@pointerInput
-                    val width = size.width.toFloat()
-                    val detailsAreaPx = detailsWidth.toPx() * 0.9f
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        if (down.position.x > detailsAreaPx) return@awaitEachGesture
-
-                        var claimed = false
-                        awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
-                            claimed = overSlop > 0f
-                            if (claimed) change.consume()
-                        } ?: return@awaitEachGesture
-                        if (!claimed) return@awaitEachGesture
-
-                        var totalX = 0f
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (change.changedToUpIgnoreConsumed()) break
-                            if (change.isConsumed) break
-                            totalX += change.positionChange().x
-                            change.consume()
-                            if (totalX >= width * 0.12f) {
-                                detailsOpen = false
-                                break
-                            }
-                        }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val expandedLayout = maxWidth >= 840.dp
+            if (expandedLayout) {
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        ChatScreen(
+                            onOpenDetails = { detailsOpen = true },
+                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                            detailsOpen = detailsOpen,
+                        )
                     }
-                },
-        ) {
-            ChatScreen(
-                onOpenDetails = { detailsOpen = true },
-                onOpenDrawer = { scope.launch { drawerState.open() } },
-                detailsOpen = detailsOpen,
-            )
+                    AnimatedVisibility(
+                        visible = detailsOpen,
+                        enter = slideInHorizontally(DsAnimations.panelSlide) { it / 3 },
+                        exit = slideOutHorizontally(DsAnimations.panelSlide) { it / 3 },
+                    ) {
+                        DetailsPanel(
+                            onClose = { detailsOpen = false },
+                            modifier = Modifier.width(340.dp).fillMaxHeight(),
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(detailsOpen) {
+                            if (!detailsOpen) return@pointerInput
+                            val width = size.width.toFloat()
+                            val detailsAreaPx = detailsWidth.toPx() * 0.9f
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                if (down.position.x > detailsAreaPx) return@awaitEachGesture
 
-            AnimatedVisibility(
-                visible = detailsOpen,
-                // Explicit spec: the platform default runs 300ms, which lags behind the drag the
-                // panel is usually opened with.
-                enter = slideInHorizontally(DsAnimations.panelSlide) { it },
-                exit = slideOutHorizontally(DsAnimations.panelSlide) { it },
-                modifier = Modifier.align(Alignment.CenterEnd),
-            ) {
-                DetailsPanel(
-                    onClose = { detailsOpen = false },
-                    modifier = Modifier.width(detailsWidth),
-                )
+                                var claimed = false
+                                awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
+                                    claimed = overSlop > 0f
+                                    if (claimed) change.consume()
+                                } ?: return@awaitEachGesture
+                                if (!claimed) return@awaitEachGesture
+
+                                var totalX = 0f
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (change.changedToUpIgnoreConsumed()) break
+                                    if (change.isConsumed) break
+                                    totalX += change.positionChange().x
+                                    change.consume()
+                                    if (totalX >= width * 0.12f) {
+                                        detailsOpen = false
+                                        break
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    ChatScreen(
+                        onOpenDetails = { detailsOpen = true },
+                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        detailsOpen = detailsOpen,
+                    )
+                    AnimatedVisibility(
+                        visible = detailsOpen,
+                        enter = slideInHorizontally(DsAnimations.panelSlide) { it },
+                        exit = slideOutHorizontally(DsAnimations.panelSlide) { it },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
+                        DetailsPanel(
+                            onClose = { detailsOpen = false },
+                            modifier = Modifier.width(detailsWidth),
+                        )
+                    }
+                }
             }
         }
     }

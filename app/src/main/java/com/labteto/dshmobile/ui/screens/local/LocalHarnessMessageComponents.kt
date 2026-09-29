@@ -407,9 +407,9 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
 
     messages.forEach { message ->
         when (message.role) {
-            "reasoning" -> appendThinking(message.content)
-            // Older sessions can contain assistant narration immediately before a tool step.
-            "assistant" -> appendThinking(message.content)
+            // Free-form model reasoning is never surfaced as product UI. Work process rows are
+            // built from observable execution events instead.
+            "reasoning", "assistant" -> Unit
             "tool" -> appendOperation(
                 kind = agentOperationKind(message.toolName),
                 failed = toolResultFailed(message.content),
@@ -452,31 +452,18 @@ internal fun ChatThinkingRow(
     messages: List<LocalHarnessMessage>,
     streaming: Boolean = false,
 ) {
-    if (messages.isEmpty()) return
-    val colors = DsTheme.colors
-    val fullSummary = remember(messages) { compactReasoningSummary(messages, maxChars = 180) } ?: return
-    val compactSummary = remember(messages) { compactReasoningSummary(messages, maxChars = 84) } ?: fullSummary
-    var expanded by remember(messages.first().id, streaming) { mutableStateOf(false) }
-
-    Column(
+    if (messages.isEmpty() || !streaming) return
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        ThinkingRow(
-            summary = stringResource(R.string.local_process_thinking) + " · " + compactSummary,
-            expanded = expanded,
-            onToggle = { expanded = !expanded },
-            streaming = streaming,
+        StateDot(StateDotState.Running, size = 8.dp)
+        Text(
+            stringResource(R.string.local_process_thinking),
+            style = DsType.small13,
+            color = DsTheme.colors.labelTertiary,
         )
-        if (expanded) {
-            Text(
-                fullSummary,
-                style = DsType.small13,
-                color = colors.labelSecondary,
-                modifier = Modifier.padding(start = DsSpacing.small, end = DsSpacing.medium),
-                maxLines = 4,
-            )
-        }
     }
 }
 
