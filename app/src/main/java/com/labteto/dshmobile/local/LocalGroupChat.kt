@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.hasUsefulFacts
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -32,6 +35,21 @@ data class LocalGroupChatState(
     val announcement: String = "",
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
+}
+
+internal fun LocalGroupChatState.migrateLegacyConversationContext(): LocalGroupChatState {
+    val legacyState = members.asSequence()
+        .map(LocalGroupChatMember::chatState)
+        .firstOrNull { state ->
+            ChatContextState().withLegacyFallback(state).hasUsefulFacts()
+        }
+    val migratedContext = legacyState?.let(context::withLegacyFallback) ?: context
+    return copy(
+        context = migratedContext,
+        members = members.map { member ->
+            member.copy(chatState = member.chatState.withoutLegacyConversationContext())
+        },
+    )
 }
 
 internal const val MAX_GROUP_CHAT_MEMBERS = 6
