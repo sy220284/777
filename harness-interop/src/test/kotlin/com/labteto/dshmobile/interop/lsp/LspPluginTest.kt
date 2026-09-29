@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.interop.lsp
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
+import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolContext
 import java.io.File
 import kotlinx.coroutines.TimeoutCancellationException
@@ -153,4 +155,74 @@ class LspPluginTest {
             plugin.uninstall(context)
         }
     }
+
+    @Test fun cancellingStopStillClosesEveryLanguageServerLease() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
+        fun server(name: String): File {
+            val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
+            val hover = """{"jsonrpc":"2.0","id":2,"result":{"contents":"$name"}}"""
+            return temporary.newFile("$name.sh").apply {
+                writeText(
+                    "printf '%s' '" + frame(initialized) + frame(hover) +
+                        "'\nexec cat >/dev/null\n",
+                )
+            }
+        }
+
+        val firstServer = server("first")
+        val secondServer = server("second")
+        temporary.newFile("a.kt").writeText("val a = 1")
+        temporary.newFile("b.kt").writeText("val b = 2")
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(
+                maxModelRequests = 1,
+                maxAgents = 1,
+                maxLanguageServers = 2,
+            ),
+        )
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { path ->
+                listOf(
+                    "/bin/sh",
+                    if (path == "a.kt") firstServer.absolutePath else secondServer.absolutePath,
+                )
+            },
+            resourceScheduler = scheduler,
+        )
+        plugin.install(context)
+        try {
+            val toolContext = ToolContext(approval = { true })
+            withTimeout(5_000) {
+                context.tools.execute(
+                    "lsp_hover",
+                    buildJsonObject { put("path", "a.kt") },
+                    context = toolContext,
+                )
+                context.tools.execute(
+                    "lsp_hover",
+                    buildJsonObject { put("path", "b.kt") },
+                    context = toolContext,
+                )
+            }
+            assertEquals(2, scheduler.snapshot().activeLanguageServers)
+
+            var cancelled = false
+            try {
+                withTimeout(250) { plugin.stop() }
+            } catch (_: TimeoutCancellationException) {
+                cancelled = true
+            }
+
+            assertTrue(cancelled)
+            assertEquals(0, scheduler.snapshot().activeLanguageServers)
+            assertTrue(scheduler.snapshot().leases.isEmpty())
+        } finally {
+            runCatching { plugin.uninstall(context) }
+        }
+    }
+
 }
