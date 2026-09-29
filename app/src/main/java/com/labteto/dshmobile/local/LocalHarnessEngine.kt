@@ -275,6 +275,7 @@ class LocalHarnessEngine @Inject constructor(
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
     }
+    private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, activeWorkRuns, ::eventLogFor) { currentSessionId } }
     private val pluginComposition by lazy {
         pluginCompositionFactory.create(
             workspaceRoot = File(workspace.path),
@@ -295,18 +296,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             executeBuiltin = ::executeBuiltin,
-            usageContextProvider = { sessionId, callId ->
-                val resolvedSessionId = sessionId?.takeIf(String::isNotBlank) ?: currentSessionId
-                val snapshot = activeWorkRuns[resolvedSessionId]?.state?.value
-                    ?: _state.value.copy(sessionId = resolvedSessionId)
-                buildToolTokenUsageContext(
-                    snapshot = snapshot,
-                    eventLog = eventLogFor(resolvedSessionId),
-                    sessionId = resolvedSessionId,
-                    callId = callId,
-                    action = TokenUsageAction.VISION,
-                )
-            },
+            usageContextProvider = { sessionId, callId -> tokenUsageBridge.resolve(sessionId, callId, TokenUsageAction.VISION) },
         )
     }
     private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
@@ -2751,10 +2741,6 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics()
     }
 
-
-
-
-
     private suspend fun runChatTurn(
         input: String,
         replacingMessageId: String? = null,
@@ -4036,18 +4022,7 @@ class LocalHarnessEngine @Inject constructor(
             "web_search" -> {
                 val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                web.search(
-                    key,
-                    queries,
-                    buildToolTokenUsageContext(
-                        snapshot = executionState.value,
-                        eventLog = eventLogFor(boundSessionId),
-                        sessionId = boundSessionId,
-                        callId = call.id,
-                        action = TokenUsageAction.WEB_SEARCH,
-                        fallbackTaskLabel = queries.firstOrNull(),
-                    ),
-                )
+                web.search(key, queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
             }
             "web_fetch" -> {
                 val input = args.string("url")

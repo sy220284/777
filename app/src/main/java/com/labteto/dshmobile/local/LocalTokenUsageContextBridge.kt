@@ -1,0 +1,35 @@
+package com.labteto.dshmobile.local
+
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * Resolves model-consuming tool calls back to the Work run that triggered them.
+ *
+ * Keeping this lookup outside LocalHarnessEngine prevents usage analytics from adding another
+ * orchestration responsibility to the engine while preserving session/run/subagent attribution.
+ */
+internal class LocalTokenUsageContextBridge(
+    private val state: StateFlow<LocalHarnessState>,
+    private val activeWorkRuns: Map<String, LocalWorkRunBinding>,
+    private val eventLogFor: (String) -> LocalSessionEventLog,
+    private val currentSessionId: () -> String,
+) {
+    fun resolve(
+        sessionId: String?,
+        callId: String?,
+        action: TokenUsageAction,
+        fallbackTaskLabel: String? = null,
+    ): TokenUsageContext {
+        val resolvedSessionId = sessionId?.takeIf(String::isNotBlank) ?: currentSessionId()
+        val snapshot = activeWorkRuns[resolvedSessionId]?.state?.value
+            ?: state.value.copy(sessionId = resolvedSessionId)
+        return buildToolTokenUsageContext(
+            snapshot = snapshot,
+            eventLog = eventLogFor(resolvedSessionId),
+            sessionId = resolvedSessionId,
+            callId = callId,
+            action = action,
+            fallbackTaskLabel = fallbackTaskLabel,
+        )
+    }
+}
