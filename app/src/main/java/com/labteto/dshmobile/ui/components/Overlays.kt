@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -203,7 +204,12 @@ fun DsPopupMenu(
         containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, colors.borderL1),
-        properties = PopupProperties(focusable = focusable),
+        properties = PopupProperties(
+            focusable = focusable,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            clippingEnabled = true,
+        ),
     ) {
         items.forEach { item ->
             DropdownMenuItem(
@@ -231,6 +237,72 @@ fun DsPopupMenu(
                 modifier = Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             )
+        }
+    }
+}
+
+/**
+ * Compact contextual action menu used for message long-press actions.
+ *
+ * It deliberately shares the same popup/dismiss contract as [DsPopupMenu]: tapping any area
+ * outside the plate closes it. Actions are laid out horizontally to keep frequent message
+ * operations close to the selected bubble without turning them into a permanent toolbar.
+ */
+@Composable
+fun DsContextActionMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    items: List<MenuItem>,
+) {
+    val colors = DsTheme.colors
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = DsShapes.menu,
+        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+        tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, colors.borderL1),
+        properties = PopupProperties(
+            focusable = true,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            clippingEnabled = true,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEach { item ->
+                Column(
+                    modifier = Modifier
+                        .widthIn(min = 64.dp)
+                        .heightIn(min = 64.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            onDismiss()
+                            item.onClick()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    item.icon?.let { icon ->
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (item.danger) colors.error else colors.labelSecondary,
+                        )
+                    }
+                    Text(
+                        text = item.text,
+                        style = DsType.small13,
+                        color = if (item.danger) colors.error else colors.labelPrimary,
+                    )
+                }
+            }
         }
     }
 }
