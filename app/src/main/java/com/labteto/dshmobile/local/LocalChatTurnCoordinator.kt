@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 
 internal data class LocalPreparedChatTurn(
     val context: ChatTurnContext,
