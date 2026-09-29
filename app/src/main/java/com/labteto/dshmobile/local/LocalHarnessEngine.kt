@@ -723,6 +723,9 @@ class LocalHarnessEngine @Inject constructor(
             endTransition = ::endSessionTransition,
             runBusy = ::isRunBusy,
             cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
+            cancelWorkRunsAndJoin = { ids ->
+                cancelWorkRunsForDeletedSessions(activeWorkRuns, ids, runStateLock)
+            },
             resetModelHistory = { modelHistory.reset() },
             persist = ::persist,
             loadSession = { id ->
