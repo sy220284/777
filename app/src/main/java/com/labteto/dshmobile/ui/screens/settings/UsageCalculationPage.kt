@@ -448,13 +448,11 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
 
     PromptBreakdownCard(record.promptBreakdown)
 
+    val modelStep = record.context.step?.let { step ->
+        stringResource(R.string.usage_model_step, record.model, step)
+    } ?: record.model
     Text(
-        buildString {
-            append(record.model)
-            record.context.step?.let { append(" · Step ").append(it) }
-            append(" · ")
-            append(formatTime(record.timestamp))
-        },
+        "$modelStep · ${formatTime(record.timestamp)}",
         style = DsType.caption11,
         color = colors.labelTertiary,
     )
