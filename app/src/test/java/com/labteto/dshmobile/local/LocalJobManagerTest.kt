@@ -104,6 +104,38 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun stoppingOwnedNonPersistentJobsKeepsPersistentJobsRunning() = runTest {
+        val persistentGate = CompletableDeferred<Unit>()
+        val manager = LocalJobManager(this) { }
+
+        val transient = manager.start("shell", ownerSessionId = "session-a") { _, _ ->
+            awaitCancellation()
+        }
+        val persistent = manager.startPersistent(
+            label = "fetch",
+            resumeKind = "web_fetch",
+            resumePayload = "{}",
+            ownerSessionId = "session-a",
+        ) { _, _ ->
+            persistentGate.await()
+            "done"
+        }
+        val transientId = transient.substringAfterLast('：')
+        val persistentId = persistent.substringAfterLast('：')
+        runCurrent()
+
+        manager.stopOwnedNonPersistentAndJoin(setOf("session-a"))
+        runCurrent()
+
+        assertTrue(manager.output(transientId, "session-a").contains("[cancelled]"))
+        assertTrue(manager.output(persistentId, "session-a").contains("[running]"))
+
+        persistentGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(manager.output(persistentId, "session-a").contains("[completed]"))
+    }
+
+    @Test
     fun scopedJobApisCannotSeeOrControlAnotherSession() = runTest {
         val otherGate = CompletableDeferred<Unit>()
         val manager = LocalJobManager(this) { }
