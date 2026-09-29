@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.plugin.PluginDescriptor
 import com.labteto.dshmobile.harness.plugin.PluginLifecycleState
 import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,12 +23,15 @@ class PluginManagerTest {
     fun installsDependenciesInTopologicalOrder() = runTest {
         val installs = mutableListOf<String>()
         val manager = manager(
-            definition("feature", dependencies = listOf(PluginDependency("core"))) {
-                installs += "feature"
-            },
-            definition("core") {
-                installs += "core"
-            },
+            definition(
+                "feature",
+                dependencies = listOf(PluginDependency("core")),
+                onInstall = { installs += "feature" },
+            ),
+            definition(
+                "core",
+                onInstall = { installs += "core" },
+            ),
         )
 
         assertEquals(listOf("core", "feature"), manager.install("feature"))
@@ -39,11 +43,16 @@ class PluginManagerTest {
     fun rejectsUnsatisfiedDependencyVersionBeforeAnyInstall() = runTest {
         val installs = mutableListOf<String>()
         val manager = manager(
-            definition("core", version = 1) { installs += "core" },
+            definition(
+                "core",
+                version = 1,
+                onInstall = { installs += "core" },
+            ),
             definition(
                 "feature",
                 dependencies = listOf(PluginDependency("core", minVersion = 2)),
-            ) { installs += "feature" },
+                onInstall = { installs += "feature" },
+            ),
         )
 
         val failure = runCatching { manager.install("feature") }
@@ -195,6 +204,102 @@ class PluginManagerTest {
         val manager = manager(definition("core"))
 
         assertFalse(manager.disable("missing"))
+    }
+
+    @Test
+    fun concurrentEnableStormInstallsPluginOnlyOnce() = runTest {
+        var installs = 0
+        val manager = manager(
+            definition(
+                "core",
+                onInstall = { installs += 1 },
+            ),
+        )
+
+        val attempts = (0 until 100).map {
+            async { manager.enable("core") }
+        }
+        attempts.forEach { it.await() }
+
+        assertEquals(1, installs)
+        assertEquals(listOf("core"), manager.installedPluginIds())
+    }
+
+    @Test
+    fun unorderedDisableAndReenablePreservesDependencyRules() = runTest {
+        val manager = manager(
+            definition("core"),
+            definition("feature", dependencies = listOf(PluginDependency("core"))),
+        )
+        manager.install("feature")
+
+        assertTrue(runCatching { manager.disable("core") }.isFailure)
+        assertTrue(manager.disable("feature"))
+        assertTrue(manager.disable("core"))
+        assertEquals(listOf("core", "feature"), manager.enable("feature"))
+    }
+
+    @Test
+    fun largeReverseOrderedCatalogStillResolvesDeterministically() = runTest {
+        val definitions = (0 until 128).map { index ->
+            definition(
+                id = "plugin-" + index,
+                dependencies = if (index == 0) {
+                    emptyList()
+                } else {
+                    listOf(PluginDependency("plugin-" + (index - 1)))
+                },
+            )
+        }.reversed()
+
+        val manager = manager(*definitions.toTypedArray())
+        val installed = manager.install("plugin-127")
+
+        assertEquals(128, installed.size)
+        assertEquals("plugin-0", installed.first())
+        assertEquals("plugin-127", installed.last())
+        assertEquals(installed, manager.installedPluginIds())
+    }
+
+    @Test
+    fun replacementCleanupFailureLeavesLifecycleFailedInsteadOfPretendingHealthy() = runTest {
+        val registry = PluginRegistry()
+        val manager = manager(
+            definition(
+                id = "replaceable",
+                version = 1,
+                onInstall = { it.events.register("owner", "old") },
+                onUninstall = { it.events.unregister("owner") },
+            ),
+            registry = registry,
+        )
+        manager.install("replaceable")
+
+        val failure = runCatching {
+            manager.replace(
+                definition(
+                    id = "replaceable",
+                    version = 2,
+                    onInstall = {
+                        it.events.register("owner", "broken")
+                        error("replacement failed")
+                    },
+                    onUninstall = {
+                        it.events.unregister("owner")
+                        error("cleanup failed")
+                    },
+                ),
+            )
+        }
+
+        assertTrue(failure.isFailure)
+        assertEquals("old", registry.context.events.get("owner"))
+        assertEquals(1, manager.descriptors().single { it.id == "replaceable" }.version)
+        assertEquals(
+            PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("replaceable")?.state,
+        )
+        assertTrue(runCatching { manager.install("replaceable") }.isFailure)
     }
 
     private fun manager(

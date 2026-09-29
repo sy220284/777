@@ -58,6 +58,9 @@ class PluginManager(
             "插件 API 不兼容：${replacement.id} 需要 ${replacement.apiVersion}，当前 $apiVersion"
         }
         require(registry.isInstalled(replacement.id)) { "插件未安装：${replacement.id}" }
+        require(registry.lifecycleSnapshot(replacement.id)?.state == PluginLifecycleState.ACTIVE) {
+            "插件运行态异常，必须先停用后再恢复：${replacement.id}"
+        }
 
         val activeIds = registry.ids().toSet()
         replacement.dependencies.forEach { dependency ->
@@ -99,6 +102,9 @@ class PluginManager(
     fun lifecycleSnapshot(id: String): PluginLifecycleSnapshot? = registry.lifecycleSnapshot(id)
 
     private fun installedVersions(): Map<String, Int> = registry.ids().associateWith { id ->
+        require(registry.lifecycleSnapshot(id)?.state == PluginLifecycleState.ACTIVE) {
+            "插件运行态异常，不能视为已启用：$id"
+        }
         catalog.descriptor(id)?.version ?: error("已安装插件未登记：$id")
     }
 

@@ -577,13 +577,17 @@ class WebhookPlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        listOf(
-            "webhook_start",
-            "webhook_status",
-            "webhook_stop",
-            "webhook_copy_token",
-            "webhook_rotate_token",
-        ).forEach(context.tools::unregister)
+        try {
+            listOf(
+                "webhook_start",
+                "webhook_status",
+                "webhook_stop",
+                "webhook_copy_token",
+                "webhook_rotate_token",
+            ).forEach(context.tools::unregister)
+        } finally {
+            controller.stop()
+        }
     }
 
     private fun schema(
