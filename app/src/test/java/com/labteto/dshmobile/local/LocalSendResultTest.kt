@@ -81,4 +81,66 @@ class LocalSendResultTest {
         assertEquals(LocalSendRejectReason.LOADING, loading?.rejectReason)
         assertEquals(LocalSendRejectReason.UNCONFIGURED, unconfigured?.rejectReason)
     }
+
+    @Test
+    fun failedQueueOfferDoesNotRunAcceptedOrQueuedCallbacks() {
+        var accepted = 0
+        var queued = 0
+        var rejected = 0
+        var started = 0
+
+        val result = com.labteto.dshmobile.local.send.coordinateLocalSend(
+            configured = true,
+            loading = false,
+            sessionTransitioning = false,
+            activeRun = true,
+            pendingCount = 0,
+            pendingLimit = 16,
+            onRejected = { rejected += 1 },
+            onAccepted = { accepted += 1 },
+            enqueue = { false },
+            onQueued = { queued += 1 },
+            onStart = { started += 1 },
+        )
+
+        assertFalse(result.accepted)
+        assertEquals(LocalSendRejectReason.QUEUE_FULL, result.rejectReason)
+        assertEquals(0, accepted)
+        assertEquals(0, queued)
+        assertEquals(0, started)
+        assertEquals(1, rejected)
+    }
+
+    @Test
+    fun idleSendStartsDirectlyWithoutTouchingQueue() {
+        var accepted = 0
+        var enqueueCalls = 0
+        var queued = 0
+        var started = 0
+
+        val result = com.labteto.dshmobile.local.send.coordinateLocalSend(
+            configured = true,
+            loading = false,
+            sessionTransitioning = false,
+            activeRun = false,
+            pendingCount = 0,
+            pendingLimit = 16,
+            onRejected = { error("不应拒绝") },
+            onAccepted = { accepted += 1 },
+            enqueue = {
+                enqueueCalls += 1
+                true
+            },
+            onQueued = { queued += 1 },
+            onStart = { started += 1 },
+        )
+
+        assertTrue(result.accepted)
+        assertEquals(LocalSendResult.Started, result)
+        assertEquals(1, accepted)
+        assertEquals(0, enqueueCalls)
+        assertEquals(0, queued)
+        assertEquals(1, started)
+    }
+
 }
