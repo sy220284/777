@@ -544,7 +544,7 @@ class LocalHarnessEngine @Inject constructor(
             imageCapabilities = imageCapabilities,
             usageTracker = usageTracker,
             resourceScheduler = resourceScheduler,
-            deviceProvider = deviceProvider,
+            virtualDisplayProvider = deviceProvider,
             memoryClassMb = memoryClassMb,
             agentRunCoordinator = agentRunCoordinator,
             contextComposer = contextComposer,
