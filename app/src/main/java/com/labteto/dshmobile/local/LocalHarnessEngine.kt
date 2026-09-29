@@ -374,6 +374,8 @@ class LocalHarnessEngine @Inject constructor(
     )
     private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
+    private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
 
     private val transcriptRuntime by lazy {
@@ -508,10 +510,8 @@ class LocalHarnessEngine @Inject constructor(
         },
     )
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
-        _state.update { current ->
-            current.copy(jobs = projectExecutionJobs(current.usageMode, snapshot))
-        }
-        syncForegroundJobs(context, currentSessionId, snapshot) { message ->
+        projectJobSnapshotToSessionStates(snapshot, _state, activeWorkRuns)
+        syncForegroundJobs(context, snapshot) { message ->
             _state.update { it.copy(error = message) }
         }
     }
@@ -674,8 +674,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
-    private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
     private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
