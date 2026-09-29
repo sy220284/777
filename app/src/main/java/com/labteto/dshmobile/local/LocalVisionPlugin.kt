@@ -139,7 +139,7 @@ class LocalVisionPlugin(
                     val key = keyProvider()
                     if (route == null || key.isNullOrBlank()) {
                         return@HarnessToolExecutor ToolResult(
-                            "视觉模型尚未配置，请先在设置中填写视觉模型、接口地址和密钥",
+                            "当前模型尚未配置，请先在模型设置中选择模型并填写接口地址和密钥",
                             isError = true,
                         )
                     }
