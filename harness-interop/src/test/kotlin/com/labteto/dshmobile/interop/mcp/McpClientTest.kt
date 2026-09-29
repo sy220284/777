@@ -309,4 +309,31 @@ class McpClientTest {
         }
     }
 
+
+    @Test
+    fun httpJsonResponseWithWrongIdIsRejected() = runTest {
+        val http = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .header("Content-Type", "application/json")
+                    .body("""{"jsonrpc":"2.0","id":999,"result":{"tools":[]}}""".toResponseBody())
+                    .build()
+            }
+            .build()
+        val transport = McpStreamableHttpTransport(
+            endpoint = "https://example.com/mcp",
+            http = http,
+            json = Json,
+        )
+
+        val failure = runCatching { transport.request("tools/list") }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("id"))
+    }
+
 }
