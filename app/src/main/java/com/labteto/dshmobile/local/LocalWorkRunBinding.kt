@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -47,4 +48,32 @@ internal class LocalWorkRunBinding(
             transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence)
         },
     )
+}
+
+internal suspend fun cancelWorkRunBindingsForSessions(
+    activeRuns: ConcurrentHashMap<String, LocalWorkRunBinding>,
+    sessionIds: Set<String>,
+) {
+    if (sessionIds.isEmpty()) return
+    val targets = sessionIds.mapNotNull { id ->
+        activeRuns[id]?.let { id to it }
+    }
+    targets.forEach { (_, binding) ->
+        binding.interactions.cancelAll()
+        binding.pendingInputs.drain()
+        binding.state.value = binding.state.value.copy(
+            queuedInputCount = 0,
+            pendingApproval = null,
+            pendingQuestion = null,
+        )
+        binding.job?.cancel()
+    }
+    targets.forEach { (id, binding) ->
+        binding.job?.join()
+        if (activeRuns.remove(id, binding)) {
+            binding.mirrorJob?.cancel()
+            binding.mirrorJob = null
+            binding.job = null
+        }
+    }
 }
