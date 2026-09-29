@@ -51,7 +51,7 @@ class UsageCalculationPageTest {
             onOpenPricing = { pricingOpens++ },
         )
 
-        compose.onNodeWithText("¥0.1234").assertExists()
+        compose.onNodeWithText("¥0.1234", substring = true).assertExists()
         compose.onNodeWithText("75.0%").assertExists()
         compose.onNodeWithText(context.getString(R.string.usage_calculation_partial)).assertExists()
         compose.onNodeWithText(context.getString(R.string.usage_calculation_view_prices))
