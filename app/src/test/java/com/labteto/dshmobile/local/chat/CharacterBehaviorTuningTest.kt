@@ -38,4 +38,53 @@ class CharacterBehaviorTuningTest {
         assertEquals(55, previous.evolution.initiativeBaseline)
         assertTrue(evolved.initiativeBaseline >= 55)
     }
+    @Test
+    fun malformedPersistedTuningIsClampedBeforeUse() {
+        val normalized = CharacterBehaviorTuning(
+            intimacy = Int.MIN_VALUE,
+            persistence = Int.MAX_VALUE,
+            initiative = -1,
+            openness = 101,
+            evolution = Int.MAX_VALUE,
+            emotionalAfterglow = Int.MIN_VALUE,
+            novelty = 999,
+            loreAdherence = -999,
+            relationshipPace = 101,
+            updatedAt = Long.MIN_VALUE,
+        ).normalized()
+
+        assertEquals(0, normalized.intimacy)
+        assertEquals(100, normalized.persistence)
+        assertEquals(0, normalized.initiative)
+        assertEquals(100, normalized.openness)
+        assertEquals(100, normalized.evolution)
+        assertEquals(0, normalized.emotionalAfterglow)
+        assertEquals(100, normalized.novelty)
+        assertEquals(0, normalized.loreAdherence)
+        assertEquals(100, normalized.relationshipPace)
+        assertEquals(0L, normalized.updatedAt)
+    }
+
+    @Test
+    fun extremeBaseValuesNeverOverflowOrThrow() {
+        val tuning = CharacterBehaviorTuning(
+            persistence = 100,
+            novelty = 100,
+            relationshipPace = 100,
+        )
+
+        assertTrue(tuning.transientTtl(Int.MAX_VALUE) > 0)
+        assertTrue(tuning.cooldownTurns(Int.MAX_VALUE) in 1..8)
+        assertTrue(tuning.relationshipDelta(Int.MAX_VALUE) > 0)
+        assertEquals(1, tuning.transientTtl(Int.MIN_VALUE))
+        assertEquals(1, tuning.relationshipDelta(Int.MIN_VALUE))
+    }
+
+    @Test
+    fun staleImportedTuningCannotOverwriteNewerLocalChoice() {
+        val local = CharacterBehaviorTuning(intimacy = 90, updatedAt = 200)
+        val stale = CharacterBehaviorTuning(intimacy = 10, updatedAt = 100)
+
+        assertEquals(local, mergeCharacterBehaviorTuning(local, stale))
+    }
 }

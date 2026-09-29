@@ -66,7 +66,7 @@ class UpdateInstaller @Inject constructor(
             val expected = update.expectedSha256
                 ?: update.checksumUrl
                     ?.let { fetchText(it, MAX_CHECKSUM_BYTES) }
-                    ?.let { parseChecksum(it, apkName) }
+                    ?.let { parseUpdateChecksum(it, apkName) }
                 ?: error("发行版缺少 ${apkName} 的 SHA-256 校验信息")
 
             // Update payloads are temporary staging data. Starting a new attempt always discards
@@ -268,9 +268,7 @@ class UpdateInstaller @Inject constructor(
         kind: String,
         accept: String,
     ) {
-        require(expectedBytes == null || expectedBytes in 1..maxBytes) {
-            "$kind 大小异常：$expectedBytes 字节"
-        }
+        validateUpdateExpectedSize(expectedBytes, maxBytes, kind)
         val temp = File(target.parentFile, target.name + ".part")
         var lastError: IOException? = null
 
@@ -289,10 +287,7 @@ class UpdateInstaller @Inject constructor(
                     }
                     val body = response.body ?: throw IOException("下载 $kind 返回空响应")
                     val declared = body.contentLength()
-                    if (declared > maxBytes) throw IOException("$kind 超过允许大小：$declared 字节")
-                    if (expectedBytes != null && declared >= 0L && declared != expectedBytes) {
-                        throw EOFException("$kind 响应长度异常：$declared/$expectedBytes 字节")
-                    }
+                    validateUpdateDeclaredSize(declared, expectedBytes, maxBytes, kind)
 
                     var total = 0L
                     temp.outputStream().use { output ->
@@ -355,20 +350,6 @@ class UpdateInstaller @Inject constructor(
             bytes.toString(Charsets.UTF_8)
         }
     }
-
-    private fun parseChecksum(text: String, apkName: String): String? =
-        text.lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .mapNotNull { line ->
-                val parts = line.split(Regex("\\s+"), limit = 2)
-                if (parts.size != 2) null
-                else parts[0].takeIf {
-                    parts[1].removePrefix("*").trim() == apkName &&
-                        it.matches(Regex("[0-9a-fA-F]{64}"))
-                }
-            }
-            .firstOrNull()
 
     private fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

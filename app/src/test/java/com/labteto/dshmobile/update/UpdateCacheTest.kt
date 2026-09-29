@@ -165,4 +165,37 @@ class UpdateCacheTest {
         currentVersionCode = currentVersionCode,
         nowMillis = nowMillis,
     )
+    @Test
+    fun `clock rollback rebases handoff so cleanup remains bounded`() {
+        val cacheDir = temporary.newFolder("cache")
+        val root = prepare(cacheDir, currentVersionCode = 100L, nowMillis = 2_000_000L)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
+
+        UpdateCache.markInstallerHandoff(
+            root = root,
+            apk = apk,
+            targetVersionCode = 101L,
+            handedAtMillis = 2_000_000L,
+        )
+
+        val rebasedAt = 1_000_000L
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(
+                cacheDir = cacheDir,
+                currentVersionCode = 100L,
+                nowMillis = rebasedAt,
+            ),
+        )
+        assertTrue(root.exists())
+
+        assertNull(
+            UpdateCache.cleanupStale(
+                cacheDir = cacheDir,
+                currentVersionCode = 100L,
+                nowMillis = rebasedAt + UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            ),
+        )
+        assertFalse(root.exists())
+    }
 }

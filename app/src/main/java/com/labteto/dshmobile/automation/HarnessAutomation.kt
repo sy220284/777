@@ -2,6 +2,7 @@ package com.labteto.dshmobile.automation
 
 import android.content.Context
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
@@ -89,6 +90,9 @@ internal fun appendAutomationReceipt(
 
 private const val AUTOMATION_HISTORY_DAYS = 30L
 private const val AUTOMATION_HISTORY_RECORDS = 200
+
+internal fun Int.saturatingIncrement(): Int =
+    if (this >= Int.MAX_VALUE) Int.MAX_VALUE else (this + 1).coerceAtLeast(0)
 
 internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
     task.mode == AutomationMode.CHAT &&
@@ -1180,7 +1184,7 @@ class HarnessAutomationWorker(
                 task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
-                val nextFailureStreak = current.failureStreak + 1
+                val nextFailureStreak = current.failureStreak.saturatingIncrement()
                 autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
                 current.copy(
                     workSessionId = error.sessionId,
@@ -1254,7 +1258,7 @@ class HarnessAutomationWorker(
                 task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
-                val nextFailureStreak = current.failureStreak + 1
+                val nextFailureStreak = current.failureStreak.saturatingIncrement()
                 autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
                 current.copy(
                     status = when {
@@ -1324,16 +1328,14 @@ class HarnessAutomationWorker(
             applicationContext.getString(R.string.tasks_notification_open_result)
         }
         entry.notifications().postLocalSession(
-            id = AUTOMATION_NOTIFICATION_BASE + (task.id.hashCode() and Int.MAX_VALUE) % 10_000,
+            id = stableNotificationId("automation", task.id),
             title = title,
             text = text,
             sessionId = sessionId,
+            notificationKey = "automation:${task.id}",
         )
     }
 
-    companion object {
-        private const val AUTOMATION_NOTIFICATION_BASE = 34_000
-    }
 }
 
 class AutomationPlugin(

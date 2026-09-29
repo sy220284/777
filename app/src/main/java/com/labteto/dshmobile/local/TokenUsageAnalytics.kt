@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.local.usage.distinctForAccounting
+import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
+import com.labteto.dshmobile.local.usage.saturatingUsageAdd
+import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -55,15 +59,17 @@ data class TokenPromptBreakdown(
     val otherSystemTokens: Int = 0,
 ) {
     val estimatedInputTokens: Long
-        get() = (
-            systemBaseTokens +
-                personaStateTokens +
-                memoryRuleTokens +
-                historyTokens +
-                currentUserTokens +
-                toolDefinitionTokens +
-                otherSystemTokens
-            ).toLong()
+        get() = listOf(
+            systemBaseTokens,
+            personaStateTokens,
+            memoryRuleTokens,
+            historyTokens,
+            currentUserTokens,
+            toolDefinitionTokens,
+            otherSystemTokens,
+        ).fold(0L) { total, value ->
+            saturatingUsageAdd(total, value.toLong())
+        }
 }
 
 @Serializable
@@ -102,7 +108,7 @@ data class TokenUsageRecord(
     val reported: Boolean = false,
     val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
 ) {
-    val totalTokens: Long get() = inputTokens + outputTokens
+    val totalTokens: Long get() = saturatingUsageAdd(inputTokens, outputTokens)
 }
 
 data class TokenUsageAggregate(
@@ -115,8 +121,8 @@ data class TokenUsageAggregate(
     val unreportedRequestCount: Long = 0L,
     val estimatedCostCny: Double = 0.0,
 ) {
-    val totalTokens: Long get() = inputTokens + outputTokens
-    val cacheMeasuredTokens: Long get() = cacheHitTokens + cacheMissTokens
+    val totalTokens: Long get() = saturatingUsageAdd(inputTokens, outputTokens)
+    val cacheMeasuredTokens: Long get() = saturatingUsageAdd(cacheHitTokens, cacheMissTokens)
     val cacheHitRate: Double
         get() = if (cacheMeasuredTokens <= 0L) 0.0 else cacheHitTokens.toDouble() / cacheMeasuredTokens.toDouble()
 }
@@ -446,7 +452,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
         aggregateTokenUsageRecords(allRecords(), ZoneId.systemDefault())
 
     fun groupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? {
-        val records = allRecords().filter { record ->
+        val records = allRecords().distinctForAccounting().filter { record ->
             when (kind) {
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
                 TokenUsageGroupKind.TASK ->
@@ -563,7 +569,7 @@ internal fun aggregateTokenUsageRecords(
         var workTaskInputTokens = 0L
         var workTaskOutputTokens = 0L
 
-        records.forEach { record ->
+        records.distinctForAccounting().forEach { record ->
             if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
             total.add(record)
             val epochDay = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate().toEpochDay()
@@ -575,7 +581,7 @@ internal fun aggregateTokenUsageRecords(
                     chatActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
                     record.context.turnId?.takeIf(String::isNotBlank)?.let { turnId ->
                         chatTurns += turnId
-                        chatTurnInputTokens += record.inputTokens
+                        chatTurnInputTokens = saturatingUsageAdd(chatTurnInputTokens, record.inputTokens)
                         when (record.context.action) {
                             TokenUsageAction.CHAT_REPLY,
                             TokenUsageAction.CHAT_REPAIR,
@@ -589,8 +595,8 @@ internal fun aggregateTokenUsageRecords(
                         }
                     }
                     if (record.context.action == TokenUsageAction.GROUP_REPLY) {
-                        groupVisibleReplyOutputTokens += record.outputTokens
-                        groupVisibleReplyTotalTokens += record.totalTokens
+                        groupVisibleReplyOutputTokens = saturatingUsageAdd(groupVisibleReplyOutputTokens, record.outputTokens)
+                        groupVisibleReplyTotalTokens = saturatingUsageAdd(groupVisibleReplyTotalTokens, record.totalTokens)
                         groupVisibleReplyCount += 1
                     }
                     record.context.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
@@ -611,8 +617,8 @@ internal fun aggregateTokenUsageRecords(
                         ?: record.context.runId?.takeIf(String::isNotBlank)
                     taskRunId?.let { runId ->
                         workRuns += runId
-                        workTaskInputTokens += record.inputTokens
-                        workTaskOutputTokens += record.outputTokens
+                        workTaskInputTokens = saturatingUsageAdd(workTaskInputTokens, record.inputTokens)
+                        workTaskOutputTokens = saturatingUsageAdd(workTaskOutputTokens, record.outputTokens)
                         taskGroups.getOrPut(runId) {
                             MutableGroup(
                                 key = runId,
@@ -622,8 +628,10 @@ internal fun aggregateTokenUsageRecords(
                         }.add(record)
                     }
                     when (record.context.runKind) {
-                        LocalAgentRunKind.FOREGROUND.name.lowercase() -> workMainTokens += record.totalTokens
-                        LocalAgentRunKind.SUBAGENT.name.lowercase() -> workSubagentTokens += record.totalTokens
+                        LocalAgentRunKind.FOREGROUND.name.lowercase() ->
+                            workMainTokens = saturatingUsageAdd(workMainTokens, record.totalTokens)
+                        LocalAgentRunKind.SUBAGENT.name.lowercase() ->
+                            workSubagentTokens = saturatingUsageAdd(workSubagentTokens, record.totalTokens)
                     }
                 }
                 null -> day.other.add(record)
@@ -633,14 +641,19 @@ internal fun aggregateTokenUsageRecords(
         }
 
         val chatTurnCount = chatTurns.size
-        val directReplyOutputTokens = directVisibleReplies.values.sumOf { it.outputTokens }
-        val directReplyTotalTokens = directVisibleReplies.values.sumOf { it.totalTokens }
+        val directReplyOutputTokens = directVisibleReplies.values.fold(0L) { total, record ->
+            saturatingUsageAdd(total, record.outputTokens)
+        }
+        val directReplyTotalTokens = directVisibleReplies.values.fold(0L) { total, record ->
+            saturatingUsageAdd(total, record.totalTokens)
+        }
         val visibleReplyCount = directVisibleReplies.size + groupVisibleReplyCount
-        val visibleReplyOutputTokens = directReplyOutputTokens + groupVisibleReplyOutputTokens
-        val visibleReplyTotalTokens = directReplyTotalTokens + groupVisibleReplyTotalTokens
-        val chatBackgroundTokens = (
-            chat.inputTokens + chat.outputTokens - visibleReplyTotalTokens
-        ).coerceAtLeast(0L)
+        val visibleReplyOutputTokens = saturatingUsageAdd(directReplyOutputTokens, groupVisibleReplyOutputTokens)
+        val visibleReplyTotalTokens = saturatingUsageAdd(directReplyTotalTokens, groupVisibleReplyTotalTokens)
+        val chatBackgroundTokens = nonNegativeUsageDifference(
+            saturatingUsageAdd(chat.inputTokens, chat.outputTokens),
+            visibleReplyTotalTokens,
+        )
         return TokenUsageAnalyticsSnapshot(
             trackedSince = trackedSince,
             tracked = total.freeze(),
@@ -689,13 +702,17 @@ private class MutableTokenAggregate {
     var estimatedCostCny: Double = 0.0
 
     fun add(record: TokenUsageRecord) {
-        inputTokens += record.inputTokens
-        cacheHitTokens += record.cacheHitTokens
-        cacheMissTokens += record.cacheMissTokens
-        outputTokens += record.outputTokens
-        reasoningTokens += record.reasoningTokens
-        if (record.reported) requestCount += 1L else unreportedRequestCount += 1L
-        estimatedCostCny += record.estimatedCostCny
+        inputTokens = saturatingUsageAdd(inputTokens, record.inputTokens)
+        cacheHitTokens = saturatingUsageAdd(cacheHitTokens, record.cacheHitTokens)
+        cacheMissTokens = saturatingUsageAdd(cacheMissTokens, record.cacheMissTokens)
+        outputTokens = saturatingUsageAdd(outputTokens, record.outputTokens)
+        reasoningTokens = saturatingUsageAdd(reasoningTokens, record.reasoningTokens)
+        if (record.reported) {
+            requestCount = saturatingUsageAdd(requestCount, 1L)
+        } else {
+            unreportedRequestCount = saturatingUsageAdd(unreportedRequestCount, 1L)
+        }
+        estimatedCostCny = saturatingUsageCostAdd(estimatedCostCny, record.estimatedCostCny)
     }
 
     fun freeze() = TokenUsageAggregate(
@@ -744,8 +761,10 @@ private class MutableGroup(
         record.context.turnId?.takeIf(String::isNotBlank)?.let(turns::add)
         lastUsedAt = maxOf(lastUsedAt, record.timestamp)
         when (record.context.runKind) {
-            LocalAgentRunKind.FOREGROUND.name.lowercase() -> mainTokens += record.totalTokens
-            LocalAgentRunKind.SUBAGENT.name.lowercase() -> subagentTokens += record.totalTokens
+            LocalAgentRunKind.FOREGROUND.name.lowercase() ->
+                mainTokens = saturatingUsageAdd(mainTokens, record.totalTokens)
+            LocalAgentRunKind.SUBAGENT.name.lowercase() ->
+                subagentTokens = saturatingUsageAdd(subagentTokens, record.totalTokens)
         }
     }
 

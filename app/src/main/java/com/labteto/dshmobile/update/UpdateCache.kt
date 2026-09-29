@@ -66,21 +66,14 @@ internal object UpdateCache {
         require(targetVersionCode > 0L) { "目标版本号无效" }
         require(handedAtMillis > 0L) { "安装交接时间无效" }
 
-        val marker = File(root, HANDOFF_MARKER)
-        val temp = File(root, "$HANDOFF_MARKER.tmp")
-        temp.writeText(
-            listOf(
-                HANDOFF_SCHEMA,
-                apk.name,
-                targetVersionCode.toString(),
-                handedAtMillis.toString(),
-            ).joinToString("\n", postfix = "\n"),
+        writeHandoff(
+            root,
+            InstallerHandoff(
+                apkName = apk.name,
+                targetVersionCode = targetVersionCode,
+                handedAtMillis = handedAtMillis,
+            ),
         )
-        marker.delete()
-        if (!temp.renameTo(marker)) {
-            temp.copyTo(marker, overwrite = true)
-            temp.delete()
-        }
     }
 
     @Synchronized
@@ -101,10 +94,14 @@ internal object UpdateCache {
         val root = File(cacheDir, DIRECTORY_NAME)
         if (!root.isDirectory) return null
 
-        val handoff = readHandoff(root)
+        var handoff = readHandoff(root)
         if (handoff == null) {
             root.deleteRecursively()
             return null
+        }
+        if (nowMillis > 0L && handoff.handedAtMillis > nowMillis) {
+            handoff = handoff.copy(handedAtMillis = nowMillis)
+            writeHandoff(root, handoff)
         }
 
         val apk = File(root, handoff.apkName)
@@ -129,6 +126,24 @@ internal object UpdateCache {
             }
         }
         return INSTALLER_HANDOFF_GRACE_MS - elapsed
+    }
+
+    private fun writeHandoff(root: File, handoff: InstallerHandoff) {
+        val marker = File(root, HANDOFF_MARKER)
+        val temp = File(root, "$HANDOFF_MARKER.tmp")
+        temp.writeText(
+            listOf(
+                HANDOFF_SCHEMA,
+                handoff.apkName,
+                handoff.targetVersionCode.toString(),
+                handoff.handedAtMillis.toString(),
+            ).joinToString("\n", postfix = "\n"),
+        )
+        marker.delete()
+        if (!temp.renameTo(marker)) {
+            temp.copyTo(marker, overwrite = true)
+            temp.delete()
+        }
     }
 
     private fun readHandoff(root: File): InstallerHandoff? {

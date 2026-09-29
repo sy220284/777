@@ -211,15 +211,8 @@ class NotificationObserver @Inject constructor(
     private fun sessionTitle(sessionId: String): String? =
         store.sessions.value.firstOrNull { it.sessionId == sessionId }?.title
 
-    private fun notificationId(sessionId: String, channel: String): Int {
-        val offset = when (channel) {
-            DshNotifications.CHANNEL_ACTION -> CHANNEL_ACTION_OFFSET
-            DshNotifications.CHANNEL_CONNECTION -> CHANNEL_CONNECTION_OFFSET
-            else -> CHANNEL_COMPLETIONS_OFFSET
-        }
-        val base = ((sessionId.hashCode() % 1000) + 1000) % 1000
-        return base + offset
-    }
+    private fun notificationId(sessionId: String, channel: String): Int =
+        stableNotificationId("remote:$channel", sessionId)
 
     private fun isDuplicate(key: String): Boolean {
         synchronized(seen) {
@@ -240,8 +233,5 @@ class NotificationObserver @Inject constructor(
 
     private companion object {
         const val MAX_DEDUP_KEYS = 1024
-        const val CHANNEL_COMPLETIONS_OFFSET = 1000
-        const val CHANNEL_ACTION_OFFSET = 2000
-        const val CHANNEL_CONNECTION_OFFSET = 3000
     }
 }

@@ -460,4 +460,13 @@ class AutomationReceiptTest {
         assertTrue(next - after.timeInMillis <= 8L * 24L * 60L * 60L * 1000L)
     }
 
+
+    @Test
+    fun failureCounterSaturatesInsteadOfWrappingNegative() {
+        assertEquals(1, 0.saturatingIncrement())
+        assertEquals(Int.MAX_VALUE, (Int.MAX_VALUE - 1).saturatingIncrement())
+        assertEquals(Int.MAX_VALUE, Int.MAX_VALUE.saturatingIncrement())
+        assertEquals(0, Int.MIN_VALUE.saturatingIncrement())
+    }
+
 }

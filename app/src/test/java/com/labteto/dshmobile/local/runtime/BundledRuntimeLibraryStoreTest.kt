@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local.runtime
 
+import java.nio.file.Files
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BundledRuntimeLibraryStoreTest {
@@ -61,6 +65,34 @@ class BundledRuntimeLibraryStoreTest {
             throw AssertionError("expected IllegalArgumentException")
         } catch (_: IllegalArgumentException) {
             // Expected.
+        }
+    }
+    @Test
+    fun sameSizeCorruptionIsNotAcceptedAsReusableBlob() {
+        val root = Files.createTempDirectory("runtime-blob-validation-").toFile()
+        try {
+            val expectedBytes = "expected-runtime-library".toByteArray()
+            val corruptedBytes = expectedBytes.copyOf().also { bytes ->
+                bytes[0] = (bytes[0].toInt() xor 0x01).toByte()
+            }
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(expectedBytes)
+                .toLowerHex()
+            val entry = BundledRuntimeLibraryEntry(
+                name = "libsame.so",
+                sha256 = digest,
+                size = expectedBytes.size.toLong(),
+            )
+            val file = root.resolve(digest)
+
+            file.writeBytes(corruptedBytes)
+            assertEquals(expectedBytes.size.toLong(), file.length())
+            assertFalse(runtimeBlobMatches(file, entry))
+
+            file.writeBytes(expectedBytes)
+            assertTrue(runtimeBlobMatches(file, entry))
+        } finally {
+            root.deleteRecursively()
         }
     }
 }

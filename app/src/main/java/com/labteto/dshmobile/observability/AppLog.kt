@@ -4,7 +4,9 @@ import android.util.Log
 import java.io.File
 import java.util.ArrayDeque
 import java.util.Base64
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 data class AppLogEntry(
     val timestampMillis: Long,
@@ -22,6 +24,20 @@ data class AppLogEntry(
  * process and a sanitized app-private tail is persisted so diagnostics remain useful after a crash,
  * update or process restart.
  */
+
+internal fun createAppLogPersistenceExecutor(maxQueued: Int = 1_024): ThreadPoolExecutor {
+    require(maxQueued > 0) { "日志持久化队列容量必须大于 0" }
+    return ThreadPoolExecutor(
+        1,
+        1,
+        0L,
+        TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue(maxQueued),
+        { runnable -> Thread(runnable, "777-app-log").apply { isDaemon = true } },
+        ThreadPoolExecutor.DiscardOldestPolicy(),
+    )
+}
+
 object AppLog {
     private const val MAX_ENTRIES = 200
     private const val MAX_EXPORT_ENTRIES = 800
@@ -30,9 +46,7 @@ object AppLog {
     private val lock = Any()
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
-    private val persistenceExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "777-app-log").apply { isDaemon = true }
-    }
+    private val persistenceExecutor = createAppLogPersistenceExecutor()
 
     @Volatile
     private var persistentFile: File? = null

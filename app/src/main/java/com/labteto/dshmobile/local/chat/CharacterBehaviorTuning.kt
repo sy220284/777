@@ -115,12 +115,18 @@ internal fun StringBuilder.appendCharacterBehaviorTuningContext(tuning: Characte
 
 private fun scaleAroundNatural(base: Int, value: Int, low: Float, high: Float): Int {
     val safe = value.coerceIn(0, 100)
+    val safeBase = base.coerceAtLeast(0)
     val factor = if (safe <= 50) {
         low + (1f - low) * (safe / 50f)
     } else {
         1f + (high - 1f) * ((safe - 50) / 50f)
     }
-    return (base * factor).roundToInt()
+    val scaled = safeBase.toDouble() * factor.toDouble()
+    return when {
+        !scaled.isFinite() || scaled >= Int.MAX_VALUE.toDouble() -> Int.MAX_VALUE
+        scaled <= 0.0 -> 0
+        else -> scaled.roundToInt()
+    }
 }
 
 private fun axisLabel(value: Int, low: String, middle: String, high: String): String = when {

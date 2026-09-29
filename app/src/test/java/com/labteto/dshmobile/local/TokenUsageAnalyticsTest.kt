@@ -204,4 +204,115 @@ class TokenUsageAnalyticsTest {
         reasoningTokens = reasoning,
         reported = true,
     )
+
+    @Test
+    fun duplicateRequestIdBeyondRecentWindowIsStillCountedOnce() {
+        val records = buildList {
+            add(
+                record(
+                    id = "replayed",
+                    time = 1L,
+                    input = 10L,
+                    output = 5L,
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, turnId = "turn-original"),
+                ),
+            )
+            repeat(1_100) { index ->
+                add(
+                    record(
+                        id = "unique-$index",
+                        time = index + 2L,
+                        input = 1L,
+                        output = 0L,
+                        context = TokenUsageContext(mode = LocalUsageMode.CHAT, turnId = "turn-$index"),
+                    ),
+                )
+            }
+            add(
+                record(
+                    id = "replayed",
+                    time = 2_000L,
+                    input = 10_000L,
+                    output = 10_000L,
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, turnId = "turn-replay"),
+                ),
+            )
+        }
+
+        val snapshot = aggregateTokenUsageRecords(records.asSequence(), ZoneId.of("UTC"))
+
+        assertEquals(1_115L, snapshot.tracked.totalTokens)
+        assertEquals(1_101L, snapshot.tracked.requestCount)
+        assertEquals(200, snapshot.recentRecords.size)
+    }
+
+    @Test
+    fun extremeTokenValuesSaturateInsteadOfWrappingNegative() {
+        val records = sequenceOf(
+            record(
+                id = "max-a",
+                time = 1L,
+                input = Long.MAX_VALUE,
+                output = Long.MAX_VALUE,
+                context = TokenUsageContext(mode = LocalUsageMode.WORK, runId = "run"),
+            ),
+            record(
+                id = "max-b",
+                time = 2L,
+                input = Long.MAX_VALUE,
+                output = Long.MAX_VALUE,
+                context = TokenUsageContext(mode = LocalUsageMode.WORK, runId = "run"),
+            ),
+        )
+
+        val snapshot = aggregateTokenUsageRecords(records, ZoneId.of("UTC"))
+
+        assertEquals(Long.MAX_VALUE, snapshot.tracked.inputTokens)
+        assertEquals(Long.MAX_VALUE, snapshot.tracked.outputTokens)
+        assertEquals(Long.MAX_VALUE, snapshot.tracked.totalTokens)
+        assertTrue(snapshot.work.averageInputPerTurn >= 0L)
+        assertTrue(snapshot.work.averageOutputPerTurn >= 0L)
+    }
+
+    @Test
+    fun negativeOrNonFiniteAccountingDataCannotPoisonTotals() {
+        val snapshot = aggregateTokenUsageRecords(
+            sequenceOf(
+                TokenUsageRecord(
+                    requestId = "bad",
+                    timestamp = 1L,
+                    model = "test",
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, turnId = "turn"),
+                    inputTokens = -5L,
+                    cacheHitTokens = -2L,
+                    cacheMissTokens = -3L,
+                    outputTokens = -7L,
+                    reasoningTokens = -1L,
+                    estimatedCostCny = Double.NaN,
+                    reported = true,
+                ),
+            ),
+            ZoneId.of("UTC"),
+        )
+
+        assertEquals(0L, snapshot.tracked.totalTokens)
+        assertEquals(0L, snapshot.tracked.cacheMeasuredTokens)
+        assertEquals(0.0, snapshot.tracked.estimatedCostCny, 0.0)
+    }
+
+    @Test
+    fun promptBreakdownCannotOverflowBeforeConversionToLong() {
+        val breakdown = TokenPromptBreakdown(
+            systemBaseTokens = Int.MAX_VALUE,
+            personaStateTokens = Int.MAX_VALUE,
+            memoryRuleTokens = Int.MAX_VALUE,
+            historyTokens = Int.MAX_VALUE,
+            currentUserTokens = Int.MAX_VALUE,
+            toolDefinitionTokens = Int.MAX_VALUE,
+            otherSystemTokens = Int.MAX_VALUE,
+        )
+
+        assertEquals(Int.MAX_VALUE.toLong() * 7L, breakdown.estimatedInputTokens)
+    }
+
 }

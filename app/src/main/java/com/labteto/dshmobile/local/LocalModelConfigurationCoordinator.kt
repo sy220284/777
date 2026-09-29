@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
+import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -8,7 +9,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-
 internal data class LocalModelConfigurationResult(
     val configured: Boolean,
     val model: String,
@@ -31,7 +31,7 @@ internal class LocalModelConfigurationCoordinator(
     private val tester: LocalModelConnectionTester,
     private val json: Json,
 ) {
-    suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult {
+    suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult = LocalModelMutationGate.run {
         require(model.isNotBlank()) { "模型名称不能为空" }
         val normalizedModel = normalizeModel(model)
         val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
@@ -49,30 +49,30 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_MODEL_PROFILES, encodeProfiles(profiles))
             .apply()
         apiKeys.activate(id)
-        return LocalModelConfigurationResult(true, normalizedModel, normalizedBaseUrl, profiles)
+        LocalModelConfigurationResult(true, normalizedModel, normalizedBaseUrl, profiles)
     }
 
     suspend fun select(
         id: String,
         profiles: List<LocalModelProfile>,
-    ): LocalModelConfigurationResult? {
-        val selected = profiles.firstOrNull { it.id == id } ?: return null
+    ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
+        val selected = profiles.firstOrNull { it.id == id } ?: return@run null
         require(apiKeys.getFor(id) != null) { "该模型密钥不可用，请编辑配置重新填写" }
         preferences.edit()
             .putString(KEY_MODEL, selected.model)
             .putString(KEY_BASE_URL, selected.baseUrl)
             .apply()
         apiKeys.activate(selected.id)
-        return LocalModelConfigurationResult(true, selected.model, selected.baseUrl, profiles)
+        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, profiles)
     }
 
     suspend fun remove(
         id: String,
         currentModel: String,
         currentBaseUrl: String,
-    ): LocalModelConfigurationResult? {
+    ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         val profiles = readProfiles()
-        if (profiles.none { it.id == id }) return null
+        if (profiles.none { it.id == id }) return@run null
         apiKeys.clearFor(id)
         val remaining = profiles.filterNot { it.id == id }
         val next = remaining.firstOrNull {
@@ -84,7 +84,7 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL)
             .apply()
         apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-        return LocalModelConfigurationResult(
+        LocalModelConfigurationResult(
             configured = next != null,
             model = next?.model ?: DEFAULT_MODEL,
             baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
@@ -95,7 +95,7 @@ internal class LocalModelConfigurationCoordinator(
     suspend fun clearActive(
         currentModel: String,
         currentBaseUrl: String,
-    ): LocalModelConfigurationResult {
+    ): LocalModelConfigurationResult = LocalModelMutationGate.run {
         val id = modelProfileId(currentModel, currentBaseUrl)
         apiKeys.clearFor(id)
         val remaining = readProfiles().filterNot { it.id == id }
@@ -106,7 +106,7 @@ internal class LocalModelConfigurationCoordinator(
             .putString(KEY_BASE_URL, next?.baseUrl ?: DEFAULT_BASE_URL)
             .apply()
         apiKeys.activate(next?.id ?: modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
-        return LocalModelConfigurationResult(
+        LocalModelConfigurationResult(
             configured = next != null,
             model = next?.model ?: DEFAULT_MODEL,
             baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,

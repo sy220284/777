@@ -50,6 +50,24 @@ internal fun ByteArray.toLowerHex(): String {
     return String(chars)
 }
 
+internal fun runtimeBlobMatches(
+    file: File,
+    entry: BundledRuntimeLibraryEntry,
+): Boolean {
+    if (!file.isFile || file.length() != entry.size) return false
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().buffered().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().toLowerHex() == entry.sha256
+}
+
 internal object BundledRuntimeLibraryStore {
     const val LAYOUT_VERSION = "shared-v1"
 
@@ -121,7 +139,7 @@ internal object BundledRuntimeLibraryStore {
         entry: BundledRuntimeLibraryEntry,
         canonical: File,
     ) {
-        if (canonical.isFile && canonical.length() == entry.size) return
+        if (runtimeBlobMatches(canonical, entry)) return
 
         Files.deleteIfExists(canonical.toPath())
         val temporary = File(canonical.parentFile, "." + entry.sha256 + ".tmp")

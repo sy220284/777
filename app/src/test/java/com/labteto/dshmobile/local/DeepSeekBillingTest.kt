@@ -134,4 +134,101 @@ class DeepSeekBillingTest {
         val saturdayNoon = ZonedDateTime.of(2026, 9, 26, 10, 0, 0, 0, zone).toInstant().toEpochMilli()
         assertEquals(DeepSeekPricePeriod.OFF_PEAK, DeepSeekBillingSchedule.periodAt(saturdayNoon))
     }
+
+    @Test
+    fun extremeUsageSaturatesInsteadOfWrappingNegative() {
+        val next = accumulateDeepSeekUsage(
+            current = DeepSeekUsageSnapshot(
+                inputTokens = Long.MAX_VALUE - 1L,
+                outputTokens = Long.MAX_VALUE - 1L,
+                requestCount = Long.MAX_VALUE,
+                unpricedTokens = Long.MAX_VALUE - 1L,
+                estimatedCostCny = Double.MAX_VALUE,
+            ),
+            model = "unknown-unpriced-model",
+            usage = DeepSeekTokenUsage(
+                promptTokens = Long.MAX_VALUE,
+                cacheHitTokens = Long.MAX_VALUE,
+                cacheMissTokens = Long.MAX_VALUE,
+                completionTokens = Long.MAX_VALUE,
+                reasoningTokens = Long.MAX_VALUE,
+                reported = true,
+            ),
+            pricing = DeepSeekPricingState(),
+            epochMillis = 9_999L,
+        )
+
+        assertEquals(Long.MAX_VALUE, next.inputTokens)
+        assertEquals(Long.MAX_VALUE, next.outputTokens)
+        assertEquals(Long.MAX_VALUE, next.totalTokens)
+        assertEquals(Long.MAX_VALUE, next.requestCount)
+        assertEquals(Long.MAX_VALUE, next.unpricedTokens)
+        assertEquals(Double.MAX_VALUE, next.estimatedCostCny, 0.0)
+    }
+
+    @Test
+    fun negativeProviderUsageIsNormalizedToZero() {
+        val json = kotlinx.serialization.json.Json
+        val openAi = parseDeepSeekOpenAiUsage(
+            json.parseToJsonElement(
+                """{"usage":{"prompt_tokens":-10,"prompt_cache_hit_tokens":-5,"prompt_cache_miss_tokens":-2,"completion_tokens":-3,"completion_tokens_details":{"reasoning_tokens":-4}}}"""
+            ).jsonObject,
+        )
+        val anthropic = parseDeepSeekAnthropicUsage(
+            json.parseToJsonElement(
+                """{"usage":{"input_tokens":-10,"cache_read_input_tokens":-20,"cache_creation_input_tokens":-30,"output_tokens":-40}}"""
+            ).jsonObject,
+        )
+
+        assertEquals(0L, openAi.totalTokens)
+        assertEquals(0L, openAi.cacheHitTokens)
+        assertEquals(0L, openAi.cacheMissTokens)
+        assertEquals(0L, openAi.reasoningTokens)
+        assertEquals(0L, anthropic.totalTokens)
+        assertEquals(0L, anthropic.cacheHitTokens)
+        assertEquals(0L, anthropic.cacheMissTokens)
+    }
+
+    @Test
+    fun anthropicUsageAdditionCannotOverflow() {
+        val json = kotlinx.serialization.json.Json
+        val usage = parseDeepSeekAnthropicUsage(
+            json.parseToJsonElement(
+                """{"usage":{"input_tokens":9223372036854775807,"cache_read_input_tokens":9223372036854775807,"cache_creation_input_tokens":9223372036854775807,"output_tokens":9223372036854775807}}"""
+            ).jsonObject,
+        )
+
+        assertEquals(Long.MAX_VALUE, usage.promptTokens)
+        assertEquals(Long.MAX_VALUE, usage.cacheMissTokens)
+        assertEquals(Long.MAX_VALUE, usage.totalTokens)
+    }
+
+    @Test
+    fun invalidPricingValuesCannotProduceNanOrNegativeCost() {
+        val invalidPricing = DeepSeekPricingState(
+            models = listOf(
+                DeepSeekModelPricing(
+                    modelId = "broken",
+                    displayName = "broken",
+                    version = "broken",
+                    offPeak = DeepSeekPriceTier(Double.NaN, -1.0, Double.POSITIVE_INFINITY),
+                    peak = DeepSeekPriceTier(Double.NaN, -1.0, Double.POSITIVE_INFINITY),
+                ),
+            ),
+        )
+        val cost = DeepSeekCostCalculator.estimateCny(
+            model = "broken",
+            usage = DeepSeekTokenUsage(
+                promptTokens = Long.MAX_VALUE,
+                cacheHitTokens = Long.MAX_VALUE,
+                completionTokens = Long.MAX_VALUE,
+                reported = true,
+            ),
+            pricing = invalidPricing,
+            epochMillis = 0L,
+        )
+
+        assertEquals(0.0, requireNotNull(cost), 0.0)
+    }
+
 }

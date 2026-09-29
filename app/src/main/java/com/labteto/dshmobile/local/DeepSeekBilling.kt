@@ -2,6 +2,11 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
+import com.labteto.dshmobile.local.usage.normalizedForAccounting
+import com.labteto.dshmobile.local.usage.saturatingUsageAdd
+import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
+import com.labteto.dshmobile.local.usage.saturatingUsageCostProduct
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
@@ -64,7 +69,7 @@ data class DeepSeekTokenUsage(
     val reasoningTokens: Long = 0L,
     val reported: Boolean = false,
 ) {
-    val totalTokens: Long get() = promptTokens + completionTokens
+    val totalTokens: Long get() = saturatingUsageAdd(promptTokens, completionTokens)
 }
 
 data class DeepSeekUsageSnapshot(
@@ -79,9 +84,9 @@ data class DeepSeekUsageSnapshot(
     val unpricedTokens: Long = 0L,
     val updatedAt: Long = 0L,
 ) {
-    val totalTokens: Long get() = inputTokens + outputTokens
-    val totalRequestCount: Long get() = requestCount + unreportedRequestCount
-    val cacheMeasuredTokens: Long get() = cacheHitTokens + cacheMissTokens
+    val totalTokens: Long get() = saturatingUsageAdd(inputTokens, outputTokens)
+    val totalRequestCount: Long get() = saturatingUsageAdd(requestCount, unreportedRequestCount)
+    val cacheMeasuredTokens: Long get() = saturatingUsageAdd(cacheHitTokens, cacheMissTokens)
     val cacheHitRate: Double
         get() = if (cacheMeasuredTokens <= 0L) 0.0 else cacheHitTokens.toDouble() / cacheMeasuredTokens.toDouble()
 }
@@ -115,13 +120,13 @@ object DeepSeekCostCalculator {
     ): Double? {
         val modelPricing = pricing.models.firstOrNull { it.matches(model) } ?: return null
         val tier = modelPricing.tier(DeepSeekBillingSchedule.periodAt(epochMillis))
-        val miss = usage.cacheMissTokens.takeIf { it > 0L }
-            ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
-        return (
-            usage.cacheHitTokens * tier.cacheHitCnyPerMillion +
-                miss * tier.cacheMissCnyPerMillion +
-                usage.completionTokens * tier.outputCnyPerMillion
-            ) / 1_000_000.0
+        val normalized = usage.normalizedForAccounting()
+        val rawCost = listOf(
+            saturatingUsageCostProduct(normalized.cacheHitTokens, tier.cacheHitCnyPerMillion),
+            saturatingUsageCostProduct(normalized.cacheMissTokens, tier.cacheMissCnyPerMillion),
+            saturatingUsageCostProduct(normalized.completionTokens, tier.outputCnyPerMillion),
+        ).fold(0.0, ::saturatingUsageCostAdd)
+        return rawCost / 1_000_000.0
     }
 }
 
@@ -129,38 +134,41 @@ object DeepSeekCostCalculator {
 
 internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
     val usage = root["usage"] as? JsonObject ?: return DeepSeekTokenUsage(reported = false)
-    val promptTokens = usage["prompt_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val promptTokens = (usage["prompt_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
     val cacheHitTokens = usage["prompt_cache_hit_tokens"]?.jsonPrimitive?.longOrNull
         ?: usage["prompt_tokens_details"]?.jsonObject
             ?.get("cached_tokens")?.jsonPrimitive?.longOrNull
         ?: 0L
-    val cacheMissTokens = usage["prompt_cache_miss_tokens"]?.jsonPrimitive?.longOrNull
-        ?: (promptTokens - cacheHitTokens).coerceAtLeast(0L)
-    val completionTokens = usage["completion_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
+    val normalizedCacheHitTokens = cacheHitTokens.coerceAtLeast(0L).coerceAtMost(promptTokens)
+    val cacheMissTokens = (usage["prompt_cache_miss_tokens"]?.jsonPrimitive?.longOrNull ?: 0L)
+        .coerceAtLeast(0L)
+        .takeIf { it > 0L }
+        ?: nonNegativeUsageDifference(promptTokens, normalizedCacheHitTokens)
+    val completionTokens = (usage["completion_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
     val reasoningTokens = usage["completion_tokens_details"]?.jsonObject
         ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
         ?: 0L
     return DeepSeekTokenUsage(
         promptTokens = promptTokens,
-        cacheHitTokens = cacheHitTokens,
+        cacheHitTokens = normalizedCacheHitTokens,
         cacheMissTokens = cacheMissTokens,
         completionTokens = completionTokens,
-        reasoningTokens = reasoningTokens,
+        reasoningTokens = reasoningTokens.coerceAtLeast(0L),
         reported = true,
     )
 }
 
 internal fun parseDeepSeekAnthropicUsage(root: JsonObject): DeepSeekTokenUsage {
     val usage = root["usage"] as? JsonObject ?: return DeepSeekTokenUsage(reported = false)
-    val uncachedInput = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
-    val cacheRead = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
-    val cacheCreation = usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
-    val promptTokens = uncachedInput + cacheRead + cacheCreation
+    val uncachedInput = (usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
+    val cacheRead = (usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
+    val cacheCreation = (usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
+    val promptTokens = saturatingUsageAdd(saturatingUsageAdd(uncachedInput, cacheRead), cacheCreation)
     return DeepSeekTokenUsage(
         promptTokens = promptTokens,
         cacheHitTokens = cacheRead,
-        cacheMissTokens = uncachedInput + cacheCreation,
-        completionTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
+        cacheMissTokens = saturatingUsageAdd(uncachedInput, cacheCreation),
+        completionTokens = (usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L),
         reported = true,
     )
 }
@@ -174,13 +182,12 @@ internal fun accumulateDeepSeekUsage(
 ): DeepSeekUsageSnapshot {
     if (!usage.reported) {
         return current.copy(
-            unreportedRequestCount = current.unreportedRequestCount + 1L,
+            unreportedRequestCount = saturatingUsageAdd(current.unreportedRequestCount, 1L),
             updatedAt = epochMillis,
         )
     }
-    val miss = usage.cacheMissTokens.takeIf { it > 0L }
-        ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
-    val normalized = usage.copy(cacheMissTokens = miss)
+    val normalized = usage.normalizedForAccounting()
+    val miss = normalized.cacheMissTokens
     val cost = DeepSeekCostCalculator.estimateCny(
         model = model,
         usage = normalized,
@@ -188,14 +195,17 @@ internal fun accumulateDeepSeekUsage(
         epochMillis = epochMillis,
     )
     return current.copy(
-        inputTokens = current.inputTokens + usage.promptTokens,
-        cacheHitTokens = current.cacheHitTokens + usage.cacheHitTokens,
-        cacheMissTokens = current.cacheMissTokens + miss,
-        outputTokens = current.outputTokens + usage.completionTokens,
-        reasoningTokens = current.reasoningTokens + usage.reasoningTokens,
-        requestCount = current.requestCount + 1L,
-        estimatedCostCny = current.estimatedCostCny + (cost ?: 0.0),
-        unpricedTokens = current.unpricedTokens + if (cost == null) usage.totalTokens else 0L,
+        inputTokens = saturatingUsageAdd(current.inputTokens, normalized.promptTokens),
+        cacheHitTokens = saturatingUsageAdd(current.cacheHitTokens, normalized.cacheHitTokens),
+        cacheMissTokens = saturatingUsageAdd(current.cacheMissTokens, miss),
+        outputTokens = saturatingUsageAdd(current.outputTokens, normalized.completionTokens),
+        reasoningTokens = saturatingUsageAdd(current.reasoningTokens, normalized.reasoningTokens),
+        requestCount = saturatingUsageAdd(current.requestCount, 1L),
+        estimatedCostCny = saturatingUsageCostAdd(current.estimatedCostCny, cost ?: 0.0),
+        unpricedTokens = saturatingUsageAdd(
+            current.unpricedTokens,
+            if (cost == null) normalized.totalTokens else 0L,
+        ),
         updatedAt = epochMillis,
     )
 }
@@ -317,9 +327,8 @@ class DeepSeekUsageTracker @Inject constructor(
         context: TokenUsageContext = TokenUsageContext(),
         promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
     ) {
-        val miss = usage.cacheMissTokens.takeIf { it > 0L }
-            ?: (usage.promptTokens - usage.cacheHitTokens).coerceAtLeast(0L)
-        val normalized = usage.copy(cacheMissTokens = miss)
+        val normalized = usage.normalizedForAccounting()
+        val miss = normalized.cacheMissTokens
         val cost = if (usage.reported) {
             DeepSeekCostCalculator.estimateCny(
                 model = model,
@@ -347,11 +356,11 @@ class DeepSeekUsageTracker @Inject constructor(
                 timestamp = epochMillis,
                 model = model,
                 context = context,
-                inputTokens = if (usage.reported) usage.promptTokens else 0L,
-                cacheHitTokens = if (usage.reported) usage.cacheHitTokens else 0L,
+                inputTokens = if (usage.reported) normalized.promptTokens else 0L,
+                cacheHitTokens = if (usage.reported) normalized.cacheHitTokens else 0L,
                 cacheMissTokens = if (usage.reported) miss else 0L,
-                outputTokens = if (usage.reported) usage.completionTokens else 0L,
-                reasoningTokens = if (usage.reported) usage.reasoningTokens else 0L,
+                outputTokens = if (usage.reported) normalized.completionTokens else 0L,
+                reasoningTokens = if (usage.reported) normalized.reasoningTokens else 0L,
                 estimatedCostCny = cost ?: 0.0,
                 reported = usage.reported,
                 promptBreakdown = promptBreakdown,
