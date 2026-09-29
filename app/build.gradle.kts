@@ -103,6 +103,30 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
     )
 }
 
+val generatedBundledRuntimeAssets = layout.buildDirectory.dir("generated/bundledRuntimeAssets")
+val compactBundledRuntimeAssets = tasks.register<Exec>("compactBundledRuntimeAssets") {
+    group = "build setup"
+    description = "Deduplicates bundled runtime shared libraries by content hash."
+    dependsOn(
+        prepareBundledNodeRuntime,
+        prepareBundledPythonRuntime,
+        prepareBundledGitRuntime,
+    )
+    inputs.file(rootProject.file("tools/runtime/compact-runtime-assets.py"))
+    inputs.dir(generatedNodeRuntime.map { it.dir("assets") })
+    inputs.dir(generatedPythonRuntime.map { it.dir("assets") })
+    inputs.dir(generatedGitRuntime.map { it.dir("assets") })
+    outputs.dir(generatedBundledRuntimeAssets)
+    commandLine(
+        "python3",
+        rootProject.file("tools/runtime/compact-runtime-assets.py").absolutePath,
+        generatedBundledRuntimeAssets.get().asFile.absolutePath,
+        generatedNodeRuntime.get().dir("assets").asFile.absolutePath,
+        generatedPythonRuntime.get().dir("assets").asFile.absolutePath,
+        generatedGitRuntime.get().dir("assets").asFile.absolutePath,
+    )
+}
+
 val generatedUpdatePatcher = layout.buildDirectory.dir("generated/updatePatcher")
 val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
     group = "build setup"
@@ -205,9 +229,7 @@ android {
         jniLibs.srcDir(generatedPythonRuntime.get().dir("jniLibs").asFile)
         jniLibs.srcDir(generatedGitRuntime.get().dir("jniLibs").asFile)
         jniLibs.srcDir(generatedUpdatePatcher.get().dir("jniLibs").asFile)
-        assets.srcDir(generatedNodeRuntime.get().dir("assets").asFile)
-        assets.srcDir(generatedPythonRuntime.get().dir("assets").asFile)
-        assets.srcDir(generatedGitRuntime.get().dir("assets").asFile)
+        assets.srcDir(generatedBundledRuntimeAssets.get().dir("assets").asFile)
     }
 
     packaging {
@@ -238,6 +260,7 @@ tasks.matching {
         prepareBundledNodeRuntime,
         prepareBundledPythonRuntime,
         prepareBundledGitRuntime,
+        compactBundledRuntimeAssets,
         prepareUpdatePatcher,
     )
 }
@@ -246,9 +269,7 @@ tasks.matching {
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
 tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
     dependsOn(
-        prepareBundledNodeRuntime,
-        prepareBundledPythonRuntime,
-        prepareBundledGitRuntime,
+        compactBundledRuntimeAssets,
         prepareUpdatePatcher,
     )
 }

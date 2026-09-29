@@ -42,6 +42,8 @@ for runtime in node python git; do
   fi
 done
 
+python3 .github/scripts/check-apk-runtime-layout.py "$apk" "$expected_abi"
+
 # Python 3.14 contains real standard-library packages whose directory names begin
 # with an underscore. AAPT normally strips <dir>_* from assets silently, which
 # leaves bz2/gzip/lzma present while their shared compression._common package is
@@ -68,7 +70,11 @@ esac
 
 elf_dir="$(mktemp -d)"
 trap 'rm -rf "$elf_dir"' EXIT
-unzip -qq "$apk" "lib/$expected_abi/*" "assets/runtime/*/$expected_abi/*" -d "$elf_dir" || true
+unzip -qq "$apk" \
+  "lib/$expected_abi/*" \
+  "assets/runtime/*/$expected_abi/*" \
+  "assets/runtime/shared/$expected_abi/lib/*" \
+  -d "$elf_dir" || true
 
 elf_count=0
 while IFS= read -r -d '' library; do

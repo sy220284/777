@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import android.os.Build
+import com.labteto.dshmobile.local.runtime.BundledRuntimeLibraryStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
@@ -42,11 +43,12 @@ class BundledNodeRuntime @Inject constructor(
         val versionRoot = File(runtimeHome, "$version/$abi")
         val libraryDir = File(versionRoot, "lib")
         val marker = File(versionRoot, ".ready")
-        if (marker.readTextOrNull() != version) {
+        val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
+        if (marker.readTextOrNull() != markerValue) {
             versionRoot.deleteRecursively()
-            libraryDir.mkdirs()
-            copyAssetDirectory("$ASSET_ROOT/$abi/lib", libraryDir)
-            marker.writeText(version)
+            BundledRuntimeLibraryStore.materialize(context, "node", abi, libraryDir)
+            marker.parentFile?.mkdirs()
+            marker.writeText(markerValue)
         }
 
         val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
@@ -63,7 +65,6 @@ class BundledNodeRuntime @Inject constructor(
             ?.filter { it.isDirectory && it.name != version }
             ?.forEach { it.deleteRecursively() }
 
-        RuntimeLibraryDeduplicator.deduplicate(File(context.noBackupFilesDir, "runtime"), abi)
 
         activeLibraryDir = libraryDir
         runtimeVersion = version
@@ -87,28 +88,6 @@ class BundledNodeRuntime @Inject constructor(
         Build.SUPPORTED_ABIS.none(SUPPORTED_ABIS::contains) ->
             "当前 ABI 不支持内置 Node：${Build.SUPPORTED_ABIS.joinToString()}"
         else -> "Node 尚未完成初始化"
-    }
-
-    private fun copyAssetDirectory(assetPath: String, target: File) {
-        val children = context.assets.list(assetPath).orEmpty()
-        require(children.isNotEmpty()) { "内置 Node 运行库目录为空：$assetPath" }
-        children.forEach { name ->
-            val childAsset = "$assetPath/$name"
-            val nested = context.assets.list(childAsset).orEmpty()
-            val destination = File(target, name)
-            if (nested.isNotEmpty()) {
-                destination.mkdirs()
-                copyAssetDirectory(childAsset, destination)
-            } else {
-                destination.parentFile?.mkdirs()
-                context.assets.open(childAsset).use { input ->
-                    destination.outputStream().use(input::copyTo)
-                }
-                destination.setReadable(true, true)
-                destination.setWritable(true, true)
-                destination.setExecutable(false, false)
-            }
-        }
     }
 
     private fun File.readTextOrNull(): String? =

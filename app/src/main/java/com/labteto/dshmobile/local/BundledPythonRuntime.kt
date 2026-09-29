@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import android.os.Build
+import com.labteto.dshmobile.local.runtime.BundledRuntimeLibraryStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
@@ -40,13 +41,13 @@ class BundledPythonRuntime @Inject constructor(
         val libraryDir = File(versionRoot, "lib")
         val homeDir = File(versionRoot, "home")
         val marker = File(versionRoot, ".ready")
-        if (marker.readTextOrNull() != version) {
+        val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
+        if (marker.readTextOrNull() != markerValue) {
             versionRoot.deleteRecursively()
-            libraryDir.mkdirs()
             homeDir.mkdirs()
-            copyAssetDirectory("$ASSET_ROOT/$abi/lib", libraryDir)
+            BundledRuntimeLibraryStore.materialize(context, "python", abi, libraryDir)
             copyAssetDirectory("$ASSET_ROOT/$abi/home", homeDir)
-            marker.writeText(version)
+            marker.writeText(markerValue)
         }
 
         require(File(homeDir, "etc/tls/cert.pem").isFile) {
@@ -72,7 +73,6 @@ class BundledPythonRuntime @Inject constructor(
             ?.filter { it.isDirectory && it.name != version }
             ?.forEach { it.deleteRecursively() }
 
-        RuntimeLibraryDeduplicator.deduplicate(File(context.noBackupFilesDir, "runtime"), abi)
 
         activeHomeDir = homeDir
         activeLibraryDir = libraryDir
