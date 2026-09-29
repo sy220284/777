@@ -252,6 +252,17 @@ for forbidden_plugin_type in (
     if re.search(r"\b" + forbidden_plugin_type + r"\b", strip_comments(engine)):
         die(f"LocalHarnessEngine must not construct concrete plugin {forbidden_plugin_type}")
 
+plugin_composition_path = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+plugin_composition = strip_comments(read(plugin_composition_path))
+if "PluginCatalog(" not in plugin_composition:
+    die("LocalPluginComposition must declare a PluginCatalog")
+if "PluginManager(" not in plugin_composition:
+    die("LocalPluginComposition must route lifecycle through PluginManager")
+if "pluginManager.installAll(pluginCatalog.ids())" not in plugin_composition:
+    die("startup plugin installation must be resolved through PluginManager/PluginCatalog")
+if re.search(r"\bstartupPlugins\b", plugin_composition):
+    die("startup plugins must not be maintained as a raw hard-coded lifecycle list")
+
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
     die(
