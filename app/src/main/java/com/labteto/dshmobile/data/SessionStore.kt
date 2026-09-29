@@ -605,35 +605,9 @@ class SessionStore @Inject constructor(
      * for the same `eventId` may still arrive if the host had a second delivery open.
      */
     private fun forgetRequest(eventId: String) {
-        val removedApproval = synchronized(lock) { pendingInteractions.forgetApproval(eventId) }
-        if (removedApproval != null) {
-            synchronized(lock) {
-                if (!removedApproval.sessionStillPending) {
-                    removePendingLocked(removedApproval.request.sessionId, "approval")
-                }
-                emitSessionsLocked()
-                syncCurrentInteractionCardsLocked()
-            }
-            return
-        }
-        val sessionId = synchronized(lock) {
-            pendingInteractions.questionSessionForEvent(eventId)
-        } ?: return
-        forgetQuestions(sessionId, eventId)
-    }
-
-    /**
-     * Drop the question batch [sessionId] is holding — but only while it is still [eventId]'s, and
-     * only the card drawn from that same request. [PendingQuestionRegistry.forget] holds the rule
-     * and the reason for it; a null [eventId] is the corpse case it describes.
-     */
-    private fun forgetQuestions(sessionId: String, eventId: String?) {
-        // Registry and card move together under the lock, so a replacement cannot land between
-        // them and lose its card to this call.
         synchronized(lock) {
-            if (!pendingInteractions.forgetQuestions(sessionId, eventId)) return
-            removePendingLocked(sessionId, "question")
-            removePendingLocked(sessionId, "plan-review")
+            val removed = pendingInteractions.forgetEvent(eventId) ?: return
+            removed.pendingKinds.forEach { removePendingLocked(removed.sessionId, it) }
             emitSessionsLocked()
             syncCurrentInteractionCardsLocked()
         }
@@ -772,17 +746,8 @@ class SessionStore @Inject constructor(
     var notificationSink: ((String, SessionEventEnvelope) -> Unit)? = null
 
     private fun handleApprovalRequested(eventId: String, sessionId: String, request: ApprovalRequestEvent) {
-        val card = PendingApproval(
-            sessionId = sessionId,
-            // The event id is the approval id now: 0.1.2 correlates a pending request by the
-            // frame's own `eventId` and mints nothing separate.
-            approvalId = eventId,
-            rpcId = eventId,
-            toolName = request.toolName,
-            reason = request.reason,
-        )
         synchronized(lock) {
-            pendingInteractions.installApproval(card)
+            pendingInteractions.installApproval(eventId, sessionId, request)
             addPendingLocked(sessionId, "approval")
             emitSessionsLocked()
             syncCurrentInteractionCardsLocked()
@@ -795,19 +760,11 @@ class SessionStore @Inject constructor(
         questions: List<AskUserQuestionItem>,
     ) {
         synchronized(lock) {
-            val card = PendingQuestions(sessionId, eventId, questions)
-            pendingInteractions.installQuestions(card)
-            val kind = if (questions.any { it.intent is AskUserQuestionIntent.PlanReview }) {
-                "plan-review"
-            } else {
-                "question"
-            }
+            val kind = pendingInteractions.installQuestions(eventId, sessionId, questions)
             removePendingLocked(sessionId, "question")
             removePendingLocked(sessionId, "plan-review")
             addPendingLocked(sessionId, kind)
             emitSessionsLocked()
-            // Keep every session's card, but only project the currently open session to the UI.
-            // A background session request must not overwrite the visible session's interaction.
             syncCurrentInteractionCardsLocked()
         }
     }
