@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -163,6 +164,7 @@ internal fun Composer(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var composerMenuOpen by remember { mutableStateOf(false) }
+    var composerFocused by remember { mutableStateOf(false) }
     // A file that is still uploading has no receipt to cite yet, and one that failed never will;
     // the send affordance waits for the chips rather than sending a message that names neither.
     val attachmentsSettled = attachments.none { it is PendingAttachment.File && it.state !is FileUploadState.Ready }
@@ -170,6 +172,8 @@ internal fun Composer(
     val currentDraft by rememberUpdatedState(draft)
     val currentOnDraftChange by rememberUpdatedState(onDraftChange)
     val currentOnSend by rememberUpdatedState(onSend)
+    val composerExpanded =
+        composerFocused || attachments.isNotEmpty() || preparing || draft.contains('\n')
 
     fun submitDraft() {
         val text = currentDraft
@@ -179,53 +183,84 @@ internal fun Composer(
         currentOnSend(text)
     }
 
+    @Composable
+    fun ComposerMenuControl() {
+        Box {
+            DsComposerAction(
+                icon = Icons.Filled.Add,
+                contentDescription = stringResource(R.string.chat_composer_attach_file),
+                onClick = { composerMenuOpen = true },
+                enabled = enabled && !preparing,
+                tint = colors.labelPrimary,
+                containerColor = colors.hoverSolid,
+            )
+            DsPopupMenu(
+                expanded = composerMenuOpen,
+                onDismiss = { composerMenuOpen = false },
+                items = listOf(
+                    MenuItem(
+                        text = stringResource(R.string.chat_composer_attach_file),
+                        icon = Icons.Outlined.AttachFile,
+                        onClick = onOpenAttachments,
+                    ),
+                    MenuItem(
+                        text = stringResource(R.string.chat_context_tools),
+                        icon = FeatherIcons.Tool,
+                        onClick = onOpenTools,
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Composable
+    fun SendControl() {
+        DsComposerAction(
+            icon = Icons.Filled.ArrowUpward,
+            contentDescription = stringResource(R.string.chat_composer_send),
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                submitDraft()
+            },
+            enabled = canSend,
+            tint = if (canSend) colors.onAccent else colors.labelTertiary,
+            containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+        )
+    }
+
+    @Composable
+    fun StopControl() {
+        DsComposerAction(
+            icon = null,
+            contentDescription = stringResource(R.string.chat_composer_stop),
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onStop()
+            },
+            tint = colors.onAccent,
+            containerColor = colors.error,
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+        ) {
+            Box(
+                Modifier
+                    .size(11.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White),
+            )
+        }
+    }
+
     DsConversationComposer(modifier = modifier) {
-        if (preparing) {
-            Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
-        }
-        if (attachments.isNotEmpty()) {
-            AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
-        }
+        if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
+        if (attachments.isNotEmpty()) AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Box {
-                DsComposerAction(
-                    icon = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.chat_composer_attach_file),
-                    onClick = { composerMenuOpen = true },
-                    enabled = enabled && !preparing,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.hoverSolid,
-                )
-                DsPopupMenu(
-                    expanded = composerMenuOpen,
-                    onDismiss = { composerMenuOpen = false },
-                    items = listOf(
-                        MenuItem(
-                            text = stringResource(R.string.chat_composer_attach_file),
-                            icon = Icons.Outlined.AttachFile,
-                            onClick = onOpenAttachments,
-                        ),
-                        MenuItem(
-                            text = stringResource(R.string.chat_context_tools),
-                            icon = FeatherIcons.Tool,
-                            onClick = onOpenTools,
-                        ),
-                    ),
-                )
-            }
-
-            PermissionChip(
-                select = permissions,
-                pending = pendingPermission,
-                enabled = enabled,
-                onPick = onPermissionPick,
-            )
-
+            if (!composerExpanded) ComposerMenuControl()
             DsComposerField(
                 value = draft,
                 onValueChange = onDraftChange,
@@ -234,63 +269,44 @@ internal fun Composer(
                     .weight(1f)
                     .onPreviewKeyEvent { event ->
                         if (event.key == Key.Enter && (event.isCtrlPressed || event.isMetaPressed)) {
-                            if (event.type == KeyEventType.KeyUp && canSend) {
-                                submitDraft()
-                            }
+                            if (event.type == KeyEventType.KeyUp && canSend) submitDraft()
                             true
                         } else false
                     },
                 enabled = enabled,
                 maxLines = 8,
+                onFocusedChange = { composerFocused = it },
             )
-
-            if (contextPressure != null) {
-                Box(
-                    modifier = Modifier
-                        .width(24.dp)
-                        .height(DsComposerMetrics.actionTouchTarget),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ContextMeter(
-                        contextBreakdown,
-                        contextPressure,
-                        barWidth = 24,
-                    )
-                }
+            if (!composerExpanded) {
+                SendControl()
+                if (running) StopControl()
             }
+        }
 
-            DsComposerAction(
-                icon = Icons.Filled.ArrowUpward,
-                contentDescription = stringResource(R.string.chat_composer_send),
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    submitDraft()
-                },
-                enabled = canSend,
-                tint = if (canSend) colors.onAccent else colors.labelTertiary,
-                containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-                visualSize = DsComposerMetrics.primaryActionVisualSize,
-            )
-
-            if (running) {
-                DsComposerAction(
-                    icon = null,
-                    contentDescription = stringResource(R.string.chat_composer_stop),
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onStop()
-                    },
-                    tint = colors.onAccent,
-                    containerColor = colors.error,
-                    visualSize = DsComposerMetrics.primaryActionVisualSize,
-                ) {
+        if (composerExpanded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                ComposerMenuControl()
+                PermissionChip(
+                    select = permissions,
+                    pending = pendingPermission,
+                    enabled = enabled,
+                    onPick = onPermissionPick,
+                )
+                if (contextPressure != null) {
                     Box(
-                        Modifier
-                            .size(11.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.White),
-                    )
+                        modifier = Modifier.width(24.dp).height(DsComposerMetrics.actionTouchTarget),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ContextMeter(contextBreakdown, contextPressure, barWidth = 24)
+                    }
                 }
+                Spacer(Modifier.weight(1f))
+                SendControl()
+                if (running) StopControl()
             }
         }
     }
