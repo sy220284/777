@@ -1,10 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +26,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsPill
@@ -38,7 +34,6 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -234,14 +229,10 @@ internal fun ExecutionStatusCard(
                                         size = DsButtonSize.Small,
                                     )
                                 }
-                                AnimatedVisibility(
+                                DsExpandableColumn(
                                     visible = expanded,
-                                    enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
-                                    exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                                 ) {
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                                    ) {
                                         Text(
                                             stringResource(R.string.local_run_job_output),
                                             style = DsType.caption11Strong,
@@ -308,12 +299,10 @@ internal fun ExecutionStatusCard(
                 variant = DsButtonVariant.Ghost,
                 size = DsButtonSize.Small,
             )
-            AnimatedVisibility(
+            DsExpandableColumn(
                 visible = technicalDetailsExpanded,
-                enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
-                exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
                     Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
                     Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
