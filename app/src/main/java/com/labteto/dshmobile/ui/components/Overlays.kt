@@ -41,10 +41,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -254,14 +258,38 @@ fun DsContextActionMenu(
     onDismiss: () -> Unit,
     items: List<MenuItem>,
 ) {
+    if (!expanded || items.isEmpty()) return
     val colors = DsTheme.colors
-    DropdownMenu(
-        expanded = expanded,
+    val positionProvider = remember {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+                val endAlignedX = when (layoutDirection) {
+                    LayoutDirection.Ltr -> anchorBounds.right - popupContentSize.width
+                    LayoutDirection.Rtl -> anchorBounds.left
+                }
+                val belowY = anchorBounds.bottom
+                val aboveY = anchorBounds.top - popupContentSize.height
+                val resolvedY = when {
+                    belowY + popupContentSize.height <= windowSize.height -> belowY
+                    aboveY >= 0 -> aboveY
+                    else -> (windowSize.height - popupContentSize.height).coerceAtLeast(0)
+                }
+                return IntOffset(
+                    x = endAlignedX.coerceIn(0, maxX),
+                    y = resolvedY,
+                )
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
-        shape = DsShapes.menu,
-        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
-        tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, colors.borderL1),
         properties = PopupProperties(
             focusable = true,
             dismissOnBackPress = true,
@@ -269,38 +297,45 @@ fun DsContextActionMenu(
             clippingEnabled = true,
         ),
     ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            shape = DsShapes.menu,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+            tonalElevation = 0.dp,
+            border = BorderStroke(1.dp, colors.borderL1),
         ) {
-            items.forEach { item ->
-                Column(
-                    modifier = Modifier
-                        .widthIn(min = 64.dp)
-                        .heightIn(min = 64.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            onDismiss()
-                            item.onClick()
+            Row(
+                modifier = Modifier.padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items.forEach { item ->
+                    Column(
+                        modifier = Modifier
+                            .widthIn(min = 64.dp)
+                            .heightIn(min = 64.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                onDismiss()
+                                item.onClick()
+                            }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        item.icon?.let { icon ->
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (item.danger) colors.error else colors.labelSecondary,
+                            )
                         }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    item.icon?.let { icon ->
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (item.danger) colors.error else colors.labelSecondary,
+                        Text(
+                            text = item.text,
+                            style = DsType.small13,
+                            color = if (item.danger) colors.error else colors.labelPrimary,
                         )
                     }
-                    Text(
-                        text = item.text,
-                        style = DsType.small13,
-                        color = if (item.danger) colors.error else colors.labelPrimary,
-                    )
                 }
             }
         }
