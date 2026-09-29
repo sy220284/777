@@ -8,6 +8,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -94,19 +95,35 @@ internal class LocalPersistentJobStore(
             val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val label = item["label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull
+            val resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull
             JobSnapshot(
                 id = id,
                 label = label,
                 status = status,
                 output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull,
-                resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull,
-                ownerId = item["owner_session_id"]?.jsonPrimitive?.contentOrNull,
+                resumeKind = resumeKind,
+                resumePayload = resumePayload,
+                ownerId = item["owner_session_id"]?.jsonPrimitive?.contentOrNull
+                    ?: inferLegacyOwnerId(resumeKind, resumePayload),
                 startedAt = item["started_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 deadlineAt = item["deadline_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
             )
         }
+
+    private fun inferLegacyOwnerId(resumeKind: String?, resumePayload: String?): String? {
+        if (resumeKind !in LEGACY_OWNER_INFERENCE_KINDS || resumePayload.isNullOrBlank()) return null
+        return runCatching {
+            Json.parseToJsonElement(resumePayload).jsonObject
+                .stringValue("session_id")
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+        }.getOrNull()
+    }
+
+    private fun JsonObject.stringValue(key: String): String? =
+        this[key]?.jsonPrimitive?.contentOrNull
 
     private fun atomicWrite(target: File, content: String) {
         target.parentFile?.mkdirs()
@@ -138,5 +155,6 @@ internal class LocalPersistentJobStore(
     private companion object {
         const val MAX_RECORDS = 64
         const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
+        val LEGACY_OWNER_INFERENCE_KINDS = setOf("web_fetch", "subagent_readonly")
     }
 }
