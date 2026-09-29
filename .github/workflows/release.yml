@@ -65,12 +65,36 @@ jobs:
             IS_TAG=true
           fi
 
+          release_equivalent_to_main() {
+            release_sha="$1"
+            main_sha="$2"
+            if [ "$release_sha" = "$main_sha" ]; then
+              return 0
+            fi
+
+            comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$release_sha...$main_sha" 2>/dev/null || true)"
+            status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
+            if [ "$status" != "ahead" ]; then
+              return 1
+            fi
+
+            blocking_files="$(
+              printf '%s' "$comparison" |
+                jq -r '.files[]?.filename' |
+                grep -Ev '(^docs/|\.md$|^screen\.png$)' || true
+            )"
+            [ -z "$blocking_files" ]
+          }
+
           if [ "$IS_TAG" = "false" ]; then
             MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-            if [ "$RELEASE_SHA" != "$MAIN_SHA" ]; then
-              echo "候选提交已经落后于 main：$RELEASE_SHA != $MAIN_SHA"
+            if ! release_equivalent_to_main "$RELEASE_SHA" "$MAIN_SHA"; then
+              echo "候选提交已经被影响构建的 main 变更淘汰：$RELEASE_SHA != $MAIN_SHA"
               skip_release
               exit 0
+            fi
+            if [ "$RELEASE_SHA" != "$MAIN_SHA" ]; then
+              echo "main 仅有 CI 忽略的文档变更，继续发布已验证候选：$RELEASE_SHA -> $MAIN_SHA"
             fi
           fi
 
@@ -386,9 +410,23 @@ jobs:
           MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           if [ "$MAIN_SHA" = "$RELEASE_SHA" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$RELEASE_SHA...$MAIN_SHA" 2>/dev/null || true)"
+          status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
+          blocking_files="$(
+            printf '%s' "$comparison" |
+              jq -r '.files[]?.filename' |
+              grep -Ev '(^docs/|\.md$|^screen\.png$)' || true
+          )"
+
+          if [ "$status" = "ahead" ] && [ -z "$blocking_files" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+            echo "构建期间 main 仅增加 CI 忽略的文档变更，继续发布已验证候选。"
           else
             echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "构建期间 main 已前进到 $MAIN_SHA，本次旧版本不发布。"
+            echo "构建期间 main 已出现影响构建的变更：$MAIN_SHA，本次旧版本不发布。"
           fi
 
       - name: Publish GitHub Release
