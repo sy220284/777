@@ -1336,8 +1336,6 @@ class HarnessAutomationWorker(
         )
     }
 
-    companion object {
-    }
 }
 
 class AutomationPlugin(
