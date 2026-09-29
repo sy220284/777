@@ -39,6 +39,17 @@ internal fun parseBundledRuntimeLibraryManifest(text: String): List<BundledRunti
     return entries
 }
 
+internal fun ByteArray.toLowerHex(): String {
+    val digits = "0123456789abcdef"
+    val chars = CharArray(size * 2)
+    for (index in indices) {
+        val value = this[index].toInt() and 0xff
+        chars[index * 2] = digits[value ushr 4]
+        chars[index * 2 + 1] = digits[value and 0x0f]
+    }
+    return String(chars)
+}
+
 internal object BundledRuntimeLibraryStore {
     const val LAYOUT_VERSION = "shared-v1"
 
@@ -134,7 +145,7 @@ internal object BundledRuntimeLibraryStore {
             require(written == entry.size) {
                 "共享运行库大小校验失败：" + entry.name
             }
-            require(digest.digest().toHex() == entry.sha256) {
+            require(digest.digest().toLowerHex() == entry.sha256) {
                 "共享运行库摘要校验失败：" + entry.name
             }
             try {
@@ -172,10 +183,6 @@ internal object BundledRuntimeLibraryStore {
             .filter(File::isFile)
             .filterNot { it.name in referenced }
             .forEach(File::delete)
-    }
-
-    private fun ByteArray.toHex(): String = buildString(size * 2) {
-        forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
     }
 
     private const val TAG = "BundledRuntimeLibs"

@@ -41,6 +41,20 @@ class BundledRuntimeLibraryStoreTest {
         }
     }
 
+    @Test
+    fun lowerHexEncodesAllBytesFromTheByteArrayReceiver() {
+        val bytes = byteArrayOf(
+            0x00,
+            0x0f,
+            0x10,
+            0x7f,
+            0x80.toByte(),
+            0xff.toByte(),
+        )
+
+        assertEquals("000f107f80ff", bytes.toLowerHex())
+    }
+
     private fun assertIllegalArgument(block: () -> Unit) {
         try {
             block()
