@@ -165,7 +165,6 @@ class UpdateCacheTest {
         currentVersionCode = currentVersionCode,
         nowMillis = nowMillis,
     )
-}\n
     @Test
     fun `clock rollback rebases handoff so cleanup remains bounded`() {
         val cacheDir = temporary.newFolder("cache")
@@ -199,4 +198,4 @@ class UpdateCacheTest {
         )
         assertFalse(root.exists())
     }
-
+}
