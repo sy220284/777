@@ -2,6 +2,11 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
+import com.labteto.dshmobile.local.usage.normalizedForAccounting
+import com.labteto.dshmobile.local.usage.saturatingUsageAdd
+import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
+import com.labteto.dshmobile.local.usage.saturatingUsageCostProduct
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
