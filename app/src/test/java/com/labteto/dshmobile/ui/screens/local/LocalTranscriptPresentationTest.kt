@@ -124,13 +124,12 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun reasoningOnlyWorkProcessFallsBackToGenericObservableState() {
+    fun reasoningOnlyWorkProcessProducesNoUserFacingNode() {
         val nodes = buildWorkProcessNodes(
             listOf(message("r1", "reasoning", "这段自由推理不能出现在界面里")),
         )
 
-        assertEquals(1, nodes.size)
-        assertEquals(AgentOperationKind.Generic, nodes.single().kind)
+        assertTrue(nodes.isEmpty())
     }
 
     @Test

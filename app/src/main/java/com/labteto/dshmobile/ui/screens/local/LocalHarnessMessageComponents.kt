@@ -373,7 +373,7 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
         }
     }
 
-    return nodes.ifEmpty { listOf(LocalWorkProcessNode()) }
+    return nodes
 }
 
 internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
@@ -416,6 +416,7 @@ internal fun WorkProcessRow(
 
     val colors = DsTheme.colors
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
+    if (nodes.isEmpty()) return
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
     val preview = nodes.lastOrNull()?.kind?.let { stringResource(agentOperationLabelRes(it)) }
