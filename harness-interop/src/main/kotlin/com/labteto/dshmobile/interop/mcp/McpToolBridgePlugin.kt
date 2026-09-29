@@ -202,7 +202,7 @@ class McpToolBridgePlugin(
                 ),
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
-                timeoutMillis = 10_000L,
+                timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS + 5_000L,
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(disconnect(context, input.required("server_id")))
                 },
