@@ -333,8 +333,99 @@ class TokenUsageAnalyticsStore @Inject constructor(
         true
     }
 
-    fun snapshot(): TokenUsageAnalyticsSnapshot {
-        val zone = ZoneId.systemDefault()
+    fun snapshot(): TokenUsageAnalyticsSnapshot =
+        aggregateTokenUsageRecords(allRecords(), ZoneId.systemDefault())
+
+    fun groupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? {
+        val records = allRecords().filter { record ->
+            when (kind) {
+                TokenUsageGroupKind.SESSION -> record.context.sessionId == key
+                TokenUsageGroupKind.TASK ->
+                    record.context.parentRunId == key || record.context.runId == key
+            }
+        }.toList()
+        if (records.isEmpty()) return null
+
+        val aggregate = MutableTokenAggregate()
+        val actions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
+        val agents = linkedMapOf<String, MutableAgentGroup>()
+        records.forEach { record ->
+            aggregate.add(record)
+            actions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
+            val runKind = record.context.runKind.orEmpty()
+            val agentKey = record.context.agentId?.takeIf(String::isNotBlank)
+                ?: if (runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) {
+                    "subagent"
+                } else {
+                    "main"
+                }
+            agents.getOrPut(agentKey) {
+                MutableAgentGroup(
+                    key = agentKey,
+                    title = record.context.agentId?.takeIf(String::isNotBlank)
+                        ?: if (runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) "子代理" else "主代理",
+                    runKind = runKind,
+                )
+            }.aggregate.add(record)
+        }
+        val latest = records.maxByOrNull(TokenUsageRecord::timestamp) ?: return null
+        val title = when (kind) {
+            TokenUsageGroupKind.SESSION -> latest.context.sessionTitle?.takeIf(String::isNotBlank) ?: "对话"
+            TokenUsageGroupKind.TASK -> latest.context.taskLabel?.takeIf(String::isNotBlank) ?: "工作任务"
+        }
+        return TokenUsageGroupDetail(
+            kind = kind,
+            key = key,
+            title = title,
+            aggregate = aggregate.freeze(),
+            actions = actions.freezeActions(),
+            agents = agents.values.map { value ->
+                TokenUsageAgentSummary(
+                    key = value.key,
+                    title = value.title,
+                    runKind = value.runKind,
+                    aggregate = value.aggregate.freeze(),
+                )
+            }.sortedByDescending { it.aggregate.totalTokens },
+            records = records.sortedByDescending(TokenUsageRecord::timestamp).take(DETAIL_RECORDS),
+        )
+    }
+
+    fun recordById(requestId: String): TokenUsageRecord? =
+        allRecords().firstOrNull { it.requestId == requestId }
+
+    private fun allRecords(): Sequence<TokenUsageRecord> =
+        ledger.events().mapNotNull(::decode)
+
+    private fun decode(event: LocalSessionEventLog.Event): TokenUsageRecord? {
+        if (event.type != USAGE_EVENT_TYPE) return null
+        return runCatching {
+            json.decodeFromJsonElement(TokenUsageRecord.serializer(), event.data)
+        }.getOrNull()
+    }
+
+    private fun trimSeenIds() {
+        while (seenRequestIds.size > RECENT_DEDUPE_IDS) {
+            val iterator = seenRequestIds.iterator()
+            if (!iterator.hasNext()) return
+            iterator.next()
+            iterator.remove()
+        }
+    }
+
+    private companion object {
+        const val USAGE_EVENT_TYPE = "usage/request"
+        const val RECENT_DEDUPE_IDS = 1_024
+        const val RECENT_LOG_RECORDS = 200
+        const val DETAIL_RECORDS = 300
+        const val MAX_LEDGER_SEGMENT_BYTES = 8L * 1024L * 1024L
+    }
+}
+
+internal fun aggregateTokenUsageRecords(
+    records: Sequence<TokenUsageRecord>,
+    zone: ZoneId = ZoneId.systemDefault(),
+): TokenUsageAnalyticsSnapshot {
         val total = MutableTokenAggregate()
         val chat = MutableTokenAggregate()
         val work = MutableTokenAggregate()
@@ -353,7 +444,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
         var workMainTokens = 0L
         var workSubagentTokens = 0L
 
-        allRecords().forEach { record ->
+        records.forEach { record ->
             if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
             total.add(record)
             val epochDay = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate().toEpochDay()
@@ -442,92 +533,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
                 .sortedByDescending(TokenUsageGroupSummary::lastUsedAt),
             recentRecords = recent.toList().asReversed(),
         )
-    }
-
-    fun groupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? {
-        val records = allRecords().filter { record ->
-            when (kind) {
-                TokenUsageGroupKind.SESSION -> record.context.sessionId == key
-                TokenUsageGroupKind.TASK ->
-                    record.context.parentRunId == key || record.context.runId == key
-            }
-        }.toList()
-        if (records.isEmpty()) return null
-
-        val aggregate = MutableTokenAggregate()
-        val actions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
-        val agents = linkedMapOf<String, MutableAgentGroup>()
-        records.forEach { record ->
-            aggregate.add(record)
-            actions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-            val runKind = record.context.runKind.orEmpty()
-            val agentKey = record.context.agentId?.takeIf(String::isNotBlank)
-                ?: if (runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) {
-                    "subagent"
-                } else {
-                    "main"
-                }
-            agents.getOrPut(agentKey) {
-                MutableAgentGroup(
-                    key = agentKey,
-                    title = record.context.agentId?.takeIf(String::isNotBlank)
-                        ?: if (runKind == LocalAgentRunKind.SUBAGENT.name.lowercase()) "子代理" else "主代理",
-                    runKind = runKind,
-                )
-            }.aggregate.add(record)
-        }
-        val latest = records.maxByOrNull(TokenUsageRecord::timestamp) ?: return null
-        val title = when (kind) {
-            TokenUsageGroupKind.SESSION -> latest.context.sessionTitle?.takeIf(String::isNotBlank) ?: "对话"
-            TokenUsageGroupKind.TASK -> latest.context.taskLabel?.takeIf(String::isNotBlank) ?: "工作任务"
-        }
-        return TokenUsageGroupDetail(
-            kind = kind,
-            key = key,
-            title = title,
-            aggregate = aggregate.freeze(),
-            actions = actions.freezeActions(),
-            agents = agents.values.map { value ->
-                TokenUsageAgentSummary(
-                    key = value.key,
-                    title = value.title,
-                    runKind = value.runKind,
-                    aggregate = value.aggregate.freeze(),
-                )
-            }.sortedByDescending { it.aggregate.totalTokens },
-            records = records.sortedByDescending(TokenUsageRecord::timestamp).take(DETAIL_RECORDS),
-        )
-    }
-
-    fun recordById(requestId: String): TokenUsageRecord? =
-        allRecords().firstOrNull { it.requestId == requestId }
-
-    private fun allRecords(): Sequence<TokenUsageRecord> =
-        ledger.events().mapNotNull(::decode)
-
-    private fun decode(event: LocalSessionEventLog.Event): TokenUsageRecord? {
-        if (event.type != USAGE_EVENT_TYPE) return null
-        return runCatching {
-            json.decodeFromJsonElement(TokenUsageRecord.serializer(), event.data)
-        }.getOrNull()
-    }
-
-    private fun trimSeenIds() {
-        while (seenRequestIds.size > RECENT_DEDUPE_IDS) {
-            val iterator = seenRequestIds.iterator()
-            if (!iterator.hasNext()) return
-            iterator.next()
-            iterator.remove()
-        }
-    }
-
-    private companion object {
-        const val USAGE_EVENT_TYPE = "usage/request"
-        const val RECENT_DEDUPE_IDS = 1_024
-        const val RECENT_LOG_RECORDS = 200
-        const val DETAIL_RECORDS = 300
-        const val MAX_LEDGER_SEGMENT_BYTES = 8L * 1024L * 1024L
-    }
+    
 }
 
 private class MutableTokenAggregate {
