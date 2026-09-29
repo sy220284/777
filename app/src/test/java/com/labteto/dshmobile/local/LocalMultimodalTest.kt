@@ -301,4 +301,33 @@ class LocalMultimodalTest {
         }
     }
 
+
+    @Test
+    fun clearingRouteForCredentialChangeForgetsStaleImageCapability() {
+        val registry = LocalImageCapabilityRegistry()
+        registry.markUnsupported("https://api.example.com/", "Vision-Alias")
+
+        assertEquals(
+            LocalImageInputMode.TOOL,
+            resolveLocalImageInputMode(
+                LocalImageInputMode.AUTO,
+                registry,
+                "https://api.example.com",
+                "vision-alias",
+            ),
+        )
+
+        registry.clearRoute("https://API.EXAMPLE.com", "VISION-ALIAS")
+
+        assertEquals(
+            LocalImageInputMode.NATIVE,
+            resolveLocalImageInputMode(
+                LocalImageInputMode.AUTO,
+                registry,
+                "https://api.example.com",
+                "vision-alias",
+            ),
+        )
+    }
+
 }
