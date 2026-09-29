@@ -253,18 +253,24 @@ class LspPlugin(
         val current = clients.values.toList()
         clients.clear()
         versions.clear()
+        var cancellation: CancellationException? = null
         for (handle in current) {
             try {
-                handle.client.shutdown()
+                if (cancellation == null) {
+                    handle.client.shutdown()
+                } else {
+                    handle.client.close()
+                }
             } catch (cancelled: CancellationException) {
                 handle.client.close()
-                throw cancelled
+                cancellation = cancelled
             } catch (_: Exception) {
                 handle.client.close()
             } finally {
                 handle.lease?.close()
             }
         }
+        cancellation?.let { throw it }
     }
 
     private fun bounded(output: String): String =
