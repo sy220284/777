@@ -1224,6 +1224,8 @@ private fun LocalConversationSurface(
 
         val composerCanSend =
             groupChatReady && (input.isNotBlank() || attachments.isNotEmpty())
+        val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
+        val composerReplySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
 
         fun submitComposerMessage() {
             if (!state.configured) {
@@ -1261,7 +1263,7 @@ private fun LocalConversationSurface(
                     Box {
                         DsComposerAction(
                             icon = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.chat_composer_add_attachment),
+                            contentDescription = composerAttachmentLabel,
                             onClick = { composerMenuOpen = true },
                             tint = colors.labelPrimary,
                             containerColor = colors.hoverSolid,
@@ -1272,7 +1274,7 @@ private fun LocalConversationSurface(
                             items = buildList {
                                 add(
                                     MenuItem(
-                                        text = stringResource(R.string.chat_composer_add_attachment),
+                                        text = composerAttachmentLabel,
                                         icon = Icons.Outlined.AttachFile,
                                         onClick = { showAttachmentPicker = true },
                                     ),
@@ -1286,7 +1288,7 @@ private fun LocalConversationSurface(
                                 ) {
                                     add(
                                         MenuItem(
-                                            text = stringResource(R.string.local_reply_suggestions_open),
+                                            text = composerReplySuggestionsLabel,
                                             icon = Icons.Outlined.AutoAwesome,
                                             onClick = {
                                                 if (state.replySuggestions.any { it.text.isNotBlank() }) {
