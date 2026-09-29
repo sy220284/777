@@ -184,6 +184,7 @@ fun SettingsScreen(
     }
     var page by rememberSaveable { mutableStateOf(initialDestination) }
     var usageDetailSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
+    var usageDetailBackSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
@@ -212,7 +213,13 @@ fun SettingsScreen(
 
     fun navigateBack() {
         if (page == SettingsDestination.USAGE_DETAIL) {
-            page = usageDetailReturnPage
+            if (usageDetailReturnPage == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
+                usageDetailSelection = usageDetailBackSelection
+                usageDetailBackSelection = null
+                usageDetailReturnPage = SettingsDestination.USAGE
+            } else {
+                page = usageDetailReturnPage
+            }
         } else {
             page.parentDestination()?.let { page = it } ?: onClose()
         }
@@ -274,7 +281,7 @@ fun SettingsScreen(
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
                     onAction = if (page == SettingsDestination.USAGE) {
-                        { { page = SettingsDestination.USAGE_LOG } }
+                        { page = SettingsDestination.USAGE_LOG }
                     } else {
                         null
                     },
@@ -596,6 +603,7 @@ fun SettingsScreen(
                                 UsageGroupDetailPage(
                                     detail = detail,
                                     onOpenRequest = { requestId ->
+                                        usageDetailBackSelection = selection
                                         usageDetailSelection = UsageDetailSelection.Request(requestId)
                                         usageDetailReturnPage = SettingsDestination.USAGE_DETAIL
                                     },
@@ -611,7 +619,7 @@ fun SettingsScreen(
                                 }
                                 UsageRequestDetailPage(record)
                             }
-                            null -> EmptySettingsUsageDetail()
+                            null -> UsageRequestDetailPage(null)
                         }
                     }
 
