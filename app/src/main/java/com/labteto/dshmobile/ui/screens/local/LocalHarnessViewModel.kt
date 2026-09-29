@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
@@ -544,7 +545,7 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
-    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = runtime.chat.send(text, attachments)
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult = runtime.chat.send(text, attachments)
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     fun createGroupChatSession() = runtime.chat.createGroupChatSession()
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
