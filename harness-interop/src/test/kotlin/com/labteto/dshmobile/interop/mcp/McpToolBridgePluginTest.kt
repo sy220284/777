@@ -3,7 +3,10 @@ package com.labteto.dshmobile.interop.mcp
 import java.io.File
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -121,6 +124,74 @@ class McpToolBridgePluginTest {
         assertFalse(disconnected.isError)
         assertNull(registry.context.tools.get(localName))
         assertTrue(closed)
+    }
+
+    @Test
+    fun disconnectWaitsForInflightCallBeforeClosingTransport() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var closed = false
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject =
+                when (method) {
+                    "tools/list" -> buildJsonObject {
+                        put("result", buildJsonObject {
+                            put("tools", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("name", "slow")
+                                    put("inputSchema", buildJsonObject { put("type", "object") })
+                                })
+                            })
+                        })
+                    }
+                    "tools/call" -> {
+                        entered.complete(Unit)
+                        release.await()
+                        buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("isError", false)
+                                put("content", buildJsonArray())
+                            })
+                        }
+                    }
+                    else -> error("unexpected method $method")
+                }
+
+            override fun close() {
+                closed = true
+            }
+        }
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = { transport },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "slow-server", "https://example.com/mcp")
+
+        val call = async {
+            registry.context.tools.execute(
+                "mcp_slow-server_slow",
+                buildJsonObject { },
+                context = ToolContext(approval = { true }),
+            )
+        }
+        entered.await()
+
+        val disconnect = async {
+            plugin.disconnectFromUi(registry.context, "slow-server")
+        }
+        yield()
+
+        assertFalse(disconnect.isCompleted)
+        assertFalse(closed)
+
+        release.complete(Unit)
+        assertFalse(call.await().isError)
+        assertTrue(disconnect.await().contains("已断开"))
+        assertTrue(closed)
+        assertNull(registry.context.tools.get("mcp_slow-server_slow"))
     }
 
     @Test
