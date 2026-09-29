@@ -135,7 +135,6 @@ internal inline fun coordinateLocalSend(
         onRejected(rejection)
         return rejection
     }
-    onAccepted()
     if (activeRun) {
         if (!enqueue()) {
             val fallback = LocalSendResult.rejected(
@@ -145,9 +144,11 @@ internal inline fun coordinateLocalSend(
             onRejected(fallback)
             return fallback
         }
+        onAccepted()
         onQueued()
         return LocalSendResult.Queued
     }
+    onAccepted()
     onStart()
     return LocalSendResult.Started
 }
