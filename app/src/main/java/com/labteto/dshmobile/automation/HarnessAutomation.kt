@@ -91,6 +91,9 @@ internal fun appendAutomationReceipt(
 private const val AUTOMATION_HISTORY_DAYS = 30L
 private const val AUTOMATION_HISTORY_RECORDS = 200
 
+internal fun Int.saturatingIncrement(): Int =
+    if (this >= Int.MAX_VALUE) Int.MAX_VALUE else (this + 1).coerceAtLeast(0)
+
 internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
     task.mode == AutomationMode.CHAT &&
         task.scheduleType in setOf(
@@ -1181,7 +1184,7 @@ class HarnessAutomationWorker(
                 task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
-                val nextFailureStreak = current.failureStreak + 1
+                val nextFailureStreak = current.failureStreak.saturatingIncrement()
                 autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
                 current.copy(
                     workSessionId = error.sessionId,
@@ -1255,7 +1258,7 @@ class HarnessAutomationWorker(
                 task.recurringMinutes?.let { checkedAutomationFutureMillis(finished, it, "任务周期") }
             }
             val updated = store.update(id) { current ->
-                val nextFailureStreak = current.failureStreak + 1
+                val nextFailureStreak = current.failureStreak.saturatingIncrement()
                 autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
                 current.copy(
                     status = when {
