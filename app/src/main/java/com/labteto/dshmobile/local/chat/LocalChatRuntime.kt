@@ -34,10 +34,7 @@ class LocalChatRuntime @Inject constructor(
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         engine.removeGroupChatMemberByGalleryId(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
-    internal fun send(
-        text: String,
-        attachments: List<LocalImportedAttachment> = emptyList(),
-    ): com.labteto.dshmobile.local.send.LocalSendResult = engine.send(text, attachments)
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = engine.send(text, attachments)
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult =
         engine.editAndResendUserMessage(messageId, replacement)
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
