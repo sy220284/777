@@ -889,37 +889,6 @@ class ChatInteractionPlanner @Inject constructor(
         )
     }
 
-    private fun evidenceGrounded(
-        evidence: RelationshipEvidence,
-        userMessage: String,
-        assistantMessage: String,
-    ): Boolean {
-        val source = evidence.source.trim().lowercase()
-        val evidenceText = normalize(evidence.text)
-        if (evidenceText.length < 2) return false
-
-        val sourceText = when (source) {
-            "user", "explicit" -> normalize(userMessage)
-            "observed", "dialogue" -> normalize(userMessage + assistantMessage)
-            else -> return false
-        }
-        if (sourceText.length < 2) return false
-        if (sourceText.contains(evidenceText) || evidenceText.contains(sourceText)) return true
-
-        val evidenceBigrams = bigrams(evidenceText)
-        val sourceBigrams = bigrams(sourceText)
-        if (evidenceBigrams.isEmpty() || sourceBigrams.isEmpty()) return false
-        val shared = evidenceBigrams.count(sourceBigrams::contains)
-        val ratio = shared.toDouble() / evidenceBigrams.size
-        return shared >= 2 && ratio >= 0.25
-    }
-
-    private fun bigrams(text: String): Set<String> =
-        if (text.length < 2) emptySet()
-        else (0 until text.length - 1).mapTo(linkedSetOf()) { index ->
-            text.substring(index, index + 2)
-        }
-
     private fun mergeEvidence(
         previous: List<RelationshipEvidence>,
         incoming: List<RelationshipEvidence>,
