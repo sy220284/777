@@ -19,6 +19,12 @@ internal enum class LocalSendRejectReason {
     QUEUE_UNAVAILABLE,
 }
 
+internal data class LocalSendFeedbackState(
+    val sessionId: String? = null,
+    val rejectReason: LocalSendRejectReason? = null,
+    val rejectLimit: Int? = null,
+)
+
 internal data class LocalSendResult(
     val disposition: LocalSendDisposition,
     val rejectReason: LocalSendRejectReason? = null,
