@@ -14,6 +14,7 @@ data class JobInfo(
     val id: String,
     val label: String,
     val status: String,
+    val ownerId: String? = null,
 )
 
 data class JobSnapshot(
@@ -416,7 +417,7 @@ class HarnessJobManager(
     }
 
     private fun snapshotRecords(): List<JobInfo> = synchronized(lock) {
-        records.values.map { JobInfo(it.id, it.label, it.status) }
+        records.values.map { JobInfo(it.id, it.label, it.status, it.ownerId) }
     }
 
     // Old snapshots may still contain a full shell command, including credentials.
@@ -440,7 +441,7 @@ class HarnessJobManager(
         val infos: List<JobInfo>
         val snapshots: List<JobSnapshot>
         synchronized(lock) {
-            infos = records.values.map { JobInfo(it.id, it.label, it.status) }
+            infos = records.values.map { JobInfo(it.id, it.label, it.status, it.ownerId) }
             snapshots = records.values.map(::snapshot)
         }
         onChanged(infos)
