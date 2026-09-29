@@ -244,7 +244,6 @@ fun LocalHarnessScreen(
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
                 },
-                onClose = { scope.launch { drawerState.close() } },
                 onRemote = {
                     scope.launch { drawerState.close() }
                     onOpenRemote()
