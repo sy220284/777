@@ -122,6 +122,18 @@ data class PendingQuestions(
     val items: List<AskUserQuestionItem>,
 )
 
+internal fun pendingApprovalForSession(
+    sessionId: String?,
+    approvals: Iterable<PendingApproval>,
+): PendingApproval? =
+    sessionId?.let { target -> approvals.firstOrNull { it.sessionId == target } }
+
+internal fun pendingQuestionsForSession(
+    sessionId: String?,
+    questions: Iterable<PendingQuestions>,
+): PendingQuestions? =
+    sessionId?.let { target -> questions.firstOrNull { it.sessionId == target } }
+
 /**
  * Whether more history remains after folding a backwards page.
  *
