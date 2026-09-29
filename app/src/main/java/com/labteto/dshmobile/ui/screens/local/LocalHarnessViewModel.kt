@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.presentation.projectShellState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
+import com.labteto.dshmobile.local.chat.withLegacyConversationContext
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaPreset
@@ -106,13 +107,7 @@ class LocalHarnessViewModel @Inject constructor(
                 persona = snapshot.chatPersona,
                 sourceSessionId = snapshot.sessionId,
                 history = archiveHistory,
-                // Gallery stories remain a backward-compatible archive format. Snapshot the
-                // canonical conversation context only at this storage boundary; active runtime
-                // state keeps scene/continuity exclusively in ChatContextState.
-                chatState = snapshot.chatState.copy(
-                    scene = snapshot.chatContext.scene,
-                    continuity = snapshot.chatContext.continuity,
-                ),
+                chatState = snapshot.chatState.withLegacyConversationContext(snapshot.chatContext),
                 notes = notes,
                 existingId = existingId ?: snapshot.galleryId,
                 existingStoryId = existingStoryId ?: snapshot.galleryStoryId,
