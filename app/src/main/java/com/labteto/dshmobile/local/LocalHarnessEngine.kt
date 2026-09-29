@@ -414,7 +414,14 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 }
             },
-            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordUsage = { snapshot, reply ->
+                usageTracker.record(
+                    snapshot = snapshot,
+                    reply = reply,
+                    action = TokenUsageAction.CHAT_STATE_REFRESH,
+                    runKind = LocalAgentRunKind.FOREGROUND,
+                )
+            },
             persistBranchState = ::persistChatBranchState,
             persist = ::persist,
         )
@@ -423,7 +430,9 @@ class LocalHarnessEngine @Inject constructor(
     private val chatReplyCoordinator by lazy {
         LocalChatReplyCoordinator(
             chatTurnCoordinator = chatTurnCoordinator,
-            recordUsage = { snapshot, reply -> usageTracker.record(snapshot.model, reply.usage) },
+            recordUsage = { snapshot, reply, usageContext ->
+                usageTracker.record(snapshot, reply, usageContext)
+            },
             recordStyleGuardHits = ::recordStyleGuardHits,
         )
     }
@@ -2879,6 +2888,14 @@ class LocalHarnessEngine @Inject constructor(
                 reply = rawReply,
                 userMessage = input,
                 step = 1,
+                usageContext = buildTokenUsageContext(
+                    snapshot = snapshot,
+                    action = TokenUsageAction.CHAT_REPLY,
+                    turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                    runKind = LocalAgentRunKind.FOREGROUND,
+                    taskLabel = input,
+                    step = 1,
+                ),
                 retryRaw = { repairHint ->
                     completeWithRetry(
                         key = key,
@@ -3271,6 +3288,19 @@ class LocalHarnessEngine @Inject constructor(
                     step = modelStep + 1,
                     reply = rawReply,
                     userMessage = memoryInput,
+                    usageContext = buildTokenUsageContext(
+                        snapshot = snapshot,
+                        action = if (snapshot.usageMode == LocalUsageMode.CHAT) {
+                            TokenUsageAction.CHAT_REPLY
+                        } else {
+                            TokenUsageAction.WORK_MAIN
+                        },
+                        turnId = sourceMessageId ?: runContext.runId,
+                        runId = runContext.runId,
+                        runKind = LocalAgentRunKind.FOREGROUND,
+                        taskLabel = input,
+                        step = modelStep + 1,
+                    ),
                 )
                 val effectiveReply = if (!runPolicy.allowToolExecution && reply.toolCalls.isNotEmpty()) {
                     runEventLog.append("chat/tool-call-blocked", buildJsonObject {
@@ -4742,11 +4772,13 @@ class LocalHarnessEngine @Inject constructor(
         step: Int,
         reply: LocalModelReply,
         userMessage: String,
+        usageContext: TokenUsageContext,
     ): LocalModelReply = chatReplyCoordinator.finalizeDirect(
         snapshot = snapshot,
         reply = reply,
         userMessage = userMessage,
         step = step,
+        usageContext = usageContext,
         retryRaw = { repairHint ->
             completeWithRetry(
                 key = key,
