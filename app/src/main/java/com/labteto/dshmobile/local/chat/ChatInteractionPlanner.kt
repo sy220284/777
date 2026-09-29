@@ -98,6 +98,7 @@ data class ChatCharacterState(
     val initiative: Int = 50,
     val shareDesire: Int = 50,
     val dynamics: RelationshipDynamics = RelationshipDynamics(),
+    val evolution: CharacterEvolutionState = CharacterEvolutionState(),
     val userPattern: UserChatPattern = UserChatPattern(),
     val scene: ChatSceneState = ChatSceneState(),
     val continuity: ChatContinuityState = ChatContinuityState(),
@@ -168,6 +169,7 @@ class ChatInteractionPlanner @Inject constructor(
             appendLine("稳定行为：${persona.behaviorPatterns.joinToString("；")}")
         }
         appendPersonaExpressionContext(persona)
+        appendCharacterEvolutionContext(state.evolution)
 
         appendLine(
             "上一状态：情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
@@ -232,6 +234,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构。")
         appendLine("- 角色台词的模糊或习惯性推辞不得单独触发关系降温、冲突或边界状态；结合人设纠正、关系阶段和连续动作判断。针对当前行为的清晰明确停止、退出或拒绝继续除外；此类边界一次表达即生效，不要求重复。")
         appendLine("- 状态与用户画像渐进变化；stage 仅在明确事件或持续强证据下变化，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
+        appendLine("- evolution 为系统维护的长期人物演变层，只由多轮稳定信号渐进更新；模型不得输出、覆盖或重置。")
         appendLine("- 已失效短期状态显式清空；scene 和 interaction* 由系统维护，不输出。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
@@ -360,10 +363,11 @@ class ChatInteractionPlanner @Inject constructor(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
+        val evolvedState = continuityState.copy(evolution = evolveCharacterEvolution(agedPrevious, continuityState, significance))
         return decoded.copy(
             state = applyInteractionPerformance(
                 state = applyInteractionIntent(
-                    state = continuityState,
+                    state = evolvedState,
                     previous = agedPrevious,
                     userMessage = userMessage,
                 ),
@@ -620,6 +624,7 @@ class ChatInteractionPlanner @Inject constructor(
                 bounded(value.shareDesire, previous.shareDesire, 15)
             } else previous.shareDesire,
             dynamics = dynamics,
+            evolution = previous.evolution,
             userPattern = pattern,
             scene = previous.scene,
             continuity = previous.continuity,

@@ -217,7 +217,7 @@ private fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterStat
     val incomingIsNewer = incoming.updatedAt >= base.updatedAt
     val newer = if (incomingIsNewer) incoming else base
     val older = if (incomingIsNewer) base else incoming
-    return newer.copy(
+    return newer.copy(evolution = mergeCharacterEvolution(older.evolution, newer.evolution),
         unresolvedThreads = mergePersonaLines(older.unresolvedThreads, newer.unresolvedThreads, 8),
         dynamics = newer.dynamics.copy(
             facts = mergeEvidence(older.dynamics.facts, newer.dynamics.facts, 24),
