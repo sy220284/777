@@ -16,6 +16,7 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
 import java.net.Socket
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
@@ -389,7 +390,16 @@ class LocalWebProvider @Inject constructor(
                     throw LocalWebException(code, "网页搜索失败（HTTP ${response.code}）：${body.take(500)}")
                 }
                 val root = json.parseToJsonElement(body).jsonObject
-                usageTracker.record(SEARCH_MODEL, parseDeepSeekAnthropicUsage(root))
+                usageTracker.record(
+                    model = SEARCH_MODEL,
+                    usage = parseDeepSeekAnthropicUsage(root),
+                    requestId = UUID.randomUUID().toString(),
+                    context = TokenUsageContext(
+                        mode = LocalUsageMode.WORK,
+                        action = TokenUsageAction.WEB_SEARCH,
+                        taskLabel = query.take(120),
+                    ),
+                )
                 formatSearch(query, root)
             }
         } catch (error: LocalWebException) {
