@@ -49,6 +49,7 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
+import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
