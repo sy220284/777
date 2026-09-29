@@ -1,11 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -78,6 +73,7 @@ import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -202,11 +198,7 @@ internal fun LocalModeDrawer(
                     )
                 }
 
-                AnimatedVisibility(
-                    visible = searchOpen,
-                    enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
-                    exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
-                ) {
+                DsExpandableColumn(visible = searchOpen) {
                     OutlinedTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
