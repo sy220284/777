@@ -37,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
@@ -155,6 +157,9 @@ internal fun CharacterBehaviorTuningDialog(
         targetValue = if (advanced) 90f else 0f,
         animationSpec = DsAnimations.chevron,
         label = "characterTuningAdvancedChevron",
+    )
+    val advancedStateDescription = stringResource(
+        if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
 
     DsDialog(title = null, onDismiss = onDismiss) {
@@ -304,7 +309,8 @@ internal fun CharacterBehaviorTuningDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = DsSpacing.touchTarget)
-                .clickable { advanced = !advanced },
+                .semantics { stateDescription = advancedStateDescription }
+                .clickable(role = Role.Button) { advanced = !advanced },
             shape = DsShapes.row,
             color = Color.Transparent,
         ) {
