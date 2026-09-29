@@ -7,7 +7,6 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
-import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalTranscriptPage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
@@ -25,7 +24,7 @@ class LocalSessionRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
     internal val state: StateFlow<LocalHarnessState> = engine.state
-    internal val streamingState: StateFlow<LocalHarnessStreamingState> = engine.streamingState; internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = engine.sendFeedbackState
+    internal val streamingState: StateFlow<LocalHarnessStreamingState> = engine.streamingState; internal val sendFeedbackState: StateFlow<com.labteto.dshmobile.local.send.LocalSendFeedbackState> = engine.sendFeedbackState
 
     internal fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
     internal fun createSession(
