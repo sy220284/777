@@ -60,8 +60,8 @@ for name, source in (
 ):
     if "DsConversationComposer(" not in source:
         violations.append(f"{name} must use the shared DsConversationComposer shell")
-    if "composerFocused" not in source or "composerExpanded" not in source:
-        violations.append(f"{name} must preserve focus-driven two-row composer expansion")
+    if "composerFocused" in source or "composerExpanded" in source:
+        violations.append(f"{name} must not expand the composer merely because the field gains focus")
     if "shape = DsShapes.composer" in source:
         violations.append(f"{name} must not rebuild composer geometry outside DsConversationComposer")
 
