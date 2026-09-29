@@ -256,7 +256,7 @@ internal fun LocalMessageRow(
                 MarkdownText(visibleContent)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (chatMode) {
