@@ -52,6 +52,7 @@ internal fun ExecutionStatusCard(
     val colors = DsTheme.colors
     var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
+    var technicalDetailsExpanded by remember(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
     val resourceSummary = stringResource(
@@ -123,7 +124,7 @@ internal fun ExecutionStatusCard(
                 Text(
                     stringResource(R.string.local_workflow_waiting_user),
                     style = DsType.small13Strong,
-                    color = colors.error,
+                    color = colors.warnLabel,
                 )
             }
 
@@ -279,39 +280,43 @@ internal fun ExecutionStatusCard(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            if (state.queuedInputCount > 0) {
                 Text(
-                    stringResource(R.string.local_run_resources),
-                    style = DsType.caption11Strong,
-                    color = colors.labelTertiary,
+                    stringResource(R.string.local_queue_count, state.queuedInputCount),
+                    style = DsType.caption11,
+                    color = colors.labelSecondary,
                 )
-                Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
-                Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
-                if (state.queuedInputCount > 0) {
-                    Text(
-                        stringResource(R.string.local_queue_count, state.queuedInputCount),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                    )
-                }
-                Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
-                Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
-                if (
-                    state.conversationMode == LocalConversationMode.CONTINUATION &&
-                    !state.handoffSummary.isNullOrBlank()
-                ) {
-                    Text(
-                        stringResource(R.string.local_context_handoff),
-                        style = DsType.caption11Strong,
-                        color = colors.labelTertiary,
-                    )
-                    Text(
-                        state.handoffSummary.orEmpty(),
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+            }
+
+            DsButton(
+                text = stringResource(R.string.local_run_resources),
+                onClick = { technicalDetailsExpanded = !technicalDetailsExpanded },
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+            if (technicalDetailsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
+                    Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
+                    Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                    if (
+                        state.conversationMode == LocalConversationMode.CONTINUATION &&
+                        !state.handoffSummary.isNullOrBlank()
+                    ) {
+                        Text(
+                            stringResource(R.string.local_context_handoff),
+                            style = DsType.caption11Strong,
+                            color = colors.labelTertiary,
+                        )
+                        Text(
+                            state.handoffSummary.orEmpty(),
+                            style = DsType.caption11,
+                            color = colors.labelSecondary,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }

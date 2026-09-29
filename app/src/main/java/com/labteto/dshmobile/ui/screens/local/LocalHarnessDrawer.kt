@@ -5,7 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +16,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
@@ -53,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,7 +62,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsFloatingPopup
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsIconFamily
@@ -79,7 +74,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import kotlin.math.roundToInt
 
 @Composable
 internal fun LocalModeDrawer(
@@ -281,88 +275,75 @@ internal fun LocalModeDrawer(
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                DsGroupCard {
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Schedule,
-                        title = stringResource(
-                            if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
-                            else R.string.tasks_title,
-                        ),
-                        onClick = onTasks,
-                    )
-                    if (usageMode == LocalUsageMode.WORK) {
+                if (selectionOpen) {
+                    Surface(
+                        shape = DsShapes.block,
+                        color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            Text(
+                                stringResource(R.string.local_selected_count, selectedIds.size),
+                                style = DsType.small13Strong,
+                                color = colors.labelPrimary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_delete_session),
+                                onClick = {
+                                    val ids = selectedIds.toSet()
+                                    selectionOpen = false
+                                    selectedIds.clear()
+                                    if (ids.isNotEmpty()) onDeleteSessions(ids)
+                                },
+                                enabled = selectedIds.isNotEmpty(),
+                                variant = DsButtonVariant.Danger,
+                                size = DsButtonSize.Small,
+                            )
+                            DsIconButton(
+                                icon = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.common_close),
+                                onClick = {
+                                    selectionOpen = false
+                                    selectedIds.clear()
+                                },
+                                tint = colors.labelSecondary,
+                            )
+                        }
+                    }
+                } else {
+                    DsGroupCard {
                         DrawerPrimaryAction(
-                            icon = Icons.Outlined.Extension,
-                            title = stringResource(R.string.tools_title),
-                            onClick = onTools,
+                            icon = Icons.Outlined.Schedule,
+                            title = stringResource(
+                                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
+                                else R.string.tasks_title,
+                            ),
+                            onClick = onTasks,
                         )
+                        if (usageMode == LocalUsageMode.WORK) {
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Extension,
+                                title = stringResource(R.string.tools_title),
+                                onClick = onTools,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.QrCodeScanner,
+                                title = stringResource(R.string.local_remote_control),
+                                onClick = onRemote,
+                            )
+                        }
                         DrawerPrimaryAction(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            title = stringResource(R.string.local_remote_control),
-                            onClick = onRemote,
+                            icon = Icons.Outlined.Settings,
+                            title = stringResource(R.string.settings_title),
+                            onClick = onSettings,
                         )
                     }
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.Settings,
-                        title = stringResource(R.string.settings_title),
-                        onClick = onSettings,
-                    )
-                }
-            }
-        }
-    }
-
-    if (selectionOpen) {
-        var position by remember { mutableStateOf(IntOffset(24, 160)) }
-        DsFloatingPopup(
-            alignment = Alignment.TopStart,
-            offset = position,
-            onDismiss = {
-                selectionOpen = false
-                selectedIds.clear()
-            },
-        ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
-                shadowElevation = 10.dp,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectDragGestures { change, drag ->
-                        change.consume()
-                        position = IntOffset(
-                            (position.x + drag.x.roundToInt()).coerceAtLeast(0),
-                            (position.y + drag.y.roundToInt()).coerceAtLeast(0),
-                        )
-                    }
-                },
-            ) {
-                Row(
-                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    Text(stringResource(R.string.local_selected_count, selectedIds.size), color = colors.labelPrimary)
-                    DsButton(
-                        text = stringResource(R.string.local_delete_session),
-                        onClick = {
-                            val ids = selectedIds.toSet()
-                            selectionOpen = false
-                            selectedIds.clear()
-                            if (ids.isNotEmpty()) onDeleteSessions(ids)
-                        },
-                        enabled = selectedIds.isNotEmpty(),
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                    )
-                    DsIconButton(
-                        icon = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.common_close),
-                        onClick = {
-                            selectionOpen = false
-                            selectedIds.clear()
-                        },
-                        tint = colors.labelSecondary,
-                    )
                 }
             }
         }
