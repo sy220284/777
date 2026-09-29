@@ -67,7 +67,6 @@ class BundledRuntimeLibraryStoreTest {
             // Expected.
         }
     }
-}\n
     @Test
     fun sameSizeCorruptionIsNotAcceptedAsReusableBlob() {
         val root = Files.createTempDirectory("runtime-blob-validation-").toFile()
@@ -96,4 +95,4 @@ class BundledRuntimeLibraryStoreTest {
             root.deleteRecursively()
         }
     }
-
+}
