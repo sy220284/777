@@ -137,7 +137,26 @@ class CharacterEvolutionTest {
         assertEquals(60, state.evolution.initiativeBaseline)
         assertEquals(60, state.evolution.opennessBaseline)
         assertEquals(60, state.evolution.securityBaseline)
-        assertEquals(5, state.evolution.observationCount)
+        assertEquals(4, state.evolution.observationCount)
+    }
+
+    @Test
+    fun minorTurnWithoutDurableSignalDoesNotAdvanceEvolutionObservation() {
+        val previous = baselineState().copy(
+            evolution = CharacterEvolutionState(observationCount = 4),
+        )
+        val current = previous.copy(
+            initiative = 55,
+            shareDesire = 54,
+            dynamics = previous.dynamics.copy(trust = 54, stability = 53, tension = 47),
+        )
+
+        val evolution = evolveCharacterEvolution(previous, current, "MINOR")
+
+        assertEquals(4, evolution.observationCount)
+        assertEquals(50, evolution.initiativeBaseline)
+        assertEquals(50, evolution.opennessBaseline)
+        assertEquals(50, evolution.securityBaseline)
     }
 
     @Test
