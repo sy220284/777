@@ -5,6 +5,8 @@ import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
@@ -192,6 +194,90 @@ class McpToolBridgePluginTest {
         assertTrue(disconnect.await().contains("已断开"))
         assertTrue(closed)
         assertNull(registry.context.tools.get("mcp_slow-server_slow"))
+    }
+
+    @Test
+    fun slowConnectDoesNotBlockExistingServerSnapshots() = runTest {
+        val slowEntered = CompletableDeferred<Unit>()
+        val slowRelease = CompletableDeferred<Unit>()
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = { endpoint ->
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        require(method == "tools/list")
+                        if (endpoint.contains("slow")) {
+                            slowEntered.complete(Unit)
+                            slowRelease.await()
+                        }
+                        return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray { })
+                            })
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "fast", "https://example.com/fast")
+
+        val slow = async {
+            plugin.connectHttpFromUi(registry.context, "slow", "https://example.com/slow")
+        }
+        slowEntered.await()
+
+        val snapshots = plugin.serverSnapshots()
+        assertEquals(listOf("fast"), snapshots.map(McpServerSnapshot::id))
+        assertFalse(slow.isCompleted)
+
+        slowRelease.complete(Unit)
+        assertTrue(slow.await().contains("已连接"))
+    }
+
+    @Test
+    fun cancelledConnectReleasesServerReservation() = runTest {
+        val firstEntered = CompletableDeferred<Unit>()
+        var attempts = 0
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                val attempt = ++attempts
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        require(method == "tools/list")
+                        if (attempt == 1) {
+                            firstEntered.complete(Unit)
+                            awaitCancellation()
+                        }
+                        return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray { })
+                            })
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+
+        val first = async {
+            plugin.connectHttpFromUi(registry.context, "retry", "https://example.com/mcp")
+        }
+        firstEntered.await()
+        first.cancelAndJoin()
+
+        val retry = plugin.connectHttpFromUi(registry.context, "retry", "https://example.com/mcp")
+        assertTrue(retry.contains("已连接"))
+        assertEquals(2, attempts)
     }
 
     @Test
