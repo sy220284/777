@@ -48,6 +48,7 @@ interface HarnessCredentialStore {
 interface HarnessDeviceProvider {
     val capabilities: Set<String>
     suspend fun invoke(capability: String, arguments: Map<String, String>): String
+    fun close() = Unit
 }
 
 interface HarnessLlmProvider {
