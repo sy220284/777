@@ -251,4 +251,30 @@ class LocalWorkspaceTest {
         }
     }
 
+
+    @Test
+    fun skillReadsCannotEscapeSkillsDirectoryAndSymlinkSkillsAreHidden() {
+        workspace.write(".dsh/skills/good/SKILL.md", "good-skill")
+        workspace.write(".dsh/private/SKILL.md", "private-skill")
+        external = Files.createTempDirectory("local-harness-external-skill").toFile().apply {
+            resolve("SKILL.md").writeText("external-skill")
+        }
+        val skillsDir = root.resolve(".dsh/skills")
+        Files.createSymbolicLink(skillsDir.toPath().resolve("external"), external!!.toPath())
+
+        assertTrue(workspace.skills().contains("good"))
+        assertTrue(!workspace.skills().contains("external"))
+        assertTrue(workspace.readSkill("good").contains("good-skill"))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkill("../private")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkill("../../private")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkill("external")
+        }
+    }
+
 }
