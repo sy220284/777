@@ -1350,33 +1350,9 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
-    internal fun send(
-        text: String,
-        attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult {
-        val prompt = text.trim()
-        if (prompt.isEmpty() && attachments.isEmpty()) {
-            return LocalSendResult.rejected(
-                LocalSendRejectReason.EMPTY,
-                "请输入消息或添加附件",
-            )
-        }
-        val attachmentBlock = attachments.joinToString("\n") { attachment ->
-            val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
-            "- $kind：${attachment.name} → ${attachment.relativePath}（${attachment.bytes} B）"
-        }
-        val content = buildString {
-            if (prompt.isNotEmpty()) append(prompt)
-            if (attachments.isNotEmpty()) {
-                if (isNotEmpty()) append("\n\n")
-                append("本次附件已导入本机工作区：\n").append(attachmentBlock)
-                if (attachments.any { it.mediaType.startsWith("image/") }) {
-                    append("\n图片处理：支持图片输入的主模型会直接读取像素；若当前模型不支持，将使用 vision_analyze_file 分析上述工作区图片。")
-                }
-            }
-        }
-        val modelMessage = buildLocalUserModelMessage(content, attachments)
-        return queueHumanTurn(content, prompt, modelMessage)
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
+        val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
+        return queueHumanTurn(prepared.content, prepared.memoryInput, prepared.modelMessage)
     }
 
     /**
@@ -1781,111 +1757,31 @@ class LocalHarnessEngine @Inject constructor(
         content: String,
         memoryInput: String = content,
         modelMessage: JsonObject? = null,
-    ): LocalSendResult {
-        val (result, job) = synchronized(runStateLock) {
-            val state = _state.value
-            val workBinding = if (state.usageMode == LocalUsageMode.WORK) {
-                activeWorkRuns[state.sessionId]
-            } else {
-                null
-            }
-            val activeRun = if (state.usageMode == LocalUsageMode.WORK) {
-                workBinding?.job?.isCompleted == false
-            } else {
-                activeJob?.isCompleted == false
-            }
-            val pendingCount = if (state.usageMode == LocalUsageMode.WORK && workBinding != null) {
-                workBinding.pendingInputs.size()
-            } else {
-                pendingInputs.size()
-            }
-            val rejection = evaluateLocalSendAdmission(
-                configured = state.configured,
-                loading = state.loading,
-                sessionTransitioning = sessionTransitioning,
-                activeRun = activeRun,
-                pendingCount = pendingCount,
-                pendingLimit = MAX_PENDING_INPUTS,
-            )
-            if (rejection != null) {
-                (workBinding?.state ?: _state).update { current ->
-                    current.copy(error = rejection.message)
-                }
-                return@synchronized rejection to null
-            }
-
-            cancelChatPostTurn()
-            if (state.usageMode == LocalUsageMode.WORK) {
-                if (workBinding?.job?.isCompleted == false) {
-                    val queuedInput = QueuedAgentInput(
-                        content = content,
-                        memoryInput = memoryInput,
-                        modelMessage = modelMessage,
-                        id = UUID.randomUUID().toString(),
-                    )
-                    if (!workBinding.pendingInputs.offer(queuedInput)) {
-                        val fallback = LocalSendResult.rejected(
-                            LocalSendRejectReason.QUEUE_FULL,
-                            "当前执行中的补充消息队列暂时不可用；当前输入已保留",
-                        )
-                        workBinding.state.update { current -> current.copy(error = fallback.message) }
-                        return@synchronized fallback to null
-                    }
-                    recordUserTranscript(
-                        content = content,
-                        modelMessage = modelMessage,
-                        queued = true,
-                        queuedInput = queuedInput,
-                        binding = workBinding,
-                    )
-                    workBinding.state.update {
-                        it.copy(
-                            queuedInputCount = workBinding.pendingInputs.size(),
-                            error = null,
-                        )
-                    }
-                    persist(workBinding)
-                    return@synchronized LocalSendResult.Queued to null
-                }
-                return@synchronized LocalSendResult.Started to
-                    queueWorkTurnLocked(content, memoryInput, modelMessage)
-            }
-
-            if (activeJob?.isCompleted == false) {
-                val queuedInput = QueuedAgentInput(
-                    content = content,
-                    memoryInput = memoryInput,
-                    modelMessage = modelMessage,
-                    id = UUID.randomUUID().toString(),
-                )
-                if (!pendingInputs.offer(queuedInput)) {
-                    val fallback = LocalSendResult.rejected(
-                        LocalSendRejectReason.QUEUE_FULL,
-                        "当前执行中的补充消息队列暂时不可用；当前输入已保留",
-                    )
-                    _state.update { current -> current.copy(error = fallback.message) }
-                    return@synchronized fallback to null
-                }
-                recordUserTranscript(
-                    content = content,
-                    modelMessage = modelMessage,
-                    queued = true,
-                    queuedInput = queuedInput,
-                )
-                _state.update {
-                    it.copy(
-                        queuedInputCount = pendingInputs.size(),
-                        error = null,
-                    )
-                }
-                persist()
-                return@synchronized LocalSendResult.Queued to null
-            }
-
-            LocalSendResult.Started to queueTurnLocked(content, memoryInput, modelMessage)
-        }
-        job?.start()
-        return result
+    ): LocalSendResult = synchronized(runStateLock) {
+        val state = _state.value
+        val binding = if (state.usageMode == LocalUsageMode.WORK) {
+            activeWorkRuns[state.sessionId]?.takeIf { it.job?.isCompleted == false }
+        } else null
+        val targetPending = binding?.pendingInputs ?: pendingInputs
+        val targetState = binding?.state ?: _state
+        val activeRun = binding != null || (state.usageMode != LocalUsageMode.WORK && activeJob?.isCompleted == false)
+        val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
+        coordinateLocalSend(
+            state.configured, state.loading, sessionTransitioning, activeRun,
+            targetPending.size(), MAX_PENDING_INPUTS,
+            onRejected = { result -> targetState.update { it.copy(error = result.message) } },
+            onAccepted = ::cancelChatPostTurn,
+            enqueue = { targetPending.offer(queuedInput) },
+            onQueued = {
+                recordUserTranscript(content, modelMessage, true, queuedInput, binding)
+                targetState.update { it.copy(queuedInputCount = targetPending.size(), error = null) }
+                if (binding != null) persist(binding) else persist()
+            },
+            onStart = {
+                if (state.usageMode == LocalUsageMode.WORK) queueWorkTurnLocked(content, memoryInput, modelMessage).start()
+                else queueTurnLocked(content, memoryInput, modelMessage).start()
+            },
+        )
     }
 
     private fun queueWorkTurnLocked(
