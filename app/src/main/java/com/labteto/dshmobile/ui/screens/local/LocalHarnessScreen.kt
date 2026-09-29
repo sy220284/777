@@ -94,7 +94,9 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerSurface
+import com.labteto.dshmobile.ui.components.DsComposerMetrics
+import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -102,6 +104,7 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -658,6 +661,7 @@ private fun LocalConversationSurface(
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
+    val composerSurfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -683,6 +687,7 @@ private fun LocalConversationSurface(
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+    var composerMenuOpen by remember(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
@@ -690,13 +695,16 @@ private fun LocalConversationSurface(
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var composerFocused by remember(state.sessionId) { mutableStateOf(false) }
     var transcriptWindowSize by rememberSaveable(state.sessionId) {
         mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
     }
     var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
         mutableStateOf(state.messages.size)
     }
+    LaunchedEffect(state.running) {
+        if (state.running) composerMenuOpen = false
+    }
+
     LaunchedEffect(state.messages.size) {
         val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
         if (
@@ -1213,10 +1221,10 @@ private fun LocalConversationSurface(
             }
         }
 
-        val composerExpanded =
-            composerFocused || input.contains('\n') || attachments.isNotEmpty()
         val composerCanSend =
             groupChatReady && (input.isNotBlank() || attachments.isNotEmpty())
+        val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
+        val composerReplySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
 
         fun submitComposerMessage() {
             if (!state.configured) {
@@ -1231,203 +1239,175 @@ private fun LocalConversationSurface(
             keyboardController?.hide()
         }
 
-        DsComposerSurface {
-                if (attachments.isNotEmpty()) {
-                    attachments.forEachIndexed { index, attachment ->
-                        ImportedAttachmentRow(
-                            attachment = attachment,
-                            workspacePath = state.workspacePath,
-                            onRemove = { attachments.removeAt(index) },
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                ) {
-                    if (!composerExpanded) {
-                        DsComposerAction(
-                            icon = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.chat_composer_add_attachment),
-                            onClick = { showAttachmentPicker = true },
-                            enabled = !state.running,
-                            tint = colors.labelSecondary,
-                        )
-                    }
-
-                    DsComposerField(
-                        value = input,
-                        onValueChange = { drafts[state.sessionId] = it },
-                        placeholder = when {
-                            state.usageMode == LocalUsageMode.WORK ->
-                                stringResource(R.string.local_work_composer_hint)
-                            state.groupChat.enabled ->
-                                stringResource(R.string.local_group_chat_composer_hint)
-                            else ->
-                                stringResource(
-                                    R.string.local_chat_composer_persona_hint,
-                                    state.chatPersona.name,
-                                )
-                        },
-                        modifier = Modifier.weight(1f),
-                        maxLines = 5,
-                        onFocusedChange = { composerFocused = it },
+        DsConversationComposer(
+            surfaceColor = composerSurfaceColor,
+            shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+        ) {
+            if (attachments.isNotEmpty()) {
+                attachments.forEachIndexed { index, attachment ->
+                    ImportedAttachmentRow(
+                        attachment = attachment,
+                        workspacePath = state.workspacePath,
+                        onRemove = { attachments.removeAt(index) },
                     )
-
-                    if (!composerExpanded) {
-                        if (state.running) {
-                            DsComposerAction(
-                                icon = Icons.Filled.Stop,
-                                contentDescription = stringResource(R.string.chat_composer_stop),
-                                onClick = onStop,
-                                tint = colors.onAccent,
-                                containerColor = colors.error,
-                            )
-                        } else {
-                            DsComposerAction(
-                                icon = Icons.Filled.ArrowUpward,
-                                contentDescription = stringResource(R.string.chat_composer_send),
-                                onClick = ::submitComposerMessage,
-                                enabled = composerCanSend,
-                                tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
-                                containerColor = if (composerCanSend) {
-                                    colors.buttonInfoFill
-                                } else {
-                                    colors.buttonPrimaryDimmed
-                                },
-                            )
-                        }
-                    }
                 }
+            }
 
-                if (composerExpanded) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                    ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                if (!state.running) {
+                    Box {
                         DsComposerAction(
                             icon = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.chat_composer_add_attachment),
-                            onClick = { showAttachmentPicker = true },
-                            enabled = !state.running,
-                            tint = colors.labelSecondary,
+                            contentDescription = composerAttachmentLabel,
+                            onClick = { composerMenuOpen = true },
+                            tint = colors.labelPrimary,
+                            containerColor = colors.hoverSolid,
                         )
-
-                        if (
-                            state.usageMode == LocalUsageMode.CHAT &&
-                            !state.groupChat.enabled
-                        ) {
-                            DsComposerAction(
-                                icon = Icons.Outlined.AutoAwesome,
-                                contentDescription = stringResource(R.string.local_reply_suggestions_open),
-                                onClick = {
-                                    if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                                        showReplySuggestions = true
-                                    } else if (!replySuggestionsLoading) {
-                                        replySuggestionsLoading = true
-                                        scope.launch {
-                                            val generated = try {
-                                                onGenerateReplySuggestions()
-                                            } finally {
-                                                replySuggestionsLoading = false
-                                            }
-                                            if (generated) showReplySuggestions = true
-                                        }
-                                    }
-                                },
-                                enabled = !state.running &&
-                                    !replySuggestionsLoading &&
+                        DsPopupMenu(
+                            expanded = composerMenuOpen,
+                            onDismiss = { composerMenuOpen = false },
+                            items = buildList {
+                                add(
+                                    MenuItem(
+                                        text = composerAttachmentLabel,
+                                        icon = Icons.Outlined.AttachFile,
+                                        onClick = { showAttachmentPicker = true },
+                                    ),
+                                )
+                                if (
+                                    state.usageMode == LocalUsageMode.CHAT &&
+                                    !state.groupChat.enabled &&
                                     state.messages.any { message ->
                                         message.role == "assistant" && message.content.isNotBlank()
-                                    },
-                                tint = if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                                    colors.accent
-                                } else {
-                                    colors.labelSecondary
-                                },
-                            )
-                        }
-
-                        if (state.usageMode == LocalUsageMode.WORK) {
-                            DsComposerAction(
-                                icon = FeatherIcons.CheckSquare,
-                                contentDescription = stringResource(
-                                    if (state.planMode) R.string.local_plan_button_on
-                                    else R.string.local_plan_button_off,
-                                ),
-                                onClick = { onPlanModeChange(!state.planMode) },
-                                enabled = !state.running,
-                                tint = if (state.planMode) colors.accent else colors.labelSecondary,
-                                containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
-                            )
-                            DsComposerAction(
-                                icon = Icons.Outlined.Shield,
-                                contentDescription = stringResource(R.string.local_auto_approve_short),
-                                onClick = if (state.safeAutoApprovalEnabled) {
-                                    onDisableAutoApprove
-                                } else {
-                                    onAutoApprove
-                                },
-                                tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
-                                containerColor = if (state.safeAutoApprovalEnabled) {
-                                    colors.accentTertiary
-                                } else {
-                                    Color.Transparent
-                                },
-                            )
-                        }
-
-                        Spacer(Modifier.weight(1f))
-
-                        if (state.running) {
-                            DsComposerAction(
-                                icon = Icons.Filled.Stop,
-                                contentDescription = stringResource(R.string.chat_composer_stop),
-                                onClick = onStop,
-                                tint = colors.onAccent,
-                                containerColor = colors.error,
-                            )
-                            if (state.usageMode == LocalUsageMode.WORK) {
-                                DsComposerAction(
-                                    icon = Icons.Filled.ArrowUpward,
-                                    contentDescription = if (state.queuedInputCount > 0) {
-                                        stringResource(
-                                            R.string.local_queue_message_count,
-                                            state.queuedInputCount,
-                                        )
-                                    } else {
-                                        stringResource(R.string.local_queue_message)
-                                    },
-                                    onClick = ::submitComposerMessage,
-                                    enabled = composerCanSend,
-                                    tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
-                                    containerColor = if (composerCanSend) {
-                                        colors.buttonInfoFill
-                                    } else {
-                                        colors.buttonPrimaryDimmed
-                                    },
-                                )
-                            }
-                        } else {
-                            DsComposerAction(
-                                icon = Icons.Filled.ArrowUpward,
-                                contentDescription = stringResource(R.string.chat_composer_send),
-                                onClick = ::submitComposerMessage,
-                                enabled = composerCanSend,
-                                tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
-                                containerColor = if (composerCanSend) {
-                                    colors.buttonInfoFill
-                                } else {
-                                    colors.buttonPrimaryDimmed
-                                },
-                            )
-                        }
+                                    }
+                                ) {
+                                    add(
+                                        MenuItem(
+                                            text = composerReplySuggestionsLabel,
+                                            icon = Icons.Outlined.AutoAwesome,
+                                            onClick = {
+                                                if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                                                    showReplySuggestions = true
+                                                } else if (!replySuggestionsLoading) {
+                                                    replySuggestionsLoading = true
+                                                    scope.launch {
+                                                        val generated = try {
+                                                            onGenerateReplySuggestions()
+                                                        } finally {
+                                                            replySuggestionsLoading = false
+                                                        }
+                                                        if (generated) showReplySuggestions = true
+                                                    }
+                                                }
+                                            },
+                                        ),
+                                    )
+                                }
+                            },
+                        )
                     }
                 }
+
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    DsComposerAction(
+                        icon = FeatherIcons.CheckSquare,
+                        contentDescription = stringResource(
+                            if (state.planMode) R.string.local_plan_button_on
+                            else R.string.local_plan_button_off,
+                        ),
+                        onClick = { onPlanModeChange(!state.planMode) },
+                        enabled = !state.running,
+                        tint = if (state.planMode) colors.accent else colors.labelSecondary,
+                        containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
+                    )
+                    DsComposerAction(
+                        icon = Icons.Outlined.Shield,
+                        contentDescription = stringResource(R.string.local_auto_approve_short),
+                        onClick = if (state.safeAutoApprovalEnabled) {
+                            onDisableAutoApprove
+                        } else {
+                            onAutoApprove
+                        },
+                        tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
+                        containerColor = if (state.safeAutoApprovalEnabled) {
+                            colors.accentTertiary
+                        } else {
+                            Color.Transparent
+                        },
+                    )
+                }
+
+                DsComposerField(
+                    value = input,
+                    onValueChange = { drafts[state.sessionId] = it },
+                    placeholder = when {
+                        state.usageMode == LocalUsageMode.WORK ->
+                            stringResource(R.string.local_work_composer_hint)
+                        state.groupChat.enabled ->
+                            stringResource(R.string.local_group_chat_composer_hint)
+                        else ->
+                            stringResource(
+                                R.string.local_chat_composer_persona_hint,
+                                state.chatPersona.name,
+                            )
+                    },
+                    modifier = Modifier.weight(1f),
+                    maxLines = 5,
+                )
+
+                if (state.running) {
+                    DsComposerAction(
+                        icon = Icons.Filled.Stop,
+                        contentDescription = stringResource(R.string.chat_composer_stop),
+                        onClick = onStop,
+                        tint = colors.onAccent,
+                        containerColor = colors.error,
+                        visualSize = DsComposerMetrics.primaryActionVisualSize,
+                    )
+                    if (state.usageMode == LocalUsageMode.WORK) {
+                        DsComposerAction(
+                            icon = Icons.Filled.ArrowUpward,
+                            contentDescription = if (state.queuedInputCount > 0) {
+                                stringResource(
+                                    R.string.local_queue_message_count,
+                                    state.queuedInputCount,
+                                )
+                            } else {
+                                stringResource(R.string.local_queue_message)
+                            },
+                            onClick = ::submitComposerMessage,
+                            enabled = composerCanSend,
+                            tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
+                            containerColor = if (composerCanSend) {
+                                colors.buttonInfoFill
+                            } else {
+                                colors.buttonPrimaryDimmed
+                            },
+                            visualSize = DsComposerMetrics.primaryActionVisualSize,
+                        )
+                    }
+                } else {
+                    DsComposerAction(
+                        icon = Icons.Filled.ArrowUpward,
+                        contentDescription = stringResource(R.string.chat_composer_send),
+                        onClick = ::submitComposerMessage,
+                        enabled = composerCanSend,
+                        tint = if (composerCanSend) colors.onAccent else colors.labelTertiary,
+                        containerColor = if (composerCanSend) {
+                            colors.buttonInfoFill
+                        } else {
+                            colors.buttonPrimaryDimmed
+                        },
+                        visualSize = DsComposerMetrics.primaryActionVisualSize,
+                    )
+                }
+            }
         }
+
     }
 
     state.pendingApproval

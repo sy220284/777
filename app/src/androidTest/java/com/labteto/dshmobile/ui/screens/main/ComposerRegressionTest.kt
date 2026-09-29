@@ -10,7 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DS_COMPOSER_FIELD_TAG
-import com.labteto.dshmobile.ui.components.DS_COMPOSER_SURFACE_TAG
+import com.labteto.dshmobile.ui.components.DS_CONVERSATION_COMPOSER_TAG
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Rule
 import org.junit.Test
@@ -81,7 +81,7 @@ class ComposerRegressionTest {
         compose.onNodeWithContentDescription(send).assertExists()
     }
 
-    @Test fun focusExpandsComposerToSecondaryRow() {
+    @Test fun focusKeepsComposerAtTheSameCompactHeight() {
         var text by mutableStateOf("")
         compose.setContent {
             DshTheme {
@@ -106,17 +106,13 @@ class ComposerRegressionTest {
             }
         }
 
-        val composer = compose.onNodeWithTag(DS_COMPOSER_SURFACE_TAG)
-        val toolsLabel = context.getString(R.string.chat_context_tools)
-        compose.onNodeWithContentDescription(toolsLabel).assertDoesNotExist()
-        val collapsedHeight = composer.fetchSemanticsNode().boundsInRoot.height
-
+        val composer = compose.onNodeWithTag(DS_CONVERSATION_COMPOSER_TAG)
+        val before = composer.fetchSemanticsNode().boundsInRoot.height
         compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick()
         compose.waitForIdle()
+        val after = composer.fetchSemanticsNode().boundsInRoot.height
 
-        compose.onNodeWithContentDescription(toolsLabel).assertExists()
-        val expandedHeight = composer.fetchSemanticsNode().boundsInRoot.height
-        assertTrue("聚焦后聊天框应展开到第二行", expandedHeight > collapsedHeight)
+        assertEquals(before, after, 0.5f)
     }
 
     @Test fun rejectedSendRestoresOriginWithoutDroppingNewAttachments() {
