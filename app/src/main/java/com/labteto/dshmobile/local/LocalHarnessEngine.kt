@@ -4348,7 +4348,7 @@ class LocalHarnessEngine @Inject constructor(
                         val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
                         val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
                             ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-                        jobs.resumePersistent(snapshot.id) { _, report ->
+                        jobs.resumePersistent(snapshot.id, sessionId) { _, report ->
                             report("正在恢复网页抓取：$url")
                             webTools.fetch(
                                 url,
@@ -4366,7 +4366,7 @@ class LocalHarnessEngine @Inject constructor(
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
                         val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
-                        jobs.resumePersistent(snapshot.id) { jobId, _ ->
+                        jobs.resumePersistent(snapshot.id, sessionId) { jobId, _ ->
                             val result = boundSubagents.runResult(
                                 task = task,
                                 inheritHistory = false,
