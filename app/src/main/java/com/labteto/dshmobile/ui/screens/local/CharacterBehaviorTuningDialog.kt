@@ -258,14 +258,20 @@ internal fun CharacterBehaviorTuningDialog(
                     EvolutionMetric(
                         label = stringResource(R.string.local_character_tuning_growth_initiative),
                         value = evolution.initiativeBaseline,
+                        low = stringResource(R.string.local_character_tuning_initiative_low),
+                        high = stringResource(R.string.local_character_tuning_initiative_high),
                     )
                     EvolutionMetric(
                         label = stringResource(R.string.local_character_tuning_growth_openness),
                         value = evolution.opennessBaseline,
+                        low = stringResource(R.string.local_character_tuning_openness_low),
+                        high = stringResource(R.string.local_character_tuning_openness_high),
                     )
                     EvolutionMetric(
                         label = stringResource(R.string.local_character_tuning_growth_security),
                         value = evolution.securityBaseline,
+                        low = stringResource(R.string.local_character_tuning_security_low),
+                        high = stringResource(R.string.local_character_tuning_security_high),
                     )
                 }
             }
@@ -465,7 +471,7 @@ private fun ReadOnlyStateRow(label: String, value: String) {
 }
 
 @Composable
-private fun EvolutionMetric(label: String, value: Int) {
+private fun EvolutionMetric(label: String, value: Int, low: String, high: String) {
     val colors = DsTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -483,7 +489,7 @@ private fun EvolutionMetric(label: String, value: Int) {
             color = colors.characterAccentTertiary,
         ) {
             Text(
-                evolutionLabel(value),
+                evolutionLabel(value, low, high),
                 style = DsType.caption11,
                 color = colors.characterAccent,
                 modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = 3.dp),
@@ -492,10 +498,11 @@ private fun EvolutionMetric(label: String, value: Int) {
     }
 }
 
-private fun evolutionLabel(value: Int): String = when {
-    value <= 35 -> "↓"
-    value >= 65 -> "↑"
-    else -> "→"
+@Composable
+private fun evolutionLabel(value: Int, low: String, high: String): String = when {
+    value <= 35 -> low
+    value >= 65 -> high
+    else -> stringResource(R.string.local_character_tuning_balanced)
 }
 
 private fun sameTuningShape(left: CharacterBehaviorTuning, right: CharacterBehaviorTuning): Boolean =
