@@ -81,7 +81,7 @@ class ComposerRegressionTest {
         compose.onNodeWithContentDescription(send).assertExists()
     }
 
-    @Test fun focusKeepsComposerAtTheSameCompactHeight() {
+    @Test fun focusExpandsComposerToSecondaryRow() {
         var text by mutableStateOf("")
         compose.setContent {
             DshTheme {
@@ -112,7 +112,7 @@ class ComposerRegressionTest {
         compose.waitForIdle()
         val after = composer.fetchSemanticsNode().boundsInRoot.height
 
-        assertEquals(before, after, 0.5f)
+        assertTrue("聚焦后聊天框应展开到第二行", after > before)
     }
 
     @Test fun rejectedSendRestoresOriginWithoutDroppingNewAttachments() {
