@@ -44,4 +44,16 @@ class CapabilityRegistry {
 
     fun <T : Any> require(id: String, type: KClass<T>): T =
         get(id, type) ?: error("能力不存在或类型不匹配：$id")
+
+    @Synchronized
+    internal fun snapshot(): List<Pair<CapabilityDescriptor, Any>> =
+        entries.values.map { it.descriptor to it.value }
+
+    @Synchronized
+    internal fun restore(snapshot: List<Pair<CapabilityDescriptor, Any>>) {
+        entries.clear()
+        snapshot.forEach { (descriptor, value) ->
+            entries[descriptor.id] = Entry(descriptor, value)
+        }
+    }
 }
