@@ -93,6 +93,7 @@ internal fun LocalModeDrawer(
     sessionTitleOverrides: Map<String, String>,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
+    onClose: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
@@ -161,6 +162,12 @@ internal fun LocalModeDrawer(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
+                        tint = colors.labelPrimary,
+                    )
+                    DsIconButton(
+                        icon = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        onClick = onClose,
                         tint = colors.labelPrimary,
                     )
                     DsIconButton(
