@@ -21,6 +21,7 @@ data class JobSnapshot(
     val label: String,
     val status: String,
     val output: String = "",
+    val ownerId: String? = null,
     val resumeKind: String? = null,
     val resumePayload: String? = null,
     val startedAt: Long = 0L,
@@ -54,6 +55,7 @@ class HarnessJobManager(
         var output: String = "",
         var job: Job? = null,
         val inbox: MutableList<String> = mutableListOf(),
+        val ownerId: String? = null,
         val resumeKind: String? = null,
         val resumePayload: String? = null,
         val startedAt: Long = System.currentTimeMillis(),
@@ -72,6 +74,7 @@ class HarnessJobManager(
                     id = snapshot.id,
                     label = snapshot.label.take(MAX_LABEL),
                     status = if (interrupted) "interrupted" else snapshot.status,
+                    ownerId = snapshot.ownerId,
                     output = if (interrupted) {
                         snapshot.output.takeLast(MAX_OUTPUT).let { previous ->
                             val detail = if (snapshot.resumeKind.isNullOrBlank()) {
@@ -97,9 +100,11 @@ class HarnessJobManager(
     fun start(
         label: String,
         expectedDurationMillis: Long? = null,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String = startInternal(
         label = label,
+        ownerId = ownerId,
         resumeKind = null,
         resumePayload = null,
         expectedDurationMillis = expectedDurationMillis,
@@ -110,11 +115,13 @@ class HarnessJobManager(
         label: String,
         resumeKind: String,
         resumePayload: String,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         require(resumeKind.isNotBlank()) { "持久任务恢复类型不能为空" }
         return startInternal(
             label = label,
+            ownerId = ownerId,
             resumeKind = resumeKind.take(MAX_RESUME_KIND),
             resumePayload = resumePayload.take(MAX_RESUME_PAYLOAD),
             expectedDurationMillis = null,
@@ -185,6 +192,7 @@ class HarnessJobManager(
 
     private fun startInternal(
         label: String,
+        ownerId: String?,
         resumeKind: String?,
         resumePayload: String?,
         expectedDurationMillis: Long? = null,
@@ -205,6 +213,7 @@ class HarnessJobManager(
             Record(
                 id = id,
                 label = label.take(MAX_LABEL),
+                ownerId = ownerId?.take(MAX_OWNER_ID),
                 resumeKind = resumeKind,
                 resumePayload = resumePayload,
                 startedAt = startedAt,
@@ -367,6 +376,14 @@ class HarnessJobManager(
         publish()
     }
 
+    suspend fun stopOwnedAndJoin(ownerIds: Set<String>) {
+        if (ownerIds.isEmpty()) return
+        val jobs = markRunningJobsCancelled { it.ownerId != null && it.ownerId in ownerIds }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
     private fun markRunningJobsCancelled(predicate: (Record) -> Boolean = { true }): List<Job> = synchronized(lock) {
         records.values.filter { it.status == "running" && predicate(it) }.onEach {
             it.status = "cancelled"
@@ -411,6 +428,7 @@ class HarnessJobManager(
         label = record.label,
         status = record.status,
         output = record.output,
+        ownerId = record.ownerId,
         resumeKind = record.resumeKind,
         resumePayload = record.resumePayload,
         startedAt = record.startedAt,
@@ -460,6 +478,7 @@ class HarnessJobManager(
     private companion object {
         const val AGENT_PREFIX = "子代理："
         const val MAX_LABEL = 160
+        const val MAX_OWNER_ID = 160
         const val MAX_OUTPUT = 65_536
         const val MAX_INBOX_MESSAGE = 4_000
         const val MAX_INBOX_MESSAGES = 32
