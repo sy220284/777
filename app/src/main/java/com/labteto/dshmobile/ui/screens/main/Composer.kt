@@ -197,6 +197,7 @@ internal fun Composer(
             DsPopupMenu(
                 expanded = composerMenuOpen,
                 onDismiss = { composerMenuOpen = false },
+                focusable = false,
                 items = listOf(
                     MenuItem(
                         text = stringResource(R.string.chat_composer_attach_file),
