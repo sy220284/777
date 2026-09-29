@@ -405,4 +405,70 @@ class CoreArchitectureTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun failedPluginInstallRollsBackPartialRegistrations() = runTest {
+        val registry = PluginRegistry()
+        val plugin = object : HarnessPlugin {
+            override val id = "broken-install"
+
+            override suspend fun install(context: HarnessContext) {
+                context.tools.register(
+                    HarnessTool(
+                        name = "half-tool",
+                        schema = buildJsonObject { put("name", "half-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                    ),
+                )
+                context.capabilities.register(CapabilityDescriptor("half-capability"), "value")
+                context.events.register("half-event", Any())
+                error("install failed after partial registration")
+            }
+        }
+
+        val failure = runCatching { registry.install(plugin) }
+
+        assertTrue(failure.isFailure)
+        assertFalse(registry.isInstalled(plugin.id))
+        assertEquals(null, registry.context.tools.get("half-tool"))
+        assertEquals(null, registry.context.capabilities.descriptor("half-capability"))
+        assertEquals(null, registry.context.events.get("half-event"))
+    }
+
+    @Test
+    fun failedPluginUninstallRestoresPreviousRegistrationsAndInstalledState() = runTest {
+        val registry = PluginRegistry()
+        val plugin = object : HarnessPlugin {
+            override val id = "broken-uninstall"
+
+            override suspend fun install(context: HarnessContext) {
+                context.tools.register(
+                    HarnessTool(
+                        name = "stable-tool",
+                        schema = buildJsonObject { put("name", "stable-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                    ),
+                )
+                context.capabilities.register(CapabilityDescriptor("stable-capability"), "value")
+            }
+
+            override suspend fun uninstall(context: HarnessContext) {
+                context.tools.unregister("stable-tool")
+                context.capabilities.unregister("stable-capability")
+                error("uninstall failed after partial cleanup")
+            }
+        }
+
+        registry.install(plugin)
+        val failure = runCatching { registry.uninstall(plugin.id) }
+
+        assertTrue(failure.isFailure)
+        assertTrue(registry.isInstalled(plugin.id))
+        assertNotNull(registry.context.tools.get("stable-tool"))
+        assertEquals(
+            "value",
+            registry.context.capabilities.get("stable-capability", String::class),
+        )
+    }
+
 }
