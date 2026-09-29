@@ -1209,8 +1209,7 @@ private fun LocalConversationSurface(
         val composerExpanded =
             composerFocused || input.contains('\n') || attachments.isNotEmpty()
         val composerCanSend =
-            state.configured &&
-                !state.loading &&
+            !state.loading &&
                 groupChatReady &&
                 (input.isNotBlank() || attachments.isNotEmpty())
         val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
