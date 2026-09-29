@@ -52,6 +52,9 @@ data class PersonaProfile(
     }
 }
 
+internal fun PersonaProfile.isUnboundChatPersona(): Boolean =
+    copy(updatedAt = 0L) == PersonaProfile()
+
 @Serializable
 private data class PersonaDocument(
     val version: Int = 1,

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -67,9 +68,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 fun DsDialog(
     title: String?,
     onDismiss: () -> Unit,
+    dismissOnScrimTap: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
+    val scrimInteraction = remember { MutableInteractionSource() }
+    val surfaceInteraction = remember { MutableInteractionSource() }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -81,6 +85,17 @@ fun DsDialog(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
+                .then(
+                    if (dismissOnScrimTap) {
+                        Modifier.clickable(
+                            interactionSource = scrimInteraction,
+                            indication = null,
+                            onClick = onDismiss,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 .safeDrawingPadding()
                 .imePadding()
                 .padding(
@@ -93,7 +108,18 @@ fun DsDialog(
                 modifier = Modifier
                     .widthIn(max = 520.dp)
                     .fillMaxWidth()
-                    .heightIn(max = maxHeight),
+                    .heightIn(max = maxHeight)
+                    .then(
+                        if (dismissOnScrimTap) {
+                            Modifier.clickable(
+                                interactionSource = surfaceInteraction,
+                                indication = null,
+                                onClick = {},
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL1),

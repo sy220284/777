@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.data
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,4 +49,43 @@ class RequestSettlementTest {
         // no way to retry — the failure the user can see is the one they can act on.
         assertFalse(settlesRequest(QuestionOutcome.Unsent))
     }
+
+    @Test
+    fun `approval response cannot target another session`() {
+        assertTrue(approvalResponseMatchesSession("session-a", "session-a"))
+        assertFalse(approvalResponseMatchesSession("session-a", "session-b"))
+    }
+
+
+    @Test
+    fun `pending interaction projection follows the open session only`() {
+        val approvals = listOf(
+            PendingApproval("session-a", "approval-a", "approval-a", "write", null),
+            PendingApproval("session-b", "approval-b", "approval-b", "bash", null),
+        )
+        val questions = listOf(
+            PendingQuestions("session-a", "question-a", emptyList()),
+            PendingQuestions("session-b", "question-b", emptyList()),
+        )
+
+        assertEquals(
+            "approval-a",
+            pendingApprovalForSession("session-a", approvals)?.approvalId,
+        )
+        assertEquals(
+            "approval-b",
+            pendingApprovalForSession("session-b", approvals)?.approvalId,
+        )
+        assertEquals(
+            "question-a",
+            pendingQuestionsForSession("session-a", questions)?.rpcId,
+        )
+        assertEquals(
+            "question-b",
+            pendingQuestionsForSession("session-b", questions)?.rpcId,
+        )
+        assertNull(pendingApprovalForSession("missing", approvals))
+        assertNull(pendingQuestionsForSession(null, questions))
+    }
+
 }

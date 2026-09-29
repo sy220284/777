@@ -360,10 +360,6 @@ class LocalWorkspace(
         return "成果已确认：$relativePath（${file.length()} 字节）"
     }
 
-    /** Whether a write to [relativePath] may skip the approval prompt under the current boundary. */
-    fun canAutoApproveWrite(relativePath: String): Boolean =
-        runCatching { boundary.canAutoApprove(resolve(relativePath)) }.getOrDefault(false)
-
     private fun fingerprint(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->

@@ -205,6 +205,18 @@ internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): Cha
     ).normalized()
 }
 
+internal fun ChatCharacterState.withoutLegacyConversationContext(): ChatCharacterState =
+    copy(
+        scene = ChatSceneState(),
+        continuity = ChatContinuityState(),
+    )
+
+internal fun ChatCharacterState.withLegacyConversationContext(context: ChatContextState): ChatCharacterState =
+    copy(
+        scene = context.scene,
+        continuity = context.continuity,
+    )
+
 internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState): ChatCharacterState =
     copy(
         scene = context.scene.copy(

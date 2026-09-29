@@ -175,24 +175,6 @@ internal fun buildDurableChatModelHistory(
     }
 }
 
-internal fun buildChatModelHistory(
-    messages: List<LocalHarnessMessage>,
-    systemPrompt: String,
-): List<JsonObject> = buildList {
-    add(buildJsonObject {
-        put("role", "system")
-        put("content", systemPrompt)
-    })
-    messages.forEach { message ->
-        if (message.role == "user" || message.role == "assistant") {
-            add(buildJsonObject {
-                put("role", message.role)
-                put("content", message.content)
-            })
-        }
-    }
-}
-
 internal fun persistRewrittenChatTranscript(
     eventLog: LocalSessionEventLog,
     reason: String,

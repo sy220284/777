@@ -442,6 +442,7 @@ internal class LocalSubagentRunner(
                 maxSteps = stepLimit,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+                    if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
                     val next = nextAdaptiveAgentStepLimit(
                         currentLimit = currentLimit,
                         configuredBase = maxSteps,
@@ -451,17 +452,18 @@ internal class LocalSubagentRunner(
                         pressure = resourceScheduler.snapshot().pressure,
                         kind = runKind,
                     )
-                    if (next != null && next > currentLimit) {
+                    val boundedNext = next?.coerceAtMost(MAX_DYNAMIC_STEPS)
+                    if (boundedNext != null && boundedNext > currentLimit) {
                         eventLog().append("subagent/budget-extended", buildJsonObject {
                             put("agent_id", subagentId)
                             put("steps_used", stepsUsed)
                             put("previous_limit", currentLimit)
-                            put("next_limit", next)
+                            put("next_limit", boundedNext)
                             put("context_chars", history.sumOf { it.toString().length })
                             put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
                         })
                     }
-                    next
+                    boundedNext
                 },
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
@@ -678,6 +680,7 @@ internal class LocalSubagentRunner(
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
         const val SUBAGENT_PROGRESS_ITEMS = 6
+        const val MAX_DYNAMIC_STEPS = 512
         const val SUBAGENT_EVENT_CHARS = 65_536
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",

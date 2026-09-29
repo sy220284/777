@@ -136,6 +136,10 @@
     <string name="goal_max_rounds">最大轮数：%1$s</string>
     <string name="plan_mode_on">计划模式：开</string>
     <string name="plan_mode_off">计划模式：关</string>
+    <string name="local_plan_review_copy">复制方案</string>
+    <string name="local_plan_review_regenerate">重新生成方案</string>
+    <string name="local_plan_review_confirm">确认方案并执行</string>
+    <string name="local_plan_review_decline">拒绝方案</string>
     <string name="plan_review_title">计划已准备好供审阅</string>
     <string name="plan_review_approve">批准</string>
     <string name="plan_review_decline">拒绝</string>
@@ -719,10 +723,12 @@
     <string name="local_new_session_dialog_intro">选择新对话可以使用哪些已有上下文。长期规则始终保留，其他内容按作用域隔离。</string>
     <string name="local_new_session_continue">继续当前任务</string>
     <string name="local_new_session_continue_hint">继承当前项目、对话链记忆和精简交接摘要，不复制整段旧聊天。</string>
-    <string name="local_new_session_project">同项目新对话</string>
-    <string name="local_new_session_project_hint">保留全局和当前项目记忆，不带上一条对话的临时任务状态。</string>
+    <string name="local_new_session_chat_intro">继续当前人物对话，或开始一段未选择角色的空白对话。</string>
+    <string name="local_new_session_chat_continue">继续当前对话</string>
+    <string name="local_new_session_chat_continue_hint">继承当前人物对话和记忆，并保留人物状态；不复制整段旧聊天。</string>
     <string name="local_new_session_independent">独立新对话</string>
     <string name="local_new_session_independent_hint">只使用全局规则和全局长期记忆。</string>
+    <string name="local_new_session_chat_independent_hint">进入未选择角色的空白对话，不继承当前人物对话和状态；之后可选择角色，也可不选择任何角色。</string>
     <string name="settings_runtime_network_diagnostic_title">网络诊断</string>
     <string name="settings_runtime_network_diagnostic_intro">检查实际解析地址、系统代理、VPN/TUN、安全策略，并发起受限 HTTP/TLS 探测验证真实连通性。</string>
     <string name="settings_runtime_network_target_label">网址或域名</string>
@@ -1129,6 +1135,8 @@
     <string name="local_chat_thinking_collapse">收起思考摘要</string>
     <string name="local_work_composer_hint">问点什么，或直接交给 Harness 执行…</string>
     <string name="local_group_chat_composer_hint">和大家说点什么…</string>
+    <string name="local_chat_no_persona">未选择角色</string>
+    <string name="local_chat_composer_no_persona_hint">发送消息…</string>
     <string name="local_chat_composer_persona_hint">给 %1$s 发消息…</string>
     <string name="local_plan_button_on">规划中</string>
     <string name="local_plan_button_off">规划</string>

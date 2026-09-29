@@ -86,6 +86,7 @@ import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -407,6 +408,7 @@ fun LocalHarnessScreen(
             )
         } else {
             NewSessionModeDialog(
+                usageMode = shell.usageMode,
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
                     showNewSessionMode = false
@@ -685,6 +687,7 @@ private fun LocalConversationSurface(
     var transcriptWindowSize by rememberSaveable(state.sessionId) {
         mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
     }
+    var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
     var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
         mutableStateOf(state.messages.size)
     }
@@ -830,14 +833,22 @@ private fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             if (state.usageMode == LocalUsageMode.CHAT) {
-                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                val hasSelectedPersona = !state.chatPersona.isUnboundChatPersona()
+                val personaDisplayName = if (hasSelectedPersona) {
+                    state.chatPersona.name
+                } else {
+                    stringResource(R.string.local_chat_no_persona)
+                }
+                val relationship = state.chatState.relationshipState.takeIf {
+                    hasSelectedPersona && it.isNotBlank()
+                }
                 val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
                 val contextSource = when (state.conversationMode) {
                     LocalConversationMode.INDEPENDENT -> null
                     else -> localConversationModeLabel(state.conversationMode)
                 }
                 ChatSurfaceHeader(
-                    personaName = state.chatPersona.name,
+                    personaName = personaDisplayName,
                     portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
                     secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
                     groupEnabled = state.groupChat.enabled,
@@ -1065,6 +1076,41 @@ private fun LocalConversationSurface(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                    }
+                }
+                val planReview = state.pendingQuestion
+                    ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+                    ?.let(::localPlanReviewOf)
+                planReview?.let { review ->
+                    item(key = "pending-plan-review") {
+                        LocalPlanReviewCard(
+                            review = review,
+                            busy = planReviewBusy,
+                            onApprove = {
+                                if (!planReviewBusy) {
+                                    planReviewBusy = true
+                                    onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), review.approve)
+                                }
+                            },
+                            onDecline = {
+                                review.decline?.let { decline ->
+                                    if (!planReviewBusy) {
+                                        planReviewBusy = true
+                                        onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), decline)
+                                    }
+                                }
+                            },
+                            onRegenerate = {
+                                val prompt = state.messages.lastOrNull { it.role == "user" }?.content
+                                    ?.takeIf(String::isNotBlank)
+                                val callId = state.pendingQuestion?.callId
+                                if (!planReviewBusy && prompt != null && callId != null) {
+                                    planReviewBusy = true
+                                    onCancelQuestion(callId)
+                                    onSend(prompt, emptyList())
+                                }
+                            },
+                        )
                     }
                 }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
@@ -1357,6 +1403,8 @@ private fun LocalConversationSurface(
                             stringResource(R.string.local_work_composer_hint)
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
+                        state.chatPersona.isUnboundChatPersona() ->
+                            stringResource(R.string.local_chat_composer_no_persona_hint)
                         else ->
                             stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
                     },
@@ -1424,6 +1472,7 @@ private fun LocalConversationSurface(
     }
     state.pendingQuestion
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.takeUnless { localPlanReviewOf(it) != null }
         ?.let { question ->
         QuestionDialog(
             question = question.question,

@@ -14,6 +14,7 @@ import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
+import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceLease
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -27,7 +28,7 @@ class AndroidDeviceProvider(
     private val context: Context,
     private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
     private val resourceScheduler: HarnessResourceScheduler? = null,
-) : HarnessDeviceProvider {
+) : HarnessDeviceProvider, HarnessVirtualDisplayProvider {
     private val virtualDisplayLeases = ConcurrentHashMap<String, HarnessResourceLease>()
 
     override val capabilities: Set<String> = setOf(
@@ -176,7 +177,7 @@ class AndroidDeviceProvider(
             else -> error("设备能力不存在：$capability")
         }
 
-    suspend fun acquireAgentVirtualDisplay(owner: String): String {
+    override suspend fun acquireAgentVirtualDisplay(owner: String): String {
         val lease = resourceScheduler?.acquire(
             HarnessResourceKind.VIRTUAL_DISPLAY,
             owner = "agent:" + owner.take(80),
@@ -191,9 +192,18 @@ class AndroidDeviceProvider(
         }
     }
 
-    fun releaseAgentVirtualDisplay(id: String) {
+    override fun releaseAgentVirtualDisplay(id: String) {
         runCatching { virtualDisplays.close(id) }
         virtualDisplayLeases.remove(id)?.close()
+    }
+
+    override fun close() {
+        try {
+            virtualDisplays.closeAll()
+        } finally {
+            virtualDisplayLeases.values.forEach { lease -> runCatching { lease.close() } }
+            virtualDisplayLeases.clear()
+        }
     }
 
     private fun deviceInfo(): String = buildString {

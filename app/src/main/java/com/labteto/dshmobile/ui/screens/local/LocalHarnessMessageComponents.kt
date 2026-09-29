@@ -319,7 +319,7 @@ private fun MessageVariantControls(
 }
 
 @Composable
-private fun CompactMessageAction(
+internal fun CompactMessageAction(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,

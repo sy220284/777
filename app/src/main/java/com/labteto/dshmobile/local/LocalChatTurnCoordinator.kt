@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
@@ -10,6 +9,7 @@ import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 
 internal data class LocalPreparedChatTurn(
     val context: ChatTurnContext,
@@ -26,19 +26,27 @@ internal class LocalChatTurnCoordinator(
         relationshipMemory: String = "",
     ): LocalPreparedChatTurn {
         val sharedContext = if (snapshot.groupChat.enabled) {
-            snapshot.groupChat.context.withLegacyFallback(
-                snapshot.groupChat.members.firstOrNull()?.chatState ?: snapshot.chatState,
+            snapshot.groupChat.context
+        } else {
+            snapshot.chatContext
+        }
+        val context = if (snapshot.chatPersona.isUnboundChatPersona()) {
+            runner.prepareProfile(
+                persona = snapshot.chatPersona,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
             )
         } else {
-            snapshot.chatContext.withLegacyFallback(snapshot.chatState)
+            runner.prepare(
+                personaId = snapshot.personaId,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
+            )
         }
-        val context = runner.prepare(
-            personaId = snapshot.personaId,
-            state = snapshot.chatState,
-            context = sharedContext,
-            userInput = input,
-            storyContext = snapshot.handoffSummary,
-        )
         val recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
             groupEnabled = snapshot.groupChat.enabled,

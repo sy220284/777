@@ -109,4 +109,44 @@ class LocalInteractionCoordinatorTest {
         assertEquals(LOCAL_QUESTION_CANCELLED_RESPONSE, question.await())
         assertNull(state.value.pendingQuestion)
     }
+
+    @Test
+    fun staleApprovalFromCancelledGenerationCannotResolveReplacementApproval() = runTest {
+        val state = MutableStateFlow(LocalHarnessState())
+        val coordinator = LocalInteractionCoordinator(state)
+        val old = async {
+            coordinator.awaitApproval(
+                LocalApproval(
+                    callId = "old",
+                    toolName = "write",
+                    summary = "old",
+                    arguments = "{}",
+                    access = "workspace_write",
+                ),
+            )
+        }
+        runCurrent()
+        coordinator.cancelAll()
+        assertFalse(old.await())
+
+        val replacement = async {
+            coordinator.awaitApproval(
+                LocalApproval(
+                    callId = "replacement",
+                    toolName = "write",
+                    summary = "replacement",
+                    arguments = "{}",
+                    access = "workspace_write",
+                ),
+            )
+        }
+        runCurrent()
+
+        assertEquals("replacement", state.value.pendingApproval?.callId)
+        assertFalse(coordinator.answerApproval("old", true))
+        assertTrue(coordinator.answerApproval("replacement", true))
+        assertTrue(replacement.await())
+        assertNull(state.value.pendingApproval)
+    }
+
 }

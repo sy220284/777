@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -73,8 +74,7 @@ internal class LocalAutomationChatCoordinator(
         }
         require(state.value.configured) { "本机 Harness 尚未配置模型" }
 
-        val initialSession = sessionCoordinator.read(targetSessionId)
-            ?: error("定时互动绑定的聊天已不存在")
+        val initialSession = sessionCoordinator.read(targetSessionId) ?: error("定时互动绑定的聊天已不存在")
         require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
 
@@ -167,7 +167,8 @@ internal class LocalAutomationChatCoordinator(
                     ?: error("定时互动绑定的聊天已不存在")
                 require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
                 require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
-
+                val sessionContext = session.chatContext.withLegacyFallback(session.chatState)
+                val sessionCharacterState = session.chatState.withoutLegacyConversationContext()
                 val runtime = state.value
                 val persona = chatPersonaStore.get(session.personaId)
                 val boundEventLog = eventLogFor(session.id)
@@ -251,7 +252,8 @@ internal class LocalAutomationChatCoordinator(
                     galleryStoryId = session.galleryStoryId,
                     gallerySaveSuppressedThrough = session.gallerySaveSuppressedThrough,
                     chatPersona = persona,
-                    chatState = session.chatState,
+                    chatState = sessionCharacterState,
+                    chatContext = sessionContext,
                     replySuggestions = session.replySuggestions,
                     chatBranches = session.chatBranches,
                     groupChat = session.groupChat,
@@ -271,8 +273,8 @@ internal class LocalAutomationChatCoordinator(
                 )
                 val chatContext = chatTurnCoordinator.prepareProfile(
                     persona = persona,
-                    state = session.chatState,
-                    context = session.chatContext.withLegacyFallback(session.chatState),
+                    state = sessionCharacterState,
+                    context = sessionContext,
                     userInput = conversationFocus,
                     storyContext = session.handoffSummary,
                 )
@@ -379,9 +381,7 @@ internal class LocalAutomationChatCoordinator(
                     require(content.isNotEmpty()) { "角色主动消息去重重写后为空" }
                 }
 
-                val proactiveScene = session.chatContext
-                    .withLegacyFallback(session.chatState)
-                    .scene
+                val proactiveScene = sessionContext.scene
                 reply = chatReplyCoordinator.guardProactive(
                     snapshot = boundState,
                     persona = persona,
@@ -428,11 +428,12 @@ internal class LocalAutomationChatCoordinator(
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
                     val latest = sessionCoordinator.read(session.id) ?: session
+                    val latestContext = latest.chatContext.withLegacyFallback(latest.chatState)
                     val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
-                        previous = latest.chatState,
+                        previous = latest.chatState.withoutLegacyConversationContext(),
                         userMessage = "",
                         assistantMessage = content,
-                    )
+                    ).withoutLegacyConversationContext()
                     val latestIndex = localTranscriptIndexForSession(latest)
                     val nextTranscriptIndex = appendLocalTranscriptRuntimeIndex(
                         latestIndex,
@@ -441,8 +442,7 @@ internal class LocalAutomationChatCoordinator(
                     val latestWindow = latest.transcriptWindow.ifEmpty {
                         latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
                     }
-                    val baseContext = latest.chatContext
-                        .withLegacyFallback(nextChatState)
+                    val baseContext = latestContext
                         .applySceneTurn(
                             userMessage = "",
                             assistantMessage = content,

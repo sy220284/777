@@ -140,4 +140,48 @@ class HarnessResourceSchedulerTest {
         assertTrue(scheduler.snapshot().leases.isEmpty())
     }
 
+
+    @Test
+    fun cancellationStormAcrossAllResourceKindsLeavesNoLeasesOrCounters() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(
+                maxModelRequests = 1,
+                maxAgents = 1,
+                maxTerminals = 1,
+                maxVirtualDisplays = 1,
+                maxLanguageServers = 1,
+            ),
+        )
+        val kinds = HarnessResourceKind.values().toList()
+        val held = kinds.associateWith { kind ->
+            scheduler.acquire(kind, "holder-${kind.name.lowercase()}")
+        }
+        val entered = mutableSetOf<String>()
+
+        val waiters = (0 until 50).map { index ->
+            val kind = kinds[index % kinds.size]
+            launch {
+                scheduler.withResource(kind, "waiter-$index") {
+                    entered += "${kind.name}:$index"
+                }
+            }
+        }
+        runCurrent()
+
+        waiters.filterIndexed { index, _ -> index % 2 == 0 }.forEach { it.cancel() }
+        waiters.filterIndexed { index, _ -> index % 2 == 0 }.forEach { it.cancelAndJoin() }
+        held.values.forEach { it.close() }
+        waiters.filterIndexed { index, _ -> index % 2 == 1 }.forEach { it.join() }
+
+        val snapshot = scheduler.snapshot()
+        assertEquals(25, entered.size)
+        assertEquals(0, snapshot.activeModelRequests)
+        assertEquals(0, snapshot.activeAgents)
+        assertEquals(0, snapshot.activeTerminals)
+        assertEquals(0, snapshot.activeVirtualDisplays)
+        assertEquals(0, snapshot.activeLanguageServers)
+        assertTrue(snapshot.leases.isEmpty())
+        assertEquals(HarnessResourcePressure.LOW, snapshot.pressure)
+    }
+
 }

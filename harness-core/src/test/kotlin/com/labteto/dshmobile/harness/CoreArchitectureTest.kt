@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.capability.CapabilityDescriptor
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.jobs.HarnessJobManager
+import com.labteto.dshmobile.harness.plugin.PluginLifecycleState
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.SessionDocument
@@ -140,6 +141,110 @@ class CoreArchitectureTest {
         assertTrue(uninstalling.await())
         assertTrue(cleaned)
         assertFalse(registry.isInstalled(plugin.id))
+    }
+
+    @Test
+    fun failedPluginInstallRollsBackAllRegistriesAndRecordsFailure() = runTest {
+        val registry = PluginRegistry()
+        val plugin = object : HarnessPlugin {
+            override val id = "broken-install"
+
+            override suspend fun install(context: HarnessContext) {
+                context.capabilities.register(CapabilityDescriptor("partial-capability"), "partial")
+                context.events.register("partial-event", "partial")
+                context.tools.register(
+                    HarnessTool(
+                        name = "partial-tool",
+                        schema = buildJsonObject { put("name", "partial-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("partial") },
+                    ),
+                )
+                error("install exploded")
+            }
+        }
+
+        val result = runCatching { registry.install(plugin) }
+
+        assertTrue(result.isFailure)
+        assertFalse(registry.isInstalled(plugin.id))
+        assertEquals(null, registry.context.tools.get("partial-tool"))
+        assertEquals(null, registry.context.capabilities.get("partial-capability", String::class))
+        assertTrue(registry.context.events.ids().isEmpty())
+        assertEquals(
+            PluginLifecycleState.FAILED,
+            registry.lifecycleSnapshot(plugin.id)?.state,
+        )
+    }
+
+    @Test
+    fun batchInstallRollsBackEarlierPluginsWhenLaterPluginFails() = runTest {
+        val registry = PluginRegistry()
+        val first = object : HarnessPlugin {
+            override val id = "first"
+            override suspend fun install(context: HarnessContext) {
+                context.tools.register(
+                    HarnessTool(
+                        name = "first-tool",
+                        schema = buildJsonObject { put("name", "first-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("first") },
+                    ),
+                )
+            }
+
+            override suspend fun uninstall(context: HarnessContext) {
+                context.tools.unregister("first-tool")
+            }
+        }
+        val second = object : HarnessPlugin {
+            override val id = "second"
+            override suspend fun install(context: HarnessContext) {
+                context.tools.register(
+                    HarnessTool(
+                        name = "second-tool",
+                        schema = buildJsonObject { put("name", "second-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("second") },
+                    ),
+                )
+                error("second failed")
+            }
+        }
+
+        val result = runCatching { registry.installAll(listOf(first, second)) }
+
+        assertTrue(result.isFailure)
+        assertTrue(registry.ids().isEmpty())
+        assertTrue(registry.context.tools.names().isEmpty())
+        assertEquals(PluginLifecycleState.FAILED, registry.lifecycleSnapshot("second")?.state)
+    }
+
+    @Test
+    fun failedPluginUninstallRestoresRegistrySurfaceAndKeepsPluginVisible() = runTest {
+        val registry = PluginRegistry()
+        val plugin = object : HarnessPlugin {
+            override val id = "fragile-uninstall"
+            override suspend fun install(context: HarnessContext) {
+                context.tools.register(
+                    HarnessTool(
+                        name = "stable-tool",
+                        schema = buildJsonObject { put("name", "stable-tool") },
+                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                    ),
+                )
+            }
+
+            override suspend fun uninstall(context: HarnessContext) {
+                context.tools.unregister("stable-tool")
+                error("cleanup failed")
+            }
+        }
+        registry.install(plugin)
+
+        val result = runCatching { registry.uninstall(plugin.id) }
+
+        assertTrue(result.isFailure)
+        assertTrue(registry.isInstalled(plugin.id))
+        assertNotNull(registry.context.tools.get("stable-tool"))
+        assertEquals(PluginLifecycleState.FAILED, registry.lifecycleSnapshot(plugin.id)?.state)
     }
 
     @Test
