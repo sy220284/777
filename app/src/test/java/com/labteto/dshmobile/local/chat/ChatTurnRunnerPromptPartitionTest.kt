@@ -73,6 +73,8 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.dynamicPrompt.contains("【角色表达解释】"))
         assertTrue(context.dynamicPrompt.contains("不得仅凭单个"))
         assertTrue(context.dynamicPrompt.contains("明确边界始终优先"))
+        assertTrue(context.dynamicPrompt.contains("即使只表达一次"))
+        assertTrue(context.dynamicPrompt.contains("无需等待重复确认"))
         assertTrue(context.dynamicPrompt.contains("情绪=不高兴"))
         assertTrue(context.dynamicPrompt.contains("近期印象：还记得刚才的争执"))
         assertTrue(context.dynamicPrompt.contains("【当前场景｜硬连续性】"))
@@ -83,6 +85,27 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.dynamicPrompt.contains("若没有明确移动、时间推进或合理叙事跳切"))
         assertTrue(context.prompt.contains(context.stablePrompt))
         assertTrue(context.prompt.contains(context.dynamicPrompt))
+    }
+
+    @Test
+    fun genericRestraintDoesNotInjectIndirectExpressionPrompt() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "personas-restraint.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val context = runner.prepareProfile(
+            persona = PersonaProfile(
+                name = "阿青",
+                personality = "克制谨慎",
+                speechStyle = "表达含蓄",
+            ),
+            state = ChatCharacterState(),
+            context = ChatContextState(),
+            userInput = "你好",
+        )
+
+        assertFalse(context.dynamicPrompt.contains("【角色表达解释】"))
     }
 
     @Test
