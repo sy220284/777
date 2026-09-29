@@ -30,6 +30,7 @@ CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalC
 CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
 GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
+EXECUTION_SERVICE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalExecutionService.kt"
 CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
 violations: list[str] = []
@@ -79,6 +80,7 @@ chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
 group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
+execution_service = EXECUTION_SERVICE.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
 if "cron: '*/30 * * * *'" not in cleanup_workflow:
@@ -261,20 +263,28 @@ if "const val PROBE_ATTEMPTS = 3" not in web_provider or "const val SAFE_HTTP_RE
 if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_provider:
     violations.append("HTTP tooling must expose safe rate-limit response headers for error classification")
 
-if "cancelWorkRunsAndJoin(requestedIds)" not in lifecycle_coordinator:
-    violations.append("Deleting sessions must cancel and join their session-bound Work runs before files are removed")
+if "cancelWorkRunsAndJoin(ids)" not in lifecycle_coordinator:
+    violations.append("Deleting sessions must cancel and join only the resolved session-bound Work runs")
 if "cancelWorkRunsForDeletedSessions(activeWorkRuns, ids, runStateLock)" not in engine:
     violations.append("LocalHarnessEngine must route session deletion through the bound Work-run cancellation helper")
 if "jobs.stopNonPersistentAndJoin()" in lifecycle_coordinator:
     violations.append("Session lifecycle must not globally cancel unrelated background jobs")
 if "jobs.stopOwnedAndJoin(setOf(sourceId))" not in lifecycle_coordinator:
     violations.append("Creating a session must only stop background jobs owned by the source session")
-if "jobs.stopOwnedAndJoin(requestedIds)" not in lifecycle_coordinator:
-    violations.append("Deleting sessions must only stop background jobs owned by those sessions")
+if "jobs.stopOwnedAndJoin(ids)" not in lifecycle_coordinator:
+    violations.append("Deleting sessions must only stop background jobs owned by the resolved sessions")
+if "if (deletingCurrentSession) cancelActiveRunAndJoin()" not in lifecycle_coordinator:
+    violations.append("Deleting unrelated sessions must not cancel the currently visible run")
 if "LocalShellTool.execute(args, workspace, jobs, boundSessionId)" not in engine:
     violations.append("Background shell jobs must stay bound to the executing session")
 if engine.count("ownerSessionId = sessionId") < 2:
     violations.append("Persistent web/subagent jobs must retain their owning session")
+if "projectJobSnapshotToSessionStates(snapshot, _state, activeWorkRuns)" not in engine:
+    violations.append("Background job state must be projected independently to visible and bound Work sessions")
+if "EXTRA_JOB_SESSION_IDS" not in execution_service:
+    violations.append("Foreground execution service must retain per-job session ownership")
+if ".putStringArrayListExtra(EXTRA_JOB_SESSION_IDS" not in execution_service:
+    violations.append("Foreground execution service must transmit every running job's session owner")
 
 if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
