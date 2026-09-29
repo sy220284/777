@@ -160,8 +160,13 @@ internal fun ChatPersonaPickerDialog(
                 modifier = Modifier.padding(DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
+                val currentName = if (currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
+                    stringResource(R.string.local_chat_no_persona)
+                } else {
+                    currentPersona.name
+                }
                 Text(
-                    stringResource(R.string.local_persona_picker_current, currentPersona.name),
+                    stringResource(R.string.local_persona_picker_current, currentName),
                     style = DsType.base16Strong,
                     color = colors.labelPrimary,
                 )

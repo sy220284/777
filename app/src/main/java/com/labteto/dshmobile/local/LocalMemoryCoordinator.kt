@@ -89,7 +89,11 @@ internal class LocalMemoryCoordinator(
         query: String,
         snapshot: LocalHarnessState,
     ): String {
-        if (!snapshot.autoRecall || !ChatMemorySelector.shouldRecall(query)) return ""
+        if (
+            snapshot.personaId == PersonaProfile.DEFAULT_PERSONA_ID ||
+            !snapshot.autoRecall ||
+            !ChatMemorySelector.shouldRecall(query)
+        ) return ""
         val relationshipKinds = setOf(
             MemoryKind.RELATIONSHIP_FACT,
             MemoryKind.RELATIONSHIP_STATE,

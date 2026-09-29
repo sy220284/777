@@ -1131,6 +1131,8 @@
     <string name="local_chat_thinking_collapse">收起思考摘要</string>
     <string name="local_work_composer_hint">问点什么，或直接交给 Harness 执行…</string>
     <string name="local_group_chat_composer_hint">和大家说点什么…</string>
+    <string name="local_chat_no_persona">未选择角色</string>
+    <string name="local_chat_composer_no_persona_hint">发送消息…</string>
     <string name="local_chat_composer_persona_hint">给 %1$s 发消息…</string>
     <string name="local_plan_button_on">规划中</string>
     <string name="local_plan_button_off">规划</string>

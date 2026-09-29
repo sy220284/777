@@ -830,14 +830,22 @@ private fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             if (state.usageMode == LocalUsageMode.CHAT) {
-                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                val hasSelectedPersona = state.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                val personaDisplayName = if (hasSelectedPersona) {
+                    state.chatPersona.name
+                } else {
+                    stringResource(R.string.local_chat_no_persona)
+                }
+                val relationship = state.chatState.relationshipState.takeIf {
+                    hasSelectedPersona && it.isNotBlank()
+                }
                 val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
                 val contextSource = when (state.conversationMode) {
                     LocalConversationMode.INDEPENDENT -> null
                     else -> localConversationModeLabel(state.conversationMode)
                 }
                 ChatSurfaceHeader(
-                    personaName = state.chatPersona.name,
+                    personaName = personaDisplayName,
                     portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
                     secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
                     groupEnabled = state.groupChat.enabled,
@@ -1355,6 +1363,8 @@ private fun LocalConversationSurface(
                             stringResource(R.string.local_work_composer_hint)
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
+                        state.personaId == PersonaProfile.DEFAULT_PERSONA_ID ->
+                            stringResource(R.string.local_chat_composer_no_persona_hint)
                         else ->
                             stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
                     },

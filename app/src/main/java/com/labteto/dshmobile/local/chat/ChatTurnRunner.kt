@@ -44,6 +44,17 @@ class ChatTurnRunner @Inject constructor(
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext {
+        if (persona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
+            return ChatTurnContext(
+                persona = persona,
+                stablePrompt = UNBOUND_CHAT_PROMPT,
+                dynamicPrompt = listOf(
+                    renderChatContextForModel(context),
+                    renderChatTurnModeForModel(userInput),
+                ).filter(String::isNotBlank).joinToString("\n\n"),
+            )
+        }
+
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val lorePrompt = loreEngine.prompt(persona, userInput)
         val backgroundPrompt = composeRelevantBackgroundPrompt(persona, userInput)
@@ -211,5 +222,8 @@ class ChatTurnRunner @Inject constructor(
 
     private companion object {
         const val MAX_STORY_CONTEXT_CHARS = 2_500
+        const val UNBOUND_CHAT_PROMPT =
+            "【聊天模式】当前未选择人物角色。以通用聊天助手身份自然回应，" +
+                "不虚构固定人物身份、人物关系、背景或世界观。"
     }
 }
