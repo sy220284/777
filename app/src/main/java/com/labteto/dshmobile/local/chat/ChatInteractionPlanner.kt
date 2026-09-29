@@ -831,7 +831,7 @@ class ChatInteractionPlanner @Inject constructor(
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
                 mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->
-                    evidenceGrounded(RelationshipEvidence(moment, "dialogue", 100), userMessage, assistantMessage)
+                    evidenceGrounded(RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"), userMessage, assistantMessage)
                 }, 8, 180)
             } else previous.sharedMoments,
         )
