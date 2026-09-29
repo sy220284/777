@@ -293,7 +293,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun factsHypothesesAndUnknownsStaySeparated() {
+    fun factsAndUnknownsStaySeparatedAndUngroundedHypothesesAreDiscarded() {
         val previous = ChatCharacterState()
         val payload = """
             {
@@ -327,7 +327,7 @@ class ChatInteractionPlannerTest {
 
         assertEquals(1, plan.state.dynamics.facts.size)
         assertEquals("对方明确说周末有空", plan.state.dynamics.facts.single().text)
-        assertEquals(1, plan.state.dynamics.hypotheses.size)
+        assertEquals(0, plan.state.dynamics.hypotheses.size)
         assertEquals(1, plan.state.dynamics.unknowns.size)
     }
 
