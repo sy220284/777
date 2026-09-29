@@ -17,6 +17,7 @@ internal class PendingSessionInteractionStore {
     private val approvalsBySession = LinkedHashMap<String, PendingApproval>()
     private val questionEvents = PendingQuestionRegistry()
     private val questionsBySession = LinkedHashMap<String, PendingQuestions>()
+    private val permissionsBySession = LinkedHashMap<String, String>()
 
     fun installApproval(card: PendingApproval) {
         approvalsByEvent[card.approvalId] = card
@@ -57,11 +58,25 @@ internal class PendingSessionInteractionStore {
         return true
     }
 
+    fun installPermission(sessionId: String, value: String) {
+        permissionsBySession[sessionId] = value
+    }
+
+    fun permissionForSession(sessionId: String?): String? =
+        sessionId?.let(permissionsBySession::get)
+
+    fun forgetPermission(sessionId: String, value: String): Boolean {
+        if (permissionsBySession[sessionId] != value) return false
+        permissionsBySession.remove(sessionId)
+        return true
+    }
+
     fun discardSession(sessionId: String) {
         approvalsByEvent.entries.removeAll { it.value.sessionId == sessionId }
         approvalsBySession.remove(sessionId)
         questionEvents.discard(sessionId)
         questionsBySession.remove(sessionId)
+        permissionsBySession.remove(sessionId)
     }
 
     /** Clears requests bound to a retired connection generation and returns affected sessions. */
@@ -69,11 +84,13 @@ internal class PendingSessionInteractionStore {
         val affected = linkedSetOf<String>().apply {
             approvalsBySession.keys.forEach(::add)
             questionsBySession.keys.forEach(::add)
+            permissionsBySession.keys.forEach(::add)
         }
         approvalsByEvent.clear()
         approvalsBySession.clear()
         questionEvents.clear()
         questionsBySession.clear()
+        permissionsBySession.clear()
         return affected
     }
 }
