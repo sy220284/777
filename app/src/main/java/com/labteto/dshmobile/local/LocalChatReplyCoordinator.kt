@@ -27,9 +27,7 @@ internal class LocalChatReplyCoordinator(
         reply: LocalModelReply,
         userMessage: String,
         step: Int,
-        usageTurnId: String? = null,
-        usageRunId: String? = null,
-        usageTaskLabel: String? = null,
+        usage: ForegroundTokenUsageSeed = ForegroundTokenUsageSeed(),
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
@@ -40,9 +38,9 @@ internal class LocalChatReplyCoordinator(
             } else {
                 TokenUsageAction.WORK_MAIN
             },
-            turnId = usageTurnId,
-            runId = usageRunId,
-            taskLabel = usageTaskLabel ?: userMessage,
+            turnId = usage.turnId,
+            runId = usage.runId,
+            taskLabel = usage.taskLabel ?: userMessage,
             step = step,
         )
         if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
