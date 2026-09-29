@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5303,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5232,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 2011,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 662,
@@ -47,7 +47,7 @@ LINE_BUDGETS = {
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 25
+ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 21
 AGGREGATE_STATE_MAX_FIELDS = 66
 LOCAL_ROOT_MAX_KOTLIN_FILES = 90
 PROJECTION_FIELD_BUDGETS = {
@@ -233,10 +233,24 @@ for path in main_root.rglob("*.kt"):
 view_model_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
 if "LocalHarnessEngine" in strip_comments(read(view_model_path)):
     die("LocalHarnessViewModel must depend on capability runtimes, not LocalHarnessEngine")
-if "pluginRegistry.installAll(" not in engine:
-    die("LocalHarnessEngine must install its startup plugin set atomically")
-if re.search(r"pluginRegistry\.install\(", strip_comments(engine)):
-    die("LocalHarnessEngine must not install startup plugins one-by-one")
+if "pluginComposition.installStartup()" not in engine:
+    die("LocalHarnessEngine must delegate atomic startup plugin installation to its composition root")
+if re.search(r"\bpluginRegistry\b", strip_comments(engine)):
+    die("LocalHarnessEngine must not own PluginRegistry directly")
+if "LocalPluginCompositionFactory" not in engine:
+    die("LocalHarnessEngine must delegate plugin construction to LocalPluginCompositionFactory")
+for forbidden_plugin_type in (
+    "AndroidRuntimePlugin",
+    "McpToolBridgePlugin",
+    "GitHubConnectorPlugin",
+    "LspPlugin",
+    "AndroidDevicePlugin",
+    "LocalVisionPlugin",
+    "AutomationPlugin",
+    "WebhookPlugin",
+):
+    if re.search(r"\b" + forbidden_plugin_type + r"\b", strip_comments(engine)):
+        die(f"LocalHarnessEngine must not construct concrete plugin {forbidden_plugin_type}")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
@@ -262,15 +276,16 @@ if unexpected_ui_consumers:
         + ", ".join(unexpected_ui_consumers)
     )
 
+android_device_provider_allowlist = {
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+}
 for path in local_root.rglob("*.kt"):
     relative = path.relative_to(ROOT).as_posix()
-    if relative == engine_path:
-        continue
     source = strip_comments(path.read_text(encoding="utf-8"))
-    if re.search(r"\bAndroidDeviceProvider\b", source):
+    if relative not in android_device_provider_allowlist and re.search(r"\bAndroidDeviceProvider\b", source):
         die(
             f"{relative} depends on AndroidDeviceProvider directly; "
-            "depend on a harness capability contract instead"
+            "only the plugin composition root may construct platform providers"
         )
 
 subagent_factory_path = "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt"
