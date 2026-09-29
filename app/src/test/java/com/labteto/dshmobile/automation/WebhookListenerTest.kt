@@ -26,17 +26,21 @@ class WebhookListenerTest {
                 listener.restart(InetSocketAddress("127.0.0.1", currentPort))
                 usedPorts += currentPort
 
-                Socket("127.0.0.1", currentPort).use { client ->
-                    client.soTimeout = 3000
-                    assertEquals(42, client.getInputStream().read())
-                }
-
+                // Verify the previous listener is actually released before opening a client
+                // connection to the new listener. An outbound client also consumes an ephemeral
+                // local port; doing that first can legitimately reuse the just-freed old server
+                // port and make this assertion fail even though WebhookListener released it.
                 if (usedPorts.size > 1) {
                     val previousPort = usedPorts[usedPorts.lastIndex - 1]
                     ServerSocket().use { probe ->
                         probe.reuseAddress = true
                         probe.bind(InetSocketAddress("127.0.0.1", previousPort))
                     }
+                }
+
+                Socket("127.0.0.1", currentPort).use { client ->
+                    client.soTimeout = 3000
+                    assertEquals(42, client.getInputStream().read())
                 }
             }
 
