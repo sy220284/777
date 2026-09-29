@@ -104,6 +104,34 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun scopedJobApisCannotSeeOrControlAnotherSession() = runTest {
+        val otherGate = CompletableDeferred<Unit>()
+        val manager = LocalJobManager(this) { }
+
+        val first = manager.start("first", ownerSessionId = "session-a") { _, _ ->
+            awaitCancellation()
+        }
+        val second = manager.start("second", ownerSessionId = "session-b") { _, _ ->
+            otherGate.await()
+            "second done"
+        }
+        val firstId = first.substringAfterLast('：')
+        val secondId = second.substringAfterLast('：')
+        runCurrent()
+
+        assertTrue(manager.list("session-a").contains(firstId))
+        assertTrue(!manager.list("session-a").contains(secondId))
+        assertTrue(manager.output(secondId, "session-a").contains("不存在"))
+        assertTrue(manager.kill(secondId, "session-a").contains("不存在"))
+        assertTrue(manager.output(secondId, "session-b").contains("[running]"))
+
+        manager.kill(firstId, "session-a")
+        otherGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(manager.output(secondId, "session-b").contains("[completed]"))
+    }
+
+    @Test
     fun persistentStoreRoundTripsOwnerSessionId() = runTest {
         val root = createTempDir(prefix = "persistent-job-owner-")
         try {
