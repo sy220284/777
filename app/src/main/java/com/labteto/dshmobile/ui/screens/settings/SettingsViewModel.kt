@@ -356,26 +356,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun configureLocalHarness(
-        apiKey: String,
-        model: String,
-        baseUrl: String,
-        mainMaxSteps: Int,
-        subagentMaxSteps: Int,
-        modelAttempts: Int,
-        userRules: String,
-        autoRecall: Boolean,
-        autoMemory: Boolean,
-    ) {
-        localHarness.configureModel(apiKey, model, baseUrl)
-        localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
-        localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
-    }
-
-    fun configureLocalModel(apiKey: String, model: String, baseUrl: String) {
-        localHarness.configureModel(apiKey, model, baseUrl)
-    }
-
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl) }
 
@@ -472,10 +452,6 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
         usageTracker.analyticsRecord(requestId)
-    }
-
-    fun clearLocalCredential() {
-        localHarness.clearCredential()
     }
 
     fun refreshDeviceCapabilities() {
