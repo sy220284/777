@@ -49,15 +49,16 @@ internal class LocalJobManager(
         LocalJobInfo(it.id, it.label, it.status, it.ownerId)
     }
 
-    fun list(): String = delegate.list()
+    fun list(ownerSessionId: String? = null): String = delegate.list(ownerSessionId)
 
-    fun listAgents(): String = delegate.listAgents()
+    fun listAgents(ownerSessionId: String? = null): String = delegate.listAgents(ownerSessionId)
 
-    fun output(id: String): String = delegate.output(id)
+    fun output(id: String, ownerSessionId: String? = null): String = delegate.output(id, ownerSessionId)
 
-    fun kill(id: String): String = delegate.kill(id)
+    fun kill(id: String, ownerSessionId: String? = null): String = delegate.kill(id, ownerSessionId)
 
-    fun send(id: String, message: String): String = delegate.send(id, message)
+    fun send(id: String, message: String, ownerSessionId: String? = null): String =
+        delegate.send(id, message, ownerSessionId)
 
     fun drainMessages(id: String): List<String> = delegate.drainMessages(id)
 
