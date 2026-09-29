@@ -16,44 +16,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebhookListenerTest {
-    @Test fun repeatedRestartReleasesEveryPreviousPortAndServesOnlyCurrentListener() {
+    @Test
+    fun repeatedRestartRebindsSamePortAndStopsAfterClose() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val listener = WebhookListener(scope) { it.getOutputStream().write(42) }
-        val usedPorts = mutableListOf<Int>()
+        val port = ServerSocket(0).use { it.localPort }
         try {
             repeat(100) {
-                val currentPort = ServerSocket(0).use { it.localPort }
-                listener.restart(InetSocketAddress("127.0.0.1", currentPort))
-                usedPorts += currentPort
-
-                // Verify the previous listener is actually released before opening a client
-                // connection to the new listener. An outbound client also consumes an ephemeral
-                // local port; doing that first can legitimately reuse the just-freed old server
-                // port and make this assertion fail even though WebhookListener released it.
-                if (usedPorts.size > 1) {
-                    val previousPort = usedPorts[usedPorts.lastIndex - 1]
-                    ServerSocket().use { probe ->
-                        probe.reuseAddress = true
-                        probe.bind(InetSocketAddress("127.0.0.1", previousPort))
-                    }
-                }
-
-                Socket("127.0.0.1", currentPort).use { client ->
+                // Rebinding the exact same address is the real restart contract. If the previous
+                // generation still owns its listening socket, restart() itself fails here.
+                listener.restart(InetSocketAddress("127.0.0.1", port))
+                Socket("127.0.0.1", port).use { client ->
                     client.soTimeout = 3000
                     assertEquals(42, client.getInputStream().read())
                 }
             }
 
-            val finalPort = usedPorts.last()
             listener.close()
-            ServerSocket().use { probe ->
-                probe.reuseAddress = true
-                probe.bind(InetSocketAddress("127.0.0.1", finalPort))
-            }
+            assertConnectionRejected(port)
         } finally {
             listener.close()
             scope.cancel()
         }
+    }
+
+    private fun assertConnectionRejected(port: Int) {
+        val connected = runCatching {
+            Socket().use { client ->
+                client.connect(InetSocketAddress("127.0.0.1", port), 300)
+            }
+        }.isSuccess
+        assertFalse("关闭后的 Webhook 端口仍可建立新连接：$port", connected)
     }
 
     @Test
