@@ -161,6 +161,45 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun legacyInterruptedPersistentJobBackfillsOwnerWhenResumed() = runTest {
+        val root = createTempDir(prefix = "persistent-job-owner-backfill-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-legacy",
+                        label = "网页抓取",
+                        status = "running",
+                        resumeKind = "web_fetch",
+                        resumePayload = "{\"session_id\":\"session-legacy\"}",
+                    ),
+                ),
+            )
+            val gate = CompletableDeferred<Unit>()
+            val manager = LocalJobManager(this, store) { }
+
+            manager.resumePersistent("job-legacy", "session-legacy") { _, _ ->
+                gate.await()
+                "done"
+            }
+            runCurrent()
+
+            assertEquals(
+                "session-legacy",
+                manager.snapshotInfos().single { it.id == "job-legacy" }.ownerSessionId,
+            )
+            gate.complete(Unit)
+            advanceUntilIdle()
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-backup-")
         try {
