@@ -440,6 +440,29 @@ internal class LocalSubagentRunner(
                     }
                 },
                 maxSteps = stepLimit,
+                stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
+                    val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+                    val next = nextAdaptiveAgentStepLimit(
+                        currentLimit = currentLimit,
+                        configuredBase = maxSteps,
+                        task = task,
+                        contextChars = history.sumOf { it.toString().length },
+                        contextBudgetChars = liveBudget?.maxHistoryChars ?: state.value.contextBudgetChars,
+                        pressure = resourceScheduler.snapshot().pressure,
+                        kind = runKind,
+                    )
+                    if (next != null && next > currentLimit) {
+                        eventLog().append("subagent/budget-extended", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("steps_used", stepsUsed)
+                            put("previous_limit", currentLimit)
+                            put("next_limit", next)
+                            put("context_chars", history.sumOf { it.toString().length })
+                            put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
+                        })
+                    }
+                    next
+                },
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
 
@@ -453,12 +476,12 @@ internal class LocalSubagentRunner(
 
             val partial = progress.joinToString("\n")
             val output = buildString {
-                append("[subagent][$subagentId][STEP_LIMIT] 达到 $stepLimit 步上限，任务未完整结束。")
+                append("[subagent][$subagentId][STEP_LIMIT] 动态执行预算已无法继续扩展，任务在第 ${result.steps} 步暂停。")
                 if (partial.isNotBlank()) {
                     append("\n已完成的最近进度：\n")
                     append(partial)
                 }
-                append("\n建议：继续任务时可把 max_steps 调高，当前允许最高 128。")
+                append("\n已有进度已保留；正常情况下预算会自动续算直到任务完成。")
             }
             return LocalSubagentResult(LocalSubagentStatus.STEP_LIMIT, output, "STEP_LIMIT")
         } catch (cancelled: CancellationException) {
@@ -549,53 +572,55 @@ internal class LocalSubagentRunner(
                 }
             },
         )
-        return try {
-            executor.execute {
-                resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                    modelClient.complete(key, baseUrl, model, history, tools)
+        var activeHistory = history
+        var overflowRound = 0
+        while (true) {
+            try {
+                return executor.execute {
+                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                        modelClient.complete(key, baseUrl, model, activeHistory, tools)
+                    }
                 }
-            }
-        } catch (error: Throwable) {
-            if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-            val compacted = historyCompactor.compactForOverflow(
-                history,
-                LocalHistorySummaryMode.WORK,
-            ) ?: throw error
-            durableHistory?.let { durable ->
-                applyOverflowCompaction(
-                    history = durable,
-                    compactor = historyCompactor,
-                    summaryMode = LocalHistorySummaryMode.WORK,
-                )?.let { durableCompaction ->
-                    eventLog().append("subagent/compaction", buildJsonObject {
-                        put("agent_id", subagentId)
-                        put("trigger", "context-overflow")
-                        put("omitted_messages", durableCompaction.omittedMessages)
-                        put("summary", durableCompaction.summary)
-                        put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
-                        put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
-                    })
+            } catch (error: Throwable) {
+                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+                val compacted = historyCompactor.compactForOverflow(
+                    activeHistory,
+                    LocalHistorySummaryMode.WORK,
+                ) ?: throw error
+                val madeProgress =
+                    compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                        compacted.messages != activeHistory
+                if (!madeProgress) throw error
+
+                overflowRound += 1
+                durableHistory?.let { durable ->
+                    applyOverflowCompaction(
+                        history = durable,
+                        compactor = historyCompactor,
+                        summaryMode = LocalHistorySummaryMode.WORK,
+                    )?.let { durableCompaction ->
+                        eventLog().append("subagent/compaction", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("trigger", "context-overflow")
+                            put("round", overflowRound)
+                            put("omitted_messages", durableCompaction.omittedMessages)
+                            put("summary", durableCompaction.summary)
+                            put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
+                            put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
+                        })
+                    }
                 }
+                eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("step", step)
+                    put("round", overflowRound)
+                    put("model", model)
+                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                    put("omitted_messages", compacted.omittedMessages)
+                })
+                activeHistory = compacted.messages
             }
-            eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
-                put("agent_id", subagentId)
-                put("step", step)
-                put("model", model)
-                put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                put("omitted_messages", compacted.omittedMessages)
-            })
-            completeSubagentStep(
-                key = key,
-                baseUrl = baseUrl,
-                model = model,
-                history = compacted.messages,
-                tools = tools,
-                subagentId = subagentId,
-                step = step,
-                durableHistory = null,
-                allowContextOverflowRecovery = false,
-            )
         }
     }
 

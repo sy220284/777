@@ -36,6 +36,22 @@ class LocalAdaptiveRuntimeBudgetTest {
     }
 
     @Test
+    fun exhaustedSoftBudgetAlwaysGrowsSoLongTaskCanContinue() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "全量审计并修复后完成回归测试",
+            contextChars = 95_000,
+            contextBudgetChars = 100_000,
+            pressure = HarnessResourcePressure.HIGH,
+            kind = LocalAgentRunKind.FOREGROUND,
+        )
+
+        assertTrue(next != null)
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
     fun shrinksModelVisibleToolOutputAsHistoryFills() {
         val base = LocalHistoryBudget(
             maxHistoryChars = 100_000,
@@ -57,4 +73,90 @@ class LocalAdaptiveRuntimeBudgetTest {
         assertTrue(loaded.maxToolResultChars >= 8_000)
         assertTrue(loaded.maxToolResultTokens >= 2_000)
     }
+
+    @Test
+    fun adaptiveToolBudgetNeverGrowsAboveTinyBase() {
+        val base = LocalHistoryBudget(
+            maxHistoryChars = 2_000,
+            tailChars = 1_000,
+            maxSummaryChars = 500,
+            maxToolResultChars = 1_000,
+            maxHistoryTokens = 500,
+            tailTokens = 250,
+            maxToolResultTokens = 500,
+        )
+
+        val loaded = adaptiveToolResultBudget(
+            base,
+            currentHistoryChars = 2_000,
+            currentHistoryTokens = 500,
+        )
+
+        assertTrue(loaded.maxToolResultChars <= base.maxToolResultChars)
+        assertTrue(loaded.maxToolResultTokens <= base.maxToolResultTokens)
+        assertTrue(loaded.maxToolResultChars > 0)
+        assertTrue(loaded.maxToolResultTokens > 0)
+    }
+
+
+    @Test
+    fun healthyContinuationCanGrowBeyondLegacy128StepCeiling() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "全量审计、排查、修复、测试",
+            contextChars = 20_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
+    fun exhaustedContextStillReceivesContinuationBudgetForRecovery() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 500_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
+    fun highPressureNearContextLimitStillContinuesWithSmallerGrowth() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 450_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.HIGH,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertTrue(requireNotNull(next) > 128)
+    }
+
+    @Test
+    fun unknownContextBudgetDoesNotTurnIntoTaskStop() {
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = 128,
+            configuredBase = 32,
+            task = "继续执行",
+            contextChars = 10_000,
+            contextBudgetChars = 0,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+
+        assertTrue(requireNotNull(next) > 128)
+    }
+
 }

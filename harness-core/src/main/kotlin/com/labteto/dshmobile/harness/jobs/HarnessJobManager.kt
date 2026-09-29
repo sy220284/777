@@ -3,6 +3,7 @@ package com.labteto.dshmobile.harness.jobs
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -195,10 +196,7 @@ class HarnessJobManager(
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
-            var id: String
-            do {
-                id = idFactory()
-            } while (records.containsKey(id))
+            val id = allocateUniqueIdLocked()
             val startedAt = System.currentTimeMillis()
             val deadlineAt = expectedDurationMillis
                 ?.takeIf { it > 0L }
@@ -236,7 +234,7 @@ class HarnessJobManager(
         record: Record,
         block: suspend (String, (String) -> Unit) -> String,
     ) {
-        record.job = scope.launch {
+        val launched = scope.launch(start = CoroutineStart.LAZY) {
             val heartbeat = launch {
                 while (isActive) {
                     delay(RUNNING_HEARTBEAT_MILLIS)
@@ -278,6 +276,19 @@ class HarnessJobManager(
                 heartbeat.cancel()
                 publish()
             }
+        }
+        val shouldStart = synchronized(lock) {
+            if (record.status == "running" && record.job == null) {
+                record.job = launched
+                true
+            } else {
+                false
+            }
+        }
+        if (shouldStart) {
+            launched.start()
+        } else {
+            launched.cancel()
         }
     }
 
@@ -364,6 +375,18 @@ class HarnessJobManager(
         }.mapNotNull { it.job }
     }
 
+    private fun allocateUniqueIdLocked(): String {
+        repeat(MAX_ID_FACTORY_ATTEMPTS) {
+            val candidate = idFactory()
+            if (candidate.isNotBlank() && !records.containsKey(candidate)) return candidate
+        }
+        repeat(MAX_FALLBACK_ID_ATTEMPTS) {
+            val candidate = "job-" + UUID.randomUUID().toString().replace("-", "").take(16)
+            if (!records.containsKey(candidate)) return candidate
+        }
+        error("无法分配唯一后台任务编号")
+    }
+
     private fun pruneRetainedLocked() {
         if (records.size < maxRetainedJobs) return
         val removable = records.values
@@ -446,5 +469,7 @@ class HarnessJobManager(
         const val DEFAULT_MAX_RETAINED_JOBS = 64
         const val MAX_EXPECTED_DURATION_MILLIS = 24L * 60L * 60L * 1000L
         const val RUNNING_HEARTBEAT_MILLIS = 30_000L
+        const val MAX_ID_FACTORY_ATTEMPTS = 16
+        const val MAX_FALLBACK_ID_ATTEMPTS = 16
     }
 }
