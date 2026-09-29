@@ -12,11 +12,25 @@ class LocalExecutionProjectionTest {
                 id = "job-1",
                 label = "子代理：后台检查",
                 status = "running",
+                ownerSessionId = "session-a",
+            ),
+            LocalJobInfo(
+                id = "job-2",
+                label = "后台命令",
+                status = "running",
+                ownerSessionId = "session-b",
             ),
         )
 
-        assertTrue(projectExecutionJobs(LocalUsageMode.CHAT, jobs).isEmpty())
-        assertEquals(jobs, projectExecutionJobs(LocalUsageMode.WORK, jobs))
+        assertTrue(projectExecutionJobs(LocalUsageMode.CHAT, "session-a", jobs).isEmpty())
+        assertEquals(
+            listOf(jobs.first()),
+            projectExecutionJobs(LocalUsageMode.WORK, "session-a", jobs),
+        )
+        assertEquals(
+            listOf(jobs.last()),
+            projectExecutionJobs(LocalUsageMode.WORK, "session-b", jobs),
+        )
     }
 
     @Test
