@@ -134,6 +134,7 @@ class ChatTurnRunner @Inject constructor(
             appendLine("【用户纠正｜最高优先】")
             persona.corrections.takeLast(6).forEach { appendLine("- ${it.take(240)}") }
         }
+        appendCharacterEvolutionContext(state.evolution)
         appendLine("【当前状态】情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}")
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
         state.currentAgenda.takeIf(String::isNotBlank)?.let { appendLine("行动：$it") }
