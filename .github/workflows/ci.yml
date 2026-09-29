@@ -191,3 +191,31 @@ jobs:
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r app/build/outputs/apk/optimized/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
+
+  # 统一合并门禁：main 分支保护只需依赖这一项状态检查。
+  # 仓库设置需将 “CI / merge-gate” 设为必需检查；任何失败、取消或跳过都会在这里收口为失败。
+  merge-gate:
+    if: always()
+    needs:
+      - preflight
+      - build
+      - android-16-instrumented
+      - android-17-instrumented
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI lane to complete successfully
+        env:
+          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          ANDROID16_RESULT: ${{ needs['android-16-instrumented'].result }}
+          ANDROID17_RESULT: ${{ needs['android-17-instrumented'].result }}
+        run: |
+          set -eu
+          for result in "$PREFLIGHT_RESULT" "$BUILD_RESULT" "$ANDROID16_RESULT" "$ANDROID17_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::CI 未通过：存在失败、取消或跳过的必需验证任务（结果：$result）"
+              exit 1
+            fi
+          done
+          echo "CI 合并门禁通过：所有必需验证任务均成功"
