@@ -389,6 +389,18 @@ class HarnessJobManager(
         publish()
     }
 
+    suspend fun stopOwnedNonPersistentAndJoin(ownerIds: Set<String>) {
+        if (ownerIds.isEmpty()) return
+        val jobs = markRunningJobsCancelled {
+            it.ownerId != null &&
+                it.ownerId in ownerIds &&
+                it.resumeKind.isNullOrBlank()
+        }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
     suspend fun stopOwnedAndJoin(ownerIds: Set<String>) {
         if (ownerIds.isEmpty()) return
         val jobs = markRunningJobsCancelled { it.ownerId != null && it.ownerId in ownerIds }
