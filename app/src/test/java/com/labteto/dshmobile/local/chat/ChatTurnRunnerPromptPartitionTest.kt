@@ -30,7 +30,10 @@ class ChatTurnRunnerPromptPartitionTest {
             personality = "嘴硬心软",
             hardConstraints = listOf("不替用户做决定"),
             bannedPhrases = listOf("作为AI"),
-            corrections = listOf("不会主动解释系统规则"),
+            corrections = listOf(
+                "不会主动解释系统规则",
+                "嘴硬但会服软，不善于直接拒绝",
+            ),
         )
         val state = ChatCharacterState(
             mood = "不高兴",
@@ -67,6 +70,9 @@ class ChatTurnRunnerPromptPartitionTest {
         assertFalse(context.stablePrompt.contains("地点=院子"))
 
         assertTrue(context.dynamicPrompt.contains("【用户纠正｜最高优先】"))
+        assertTrue(context.dynamicPrompt.contains("【角色表达解释】"))
+        assertTrue(context.dynamicPrompt.contains("不得仅凭单个"))
+        assertTrue(context.dynamicPrompt.contains("明确边界始终优先"))
         assertTrue(context.dynamicPrompt.contains("情绪=不高兴"))
         assertTrue(context.dynamicPrompt.contains("近期印象：还记得刚才的争执"))
         assertTrue(context.dynamicPrompt.contains("【当前场景｜硬连续性】"))

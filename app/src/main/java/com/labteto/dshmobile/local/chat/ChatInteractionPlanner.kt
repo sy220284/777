@@ -167,6 +167,7 @@ class ChatInteractionPlanner @Inject constructor(
         if (persona.behaviorPatterns.isNotEmpty()) {
             appendLine("稳定行为：${persona.behaviorPatterns.joinToString("；")}")
         }
+        appendPersonaExpressionContext(persona)
 
         appendLine(
             "上一状态：情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
@@ -229,6 +230,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("state字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。")
         appendLine("规则：")
         appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构。")
+        appendLine("- 角色台词的字面推辞不得单独触发关系降温、冲突或边界状态；结合人设纠正、关系阶段和连续动作判断。清晰、持续、与当前情境一致的停止、退出或拒绝继续除外。")
         appendLine("- 状态与用户画像渐进变化；stage 仅在明确事件或持续强证据下变化，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
         appendLine("- 已失效短期状态显式清空；scene 和 interaction* 由系统维护，不输出。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
@@ -249,6 +251,7 @@ class ChatInteractionPlanner @Inject constructor(
                 persona.personality.takeIf(String::isNotBlank)?.let { "｜性格=$it" }.orEmpty() +
                 persona.relationship.takeIf(String::isNotBlank)?.let { "｜关系=$it" }.orEmpty(),
         )
+        appendPersonaExpressionContext(persona)
         appendLine(
             "当前关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
                 "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
@@ -289,6 +292,7 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("规则：")
         appendLine("- 给4条明显不同的建议，明确覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
         appendLine("- 最新1～2轮和当前状态优先；已结束、拒绝或被纠正的话题不得复活。")
+        appendLine("- 若人设或用户纠正明确角色会嘴硬、害羞、别扭或服软，建议承接这种表达节奏，不把表面推辞自动解释为关系拒绝；清晰持续的停止、退出或拒绝继续除外。")
         appendLine("- 直接承接角色最后一句，贴合用户表达习惯和当前关系。")
         appendLine("- 不用同义改写凑数，不虚构事实，不替用户作重大决定。")
         appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
