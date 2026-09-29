@@ -1250,14 +1250,15 @@ private fun LocalConversationSurface(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                DsComposerAction(
-                    icon = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.chat_composer_add_attachment),
-                    onClick = { showAttachmentPicker = true },
-                    enabled = !state.running,
-                    tint = colors.labelPrimary,
-                    containerColor = colors.hoverSolid,
-                )
+                if (!state.running) {
+                    DsComposerAction(
+                        icon = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.chat_composer_add_attachment),
+                        onClick = { showAttachmentPicker = true },
+                        tint = colors.labelPrimary,
+                        containerColor = colors.hoverSolid,
+                    )
+                }
 
                 if (state.usageMode == LocalUsageMode.WORK) {
                     DsComposerAction(
@@ -1287,6 +1288,7 @@ private fun LocalConversationSurface(
                         },
                     )
                 } else if (
+                    !state.running &&
                     !state.groupChat.enabled &&
                     state.messages.any { message ->
                         message.role == "assistant" && message.content.isNotBlank()
