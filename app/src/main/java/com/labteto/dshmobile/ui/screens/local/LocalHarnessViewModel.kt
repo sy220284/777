@@ -106,7 +106,13 @@ class LocalHarnessViewModel @Inject constructor(
                 persona = snapshot.chatPersona,
                 sourceSessionId = snapshot.sessionId,
                 history = archiveHistory,
-                chatState = snapshot.chatState,
+                // Gallery stories remain a backward-compatible archive format. Snapshot the
+                // canonical conversation context only at this storage boundary; active runtime
+                // state keeps scene/continuity exclusively in ChatContextState.
+                chatState = snapshot.chatState.copy(
+                    scene = snapshot.chatContext.scene,
+                    continuity = snapshot.chatContext.continuity,
+                ),
                 notes = notes,
                 existingId = existingId ?: snapshot.galleryId,
                 existingStoryId = existingStoryId ?: snapshot.galleryStoryId,
