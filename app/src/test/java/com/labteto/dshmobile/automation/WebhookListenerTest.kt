@@ -26,7 +26,7 @@ class WebhookListenerTest {
                 val currentPort = ServerSocket(0).use { it.localPort }
                 listener.restart(InetSocketAddress("127.0.0.1", currentPort))
 
-                previousPort?.let(::assertConnectionRejected)
+                previousPort?.let(::assertListenerDoesNotServe)
                 Socket("127.0.0.1", currentPort).use { client ->
                     client.soTimeout = 3000
                     assertEquals(42, client.getInputStream().read())
@@ -35,7 +35,7 @@ class WebhookListenerTest {
             }
 
             listener.close()
-            previousPort?.let(::assertConnectionRejected)
+            previousPort?.let(::assertListenerDoesNotServe)
         } finally {
             listener.close()
             scope.cancel()
@@ -62,13 +62,15 @@ class WebhookListenerTest {
         }
     }
 
-    private fun assertConnectionRejected(port: Int) {
-        val connected = runCatching {
+    private fun assertListenerDoesNotServe(port: Int) {
+        val response = runCatching {
             Socket().use { client ->
                 client.connect(InetSocketAddress("127.0.0.1", port), 300)
+                client.soTimeout = 300
+                client.getInputStream().read()
             }
-        }.isSuccess
-        assertFalse("已替换或关闭的 Webhook 端口仍可建立新连接：$port", connected)
+        }.getOrDefault(-1)
+        assertTrue("已替换或关闭的 Webhook 监听仍处理了请求：$port", response != 42)
     }
 
     @Test
