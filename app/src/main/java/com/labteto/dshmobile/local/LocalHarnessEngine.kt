@@ -1415,12 +1415,14 @@ class LocalHarnessEngine @Inject constructor(
         cancelChatPostTurn()
 
         val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
-        val branchParentState = state.chatBranches.nodes
+        val branchParentNode = state.chatBranches.nodes
             .firstOrNull { node -> node.message.id == messageId }
             ?.parentId
             ?.let { parentId ->
-                state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }?.chatStateAfter
+                state.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }
             }
+        val branchParentState = branchParentNode?.chatStateAfter
+        val branchParentContext = branchParentNode?.chatContextAfter
         val baseState = branchParentState
             ?: restoreChatStateBefore(eventLog, json, sourceSequence, original.createdAt)
             ?: ChatCharacterState()
@@ -1476,7 +1478,12 @@ class LocalHarnessEngine @Inject constructor(
             messages = retainedPrefix,
             generation = previousGeneration + 1L,
         )
-        val baseContext = replayedContext.copy(continuity = baseState.continuity)
+        val recoveredBaseContext = restoreBranchContext(
+            snapshot = branchParentContext,
+            legacyState = baseState,
+            previousGeneration = previousGeneration,
+        )
+        val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity)
 
         val editedModelMessage = editedChatUserModelMessage(
             eventLog = eventLog,
@@ -3197,7 +3204,6 @@ class LocalHarnessEngine @Inject constructor(
                             runHistory.snapshot(),
                             recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
                             currentFacts = snapshot.chatContext
-                                .withLegacyFallback(snapshot.chatState)
                                 .canonicalFactLines(),
                         ),
                         stableContext = chatStableContext,
