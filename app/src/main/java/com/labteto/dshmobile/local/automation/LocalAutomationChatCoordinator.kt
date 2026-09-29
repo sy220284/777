@@ -334,15 +334,7 @@ internal class LocalAutomationChatCoordinator(
                     snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
-                    recordUsage = { candidate ->
-                        usageTracker.record(
-                            snapshot = boundState,
-                            reply = candidate,
-                            action = TokenUsageAction.AUTOMATION_CHAT,
-                            runKind = LocalAgentRunKind.AUTOMATION,
-                            taskLabel = proactiveDirective,
-                        )
-                    },
+                    recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.AUTOMATION_CHAT, proactiveDirective) },
                     onGuardEvent = { action, violations ->
                         recordStyleGuardHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
@@ -373,15 +365,7 @@ internal class LocalAutomationChatCoordinator(
                         snapshot = boundState,
                         persona = persona,
                         reply = retryRawReply,
-                        recordUsage = { candidate ->
-                            usageTracker.record(
-                                snapshot = boundState,
-                                reply = candidate,
-                                action = TokenUsageAction.CHAT_REPAIR,
-                                runKind = LocalAgentRunKind.AUTOMATION,
-                                taskLabel = proactiveDirective,
-                            )
-                        },
+                        recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.CHAT_REPAIR, proactiveDirective) },
                         onGuardEvent = { action, violations ->
                             recordStyleGuardHits(violations)
                             boundEventLog.append("chat/style-guard", buildJsonObject {

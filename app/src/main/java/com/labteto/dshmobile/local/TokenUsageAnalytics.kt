@@ -308,6 +308,19 @@ internal fun DeepSeekUsageTracker.recordForeground(
     step = step,
 )
 
+internal fun DeepSeekUsageTracker.recordAutomation(
+    snapshot: LocalHarnessState,
+    reply: LocalModelReply,
+    action: TokenUsageAction,
+    taskLabel: String,
+) = record(
+    snapshot = snapshot,
+    reply = reply,
+    action = action,
+    runKind = LocalAgentRunKind.AUTOMATION,
+    taskLabel = taskLabel,
+)
+
 internal fun estimatePromptBreakdown(
     messages: List<JsonObject>,
     tools: JsonArray,
