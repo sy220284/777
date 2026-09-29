@@ -2462,32 +2462,8 @@ class LocalHarnessEngine @Inject constructor(
         synchronized(runStateLock) { sessionTransitioning = false }
     }
 
-    private suspend fun cancelWorkRunsForSessions(sessionIds: Set<String>) {
-        if (sessionIds.isEmpty()) return
-        val targets = sessionIds.mapNotNull { id ->
-            activeWorkRuns[id]?.let { id to it }
-        }
-        targets.forEach { (_, binding) ->
-            binding.interactions.cancelAll()
-            binding.pendingInputs.drain()
-            binding.state.update {
-                it.copy(
-                    queuedInputCount = 0,
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                )
-            }
-            binding.job?.cancel()
-        }
-        targets.forEach { (id, binding) ->
-            binding.job?.join()
-            if (activeWorkRuns.remove(id, binding)) {
-                binding.mirrorJob?.cancel()
-                binding.mirrorJob = null
-                binding.job = null
-            }
-        }
-    }
+    private suspend fun cancelWorkRunsForSessions(sessionIds: Set<String>) =
+        cancelWorkRunBindingsForSessions(activeWorkRuns, sessionIds)
 
     private suspend fun cancelActiveRunAndJoin() {
         interactions.cancelAll()
