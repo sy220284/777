@@ -87,7 +87,6 @@ import com.labteto.dshmobile.core.wire.dto.ImageRejection
 @Composable
 fun ChatScreen(
     onOpenDetails: () -> Unit,
-    onOpenDrawer: () -> Unit,
     detailsOpen: Boolean,
 ) {
     val store = rememberSessionStore()
@@ -396,7 +395,6 @@ fun ChatScreen(
                 models = models,
                 modelsLoading = modelsLoading,
                 detailsOpen = detailsOpen,
-                onOpenDrawer = onOpenDrawer,
                 onOpenModels = { sheet = ChatSheet.Models },
                 onOpenFiles = {
                     if (currentSessionId != null) {
