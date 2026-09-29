@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 
 internal data class LocalPreparedChatTurn(
     val context: ChatTurnContext,
@@ -32,13 +33,23 @@ internal class LocalChatTurnCoordinator(
         } else {
             snapshot.chatContext.withLegacyFallback(snapshot.chatState)
         }
-        val context = runner.prepare(
-            personaId = snapshot.personaId,
-            state = snapshot.chatState,
-            context = sharedContext,
-            userInput = input,
-            storyContext = snapshot.handoffSummary,
-        )
+        val context = if (snapshot.chatPersona.isUnboundChatPersona()) {
+            runner.prepareProfile(
+                persona = snapshot.chatPersona,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
+            )
+        } else {
+            runner.prepare(
+                personaId = snapshot.personaId,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
+            )
+        }
         val recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
             groupEnabled = snapshot.groupChat.enabled,
