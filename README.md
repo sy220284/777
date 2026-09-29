@@ -5,8 +5,8 @@
 <h1 align="center">神言神语</h1>
 
 <p align="center">
-  一款开源的 Android 端侧 Agent 平台。<b>APK 内自带完整的 Harness 内核</b>——<br>
-  模型循环、持久终端、原生进程、内置 Node/Python 运行时、MCP 互通、聊天 / 工作双模式，全程不需要电脑在线。
+  一款开源的 Android 端侧 Agent 平台。<b>APK 内自带完整 Harness 内核</b>——<br>
+  模型循环、会话、主 / 子代理、持久终端、Node / Python / Git、MCP / LSP、设备能力与聊天人物系统，都在手机上完成编排。
 </p>
 
 <p align="center">
@@ -20,8 +20,8 @@
 > **血统与许可**：本仓库 fork 自
 > [`sorsama/deepseek-harness-mobile@e5f8c2f`](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)
 > （DSH Mobile 时代），现以独立应用标识 `com.sy220284.dshmobile` 发行，可与上游同时安装。
-> 上游 MIT 许可证与第三方声明完整保留。DeepSeek Harness 官方源码经
-> `upstream/deepseek-harness.lock.json` 钉定版本，作为语义、协议与一致性测试的基准。
+> 上游 MIT 许可证与第三方声明完整保留。本机原生 Harness 的官方语义参考由
+> `upstream/deepseek-harness.lock.json` 钉定；远程 Web 协议基线独立维护，避免把两条运行链混为一套版本。
 
 ---
 
@@ -29,139 +29,224 @@
 
 一个内核，三种形态：
 
-1. **本机自包含执行（主形态）**——模型循环、会话、工具、子代理、工作流全部在 APK 内运行。
-   持久终端与原生进程执行 shell 命令，内置 Node / Python 双运行时兜底脚本生态，
-   MCP（HTTP / stdio）与 LSP 打通外部工具和语言服务器。断网也能干活。
-2. **远程中继控制**——通过配对的 HTTPS 中继连接电脑上的 DeepSeek Harness，
-   手机当驾驶舱：驱动会话、回应审批与提问、收完成通知。旧的局域网扫描与明文直连已移除。
-3. **聊天模式**——把 Agent 当"人"聊：人设运行时、人物主档案与多故事线、多角色群聊、
-   长期记忆、连续意图路由、定时互动。输出经 AI 味短语黑名单硬门禁，说人话是产品约束不是建议。
+1. **本机自包含 Agent**——模型循环、工具、会话、主代理、子代理、自动任务和恢复逻辑直接运行在 Android。
+   APK 内置 Node / Python / Git 运行时，持久终端与原生进程负责真实执行；MCP、LSP、Web、Vision 和设备能力统一挂到工具面。
+2. **聊天人物系统**——在同一 Agent 内核上增加人物主档案、故事线、长期关系记忆、场景连续性、人物变化、群聊和定时互动。
+   角色表现可调，但共同经历、关系事实和记忆仍由真实对话推进。
+3. **远程中继控制**——通过配对 HTTPS 中继连接电脑上的 DeepSeek Harness，手机作为驾驶舱处理会话、审批、提问和完成通知。
 
-## 功能总览
+本机模式不依赖电脑在线；模型是否需要网络取决于所配置的模型服务。
 
-### 执行内核（本机 Harness）
+## 现在能做什么
 
-- 完整 Agent 循环：多会话、追加式事件账本、计划、目标、任务清单、技能、用户问答、
-  可选模型子代理、并行 / 流水线工作流。
-- 工具面：文件读写与编辑、搜索、安卓 shell（持久终端 + 托管进程）、后台任务、
-  网页搜索与获取、代码智能（按项目与文件类型检测语言服务器）。
-- **内置 Node / Python 双运行时**：无需 root，脚本生态开箱即用。
-- **MCP 互通**：HTTP 与 stdio 双传输，外部 MCP 服务器直接挂成本机工具；旧传输兼容。
+### 本机执行内核
 
-### 设备能力
-
-- 无障碍服务、通知读取与虚拟屏（VirtualDisplay）——Agent 可以看屏幕、操作界面，并在隔离虚拟屏中持续执行设备任务。
+- 完整 Agent 循环：会话、计划、目标、任务、技能、主代理、子代理、自动任务、并行 / 流水线执行。
+- 文件与代码：读取、编辑、搜索、工作区管理、Git、LSP 语言服务器。
+- 命令与脚本：持久终端、托管进程、内置 Node / Python / Git，无需 root。
+- 外部能力：MCP HTTP / stdio、网页搜索与获取、Vision、Android 设备能力。
+- 设备执行：无障碍服务、通知读取、VirtualDisplay，可在隔离虚拟屏中持续完成设备任务。
+- 持久恢复：运行 checkpoint、Agent inbox、会话事件账本；恢复时不会自动重放结果未知的危险副作用。
 
 ### 聊天模式
 
-- 人设图集 V4：人物主档案、多故事线、会话绑定、立绘页面。
-- 多角色群聊：独立人设智能体、自然点名、群聊长期关系、路由延迟优化。
-- 连续用户意图路由、意图优先级加固、用户意图内容策略。
-- 消息修改重发、回复版本前后切换、表格渲染、自适应壁纸（按图片内容动态调整阅读层）。
-- 定时互动：人设按计划主动发起对话。
-- **去 AI 味硬门禁**：聊天输出过 AI 味短语黑名单，命中即拦。
+- **人物主档案 + 多故事线**：角色、人设、故事、关系与会话绑定分离保存。
+- **稳定记忆归属**：人物关系记忆按 Gallery / Persona 身份隔离，避免不同角色之间串记忆。
+- **连续性状态**：场景、情绪、关系、未完话题、用户互动习惯与人物变化持续推进。
+- **人物行为调节**：亲密距离、状态延续、主动性、表达开放度、人物变化、情绪余韵、互动新鲜度、原设遵循、关系节奏和关系阶段锁定。
+- **事实不跟滑杆走**：行为参数只改变表现与变化速度，不会凭参数改写信任、共同经历和关系事实。
+- 多角色群聊、主动点名、群关系与群公告。
+- 消息修改重发、回复版本切换、重新生成、回复建议与聊天分支。
+- 定时互动：人物可按计划主动发起对话。
+- AI 味短语硬门禁与重复片段过滤，保持角色表达稳定。
 
 ### 工作模式
 
-- 统一顶栏、自然自动化、能力中心与运行中心全链路打通、工作执行闭环与人物记忆。
+- 统一任务执行：计划模式、审批、提问、后台任务、工具调用和运行中心共用同一套 Agent 运行链。
+- 主代理 / 子代理共享 run checkpoint 与恢复边界，任务可追踪到父子执行关系。
+- 发送路径显式区分 **已开始 / 已排队 / 已拒绝**，队列满、会话切换、未配置等原因直接反馈，不再静默丢输入。
+- Web、Vision、Automation 和子代理都继承任务归属，便于恢复、日志和消耗分析。
 
-### 通用
+### Token 与可观测性
 
-- 前台服务维持后台执行，回合完成、审批、提问均有系统通知。
-- 会话搜索、轨迹账本（按回合排列 + 用量合计）、会话导出、消息反馈。
-- 中英双语、浅色 / 深色 / 跟随系统主题、背景图个性化。
-- 应用内增量更新：哈希校验的分发链，无需反复下载完整包。
+- 聊天 / 工作模式独立统计，并保留本机累计。
+- 按天查看 7 / 30 / 90 天趋势。
+- 聊天可查到具体会话，工作可查到具体任务。
+- 工作模式区分主代理 / 子代理消耗。
+- 单次模型调用带 `requestId / sessionId / turnId / runId / parentRunId / agentId / action`。
+- Token 日志可追到回复、状态刷新、回复建议、子代理、Automation、Web、Vision 等动作。
+- API usage 是真实计费口径；系统提示词、人物状态、记忆、历史与工具定义只作为输入构成诊断，避免重复统计。
+- 旧版本只有累计值的数据继续保留，但不会伪造历史日期、会话或任务归属。
 
-## 差分验证体系
+### 通用体验
 
-本机内核不是"照着文档抄"，而是**对着官方实现逐项比对**：
-
-1. **钉版**——`upstream/deepseek-harness.lock.json` 锁定官方 commit，官方语义不再漂移。
-2. **黄金结果**——对锁定版本跑官方行为，录制为一致性夹具（`tools/capture/`）。
-3. **原生比对**——`reference-validation` 模块的 `NativeConformanceRunner` 用同一输入驱动本机实现，
-   输出与黄金结果逐字节对照。
-4. **CI 门禁**——一致性不一致即构建失败；`mock-harness`（Ktor 模拟服务端）作为常驻测试对手，
-   连 mock 自身的缺陷都曾在此体系中被反向抓出。
-
-当前一致性覆盖与路线见
-[执行内核 Phase B/C 验证](docs/EXECUTION-KERNEL-PHASE-BC-VALIDATION.zh-CN.md)。
+- 前台服务维持后台执行；完成、审批、提问均有系统通知。
+- 会话搜索、轨迹账本、会话导出、消息反馈。
+- 浅色 / 深色 / 跟随系统主题、背景图与自适应阅读层。
+- 应用内增量更新：带哈希校验的分发链，减少重复下载完整 APK。
 
 ## 架构
 
-| 模块 | 体量 | 职责 |
-|---|---|---|
-| `app/` | 294 文件 · 62.4k 行 | 组合根：聊天 / 工作双模式 UI、连接与配对、通知与前台服务、更新链、Webhook |
-| `core/` | 69 · 12.5k | 纯 JVM 协议核心（上游血统）：线路 DTO、RPC 客户端、WebSocket 下行流、重连循环、会话折叠、通知分类 |
-| `harness-core/` | 31 · 4.1k | 纯 JVM Agent 内核：AgentLoop、输入队列、请求执行、上下文组装、会话事件账本、资源调度 |
-| `harness-interop/` | 9 · 2.9k | 互通层：MCP 客户端（HTTP / stdio / 旧传输）与工具桥、LSP 插件 |
-| `harness-runtime-android/` | 6 · 1.0k | 进程运行时：持久终端、托管进程、Android 运行时插件 |
-| `harness-device-android/` | 8 · 1.4k | 设备能力：无障碍服务、通知、虚拟屏控制器、设备提供者 |
-| `mock-harness/` | 7 · 1.9k | Ktor 实现的 harness `/api` 模拟服务端，一致性测试的对手盘 |
-| `reference-validation/` | 3 · 204 | 原生一致性运行器：对照锁定官方版本的黄金结果 |
+这是一个 **8 模块 Gradle 工程 + app 内模块化单体**。
 
-依赖方向单向：`app → harness-* → harness-core`，`core`（远程模式）与内核互不依赖。
+Gradle 模块负责真正的二进制 / 平台边界；高频产品能力留在 `app` 中，通过 capability package、窄 Runtime、Projection 和 Coordinator 拆分，避免为了拆文件不断增加 Gradle 配置和 DI 表面积。
+
+### 模块边界
+
+| 模块 | 职责 |
+|---|---|
+| `app/` | Android 组合根：聊天 / 工作 UI、本机 Harness 编排、远程连接、通知、更新、Webhook |
+| `core/` | 纯 JVM 远程协议核心：DTO、RPC、WebSocket mux、重连、事件折叠、通知分类 |
+| `harness-core/` | 平台无关 Agent 内核：AgentLoop、工具、任务、资源调度、上下文、事件与插件契约 |
+| `harness-runtime-android/` | Android 进程运行时：持久终端、托管进程 |
+| `harness-interop/` | MCP HTTP / stdio 与 LSP 互通 |
+| `harness-device-android/` | Android 设备能力：无障碍、通知、虚拟屏 |
+| `mock-harness/` | Ktor Harness 模拟服务端，用于协议和行为测试 |
+| `reference-validation/` | 官方 Harness 黄金结果与原生一致性验证 |
+
+依赖保持单向：
+
+```text
+app
+├─ harness-device-android
+├─ harness-interop
+├─ harness-runtime-android
+└─ harness-core
+
+core   ← 远程 Harness 协议链，和本机 Agent 内核保持独立
+```
+
+### app 内能力架构
+
+本机 UI 不再直接把所有能力压到一个 Engine 上。
+
+```text
+Compose UI / ViewModels
+        │
+        ▼
+presentation
+  ├─ LocalUiRuntime
+  ├─ Chat / Work Surface Projection
+  └─ Settings / Task Projection
+        │
+        ▼
+capability runtimes
+  ├─ local.chat
+  ├─ local.work
+  ├─ local.session
+  ├─ local.model
+  ├─ local.tools
+  ├─ local.automation
+  └─ local.usage
+        │
+        ▼
+LocalHarnessEngine
+  只负责跨能力回合一致性与编排
+        │
+        ▼
+Coordinators / Stores / Repositories
+        │
+        ▼
+harness-core / Android runtime / MCP / device
+```
+
+几个关键边界：
+
+- **UI 状态投影**：Chat 与 Work 从同一运行态投影出各自的 `LocalConversationSurfaceState`，另一模式的状态保持稳定默认值；`distinctUntilChanged` 避免无关状态唤醒 UI。
+- **流式输出独立**：高频 streaming preview 不反复重写完整 aggregate state，降低 Compose 热路径更新成本。
+- **发送协调**：`LocalSendCoordinator` 统一处理启动、排队和拒绝，避免 UI 与 Engine 各自维护一套发送规则。
+- **运行上下文**：`LocalAgentRunCoordinator` 为前台、子代理、Automation 建立统一 checkpoint；未知副作用不会在恢复时盲目重试。
+- **插件组合**：Android / MCP / Vision 等平台能力由 `LocalPluginCompositionFactory` 组装，Engine 不直接持有 PluginRegistry。
+- **Token 可观测**：`TokenUsageAnalyticsStore` 记录请求级账本，`LocalTokenUsageContextBridge` 把 Web / Vision 等内部调用重新归属到触发它们的任务。
+- **聊天记忆**：人物关系记忆有稳定 subject key；人物连续性、关系证据和行为调节分别处理，避免“调参数 = 改历史事实”。
+- **历史与性能**：会话事件采用追加式账本、分页与有界 transcript window；热路径禁止重新物化整个历史。
+
+`LocalHarnessEngine`、`LocalHarnessScreen`、`SessionStore` 等热点文件受 CI 行数与职责 ratchet 约束：新功能必须优先向独立能力边界下沉。
+
+## 验证体系
+
+本机内核不是“照着文档抄”，而是**对着官方实现逐项比对**：
+
+1. **钉版**——`upstream/deepseek-harness.lock.json` 锁定官方 commit，避免语义基准漂移。
+2. **黄金结果**——`tools/capture/` 对锁定版本运行真实行为并录制一致性夹具。
+3. **原生比对**——`reference-validation` 用同一输入驱动 Android 本机实现，与黄金结果比对。
+4. **模拟对手**——`mock-harness` 提供常驻 Ktor 测试服务端。
+5. **CI 门禁**——架构、性能、UI、Kotlin 风险、单元测试、Harness 一致性、Lint、optimized APK、Android 16 / 17 仪器测试和 merge-gate 共同放行。
+
+除了“测试通过”，仓库还对热点文件大小、热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。
+
+当前验证闭环见 [VALIDATION.md](docs/VALIDATION.md)，本机 Harness 实现边界见
+[Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)。
 
 ## 环境要求
 
-- Android 16+（minSdk 36）。
-- 内置运行时按 `arm64-v8a` 打包；模拟器 / x86_64 设备可用 `DSH_RUNTIME_ABIS=x86_64` 自行构建。
-- 远程模式需一台运行中的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
-  （已针对 `0.1.3-alpha.1` 测试；App 与 harness 需同时升级到流式协议版本，
-  详见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)）。
+- Android 16+（minSdk 36，targetSdk 36，compileSdk 37）。
+- 默认内置运行时按 `arm64-v8a` 打包。
+- 模拟器 / x86_64 设备可用 `DSH_RUNTIME_ABIS=x86_64` 自行构建。
+- 远程模式需运行 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)，协议基线与兼容说明见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
 
 ## 快速开始
 
 1. 从 [Releases](https://github.com/sy220284/777/releases/latest) 安装 APK。
-2. **本机模式**：连接页直接进入本机 Harness，填入 DeepSeek API 密钥（Android Keystore 加密存储）即用。
-3. **远程模式**：在电脑上装 [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay)：
+2. **本机模式**：直接进入本机 Harness，配置模型 API 密钥即可开始。密钥使用 Android Keystore 加密存储。
+3. **远程模式**：在电脑上安装 [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay)：
 
    ```sh
    dsh plugin --profile web add dsh-relay
    dsh web
    ```
 
-   打开打印的 URL 设置密码，进入 `/relay/pair`；在应用里**中继 → 配对中继**扫码。
-   远程访问仅支持 HTTPS 中继配对。
+   打开打印的 URL 设置密码，进入 `/relay/pair`；在应用里 **中继 → 配对中继** 扫码。
+   远程访问只支持配对后的 HTTPS 中继。
 
 ## 安全与边界
 
-- API 密钥由 Android Keystore 加密；写文件、编辑文件、执行命令必须逐次取得用户批准。
-- 本机执行限制在应用私有工作区；Webhook 仅监听回环地址。
-- 远程访问要求配对的 HTTPS 中继，详见 [docs/SECURITY.md](docs/SECURITY.md)。
-  代理可在远端执行命令，请只配对可信服务。
+- API 密钥由 Android Keystore 加密。
+- 写文件、编辑文件、执行高风险命令受审批和能力边界约束。
+- 本机执行限制在应用私有工作区；Webhook 只监听回环地址。
+- 远程访问要求配对 HTTPS 中继，详见 [docs/SECURITY.md](docs/SECURITY.md)。
+- Agent 可以实际执行文件、命令与设备操作；请只启用你理解并信任的能力。
 
 ## 构建
 
 ```sh
-./gradlew :app:assembleDebug      # 调试版 APK
-./gradlew :app:assembleRelease    # 发布版 APK（设置了 keystore 环境变量时会签名）
+./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
 ```
 
-工具链：AGP 9.4 / Kotlin 2.2.10 / Jetpack Compose（BOM 2026.09）/ Hilt 2.59，compileSdk 37。
+工具链：
 
-发布版本号来自 git 标签：发布工作流从标签名导出 `DSH_VERSION_NAME`，`versionCode` 由它推导；
-本地构建回退到 `app/build.gradle.kts` 的写死值。开发流程与发布细节见
-[CONTRIBUTING.md](CONTRIBUTING.md)。
+- AGP 9.4.0
+- Kotlin 2.2.10
+- Jetpack Compose BOM 2026.09.00
+- Hilt 2.59.2
+- Java 17
+
+当前仓库版本基线：`0.12.0-777.22`。
+
+发布版本号来自 git 标签：发布工作流导出 `DSH_VERSION_NAME`，`versionCode` 由版本名推导；本地构建回退到 `.github/release-version`。
+
+开发与合并规则见 [AGENTS.md](AGENTS.md)，贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 文档
 
+- [文档入口](docs/README.md)
 - [架构](docs/ARCHITECTURE.md) · [协议](docs/PROTOCOL.md) · [兼容性](docs/COMPATIBILITY.md) · [安全](docs/SECURITY.md)
-- [Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)
-- [Android 原生 Harness 内核规划](docs/ANDROID-NATIVE-HARNESS-IMPLEMENTATION-PLAN.zh-CN.md) · [M1 进展](docs/NATIVE-HARNESS-M1-STATUS.zh-CN.md)
-- [执行内核 Phase B/C 验证](docs/EXECUTION-KERNEL-PHASE-BC-VALIDATION.zh-CN.md)
-- [UI/UX 重设计](docs/ANDROID-UIUX-REDESIGN.zh-CN.md) · [频率优先重设计](docs/UI-FREQUENCY-FIRST-REDESIGN.zh-CN.md)
+- [Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md) · [后续路线](docs/ANDROID-HARNESS-ROADMAP.zh-CN.md)
+- [验证体系](docs/VALIDATION.md) · [UI / UX](docs/UI-UX.zh-CN.md) · [效果图](docs/UI-ARTIFACTS.md)
 
 ## 截图
 
 | 连接 | 聊天 | 轨迹 |
 |:--:|:--:|:--:|
-| <img src="docs/images/home.png" width="240" alt="连接界面：本机 Harness 入口、已配对中继与实时可达性"> | <img src="docs/images/chat.png" width="240" alt="聊天：流式输出的回合、工具卡片、目标停靠栏与输入框"> | <img src="docs/images/trajectory.png" width="240" alt="轨迹：按回合排列的账本，附带用量合计"> |
+| <img src="docs/images/home.png" width="240" alt="连接界面：本机 Harness 入口、已配对中继与实时可达性"> | <img src="docs/images/chat.png" width="240" alt="聊天：流式输出、人物对话与输入区"> | <img src="docs/images/trajectory.png" width="240" alt="轨迹：按回合排列的执行账本"> |
 
 | 会话详情 | 子代理 |
 |:--:|:--:|
-| <img src="docs/images/session-info.png" width="240" alt="详情面板：上下文构成、目标、任务、子代理、主机信息"> | <img src="docs/images/subagent.png" width="240" alt="子代理目录，可继续与子代理对话"> |
+| <img src="docs/images/session-info.png" width="240" alt="详情面板：上下文、目标、任务、主机信息"> | <img src="docs/images/subagent.png" width="240" alt="子代理目录与子代理对话"> |
 
 ## 许可证
 
-[MIT](LICENSE)。随附的第三方材料列在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-DeepSeek Harness 及其品牌归各自所有者所有；本项目是独立的社区构建，与上游已按自己的路径演化。
+[MIT](LICENSE)。第三方材料见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+DeepSeek Harness 及其品牌归各自所有者所有；本项目是独立的社区构建，并已沿自己的产品与架构路径持续演化。

@@ -1,24 +1,32 @@
 # Security
 
-See [docs/SECURITY.md](docs/SECURITY.md) for the full trust model — read it before exposing a
-harness to your network.
+777 能在 Android 本机执行 Agent，也能通过配对 HTTPS 中继控制远程 Harness。
 
-## Reporting a vulnerability
+完整信任模型见 [docs/SECURITY.md](docs/SECURITY.md)。
 
-Please use this repository's private GitHub Security Advisory form — do not open a public issue:
+## 报告漏洞
 
-- **[Report a vulnerability](https://github.com/sy220284/777/security/advisories/new)**
+请通过 GitHub Security Advisory 私下报告，不要公开提交 Issue：
 
-Useful things to include: what an attacker can do, the steps to reproduce it, the app version and
-the harness version, and how the app was connected.
+- [Report a vulnerability](https://github.com/sy220284/777/security/advisories/new)
 
-## Already known, and not a vulnerability in this app
+建议提供：
 
-The DeepSeek Harness has **no authentication**. Its only gate is a `Host`-header trust fence, and
-when it binds `0.0.0.0` it trusts its own LAN IP literals — so any device on that network can drive
-the agent, including running commands on the host computer. This is a documented property of the
-harness, described in [docs/SECURITY.md](docs/SECURITY.md), which is why LAN mode requires a
-deliberate patch and why the app warns whenever it connects to a non-loopback host.
+- 应用版本。
+- 本机 / 远程模式。
+- 复现步骤。
+- 受影响能力。
+- 是否涉及凭据、数据、文件、网络、设备权限或外部命令。
+- 可稳定复现的日志或最小案例。
 
-Reports of that behaviour on its own are not needed. Ways to bypass the trust fence, or anything
-this app does beyond what that model already permits, very much are.
+## 当前安全边界
+
+- 远程控制只支持配对后的 HTTPS 中继；旧 LAN 扫描和明文直连路径已经移除。
+- 模型密钥和中继凭据使用 Android Keystore 加密。
+- 本机文件与命令执行受应用私有工作区、审批和能力边界约束。
+- Web 工具执行 SSRF / DNS / 重定向目标校验，并限制请求和响应大小。
+- Agent 恢复不会盲目重放结果未知的外部副作用。
+- Android 无障碍、通知和 VirtualDisplay 通过显式 capability provider 暴露。
+- 应用更新必须通过完整性和签名校验。
+
+如果问题涉及这些边界之外的行为，请一并说明为什么现有保护不足。

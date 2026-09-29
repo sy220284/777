@@ -1,45 +1,54 @@
 <!--
-Thanks for contributing to DSH Mobile. Delete any section that does not apply.
-Conventions live in CONTRIBUTING.md; the deeper documents are in docs/.
+提交前请阅读 AGENTS.md 与 CONTRIBUTING.md。
+PR 标题和描述使用中文。
 -->
 
-## What and why
+## 改动内容
 
-<!-- What changes, and what problem it solves. If it fixes an issue: Fixes #123 -->
+<!-- 说明改了什么、为什么改。 -->
 
-## How it was verified
+## 关联影响
 
 <!--
-Say what you actually ran, not what should work. For example:
-- Real harness 0.1.3-alpha.1 over adb reverse, Pixel 6a / Android 14
-- Real harness over Wi-Fi LAN mode
-- mock-harness only
-- Unit tests only
+至少检查真正相关的横向 / 纵向链路：
+Chat / Work、主 / 子代理、Session、Memory、Automation、Web / Vision、
+Token、UI、Runtime、协议、持久化、性能、安全。
 -->
 
-- [ ] Against a real harness (version: …, connected over: …)
-- [ ] Against `mock-harness`
-- [ ] Tests only
+## 验证
+
+<!-- 写实际执行过的验证，不写“应该没问题”。 -->
+
+- [ ] 单元测试
+- [ ] 官方 Harness conformance
+- [ ] Lint
+- [ ] optimized APK
+- [ ] Android 16
+- [ ] Android 17
+- [ ] 专项验证（如适用）
+
+补充说明：
+
+<!-- 命令、设备、复现场景、关键结果。 -->
 
 ## Checklist
 
-- [ ] `./gradlew :core:test :mock-harness:test :app:testDebugUnitTest` passes
-- [ ] `./gradlew :app:lintDebug` is clean
-- [ ] Any new user-visible text is in `values/strings.xml` **and all ten translation
-      directories** — `MissingTranslation` is a lint error, which is what keeps the
-      eleven-language claim true
-- [ ] No hardcoded UI strings
-- [ ] Wire-layer changes still parse leniently: unknown keys, event types and tool cards
-      fall back to a passthrough rather than failing
-- [ ] Behaviour that depends on the harness build degrades by hiding the control, not by
-      reporting a broken connection (404 → capability unavailable, 403 → forbidden)
-- [ ] `CHANGELOG.md` updated if the change is user-visible
-- [ ] Screenshots or a screen recording below, for anything that changes the UI
+- [ ] 修改基于当前 main，或已经重新同步最新 main
+- [ ] 没有通过提高架构 / 性能 / APK 预算绕过门禁
+- [ ] 新增或修复没有破坏关联功能
+- [ ] 用户可见文本使用字符串资源
+- [ ] UI 复用现有 Design System
+- [ ] 异步 / 后台 / Agent 逻辑考虑取消、超时、重试、恢复和幂等
+- [ ] 日志可定位问题，但不记录不必要的敏感正文
+- [ ] 需要文档同步的改动已更新当前文档
+- [ ] 用户可见变化已更新 CHANGELOG
+- [ ] UI 改动附必要截图 / 录屏
+- [ ] 最终放行依据对应当前 main + 当前 PR head
 
-## Screenshots
+## 截图 / 录屏
 
-<!-- Before / after, and both light and dark if the change touches theming. -->
+<!-- UI 改动时提供。 -->
 
-## Notes for the reviewer
+## 备注
 
-<!-- Anything you are unsure about, deliberately left out, or want a second opinion on. -->
+<!-- 已知边界、刻意不处理的范围、需要 reviewer 特别关注的风险。 -->

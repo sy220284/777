@@ -1,28 +1,87 @@
 # 官方 Harness 差分验证
 
-这里维护 777 Android 原生 Harness 与官方参考实现之间的差分测试入口。
+这里维护 777 Android 原生 Harness 与锁定官方 Harness 参考实现之间的差分验证。
 
-- 官方基线由 `upstream/deepseek-harness.lock.json` 人工锁定。
-- `official-runner.ts` 只在刷新黄金结果时运行于锁定的官方仓库工作区。
-- `refresh-official-fixtures.sh` 会临时拉取该锁定提交并更新
-  `reference-validation/src/test/resources/official/`。
-- 日常 CI 不自动跟踪官方 master，只比较已提交的固定黄金结果。
-- Kotlin 原生实现的输出由 `:reference-validation:test` 生成并比较。
+## 当前基线
 
-当前固定黄金集为 22 个官方参考案例，覆盖普通文本、多语言与空文本、单/多工具同一步、
-连续多工具步骤、同名工具重复调用、正文与工具并存、嵌套/混合 JSON 参数、空工具输出等
-AgentLoop 核心调度语义。
+来源：
 
-取消、审批、Ask User、Plan、Goal、Todo、Job、Subagent、Workflow、Session 迁移与自愈
-由对应模块的确定性单元/集成测试覆盖；这些状态不塞进无法表达它们的模型回复向量。
+```text
+upstream/deepseek-harness.lock.json
+```
 
-CI 会从锁定的官方提交重新生成全部黄金结果并检查工作树无差异，防止手写 fixture 冒充官方基线。
+当前语义参考：
 
-刷新命令：
+```text
+deepseek-ai/deepseek-harness
+0.1.7-rc.2
+477b4f420553e8a52c2fbccc464d7561b239c443
+Session format reference: V4
+```
+
+日常 CI 不自动追踪官方 master。
+
+## 结构
+
+- `official-runner.ts`：只在刷新官方 fixture 时运行。
+- `refresh-official-fixtures.sh`：拉取锁定提交并重新生成官方黄金结果。
+- `reference-validation/src/test/resources/official/`：提交到仓库的固定黄金结果。
+- `:reference-validation:test`：运行 Android 原生实现并与黄金结果比较。
+
+## 覆盖
+
+黄金 fixture 用于验证 AgentLoop 的核心模型调度语义，例如：
+
+- 普通文本。
+- 空文本 / 多语言。
+- 单工具 / 多工具。
+- 连续多工具 step。
+- 同名工具重复调用。
+- 正文与工具并存。
+- JSON 参数。
+- 空工具输出。
+
+不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
+
+- Cancel。
+- Approval / Ask User。
+- Plan / Goal / Todo。
+- Job / Subagent / Workflow。
+- Session 恢复。
+- Agent run checkpoint。
+- Plugin Tool View。
+- Android device。
+
+## CI
+
+preflight 会：
+
+```sh
+corepack enable
+bash tools/reference-validation/refresh-official-fixtures.sh
+git diff --exit-code -- reference-validation/src/test/resources/official
+./gradlew :reference-validation:test
+```
+
+因此：
+
+- fixture 不能手写冒充官方输出。
+- 锁定 commit 改变后必须重新生成。
+- 本机行为偏离官方语义会在差分测试里显式暴露。
+
+## 刷新基线
 
 ```sh
 bash tools/reference-validation/refresh-official-fixtures.sh
 ./gradlew :reference-validation:test
 ```
 
-刷新官方基线属于人工维护动作。只有差分结果解释清楚且原生实现完成相应移植后，才允许修改锁文件。
+只有在以下条件同时满足时才能修改锁文件：
+
+1. 明确知道为什么升级官方参考版本。
+2. fixture 差异已经审计。
+3. Android 原生实现已完成必要适配。
+4. 单元测试和 conformance 通过。
+5. Android 16 / 17 回归通过。
+
+完整验证体系见 [../../docs/VALIDATION.md](../../docs/VALIDATION.md)。
