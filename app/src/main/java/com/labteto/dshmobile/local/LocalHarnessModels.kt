@@ -188,6 +188,7 @@ data class LocalJobInfo(
     val id: String,
     val label: String,
     val status: String,
+    val ownerSessionId: String? = null,
 )
 
 data class LocalWorkflowProgress(
