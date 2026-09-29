@@ -241,9 +241,9 @@ internal class LocalChatReplyCoordinator(
         snapshot = snapshot,
         persona = persona,
         reply = reply,
-        recordUsage = {
-            // The finalized candidate owns the same request usage passed by ChatTurnCoordinator.
-            recordUsage(snapshot, reply, usageContext)
+        recordUsage = { finalizedReply ->
+            // Preserve request id and diagnostic prompt composition through the finalization boundary.
+            recordUsage(snapshot, finalizedReply, usageContext)
         },
         onGuardEvent = { action, violations ->
             recordStyleGuardHits(violations)
