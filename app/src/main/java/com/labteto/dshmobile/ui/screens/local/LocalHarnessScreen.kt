@@ -86,6 +86,7 @@ import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -407,6 +408,7 @@ fun LocalHarnessScreen(
             )
         } else {
             NewSessionModeDialog(
+                usageMode = shell.usageMode,
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
                     showNewSessionMode = false
@@ -830,14 +832,22 @@ private fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             if (state.usageMode == LocalUsageMode.CHAT) {
-                val relationship = state.chatState.relationshipState.takeIf { it.isNotBlank() }
+                val hasSelectedPersona = !state.chatPersona.isUnboundChatPersona()
+                val personaDisplayName = if (hasSelectedPersona) {
+                    state.chatPersona.name
+                } else {
+                    stringResource(R.string.local_chat_no_persona)
+                }
+                val relationship = state.chatState.relationshipState.takeIf {
+                    hasSelectedPersona && it.isNotBlank()
+                }
                 val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
                 val contextSource = when (state.conversationMode) {
                     LocalConversationMode.INDEPENDENT -> null
                     else -> localConversationModeLabel(state.conversationMode)
                 }
                 ChatSurfaceHeader(
-                    personaName = state.chatPersona.name,
+                    personaName = personaDisplayName,
                     portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
                     secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
                     groupEnabled = state.groupChat.enabled,
@@ -1390,6 +1400,8 @@ private fun LocalConversationSurface(
                             stringResource(R.string.local_work_composer_hint)
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
+                        state.chatPersona.isUnboundChatPersona() ->
+                            stringResource(R.string.local_chat_composer_no_persona_hint)
                         else ->
                             stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
                     },

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -89,7 +90,11 @@ internal class LocalMemoryCoordinator(
         query: String,
         snapshot: LocalHarnessState,
     ): String {
-        if (!snapshot.autoRecall || !ChatMemorySelector.shouldRecall(query)) return ""
+        if (
+            snapshot.chatPersona.isUnboundChatPersona() ||
+            !snapshot.autoRecall ||
+            !ChatMemorySelector.shouldRecall(query)
+        ) return ""
         val relationshipKinds = setOf(
             MemoryKind.RELATIONSHIP_FACT,
             MemoryKind.RELATIONSHIP_STATE,

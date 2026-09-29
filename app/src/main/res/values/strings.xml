@@ -725,10 +725,12 @@
     <string name="local_new_session_dialog_intro">Choose which existing context this chat can use. Long-term rules are always kept; other context remains scope-isolated.</string>
     <string name="local_new_session_continue">Continue current task</string>
     <string name="local_new_session_continue_hint">Keep the current project, conversation-lineage memory, and a compact handoff summary without copying the full previous chat.</string>
-    <string name="local_new_session_project">New chat in same project</string>
-    <string name="local_new_session_project_hint">Keep global and current-project memory without carrying over temporary task state from the previous chat.</string>
+    <string name="local_new_session_chat_intro">Continue the current character conversation, or start a blank chat with no character selected.</string>
+    <string name="local_new_session_chat_continue">Continue current chat</string>
+    <string name="local_new_session_chat_continue_hint">Keep the current character conversation and memory, including character state, without copying the full previous chat.</string>
     <string name="local_new_session_independent">Independent new chat</string>
     <string name="local_new_session_independent_hint">Use only global rules and global long-term memory.</string>
+    <string name="local_new_session_chat_independent_hint">Start a blank chat with no character selected. Do not inherit the current character conversation or state; you can choose a character later or keep chatting without one.</string>
     <string name="settings_runtime_network_diagnostic_title">Network diagnostics</string>
     <string name="settings_runtime_network_diagnostic_intro">Check resolved addresses, system proxy, VPN/TUN and security policy, then run a restricted HTTP/TLS probe to verify actual connectivity.</string>
     <string name="settings_runtime_network_target_label">URL or domain</string>
@@ -1135,6 +1137,8 @@
     <string name="local_chat_thinking_collapse">Hide thinking summary</string>
     <string name="local_work_composer_hint">Ask something, or hand the task to Harness…</string>
     <string name="local_group_chat_composer_hint">Message the group…</string>
+    <string name="local_chat_no_persona">No character selected</string>
+    <string name="local_chat_composer_no_persona_hint">Send a message…</string>
     <string name="local_chat_composer_persona_hint">Message %1$s…</string>
     <string name="local_plan_button_on">Planning</string>
     <string name="local_plan_button_off">Plan</string>

@@ -22,6 +22,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalApproval
 import com.labteto.dshmobile.local.LocalApprovalImpact
 import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.agentApprovalPurposeRes
@@ -38,34 +39,47 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun NewSessionModeDialog(
+    usageMode: LocalUsageMode,
     onDismiss: () -> Unit,
     onSelect: (LocalConversationMode) -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.local_new_session_dialog_title), onDismiss = onDismiss) {
+    val chatMode = usageMode == LocalUsageMode.CHAT
+    DsDialog(
+        title = stringResource(R.string.local_new_session_dialog_title),
+        onDismiss = onDismiss,
+        dismissOnScrimTap = true,
+    ) {
         Text(
-            stringResource(R.string.local_new_session_dialog_intro),
+            stringResource(
+                if (chatMode) {
+                    R.string.local_new_session_chat_intro
+                } else {
+                    R.string.local_new_session_dialog_intro
+                },
+            ),
             style = DsType.small13,
             color = colors.labelSecondary,
         )
         DsButton(
-            text = stringResource(R.string.local_new_session_continue),
+            text = stringResource(
+                if (chatMode) {
+                    R.string.local_new_session_chat_continue
+                } else {
+                    R.string.local_new_session_continue
+                },
+            ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            stringResource(R.string.local_new_session_continue_hint),
-            style = DsType.caption11,
-            color = colors.labelTertiary,
-        )
-        DsButton(
-            text = stringResource(R.string.local_new_session_project),
-            onClick = { onSelect(LocalConversationMode.PROJECT) },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-        Text(
-            stringResource(R.string.local_new_session_project_hint),
+            stringResource(
+                if (chatMode) {
+                    R.string.local_new_session_chat_continue_hint
+                } else {
+                    R.string.local_new_session_continue_hint
+                },
+            ),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -73,10 +87,16 @@ internal fun NewSessionModeDialog(
             text = stringResource(R.string.local_new_session_independent),
             onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = DsButtonVariant.Outline,
         )
         Text(
-            stringResource(R.string.local_new_session_independent_hint),
+            stringResource(
+                if (chatMode) {
+                    R.string.local_new_session_chat_independent_hint
+                } else {
+                    R.string.local_new_session_independent_hint
+                },
+            ),
             style = DsType.caption11,
             color = colors.labelTertiary,
         )
@@ -90,7 +110,11 @@ internal fun GroupNewSessionDialog(
     onNewSingle: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.local_group_new_session_title), onDismiss = onDismiss) {
+    DsDialog(
+        title = stringResource(R.string.local_group_new_session_title),
+        onDismiss = onDismiss,
+        dismissOnScrimTap = true,
+    ) {
         Text(
             stringResource(R.string.local_group_new_session_intro),
             style = DsType.small13,
@@ -136,8 +160,13 @@ internal fun ChatPersonaPickerDialog(
                 modifier = Modifier.padding(DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
+                val currentName = if (currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
+                    stringResource(R.string.local_chat_no_persona)
+                } else {
+                    currentPersona.name
+                }
                 Text(
-                    stringResource(R.string.local_persona_picker_current, currentPersona.name),
+                    stringResource(R.string.local_persona_picker_current, currentName),
                     style = DsType.base16Strong,
                     color = colors.labelPrimary,
                 )
