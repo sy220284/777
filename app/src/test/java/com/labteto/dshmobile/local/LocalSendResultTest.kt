@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.send.evaluateLocalSendAdmission
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
