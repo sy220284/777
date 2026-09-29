@@ -42,8 +42,9 @@ internal class LocalJobManager(
 
     fun resumePersistent(
         id: String,
+        ownerSessionId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.resumePersistent(id, block)
+    ): String = delegate.resumePersistent(id, ownerSessionId, block)
 
     fun snapshotInfos(): List<LocalJobInfo> = delegate.snapshots().map {
         LocalJobInfo(it.id, it.label, it.status, it.ownerId)
