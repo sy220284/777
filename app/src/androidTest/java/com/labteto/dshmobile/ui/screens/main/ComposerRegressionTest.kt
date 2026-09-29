@@ -115,6 +115,47 @@ class ComposerRegressionTest {
         assertTrue("聚焦后聊天框应展开到第二行", after > before)
     }
 
+    @Test fun openingComposerMenuKeepsFieldFocusedAndExpanded() {
+        var text by mutableStateOf("")
+        compose.setContent {
+            DshTheme {
+                Composer(
+                    text,
+                    { text = it },
+                    emptyList(),
+                    {},
+                    {},
+                    null,
+                    null,
+                    {},
+                    null,
+                    null,
+                    running = false,
+                    enabled = true,
+                    onOpenAttachments = {},
+                    onOpenTools = {},
+                    onStop = {},
+                    onSend = {},
+                )
+            }
+        }
+
+        val field = compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG)
+        val composer = compose.onNodeWithTag(DS_CONVERSATION_COMPOSER_TAG)
+        field.performClick()
+        compose.waitForIdle()
+        field.assertIsFocused()
+        val expandedHeight = composer.fetchSemanticsNode().boundsInRoot.height
+
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.chat_composer_attach_file),
+        ).performClick()
+        compose.waitForIdle()
+
+        field.assertIsFocused()
+        assertEquals(expandedHeight, composer.fetchSemanticsNode().boundsInRoot.height, 0.5f)
+    }
+
     @Test fun rejectedSendRestoresOriginWithoutDroppingNewAttachments() {
         val repository = ComposerRepository()
         val original = repository.get(ComposerKey("host-a", "session"))

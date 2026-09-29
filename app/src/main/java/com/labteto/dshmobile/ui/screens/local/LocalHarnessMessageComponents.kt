@@ -65,9 +65,9 @@ import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsContextActionMenu
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -168,25 +168,16 @@ internal fun LocalMessageRow(
                 Box {
                     Box(
                         modifier = Modifier.combinedClickable(
-                            onClick = {},
+                            onClick = { actionsOpen = false },
                             onLongClick = { actionsOpen = true },
                         ),
                     ) {
                         UserBubble(message.content)
                     }
-                    DsPopupMenu(
+                    DsContextActionMenu(
                         expanded = actionsOpen,
                         onDismiss = { actionsOpen = false },
                         items = buildList {
-                            if (canEdit) {
-                                add(
-                                    MenuItem(
-                                        text = stringResource(R.string.local_edit_user_message),
-                                        icon = FeatherIcons.Edit3,
-                                        onClick = { onEdit(message) },
-                                    ),
-                                )
-                            }
                             if (copyText.isNotBlank()) {
                                 add(
                                     MenuItem(
@@ -196,6 +187,15 @@ internal fun LocalMessageRow(
                                             clipboard.setText(AnnotatedString(copyText))
                                             Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                                         },
+                                    ),
+                                )
+                            }
+                            if (canEdit) {
+                                add(
+                                    MenuItem(
+                                        text = stringResource(R.string.local_edit_user_message),
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = { onEdit(message) },
                                     ),
                                 )
                             }
@@ -256,7 +256,7 @@ internal fun LocalMessageRow(
                 MarkdownText(visibleContent)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (chatMode) {
@@ -329,8 +329,8 @@ private fun CompactMessageAction(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(36.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.size(32.dp),
+        shape = RoundedCornerShape(8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Box(contentAlignment = Alignment.Center) {

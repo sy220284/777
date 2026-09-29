@@ -93,6 +93,7 @@ internal fun LocalModeDrawer(
     sessionTitleOverrides: Map<String, String>,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
+    onClose: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: (Set<String>) -> Unit,
@@ -161,6 +162,12 @@ internal fun LocalModeDrawer(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
+                        tint = colors.labelPrimary,
+                    )
+                    DsIconButton(
+                        icon = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        onClick = onClose,
                         tint = colors.labelPrimary,
                     )
                     DsIconButton(
@@ -233,6 +240,11 @@ internal fun LocalModeDrawer(
                                 title = stringResource(R.string.persona_gallery_title),
                                 trailing = galleryCount.toString(),
                                 onClick = onOpenPersonaGallery,
+                            )
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_chat_title),
+                                onClick = onTasks,
                             )
                         } else {
                             DrawerPrimaryAction(
@@ -345,15 +357,12 @@ internal fun LocalModeDrawer(
                     }
                 } else {
                     DsGroupCard {
-                        DrawerPrimaryAction(
-                            icon = Icons.Outlined.Schedule,
-                            title = stringResource(
-                                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title
-                                else R.string.tasks_title,
-                            ),
-                            onClick = onTasks,
-                        )
                         if (usageMode == LocalUsageMode.WORK) {
+                            DrawerPrimaryAction(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.tasks_title),
+                                onClick = onTasks,
+                            )
                             DrawerPrimaryAction(
                                 icon = Icons.Outlined.Extension,
                                 title = stringResource(R.string.tools_title),

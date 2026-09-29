@@ -318,11 +318,7 @@ fun TasksScreen(
     } else {
         AutomationMode.WORK
     }
-    var selectedModeName by rememberSaveable {
-        mutableStateOf((initialMode ?: harnessTaskMode).name)
-    }
-    val taskMode = runCatching { AutomationMode.valueOf(selectedModeName) }
-        .getOrDefault(harnessTaskMode)
+    val taskMode = initialMode ?: harnessTaskMode
     val chatMode = taskMode == AutomationMode.CHAT
     val canCreateChatInteraction = harnessState.usageMode == LocalUsageMode.CHAT &&
         !harnessState.groupChat.enabled &&
@@ -431,39 +427,12 @@ fun TasksScreen(
                 },
             )
 
-            if (!showCreate) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    DsButton(
-                        text = stringResource(R.string.tasks_mode_work),
-                        onClick = { selectedModeName = AutomationMode.WORK.name },
-                        modifier = Modifier.weight(1f),
-                        variant = if (taskMode == AutomationMode.WORK) {
-                            DsButtonVariant.Info
-                        } else {
-                            DsButtonVariant.Ghost
-                        },
-                    )
-                    DsButton(
-                        text = stringResource(R.string.tasks_mode_chat),
-                        onClick = { selectedModeName = AutomationMode.CHAT.name },
-                        modifier = Modifier.weight(1f),
-                        variant = if (taskMode == AutomationMode.CHAT) {
-                            DsButtonVariant.Info
-                        } else {
-                            DsButtonVariant.Ghost
-                        },
-                    )
-                }
-                if (chatMode && !canCreateChatInteraction) {
-                    Text(
-                        stringResource(R.string.tasks_chat_mode_unavailable),
-                        style = DsType.small13,
-                        color = colors.labelSecondary,
-                    )
-                }
+            if (!showCreate && chatMode && !canCreateChatInteraction) {
+                Text(
+                    stringResource(R.string.tasks_chat_mode_unavailable),
+                    style = DsType.small13,
+                    color = colors.labelSecondary,
+                )
             }
 
             if (showCreate) {
@@ -1368,7 +1337,10 @@ private fun TaskCard(
             onDismiss = { confirmDelete = false },
         ) {
             Text(
-                stringResource(R.string.tasks_delete_confirm_body),
+                stringResource(
+                    if (task.mode == AutomationMode.CHAT) R.string.tasks_chat_delete_confirm_body
+                    else R.string.tasks_delete_confirm_body,
+                ),
                 style = DsType.std14,
                 color = colors.labelSecondary,
             )

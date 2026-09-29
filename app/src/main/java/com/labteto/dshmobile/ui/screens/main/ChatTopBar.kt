@@ -47,8 +47,8 @@ internal enum class ChatTab { Chat, Trajectory }
 /**
  * Frequency-first chat chrome.
  *
- * Only controls used while actively talking stay resident: session navigation, the current model,
- * live running state and details. Presets, subagents and trajectory remain one tap away in the
+ * Only controls used while actively talking stay resident: the current model, live running state
+ * and details. Presets, subagents and trajectory remain one tap away in the
  * capability sheet instead of taking a permanent second and third row from every conversation.
  */
 @Composable
@@ -58,7 +58,6 @@ internal fun ChatTopBar(
     models: SessionModelsValue?,
     modelsLoading: Boolean,
     detailsOpen: Boolean,
-    onOpenDrawer: () -> Unit,
     onOpenModels: () -> Unit,
     onOpenFiles: () -> Unit,
     onOpenDetails: () -> Unit,
@@ -73,14 +72,6 @@ internal fun ChatTopBar(
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DsIconButton(
-                icon = FeatherIcons.Menu,
-                contentDescription = stringResource(R.string.chatlist_open),
-                onClick = onOpenDrawer,
-                tint = colors.labelSecondary,
-                iconSize = 18.dp,
-            )
-            Spacer(Modifier.width(DsSpacing.medium))
             Text(
                 title,
                 style = DsType.base16Strong,
@@ -110,8 +101,11 @@ internal fun ChatTopBar(
         }
         Row(
             modifier = Modifier.fillMaxWidth()
-                .padding(start = DsSpacing.comfortable + DsSpacing.touchTarget + DsSpacing.medium,
-                    end = DsSpacing.comfortable, bottom = DsSpacing.small),
+                .padding(
+                    start = DsSpacing.comfortable,
+                    end = DsSpacing.comfortable,
+                    bottom = DsSpacing.small,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ModelChip(

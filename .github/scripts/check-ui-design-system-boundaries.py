@@ -16,6 +16,11 @@ UI = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
 RULES = (
     (re.compile(r"\bAlertDialog\s*\("), set(), "use DsDialog"),
     (
+        re.compile(r"\bDialog\s*\("),
+        {"components/Overlays.kt"},
+        "use DsDialog/DsFullScreenDialog",
+    ),
+    (
         re.compile(r"\bModalBottomSheet\s*\("),
         {"components/DsBottomSheet.kt"},
         "use DsBottomSheet",
@@ -24,6 +29,11 @@ RULES = (
         re.compile(r"\bDropdownMenu\s*\("),
         {"components/Overlays.kt"},
         "use DsPopupMenu/DsMenu",
+    ),
+    (
+        re.compile(r"\bPopup\s*\("),
+        {"components/Overlays.kt"},
+        "use DsFloatingPopup or another shared Ds* popup primitive",
     ),
     (
         re.compile(r"\bOutlinedCard\s*\("),

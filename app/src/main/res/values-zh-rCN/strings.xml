@@ -434,6 +434,7 @@
     <string name="tasks_missing">任务已经不存在</string>
     <string name="tasks_delete_confirm_title">删除这个任务？</string>
     <string name="tasks_delete_confirm_body">删除后将停止后续执行，并从自动化列表移除。</string>
+    <string name="tasks_chat_delete_confirm_body">删除后将停止这项定时互动，并从互动列表移除。</string>
     <string name="tasks_delete_confirm">确认删除</string>
     <string name="tasks_mode_work">工作自动化</string>
     <string name="tasks_mode_chat">角色互动</string>

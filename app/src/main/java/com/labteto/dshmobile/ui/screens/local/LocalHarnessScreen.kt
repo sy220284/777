@@ -244,6 +244,7 @@ fun LocalHarnessScreen(
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
                 },
+                onClose = { scope.launch { drawerState.close() } },
                 onRemote = {
                     scope.launch { drawerState.close() }
                     onOpenRemote()
@@ -328,11 +329,6 @@ fun LocalHarnessScreen(
                     gallery = gallery,
                     transcriptHistory = transcriptHistory,
                     modeIntro = modeIntro,
-                    onOpenMenu = {
-                        drawerFocusManager.clearFocus(force = true)
-                        drawerKeyboard?.hide()
-                        scope.launch { drawerState.open() }
-                    },
                     onConfigure = onOpenSettings,
                     onSelectModel = viewModel::selectModel,
                     onSend = viewModel::send,
@@ -498,7 +494,6 @@ private fun LoadingScreen() {
 private fun LocalConfiguration(
     state: LocalConversationSurfaceState,
     canCancel: Boolean,
-    onOpenMenu: () -> Unit,
     onCancel: () -> Unit,
     onSave: (String, String, String) -> Unit,
     onClearCredential: () -> Unit,
@@ -515,13 +510,6 @@ private fun LocalConfiguration(
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            DsIconButton(
-                icon = FeatherIcons.Menu,
-                contentDescription = stringResource(R.string.local_open_menu),
-                onClick = onOpenMenu,
-                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 3.dp,
-            )
             Text(
                 stringResource(R.string.local_harness_title),
                 style = DsType.large20,
@@ -530,8 +518,6 @@ private fun LocalConfiguration(
             )
             if (canCancel) {
                 DsButton(stringResource(R.string.common_cancel), onCancel, variant = DsButtonVariant.Ghost)
-            } else {
-                Spacer(Modifier.size(56.dp))
             }
         }
 
@@ -618,7 +604,6 @@ private fun LocalConversationSurface(
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
     modeIntro: LocalUsageMode?,
-    onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
@@ -858,7 +843,6 @@ private fun LocalConversationSurface(
                     groupMembers = state.groupChat.members,
                     activeSpeakerName = state.groupActiveSpeakerName,
                     running = state.running || state.loading,
-                    onOpenMenu = onOpenMenu,
                     onContextClick = {
                         if (state.groupChat.enabled) showGroupMemberPicker = true
                         else showPersonaPicker = true
@@ -877,7 +861,6 @@ private fun LocalConversationSurface(
                     modelLabel = state.model,
                     configured = state.configured,
                     running = state.running,
-                    onOpenMenu = onOpenMenu,
                     onModelClick = {
                         if (state.configured) showModelPicker = true else onConfigure()
                     },
@@ -1228,6 +1211,27 @@ private fun LocalConversationSurface(
             groupChatReady && (input.isNotBlank() || attachments.isNotEmpty())
         val composerAttachmentLabel = stringResource(R.string.chat_composer_add_attachment)
         val composerReplySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
+        val replySuggestionsAvailable =
+            state.usageMode == LocalUsageMode.CHAT &&
+                !state.groupChat.enabled &&
+                state.messages.any { it.role == "assistant" && it.content.isNotBlank() }
+
+        fun openReplySuggestions() {
+            if (!replySuggestionsAvailable || replySuggestionsLoading || state.running) return
+            if (state.replySuggestions.any { it.text.isNotBlank() }) {
+                showReplySuggestions = true
+                return
+            }
+            replySuggestionsLoading = true
+            scope.launch {
+                val generated = try {
+                    onGenerateReplySuggestions()
+                } finally {
+                    replySuggestionsLoading = false
+                }
+                if (generated) showReplySuggestions = true
+            }
+        }
 
         fun submitComposerMessage() {
             if (!state.configured) {
@@ -1256,44 +1260,33 @@ private fun LocalConversationSurface(
                 DsPopupMenu(
                     expanded = composerMenuOpen,
                     onDismiss = { composerMenuOpen = false },
-                    items = buildList {
-                        add(
-                            MenuItem(
-                                text = composerAttachmentLabel,
-                                icon = Icons.Outlined.AttachFile,
-                                onClick = { showAttachmentPicker = true },
-                            ),
-                        )
-                        if (
-                            state.usageMode == LocalUsageMode.CHAT &&
-                            !state.groupChat.enabled &&
-                            state.messages.any { it.role == "assistant" && it.content.isNotBlank() }
-                        ) {
-                            add(
-                                MenuItem(
-                                    text = composerReplySuggestionsLabel,
-                                    icon = Icons.Outlined.AutoAwesome,
-                                    onClick = {
-                                        if (state.replySuggestions.any { it.text.isNotBlank() }) {
-                                            showReplySuggestions = true
-                                        } else if (!replySuggestionsLoading) {
-                                            replySuggestionsLoading = true
-                                            scope.launch {
-                                                val generated = try {
-                                                    onGenerateReplySuggestions()
-                                                } finally {
-                                                    replySuggestionsLoading = false
-                                                }
-                                                if (generated) showReplySuggestions = true
-                                            }
-                                        }
-                                    },
-                                ),
-                            )
-                        }
-                    },
+                    focusable = false,
+                    items = listOf(
+                        MenuItem(
+                            text = composerAttachmentLabel,
+                            icon = Icons.Outlined.AttachFile,
+                            onClick = { showAttachmentPicker = true },
+                        ),
+                    ),
                 )
             }
+        }
+
+        @Composable
+        fun ReplySuggestionsControl() {
+            if (!replySuggestionsAvailable) return
+            DsComposerAction(
+                icon = Icons.Outlined.AutoAwesome,
+                contentDescription = if (replySuggestionsLoading) {
+                    stringResource(R.string.common_loading)
+                } else {
+                    composerReplySuggestionsLabel
+                },
+                onClick = ::openReplySuggestions,
+                enabled = !state.running && !replySuggestionsLoading,
+                tint = if (replySuggestionsLoading) colors.labelTertiary else colors.labelSecondary,
+                containerColor = Color.Transparent,
+            )
         }
 
         @Composable
@@ -1346,7 +1339,10 @@ private fun LocalConversationSurface(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                if (!composerExpanded) ComposerMenuControl()
+                if (!composerExpanded) {
+                    ComposerMenuControl()
+                    ReplySuggestionsControl()
+                }
                 DsComposerField(
                     value = input,
                     onValueChange = { drafts[state.sessionId] = it },
@@ -1374,6 +1370,7 @@ private fun LocalConversationSurface(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
                     ComposerMenuControl()
+                    ReplySuggestionsControl()
                     if (state.usageMode == LocalUsageMode.WORK) {
                         DsComposerAction(
                             icon = FeatherIcons.CheckSquare,
