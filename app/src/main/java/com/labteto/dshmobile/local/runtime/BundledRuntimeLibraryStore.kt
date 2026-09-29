@@ -23,8 +23,9 @@ internal fun parseBundledRuntimeLibraryManifest(text: String): List<BundledRunti
             require(fields.size == 3) { "运行库清单字段数量无效：" + line }
             val name = fields[0]
             val digest = fields[1]
-            val size = fields[2].toLongOrNull()
-                ?: error("运行库大小无效：" + line)
+            val size = requireNotNull(fields[2].toLongOrNull()) {
+                "运行库大小无效：" + line
+            }
             require(LIBRARY_NAME.matches(name)) { "运行库名称无效：" + name }
             require(SHA256.matches(digest)) { "运行库摘要无效：" + digest }
             require(size > 0L) { "运行库大小必须大于零：" + name }
@@ -153,10 +154,9 @@ internal object BundledRuntimeLibraryStore {
         abi: String,
         sharedDir: File,
     ) {
-        val referenced = runtimeNames.flatMap { runtime ->
-            runCatching { readManifest(context, runtime, abi) }
-                .getOrDefault(emptyList())
-        }.mapTo(mutableSetOf(), BundledRuntimeLibraryEntry::sha256)
+        val referenced = runtimeNames
+            .flatMap { runtime -> readManifest(context, runtime, abi) }
+            .mapTo(mutableSetOf(), BundledRuntimeLibraryEntry::sha256)
 
         sharedDir.listFiles().orEmpty()
             .filter(File::isFile)
