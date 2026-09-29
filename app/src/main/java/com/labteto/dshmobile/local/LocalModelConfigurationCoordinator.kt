@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
+import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -8,7 +9,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-
 internal data class LocalModelConfigurationResult(
     val configured: Boolean,
     val model: String,
