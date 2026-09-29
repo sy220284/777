@@ -5123,7 +5123,11 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 LocalChatBranchState()
             },
-            groupChat = if (stored.usageMode == LocalUsageMode.CHAT) stored.groupChat else LocalGroupChatState(),
+            groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
+                stored.groupChat.migrateLegacyConversationContext()
+            } else {
+                LocalGroupChatState()
+            },
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
