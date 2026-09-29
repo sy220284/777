@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplyContinuityGuard
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -55,7 +54,7 @@ internal class LocalChatReplyCoordinator(
                 },
             )
 
-        val scene = snapshot.chatContext.withLegacyFallback(snapshot.chatState).scene
+        val scene = snapshot.chatContext.scene
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = userMessage,
@@ -98,7 +97,7 @@ internal class LocalChatReplyCoordinator(
         val personaPrompt = chatTurnCoordinator.prepareProfile(
             persona = persona,
             state = member.chatState,
-            context = sharedContext.withLegacyFallback(member.chatState),
+            context = sharedContext,
             userInput = input,
             storyContext = handoffSummary,
         ).prompt
@@ -160,7 +159,7 @@ internal class LocalChatReplyCoordinator(
             )
         }
 
-        val scene = sharedContext.withLegacyFallback(member.chatState).scene
+        val scene = sharedContext.scene
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = input,

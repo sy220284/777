@@ -82,6 +82,11 @@ sealed interface QuestionOutcome {
 /** The refusal that means the request this answer addressed is already over. */
 internal const val NOT_PENDING: String = "not-pending"
 
+internal fun approvalResponseMatchesSession(
+    requestSessionId: String,
+    responseSessionId: String,
+): Boolean = requestSessionId == responseSessionId
+
 /**
  * Whether [outcome] means this client is done holding the request it answered.
  *
@@ -116,6 +121,18 @@ data class PendingQuestions(
     val rpcId: String,
     val items: List<AskUserQuestionItem>,
 )
+
+internal fun pendingApprovalForSession(
+    sessionId: String?,
+    approvals: Iterable<PendingApproval>,
+): PendingApproval? =
+    sessionId?.let { target -> approvals.firstOrNull { it.sessionId == target } }
+
+internal fun pendingQuestionsForSession(
+    sessionId: String?,
+    questions: Iterable<PendingQuestions>,
+): PendingQuestions? =
+    sessionId?.let { target -> questions.firstOrNull { it.sessionId == target } }
 
 /**
  * Whether more history remains after folding a backwards page.

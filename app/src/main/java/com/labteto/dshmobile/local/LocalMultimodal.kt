@@ -86,6 +86,10 @@ internal class LocalImageCapabilityRegistry {
         states[routeKey(baseUrl, model)] = LocalImageCapability.UNSUPPORTED
     }
 
+    fun clearRoute(baseUrl: String, model: String) {
+        states.remove(routeKey(baseUrl, model))
+    }
+
     private fun routeKey(baseUrl: String, model: String): String =
         baseUrl.trim().trimEnd('/').lowercase() + "|" + model.trim().lowercase()
 }

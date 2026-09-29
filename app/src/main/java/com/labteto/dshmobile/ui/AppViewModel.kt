@@ -93,10 +93,6 @@ class AppViewModel @Inject constructor(
         return sessionStore.currentSessionId.value == id
     }
 
-    fun clearUpdateInstallStatus() {
-        _updateInstallStatus.value = null
-    }
-
     fun disconnectRemote() {
         connectionManager.disconnect()
     }

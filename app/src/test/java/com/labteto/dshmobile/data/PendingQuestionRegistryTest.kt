@@ -78,4 +78,18 @@ class PendingQuestionRegistryTest {
         assertNull(registry.sessionFor("evt-1"))
         assertEquals("evt-2", registry.eventFor("s2"))
     }
+
+    @Test
+    fun `retiring a connection generation clears every old question registration`() {
+        registry.install("s1", "evt-1")
+        registry.install("s2", "evt-2")
+
+        registry.clear()
+
+        assertNull(registry.eventFor("s1"))
+        assertNull(registry.eventFor("s2"))
+        assertNull(registry.sessionFor("evt-1"))
+        assertNull(registry.sessionFor("evt-2"))
+    }
+
 }

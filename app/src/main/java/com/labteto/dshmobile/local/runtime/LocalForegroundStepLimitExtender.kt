@@ -6,6 +6,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
+internal const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
+
 /**
  * Builds the foreground soft-step extender without making LocalHarnessEngine own budget policy.
  */
@@ -16,9 +19,11 @@ internal fun localForegroundStepLimitExtender(
     state: () -> LocalHarnessState,
     pressure: () -> HarnessResourcePressure,
     onExtended: (JsonObject) -> Unit,
+    maxTotalSteps: Int = 512,
 ): AgentStepLimitExtender? {
     if (!enabled) return null
     return AgentStepLimitExtender { currentLimit, stepsUsed ->
+        if (currentLimit >= maxTotalSteps) return@AgentStepLimitExtender null
         val current = state()
         val livePressure = pressure()
         val next = nextAdaptiveAgentStepLimit(
@@ -30,18 +35,19 @@ internal fun localForegroundStepLimitExtender(
             pressure = livePressure,
             kind = LocalAgentRunKind.FOREGROUND,
         )
-        if (next != null && next > currentLimit) {
+        val boundedNext = next?.coerceAtMost(maxTotalSteps)
+        if (boundedNext != null && boundedNext > currentLimit) {
             onExtended(
                 buildJsonObject {
                     put("steps_used", stepsUsed)
                     put("previous_limit", currentLimit)
-                    put("next_limit", next)
+                    put("next_limit", boundedNext)
                     put("context_chars", current.contextChars)
                     put("context_budget_chars", current.contextBudgetChars)
                     put("resource_pressure", livePressure.name.lowercase())
                 },
             )
         }
-        next
+        boundedNext
     }
 }

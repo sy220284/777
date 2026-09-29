@@ -5,6 +5,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.RelationshipDynamics
@@ -19,6 +20,11 @@ class LocalChatHistoryWindowTest {
     fun continuationHandoffKeepsFactsAndUserEventsWithoutOldRoleWording() {
         val handoff = buildChatContinuationHandoff(
             state = ChatCharacterState(
+                dynamics = RelationshipDynamics(
+                    sharedMoments = listOf("一起看过日落"),
+                ),
+            ),
+            context = ChatContextState(
                 scene = ChatSceneState(
                     sceneTime = "夜晚",
                     location = "院子",
@@ -31,9 +37,6 @@ class LocalChatHistoryWindowTest {
                 continuity = ChatContinuityState(
                     decisions = listOf("明早九点去城南"),
                     unfinished = listOf("城南之行尚未发生"),
-                ),
-                dynamics = RelationshipDynamics(
-                    sharedMoments = listOf("一起看过日落"),
                 ),
             ),
             messages = listOf(

@@ -44,4 +44,18 @@ class CapabilityRegistry {
 
     fun <T : Any> require(id: String, type: KClass<T>): T =
         get(id, type) ?: error("能力不存在或类型不匹配：$id")
+
+    /** Internal transaction snapshot used by the plugin lifecycle manager. */
+    @Synchronized
+    internal fun snapshot(): Map<String, Pair<CapabilityDescriptor, Any>> =
+        entries.mapValuesTo(linkedMapOf()) { (_, entry) -> entry.descriptor to entry.value }
+
+    /** Restore the exact pre-lifecycle capability surface after a failed plugin transition. */
+    @Synchronized
+    internal fun restore(snapshot: Map<String, Pair<CapabilityDescriptor, Any>>) {
+        entries.clear()
+        snapshot.forEach { (id, pair) ->
+            entries[id] = Entry(pair.first, pair.second)
+        }
+    }
 }

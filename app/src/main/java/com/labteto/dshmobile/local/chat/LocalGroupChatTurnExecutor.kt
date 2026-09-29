@@ -10,7 +10,6 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.enqueuePending
 import com.labteto.dshmobile.local.chat.withContextForPlanner
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -246,7 +245,7 @@ internal class LocalGroupChatTurnExecutor(
     ): ChatCharacterState? {
         val snapshot = _state.value
         val key = apiKeys.get() ?: return null
-        val sharedContext = _state.value.groupChat.context.withLegacyFallback(member.chatState)
+        val sharedContext = _state.value.groupChat.context
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
         val prompt = buildString {
             appendLine(
@@ -344,7 +343,7 @@ internal class LocalGroupChatTurnExecutor(
                 val memberPrompt = chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
                     state = reply.member.chatState.withContextForPlanner(
-                        snapshot.groupChat.context.withLegacyFallback(reply.member.chatState),
+                        snapshot.groupChat.context,
                     ),
                     userMessage = userMessage,
                     assistantMessage = reply.content,
@@ -393,7 +392,7 @@ internal class LocalGroupChatTurnExecutor(
                 val parsed = chatTurnCoordinator.parsePostTurn(
                     text = plan.toString(),
                     previous = source.member.chatState.withContextForPlanner(
-                        snapshot.groupChat.context.withLegacyFallback(source.member.chatState),
+                        snapshot.groupChat.context,
                     ),
                     userMessage = userMessage,
                     assistantMessage = source.content,
