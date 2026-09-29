@@ -328,11 +328,6 @@ fun LocalHarnessScreen(
                     gallery = gallery,
                     transcriptHistory = transcriptHistory,
                     modeIntro = modeIntro,
-                    onOpenMenu = {
-                        drawerFocusManager.clearFocus(force = true)
-                        drawerKeyboard?.hide()
-                        scope.launch { drawerState.open() }
-                    },
                     onConfigure = onOpenSettings,
                     onSelectModel = viewModel::selectModel,
                     onSend = viewModel::send,
@@ -498,7 +493,6 @@ private fun LoadingScreen() {
 private fun LocalConfiguration(
     state: LocalConversationSurfaceState,
     canCancel: Boolean,
-    onOpenMenu: () -> Unit,
     onCancel: () -> Unit,
     onSave: (String, String, String) -> Unit,
     onClearCredential: () -> Unit,
@@ -515,13 +509,6 @@ private fun LocalConfiguration(
         verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            DsIconButton(
-                icon = FeatherIcons.Menu,
-                contentDescription = stringResource(R.string.local_open_menu),
-                onClick = onOpenMenu,
-                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 3.dp,
-            )
             Text(
                 stringResource(R.string.local_harness_title),
                 style = DsType.large20,
@@ -530,8 +517,6 @@ private fun LocalConfiguration(
             )
             if (canCancel) {
                 DsButton(stringResource(R.string.common_cancel), onCancel, variant = DsButtonVariant.Ghost)
-            } else {
-                Spacer(Modifier.size(56.dp))
             }
         }
 
@@ -618,7 +603,6 @@ private fun LocalConversationSurface(
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
     modeIntro: LocalUsageMode?,
-    onOpenMenu: () -> Unit,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> Unit,
@@ -858,7 +842,6 @@ private fun LocalConversationSurface(
                     groupMembers = state.groupChat.members,
                     activeSpeakerName = state.groupActiveSpeakerName,
                     running = state.running || state.loading,
-                    onOpenMenu = onOpenMenu,
                     onContextClick = {
                         if (state.groupChat.enabled) showGroupMemberPicker = true
                         else showPersonaPicker = true
@@ -877,7 +860,6 @@ private fun LocalConversationSurface(
                     modelLabel = state.model,
                     configured = state.configured,
                     running = state.running,
-                    onOpenMenu = onOpenMenu,
                     onModelClick = {
                         if (state.configured) showModelPicker = true else onConfigure()
                     },
