@@ -84,7 +84,15 @@ class SessionEventLog(
     fun snapshot(): List<SessionEvent> = synchronized(lock) { readEventsUnsafe() }
 
     /** Latest durable event sequence, or -1 when the log is empty. */
-    fun latestSequence(): Long = synchronized(lock) { nextSequence.get() - 1L }
+    fun latestSequence(): Long = synchronized(lock) {
+        // Another live instance for the same path may have appended or cleared the durable log.
+        // Reconcile under the shared path lock instead of trusting this instance's stale counter.
+        val durableNextSequence = readNextSequence()
+        if (nextSequence.get() != durableNextSequence) {
+            nextSequence.set(durableNextSequence)
+        }
+        durableNextSequence - 1L
+    }
 
     /**
      * Return events strictly newer than a persisted projection cursor.
