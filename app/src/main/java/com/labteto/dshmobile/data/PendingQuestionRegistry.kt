@@ -56,4 +56,9 @@ internal class PendingQuestionRegistry {
     fun discard(sessionId: String) {
         bySession.remove(sessionId)
     }
+
+    /** Drop every request when the connection generation that owned them retires. */
+    fun clear() {
+        bySession.clear()
+    }
 }
