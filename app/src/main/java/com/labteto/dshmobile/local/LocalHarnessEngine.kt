@@ -147,9 +147,6 @@ import okhttp3.OkHttpClient
  * providers with Android providers: an app-private filesystem, `/system/bin/sh`, OkHttp and Android
  * Keystore. Remote mode remains separate and unchanged.
  */
-private const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
-private const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
-
 @Singleton
 class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -3587,9 +3584,7 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         try {
-            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
-                loop.run(input)
-            }
+            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) { loop.run(input) }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
                 finalChatAssistant?.let { assistantMessage ->
@@ -3605,11 +3600,9 @@ class LocalHarnessEngine @Inject constructor(
                     )
                 }
             }
-        } catch (timeout: TimeoutCancellationException) {
+        } catch (_: TimeoutCancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-            runState.update {
-                it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度")
-            }
+            runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
         } catch (_: CancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.
