@@ -544,7 +544,7 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
-    fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = runtime.chat.send(text, attachments)
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()) = runtime.chat.send(text, attachments)
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     fun createGroupChatSession() = runtime.chat.createGroupChatSession()
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
