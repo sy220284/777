@@ -107,6 +107,7 @@ class VisionClient @Inject constructor(
                         usage = parseDeepSeekOpenAiUsage(root),
                         requestId = UUID.randomUUID().toString(),
                         context = TokenUsageContext(
+                            mode = LocalUsageMode.WORK,
                             action = TokenUsageAction.VISION,
                             taskLabel = prompt.take(120),
                         ),
