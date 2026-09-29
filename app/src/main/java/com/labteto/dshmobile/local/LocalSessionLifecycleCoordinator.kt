@@ -368,7 +368,7 @@ internal class LocalSessionLifecycleCoordinator(
                 persist()
                 val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
-                if (ids.isEmpty()) return@withLock
+                if (ids.isEmpty()) return@withLock 0
                 if (currentSessionId() in ids) {
                     cancelActiveRunAndJoin()
                 }

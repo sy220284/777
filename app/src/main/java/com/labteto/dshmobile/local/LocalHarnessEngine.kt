@@ -2463,42 +2463,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {
-        if (sessionIds.isEmpty()) return
         val cancelled = synchronized(runStateLock) {
-            sessionIds.mapNotNull { sessionId ->
-                activeWorkRuns.remove(sessionId)?.let { binding ->
-                    val job = binding.job
-                    val mirror = binding.mirrorJob
-                    binding.job = null
-                    binding.mirrorJob = null
-                    Triple(binding, job, mirror)
-                }
-            }
+            sessionIds.mapNotNull(activeWorkRuns::remove)
         }
-        cancelled.forEach { (binding, job, mirror) ->
-            binding.interactions.cancelAll()
-            val discarded = binding.pendingInputs.drain()
-            if (discarded.isNotEmpty()) {
-                binding.eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "cancelled",
-                        pending = emptyList(),
-                        affected = discarded,
-                    ),
-                )
-            }
-            binding.state.update {
-                it.copy(
-                    running = false,
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                    queuedInputCount = 0,
-                )
-            }
-            job?.cancelAndJoin()
-            mirror?.cancelAndJoin()
-        }
+        cancelled.forEach { it.cancelAndJoin() }
     }
 
     private suspend fun cancelActiveRunAndJoin() {
@@ -5329,9 +5297,4 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { it.copy(error = future.message) }
         emptyList()
     }
-
-
-
-
-
 }

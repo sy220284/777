@@ -3,7 +3,9 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * One Work turn's session-bound mutable runtime.
@@ -47,4 +49,32 @@ internal class LocalWorkRunBinding(
             transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence)
         },
     )
+
+    /** Tear down only this session-owned runtime; other Work conversations keep running. */
+    suspend fun cancelAndJoin() {
+        interactions.cancelAll()
+        val discarded = pendingInputs.drain()
+        if (discarded.isNotEmpty()) {
+            eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "cancelled",
+                    pending = emptyList(),
+                    affected = discarded,
+                ),
+            )
+        }
+        state.update {
+            it.copy(
+                running = false,
+                pendingApproval = null,
+                pendingQuestion = null,
+                queuedInputCount = 0,
+            )
+        }
+        val activeJob = job.also { job = null }
+        val activeMirror = mirrorJob.also { mirrorJob = null }
+        activeJob?.cancelAndJoin()
+        activeMirror?.cancelAndJoin()
+    }
 }
