@@ -143,12 +143,12 @@ internal fun GroupChatMemberPickerSheet(
                             ) {
                                 Surface(
                                     shape = CircleShape,
-                                    color = DsTheme.colors.accent.copy(alpha = 0.12f),
+                                    color = DsTheme.colors.characterAccentTertiary,
                                 ) {
                                     Text(
                                         entry.persona.name.trim().take(1).ifBlank { avatarFallback },
                                         style = DsType.std14Strong,
-                                        color = DsTheme.colors.accent,
+                                        color = DsTheme.colors.characterAccent,
                                         modifier = Modifier.padding(DsSpacing.small),
                                     )
                                 }

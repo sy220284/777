@@ -36,8 +36,8 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
     Surface(
         modifier = Modifier.size(24.dp),
         shape = CircleShape,
-        color = if (active) colors.accent.copy(alpha = 0.16f) else Color.Transparent,
-        border = if (active) BorderStroke(1.dp, colors.accent) else null,
+        color = if (active) colors.characterAccentTertiary else Color.Transparent,
+        border = if (active) BorderStroke(1.dp, colors.characterAccent) else null,
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (portrait != null) {
@@ -51,7 +51,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
                 Text(
                     member.displayName.trim().take(1).ifBlank { "·" },
                     style = DsType.caption11,
-                    color = if (active) colors.accent else colors.labelSecondary,
+                    color = if (active) colors.characterAccent else colors.labelSecondary,
                     maxLines = 1,
                 )
             }
@@ -68,7 +68,7 @@ internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
     Surface(
         modifier = Modifier.size(34.dp),
         shape = CircleShape,
-        color = colors.accentTertiary,
+        color = colors.characterAccentTertiary,
         border = BorderStroke(1.dp, colors.borderL1),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -83,7 +83,7 @@ internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
                 Text(
                     name.trim().take(1).ifBlank { "·" },
                     style = DsType.small13Strong,
-                    color = colors.accent,
+                    color = colors.characterAccent,
                 )
             }
         }

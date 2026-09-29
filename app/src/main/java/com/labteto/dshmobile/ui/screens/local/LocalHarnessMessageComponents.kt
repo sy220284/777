@@ -246,7 +246,7 @@ internal fun LocalMessageRow(
                         Text(
                             speaker,
                             style = DsType.small13Strong,
-                            color = colors.accent,
+                            color = colors.characterAccent,
                         )
                     }
                 }
