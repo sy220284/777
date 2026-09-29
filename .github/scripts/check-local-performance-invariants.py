@@ -261,6 +261,11 @@ if "const val PROBE_ATTEMPTS = 3" not in web_provider or "const val SAFE_HTTP_RE
 if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_provider:
     violations.append("HTTP tooling must expose safe rate-limit response headers for error classification")
 
+if "cancelWorkRunsAndJoin(requestedIds)" not in lifecycle_coordinator:
+    violations.append("Deleting sessions must cancel and join their session-bound Work runs before files are removed")
+if "cancelWorkRunsForDeletedSessions(activeWorkRuns, ids, runStateLock)" not in engine:
+    violations.append("LocalHarnessEngine must route session deletion through the bound Work-run cancellation helper")
+
 if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
 if "eventType(context.kind)" not in run_coordinator or "TOOL_OUTCOME_UNKNOWN" not in run_coordinator:
