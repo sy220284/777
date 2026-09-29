@@ -116,6 +116,15 @@ class ToolRegistry {
         )
     }
 
+    @Synchronized
+    internal fun snapshot(): Map<String, HarnessTool> = LinkedHashMap(tools)
+
+    @Synchronized
+    internal fun restore(snapshot: Map<String, HarnessTool>) {
+        tools.clear()
+        tools.putAll(snapshot)
+    }
+
     private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
         val function = tool.schema["function"] as? JsonObject ?: return null
         val parameters = function["parameters"] as? JsonObject ?: return null
