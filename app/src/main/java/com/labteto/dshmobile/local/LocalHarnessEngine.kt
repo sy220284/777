@@ -1743,7 +1743,15 @@ class LocalHarnessEngine @Inject constructor(
                 persistOverflowHistory = true,
             )
             val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
-            usageTracker.record(snapshot.model, reply.usage)
+            usageTracker.record(
+                snapshot = snapshot,
+                reply = reply,
+                action = TokenUsageAction.WORK_MAIN,
+                turnId = messageId,
+                runKind = LocalAgentRunKind.FOREGROUND,
+                taskLabel = "regenerate",
+                step = 1,
+            )
             val transcript = listOf(transcriptRuntime.newMessage("assistant", content))
             val data = transcriptRuntime.withTranscript(reply.message, transcript)
             val event = eventLog.append("assistant/message", JsonObject(
