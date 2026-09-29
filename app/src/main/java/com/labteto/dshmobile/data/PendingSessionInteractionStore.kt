@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.data
 
+import com.labteto.dshmobile.core.wire.dto.ApprovalRequestEvent
+import com.labteto.dshmobile.core.wire.dto.AskUserQuestionIntent
+import com.labteto.dshmobile.core.wire.dto.AskUserQuestionItem
+
 /**
  * Keeps remote approval/question waterfalls isolated by session while retaining event-id lookup.
  *
@@ -92,6 +96,8 @@ internal class PendingSessionInteractionStore {
     }
 
     fun questionSessionForEvent(eventId: String): String? = questionEvents.sessionFor(eventId)
+
+    fun questionEventForSession(sessionId: String): String? = questionEvents.eventFor(sessionId)
 
     fun questionsForSession(sessionId: String?): PendingQuestions? =
         pendingQuestionsForSession(sessionId, questionsBySession.values)
