@@ -114,7 +114,15 @@ internal class LocalSubagentRunnerFactory(
         },
         resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },
         onNativeImageAccepted = { baseUrl, model -> imageCapabilities.markSupported(baseUrl, model) },
-        onUsage = { model, usage -> usageTracker.record(model, usage) },
+        onUsage = { model, reply, context ->
+            usageTracker.record(
+                model = model,
+                usage = reply.usage,
+                requestId = reply.requestId,
+                context = context,
+                promptBreakdown = reply.promptBreakdown,
+            )
+        },
         onNativeImageRejected = { baseUrl, model -> imageCapabilities.markUnsupported(baseUrl, model) },
         resourceScheduler = resourceScheduler,
         acquireVirtualScreen = { owner -> deviceProvider.acquireAgentVirtualDisplay(owner) },
