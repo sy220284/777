@@ -830,7 +830,7 @@ private fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             if (state.usageMode == LocalUsageMode.CHAT) {
-                val hasSelectedPersona = state.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                val hasSelectedPersona = state.chatPersona.id != PersonaProfile.DEFAULT_PERSONA_ID
                 val personaDisplayName = if (hasSelectedPersona) {
                     state.chatPersona.name
                 } else {
@@ -1363,7 +1363,7 @@ private fun LocalConversationSurface(
                             stringResource(R.string.local_work_composer_hint)
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
-                        state.personaId == PersonaProfile.DEFAULT_PERSONA_ID ->
+                        state.chatPersona.id == PersonaProfile.DEFAULT_PERSONA_ID ->
                             stringResource(R.string.local_chat_composer_no_persona_hint)
                         else ->
                             stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
