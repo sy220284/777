@@ -141,7 +141,11 @@ class DeepSeekClient @Inject constructor(
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
-                val responseBody = response.body ?: error("模型响应为空")
+                val responseBody = response.body ?: throw LocalModelException(
+                    code = "MODEL_STREAM_INCOMPLETE",
+                    message = "模型流式响应为空",
+                    retryable = true,
+                )
                 val content = StringBuilder()
                 val reasoning = StringBuilder()
                 val fallback = StringBuilder()
@@ -211,10 +215,23 @@ class DeepSeekClient @Inject constructor(
                         }
                     }
                 }
-                if (!sawStreamData && fallback.isNotBlank()) {
-                    return@withContext parse(fallback.toString())
+                if (!sawStreamData) {
+                    if (fallback.isBlank()) {
+                        throw LocalModelException(
+                            code = "MODEL_STREAM_INCOMPLETE",
+                            message = "模型流式响应为空",
+                            retryable = true,
+                        )
+                    }
+                    return@withContext try {
+                        parse(fallback.toString())
+                    } catch (error: LocalModelException) {
+                        throw error
+                    } catch (error: Exception) {
+                        throw streamProtocolError("模型响应无法解析", error)
+                    }
                 }
-                if (sawStreamData && !sawTerminalFrame) {
+                if (!sawTerminalFrame) {
                     throw LocalModelException(
                         code = "MODEL_STREAM_INCOMPLETE",
                         message = "模型流式响应提前结束，未收到完成标记",
