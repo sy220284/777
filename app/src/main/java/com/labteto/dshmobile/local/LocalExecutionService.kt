@@ -12,7 +12,8 @@ import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
-import com.labteto.dshmobile.notify.NotificationArtwork\nimport com.labteto.dshmobile.notify.stableNotificationId
+import com.labteto.dshmobile.notify.NotificationArtwork
+import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
