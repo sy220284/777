@@ -1757,31 +1757,37 @@ class LocalHarnessEngine @Inject constructor(
         content: String,
         memoryInput: String = content,
         modelMessage: JsonObject? = null,
-    ): LocalSendResult = synchronized(runStateLock) {
-        val state = _state.value
-        val binding = if (state.usageMode == LocalUsageMode.WORK) {
-            activeWorkRuns[state.sessionId]?.takeIf { it.job?.isCompleted == false }
-        } else null
-        val targetPending = binding?.pendingInputs ?: pendingInputs
-        val targetState = binding?.state ?: _state
-        val activeRun = binding != null || (state.usageMode != LocalUsageMode.WORK && activeJob?.isCompleted == false)
-        val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
-        coordinateLocalSend(
-            state.configured, state.loading, sessionTransitioning, activeRun,
-            targetPending.size(), MAX_PENDING_INPUTS,
-            onRejected = { result -> targetState.update { it.copy(error = result.message) } },
-            onAccepted = ::cancelChatPostTurn,
-            enqueue = { targetPending.offer(queuedInput) },
-            onQueued = {
-                recordUserTranscript(content, modelMessage, true, queuedInput, binding)
-                targetState.update { it.copy(queuedInputCount = targetPending.size(), error = null) }
-                if (binding != null) persist(binding) else persist()
-            },
-            onStart = {
-                if (state.usageMode == LocalUsageMode.WORK) queueWorkTurnLocked(content, memoryInput, modelMessage).start()
-                else queueTurnLocked(content, memoryInput, modelMessage).start()
-            },
-        )
+    ): LocalSendResult {
+        var job: Job? = null
+        val result = synchronized(runStateLock) {
+            val state = _state.value
+            val binding = if (state.usageMode == LocalUsageMode.WORK) {
+                activeWorkRuns[state.sessionId]?.takeIf { it.job?.isCompleted == false }
+            } else null
+            val targetPending = binding?.pendingInputs ?: pendingInputs
+            val targetState = binding?.state ?: _state
+            val activeRun = binding != null || (state.usageMode != LocalUsageMode.WORK && activeJob?.isCompleted == false)
+            val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
+            coordinateLocalSend(
+                state.configured, state.loading, sessionTransitioning, activeRun,
+                targetPending.size(), MAX_PENDING_INPUTS,
+                onRejected = { rejected -> targetState.update { it.copy(error = rejected.message) } },
+                onAccepted = ::cancelChatPostTurn,
+                enqueue = { targetPending.offer(queuedInput) },
+                onQueued = {
+                    recordUserTranscript(content, modelMessage, true, queuedInput, binding)
+                    targetState.update { it.copy(queuedInputCount = targetPending.size(), error = null) }
+                    if (binding != null) persist(binding) else persist()
+                },
+                onStart = {
+                    job = if (state.usageMode == LocalUsageMode.WORK) {
+                        queueWorkTurnLocked(content, memoryInput, modelMessage)
+                    } else queueTurnLocked(content, memoryInput, modelMessage)
+                },
+            )
+        }
+        job?.start()
+        return result
     }
 
     private fun queueWorkTurnLocked(
