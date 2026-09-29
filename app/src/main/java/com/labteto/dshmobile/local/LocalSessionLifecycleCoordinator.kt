@@ -102,7 +102,7 @@ internal class LocalSessionLifecycleCoordinator(
                         sourceState.usageMode == LocalUsageMode.WORK && sourceState.running
                     if (!preserveWorkRun) {
                         cancelActiveRunAndJoin()
-                        jobs.stopOwnedAndJoin(setOf(sourceId))
+                        jobs.stopOwnedNonPersistentAndJoin(setOf(sourceId))
                     }
                     persist()
 
