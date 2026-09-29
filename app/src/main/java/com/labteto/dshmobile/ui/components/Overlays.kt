@@ -126,6 +126,28 @@ fun DsDialog(
 }
 
 /**
+ * Full-screen modal surface with the same dismissal contract as [DsDialog].
+ *
+ * Feature code should use this instead of constructing raw [Dialog] instances so back/outside
+ * dismissal policy remains centralized even for document and media viewers.
+ */
+@Composable
+fun DsFullScreenDialog(
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+        ),
+        content = content,
+    )
+}
+
+/**
  * Toast state pair: the current message ([State]) and a [show] lambda. The
  * message auto-clears 3s after the last [show] call.
  */
