@@ -38,7 +38,6 @@ class CharacterBehaviorTuningTest {
         assertEquals(55, previous.evolution.initiativeBaseline)
         assertTrue(evolved.initiativeBaseline >= 55)
     }
-}\n
     @Test
     fun malformedPersistedTuningIsClampedBeforeUse() {
         val normalized = CharacterBehaviorTuning(
@@ -88,4 +87,4 @@ class CharacterBehaviorTuningTest {
 
         assertEquals(local, mergeCharacterBehaviorTuning(local, stale))
     }
-
+}
