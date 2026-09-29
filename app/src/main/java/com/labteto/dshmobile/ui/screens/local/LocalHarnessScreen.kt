@@ -1530,25 +1530,11 @@ private fun LocalConversationSurface(
             onDismiss = { showGroupAnnouncement = false },
         )
     }
-    if (
-        showCharacterTuning &&
-        state.usageMode == LocalUsageMode.CHAT &&
-        !state.groupChat.enabled
-    ) {
-        CharacterBehaviorTuningDialog(
-            personaName = state.chatPersona.name,
-            portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-            relationshipState = state.chatState.relationshipState,
-            mood = state.chatState.mood,
-            evolution = state.chatState.evolution,
-            initial = state.chatState.behaviorTuning,
-            onSave = { tuning ->
-                onConfigureChatPersona(state.chatPersona.copy(behaviorTuning = tuning))
-                showCharacterTuning = false
-            },
-            onDismiss = { showCharacterTuning = false },
-        )
-    }
+    CharacterBehaviorTuningDialogHost(
+        showCharacterTuning && state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled,
+        state.chatPersona, currentGalleryEntry?.portraitPath.orEmpty(), state.chatState,
+        onConfigureChatPersona,
+    ) { showCharacterTuning = false }
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&

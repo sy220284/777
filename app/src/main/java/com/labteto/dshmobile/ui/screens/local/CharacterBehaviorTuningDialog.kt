@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.CharacterEvolutionState
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -53,6 +55,31 @@ private data class TuningPreset(
     @StringRes val labelRes: Int,
     val tuning: CharacterBehaviorTuning,
 )
+
+@Composable
+internal fun CharacterBehaviorTuningDialogHost(
+    visible: Boolean,
+    persona: PersonaProfile,
+    portraitPath: String,
+    state: ChatCharacterState,
+    onConfigurePersona: (PersonaProfile) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (!visible) return
+    CharacterBehaviorTuningDialog(
+        personaName = persona.name,
+        portraitPath = portraitPath,
+        relationshipState = state.relationshipState,
+        mood = state.mood,
+        evolution = state.evolution,
+        initial = state.behaviorTuning,
+        onSave = { tuning ->
+            onConfigurePersona(persona.copy(behaviorTuning = tuning))
+            onDismiss()
+        },
+        onDismiss = onDismiss,
+    )
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
