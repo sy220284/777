@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -67,9 +68,9 @@ fun DsDialog(
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
+            usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
             dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false,
         ),
     ) {
         BoxWithConstraints(
@@ -77,31 +78,39 @@ fun DsDialog(
                 .fillMaxSize()
                 .safeDrawingPadding()
                 .imePadding()
-                .padding(vertical = 16.dp),
+                .padding(
+                    horizontal = com.labteto.dshmobile.ui.theme.DsSpacing.comfortable,
+                    vertical = com.labteto.dshmobile.ui.theme.DsSpacing.comfortable,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
+                    .widthIn(max = 520.dp)
+                    .fillMaxWidth()
                     .heightIn(max = maxHeight),
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 8.dp,
+                shadowElevation = 4.dp,
             ) {
                 Column(
-                    Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Modifier.padding(com.labteto.dshmobile.ui.theme.DsSpacing.comfortable),
+                    verticalArrangement = Arrangement.spacedBy(
+                        com.labteto.dshmobile.ui.theme.DsSpacing.small,
+                    ),
                 ) {
                     title?.let {
-                        Text(it, style = DsType.large20, color = colors.labelPrimary)
+                        Text(it, style = DsType.base16Strong, color = colors.labelPrimary)
                     }
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(
+                            com.labteto.dshmobile.ui.theme.DsSpacing.small,
+                        ),
                     ) {
                         content()
                     }

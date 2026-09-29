@@ -30,7 +30,6 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
@@ -106,8 +105,6 @@ internal fun LocalModeDrawer(
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
-    onCheckUpdate: () -> Unit,
-    updateStatus: String?,
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable { mutableStateOf("") }
@@ -309,21 +306,6 @@ internal fun LocalModeDrawer(
                         icon = Icons.Outlined.Settings,
                         title = stringResource(R.string.settings_title),
                         onClick = onSettings,
-                    )
-                    DrawerPrimaryAction(
-                        icon = Icons.Outlined.CloudDownload,
-                        title = stringResource(R.string.settings_update_check),
-                        onClick = onCheckUpdate,
-                    )
-                }
-                updateStatus?.let { status ->
-                    Text(
-                        status,
-                        style = DsType.caption11,
-                        color = colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = DsSpacing.small),
                     )
                 }
             }

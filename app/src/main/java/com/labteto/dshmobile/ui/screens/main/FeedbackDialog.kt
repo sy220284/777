@@ -1,13 +1,25 @@
 package com.labteto.dshmobile.ui.screens.main
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalResources
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.*
 
 @Composable
@@ -57,17 +69,70 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
         catch (e: Exception) { error = e.message }
         finally { busy = false }
     }
-    AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(if (positive) R.string.chat_feedback_up else R.string.chat_feedback_down)) },
-        text = { Column {
-            OutlinedTextField(note, { note = it }, enabled = !busy, maxLines = 6, label = { Text(stringResource(R.string.feedback_note)) })
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (current != null) TextButton(onClick = { submit(true) }, enabled = !busy) { Text(stringResource(R.string.common_remove)) }
-            if (!loaded && !busy) TextButton(onClick = {
-                busy = true
-                scope.launch { try { refresh(); error = null } catch (e: Exception) { error = e.message } finally { busy = false } }
-            }) { Text(stringResource(R.string.common_retry)) }
-        } },
-        confirmButton = { TextButton(onClick = { submit(false) }, enabled = !busy && loaded) { Text(stringResource(R.string.feedback_send)) } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(R.string.common_cancel)) } })
+    DsDialog(
+        title = stringResource(if (positive) R.string.chat_feedback_up else R.string.chat_feedback_down),
+        onDismiss = { if (!busy) onDismiss() },
+    ) {
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !busy,
+            maxLines = 6,
+            label = { Text(stringResource(R.string.feedback_note)) },
+        )
+        error?.let {
+            Text(it, style = DsType.small13, color = DsTheme.colors.error)
+        }
+        if (!loaded && !busy) {
+            DsButton(
+                text = stringResource(R.string.common_retry),
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        try {
+                            refresh()
+                            error = null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            error = e.message
+                        } finally {
+                            busy = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall, Alignment.End),
+        ) {
+            if (current != null) {
+                DsButton(
+                    text = stringResource(R.string.common_remove),
+                    onClick = { submit(true) },
+                    enabled = !busy,
+                    variant = DsButtonVariant.Danger,
+                    size = DsButtonSize.Small,
+                )
+            }
+            DsButton(
+                text = stringResource(R.string.common_cancel),
+                onClick = onDismiss,
+                enabled = !busy,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+            DsButton(
+                text = stringResource(R.string.feedback_send),
+                onClick = { submit(false) },
+                enabled = !busy && loaded,
+                size = DsButtonSize.Small,
+            )
+        }
+    }
 }

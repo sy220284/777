@@ -44,6 +44,8 @@ internal class LocalModelRequestCoordinator(
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
         temperature: Double? = null,
+        previewGuard: () -> Boolean = { true },
+        overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val log = requestLog ?: defaultEventLog()
@@ -86,7 +88,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
-                        if (publishPreviewEnabled) resetPreview()
+                        if (publishPreviewEnabled && previewGuard()) resetPreview()
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         AppLog.warn(
@@ -153,7 +155,7 @@ internal class LocalModelRequestCoordinator(
                         minIntervalMs = streamPreviewIntervalMs,
                         clockMs = { System.nanoTime() / 1_000_000 },
                         publish = { preview ->
-                            if (publishPreviewEnabled) publishPreview(preview)
+                            if (publishPreviewEnabled && previewGuard()) publishPreview(preview)
                         },
                     )
                     val streamFilter = streamFilterPhrases
@@ -193,7 +195,7 @@ internal class LocalModelRequestCoordinator(
 
                 overflowRound += 1
                 if (persistOverflowHistory) {
-                    persistOverflowCompaction(snapshot, summaryMode)
+                    (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
                 }
                 log.append("request/context-overflow-recovery", buildJsonObject {
                     put("step", step)

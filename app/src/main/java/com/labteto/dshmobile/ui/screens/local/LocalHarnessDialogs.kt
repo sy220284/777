@@ -225,7 +225,7 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    DsDialog(title = stringResource(R.string.local_approval_title), onDismiss = {}) {
+    DsDialog(title = stringResource(R.string.local_approval_title), onDismiss = onDeny) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong,
@@ -323,7 +323,7 @@ internal fun QuestionDialog(
     var answer by rememberSaveable(question) { mutableStateOf("") }
     DsDialog(
         title = stringResource(R.string.local_question_title),
-        onDismiss = {},
+        onDismiss = onDismiss,
     ) {
         Text(question, style = DsType.base16Strong, color = colors.labelPrimary)
         options.forEach { option ->

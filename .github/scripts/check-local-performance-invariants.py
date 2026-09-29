@@ -28,6 +28,7 @@ TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalTo
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
 CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
 CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
+GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
 CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
@@ -75,6 +76,7 @@ tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
 chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
 chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
+group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
@@ -287,7 +289,7 @@ else:
         violations.append("Unified Chat turns must preserve stable/dynamic context placement")
 if "chatReplyCoordinator.finalizeDirect(" not in engine:
     violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
-if "chatReplyCoordinator.finalizeGroup(" not in engine:
+if "chatReplyCoordinator.finalizeGroup(" not in group_chat_executor:
     violations.append("Group Chat replies must pass the shared-scene continuity guard")
 if "chatReplyCoordinator.guardProactive(" not in automation_chat:
     violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")

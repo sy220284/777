@@ -47,6 +47,7 @@ internal class LocalSubagentRunnerFactory(
             memoryTools: LocalMemoryTools,
             enabledOptionalTools: MutableSet<String>,
         ) -> AgentToolResult,
+        historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -78,6 +79,7 @@ internal class LocalSubagentRunnerFactory(
             toolOutputSessionId = { sessionId },
             runSessionId = { sessionId },
             runKind = runKind,
+            historySnapshotProvider = historySnapshot,
         )
     }
 
@@ -90,19 +92,18 @@ internal class LocalSubagentRunnerFactory(
         toolOutputSessionId: () -> String = defaultSessionId,
         runSessionId: () -> String = defaultSessionId,
         runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
+        historySnapshotProvider: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner = LocalSubagentRunner(
         apiKeys = apiKeys,
         modelClient = modelClient,
         state = runnerState,
         jobs = jobs,
-        historySnapshot = modelHistory::snapshot,
+        historySnapshot = historySnapshotProvider,
         contextSnapshot = contextSnapshotProvider,
         eventLog = eventLogProvider,
         schemas = schemasProvider,
         execute = executeTool,
-        spillToolOutput = { callId, output ->
-            toolOutputStore.store(toolOutputSessionId(), callId, output) != null
-        },
+        spillToolOutput = { callId, output -> toolOutputStore.store(toolOutputSessionId(), callId, output) != null },
         prepareMessages = { messages, mode, _, _ ->
             prepareLocalMultimodalMessages(
                 messages = messages,
@@ -111,9 +112,7 @@ internal class LocalSubagentRunnerFactory(
                 budget = imageRequestBudget,
             )
         },
-        resolveImageMode = { mode, baseUrl, model ->
-            resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model)
-        },
+        resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },
         onNativeImageAccepted = { baseUrl, model -> imageCapabilities.markSupported(baseUrl, model) },
         onUsage = { model, usage -> usageTracker.record(model, usage) },
         onNativeImageRejected = { baseUrl, model -> imageCapabilities.markUnsupported(baseUrl, model) },
