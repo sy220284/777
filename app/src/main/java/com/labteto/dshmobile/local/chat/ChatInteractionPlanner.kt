@@ -298,27 +298,6 @@ class ChatInteractionPlanner @Inject constructor(
         appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
-    private fun StringBuilder.appendPersonaExpressionContext(persona: PersonaProfile) {
-        if (persona.corrections.isNotEmpty()) {
-            appendLine("用户纠正（最高优先）：${persona.corrections.takeLast(6).joinToString("；")}")
-        }
-        val expressionProfile = buildString {
-            append(persona.personality)
-            append(' ')
-            append(persona.speechStyle)
-            append(' ')
-            append(persona.behaviorPatterns.joinToString(" "))
-            append(' ')
-            append(persona.corrections.joinToString(" "))
-        }
-        if (PERSONA_INDIRECT_EXPRESSION_HINTS.any { expressionProfile.contains(it, ignoreCase = true) }) {
-            appendLine(
-                "表达解释：角色存在含蓄、嘴硬、心软、害羞、别扭、服软或不善直接拒绝等特征；" +
-                    "状态判断必须同时看关系阶段、前后行为和持续参与证据，不以单个字面推辞覆盖既定人物模式；明确持续边界仍优先。",
-            )
-        }
-    }
-
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? {
         val body = extractJsonObject(text) ?: return null
         val decoded = runCatching {
@@ -1029,10 +1008,6 @@ class ChatInteractionPlanner @Inject constructor(
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
         const val RECENT_ADDRESS_LIMIT = 4
-        val PERSONA_INDIRECT_EXPRESSION_HINTS = listOf(
-            "嘴硬", "心软", "服软", "害羞", "别扭", "口是心非", "傲娇",
-            "不善于拒绝", "不太会拒绝", "不善拒绝", "含蓄", "克制",
-        )
         val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")

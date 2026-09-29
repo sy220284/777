@@ -154,26 +154,6 @@ class ChatTurnRunner @Inject constructor(
         append("当前状态决定本轮反应；已结束或失效内容不再沿用。")
     }.trim()
 
-    private fun composePersonaExpressionSemanticsPrompt(persona: PersonaProfile): String {
-        val expressionProfile = buildString {
-            append(persona.personality)
-            append(' ')
-            append(persona.speechStyle)
-            append(' ')
-            append(persona.behaviorPatterns.joinToString(" "))
-            append(' ')
-            append(persona.corrections.joinToString(" "))
-        }
-        if (PERSONA_INDIRECT_EXPRESSION_HINTS.none { expressionProfile.contains(it, ignoreCase = true) }) {
-            return ""
-        }
-        return """
-            【角色表达解释】
-            当前人设或用户纠正包含嘴硬、心软、害羞、别扭、服软、不善直接拒绝等表达特征。表面推辞、逞强、害羞或嘴硬台词先按人物表达方式理解，并与关系阶段、前后行为以及主动靠近、承接、回撩、继续参与等连续证据一起判断；不得仅凭单个“不行”“不要”“别”等字面词把人物突然改写成程序化拒绝。
-            只有清晰、持续、与当前情境一致的停止、退出或拒绝继续，才改变互动方向；明确边界始终优先。人物可以含蓄、服软或嘴硬，但状态和行为必须保持连续。
-        """.trimIndent()
-    }
-
     private fun composeRoleplayNoveltyPrompt(state: ChatCharacterState): String {
         val cooling = state.interactionCooldowns
             .filterValues { it > 0 }
@@ -230,9 +210,5 @@ class ChatTurnRunner @Inject constructor(
 
     private companion object {
         const val MAX_STORY_CONTEXT_CHARS = 2_500
-        val PERSONA_INDIRECT_EXPRESSION_HINTS = listOf(
-            "嘴硬", "心软", "服软", "害羞", "别扭", "口是心非", "傲娇",
-            "不善于拒绝", "不太会拒绝", "不善拒绝", "含蓄", "克制",
-        )
     }
 }
