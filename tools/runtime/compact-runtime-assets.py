@@ -11,7 +11,7 @@ from pathlib import Path
 
 RUNTIMES = ("node", "python", "git")
 SUPPORTED_ABIS = {"arm64-v8a", "x86_64"}
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "shared-v1"
 
 
 def sha256_file(path: Path) -> str:
@@ -143,6 +143,9 @@ def self_test() -> None:
         ).read_text(encoding="utf-8")
         assert "libsame.so\t" in node_manifest
         assert "libsame.so.1\t" in node_manifest
+        assert (
+            output / "assets/runtime/shared/schema-version.txt"
+        ).read_text(encoding="utf-8").strip() == SCHEMA_VERSION
         print("runtime compactor self-test passed")
 
 
