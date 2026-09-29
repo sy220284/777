@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.Text
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -20,6 +21,8 @@ import com.labteto.dshmobile.ui.theme.DsType
  * Focus alone never changes composer geometry. Text grows naturally until [maxLines], while the
  * shared composer shell keeps idle and focused states at the same compact height.
  */
+const val DS_COMPOSER_FIELD_TAG = "ds-composer-field"
+
 @Composable
 fun DsComposerField(
     value: String,
@@ -34,6 +37,7 @@ fun DsComposerField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
+            .testTag(DS_COMPOSER_FIELD_TAG)
             .heightIn(min = DsSpacing.touchTarget)
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
         enabled = enabled,
