@@ -61,14 +61,9 @@ internal fun canUseDeviceApprovalLease(tool: HarnessTool): Boolean =
         tool.approvalPolicy == ToolApprovalPolicy.MUTATION
 
 internal fun projectExecutionJobs(
-    usageMode: LocalUsageMode,
-    sessionId: String,
-    jobs: List<LocalJobInfo>,
-): List<LocalJobInfo> = if (usageMode == LocalUsageMode.WORK) {
-    jobs.filter { it.ownerSessionId == sessionId }
-} else {
-    emptyList()
-}
+    usageMode: LocalUsageMode, sessionId: String, jobs: List<LocalJobInfo>,
+): List<LocalJobInfo> =
+    if (usageMode == LocalUsageMode.WORK) jobs.filter { it.ownerSessionId == sessionId } else emptyList()
 
 internal fun projectWorkResourceCount(
     usageMode: LocalUsageMode,
