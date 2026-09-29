@@ -254,6 +254,42 @@ internal fun DeepSeekUsageTracker.record(
     )
 }
 
+internal fun buildForegroundTokenUsageContext(
+    snapshot: LocalHarnessState,
+    action: TokenUsageAction,
+    turnId: String? = null,
+    runId: String? = null,
+    taskLabel: String? = null,
+    step: Int? = null,
+): TokenUsageContext = buildTokenUsageContext(
+    snapshot = snapshot,
+    action = action,
+    turnId = turnId,
+    runId = runId,
+    runKind = LocalAgentRunKind.FOREGROUND,
+    taskLabel = taskLabel,
+    step = step,
+)
+
+internal fun DeepSeekUsageTracker.recordForeground(
+    snapshot: LocalHarnessState,
+    reply: LocalModelReply,
+    action: TokenUsageAction,
+    turnId: String? = null,
+    runId: String? = null,
+    taskLabel: String? = null,
+    step: Int? = null,
+) = record(
+    snapshot = snapshot,
+    reply = reply,
+    action = action,
+    turnId = turnId,
+    runId = runId,
+    runKind = LocalAgentRunKind.FOREGROUND,
+    taskLabel = taskLabel,
+    step = step,
+)
+
 internal fun estimatePromptBreakdown(
     messages: List<JsonObject>,
     tools: JsonArray,
