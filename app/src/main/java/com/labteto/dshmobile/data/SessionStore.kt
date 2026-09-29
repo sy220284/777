@@ -1328,7 +1328,7 @@ class SessionStore @Inject constructor(
             eventId = request.rpcId,
             outcome = RemoteEventOutcome.Result(value = JsonPrimitive(outcome)),
         )
-        return answerOutcome(result, "approval response", sessionId) { forgetRequest(request.eventId) }
+        return answerOutcome(result, "approval response", sessionId) { forgetRequest(request.rpcId) }
     }
 
     /**
