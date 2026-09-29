@@ -3523,7 +3523,7 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.TurnStepLimit -> {
                         val transcriptMessage = runTranscript.newMessage(
                             "system",
-                            "本轮达到 $mainMaxSteps 步安全上限，请继续发送消息以恢复任务。",
+                            "当前任务已无法继续扩展执行预算，已在第 ${event.steps} 步暂停；已有进度已保留。",
                         )
                         val turnEnd = runEventLog.append("turn/end", buildJsonObject {
                             put("reason", "step_limit")
@@ -3565,6 +3565,9 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
+            stepLimitExtender = localForegroundStepLimitExtender(
+                runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure },
+            ) { runEventLog.append("turn/budget-extended", it) },
             idFactory = { runContext.runId },
         )
 
