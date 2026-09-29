@@ -5261,18 +5261,21 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun persist(binding: LocalWorkRunBinding? = null) {
-        // Capture the durable boundary before the in-memory projection. A concurrent state update
-        // may then be included in the snapshot with an older cursor, which is safe because replay
-        // can idempotently re-apply its later event.
+        // Capture durable projection boundaries before reading the in-memory state. If a concurrent
+        // update lands after these cursors, the snapshot may already include it and replaying the
+        // later event is idempotent. Reading state first could instead persist old state with a newer
+        // cursor and make recovery incorrectly skip that event.
         val sessionId = binding?.sessionId ?: currentSessionId
-        val state = binding?.state?.value ?: _state.value
         val log = binding?.eventLog ?: eventLog
-        val cursor = binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
+        val controlProjectedThroughSequence = log.latestSequence()
+        val transcriptProjectedThroughSequence =
+            binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
+        val state = binding?.state?.value ?: _state.value
         val snapshot = sessionCoordinator.snapshot(
             sessionId = sessionId,
             state = state,
-            controlProjectedThroughSequence = log.latestSequence(),
-            transcriptProjectedThroughSequence = cursor,
+            controlProjectedThroughSequence = controlProjectedThroughSequence,
+            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
         )
         sessionCoordinator.enqueue(snapshot)
     }
