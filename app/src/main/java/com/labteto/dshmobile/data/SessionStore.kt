@@ -1295,6 +1295,10 @@ class SessionStore @Inject constructor(
             if (_pendingApproval.value?.approvalId == approvalId) _pendingApproval.value = null
             return QuestionOutcome.Refused(NOT_PENDING)
         }
+        if (!approvalResponseMatchesSession(request.sessionId, sessionId)) {
+            log("refusing approval $approvalId for session $sessionId; owner=${request.sessionId}")
+            return QuestionOutcome.Refused(NOT_PENDING)
+        }
         val clientId = connectionManager.generation?.clientId
         if (clientId == null) {
             log("cannot answer approval $approvalId: no connection generation")
