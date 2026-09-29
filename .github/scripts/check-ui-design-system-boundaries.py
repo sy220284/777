@@ -26,6 +26,11 @@ RULES = (
         "use DsPopupMenu/DsMenu",
     ),
     (
+        re.compile(r"\bPopup\s*\("),
+        {"components/Overlays.kt"},
+        "use DsFloatingPopup or another shared Ds* popup primitive",
+    ),
+    (
         re.compile(r"\bOutlinedCard\s*\("),
         set(),
         "use a shared Ds* card such as DsDeliverableCard",
