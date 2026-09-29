@@ -50,7 +50,6 @@ internal fun ChatSurfaceHeader(
     groupMembers: List<LocalGroupChatMember>,
     activeSpeakerName: String?,
     running: Boolean,
-    onOpenMenu: () -> Unit,
     onContextClick: () -> Unit,
     onExitGroupChat: () -> Unit,
     onNewSession: () -> Unit,
@@ -135,12 +134,6 @@ internal fun ChatSurfaceHeader(
             )
         }
         DsIconButton(
-            icon = FeatherIcons.Menu,
-            contentDescription = stringResource(R.string.local_open_menu),
-            onClick = onOpenMenu,
-            tint = colors.labelSecondary,
-        )
-        DsIconButton(
             icon = Icons.Filled.Add,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
@@ -161,7 +154,6 @@ internal fun WorkSurfaceHeader(
     modelLabel: String,
     configured: Boolean,
     running: Boolean,
-    onOpenMenu: () -> Unit,
     onModelClick: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onNewSession: () -> Unit,
@@ -226,12 +218,6 @@ internal fun WorkSurfaceHeader(
             icon = FeatherIcons.CheckSquare,
             contentDescription = stringResource(R.string.local_execution_console),
             onClick = onOpenRunCenter,
-            tint = colors.labelSecondary,
-        )
-        DsIconButton(
-            icon = FeatherIcons.Menu,
-            contentDescription = stringResource(R.string.local_open_menu),
-            onClick = onOpenMenu,
             tint = colors.labelSecondary,
         )
         DsIconButton(
