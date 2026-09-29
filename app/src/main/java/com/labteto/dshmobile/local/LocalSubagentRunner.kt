@@ -63,7 +63,7 @@ internal class LocalSubagentRunner(
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
-    private val onUsage: (String, DeepSeekTokenUsage) -> Unit = { _, _ -> },
+    private val onUsage: (String, LocalModelReply, TokenUsageContext) -> Unit = { _, _, _ -> },
     private val onNativeImageAccepted: (String, String) -> Unit = { _, _ -> },
     private val onNativeImageRejected: (String, String) -> Unit = { _, _ -> },
     private val resourceScheduler: HarnessResourceScheduler,
@@ -300,7 +300,22 @@ internal class LocalSubagentRunner(
                             throw error
                         }
                     }
-                    onUsage(routeModel, reply.usage)
+                    val usageAction = if (runKind == LocalAgentRunKind.AUTOMATION) {
+                        TokenUsageAction.AUTOMATION
+                    } else {
+                        TokenUsageAction.WORK_SUBAGENT
+                    }
+                    val usageContext = buildTokenUsageContext(
+                        snapshot = snapshot,
+                        action = usageAction,
+                        turnId = runContext?.runId ?: subagentId,
+                        runId = runContext?.runId ?: subagentId,
+                        runKind = runKind,
+                        agentId = subagentId,
+                        taskLabel = task,
+                        step = modelStep,
+                    ).copy(sessionId = runSessionId())
+                    onUsage(routeModel, reply, usageContext)
                     repliesByStep[modelStep] = reply
                     AgentModelReply(
                         content = reply.content.orEmpty(),
