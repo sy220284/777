@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -280,6 +281,8 @@ data class LocalHarnessState(
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
+    val sendRejectReason: LocalSendRejectReason? = null,
+    val sendRejectLimit: Int? = null,
     val error: String? = null,
 )
 
