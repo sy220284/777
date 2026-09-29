@@ -170,7 +170,6 @@ internal class LocalAutomationChatCoordinator(
                 require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
                 val sessionContext = session.chatContext.withLegacyFallback(session.chatState)
                 val sessionCharacterState = session.chatState.withoutLegacyConversationContext()
-
                 val runtime = state.value
                 val persona = chatPersonaStore.get(session.personaId)
                 val boundEventLog = eventLogFor(session.id)
