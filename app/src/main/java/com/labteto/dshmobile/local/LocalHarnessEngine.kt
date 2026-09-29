@@ -2250,9 +2250,9 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun installedPluginIdsForUi(): List<String> = pluginRegistry.ids()
 
-    internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId)
+    internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId, currentSessionId)
 
-    internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId)
+    internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId, currentSessionId)
 
     /** Resolve the approval owned by the currently visible conversation. */
     internal fun answerApproval(callId: String, approved: Boolean) {
@@ -4088,9 +4088,9 @@ class LocalHarnessEngine @Inject constructor(
                 if (!allowMutation) return "该子任务处于只读模式"
                 LocalShellTool.execute(args, workspace, jobs, boundSessionId)
             }
-            "job_list" -> jobs.list()
-            "job_output" -> jobs.output(args.string("job_id"))
-            "job_kill" -> jobs.kill(args.string("job_id"))
+            "job_list" -> jobs.list(boundSessionId)
+            "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
+            "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
                 val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
@@ -4197,9 +4197,9 @@ class LocalHarnessEngine @Inject constructor(
                     maxSteps = executionState.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> "${executionState.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
-            "list_agents" -> jobs.listAgents()
-            "send_message" -> jobs.send(args.string("agent_id"), args.string("message"))
-            "interrupt_agent" -> jobs.kill(args.string("agent_id"))
+            "list_agents" -> jobs.listAgents(boundSessionId)
+            "send_message" -> jobs.send(args.string("agent_id"), args.string("message"), boundSessionId)
+            "interrupt_agent" -> jobs.kill(args.string("agent_id"), boundSessionId)
             "workflow" -> runWorkflow(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
