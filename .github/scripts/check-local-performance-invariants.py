@@ -28,7 +28,7 @@ TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalTo
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
 CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
 CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
-GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalGroupChatTurnExecutor.kt"
+GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
 CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
