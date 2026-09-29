@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -879,15 +880,16 @@ private fun SectionHeading(text: String) {
 }
 
 @Composable
-private fun EmptyUsageDetail(message: String = stringResource(R.string.usage_empty_detail)) {
+private fun EmptyUsageDetail(message: String? = null) {
     val colors = DsTheme.colors
+    val resolvedMessage = message ?: stringResource(R.string.usage_empty_detail)
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.row,
         color = colors.bgLayer1,
     ) {
         Text(
-            message,
+            resolvedMessage,
             modifier = Modifier.padding(DsSpacing.medium),
             style = DsType.small13,
             color = colors.labelSecondary,
