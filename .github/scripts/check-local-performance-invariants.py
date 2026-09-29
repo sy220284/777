@@ -271,7 +271,7 @@ if "jobs.stopOwnedAndJoin(setOf(sourceId))" not in lifecycle_coordinator:
     violations.append("Creating a session must only stop background jobs owned by the source session")
 if "jobs.stopOwnedAndJoin(requestedIds)" not in lifecycle_coordinator:
     violations.append("Deleting sessions must only stop background jobs owned by those sessions")
-if "ownerSessionId = boundSessionId" not in engine:
+if "LocalShellTool.execute(args, workspace, jobs, boundSessionId)" not in engine:
     violations.append("Background shell jobs must stay bound to the executing session")
 if engine.count("ownerSessionId = sessionId") < 2:
     violations.append("Persistent web/subagent jobs must retain their owning session")
