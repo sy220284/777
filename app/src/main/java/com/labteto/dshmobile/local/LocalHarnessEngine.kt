@@ -1309,7 +1309,14 @@ class LocalHarnessEngine @Inject constructor(
             })
             return false
         }
-        usageTracker.record(snapshot.model, reply.usage)
+        usageTracker.record(
+            snapshot = snapshot,
+            reply = reply,
+            action = TokenUsageAction.REPLY_SUGGESTIONS,
+            turnId = snapshot.transcriptIndex.latestUserMessageId,
+            runKind = LocalAgentRunKind.FOREGROUND,
+            step = CHAT_POST_TURN_MODEL_STEP + 1,
+        )
         val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
             boundEventLog.append("chat/reply-suggestions", buildJsonObject {
