@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -19,9 +20,9 @@ import androidx.compose.ui.unit.IntSize
  * a loading skeleton, and only while something is genuinely loading.
  */
 object DsAnimations {
-    /** Quick, slightly springy — for direct manipulation that should feel physical. */
+    /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
     val fastSpring = spring<Float>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
+        dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessHigh,
     )
 
@@ -47,13 +48,19 @@ object DsAnimations {
     )
 
     /** Chevron rotation on a disclosure row. */
-    val chevron: AnimationSpec<Float> = tween(180, easing = FastOutSlowInEasing)
+    val chevron: AnimationSpec<Float> = tween(160, easing = FastOutSlowInEasing)
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
 
-    /** Sliding indicator used by compact segmented controls. */
-    val segmentSlide: FiniteAnimationSpec<Dp> = tween(220, easing = FastOutSlowInEasing)
+    /** Sliding indicator used by compact segmented controls. It settles instead of gliding mechanically. */
+    val segmentSlide: FiniteAnimationSpec<Dp> = spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium,
+    )
+
+    /** Subtle surface feedback for selectable rows and tabs. */
+    val interactionColor: FiniteAnimationSpec<Color> = tween(120, easing = FastOutSlowInEasing)
 
     /** Item placement inside a lazy list when rows are inserted, removed, or reordered. */
     val listItem: FiniteAnimationSpec<IntOffset> = spring(
@@ -65,7 +72,7 @@ object DsAnimations {
     val fade: FiniteAnimationSpec<Float> = tween(fadeDuration, easing = FastOutSlowInEasing)
 
     /** Panel slide-in, faster than the platform default so it keeps up with a drag. */
-    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(220, easing = FastOutSlowInEasing)
+    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
     const val scaleDuration = 100
@@ -79,6 +86,6 @@ object DsAnimations {
     /** Scale values for interactive elements */
     object Scale {
         const val normal = 1f
-        const val pressed = 0.95f
+        const val pressed = 0.975f
     }
 }

@@ -94,6 +94,7 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -817,7 +818,7 @@ internal fun SettingsCard(
     content: @Composable () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Column(Modifier.fillMaxWidth().animateContentSize()) {
+    Column(Modifier.fillMaxWidth().animateContentSize(DsAnimations.expand)) {
         Row(
             Modifier.padding(
                 start = DsSpacing.small,

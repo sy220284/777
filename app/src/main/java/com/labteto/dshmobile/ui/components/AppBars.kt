@@ -1,7 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +15,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -101,13 +105,22 @@ fun DsSegmentedTabs(
     ) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex
+            val segmentColor by animateColorAsState(
+                targetValue = if (selected) selectedBackground else Color.Transparent,
+                animationSpec = DsAnimations.interactionColor,
+                label = "segmentedTabBackground",
+            )
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 40.dp)
                     .clip(DsShapes.row)
-                    .background(if (selected) selectedBackground else Color.Transparent)
-                    .clickable { onSelect(index) }
+                    .background(segmentColor)
+                    .selectable(
+                        selected = selected,
+                        role = Role.Tab,
+                        onClick = { onSelect(index) },
+                    )
                     .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
                 contentAlignment = Alignment.Center,
             ) {

@@ -2,7 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -89,12 +90,17 @@ internal fun LocalUsageModePill(
                             .width(segmentWidth)
                             .height(44.dp)
                             .clip(DsShapes.pillFull)
-                            .clickable(enabled = enabled) { onSelect(mode) },
+                            .selectable(
+                                selected = selected == mode,
+                                enabled = enabled,
+                                role = Role.Tab,
+                                onClick = { onSelect(mode) },
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = DsType.std14,
+                            style = if (selected == mode) DsType.std14Strong else DsType.std14,
                             color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
                         )
                     }

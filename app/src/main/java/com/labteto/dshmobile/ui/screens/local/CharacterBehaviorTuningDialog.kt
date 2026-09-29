@@ -2,6 +2,11 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
@@ -45,6 +52,7 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -145,6 +153,14 @@ internal fun CharacterBehaviorTuningDialog(
         )
     }
     val selectedPreset = presets.firstOrNull { sameTuningShape(it.tuning, draft) }
+    val advancedRotation by animateFloatAsState(
+        targetValue = if (advanced) 90f else 0f,
+        animationSpec = DsAnimations.chevron,
+        label = "characterTuningAdvancedChevron",
+    )
+    val advancedStateDescription = stringResource(
+        if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
+    )
 
     DsDialog(title = null, onDismiss = onDismiss) {
         Surface(
@@ -242,21 +258,6 @@ internal fun CharacterBehaviorTuningDialog(
             value = draft.openness,
             onValueChange = { draft = draft.copy(openness = it) },
         )
-        BehaviorSlider(
-            title = stringResource(R.string.local_character_tuning_evolution),
-            low = stringResource(R.string.local_character_tuning_evolution_low),
-            high = stringResource(R.string.local_character_tuning_evolution_high),
-            value = draft.evolution,
-            onValueChange = { draft = draft.copy(evolution = it) },
-        )
-        BehaviorSlider(
-            title = stringResource(R.string.local_character_tuning_afterglow),
-            low = stringResource(R.string.local_character_tuning_afterglow_low),
-            high = stringResource(R.string.local_character_tuning_afterglow_high),
-            value = draft.emotionalAfterglow,
-            onValueChange = { draft = draft.copy(emotionalAfterglow = it) },
-        )
-
         SectionLabel(stringResource(R.string.local_character_tuning_current_state))
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -308,7 +309,8 @@ internal fun CharacterBehaviorTuningDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = DsSpacing.touchTarget)
-                .clickable { advanced = !advanced },
+                .semantics { stateDescription = advancedStateDescription }
+                .clickable(role = Role.Button) { advanced = !advanced },
             shape = DsShapes.row,
             color = Color.Transparent,
         ) {
@@ -328,16 +330,34 @@ internal fun CharacterBehaviorTuningDialog(
                     tint = colors.labelSecondary,
                     modifier = Modifier
                         .size(18.dp)
-                        .graphicsLayer { rotationZ = if (advanced) 90f else 0f },
+                        .graphicsLayer { rotationZ = advancedRotation },
                 )
             }
         }
 
-        AnimatedVisibility(visible = advanced) {
+        AnimatedVisibility(
+            visible = advanced,
+            enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
+            exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
+        ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                BehaviorSlider(
+                    title = stringResource(R.string.local_character_tuning_evolution),
+                    low = stringResource(R.string.local_character_tuning_evolution_low),
+                    high = stringResource(R.string.local_character_tuning_evolution_high),
+                    value = draft.evolution,
+                    onValueChange = { draft = draft.copy(evolution = it) },
+                )
+                BehaviorSlider(
+                    title = stringResource(R.string.local_character_tuning_afterglow),
+                    low = stringResource(R.string.local_character_tuning_afterglow_low),
+                    high = stringResource(R.string.local_character_tuning_afterglow_high),
+                    value = draft.emotionalAfterglow,
+                    onValueChange = { draft = draft.copy(emotionalAfterglow = it) },
+                )
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_novelty),
                     low = stringResource(R.string.local_character_tuning_novelty_low),
