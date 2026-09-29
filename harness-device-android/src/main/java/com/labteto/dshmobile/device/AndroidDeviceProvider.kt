@@ -77,10 +77,10 @@ class AndroidDeviceProvider(
             "accessibility_tree" -> accessibilityTree()
             "accessibility_find" -> accessibilityFind(arguments)
             "accessibility_click_node" ->
-                accessibility().clickNode(arguments.requiredInt("node")).toString()
+                accessibility().clickNode(arguments.deviceRequiredInt("node")).toString()
             "accessibility_set_text_node" ->
                 accessibility().setTextNode(
-                    arguments.requiredInt("node"),
+                    arguments.deviceRequiredInt("node"),
                     arguments.required("value"),
                 ).toString()
             "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
@@ -95,17 +95,17 @@ class AndroidDeviceProvider(
                 ).toString()
             "accessibility_tap" ->
                 accessibility().tap(
-                    arguments.requiredFiniteFloat("x"),
-                    arguments.requiredFiniteFloat("y"),
-                    arguments.optionalLong("duration_ms", 60L, 1L..60_000L),
+                    arguments.deviceRequiredFiniteFloat("x"),
+                    arguments.deviceRequiredFiniteFloat("y"),
+                    arguments.deviceOptionalLong("duration_ms", 60L, 1L..60_000L),
                 ).toString()
             "accessibility_swipe" ->
                 accessibility().swipe(
-                    arguments.requiredFiniteFloat("start_x"),
-                    arguments.requiredFiniteFloat("start_y"),
-                    arguments.requiredFiniteFloat("end_x"),
-                    arguments.requiredFiniteFloat("end_y"),
-                    arguments.optionalLong("duration_ms", 350L, 1L..60_000L),
+                    arguments.deviceRequiredFiniteFloat("start_x"),
+                    arguments.deviceRequiredFiniteFloat("start_y"),
+                    arguments.deviceRequiredFiniteFloat("end_x"),
+                    arguments.deviceRequiredFiniteFloat("end_y"),
+                    arguments.deviceOptionalLong("duration_ms", 350L, 1L..60_000L),
                 ).toString()
             "android_back" -> accessibility().globalBack().toString()
             "android_home" -> accessibility().globalHome().toString()
@@ -124,9 +124,9 @@ class AndroidDeviceProvider(
                 )
                 try {
                     val status = virtualDisplays.create(
-                        width = arguments.optionalInt("width", 1080),
-                        height = arguments.optionalInt("height", 1920),
-                        densityDpi = arguments.optionalInt("density_dpi", 420),
+                        width = arguments.deviceOptionalInt("width", 1080),
+                        height = arguments.deviceOptionalInt("height", 1920),
+                        densityDpi = arguments.deviceOptionalInt("density_dpi", 420),
                     )
                     if (lease != null) virtualDisplayLeases[status.id] = lease
                     virtualStatus(status)
@@ -144,20 +144,20 @@ class AndroidDeviceProvider(
             "vscreen_tap" -> {
                 val id = arguments.required("id")
                 accessibility().tap(
-                    x = arguments.requiredFiniteFloat("x"),
-                    y = arguments.requiredFiniteFloat("y"),
-                    durationMillis = arguments.optionalLong("duration_ms", 60L, 1L..60_000L),
+                    x = arguments.deviceRequiredFiniteFloat("x"),
+                    y = arguments.deviceRequiredFiniteFloat("y"),
+                    durationMillis = arguments.deviceOptionalLong("duration_ms", 60L, 1L..60_000L),
                     displayId = virtualDisplays.displayId(id),
                 ).toString()
             }
             "vscreen_swipe" -> {
                 val id = arguments.required("id")
                 accessibility().swipe(
-                    startX = arguments.requiredFiniteFloat("start_x"),
-                    startY = arguments.requiredFiniteFloat("start_y"),
-                    endX = arguments.requiredFiniteFloat("end_x"),
-                    endY = arguments.requiredFiniteFloat("end_y"),
-                    durationMillis = arguments.optionalLong("duration_ms", 350L, 1L..60_000L),
+                    startX = arguments.deviceRequiredFiniteFloat("start_x"),
+                    startY = arguments.deviceRequiredFiniteFloat("start_y"),
+                    endX = arguments.deviceRequiredFiniteFloat("end_x"),
+                    endY = arguments.deviceRequiredFiniteFloat("end_y"),
+                    durationMillis = arguments.deviceOptionalLong("duration_ms", 350L, 1L..60_000L),
                     displayId = virtualDisplays.displayId(id),
                 ).toString()
             }
@@ -264,8 +264,8 @@ class AndroidDeviceProvider(
         val text = arguments["text"]?.takeIf(String::isNotBlank)
         val viewId = arguments["id"]?.takeIf(String::isNotBlank)
         val className = arguments["class"]?.takeIf(String::isNotBlank)
-        val clickable = arguments.optionalBoolean("clickable")
-        val editable = arguments.optionalBoolean("editable")
+        val clickable = arguments.deviceOptionalBoolean("clickable")
+        val editable = arguments.deviceOptionalBoolean("editable")
         require(
             text != null || viewId != null || className != null || clickable != null || editable != null,
         ) { "android_find 至少需要 text、id、class、clickable 或 editable 之一" }
@@ -297,7 +297,7 @@ class AndroidDeviceProvider(
         val text = arguments["text"]?.takeIf(String::isNotBlank)
         val viewId = arguments["id"]?.takeIf(String::isNotBlank)
         require(text != null || viewId != null) { "android_wait 至少需要 text 或 id" }
-        val timeout = arguments.optionalLong("timeout_ms", 10_000L, 100L..60_000L)
+        val timeout = arguments.deviceOptionalLong("timeout_ms", 10_000L, 100L..60_000L)
         val match: AccessibilityNodeSnapshot = withTimeoutOrNull(timeout) {
             var found: AccessibilityNodeSnapshot? = null
             while (found == null) {
@@ -361,41 +361,43 @@ class AndroidDeviceProvider(
     private fun Map<String, String>.required(key: String): String =
         this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
 
-    private fun Map<String, String>.requiredInt(key: String): Int =
-        required(key).toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
-
-    private fun Map<String, String>.requiredFiniteFloat(key: String): Float {
-        val value = required(key).toFloatOrNull()
-            ?: throw IllegalArgumentException("$key 必须是数字")
-        require(value.isFinite()) { "$key 必须是有限数字" }
-        return value
-    }
-
-    private fun Map<String, String>.optionalInt(key: String, default: Int): Int {
-        val raw = this[key] ?: return default
-        require(raw.isNotBlank()) { "$key 不能为空" }
-        return raw.toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
-    }
-
-    private fun Map<String, String>.optionalLong(
-        key: String,
-        default: Long,
-        range: LongRange,
-    ): Long {
-        val raw = this[key] ?: return default
-        require(raw.isNotBlank()) { "$key 不能为空" }
-        val value = raw.toLongOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
-        require(value in range) { "$key 必须在 ${range.first}..${range.last} 之间" }
-        return value
-    }
-
-    private fun Map<String, String>.optionalBoolean(key: String): Boolean? {
-        val raw = this[key] ?: return null
-        return raw.toBooleanStrictOrNull()
-            ?: throw IllegalArgumentException("$key 必须是 true 或 false")
-    }
-
     private companion object {
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
+}
+
+internal fun Map<String, String>.deviceRequiredInt(key: String): Int {
+    val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
+    return raw.toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+}
+
+internal fun Map<String, String>.deviceRequiredFiniteFloat(key: String): Float {
+    val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
+    val value = raw.toFloatOrNull() ?: throw IllegalArgumentException("$key 必须是数字")
+    require(value.isFinite()) { "$key 必须是有限数字" }
+    return value
+}
+
+internal fun Map<String, String>.deviceOptionalInt(key: String, default: Int): Int {
+    val raw = this[key] ?: return default
+    require(raw.isNotBlank()) { "$key 不能为空" }
+    return raw.toIntOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+}
+
+internal fun Map<String, String>.deviceOptionalLong(
+    key: String,
+    default: Long,
+    range: LongRange,
+): Long {
+    val raw = this[key] ?: return default
+    require(raw.isNotBlank()) { "$key 不能为空" }
+    val value = raw.toLongOrNull() ?: throw IllegalArgumentException("$key 必须是整数")
+    require(value in range) { "$key 必须在 ${range.first}..${range.last} 之间" }
+    return value
+}
+
+internal fun Map<String, String>.deviceOptionalBoolean(key: String): Boolean? {
+    val raw = this[key] ?: return null
+    return raw.toBooleanStrictOrNull()
+        ?: throw IllegalArgumentException("$key 必须是 true 或 false")
 }
