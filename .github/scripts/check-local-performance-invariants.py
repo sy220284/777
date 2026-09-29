@@ -28,6 +28,8 @@ AUTOMATION_CHAT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automati
 PROMPT_CONTEXT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt"
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
 CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
+CHAT_REPLY_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt"
+CHAT_HISTORY_WINDOW = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt"
 CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
 CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
 GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
@@ -100,12 +102,37 @@ automation_chat = AUTOMATION_CHAT.read_text(encoding="utf-8")
 prompt_context = PROMPT_CONTEXT.read_text(encoding="utf-8")
 tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
 chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
+chat_reply_coordinator = CHAT_REPLY_COORDINATOR.read_text(encoding="utf-8")
+chat_history_window = CHAT_HISTORY_WINDOW.read_text(encoding="utf-8")
 chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
 chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
 group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
+
+for name, source in (
+    ("LocalChatTurnCoordinator.kt", chat_coordinator),
+    ("LocalChatReplyCoordinator.kt", chat_reply_coordinator),
+    ("LocalChatHistoryWindow.kt", chat_history_window),
+    ("LocalChatContextRefreshCoordinator.kt", chat_context_refresh),
+    ("LocalGroupChatTurnExecutor.kt", group_chat_executor),
+):
+    if "withLegacyFallback" in source:
+        violations.append(
+            f"{name} must use ChatContextState as the runtime scene/continuity source; "
+            "legacy fallback is allowed only at persistence migration boundaries"
+        )
+
+for forbidden_runtime_fallback in (
+    ".withLegacyFallback(snapshot.chatState)",
+    ".withLegacyFallback(beforeAssistant.chatState)",
+    ".withLegacyFallback(nextChatState)",
+):
+    if forbidden_runtime_fallback in engine:
+        violations.append(
+            f"LocalHarnessEngine reintroduced runtime legacy chat-context fallback: {forbidden_runtime_fallback}"
+        )
 
 if "cron: '*/30 * * * *'" not in cleanup_workflow:
     violations.append("Release cleanup must stay on the 30-minute schedule")
