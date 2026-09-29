@@ -666,6 +666,7 @@ private fun LocalConversationSurface(
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
     var showGroupAnnouncement by rememberSaveable { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
@@ -843,10 +844,12 @@ private fun LocalConversationSurface(
                     groupMembers = state.groupChat.members,
                     activeSpeakerName = state.groupActiveSpeakerName,
                     running = state.running || state.loading,
+                    behaviorTuningCustomized = !state.chatPersona.behaviorTuning.isNatural(),
                     onContextClick = {
                         if (state.groupChat.enabled) showGroupMemberPicker = true
                         else showPersonaPicker = true
                     },
+                    onOpenCharacterTuning = { showCharacterTuning = true },
                     onExitGroupChat = onExitGroupChat,
                     onNewSession = onNewSession,
                     sessionPinned = sessionPinned,
@@ -1450,6 +1453,25 @@ private fun LocalConversationSurface(
             onSave = onSaveGroupAnnouncement,
             onGenerate = onGenerateGroupAnnouncement,
             onDismiss = { showGroupAnnouncement = false },
+        )
+    }
+    if (
+        showCharacterTuning &&
+        state.usageMode == LocalUsageMode.CHAT &&
+        !state.groupChat.enabled
+    ) {
+        CharacterBehaviorTuningDialog(
+            personaName = state.chatPersona.name,
+            portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+            relationshipState = state.chatState.relationshipState,
+            mood = state.chatState.mood,
+            evolution = state.chatState.evolution,
+            initial = state.chatPersona.behaviorTuning,
+            onSave = { tuning ->
+                onConfigureChatPersona(state.chatPersona.copy(behaviorTuning = tuning))
+                showCharacterTuning = false
+            },
+            onDismiss = { showCharacterTuning = false },
         )
     }
     if (
