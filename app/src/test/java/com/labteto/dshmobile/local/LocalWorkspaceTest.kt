@@ -251,4 +251,37 @@ class LocalWorkspaceTest {
         }
     }
 
+
+    @Test
+    fun skillRemovedAfterDiscoveryDoesNotReturnStaleInstructions() {
+        workspace.write(".dsh/skills/volatile/SKILL.md", "original-skill")
+        assertTrue(workspace.skills().contains("volatile"))
+
+        root.resolve(".dsh/skills/volatile").deleteRecursively()
+
+        assertTrue(!workspace.skills().contains("volatile"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkill("volatile")
+        }
+    }
+
+    @Test
+    fun skillReplacedByExternalSymlinkAfterDiscoveryCannotEscapeWorkspace() {
+        workspace.write(".dsh/skills/volatile/SKILL.md", "original-skill")
+        assertTrue(workspace.skills().contains("volatile"))
+        root.resolve(".dsh/skills/volatile").deleteRecursively()
+        external = Files.createTempDirectory("local-harness-swapped-skill").toFile().apply {
+            resolve("SKILL.md").writeText("external-secret")
+        }
+        Files.createSymbolicLink(
+            root.resolve(".dsh/skills/volatile").toPath(),
+            external!!.toPath(),
+        )
+
+        assertTrue(!workspace.skills().contains("volatile"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkill("volatile")
+        }
+    }
+
 }
