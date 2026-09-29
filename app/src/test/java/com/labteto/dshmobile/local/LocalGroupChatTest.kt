@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
+import com.labteto.dshmobile.local.chat.ChatSceneState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -190,4 +192,30 @@ class LocalGroupChatTest {
         assertEquals(saved.announcement, restored.announcement)
         assertTrue(restored.enabled)
     }
+    @Test
+    fun legacyGroupMemberContextMigratesOnceIntoSharedContext() {
+        val legacyMember = ayaka.copy(
+            chatState = ChatCharacterState(
+                mood = "开心",
+                scene = ChatSceneState(sceneTime = "夜晚", location = "庭院"),
+                continuity = ChatContinuityState(
+                    recentEvents = listOf("刚刚一起吃完晚饭"),
+                    decisions = listOf("今晚留在庭院"),
+                ),
+            ),
+        )
+        val migrated = LocalGroupChatState(
+            mode = LocalChatMode.GROUP,
+            members = listOf(legacyMember, kafka),
+        ).migrateLegacyConversationContext()
+
+        assertEquals("庭院", migrated.context.scene.location)
+        assertEquals("夜晚", migrated.context.scene.sceneTime)
+        assertEquals(listOf("刚刚一起吃完晚饭"), migrated.context.continuity.recentEvents)
+        assertEquals(listOf("今晚留在庭院"), migrated.context.continuity.decisions)
+        assertTrue(migrated.members.all { it.chatState.scene.location.isBlank() })
+        assertTrue(migrated.members.all { it.chatState.continuity.recentEvents.isEmpty() })
+        assertEquals("开心", migrated.members.first().chatState.mood)
+    }
+
 }
