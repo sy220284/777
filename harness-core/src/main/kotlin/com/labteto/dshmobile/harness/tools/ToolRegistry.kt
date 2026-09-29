@@ -76,6 +76,17 @@ class ToolRegistry {
     @Synchronized
     fun schemas(): JsonArray = JsonArray(tools.values.map(HarnessTool::schema))
 
+    /** Internal transaction snapshot used by the plugin lifecycle manager. */
+    @Synchronized
+    internal fun snapshot(): Map<String, HarnessTool> = LinkedHashMap(tools)
+
+    /** Restore the exact pre-lifecycle tool surface after a failed plugin transition. */
+    @Synchronized
+    internal fun restore(snapshot: Map<String, HarnessTool>) {
+        tools.clear()
+        tools.putAll(snapshot)
+    }
+
     suspend fun execute(
         name: String,
         input: JsonObject,
