@@ -174,13 +174,13 @@ class AndroidRuntimePluginTest {
             assertTrue(scheduler.snapshot().activeTerminals == 1)
 
             var output = ""
-            repeat(100) {
+            for (attempt in 0 until 100) {
                 val read = registry.context.tools.execute(
                     "terminal_read",
                     buildJsonObject { put("session_id", sessionId) },
                 )
                 if (!read.isError) output += read.content
-                if (output.contains("lease-tail") && scheduler.snapshot().activeTerminals == 0) return@repeat
+                if (output.contains("lease-tail") && scheduler.snapshot().activeTerminals == 0) break
                 delay(10)
             }
 
