@@ -139,4 +139,64 @@ class ToolRegistrySchemaValidationTest {
         assertTrue(result.isError)
         assertEquals(0, approvals)
     }
+
+    @Test
+    fun enforcesArrayAndNumericBoundsDeclaredByTools() = runTest {
+        val calls = mutableListOf<String>()
+        val registry = ToolRegistry()
+        registry.register(
+            HarnessTool(
+                name = "bounded",
+                schema = buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "bounded")
+                        put("parameters", buildJsonObject {
+                            put("type", "object")
+                            put("properties", buildJsonObject {
+                                put("args", buildJsonObject {
+                                    put("type", "array")
+                                    put("minItems", 1)
+                                    put("maxItems", 2)
+                                    put("items", buildJsonObject { put("type", "string") })
+                                })
+                                put("timeout", buildJsonObject {
+                                    put("type", "integer")
+                                    put("minimum", 100)
+                                    put("maximum", 120_000)
+                                })
+                            })
+                            put("additionalProperties", false)
+                        })
+                    })
+                },
+                executor = HarnessToolExecutor { _, input, _ ->
+                    calls += input.toString()
+                    ToolResult("ok")
+                },
+            ),
+        )
+
+        assertTrue(registry.execute("bounded", buildJsonObject {
+            put("args", buildJsonArray { })
+        }).isError)
+        assertTrue(registry.execute("bounded", buildJsonObject {
+            put("args", buildJsonArray {
+                add(JsonPrimitive("a"))
+                add(JsonPrimitive("b"))
+                add(JsonPrimitive("c"))
+            })
+        }).isError)
+        assertTrue(registry.execute("bounded", buildJsonObject { put("timeout", 99) }).isError)
+        assertTrue(registry.execute("bounded", buildJsonObject { put("timeout", 120_001) }).isError)
+        assertTrue(calls.isEmpty())
+
+        val good = registry.execute("bounded", buildJsonObject {
+            put("args", buildJsonArray { add(JsonPrimitive("a")) })
+            put("timeout", 100)
+        })
+        assertFalse(good.isError)
+        assertEquals(1, calls.size)
+    }
+
 }
