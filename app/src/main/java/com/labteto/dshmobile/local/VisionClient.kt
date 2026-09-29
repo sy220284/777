@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -101,7 +102,15 @@ class VisionClient @Inject constructor(
                 val root = json.parseToJsonElement(body).jsonObject
                 val result = parseRoot(root)
                 if (isDeepSeekEndpoint(baseUrl)) {
-                    usageTracker.get().record(model, parseDeepSeekOpenAiUsage(root))
+                    usageTracker.get().record(
+                        model = model,
+                        usage = parseDeepSeekOpenAiUsage(root),
+                        requestId = UUID.randomUUID().toString(),
+                        context = TokenUsageContext(
+                            action = TokenUsageAction.VISION,
+                            taskLabel = prompt.take(120),
+                        ),
+                    )
                 }
                 result
             }
