@@ -23,8 +23,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.media.AttachmentImageState
 import com.labteto.dshmobile.ui.media.aspectRatioOf
@@ -105,9 +103,8 @@ fun AttachmentImage(
 
     val ready = state as? AttachmentImageState.Ready
     if (zoomed && ready != null) {
-        Dialog(
-            onDismissRequest = { zoomed = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+        DsFullScreenDialog(
+            onDismiss = { zoomed = false },
         ) {
             Box(
                 Modifier
