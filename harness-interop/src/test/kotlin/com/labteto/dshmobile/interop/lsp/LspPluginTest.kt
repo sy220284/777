@@ -165,7 +165,7 @@ class LspPluginTest {
             return temporary.newFile("$name.sh").apply {
                 writeText(
                     "printf '%s' '" + frame(initialized) + frame(hover) +
-                        "'\nexec cat >/dev/null\n",
+                        "'\nwhile IFS= read -r line; do :; done\n",
                 )
             }
         }
