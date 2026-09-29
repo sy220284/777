@@ -407,6 +407,7 @@ fun LocalHarnessScreen(
             )
         } else {
             NewSessionModeDialog(
+                usageMode = shell.usageMode,
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
                     showNewSessionMode = false

@@ -26,6 +26,17 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
+internal fun shouldContinueSingleChatBinding(
+    mode: LocalConversationMode,
+    targetUsageMode: LocalUsageMode,
+    sourceUsageMode: LocalUsageMode,
+    sourceGroupEnabled: Boolean,
+): Boolean =
+    mode == LocalConversationMode.CONTINUATION &&
+        targetUsageMode == LocalUsageMode.CHAT &&
+        sourceUsageMode == LocalUsageMode.CHAT &&
+        !sourceGroupEnabled
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<LocalHarnessState>,
@@ -77,6 +88,12 @@ internal class LocalSessionLifecycleCoordinator(
         if (!beginTransition()) return
         val sourceId = currentSessionId()
         val sourceState = state.value
+        val continueSingleChatBinding = shouldContinueSingleChatBinding(
+            mode = mode,
+            targetUsageMode = usageMode,
+            sourceUsageMode = sourceState.usageMode,
+            sourceGroupEnabled = sourceState.groupChat.enabled,
+        )
         val resolvedChatMode = when {
             usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
             galleryEntry != null -> LocalChatMode.SINGLE
@@ -146,11 +163,7 @@ internal class LocalSessionLifecycleCoordinator(
                         chatPersonaStore.upsert(
                             galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}"),
                         ).id
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                        !sourceState.groupChat.enabled
-                    ) {
+                    } else if (continueSingleChatBinding) {
                         sourceState.personaId
                     } else {
                         PersonaProfile.DEFAULT_PERSONA_ID
@@ -164,11 +177,7 @@ internal class LocalSessionLifecycleCoordinator(
                         !freshGalleryStory
                     ) {
                         selectedGalleryStory?.chatState ?: ChatCharacterState()
-                    } else if (
-                        usageMode == LocalUsageMode.CHAT &&
-                        mode == LocalConversationMode.CONTINUATION &&
-                        sourceState.usageMode == LocalUsageMode.CHAT
-                    ) {
+                    } else if (continueSingleChatBinding) {
                         sourceState.chatState
                     } else {
                         ChatCharacterState()
@@ -178,10 +187,7 @@ internal class LocalSessionLifecycleCoordinator(
                         resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
                         galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
                             ChatContextState().withLegacyFallback(chatState)
-                        usageMode == LocalUsageMode.CHAT &&
-                            mode == LocalConversationMode.CONTINUATION &&
-                            sourceState.usageMode == LocalUsageMode.CHAT &&
-                            !sourceState.groupChat.enabled -> sourceState.chatContext
+                        continueSingleChatBinding -> sourceState.chatContext
                         else -> ChatContextState()
                     }
 
@@ -195,18 +201,14 @@ internal class LocalSessionLifecycleCoordinator(
                                 null
                             } else {
                                 galleryEntry?.id ?: sourceState.galleryId.takeIf {
-                                    usageMode == LocalUsageMode.CHAT &&
-                                        sourceState.usageMode == LocalUsageMode.CHAT &&
-                                        !sourceState.groupChat.enabled
+                                    continueSingleChatBinding
                                 }
                             },
                             galleryStoryId = when {
                                 resolvedChatMode == LocalChatMode.GROUP -> null
                                 galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
                                 galleryEntry != null -> null
-                                usageMode == LocalUsageMode.CHAT &&
-                                    sourceState.usageMode == LocalUsageMode.CHAT &&
-                                    mode == LocalConversationMode.CONTINUATION -> sourceState.galleryStoryId
+                                continueSingleChatBinding -> sourceState.galleryStoryId
                                 else -> null
                             },
                             gallerySaveSuppressedThrough = 0L,
