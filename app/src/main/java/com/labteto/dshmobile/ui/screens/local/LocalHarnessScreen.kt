@@ -844,7 +844,7 @@ private fun LocalConversationSurface(
                     groupMembers = state.groupChat.members,
                     activeSpeakerName = state.groupActiveSpeakerName,
                     running = state.running || state.loading,
-                    behaviorTuningCustomized = !state.chatPersona.behaviorTuning.isNatural(),
+                    behaviorTuningCustomized = !state.chatState.behaviorTuning.isNatural(),
                     onContextClick = {
                         if (state.groupChat.enabled) showGroupMemberPicker = true
                         else showPersonaPicker = true
@@ -1466,7 +1466,7 @@ private fun LocalConversationSurface(
             relationshipState = state.chatState.relationshipState,
             mood = state.chatState.mood,
             evolution = state.chatState.evolution,
-            initial = state.chatPersona.behaviorTuning,
+            initial = state.chatState.behaviorTuning,
             onSave = { tuning ->
                 onConfigureChatPersona(state.chatPersona.copy(behaviorTuning = tuning))
                 showCharacterTuning = false
