@@ -28,4 +28,15 @@ class NamedRegistry<T : Any> {
 
     @Synchronized
     fun clear() = entries.clear()
+
+    /** Internal transaction snapshot used by the plugin lifecycle manager. */
+    @Synchronized
+    internal fun snapshot(): Map<String, T> = LinkedHashMap(entries)
+
+    /** Restore the exact pre-lifecycle named surface after a failed plugin transition. */
+    @Synchronized
+    internal fun restore(snapshot: Map<String, T>) {
+        entries.clear()
+        entries.putAll(snapshot)
+    }
 }
