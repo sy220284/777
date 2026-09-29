@@ -61,7 +61,7 @@ class BundledRuntimeUpgradeCleanupTest {
             versionRoot.deleteRecursively()
             val legacyLibrary = File(versionRoot, "lib/legacy-duplicate.so").apply {
                 parentFile?.mkdirs()
-                writeBytes(ByteArray(64 * 1024) { 0x5a })
+                writeBytes(ByteArray(64 * 1024) { 0x5a.toByte() })
             }
             File(versionRoot, ".ready").writeText(version)
             legacyFiles += legacyLibrary
@@ -70,16 +70,16 @@ class BundledRuntimeUpgradeCleanupTest {
                 mkdirs()
                 File(this, "lib/obsolete.so").apply {
                     parentFile?.mkdirs()
-                    writeBytes(ByteArray(32 * 1024) { 0x33 })
+                    writeBytes(ByteArray(32 * 1024) { 0x33.toByte() })
                 }
                 File(this, ".ready").writeText("obsolete-version")
             }
-            obsoleteVersionRoots += obsoleteRoot.parentFile
+            obsoleteVersionRoots += requireNotNull(obsoleteRoot.parentFile)
         }
 
         sharedDir.mkdirs()
         val obsoleteSharedBlob = File(sharedDir, "obsolete-shared-blob").apply {
-            writeBytes(ByteArray(16 * 1024) { 0x21 })
+            writeBytes(ByteArray(16 * 1024) { 0x21.toByte() })
         }
 
         fixtures.forEach { it.prepare() }
