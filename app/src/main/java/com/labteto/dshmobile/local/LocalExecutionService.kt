@@ -80,11 +80,12 @@ class LocalExecutionService : Service() {
                 if (sessionId != null) postCompletion(sessionId, outcome)
             }
             ACTION_SYNC_JOBS -> {
-                val sessionId = intent.getStringExtra(EXTRA_SESSION_ID).orEmpty()
                 val ids = intent.getStringArrayListExtra(EXTRA_JOB_IDS).orEmpty()
                 val labels = intent.getStringArrayListExtra(EXTRA_JOB_LABELS).orEmpty()
+                val sessionIds = intent.getStringArrayListExtra(EXTRA_JOB_SESSION_IDS).orEmpty()
                 jobs.clear()
                 ids.forEachIndexed { index, id ->
+                    val sessionId = sessionIds.getOrNull(index).orEmpty()
                     if (id.isNotBlank() && sessionId.isNotBlank()) {
                         jobs[id] = Hold(
                             key = id,
@@ -198,6 +199,7 @@ class LocalExecutionService : Service() {
         private const val EXTRA_OUTCOME = "outcome"
         private const val EXTRA_JOB_IDS = "job_ids"
         private const val EXTRA_JOB_LABELS = "job_labels"
+        private const val EXTRA_JOB_SESSION_IDS = "job_session_ids"
         private const val NOTIFICATION_ID = 7720
         private const val COMPLETION_ID_BASE = 23_000
 
@@ -232,16 +234,20 @@ class LocalExecutionService : Service() {
             )
         }
 
-        fun syncJobs(context: Context, sessionId: String, activeJobs: List<LocalJobInfo>): Boolean {
-            if (activeJobs.isEmpty() && !dispatchedActive) return true
-            if (activeJobs.isNotEmpty()) dispatchedActive = true
+        fun syncJobs(context: Context, activeJobs: List<LocalJobInfo>): Boolean {
+            val owned = activeJobs.filter { !it.ownerSessionId.isNullOrBlank() }
+            if (owned.isEmpty() && !dispatchedActive) return true
+            if (owned.isNotEmpty()) dispatchedActive = true
             return dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_SYNC_JOBS)
-                    .putExtra(EXTRA_SESSION_ID, sessionId)
-                    .putStringArrayListExtra(EXTRA_JOB_IDS, ArrayList(activeJobs.map(LocalJobInfo::id)))
-                    .putStringArrayListExtra(EXTRA_JOB_LABELS, ArrayList(activeJobs.map(LocalJobInfo::label))),
+                    .putStringArrayListExtra(EXTRA_JOB_IDS, ArrayList(owned.map(LocalJobInfo::id)))
+                    .putStringArrayListExtra(EXTRA_JOB_LABELS, ArrayList(owned.map(LocalJobInfo::label)))
+                    .putStringArrayListExtra(
+                        EXTRA_JOB_SESSION_IDS,
+                        ArrayList(owned.map { it.ownerSessionId.orEmpty() }),
+                    ),
             )
         }
 

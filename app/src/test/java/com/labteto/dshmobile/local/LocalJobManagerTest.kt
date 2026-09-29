@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -74,6 +75,71 @@ class LocalJobManagerTest {
         assertTrue(manager.output(secondId).contains("second done"))
     }
 
+
+    @Test
+    fun stoppingOwnedNonPersistentJobsDoesNotTouchAnotherSessionOrPersistentJob() = runTest {
+        val otherGate = CompletableDeferred<Unit>()
+        val persistentGate = CompletableDeferred<Unit>()
+        val manager = LocalJobManager(this) { }
+
+        val transient = manager.start("a-transient", ownerSessionId = "session-a") { _, _ ->
+            awaitCancellation()
+        }
+        val persistent = manager.startPersistent(
+            label = "a-persistent",
+            resumeKind = "web_fetch",
+            resumePayload = "{}",
+            ownerSessionId = "session-a",
+        ) { _, _ ->
+            persistentGate.await()
+            "persistent done"
+        }
+        val other = manager.start("b-transient", ownerSessionId = "session-b") { _, _ ->
+            otherGate.await()
+            "other done"
+        }
+        val transientId = transient.substringAfterLast('：')
+        val persistentId = persistent.substringAfterLast('：')
+        val otherId = other.substringAfterLast('：')
+        runCurrent()
+
+        manager.stopOwnedNonPersistentAndJoin(setOf("session-a"))
+        runCurrent()
+
+        assertTrue(manager.output(transientId, "session-a").contains("[cancelled]"))
+        assertTrue(manager.output(persistentId, "session-a").contains("[running]"))
+        assertTrue(manager.output(otherId, "session-b").contains("[running]"))
+
+        persistentGate.complete(Unit)
+        otherGate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun scopedJobApisCannotSeeOrControlAnotherSession() = runTest {
+        val otherGate = CompletableDeferred<Unit>()
+        val manager = LocalJobManager(this) { }
+
+        val first = manager.start("first", ownerSessionId = "session-a") { _, _ -> awaitCancellation() }
+        val second = manager.start("second", ownerSessionId = "session-b") { _, _ ->
+            otherGate.await()
+            "second done"
+        }
+        val firstId = first.substringAfterLast('：')
+        val secondId = second.substringAfterLast('：')
+        runCurrent()
+
+        assertTrue(manager.list("session-a").contains(firstId))
+        assertTrue(!manager.list("session-a").contains(secondId))
+        assertTrue(manager.output(secondId, "session-a").contains("不存在"))
+        assertTrue(manager.kill(secondId, "session-a").contains("不存在"))
+        assertTrue(manager.output(secondId, "session-b").contains("[running]"))
+
+        manager.kill(firstId, "session-a")
+        otherGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(manager.output(secondId, "session-b").contains("[completed]"))
+    }
 
     @Test
     fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {

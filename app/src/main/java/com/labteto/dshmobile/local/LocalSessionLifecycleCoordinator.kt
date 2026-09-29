@@ -102,7 +102,7 @@ internal class LocalSessionLifecycleCoordinator(
                         sourceState.usageMode == LocalUsageMode.WORK && sourceState.running
                     if (!preserveWorkRun) {
                         cancelActiveRunAndJoin()
-                        jobs.stopNonPersistentAndJoin()
+                        jobs.stopOwnedNonPersistentAndJoin(setOf(sourceId))
                     }
                     persist()
 
@@ -245,7 +245,7 @@ internal class LocalSessionLifecycleCoordinator(
                             planMode = false,
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = projectExecutionJobs(usageMode, jobs.snapshotInfos()),
+                            jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
                             activeAgents = projectWorkResourceCount(
                                 usageMode,
                                 resourceScheduler.snapshot().activeAgents,
