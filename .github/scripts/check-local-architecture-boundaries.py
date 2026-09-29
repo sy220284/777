@@ -233,6 +233,10 @@ for path in main_root.rglob("*.kt"):
 view_model_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
 if "LocalHarnessEngine" in strip_comments(read(view_model_path)):
     die("LocalHarnessViewModel must depend on capability runtimes, not LocalHarnessEngine")
+if "pluginRegistry.installAll(" not in engine:
+    die("LocalHarnessEngine must install its startup plugin set atomically")
+if re.search(r"pluginRegistry\.install\(", strip_comments(engine)):
+    die("LocalHarnessEngine must not install startup plugins one-by-one")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
@@ -257,6 +261,22 @@ if unexpected_ui_consumers:
         "UI must consume projected state instead of LocalHarnessState: "
         + ", ".join(unexpected_ui_consumers)
     )
+
+for path in local_root.rglob("*.kt"):
+    relative = path.relative_to(ROOT).as_posix()
+    if relative == engine_path:
+        continue
+    source = strip_comments(path.read_text(encoding="utf-8"))
+    if re.search(r"\bAndroidDeviceProvider\b", source):
+        die(
+            f"{relative} depends on AndroidDeviceProvider directly; "
+            "depend on a harness capability contract instead"
+        )
+
+subagent_factory_path = "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt"
+subagent_factory = strip_comments(read(subagent_factory_path))
+if "HarnessVirtualDisplayProvider" not in subagent_factory:
+    die("LocalSubagentRunnerFactory must depend on HarnessVirtualDisplayProvider")
 
 print(
     "[architecture-guard] OK: "
