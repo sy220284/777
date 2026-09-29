@@ -20,8 +20,8 @@
 > **血统与许可**：本仓库 fork 自
 > [`sorsama/deepseek-harness-mobile@e5f8c2f`](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)
 > （DSH Mobile 时代），现以独立应用标识 `com.sy220284.dshmobile` 发行，可与上游同时安装。
-> 上游 MIT 许可证与第三方声明完整保留。DeepSeek Harness 官方源码经
-> `upstream/deepseek-harness.lock.json` 钉定版本，作为语义、协议与一致性测试的基准。
+> 上游 MIT 许可证与第三方声明完整保留。本机原生 Harness 的官方语义参考由
+> `upstream/deepseek-harness.lock.json` 钉定；远程 Web 协议基线独立维护，避免把两条运行链混为一套版本。
 
 ---
 
@@ -175,8 +175,8 @@ harness-core / Android runtime / MCP / device
 
 除了“测试通过”，仓库还对热点文件大小、热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。
 
-当前一致性覆盖与路线见
-[执行内核 Phase B/C 验证](docs/EXECUTION-KERNEL-PHASE-BC-VALIDATION.zh-CN.md)。
+当前验证闭环见 [VALIDATION.md](docs/VALIDATION.md)，本机 Harness 实现边界见
+[Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)。
 
 ## 环境要求
 
@@ -230,11 +230,10 @@ harness-core / Android runtime / MCP / device
 
 ## 文档
 
+- [文档入口](docs/README.md)
 - [架构](docs/ARCHITECTURE.md) · [协议](docs/PROTOCOL.md) · [兼容性](docs/COMPATIBILITY.md) · [安全](docs/SECURITY.md)
-- [Android 16 本机 Harness 适配审计](docs/ANDROID16-HARNESS-PARITY.zh-CN.md)
-- [Android 原生 Harness 内核规划](docs/ANDROID-NATIVE-HARNESS-IMPLEMENTATION-PLAN.zh-CN.md) · [M1 进展](docs/NATIVE-HARNESS-M1-STATUS.zh-CN.md)
-- [执行内核 Phase B/C 验证](docs/EXECUTION-KERNEL-PHASE-BC-VALIDATION.zh-CN.md)
-- [UI/UX 重设计](docs/ANDROID-UIUX-REDESIGN.zh-CN.md) · [频率优先重设计](docs/UI-FREQUENCY-FIRST-REDESIGN.zh-CN.md)
+- [Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md) · [后续路线](docs/ANDROID-HARNESS-ROADMAP.zh-CN.md)
+- [验证体系](docs/VALIDATION.md) · [UI / UX](docs/UI-UX.zh-CN.md) · [效果图](docs/UI-ARTIFACTS.md)
 
 ## 截图
 

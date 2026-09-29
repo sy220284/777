@@ -171,7 +171,7 @@ Reported by @MatunSh (#20, #21, #22, #23) and @ServerDestroyer (#24).
 - Attachments from inactive or child sessions now use the owning host and session for fetching
   and caching.
 
-Validation and remaining live coverage are tracked in [VALIDATION-0.11.0.md](docs/VALIDATION-0.11.0.md).
+Current validation and live coverage rules are tracked in [VALIDATION.md](docs/VALIDATION.md).
 
 ## [0.10.1] - 2026-09-14
 
