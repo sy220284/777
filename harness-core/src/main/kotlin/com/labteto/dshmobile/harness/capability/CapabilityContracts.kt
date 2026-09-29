@@ -48,6 +48,8 @@ interface HarnessCredentialStore {
 interface HarnessDeviceProvider {
     val capabilities: Set<String>
     suspend fun invoke(capability: String, arguments: Map<String, String>): String
+    /** Releases provider-owned resources when the device plugin is uninstalled. Must be idempotent. */
+    fun close() = Unit
 }
 
 /**
