@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
@@ -185,6 +186,52 @@ internal class LocalChatContextRefreshCoordinator(
         job.start()
     }
 
+    private fun scheduleRetry(
+        persona: PersonaProfile,
+        expectedSessionId: String,
+        expectedGeneration: Long,
+        boundEventLog: LocalSessionEventLog,
+        retryAttempt: Int,
+        reason: String,
+    ) {
+        if (retryAttempt >= MAX_REFRESH_RETRIES) return
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            delay(RETRY_BASE_DELAY_MS * (retryAttempt + 1L))
+            val latest = state.value
+            val stillPending = latest.chatContext.pendingTurns.any { pending ->
+                pending.sequence > latest.chatContext.processedThroughSequence &&
+                    pending.generation == expectedGeneration
+            }
+            if (
+                latest.usageMode != LocalUsageMode.CHAT ||
+                latest.sessionId != expectedSessionId ||
+                latest.chatContext.generation != expectedGeneration ||
+                !stillPending
+            ) return@launch
+
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "retrying")
+                put("reason", reason)
+                put("attempt", retryAttempt + 1)
+            })
+            refresh(
+                persona = persona,
+                expectedSessionId = expectedSessionId,
+                expectedBaseState = latest.chatState,
+                expectedGeneration = expectedGeneration,
+                boundEventLog = boundEventLog,
+                retryAttempt = retryAttempt + 1,
+            )
+        }
+        synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
+        job.invokeOnCompletion {
+            synchronized(scheduledRefreshLock) {
+                if (scheduledRefreshJob === job) scheduledRefreshJob = null
+            }
+        }
+        job.start()
+    }
+
     fun enqueue(
         userMessage: String,
         assistantMessage: String,
@@ -272,6 +319,7 @@ internal class LocalChatContextRefreshCoordinator(
         expectedBaseState: ChatCharacterState,
         expectedGeneration: Long,
         boundEventLog: LocalSessionEventLog,
+        retryAttempt: Int = 0,
     ) {
         val before = state.value
         if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
@@ -297,7 +345,7 @@ internal class LocalChatContextRefreshCoordinator(
             assistantMessage = "",
         )
         val plannerReply = try {
-            requestPlanner(before, prompt, boundEventLog) ?: return
+            requestPlanner(before, prompt, boundEventLog)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -306,6 +354,19 @@ internal class LocalChatContextRefreshCoordinator(
                 put("detail", error.message.orEmpty().take(1_000))
                 put("pending_count", pending.size)
             })
+            scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "request-failed",
+            )
+            return
+        }
+        if (plannerReply == null) {
+            boundEventLog.append("chat/post-turn", buildJsonObject {
+                put("status", "empty-reply")
+                put("pending_count", pending.size)
+            })
+            scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "empty-reply",
+            )
             return
         }
         recordUsage(before, plannerReply)
@@ -322,6 +383,9 @@ internal class LocalChatContextRefreshCoordinator(
                 put("content", plannerReply.content.orEmpty().take(2_000))
                 put("pending_count", pending.size)
             })
+            scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "parse-failed",
+            )
             return
         }
 
@@ -373,6 +437,9 @@ internal class LocalChatContextRefreshCoordinator(
                 put("through_sequence", throughSequence)
                 put("pending_preserved", true)
             })
+            scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "stale-discarded",
+            )
             return
         }
 
@@ -417,5 +484,7 @@ internal class LocalChatContextRefreshCoordinator(
     private companion object {
         const val PENDING_BATCH = 8
         const val EVENT_SCAN_PAGE_SIZE = 200
+        const val MAX_REFRESH_RETRIES = 3
+        const val RETRY_BASE_DELAY_MS = 1_000L
     }
 }

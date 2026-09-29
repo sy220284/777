@@ -823,17 +823,38 @@ class ChatInteractionPlanner @Inject constructor(
             ) else previous.facts,
             hypotheses = if (raw.containsKey("hypotheses")) mergeEvidence(
                 previous = previous.hypotheses,
-                incoming = value.hypotheses,
+                incoming = value.hypotheses.filter {
+                    evidenceGrounded(
+                        evidence = it,
+                        userMessage = userMessage,
+                        assistantMessage = assistantMessage,
+                    )
+                },
                 minimumConfidence = 10,
                 maximumConfidence = 85,
-                allowedSources = null,
+                allowedSources = FACT_SOURCES,
                 limit = 6,
             ) else previous.hypotheses,
             unknowns = if (raw.containsKey("unknowns")) {
                 mergeStrings(previous.unknowns, value.unknowns, 6, 160)
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
-                mergeStrings(previous.sharedMoments, value.sharedMoments, 8, 180)
+                mergeStrings(
+                    previous.sharedMoments,
+                    value.sharedMoments.filter { moment ->
+                        evidenceGrounded(
+                            evidence = RelationshipEvidence(
+                                text = moment,
+                                source = "dialogue",
+                                confidence = 100,
+                            ),
+                            userMessage = userMessage,
+                            assistantMessage = assistantMessage,
+                        )
+                    },
+                    8,
+                    180,
+                )
             } else previous.sharedMoments,
         )
     }
