@@ -107,7 +107,7 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun workProcessNodesKeepThinkingAndCollapseRawToolNoise() {
+    fun workProcessNodesIgnoreReasoningAndCollapseStructuredOperations() {
         val nodes = buildWorkProcessNodes(
             listOf(
                 message("r1", "reasoning", "先确认相关实现，再做最小修改。"),
@@ -117,45 +117,33 @@ class LocalTranscriptPresentationTest {
             ),
         )
 
-        assertEquals(3, nodes.size)
-        assertTrue(nodes[0].isThinking)
-        assertEquals("先确认相关实现，再做最小修改。", nodes[0].thinkingSummary)
-        assertEquals(AgentOperationKind.Inspect, nodes[1].kind)
-        assertEquals(2, nodes[1].count)
-        assertEquals(AgentOperationKind.Search, nodes[2].kind)
-        assertTrue(nodes.none { it.thinkingSummary?.contains("/private/project") == true })
+        assertEquals(2, nodes.size)
+        assertEquals(AgentOperationKind.Inspect, nodes[0].kind)
+        assertEquals(2, nodes[0].count)
+        assertEquals(AgentOperationKind.Search, nodes[1].kind)
     }
 
     @Test
-    fun compactProcessSummaryRemovesCodeUrlsAndDeepPaths() {
-        val summary = compactProcessSummary(
-            "先检查 `LocalHarnessScreen.kt`、PlainFile.kt 和 /private/project/ui/Screen.kt，再参考 https://example.com/raw 做调整。",
+    fun reasoningOnlyWorkProcessFallsBackToGenericObservableState() {
+        val nodes = buildWorkProcessNodes(
+            listOf(message("r1", "reasoning", "这段自由推理不能出现在界面里")),
         )
 
-        assertTrue(summary != null)
-        assertTrue("LocalHarnessScreen.kt" !in summary.orEmpty())
-        assertTrue("PlainFile.kt" !in summary.orEmpty())
-        assertTrue("/private/project" !in summary.orEmpty())
-        assertTrue("https://example.com" !in summary.orEmpty())
+        assertEquals(1, nodes.size)
+        assertEquals(AgentOperationKind.Generic, nodes.single().kind)
     }
 
     @Test
     fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
-        val nodes = (1..12).map { index -> LocalWorkProcessNode(thinkingSummary = "节点 $index") }
+        val nodes = (1..12).map { index ->
+            LocalWorkProcessNode(kind = AgentOperationKind.Generic, count = index)
+        }
         val recent = visibleWorkProcessNodes(nodes, showAll = false)
         val all = visibleWorkProcessNodes(nodes, showAll = true)
         assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
-        assertEquals("节点 5", recent.first().thinkingSummary)
-        assertEquals("节点 12", recent.last().thinkingSummary)
+        assertEquals(5, recent.first().count)
+        assertEquals(12, recent.last().count)
         assertEquals(12, all.size)
-    }
-
-    @Test
-    fun compactProcessSummaryKeepsLatestPartOfLongStreamingReasoning() {
-        val summary = compactProcessSummary("旧内容 ".repeat(500) + "当前正在核对最终状态。")
-        assertTrue(summary != null)
-        assertTrue(summary.orEmpty().contains("当前正在核对最终状态"))
-        assertTrue(summary.orEmpty().length <= 180)
     }
 
     @Test
