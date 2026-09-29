@@ -293,6 +293,19 @@ internal fun readLocalImageBytesBounded(file: File, maxBytes: Long): ByteArray {
     }
 }
 
+
+internal fun readLocalImageBytesBounded(file: File, maxBytes: Long): ByteArray {
+    require(maxBytes in 1L..Int.MAX_VALUE.toLong()) { "图片读取上限无效" }
+    val limit = maxBytes.toInt()
+    file.inputStream().use { input ->
+        val bytes = input.readNBytes(limit + 1)
+        require(bytes.size <= limit) {
+            "图片附件超过 ${maxBytes / 1024 / 1024} MB 直传上限：${file.name}"
+        }
+        return bytes
+    }
+}
+
 internal fun sniffLocalImageMediaType(file: File): String? {
     if (!file.isFile || file.length() < 3L) return null
     val header = ByteArray(12)
