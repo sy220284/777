@@ -97,7 +97,12 @@ class PluginRegistry(
     suspend fun installAll(plugins: Iterable<HarnessPlugin>) = lifecycleMutex.withLock {
         val batch = plugins.toList()
         val ids = batch.map(HarnessPlugin::id)
+        require(ids.all(String::isNotBlank)) { "插件编号不能为空" }
         require(ids.size == ids.toSet().size) { "插件批次包含重复编号" }
+        val activeIds = synchronized(this) { installed.keys.toSet() }
+        require(ids.none(activeIds::contains)) {
+            "插件批次包含已安装插件：" + ids.filter(activeIds::contains).joinToString()
+        }
 
         val registryBefore = context.snapshotRegistries()
         val installedBefore = synchronized(this) { LinkedHashMap(installed) }
