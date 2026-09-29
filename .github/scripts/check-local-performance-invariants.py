@@ -265,6 +265,16 @@ if "cancelWorkRunsAndJoin(requestedIds)" not in lifecycle_coordinator:
     violations.append("Deleting sessions must cancel and join their session-bound Work runs before files are removed")
 if "cancelWorkRunsForDeletedSessions(activeWorkRuns, ids, runStateLock)" not in engine:
     violations.append("LocalHarnessEngine must route session deletion through the bound Work-run cancellation helper")
+if "jobs.stopNonPersistentAndJoin()" in lifecycle_coordinator:
+    violations.append("Session lifecycle must not globally cancel unrelated background jobs")
+if "jobs.stopOwnedAndJoin(setOf(sourceId))" not in lifecycle_coordinator:
+    violations.append("Creating a session must only stop background jobs owned by the source session")
+if "jobs.stopOwnedAndJoin(requestedIds)" not in lifecycle_coordinator:
+    violations.append("Deleting sessions must only stop background jobs owned by those sessions")
+if "ownerSessionId = boundSessionId" not in engine:
+    violations.append("Background shell jobs must stay bound to the executing session")
+if engine.count("ownerSessionId = sessionId") < 2:
+    violations.append("Persistent web/subagent jobs must retain their owning session")
 
 if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
