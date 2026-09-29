@@ -77,6 +77,7 @@ import com.labteto.dshmobile.local.chat.rebaseGeneration
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
@@ -1503,7 +1504,7 @@ class LocalHarnessEngine @Inject constructor(
             eventLog,
             json,
             state.copy(
-                chatState = baseState.copy(scene = baseContext.scene, continuity = baseContext.continuity),
+                chatState = baseState.withoutLegacyConversationContext(),
                 chatContext = baseContext,
                 groupChat = restoredGroupState,
             ),
@@ -1522,10 +1523,7 @@ class LocalHarnessEngine @Inject constructor(
             current.copy(
                 messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-                chatState = baseState.copy(
-                    scene = if (current.groupChat.enabled) ChatSceneState() else baseContext.scene,
-                    continuity = if (current.groupChat.enabled) ChatContinuityState() else baseContext.continuity,
-                ),
+                chatState = baseState.withoutLegacyConversationContext(),
                 chatContext = if (current.groupChat.enabled) current.chatContext else baseContext,
                 groupChat = restoredGroupState,
                 replySuggestions = emptyList(),
@@ -1600,7 +1598,7 @@ class LocalHarnessEngine @Inject constructor(
             current.copy(
                 messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
-                chatState = snapshot?.first ?: current.chatState,
+                chatState = (snapshot?.first ?: current.chatState).withoutLegacyConversationContext(),
                 chatContext = selectedContext,
                 replySuggestions = snapshot?.second.orEmpty(),
                 chatBranches = selected,
@@ -1663,10 +1661,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             _state.update {
                 it.copy(
-                    chatState = baseState.copy(
-                        scene = baseContext.scene,
-                        continuity = baseContext.continuity,
-                    ),
+                    chatState = baseState.withoutLegacyConversationContext(),
                     chatContext = baseContext,
                     replySuggestions = emptyList(),
                     chatBranches = branches,
@@ -2105,10 +2100,10 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         val beforeProactive = _state.value
         val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
-            previous = beforeProactive.chatState,
+            previous = beforeProactive.chatState.withoutLegacyConversationContext(),
             userMessage = "",
             assistantMessage = content,
-        )
+        ).withoutLegacyConversationContext()
         modelHistory.append(reply.message)
         updateContextMetrics()
         transcriptRuntime.applyMessages(
@@ -2121,7 +2116,6 @@ class LocalHarnessEngine @Inject constructor(
                 current
             } else {
                 val baseContext = current.chatContext
-                    .withLegacyFallback(nextChatState)
                     .applySceneTurn(
                         userMessage = "",
                         assistantMessage = content,
@@ -2844,7 +2838,6 @@ class LocalHarnessEngine @Inject constructor(
                         if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.dropLast(1),
                         recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
                         currentFacts = snapshot.chatContext
-                            .withLegacyFallback(snapshot.chatState)
                             .canonicalFactLines(),
                     ),
                     stableContext = chatContext.stablePrompt,
@@ -3395,7 +3388,6 @@ class LocalHarnessEngine @Inject constructor(
                             }
                             if (assistantTranscript != null) {
                                 val hardContext = beforeAssistant.chatContext
-                                    .withLegacyFallback(beforeAssistant.chatState)
                                     .applySceneTurn(
                                         userMessage = memoryInput,
                                         assistantMessage = assistantTranscript.content,
@@ -5112,7 +5104,7 @@ class LocalHarnessEngine @Inject constructor(
             galleryStoryId = stored.galleryStoryId,
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
-            chatState = stored.chatState,
+            chatState = stored.chatState.withoutLegacyConversationContext(),
             chatContext = stored.chatContext.withLegacyFallback(stored.chatState),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
