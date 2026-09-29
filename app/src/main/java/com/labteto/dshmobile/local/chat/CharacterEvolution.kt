@@ -30,16 +30,7 @@ internal fun evolveCharacterEvolution(
     val normalizedSignificance = significance.trim().uppercase()
     if (normalizedSignificance == "NONE") return previous.evolution
 
-    val seeded = if (previous.evolution.observationCount == 0) {
-        previous.evolution.copy(
-            initiativeBaseline = previous.initiative.coerceIn(0, 100),
-            opennessBaseline = previous.shareDesire.coerceIn(0, 100),
-            securityBaseline = relationshipSecurity(previous.dynamics),
-        )
-    } else {
-        previous.evolution
-    }
-
+    val seeded = previous.evolution
     val weight = if (normalizedSignificance == "MAJOR") 2 else 1
     val initiative = evolveAxis(
         baseline = seeded.initiativeBaseline,
@@ -53,20 +44,27 @@ internal fun evolveCharacterEvolution(
         momentum = seeded.opennessMomentum,
         weight = weight,
     )
+    val currentSecurity = relationshipSecurity(current.dynamics)
     val security = evolveAxis(
         baseline = seeded.securityBaseline,
-        target = relationshipSecurity(current.dynamics),
+        target = currentSecurity,
         momentum = seeded.securityMomentum,
         weight = weight,
     )
 
-    val observationCount = if (seeded.observationCount == Int.MAX_VALUE) {
-        Int.MAX_VALUE
-    } else {
-        seeded.observationCount + 1
+    val hasEvolutionSignal =
+        abs(current.initiative.coerceIn(0, 100) - seeded.initiativeBaseline) >= EVOLUTION_SIGNAL_GAP ||
+            abs(current.shareDesire.coerceIn(0, 100) - seeded.opennessBaseline) >= EVOLUTION_SIGNAL_GAP ||
+            abs(currentSecurity - seeded.securityBaseline) >= EVOLUTION_SIGNAL_GAP
+    val shouldCountObservation = normalizedSignificance == "MAJOR" || hasEvolutionSignal
+    val observationCount = when {
+        !shouldCountObservation -> seeded.observationCount
+        seeded.observationCount == Int.MAX_VALUE -> Int.MAX_VALUE
+        else -> seeded.observationCount + 1
     }
     val milestone = if (normalizedSignificance == "MAJOR") {
-        current.dynamics.sharedMoments.lastOrNull()
+        current.dynamics.sharedMoments.asReversed()
+            .firstOrNull { it !in previous.dynamics.sharedMoments }
             ?.trim()
             ?.take(160)
             ?.takeIf(String::isNotBlank)
