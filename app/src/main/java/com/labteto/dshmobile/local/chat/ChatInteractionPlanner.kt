@@ -99,6 +99,7 @@ data class ChatCharacterState(
     val shareDesire: Int = 50,
     val dynamics: RelationshipDynamics = RelationshipDynamics(),
     val evolution: CharacterEvolutionState = CharacterEvolutionState(),
+    val behaviorTuning: CharacterBehaviorTuning = CharacterBehaviorTuning(),
     val userPattern: UserChatPattern = UserChatPattern(),
     val scene: ChatSceneState = ChatSceneState(),
     val continuity: ChatContinuityState = ChatContinuityState(),
@@ -170,6 +171,7 @@ class ChatInteractionPlanner @Inject constructor(
         }
         appendPersonaExpressionContext(persona)
         appendCharacterEvolutionContext(state.evolution)
+        appendCharacterBehaviorTuningContext(state.behaviorTuning)
 
         appendLine(
             "上一状态：情绪=${state.mood}｜关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
@@ -394,7 +396,6 @@ class ChatInteractionPlanner @Inject constructor(
             turnSignificance = significance,
         )
     }
-
     private fun applyExplicitTransientClears(
         value: ChatCharacterState,
         previous: ChatCharacterState,
@@ -467,7 +468,6 @@ class ChatInteractionPlanner @Inject constructor(
             assistantMessage = assistantMessage,
         )
     }
-
     private fun applyInteractionIntent(
         state: ChatCharacterState,
         previous: ChatCharacterState,
@@ -480,7 +480,6 @@ class ChatInteractionPlanner @Inject constructor(
             interactionIntensity = nextInteractionIntensity(userMessage, previous),
         )
     }
-
     private fun applyInteractionPerformance(
         state: ChatCharacterState,
         previous: ChatCharacterState,
@@ -497,10 +496,10 @@ class ChatInteractionPlanner @Inject constructor(
             tags.forEach { tag -> cooldowns["$prefix:$tag"] = turns }
         }
 
-        cool("动作", signals.actionTags, ACTION_COOLDOWN_TURNS)
-        cool("姿态", signals.poseTags, POSE_COOLDOWN_TURNS)
-        cool("话术", signals.verbalTags, VERBAL_COOLDOWN_TURNS)
-        cool("称呼", signals.addressTerms, ADDRESS_COOLDOWN_TURNS)
+        cool("动作", signals.actionTags, previous.behaviorTuning.cooldownTurns(ACTION_COOLDOWN_TURNS))
+        cool("姿态", signals.poseTags, previous.behaviorTuning.cooldownTurns(POSE_COOLDOWN_TURNS))
+        cool("话术", signals.verbalTags, previous.behaviorTuning.cooldownTurns(VERBAL_COOLDOWN_TURNS))
+        cool("称呼", signals.addressTerms, previous.behaviorTuning.cooldownTurns(ADDRESS_COOLDOWN_TURNS))
 
         val resetRequested = isInteractionResetIntent(userMessage)
         val assistantIntensity = if (resetRequested) 0 else assistantInitiatedInteractionIntensity(assistantMessage)
@@ -530,7 +529,6 @@ class ChatInteractionPlanner @Inject constructor(
             interactionCooldowns = if (finalIntensity == 0) emptyMap() else cooldowns.toMap(),
         )
     }
-
     private fun mergeRecentTags(
         previous: List<String>,
         incoming: List<String>,
@@ -544,7 +542,6 @@ class ChatInteractionPlanner @Inject constructor(
         }
         return merged.takeLast(limit)
     }
-
     private fun sanitizeState(
         value: ChatCharacterState,
         previous: ChatCharacterState,
@@ -563,6 +560,7 @@ class ChatInteractionPlanner @Inject constructor(
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 raw = rawDynamics,
+                tuning = previous.behaviorTuning,
             )
         }
         val pattern = if (rawPattern == null && userMessage.isBlank()) {
@@ -579,6 +577,7 @@ class ChatInteractionPlanner @Inject constructor(
             normalizeStage(value.dynamics.stage)
         } else previous.dynamics.stage
         val relationshipDescription = when {
+            previous.behaviorTuning.lockRelationshipStage -> previous.relationshipState
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
             requestedStage != previous.dynamics.stage -> previous.relationshipState
             rawState?.containsKey("relationshipState") == true ->
@@ -586,6 +585,7 @@ class ChatInteractionPlanner @Inject constructor(
             else -> previous.relationshipState
         }
         val merged = value.copy(
+            behaviorTuning = previous.behaviorTuning.normalized(),
             mood = if (rawState?.containsKey("mood") == true) {
                 value.mood.trim().take(80).ifBlank { previous.mood }
             } else previous.mood,
@@ -643,7 +643,6 @@ class ChatInteractionPlanner @Inject constructor(
         )
         return resetUpdatedAges(merged, rawState)
     }
-
     private fun mergeSceneAndContinuity(
         value: ChatCharacterState,
         previous: ChatCharacterState,
@@ -663,7 +662,6 @@ class ChatInteractionPlanner @Inject constructor(
             updatedAt = System.currentTimeMillis(),
         )
     }
-
     private fun sanitizeContinuity(
         value: ChatContinuityState,
         previous: ChatContinuityState,
@@ -682,7 +680,6 @@ class ChatInteractionPlanner @Inject constructor(
         // Provenance is derived from durable Pending turns after parsing; the model never owns it.
         evidence = previous.evidence,
     )
-
     private fun sanitizeCurrentStrings(
         values: List<String>,
         limit: Int,
@@ -729,7 +726,7 @@ class ChatInteractionPlanner @Inject constructor(
             previous.unresolvedThreads.filter { thread ->
                 val key = normalize(thread)
                 val next = (nextThreadAges[key] ?: 0) + 1
-                if (next > THREAD_TTL) {
+                if (next > previous.behaviorTuning.transientTtl(THREAD_TTL)) {
                     nextThreadAges.remove(key)
                     false
                 } else {
@@ -740,12 +737,13 @@ class ChatInteractionPlanner @Inject constructor(
         }
 
         return previous.copy(
-            currentFocus = age("currentFocus", previous.currentFocus, 3, clearOnTopicReset = true),
-            recentImpression = age("recentImpression", previous.recentImpression, 5),
-            activeGoal = age("activeGoal", previous.activeGoal, 12),
-            currentAgenda = age("currentAgenda", previous.currentAgenda, 3, clearOnTopicReset = true),
-            internalConflict = age("internalConflict", previous.internalConflict, 6),
-            immediateConcern = age("immediateConcern", previous.immediateConcern, 2, clearOnTopicReset = true),
+            mood = age("mood", previous.mood.takeUnless { it == "自然" }.orEmpty(), previous.behaviorTuning.moodTtl()).ifBlank { "自然" },
+            currentFocus = age("currentFocus", previous.currentFocus, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
+            recentImpression = age("recentImpression", previous.recentImpression, previous.behaviorTuning.transientTtl(5)),
+            activeGoal = age("activeGoal", previous.activeGoal, previous.behaviorTuning.transientTtl(12)),
+            currentAgenda = age("currentAgenda", previous.currentAgenda, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
+            internalConflict = age("internalConflict", previous.internalConflict, previous.behaviorTuning.transientTtl(6)),
+            immediateConcern = age("immediateConcern", previous.immediateConcern, previous.behaviorTuning.transientTtl(2), clearOnTopicReset = true),
             unresolvedThreads = threads,
             transientAges = nextAges,
             unresolvedThreadAges = nextThreadAges,
@@ -764,6 +762,7 @@ class ChatInteractionPlanner @Inject constructor(
             if (value.isBlank()) ages.remove(key) else ages[key] = 0
         }
 
+        reset("mood", state.mood.takeUnless { it == "自然" }.orEmpty())
         reset("currentFocus", state.currentFocus)
         reset("recentImpression", state.recentImpression)
         reset("activeGoal", state.activeGoal)
@@ -788,10 +787,12 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String,
         assistantMessage: String,
         raw: JsonObject,
+        tuning: CharacterBehaviorTuning,
     ): RelationshipDynamics {
         val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
         val explicitStageEvidence = EXPLICIT_STAGE_SIGNAL.containsMatchIn(userMessage)
         val stage = when {
+            tuning.lockRelationshipStage -> previous.stage
             candidateStage == previous.stage -> previous.stage
             explicitStageEvidence -> candidateStage
             else -> previous.stage
@@ -799,11 +800,11 @@ class ChatInteractionPlanner @Inject constructor(
 
         return RelationshipDynamics(
             stage = stage,
-            warmth = if (raw.containsKey("warmth")) bounded(value.warmth, previous.warmth, 10) else previous.warmth,
-            trust = if (raw.containsKey("trust")) bounded(value.trust, previous.trust, 8) else previous.trust,
-            reciprocity = if (raw.containsKey("reciprocity")) bounded(value.reciprocity, previous.reciprocity, 8) else previous.reciprocity,
-            tension = if (raw.containsKey("tension")) bounded(value.tension, previous.tension, 12) else previous.tension,
-            stability = if (raw.containsKey("stability")) bounded(value.stability, previous.stability, 8) else previous.stability,
+            warmth = if (raw.containsKey("warmth")) bounded(value.warmth, previous.warmth, tuning.relationshipDelta(10)) else previous.warmth,
+            trust = if (raw.containsKey("trust")) bounded(value.trust, previous.trust, tuning.relationshipDelta(8)) else previous.trust,
+            reciprocity = if (raw.containsKey("reciprocity")) bounded(value.reciprocity, previous.reciprocity, tuning.relationshipDelta(8)) else previous.reciprocity,
+            tension = if (raw.containsKey("tension")) bounded(value.tension, previous.tension, tuning.relationshipDelta(12)) else previous.tension,
+            stability = if (raw.containsKey("stability")) bounded(value.stability, previous.stability, tuning.relationshipDelta(8)) else previous.stability,
             unresolvedConflict = if (raw.containsKey("unresolvedConflict")) {
                 value.unresolvedConflict.trim().take(240)
             } else previous.unresolvedConflict,
