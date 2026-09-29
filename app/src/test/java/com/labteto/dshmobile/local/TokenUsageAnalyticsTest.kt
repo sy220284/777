@@ -47,6 +47,20 @@ class TokenUsageAnalyticsTest {
                 ),
             ),
             record(
+                id = "chat-repair",
+                time = day + 1_500,
+                input = 40,
+                output = 8,
+                context = TokenUsageContext(
+                    mode = LocalUsageMode.CHAT,
+                    sessionId = "session-a",
+                    sessionTitle = "角色聊天",
+                    turnId = "turn-1",
+                    runKind = LocalAgentRunKind.FOREGROUND.name.lowercase(),
+                    action = TokenUsageAction.CHAT_REPAIR,
+                ),
+            ),
+            record(
                 id = "chat-2",
                 time = day + 2_000,
                 input = 80,
@@ -92,12 +106,12 @@ class TokenUsageAnalyticsTest {
 
         val snapshot = aggregateTokenUsageRecords(records.asSequence(), zone)
 
-        assertEquals(640L, snapshot.tracked.totalTokens)
-        assertEquals(270L, snapshot.chat.aggregate.totalTokens)
+        assertEquals(688L, snapshot.tracked.totalTokens)
+        assertEquals(318L, snapshot.chat.aggregate.totalTokens)
         assertEquals(2, snapshot.chat.turnCount)
-        assertEquals(115L, snapshot.chat.averageInputPerTurn)
-        assertEquals(20L, snapshot.chat.averageOutputPerTurn)
-        assertEquals(27L, snapshot.chat.averageBackgroundPerTurn)
+        assertEquals(135L, snapshot.chat.averageInputPerTurn)
+        assertEquals(11L, snapshot.chat.averageOutputPerTurn)
+        assertEquals(87L, snapshot.chat.averageBackgroundPerTurn)
 
         assertEquals(1, snapshot.work.turnCount)
         assertEquals(320L, snapshot.work.averageInputPerTurn)

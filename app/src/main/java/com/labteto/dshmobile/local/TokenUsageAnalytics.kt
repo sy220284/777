@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -216,6 +217,45 @@ internal fun buildTokenUsageContext(
     step = step,
     action = action,
 )
+
+internal fun buildToolTokenUsageContext(
+    snapshot: LocalHarnessState,
+    eventLog: LocalSessionEventLog,
+    sessionId: String,
+    callId: String?,
+    action: TokenUsageAction,
+    fallbackTaskLabel: String? = null,
+): TokenUsageContext {
+    val checkpoint = callId?.takeIf(String::isNotBlank)?.let { targetCallId ->
+        eventLog.events()
+            .filter { event ->
+                event.type in TOOL_USAGE_CHECKPOINT_TYPES &&
+                    event.data["call_id"]?.jsonPrimitive?.contentOrNull == targetCallId
+            }
+            .lastOrNull()
+            ?.data
+    }
+    val runId = checkpoint?.get("run_id")?.jsonPrimitive?.contentOrNull
+    val parentRunId = checkpoint?.get("parent_run_id")?.jsonPrimitive?.contentOrNull
+    val agentId = checkpoint?.get("agent_id")?.jsonPrimitive?.contentOrNull
+    val runKind = checkpoint?.get("run_kind")?.jsonPrimitive?.contentOrNull?.let { value ->
+        LocalAgentRunKind.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+    }
+    val taskLabel = checkpoint?.get("input")?.jsonPrimitive?.contentOrNull
+        ?.takeIf(String::isNotBlank)
+        ?: fallbackTaskLabel
+    return buildTokenUsageContext(
+        snapshot = snapshot,
+        action = action,
+        turnId = runId,
+        runId = runId,
+        parentRunId = parentRunId,
+        runKind = runKind,
+        agentId = agentId,
+        taskLabel = taskLabel,
+        step = checkpoint?.get("step")?.jsonPrimitive?.intOrNull,
+    ).copy(sessionId = sessionId)
+}
 
 internal fun DeepSeekUsageTracker.record(
     model: String,
@@ -513,9 +553,11 @@ internal fun aggregateTokenUsageRecords(
         val workRuns = linkedSetOf<String>()
         val recent = ArrayDeque<TokenUsageRecord>()
         var trackedSince = 0L
-        var chatBackgroundTokens = 0L
         var chatTurnInputTokens = 0L
-        var chatTurnOutputTokens = 0L
+        val directVisibleReplies = linkedMapOf<String, TokenUsageRecord>()
+        var groupVisibleReplyOutputTokens = 0L
+        var groupVisibleReplyTotalTokens = 0L
+        var groupVisibleReplyCount = 0
         var workMainTokens = 0L
         var workSubagentTokens = 0L
         var workTaskInputTokens = 0L
@@ -534,9 +576,23 @@ internal fun aggregateTokenUsageRecords(
                     record.context.turnId?.takeIf(String::isNotBlank)?.let { turnId ->
                         chatTurns += turnId
                         chatTurnInputTokens += record.inputTokens
-                        chatTurnOutputTokens += record.outputTokens
+                        when (record.context.action) {
+                            TokenUsageAction.CHAT_REPLY,
+                            TokenUsageAction.CHAT_REPAIR,
+                            -> {
+                                val previous = directVisibleReplies[turnId]
+                                if (previous == null || record.timestamp >= previous.timestamp) {
+                                    directVisibleReplies[turnId] = record
+                                }
+                            }
+                            else -> Unit
+                        }
                     }
-                    if (record.context.action.isChatBackground()) chatBackgroundTokens += record.totalTokens
+                    if (record.context.action == TokenUsageAction.GROUP_REPLY) {
+                        groupVisibleReplyOutputTokens += record.outputTokens
+                        groupVisibleReplyTotalTokens += record.totalTokens
+                        groupVisibleReplyCount += 1
+                    }
                     record.context.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
                         sessionGroups.getOrPut(sessionId) {
                             MutableGroup(
@@ -577,6 +633,14 @@ internal fun aggregateTokenUsageRecords(
         }
 
         val chatTurnCount = chatTurns.size
+        val directReplyOutputTokens = directVisibleReplies.values.sumOf { it.outputTokens }
+        val directReplyTotalTokens = directVisibleReplies.values.sumOf { it.totalTokens }
+        val visibleReplyCount = directVisibleReplies.size + groupVisibleReplyCount
+        val visibleReplyOutputTokens = directReplyOutputTokens + groupVisibleReplyOutputTokens
+        val visibleReplyTotalTokens = directReplyTotalTokens + groupVisibleReplyTotalTokens
+        val chatBackgroundTokens = (
+            chat.inputTokens + chat.outputTokens - visibleReplyTotalTokens
+        ).coerceAtLeast(0L)
         return TokenUsageAnalyticsSnapshot(
             trackedSince = trackedSince,
             tracked = total.freeze(),
@@ -584,7 +648,7 @@ internal fun aggregateTokenUsageRecords(
                 aggregate = chat.freeze(),
                 turnCount = chatTurnCount,
                 averageInputPerTurn = average(chatTurnInputTokens, chatTurnCount),
-                averageOutputPerTurn = average(chatTurnOutputTokens, chatTurnCount),
+                averageOutputPerTurn = average(visibleReplyOutputTokens, visibleReplyCount),
                 averageBackgroundPerTurn = average(chatBackgroundTokens, chatTurnCount),
                 actions = chatActions.freezeActions(),
             ),
@@ -713,13 +777,11 @@ private fun Map<TokenUsageAction, MutableTokenAggregate>.freezeActions(): List<T
 private fun average(value: Long, count: Int): Long =
     if (count <= 0) 0L else value / count.toLong()
 
-private fun TokenUsageAction.isChatBackground(): Boolean = when (this) {
-    TokenUsageAction.CHAT_REPLY,
-    TokenUsageAction.CHAT_REPAIR,
-    TokenUsageAction.GROUP_REPLY,
-    -> false
-    else -> true
-}
+private val TOOL_USAGE_CHECKPOINT_TYPES = setOf(
+    LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+    LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT,
+    LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT,
+)
 
 private val MEMORY_MARKERS = listOf(
     "【用户长期规则】",

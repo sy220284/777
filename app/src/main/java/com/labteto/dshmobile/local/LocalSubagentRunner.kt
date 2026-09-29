@@ -218,6 +218,8 @@ internal class LocalSubagentRunner(
                 (function?.get("name") as? JsonPrimitive)?.content
             },
             contextChars = history.sumOf { it.toString().length } + task.length,
+            parentRunId = parentRunId,
+            agentId = subagentId,
         )
 
         try {
