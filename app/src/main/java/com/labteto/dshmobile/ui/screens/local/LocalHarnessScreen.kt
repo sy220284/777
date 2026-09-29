@@ -82,6 +82,7 @@ import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -158,6 +159,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
@@ -341,6 +343,7 @@ fun LocalHarnessScreen(
                 )
                 else -> LocalConversationSurface(
                     state = state,
+                    sendFeedback = sendFeedback,
                     streamingState = viewModel.streamingState,
                     gallery = gallery,
                     transcriptHistory = transcriptHistory,
@@ -617,6 +620,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
@@ -1187,9 +1191,9 @@ private fun LocalConversationSurface(
             )
         }
 
-        val sendRejectMessage = state.sendRejectReason?.let { reason ->
-            localSendRejectMessage(reason, state.sendRejectLimit)
-        }
+        val sendRejectMessage = sendFeedback.rejectReason
+            ?.takeIf { sendFeedback.sessionId == state.sessionId }
+            ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
         if (sendRejectMessage != null || state.error != null) {
             Surface(
                 color = colors.warnTertiary,
