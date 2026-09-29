@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.runtime
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFailsWith
 import org.junit.Test
 
 class BundledRuntimeLibraryStoreTest {
@@ -21,10 +20,10 @@ class BundledRuntimeLibraryStoreTest {
     @Test
     fun manifestRejectsTraversalAndDuplicateNames() {
         val digest = "b".repeat(64)
-        assertFailsWith<IllegalArgumentException> {
+        assertIllegalArgument {
             parseBundledRuntimeLibraryManifest("../libbad.so\t" + digest + "\t12\n")
         }
-        assertFailsWith<IllegalArgumentException> {
+        assertIllegalArgument {
             parseBundledRuntimeLibraryManifest(
                 "libsame.so\t" + digest + "\t12\n" +
                     "libsame.so\t" + digest + "\t12\n",
@@ -34,11 +33,20 @@ class BundledRuntimeLibraryStoreTest {
 
     @Test
     fun manifestRejectsInvalidDigestAndSize() {
-        assertFailsWith<IllegalArgumentException> {
+        assertIllegalArgument {
             parseBundledRuntimeLibraryManifest("libbad.so\txyz\t12\n")
         }
-        assertFailsWith<IllegalArgumentException> {
+        assertIllegalArgument {
             parseBundledRuntimeLibraryManifest("libbad.so\t" + "c".repeat(64) + "\t0\n")
+        }
+    }
+
+    private fun assertIllegalArgument(block: () -> Unit) {
+        try {
+            block()
+            throw AssertionError("expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            // Expected.
         }
     }
 }
