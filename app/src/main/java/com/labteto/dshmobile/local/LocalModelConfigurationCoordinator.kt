@@ -8,7 +8,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.coroutines.sync.Mutex
 
 internal data class LocalModelConfigurationResult(
     val configured: Boolean,
@@ -18,19 +17,6 @@ internal data class LocalModelConfigurationResult(
 ) {
     val configuredModels: List<String>
         get() = profiles.map(LocalModelProfile::model).distinct().sorted()
-}
-
-internal class LocalModelMutationGate {
-    private val mutex = Mutex()
-
-    suspend fun <T> run(block: suspend () -> T): T {
-        mutex.lock()
-        return try {
-            block()
-        } finally {
-            mutex.unlock()
-        }
-    }
 }
 
 /**
@@ -45,8 +31,7 @@ internal class LocalModelConfigurationCoordinator(
     private val tester: LocalModelConnectionTester,
     private val json: Json,
 ) {
-    private val mutationGate = LocalModelMutationGate()
-    suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult = mutationGate.run {
+    suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult = LocalModelMutationGate.run {
         require(model.isNotBlank()) { "模型名称不能为空" }
         val normalizedModel = normalizeModel(model)
         val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
@@ -70,7 +55,7 @@ internal class LocalModelConfigurationCoordinator(
     suspend fun select(
         id: String,
         profiles: List<LocalModelProfile>,
-    ): LocalModelConfigurationResult? = mutationGate.run {
+    ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         val selected = profiles.firstOrNull { it.id == id } ?: return@run null
         require(apiKeys.getFor(id) != null) { "该模型密钥不可用，请编辑配置重新填写" }
         preferences.edit()
@@ -85,7 +70,7 @@ internal class LocalModelConfigurationCoordinator(
         id: String,
         currentModel: String,
         currentBaseUrl: String,
-    ): LocalModelConfigurationResult? = mutationGate.run {
+    ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         val profiles = readProfiles()
         if (profiles.none { it.id == id }) return@run null
         apiKeys.clearFor(id)
@@ -110,7 +95,7 @@ internal class LocalModelConfigurationCoordinator(
     suspend fun clearActive(
         currentModel: String,
         currentBaseUrl: String,
-    ): LocalModelConfigurationResult = mutationGate.run {
+    ): LocalModelConfigurationResult = LocalModelMutationGate.run {
         val id = modelProfileId(currentModel, currentBaseUrl)
         apiKeys.clearFor(id)
         val remaining = readProfiles().filterNot { it.id == id }
