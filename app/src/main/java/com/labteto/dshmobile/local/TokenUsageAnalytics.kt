@@ -218,6 +218,18 @@ internal fun buildTokenUsageContext(
 )
 
 internal fun DeepSeekUsageTracker.record(
+    model: String,
+    reply: LocalModelReply,
+    context: TokenUsageContext,
+) = record(
+    model = model,
+    usage = reply.usage,
+    requestId = reply.requestId,
+    context = context,
+    promptBreakdown = reply.promptBreakdown,
+)
+
+internal fun DeepSeekUsageTracker.record(
     snapshot: LocalHarnessState,
     reply: LocalModelReply,
     context: TokenUsageContext,
