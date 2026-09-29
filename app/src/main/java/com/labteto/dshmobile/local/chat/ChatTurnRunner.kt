@@ -44,7 +44,7 @@ class ChatTurnRunner @Inject constructor(
         userInput: String = "",
         storyContext: String? = null,
     ): ChatTurnContext {
-        if (persona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
+        if (persona.isUnboundChatPersona()) {
             val continuationPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
                 """
                 【对话连续性摘要｜已发生】

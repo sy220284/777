@@ -168,7 +168,12 @@ internal class LocalSessionLifecycleCoordinator(
                     } else {
                         PersonaProfile.DEFAULT_PERSONA_ID
                     }
-                    val chatPersona = chatPersonaStore.get(personaId)
+                    val chatPersona = when {
+                        resolvedChatMode == LocalChatMode.GROUP -> PersonaProfile()
+                        galleryEntry != null -> chatPersonaStore.get(personaId)
+                        continueSingleChatBinding -> sourceState.chatPersona
+                        else -> PersonaProfile()
+                    }
                     val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
                         ChatCharacterState()
                     } else if (

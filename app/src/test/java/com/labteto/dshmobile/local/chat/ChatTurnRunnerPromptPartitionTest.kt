@@ -88,6 +88,27 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
+    fun emptyDefaultPersonaUsesNeutralUnboundChatPrompt() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "personas-unbound.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val context = runner.prepareProfile(
+            persona = PersonaProfile(),
+            state = ChatCharacterState(relationshipState = "熟悉中"),
+            context = ChatContextState(),
+            userInput = "你好",
+        )
+
+        assertTrue(PersonaProfile().isUnboundChatPersona())
+        assertFalse(PersonaProfile(name = "阿青").isUnboundChatPersona())
+        assertTrue(context.stablePrompt.contains("当前未选择人物角色"))
+        assertFalse(context.stablePrompt.contains("【角色】默认角色"))
+        assertFalse(context.dynamicPrompt.contains("关系=熟悉中"))
+    }
+
+    @Test
     fun genericRestraintDoesNotInjectIndirectExpressionPrompt() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas-restraint.json"), json),

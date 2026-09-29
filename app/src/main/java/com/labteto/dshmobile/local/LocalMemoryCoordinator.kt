@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -90,7 +91,7 @@ internal class LocalMemoryCoordinator(
         snapshot: LocalHarnessState,
     ): String {
         if (
-            snapshot.personaId == PersonaProfile.DEFAULT_PERSONA_ID ||
+            snapshot.chatPersona.isUnboundChatPersona() ||
             !snapshot.autoRecall ||
             !ChatMemorySelector.shouldRecall(query)
         ) return ""

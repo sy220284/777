@@ -86,6 +86,7 @@ import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -830,7 +831,7 @@ private fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             if (state.usageMode == LocalUsageMode.CHAT) {
-                val hasSelectedPersona = state.chatPersona.id != PersonaProfile.DEFAULT_PERSONA_ID
+                val hasSelectedPersona = !state.chatPersona.isUnboundChatPersona()
                 val personaDisplayName = if (hasSelectedPersona) {
                     state.chatPersona.name
                 } else {
@@ -1363,7 +1364,7 @@ private fun LocalConversationSurface(
                             stringResource(R.string.local_work_composer_hint)
                         state.groupChat.enabled ->
                             stringResource(R.string.local_group_chat_composer_hint)
-                        state.chatPersona.id == PersonaProfile.DEFAULT_PERSONA_ID ->
+                        state.chatPersona.isUnboundChatPersona() ->
                             stringResource(R.string.local_chat_composer_no_persona_hint)
                         else ->
                             stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)

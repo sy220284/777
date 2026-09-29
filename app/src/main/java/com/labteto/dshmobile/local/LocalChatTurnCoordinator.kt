@@ -32,13 +32,23 @@ internal class LocalChatTurnCoordinator(
         } else {
             snapshot.chatContext.withLegacyFallback(snapshot.chatState)
         }
-        val context = runner.prepare(
-            personaId = snapshot.personaId,
-            state = snapshot.chatState,
-            context = sharedContext,
-            userInput = input,
-            storyContext = snapshot.handoffSummary,
-        )
+        val context = if (snapshot.chatPersona.isUnboundChatPersona()) {
+            runner.prepareProfile(
+                persona = snapshot.chatPersona,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
+            )
+        } else {
+            runner.prepare(
+                personaId = snapshot.personaId,
+                state = snapshot.chatState,
+                context = sharedContext,
+                userInput = input,
+                storyContext = snapshot.handoffSummary,
+            )
+        }
         val recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
             groupEnabled = snapshot.groupChat.enabled,
