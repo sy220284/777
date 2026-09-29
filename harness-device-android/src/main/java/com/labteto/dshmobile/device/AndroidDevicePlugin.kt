@@ -34,15 +34,10 @@ class AndroidDevicePlugin(
 
     private val specs = listOf(
         Spec("android_device_info", "device_info", "读取 Android 设备与系统版本信息", access = ToolAccess.READ_ONLY),
-        Spec("android_privilege_status", "shizuku_status", "读取 Shizuku Binder、授权与身份状态", access = ToolAccess.READ_ONLY),
-        Spec("android_privilege_request", "shizuku_request_permission", "请求 Shizuku 权限；建议先用 android_privilege_status 自检，未启动服务时会返回具体操作引导", mapOf("request_code" to "integer"), approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_app_list", "app_list", "列出当前可见应用包", access = ToolAccess.READ_ONLY),
         Spec("android_app_info", "app_info", "读取指定应用信息", mapOf("package" to "string"), setOf("package"), ToolAccess.READ_ONLY),
         Spec("android_app_launch", "app_launch", "启动指定 Android 应用", mapOf("package" to "string"), setOf("package")),
-        Spec("android_app_stop", "app_stop", "通过 Shizuku 强制停止应用", mapOf("package" to "string"), setOf("package"), ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS),
         Spec("android_settings_get", "settings_get", "读取 Android 系统设置", mapOf("namespace" to "string", "key" to "string"), setOf("namespace", "key"), ToolAccess.READ_ONLY),
-        Spec("android_settings_set", "settings_set", "通过 Shizuku 修改 Android 系统设置", mapOf("namespace" to "string", "key" to "string", "value" to "string"), setOf("namespace", "key", "value"), ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS),
-        Spec("android_dumpsys", "dumpsys", "通过 Shizuku 调用 dumpsys", mapOf("service" to "string", "args" to "string"), setOf("service"), ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS),
         Spec("android_screen", "accessibility_tree", "读取当前无障碍控件树，返回短生命周期 node 编号；未就绪时会返回系统无障碍授权引导", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_find", "accessibility_find", "按文本、控件 id、类型或可交互属性查找当前界面控件", mapOf("text" to "string", "id" to "string", "class" to "string", "clickable" to "boolean", "editable" to "boolean"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_click_node", "accessibility_click_node", "按最近一次界面树/查找结果中的 node 编号点击控件", mapOf("node" to "integer"), setOf("node")),

@@ -14,12 +14,51 @@ class LocalModelProfilesTest {
         assertEquals(first, modelProfileId(" shared-model ", "https://service-a.example/v1/"))
     }
 
+    @Test fun providerPresetsUseDomesticRoutesWithoutRegionSuffixes() {
+        val providers = LocalModelPresets.entries.map { it.provider }
+        assertFalse(providers.any { it.contains("海外") || it.contains("国际") || it.contains("中国") })
+
+        val routes = LocalModelPresets.entries.map { it.baseUrl }
+        assertFalse(routes.any { it.startsWith("https://api.minimax.io") })
+        assertFalse(routes.any { it.startsWith("https://api.kimi.ai") })
+        assertFalse(routes.any { it.startsWith("https://dashscope-us.aliyuncs.com") })
+
+        assertTrue(
+            LocalModelPresets.entries
+                .filter { it.provider == "MiniMax" }
+                .all { it.baseUrl == "https://api.minimaxi.com/v1" },
+        )
+        assertTrue(
+            LocalModelPresets.entries
+                .filter { it.provider == "Kimi Code" }
+                .all { it.baseUrl == "https://api.kimi.com/coding/v1" },
+        )
+        assertTrue(
+            LocalModelPresets.entries
+                .filter { it.provider == "通义千问" }
+                .all { it.baseUrl == "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+        )
+    }
+
     @Test fun currentProviderPresetsExposeRoutesAndDocumentedCapabilities() {
-        val miniMax = LocalModelPresets.find("MiniMax-M3", "https://api.minimax.io/v1")!!
+        val deepSeekFlash = LocalModelPresets.find("deepseek-flash", "https://api.deepseek.com")!!
+        assertTrue(LocalModelCapability.IMAGE in deepSeekFlash.capabilities)
+        assertEquals(true, deepSeekFlash.imageInputSupported)
+        assertEquals("https://api.deepseek.com/models", deepSeekFlash.modelsEndpoint)
+
+        val deepSeekPro = LocalModelPresets.find("deepseek-v4-pro", "https://api.deepseek.com")!!
+        assertFalse(LocalModelCapability.IMAGE in deepSeekPro.capabilities)
+        assertEquals(false, deepSeekPro.imageInputSupported)
+
+        val miniMax = LocalModelPresets.find("MiniMax-M3", "https://api.minimaxi.com/v1")!!
         assertTrue(LocalModelCapability.IMAGE in miniMax.capabilities)
         assertTrue(LocalModelCapability.VIDEO in miniMax.capabilities)
         assertEquals(true, miniMax.imageInputSupported)
-        assertEquals("https://api.minimax.io/v1/chat/completions", miniMax.chatEndpoint)
+        assertEquals("https://api.minimaxi.com/v1/chat/completions", miniMax.chatEndpoint)
+
+        val miniMaxText = LocalModelPresets.find("MiniMax-M2.7", "https://api.minimaxi.com/v1")!!
+        assertEquals(setOf(LocalModelCapability.TEXT), miniMaxText.capabilities)
+        assertEquals(false, miniMaxText.imageInputSupported)
 
         val kimi = LocalModelPresets.find("k3", "https://api.kimi.com/coding/v1")!!
         assertTrue(LocalModelCapability.IMAGE in kimi.capabilities)
@@ -31,22 +70,80 @@ class LocalModelProfilesTest {
         assertFalse(LocalModelCapability.VIDEO in kimi256k.capabilities)
         assertEquals(true, kimi256k.imageInputSupported)
 
-        val currentKimiIds = LocalModelPresets.entries
-            .filter { it.provider.startsWith("Kimi Code") }
-            .map { it.model }
-            .toSet()
-        assertEquals(
-            setOf("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
-            currentKimiIds,
-        )
+        val glmVision = LocalModelPresets.find("glm-5.3-flash", "https://open.bigmodel.cn/api/paas/v4")!!
+        assertTrue(LocalModelCapability.IMAGE in glmVision.capabilities)
+        assertEquals(true, glmVision.imageInputSupported)
 
-        val glm = LocalModelPresets.find("glm-5-turbo", "https://open.bigmodel.cn/api/paas/v4")!!
+        val glm = LocalModelPresets.find("glm-5.3", "https://open.bigmodel.cn/api/paas/v4")!!
         assertTrue(LocalModelCapability.TEXT in glm.capabilities)
         assertFalse(LocalModelCapability.IMAGE in glm.capabilities)
         assertEquals(false, glm.imageInputSupported)
         assertEquals(
             "https://open.bigmodel.cn/api/paas/v4/models",
             glm.modelsEndpoint,
+        )
+
+        val qwen = LocalModelPresets.find(
+            "qwen3.8-max",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )!!
+        assertTrue(LocalModelCapability.IMAGE in qwen.capabilities)
+        assertTrue(LocalModelCapability.VIDEO in qwen.capabilities)
+        assertEquals(true, qwen.imageInputSupported)
+
+        val qwenOmni = LocalModelPresets.find(
+            "qwen3.8-omni-flash",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )!!
+        assertTrue(LocalModelCapability.AUDIO in qwenOmni.capabilities)
+        assertTrue(LocalModelCapability.VIDEO in qwenOmni.capabilities)
+
+        val gpt6 = LocalModelPresets.find("gpt-6-sol", "https://api.openai.com/v1")!!
+        assertTrue(LocalModelCapability.IMAGE in gpt6.capabilities)
+        assertEquals(true, gpt6.imageInputSupported)
+        assertEquals(
+            LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING,
+            gpt6.toolCallingMode,
+        )
+        assertEquals(
+            LocalModelToolCallingMode.RESPONSES_ONLY,
+            LocalModelPresets.toolCallingModeFor("gpt-6-astra", "https://api.openai.com/v1"),
+        )
+    }
+
+    @Test fun latestDistinctModelsAreAvailablePerExistingProvider() {
+        fun models(provider: String): Set<String> = LocalModelPresets.entries
+            .filter { it.provider == provider }
+            .map { it.model }
+            .toSet()
+
+        assertEquals(
+            setOf("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"),
+            models("MiniMax"),
+        )
+        assertEquals(
+            setOf("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
+            models("Kimi Code"),
+        )
+        assertEquals(
+            setOf("glm-5.3-flash", "glm-5.3", "glm-5.2", "glm-5-turbo"),
+            models("智谱 GLM"),
+        )
+        assertEquals(
+            setOf("gpt-5.6", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"),
+            models("OpenAI"),
+        )
+        assertEquals(
+            setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"),
+            models("Google Gemini"),
+        )
+        assertEquals(
+            setOf("qwen3.8-omni-flash", "qwen3.8-max", "qwen3.8-flash", "qwen3.7-plus", "qwen-plus"),
+            models("通义千问"),
+        )
+        assertEquals(
+            setOf("claude-opus-5-5", "claude-sonnet-5", "claude-fable-5-1"),
+            models("Claude（兼容接口）"),
         )
     }
 

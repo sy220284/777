@@ -82,6 +82,43 @@ class ChatInteractionPlannerTest {
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
+    fun plannerAndSuggestionsHonorPersonaCorrectionsForIndirectExpression() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            personality = "嘴硬心软",
+            corrections = listOf("不善于拒绝，会服软，很多推辞只是她自己的表达方式"),
+        )
+        val state = ChatCharacterState(
+            relationshipState = "亲近",
+            dynamics = RelationshipDynamics(stage = "AMBIGUOUS"),
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+        )
+
+        val plannerPrompt = planner.prompt(
+            persona = persona,
+            state = state,
+            userMessage = "你又嘴硬了",
+            assistantMessage = "谁嘴硬了……你少得意。",
+        )
+        val suggestionsPrompt = planner.suggestionsPrompt(
+            persona = persona,
+            state = state,
+            userMessage = "你又嘴硬了",
+            assistantMessage = "谁嘴硬了……你少得意。",
+        )
+
+        assertTrue(plannerPrompt.contains("用户纠正（最高优先）"))
+        assertTrue(plannerPrompt.contains("不善于拒绝，会服软"))
+        assertTrue(plannerPrompt.contains("表达解释：角色存在含蓄、嘴硬"))
+        assertTrue(plannerPrompt.contains("字面推辞不得单独触发关系降温"))
+        assertTrue(suggestionsPrompt.contains("用户纠正（最高优先）"))
+        assertTrue(suggestionsPrompt.contains("不把表面推辞自动解释为关系拒绝"))
+        assertTrue(suggestionsPrompt.contains("清晰持续的停止、退出或拒绝继续除外"))
+    }
+
+    @Test
     fun parsesAndBoundsStateAndSuggestions() {
         val previous = ChatCharacterState(
             mood = "平静",

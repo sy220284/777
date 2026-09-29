@@ -199,6 +199,44 @@ class AgentLoopTest {
     }
 
     @Test
+    fun softStepBudgetExtendsSameTurnUntilTaskCompletes() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        val loop = AgentLoop(
+            model = AgentModel {
+                request += 1
+                if (request < 4) {
+                    AgentModelReply(
+                        toolCalls = listOf(
+                            AgentToolCall(
+                                id = "call-$request",
+                                name = "work",
+                                arguments = buildJsonObject { put("step", request) },
+                            ),
+                        ),
+                    )
+                } else {
+                    AgentModelReply(content = "任务完成")
+                }
+            },
+            tools = AgentToolExecutor { AgentToolResult("继续") },
+            eventSink = AgentEventSink { events += it },
+            maxSteps = 1,
+            stepLimitExtender = AgentStepLimitExtender { currentLimit, _ -> currentLimit + 1 },
+            idFactory = { "turn-soft-budget" },
+        )
+
+        val result = loop.run("完成长任务")
+
+        assertEquals(AgentStopReason.COMPLETED, result.stopReason)
+        assertEquals(4, result.steps)
+        assertEquals("任务完成", result.answer)
+        assertEquals(4, events.count { it is AgentEvent.StepStarted })
+        assertFalse(events.any { it is AgentEvent.TurnStepLimit })
+        assertTrue(events.last() is AgentEvent.TurnCompleted)
+    }
+
+    @Test
     fun modelFailureProducesFailureWithoutCompletion() = runTest {
         val events = mutableListOf<AgentEvent>()
         val loop = AgentLoop(
@@ -263,4 +301,87 @@ class AgentLoopTest {
         assertTrue(events.any { it is AgentEvent.TurnCancelled })
         assertFalse(events.any { it is AgentEvent.TurnCompleted })
     }
+
+    @Test
+    fun softBudgetCanCrossLegacy128LimitWithoutResettingTurnOrStepNumbers() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        val loop = AgentLoop(
+            model = AgentModel {
+                request += 1
+                if (request <= 129) {
+                    AgentModelReply(
+                        toolCalls = listOf(
+                            AgentToolCall(
+                                id = "call-" + request,
+                                name = "work",
+                                arguments = buildJsonObject { put("step", request) },
+                            ),
+                        ),
+                    )
+                } else {
+                    AgentModelReply(content = "跨过旧上限后完成")
+                }
+            },
+            tools = AgentToolExecutor { AgentToolResult("继续") },
+            eventSink = AgentEventSink { events += it },
+            maxSteps = 128,
+            stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
+                assertEquals(currentLimit, stepsUsed)
+                if (currentLimit == 128) 130 else null
+            },
+            idFactory = { "turn-cross-128" },
+        )
+
+        val result = loop.run("执行超长任务")
+
+        assertEquals(AgentStopReason.COMPLETED, result.stopReason)
+        assertEquals(130, result.steps)
+        assertEquals("跨过旧上限后完成", result.answer)
+        assertEquals(
+            (1..130).toList(),
+            events.filterIsInstance<AgentEvent.StepStarted>().map { it.step },
+        )
+        assertEquals(1, events.map { it.turnId }.distinct().size)
+        assertFalse(events.any { it is AgentEvent.TurnStepLimit })
+    }
+
+    @Test
+    fun nonGrowingSoftBudgetStopsExactlyAtExhaustedLimit() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var extenderCalls = 0
+        val loop = AgentLoop(
+            model = AgentModel {
+                AgentModelReply(
+                    toolCalls = listOf(
+                        AgentToolCall(
+                            id = "call-limit",
+                            name = "work",
+                            arguments = buildJsonObject { },
+                        ),
+                    ),
+                )
+            },
+            tools = AgentToolExecutor { AgentToolResult("继续") },
+            eventSink = AgentEventSink { events += it },
+            maxSteps = 3,
+            stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
+                extenderCalls += 1
+                assertEquals(3, currentLimit)
+                assertEquals(3, stepsUsed)
+                currentLimit
+            },
+            idFactory = { "turn-soft-stop" },
+        )
+
+        val result = loop.run("执行到动态熔断")
+
+        assertEquals(AgentStopReason.STEP_LIMIT, result.stopReason)
+        assertEquals(3, result.steps)
+        assertEquals(1, extenderCalls)
+        assertEquals(listOf(1, 2, 3), events.filterIsInstance<AgentEvent.StepStarted>().map { it.step })
+        assertTrue(events.last() is AgentEvent.TurnStepLimit)
+        assertFalse(events.any { it is AgentEvent.TurnFailed })
+    }
+
 }

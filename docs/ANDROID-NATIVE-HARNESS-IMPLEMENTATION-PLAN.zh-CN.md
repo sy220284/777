@@ -33,7 +33,7 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 - Android 16 是唯一目标平台，不为 Android 8～15 增加兼容债务。
 - Harness Core 使用 Kotlin 原生实现。
 - UI、Android 能力和 Harness Core 必须解耦。
-- Harness Core 不直接依赖 Compose、Activity、Service、Shizuku 或无障碍服务。
+- Harness Core 不直接依赖 Compose、Activity、Service 或无障碍服务。
 - 模型可见的状态必须来自可持久化的 Session Event。
 - 文件、进程、终端、网络、设备控制全部通过能力接口接入。
 - 官方行为兼容以“输入/事件/状态/输出一致”为准，不追求类名或代码结构逐行相似。
@@ -95,7 +95,6 @@ Node.js、Python、Git、语言服务器和本机 MCP 进程可以作为 **Agent
 │  └─ 后台任务
 │
 ├─ harness-device-android
-│  ├─ Shizuku
 │  ├─ 无障碍
 │  ├─ 截图 / 视觉
 │  ├─ App 控制
@@ -383,18 +382,6 @@ Harness 工具层提供：
 
 新增 Android 专属工具族。
 
-#### Shizuku
-
-负责：
-
-- 包管理；
-- Activity / Service 调用；
-- settings；
-- dumpsys；
-- 系统属性；
-- 进程与权限状态；
-- 安装 / 卸载（必须审批）。
-
 #### 无障碍
 
 负责：
@@ -483,12 +470,10 @@ android_home
 android_app_list
 android_app_info
 android_app_launch
-android_app_stop
 android_app_install
 android_app_uninstall
 
 android_settings_get
-android_settings_set
 android_permissions
 
 android_notification_list
@@ -661,7 +646,6 @@ Harness Core 升级比普通 UI 升级风险更高。
 - 普通进程执行；
 - 网络；
 - Android 界面操作；
-- Shizuku 系统操作；
 - 安装 / 卸载；
 - 外部目录访问。
 
@@ -673,7 +657,6 @@ Harness Core 升级比普通 UI 升级风险更高。
 - write/edit：审批；
 - shell：审批；
 - 安装/卸载：强审批；
-- Shizuku 修改系统设置：强审批；
 - 无障碍点击涉及付款、账号、安全设置：阻断或二次确认；
 - 外部应用私有数据：普通 App 权限下不可访问；
 - API Key：Keystore；
@@ -707,7 +690,7 @@ Official reference runner
 Differential conformance suite
 ```
 
-涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代 Shizuku、无障碍、厂商 ROM 行为。
+涉及 Android Device Provider 时增加真机测试矩阵，模拟器测试不能替代无障碍与厂商 ROM 行为。
 
 ---
 
@@ -808,11 +791,10 @@ app
 4. `feat: add process runtime and persistent PTY`
 5. `feat: add native MCP client`
 6. `feat: add native LSP client`
-7. `feat: add Shizuku Android provider`
-8. `feat: add accessibility and screen provider`
-9. `feat: add vision interaction loop`
-10. `feat: add virtual display agent runtime`
-11. `feat: add signed in-app updater`
+7. `feat: add accessibility and screen provider`
+8. `feat: add vision interaction loop`
+9. `feat: add virtual display agent runtime`
+10. `feat: add signed in-app updater`
 
 不得把 P0～P9 全塞进一个巨型 PR。
 

@@ -2,6 +2,9 @@ package com.labteto.dshmobile.harness.resource
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -108,4 +111,33 @@ class HarnessResourceSchedulerTest {
         assertEquals(0, scheduler.snapshot().activeLanguageServers)
         assertTrue(scheduler.snapshot().leases.isEmpty())
     }
+
+    @Test
+    fun cancelledWaiterStormDoesNotLeakPermitsOrActiveCounters() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 2),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.MODEL_REQUEST, "holder")
+        val entered = mutableSetOf<Int>()
+
+        val waiters = (0 until 64).map { index ->
+            launch {
+                scheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "waiter-$index") {
+                    entered += index
+                }
+            }
+        }
+        runCurrent()
+
+        waiters.filterIndexed { index, _ -> index % 2 == 0 }.forEach { it.cancel() }
+        waiters.filterIndexed { index, _ -> index % 2 == 0 }.forEach { it.cancelAndJoin() }
+
+        held.close()
+        waiters.filterIndexed { index, _ -> index % 2 == 1 }.forEach { it.join() }
+
+        assertEquals((0 until 64).filter { it % 2 == 1 }.toSet(), entered)
+        assertEquals(0, scheduler.snapshot().activeModelRequests)
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
 }

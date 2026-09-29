@@ -59,6 +59,7 @@ class ChatTurnRunner @Inject constructor(
             stablePrompt = composeStablePersonaPrompt(persona),
             dynamicPrompt = listOf(
                 composeDynamicPersonaPrompt(persona, privateState),
+                composePersonaExpressionSemanticsPrompt(persona),
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
                 composeRoleplayNoveltyPrompt(privateState),

@@ -101,4 +101,24 @@ class LocalMemoryToolsTest {
         assertTrue(tools.execute("memory_forget", buildJsonObject { put("id", record.id) }, true).contains("已停用"))
         assertTrue(store.listActive(setOf(MemoryScope.PROJECT), "project", null).isEmpty())
     }
+    @Test fun rememberRejectsUnknownKindInsteadOfSilentlySavingFact() {
+        val store = MemoryStore(temporary.root, Json)
+        val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())
+        val state = LocalHarnessState(conversationMode = LocalConversationMode.INDEPENDENT)
+        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+
+        val result = tools.execute(
+            "memory_remember",
+            buildJsonObject {
+                put("scope", "global")
+                put("kind", "decison")
+                put("content", "keep this decision")
+            },
+            true,
+        )
+
+        assertTrue(result.contains("记忆类型无效"))
+        assertTrue(store.listActive(setOf(MemoryScope.GLOBAL), null, null).isEmpty())
+    }
+
 }

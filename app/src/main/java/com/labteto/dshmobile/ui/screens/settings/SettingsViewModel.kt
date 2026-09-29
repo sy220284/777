@@ -18,7 +18,6 @@ import com.labteto.dshmobile.core.wire.dto.LlmModelDiscoveryRequest
 import com.labteto.dshmobile.core.wire.dto.SettingsDescribeValue
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.core.wire.dto.SettingsPathOpView
-import com.labteto.dshmobile.device.AndroidDeviceProvider
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.DeepSeekPricingRepository
@@ -72,8 +71,6 @@ data class ModelServicesState(
 
 data class DeviceCapabilitiesState(
     val loading: Boolean = false,
-    val shizukuAlive: Boolean = false,
-    val shizukuGranted: Boolean = false,
     val accessibility: Boolean = false,
     val notifications: Boolean = false,
     val virtualDisplay: Boolean = true,
@@ -92,7 +89,6 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val appContext = context.applicationContext
-    private val deviceProvider = AndroidDeviceProvider(appContext)
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -456,41 +452,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshDeviceCapabilities() {
-        viewModelScope.launch {
-            _deviceCapabilities.value = _deviceCapabilities.value.copy(loading = true, error = null)
-            runCatching {
-                val raw = deviceProvider.invoke("shizuku_status", emptyMap())
-                fun flag(name: String): Boolean =
-                    raw.lineSequence().firstOrNull { it.startsWith("$name=") }
-                        ?.substringAfter('=')
-                        ?.toBooleanStrictOrNull() == true
-                DeviceCapabilitiesState(
-                    loading = false,
-                    shizukuAlive = flag("binder_alive"),
-                    shizukuGranted = flag("permission"),
-                    accessibility = HarnessAccessibilityService.active() != null,
-                    notifications = HarnessNotificationListenerService.active() != null,
-                    virtualDisplay = true,
-                )
-            }.onSuccess {
-                _deviceCapabilities.value = it
-            }.onFailure {
-                _deviceCapabilities.value = DeviceCapabilitiesState(
-                    loading = false,
-                    accessibility = HarnessAccessibilityService.active() != null,
-                    notifications = HarnessNotificationListenerService.active() != null,
-                    virtualDisplay = true,
-                    error = it.message,
-                )
-            }
-        }
-    }
-
-    fun requestShizukuPermission() {
-        viewModelScope.launch {
-            runCatching { deviceProvider.invoke("shizuku_request_permission", emptyMap()) }
-            refreshDeviceCapabilities()
-        }
+        _deviceCapabilities.value = DeviceCapabilitiesState(
+            loading = false,
+            accessibility = HarnessAccessibilityService.active() != null,
+            notifications = HarnessNotificationListenerService.active() != null,
+            virtualDisplay = true,
+        )
     }
 
     fun openAccessibilitySettings() {

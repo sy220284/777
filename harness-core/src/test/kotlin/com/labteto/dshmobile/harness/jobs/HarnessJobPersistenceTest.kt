@@ -165,4 +165,65 @@ class HarnessJobPersistenceTest {
 
         assertTrue(manager.output(persistentId).contains("[completed]"))
     }
+
+    @Test
+    fun persistentTaskKilledDuringDurablePreflightNeverStartsLater() = runTest {
+        var ran = false
+        var killedDuringPreflight = false
+        lateinit var manager: HarnessJobManager
+        manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-preflight-race" },
+            onSnapshotsChanged = { snapshots ->
+                if (!killedDuringPreflight &&
+                    snapshots.any { it.id == "job-preflight-race" && it.status == "running" }
+                ) {
+                    killedDuringPreflight = true
+                    manager.kill("job-preflight-race")
+                }
+            },
+        )
+
+        manager.startPersistent(
+            label = "durable",
+            resumeKind = "web_fetch",
+            resumePayload = "{\"url\":\"https://example.com\"}",
+        ) { _, _ ->
+            ran = true
+            "must not run"
+        }
+        runCurrent()
+
+        assertTrue(killedDuringPreflight)
+        assertFalse(ran)
+        assertTrue(manager.output("job-preflight-race").contains("[cancelled]"))
+    }
+
+
+    @Test
+    fun duplicateIdFactoryFallsBackInsteadOfLoopingForever() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-duplicate" },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-duplicate",
+                    label = "旧任务",
+                    status = "completed",
+                ),
+            ),
+        )
+
+        val started = manager.start("新任务") { _, _ -> "done" }
+        runCurrent()
+
+        val id = started.substringAfterLast('：')
+        assertTrue(id != "job-duplicate")
+        assertTrue(id.startsWith("job-"))
+        assertTrue(manager.output(id).contains("[completed]"))
+        assertTrue(manager.output("job-duplicate").contains("[completed]"))
+    }
+
 }

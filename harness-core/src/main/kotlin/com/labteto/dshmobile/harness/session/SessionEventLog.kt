@@ -55,6 +55,14 @@ class SessionEventLog(
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
+        // Multiple live adapters can hold separate SessionEventLog instances for the same path.
+        // The striped path lock serializes their writes, but each instance has its own in-memory
+        // counter. Reconcile from the durable tail while holding that shared lock so a stale
+        // instance cannot reuse a sequence that another instance has already committed.
+        val durableNextSequence = readNextSequence()
+        if (nextSequence.get() != durableNextSequence) {
+            nextSequence.set(durableNextSequence)
+        }
         val event = SessionEvent(
             sequence = nextSequence.get(),
             type = type,

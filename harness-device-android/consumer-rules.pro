@@ -1,1 +1,0 @@
--keep class com.labteto.dshmobile.device.shizuku.PrivilegedCommandService { *; }
