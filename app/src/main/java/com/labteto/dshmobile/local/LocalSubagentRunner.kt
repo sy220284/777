@@ -180,6 +180,15 @@ internal class LocalSubagentRunner(
             })
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_API_KEY")
         }
+        val parentRunId = parentCallId?.let { callId ->
+            eventLog().events()
+                .filter { event ->
+                    event.type == LOCAL_AGENT_RUN_CHECKPOINT_EVENT &&
+                        event.data["call_id"]?.jsonPrimitive?.contentOrNull == callId
+                }
+                .mapNotNull { event -> event.data["run_id"]?.jsonPrimitive?.contentOrNull }
+                .lastOrNull()
+        }
         val runContext = runCoordinator?.start(
             sessionId = runSessionId(),
             usageMode = LocalUsageMode.WORK,
@@ -310,6 +319,7 @@ internal class LocalSubagentRunner(
                         action = usageAction,
                         turnId = runContext?.runId ?: subagentId,
                         runId = runContext?.runId ?: subagentId,
+                        parentRunId = parentRunId,
                         runKind = runKind,
                         agentId = subagentId,
                         taskLabel = task,
