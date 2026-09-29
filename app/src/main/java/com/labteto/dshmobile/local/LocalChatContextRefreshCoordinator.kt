@@ -454,6 +454,14 @@ internal class LocalChatContextRefreshCoordinator(
             persistBranchState("chat/post-turn-updated")
         }
         persist()
+        if (nextContext.pendingTurns.any { pending ->
+                pending.sequence > nextContext.processedThroughSequence &&
+                    pending.generation == expectedGeneration
+            }) {
+            scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, 0, "remaining-pending",
+            )
+        }
     }
 
 
