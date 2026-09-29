@@ -8,8 +8,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-class LocalHarnessBusyException(message: String) : IllegalStateException(message)
-
 class LocalHarnessBlockedException(
     message: String,
     val sessionId: String? = null,
