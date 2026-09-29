@@ -8,6 +8,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
+SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
 PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
 LIFECYCLE_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt"
@@ -42,11 +44,31 @@ if engine_lines > 6_500:
         f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6500); extract new logic behind a coordinator"
     )
 
-local_screen_lines = len(LOCAL_SCREEN.read_text(encoding="utf-8").splitlines())
+local_screen = LOCAL_SCREEN.read_text(encoding="utf-8")
+remote_composer = REMOTE_COMPOSER.read_text(encoding="utf-8")
+shared_composer = SHARED_COMPOSER.read_text(encoding="utf-8")
+
+local_screen_lines = len(local_screen.splitlines())
 if local_screen_lines > 2_450:
     violations.append(
         f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2450); extract UI/state into focused components"
     )
+
+for name, source in (
+    ("LocalHarnessScreen.kt", local_screen),
+    ("Composer.kt", remote_composer),
+):
+    if "DsConversationComposer(" not in source:
+        violations.append(f"{name} must use the shared DsConversationComposer shell")
+    if "composerFocused" in source or "composerExpanded" in source:
+        violations.append(f"{name} must not expand the composer merely because the field gains focus")
+    if "shape = DsShapes.composer" in source:
+        violations.append(f"{name} must not rebuild composer geometry outside DsConversationComposer")
+
+if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" not in shared_composer:
+    violations.append("Shared composer must own compact action geometry and sizing tokens")
+if "icon = FeatherIcons.CheckSquare" not in local_screen or "icon = Icons.Outlined.Shield" not in local_screen:
+    violations.append("Work composer must keep planning and auto-approve as compact in-composer actions")
 
 persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
 if persona_gallery_lines > 1_160:
