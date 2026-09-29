@@ -4086,7 +4086,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
-                LocalShellTool.execute(args, workspace, jobs)
+                LocalShellTool.execute(args, workspace, jobs, boundSessionId)
             }
             "job_list" -> jobs.list()
             "job_output" -> jobs.output(args.string("job_id"))
@@ -4245,6 +4245,7 @@ class LocalHarnessEngine @Inject constructor(
             label = "网页抓取：${url.take(120)}",
             resumeKind = "web_fetch",
             resumePayload = payload,
+            ownerSessionId = sessionId,
         ) { _, report ->
             report("正在抓取：$url")
             webTools.fetch(url, maxBytes, format, timeoutSeconds)
@@ -4272,6 +4273,7 @@ class LocalHarnessEngine @Inject constructor(
             label = "子代理：${task.take(100)}",
             resumeKind = "subagent_readonly",
             resumePayload = payload,
+            ownerSessionId = sessionId,
         ) { jobId, _ ->
             val result = boundSubagents.runResult(
                 task = task,
