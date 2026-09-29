@@ -48,6 +48,12 @@ data class PersonaGalleryStory(
             chatState.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let {
                 appendLine("已发生的共同经历：${it.joinToString("；").take(800)}")
             }
+            characterEvolutionSummary(chatState.evolution)?.let {
+                appendLine("长期人物演变：$it")
+                chatState.evolution.lastMajorMilestone.takeIf(String::isNotBlank)?.let { milestone ->
+                    appendLine("最近重大经历：$milestone")
+                }
+            }
             chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let {
                 appendLine("仍待推进的线索：${it.joinToString("；").take(400)}")
             }
@@ -219,6 +225,7 @@ private fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterStat
     val older = if (incomingIsNewer) base else incoming
     return newer.copy(
         unresolvedThreads = mergePersonaLines(older.unresolvedThreads, newer.unresolvedThreads, 8),
+        evolution = mergeCharacterEvolution(older.evolution, newer.evolution),
         dynamics = newer.dynamics.copy(
             facts = mergeEvidence(older.dynamics.facts, newer.dynamics.facts, 24),
             hypotheses = mergeEvidence(older.dynamics.hypotheses, newer.dynamics.hypotheses, 16),
