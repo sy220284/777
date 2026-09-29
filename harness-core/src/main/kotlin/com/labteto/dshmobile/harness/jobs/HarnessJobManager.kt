@@ -23,6 +23,7 @@ data class JobSnapshot(
     val output: String = "",
     val resumeKind: String? = null,
     val resumePayload: String? = null,
+    val ownerId: String? = null,
     val startedAt: Long = 0L,
     val deadlineAt: Long = 0L,
     val updatedAt: Long = System.currentTimeMillis(),
@@ -56,6 +57,7 @@ class HarnessJobManager(
         val inbox: MutableList<String> = mutableListOf(),
         val resumeKind: String? = null,
         val resumePayload: String? = null,
+        var ownerId: String? = null,
         val startedAt: Long = System.currentTimeMillis(),
         val deadlineAt: Long = 0L,
         var updatedAt: Long = System.currentTimeMillis(),
@@ -85,6 +87,7 @@ class HarnessJobManager(
                     },
                     resumeKind = snapshot.resumeKind,
                     resumePayload = snapshot.resumePayload,
+                    ownerId = snapshot.ownerId,
                     startedAt = snapshot.startedAt,
                     deadlineAt = snapshot.deadlineAt,
                     updatedAt = snapshot.updatedAt,
@@ -97,11 +100,13 @@ class HarnessJobManager(
     fun start(
         label: String,
         expectedDurationMillis: Long? = null,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String = startInternal(
         label = label,
         resumeKind = null,
         resumePayload = null,
+        ownerId = ownerId,
         expectedDurationMillis = expectedDurationMillis,
         block = block,
     )
@@ -110,6 +115,7 @@ class HarnessJobManager(
         label: String,
         resumeKind: String,
         resumePayload: String,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         require(resumeKind.isNotBlank()) { "持久任务恢复类型不能为空" }
@@ -117,6 +123,7 @@ class HarnessJobManager(
             label = label,
             resumeKind = resumeKind.take(MAX_RESUME_KIND),
             resumePayload = resumePayload.take(MAX_RESUME_PAYLOAD),
+            ownerId = ownerId,
             expectedDurationMillis = null,
             block = block,
         )
@@ -124,6 +131,7 @@ class HarnessJobManager(
 
     fun resumePersistent(
         id: String,
+        ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         var previousOutput = ""
@@ -138,6 +146,7 @@ class HarnessJobManager(
             }
             previousOutput = found.output
             previousUpdatedAt = found.updatedAt
+            if (!ownerId.isNullOrBlank()) found.ownerId = ownerId
             found.status = "running"
             found.output = "正在从安全检查点恢复…"
             found.updatedAt = System.currentTimeMillis()
@@ -187,6 +196,7 @@ class HarnessJobManager(
         label: String,
         resumeKind: String?,
         resumePayload: String?,
+        ownerId: String?,
         expectedDurationMillis: Long? = null,
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
@@ -207,6 +217,7 @@ class HarnessJobManager(
                 label = label.take(MAX_LABEL),
                 resumeKind = resumeKind,
                 resumePayload = resumePayload,
+                ownerId = ownerId,
                 startedAt = startedAt,
                 deadlineAt = deadlineAt,
                 updatedAt = startedAt,
@@ -367,6 +378,33 @@ class HarnessJobManager(
         publish()
     }
 
+    /**
+     * Cancel and forget every job owned by the supplied conversations without touching jobs from
+     * other sessions. Session deletion uses this instead of the old global non-persistent stop.
+     */
+    suspend fun removeOwnedAndJoin(ownerIds: Set<String>) {
+        if (ownerIds.isEmpty()) return
+        val jobs = synchronized(lock) {
+            records.values
+                .filter { it.ownerId in ownerIds && it.status == "running" }
+                .onEach {
+                    it.status = "cancelled"
+                    it.output = "任务已取消"
+                    it.updatedAt = System.currentTimeMillis()
+                }
+                .mapNotNull { it.job }
+        }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        synchronized(lock) {
+            val iterator = records.entries.iterator()
+            while (iterator.hasNext()) {
+                if (iterator.next().value.ownerId in ownerIds) iterator.remove()
+            }
+        }
+        publish()
+    }
+
     private fun markRunningJobsCancelled(predicate: (Record) -> Boolean = { true }): List<Job> = synchronized(lock) {
         records.values.filter { it.status == "running" && predicate(it) }.onEach {
             it.status = "cancelled"
@@ -413,6 +451,7 @@ class HarnessJobManager(
         output = record.output,
         resumeKind = record.resumeKind,
         resumePayload = record.resumePayload,
+        ownerId = record.ownerId,
         startedAt = record.startedAt,
         deadlineAt = record.deadlineAt,
         updatedAt = record.updatedAt,

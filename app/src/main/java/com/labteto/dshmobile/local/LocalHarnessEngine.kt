@@ -723,6 +723,7 @@ class LocalHarnessEngine @Inject constructor(
             endTransition = ::endSessionTransition,
             runBusy = ::isRunBusy,
             cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
+            cancelWorkRunsAndJoin = ::cancelWorkRunsAndJoin,
             resetModelHistory = { modelHistory.reset() },
             persist = ::persist,
             loadSession = { id ->
@@ -2461,6 +2462,45 @@ class LocalHarnessEngine @Inject constructor(
         synchronized(runStateLock) { sessionTransitioning = false }
     }
 
+    private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {
+        if (sessionIds.isEmpty()) return
+        val cancelled = synchronized(runStateLock) {
+            sessionIds.mapNotNull { sessionId ->
+                activeWorkRuns.remove(sessionId)?.let { binding ->
+                    val job = binding.job
+                    val mirror = binding.mirrorJob
+                    binding.job = null
+                    binding.mirrorJob = null
+                    Triple(binding, job, mirror)
+                }
+            }
+        }
+        cancelled.forEach { (binding, job, mirror) ->
+            binding.interactions.cancelAll()
+            val discarded = binding.pendingInputs.drain()
+            if (discarded.isNotEmpty()) {
+                binding.eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = emptyList(),
+                        affected = discarded,
+                    ),
+                )
+            }
+            binding.state.update {
+                it.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    queuedInputCount = 0,
+                )
+            }
+            job?.cancelAndJoin()
+            mirror?.cancelAndJoin()
+        }
+    }
+
     private suspend fun cancelActiveRunAndJoin() {
         interactions.cancelAll()
         val job = synchronized(runStateLock) {
@@ -4083,7 +4123,7 @@ class LocalHarnessEngine @Inject constructor(
             )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
-                LocalShellTool.execute(args, workspace, jobs)
+                LocalShellTool.execute(args, workspace, jobs, boundSessionId)
             }
             "job_list" -> jobs.list()
             "job_output" -> jobs.output(args.string("job_id"))
@@ -4242,6 +4282,7 @@ class LocalHarnessEngine @Inject constructor(
             label = "网页抓取：${url.take(120)}",
             resumeKind = "web_fetch",
             resumePayload = payload,
+            ownerSessionId = sessionId,
         ) { _, report ->
             report("正在抓取：$url")
             webTools.fetch(url, maxBytes, format, timeoutSeconds)
@@ -4269,6 +4310,7 @@ class LocalHarnessEngine @Inject constructor(
             label = "子代理：${task.take(100)}",
             resumeKind = "subagent_readonly",
             resumePayload = payload,
+            ownerSessionId = sessionId,
         ) { jobId, _ ->
             val result = boundSubagents.runResult(
                 task = task,
@@ -4343,7 +4385,7 @@ class LocalHarnessEngine @Inject constructor(
                         val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
                         val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
                             ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-                        jobs.resumePersistent(snapshot.id) { _, report ->
+                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { _, report ->
                             report("正在恢复网页抓取：$url")
                             webTools.fetch(
                                 url,
@@ -4361,7 +4403,7 @@ class LocalHarnessEngine @Inject constructor(
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
                         val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
-                        jobs.resumePersistent(snapshot.id) { jobId, _ ->
+                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
                             val result = boundSubagents.runResult(
                                 task = task,
                                 inheritHistory = false,
