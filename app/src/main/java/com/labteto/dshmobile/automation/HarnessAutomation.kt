@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.automation
 
 import android.content.Context
-import com.labteto.dshmobile.R
+import com.labteto.dshmobile.R\nimport com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
@@ -1324,15 +1324,15 @@ class HarnessAutomationWorker(
             applicationContext.getString(R.string.tasks_notification_open_result)
         }
         entry.notifications().postLocalSession(
-            id = AUTOMATION_NOTIFICATION_BASE + (task.id.hashCode() and Int.MAX_VALUE) % 10_000,
+            id = stableNotificationId("automation", task.id),
             title = title,
             text = text,
             sessionId = sessionId,
+            notificationKey = "automation:${task.id}",
         )
     }
 
     companion object {
-        private const val AUTOMATION_NOTIFICATION_BASE = 34_000
     }
 }
 
