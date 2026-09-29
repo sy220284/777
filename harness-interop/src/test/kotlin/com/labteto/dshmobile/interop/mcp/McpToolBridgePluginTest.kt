@@ -3,7 +3,12 @@ package com.labteto.dshmobile.interop.mcp
 import java.io.File
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -121,6 +126,158 @@ class McpToolBridgePluginTest {
         assertFalse(disconnected.isError)
         assertNull(registry.context.tools.get(localName))
         assertTrue(closed)
+    }
+
+    @Test
+    fun disconnectWaitsForInflightCallBeforeClosingTransport() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var closed = false
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject =
+                when (method) {
+                    "tools/list" -> buildJsonObject {
+                        put("result", buildJsonObject {
+                            put("tools", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("name", "slow")
+                                    put("inputSchema", buildJsonObject { put("type", "object") })
+                                })
+                            })
+                        })
+                    }
+                    "tools/call" -> {
+                        entered.complete(Unit)
+                        release.await()
+                        buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("isError", false)
+                                put("content", buildJsonArray { })
+                            })
+                        }
+                    }
+                    else -> error("unexpected method $method")
+                }
+
+            override fun close() {
+                closed = true
+            }
+        }
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = { transport },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "slow-server", "https://example.com/mcp")
+
+        val call = async {
+            registry.context.tools.execute(
+                "mcp_slow-server_slow",
+                buildJsonObject { },
+                context = ToolContext(approval = { true }),
+            )
+        }
+        entered.await()
+
+        val disconnect = async {
+            plugin.disconnectFromUi(registry.context, "slow-server")
+        }
+        yield()
+
+        assertFalse(disconnect.isCompleted)
+        assertFalse(closed)
+
+        release.complete(Unit)
+        assertFalse(call.await().isError)
+        assertTrue(disconnect.await().contains("已断开"))
+        assertTrue(closed)
+        assertNull(registry.context.tools.get("mcp_slow-server_slow"))
+    }
+
+    @Test
+    fun slowConnectDoesNotBlockExistingServerSnapshots() = runTest {
+        val slowEntered = CompletableDeferred<Unit>()
+        val slowRelease = CompletableDeferred<Unit>()
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = { endpoint ->
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        require(method == "tools/list")
+                        if (endpoint.contains("slow")) {
+                            slowEntered.complete(Unit)
+                            slowRelease.await()
+                        }
+                        return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray { })
+                            })
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "fast", "https://example.com/fast")
+
+        val slow = async {
+            plugin.connectHttpFromUi(registry.context, "slow", "https://example.com/slow")
+        }
+        slowEntered.await()
+
+        val snapshots = plugin.serverSnapshots()
+        assertEquals(listOf("fast"), snapshots.map(McpServerSnapshot::id))
+        assertFalse(slow.isCompleted)
+
+        slowRelease.complete(Unit)
+        assertTrue(slow.await().contains("已连接"))
+    }
+
+    @Test
+    fun cancelledConnectReleasesServerReservation() = runTest {
+        val firstEntered = CompletableDeferred<Unit>()
+        var attempts = 0
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                val attempt = ++attempts
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        require(method == "tools/list")
+                        if (attempt == 1) {
+                            firstEntered.complete(Unit)
+                            awaitCancellation()
+                        }
+                        return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray { })
+                            })
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+
+        val first = async {
+            plugin.connectHttpFromUi(registry.context, "retry", "https://example.com/mcp")
+        }
+        firstEntered.await()
+        first.cancelAndJoin()
+
+        val retry = plugin.connectHttpFromUi(registry.context, "retry", "https://example.com/mcp")
+        assertTrue(retry.contains("已连接"))
+        assertEquals(2, attempts)
     }
 
     @Test

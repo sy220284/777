@@ -50,6 +50,17 @@ interface HarnessDeviceProvider {
     suspend fun invoke(capability: String, arguments: Map<String, String>): String
 }
 
+/**
+ * Optional device capability used by isolated agent runs.
+ *
+ * Keeping this contract in the platform-neutral core prevents local agent orchestration from
+ * depending on the Android implementation just to acquire and release a virtual display.
+ */
+interface HarnessVirtualDisplayProvider {
+    suspend fun acquireAgentVirtualDisplay(owner: String): String
+    fun releaseAgentVirtualDisplay(id: String)
+}
+
 interface HarnessLlmProvider {
     suspend fun complete(model: String, payload: String): String
 }
