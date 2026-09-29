@@ -835,7 +835,6 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
-
     /** Switch the active route and its corresponding encrypted key together. */
     internal fun selectModel(id: String) {
         scope.launch {
