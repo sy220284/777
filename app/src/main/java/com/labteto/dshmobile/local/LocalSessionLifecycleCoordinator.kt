@@ -245,7 +245,7 @@ internal class LocalSessionLifecycleCoordinator(
                             planMode = false,
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = projectExecutionJobs(usageMode, jobs.snapshotInfos()),
+                            jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
                             activeAgents = projectWorkResourceCount(
                                 usageMode,
                                 resourceScheduler.snapshot().activeAgents,
