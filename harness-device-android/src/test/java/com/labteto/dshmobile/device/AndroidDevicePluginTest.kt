@@ -10,6 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -127,4 +128,32 @@ class AndroidDevicePluginTest {
             return "ok:$capability"
         }
     }
+
+    @Test
+    fun deviceNumericAndBooleanArgumentsRejectMalformedValuesInsteadOfFallingBack() {
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("duration_ms" to "abc").deviceOptionalLong("duration_ms", 60L, 1L..60_000L)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("duration_ms" to "-1").deviceOptionalLong("duration_ms", 60L, 1L..60_000L)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("width" to "oops").deviceOptionalInt("width", 1080)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("clickable" to "yes").deviceOptionalBoolean("clickable")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("x" to "NaN").deviceRequiredFiniteFloat("x")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            mapOf("x" to "Infinity").deviceRequiredFiniteFloat("x")
+        }
+
+        assertEquals(60L, emptyMap<String, String>().deviceOptionalLong("duration_ms", 60L, 1L..60_000L))
+        assertEquals(1080, emptyMap<String, String>().deviceOptionalInt("width", 1080))
+        assertEquals(true, mapOf("clickable" to "true").deviceOptionalBoolean("clickable"))
+        assertEquals(12.5f, mapOf("x" to "12.5").deviceRequiredFiniteFloat("x"))
+    }
+
 }
