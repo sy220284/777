@@ -322,7 +322,9 @@ class McpToolBridgePlugin(
         val client = try {
             clientFactory()
         } catch (error: Exception) {
-            mutex.withLock { releaseConnectionReservationLocked(serverId) }
+            withContext(NonCancellable) {
+                mutex.withLock { releaseConnectionReservationLocked(serverId) }
+            }
             throw error
         }
         val registered = mutableListOf<String>()
@@ -397,9 +399,11 @@ class McpToolBridgePlugin(
             }
             return connectedMessage
         } catch (error: Exception) {
-            registered.forEach(context.tools::unregister)
-            client.close()
-            mutex.withLock { releaseConnectionReservationLocked(serverId) }
+            withContext(NonCancellable) {
+                registered.forEach(context.tools::unregister)
+                client.close()
+                mutex.withLock { releaseConnectionReservationLocked(serverId) }
+            }
             throw error
         }
     }
