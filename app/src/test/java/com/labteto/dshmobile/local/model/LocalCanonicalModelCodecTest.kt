@@ -154,6 +154,51 @@ class LocalCanonicalModelCodecTest {
     }
 
     @Test
+    fun malformedToolFieldsAreRejectedInsteadOfBeingSilentlyNormalized() {
+        val badParameters = buildJsonArray {
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("description", "读取文件")
+                    put("parameters", JsonPrimitive("not-an-object"))
+                })
+            })
+        }
+        val badDescription = buildJsonArray {
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("description", 123)
+                })
+            })
+        }
+        val badStrict = buildJsonArray {
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("strict", "true")
+                })
+            })
+        }
+
+        assertTrue(
+            runCatching { LocalCanonicalModelCodec.tools(badParameters) }
+                .exceptionOrNull()?.message.orEmpty().contains("parameters"),
+        )
+        assertTrue(
+            runCatching { LocalCanonicalModelCodec.tools(badDescription) }
+                .exceptionOrNull()?.message.orEmpty().contains("description"),
+        )
+        assertTrue(
+            runCatching { LocalCanonicalModelCodec.tools(badStrict) }
+                .exceptionOrNull()?.message.orEmpty().contains("strict"),
+        )
+    }
+
+    @Test
     fun toolDefinitionsBecomeProviderNeutralBeforeAdapterProjection() {
         val tools = buildJsonArray {
             add(buildJsonObject {
