@@ -117,6 +117,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -535,7 +536,7 @@ private fun LocalConfiguration(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.local_harness_title),
-                style = DsType.large20,
+                style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
@@ -545,15 +546,15 @@ private fun LocalConfiguration(
         }
 
         DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong, color = colors.labelPrimary)
+            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         }
 
-        Text(stringResource(R.string.local_model_section_title), style = DsType.std14, color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         DsGroupCard {
             OutlinedTextField(
                 value = apiKey,
@@ -573,7 +574,7 @@ private fun LocalConfiguration(
             )
             Spacer(Modifier.height(DsSpacing.medium))
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(stringResource(R.string.models_title), style = DsType.std14Strong, color = colors.labelPrimary)
+                Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
                 ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
@@ -588,7 +589,7 @@ private fun LocalConfiguration(
             )
         }
 
-        state.error?.let { Text(it, style = DsType.small13, color = colors.error) }
+        state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
 
         DsButton(
             text = stringResource(R.string.local_model_save_enter),
@@ -616,7 +617,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected == id, onClick = { onSelect(id) })
-        Text(label, style = DsType.std14, color = DsTheme.colors.labelPrimary)
+        Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
     }
 }
 
@@ -924,7 +925,7 @@ private fun LocalConversationSurface(
                         if (mode == LocalUsageMode.CHAT) R.string.local_mode_intro_chat
                         else R.string.local_mode_intro_work,
                     ),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
@@ -941,12 +942,12 @@ private fun LocalConversationSurface(
             ) {
                 Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
                     Text(stringResource(R.string.local_group_announcement_title),
-                        style = DsType.small13Strong, color = colors.labelPrimary)
+                        style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(
                         state.groupChat.announcement.ifBlank {
                             stringResource(R.string.local_group_announcement_empty)
                         },
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -972,7 +973,7 @@ private fun LocalConversationSurface(
                 ) {
                     Text(
                         stringResource(R.string.local_persona_correction_recorded),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                         modifier = Modifier.weight(1f),
                     )
@@ -1008,13 +1009,13 @@ private fun LocalConversationSurface(
                     ) {
                         Text(
                             stringResource(R.string.local_device_approval_on),
-                            style = DsType.small13Strong,
+                            style = DsType.small13Strong.withReadingWeight(),
                             color = colors.warnLabel,
                         )
                         Text(
                             if (approvalNoticeExpanded) stringResource(R.string.local_approval_scope_hide)
                             else stringResource(R.string.local_approval_scope_show),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                     }
@@ -1028,7 +1029,7 @@ private fun LocalConversationSurface(
                 if (approvalNoticeExpanded) {
                     Text(
                         stringResource(R.string.local_device_approval_scope),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
@@ -1090,7 +1091,7 @@ private fun LocalConversationSurface(
                         DsCard {
                             Text(
                                 stringResource(R.string.local_group_chat_setup_required),
-                                style = DsType.std14,
+                                style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
                             DsButton(
@@ -1214,7 +1215,7 @@ private fun LocalConversationSurface(
         attachmentError?.let {
             Text(
                 it,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.error,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
             )
@@ -1248,7 +1249,7 @@ private fun LocalConversationSurface(
                             suggestion.label.ifBlank {
                                 suggestion.text.take(18)
                             },
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.labelSecondary,
                             maxLines = 1,
                             modifier = Modifier.padding(
@@ -1584,7 +1585,7 @@ private fun LocalConversationSurface(
         ) {
             Text(
                 stringResource(R.string.local_reply_suggestions_hint),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
@@ -1611,7 +1612,7 @@ private fun LocalConversationSurface(
                         ) {
                             Text(
                                 suggestion.label,
-                                style = DsType.std14Strong,
+                                style = DsType.std14Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f),
                             )
@@ -1619,14 +1620,14 @@ private fun LocalConversationSurface(
                                 Text(
                                     if (suggestion.bold) stringResource(R.string.local_reply_suggestions_bold)
                                     else suggestion.style,
-                                    style = DsType.caption11,
+                                    style = DsType.caption11.withReadingWeight(),
                                     color = if (suggestion.bold) colors.warnLabel else colors.labelTertiary,
                                 )
                             }
                         }
                         Text(
                             suggestion.text,
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                     }
@@ -1705,7 +1706,7 @@ private fun ImportedAttachmentRow(
                 )
             }
             Column(Modifier.weight(1f)) {
-                Text(attachment.name, style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(attachment.name, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 val dimensions = if (attachment.width != null && attachment.height != null) {
                     " · ${attachment.width}×${attachment.height}"
                 } else {
@@ -1713,7 +1714,7 @@ private fun ImportedAttachmentRow(
                 }
                 Text(
                     "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -1733,14 +1734,14 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        Text(stringResource(R.string.local_welcome_title), style = DsType.display24, color = colors.labelPrimary)
+        Text(stringResource(R.string.local_welcome_title), style = DsType.display24.withReadingWeight(), color = colors.labelPrimary)
         Text(
             stringResource(R.string.local_welcome_hint),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Text(stringResource(R.string.local_suggestions_title), style = DsType.small13Strong, color = colors.labelTertiary)
+        Text(stringResource(R.string.local_suggestions_title), style = DsType.small13Strong.withReadingWeight(), color = colors.labelTertiary)
         DsGroupCard {
             DsCategoryRow(
                 icon = FeatherIcons.FileText,

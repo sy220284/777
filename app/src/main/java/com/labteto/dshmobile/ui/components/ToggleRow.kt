@@ -16,6 +16,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * A labelled on/off row: name (with optional [hint]) on the left, a switch on the right.
@@ -39,9 +40,9 @@ fun ToggleRow(label: String, checked: Boolean, hint: String? = null, onChange: (
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.std14, color = colors.labelSecondary)
+            Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
             if (hint != null) {
-                Text(hint, style = DsType.caption11, color = colors.labelCaption)
+                Text(hint, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption)
             }
         }
         Switch(checked = checked, onCheckedChange = { onChange() })

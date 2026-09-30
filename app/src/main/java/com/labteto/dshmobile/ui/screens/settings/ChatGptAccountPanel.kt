@@ -39,6 +39,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -104,12 +105,12 @@ internal fun ChatGptAccountPanel(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.chatgpt_account_title),
-                        style = DsType.std14Strong,
+                        style = DsType.std14Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                     Text(
                         stringResource(R.string.chatgpt_account_hint),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
@@ -131,7 +132,7 @@ internal fun ChatGptAccountPanel(
             if (selected == null) {
                 Text(
                     stringResource(R.string.chatgpt_privacy_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
                 DsButton(
@@ -145,11 +146,11 @@ internal fun ChatGptAccountPanel(
                     selected.displayName?.takeIf(String::isNotBlank)
                         ?: selected.email?.takeIf(String::isNotBlank)
                         ?: stringResource(R.string.chatgpt_account_fallback),
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                 )
                 selected.email?.takeIf { it != selected.displayName }?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -157,7 +158,7 @@ internal fun ChatGptAccountPanel(
                 ) {
                     Text(
                         "$accountShortLabel ${selected.id.takeLast(6)}",
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                         modifier = Modifier.weight(1f),
                     )
@@ -188,14 +189,14 @@ internal fun ChatGptAccountPanel(
                 }
                 Text(
                     stringResource(R.string.chatgpt_session_persistence_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
 
                 if (otherAccounts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.chatgpt_saved_accounts),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     otherAccounts.forEach { account ->
@@ -215,7 +216,7 @@ internal fun ChatGptAccountPanel(
                                     append(' ')
                                     append(account.id.takeLast(6))
                                 },
-                                style = DsType.small13,
+                                style = DsType.small13.withReadingWeight(),
                                 color = colors.labelSecondary,
                                 modifier = Modifier.weight(1f),
                             )
@@ -276,11 +277,11 @@ internal fun ChatGptAccountPanel(
                 )
                 Text(
                     stringResource(R.string.chatgpt_test_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
                 testStatus?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelSecondary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
 
                 DsButton(
@@ -334,7 +335,7 @@ internal fun ChatGptAccountPanel(
                         ChatGptAuthPhase.LOADING_MODELS -> stringResource(R.string.chatgpt_loading_models)
                         else -> stringResource(R.string.chatgpt_connecting)
                     },
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
                 if (authorizationCanRestart) {
@@ -363,7 +364,7 @@ internal fun ChatGptAccountPanel(
                     }
                 }
             }
-            state.error?.let { Text(it, style = DsType.caption11, color = colors.error) }
+            state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error) }
         }
     }
 
@@ -374,7 +375,7 @@ internal fun ChatGptAccountPanel(
         ) {
             Text(
                 stringResource(R.string.chatgpt_remove_registration_body),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             Row(
@@ -410,7 +411,7 @@ internal fun ChatGptAccountPanel(
         ) {
             Text(
                 stringResource(R.string.chatgpt_welcome_body),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             DsButton(

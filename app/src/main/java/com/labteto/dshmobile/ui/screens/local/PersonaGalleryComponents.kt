@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -79,9 +78,13 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,7 +96,7 @@ internal fun PersonaGalleryTopBar(
 ) {
     val colors = DsTheme.colors
     Surface(
-        color = colors.bgBase,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CHROME, BackgroundRegion.TOP, colors.bgBase),
         shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -110,9 +113,8 @@ internal fun PersonaGalleryTopBar(
             )
             Text(
                 text = title,
-                style = DsType.large20,
+                style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -186,12 +188,12 @@ internal fun DeletePresetConfirmDialog(
     ) {
         Text(
             stringResource(R.string.persona_gallery_preset_delete_confirm, preset.persona.name),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
         Text(
             stringResource(R.string.persona_gallery_preset_delete_hint),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -225,12 +227,12 @@ internal fun DeleteCharacterConfirm(
                 entry.persona.name,
                 entry.totalDialogueCount(),
             ),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.error,
         )
         Text(
             stringResource(R.string.persona_gallery_delete_saved_hint),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -271,26 +273,25 @@ internal fun StoryDetailSection(
         DsCard {
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
-                style = DsType.std14,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 stringResource(R.string.persona_gallery_current_relation, story.chatState.relationshipState),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
             story.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
                 Text(
                     stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }
             story.chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let { threads ->
                 Text(
                     stringResource(R.string.persona_gallery_unresolved, threads.joinToString("；")),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }
@@ -319,13 +320,13 @@ internal fun StoryDetailSection(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.persona_gallery_archived_dialogue),
-                    style = DsType.std14,
+                    style = DsType.std14.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
                 )
             }
             Text(
                 stringResource(R.string.persona_gallery_history_long_press_hint),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
             )
             val history = story.history.filter { it.role == "user" || it.role == "assistant" }
@@ -343,19 +344,19 @@ internal fun StoryDetailSection(
                 DsCard {
                     Text(
                         stringResource(R.string.persona_gallery_delete_dialogue_confirm),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.error,
                     )
                     Text(
                         "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         stringResource(R.string.persona_gallery_delete_dialogue_hint),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelTertiary,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -428,9 +429,8 @@ internal fun GalleryOverviewHeader(
             ) {
                 Text(
                     stringResource(R.string.persona_gallery_master),
-                    style = DsType.large20,
+                    style = DsType.large20.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     stringResource(
@@ -439,7 +439,7 @@ internal fun GalleryOverviewHeader(
                         storyCount,
                         dialogueCount,
                     ),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }
@@ -457,7 +457,7 @@ internal fun PersonaPresetCard(
 ) {
     Surface(
         shape = RoundedCornerShape(22.dp),
-        color = DsTheme.colors.bgLayer1,
+        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
         shadowElevation = 2.dp,
         modifier = modifier
             .heightIn(min = 196.dp)
@@ -475,16 +475,15 @@ internal fun PersonaPresetCard(
             PersonaAvatar(preset.persona.name)
             Text(
                 preset.persona.name,
-                style = DsType.std14,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             GalleryPill(preset.franchise)
             Text(
                 preset.summary,
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -517,7 +516,7 @@ internal fun GalleryPersonaCard(
     }
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = DsTheme.colors.bgLayer1,
+        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
         shadowElevation = 4.dp,
         modifier = modifier.combinedClickable(
             onClick = onClick,
@@ -544,20 +543,19 @@ internal fun GalleryPersonaCard(
                     ),
                     onClick = onChoosePortrait,
                     modifier = Modifier.align(Alignment.TopEnd),
-                    containerColor = DsTheme.colors.bgLayer2.copy(alpha = 0.88f),
+                    containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = DsTheme.colors.bgLayer2),
                 )
             }
             Text(
                 entry.persona.name,
-                style = DsType.std14,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 subtitle,
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -568,7 +566,7 @@ internal fun GalleryPersonaCard(
                     entry.stories.size,
                     entry.totalDialogueCount(),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -659,7 +657,7 @@ internal fun SpatialPortraitStandee(
                             Spacer(Modifier.size(DsSpacing.small))
                             Text(
                                 stringResource(R.string.persona_gallery_portrait_empty),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
                         }
@@ -705,7 +703,10 @@ internal fun GalleryStoryCard(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) DsTheme.colors.accent.copy(alpha = 0.10f) else DsTheme.colors.bgLayer1,
+        color = DsTheme.colors.wallpaperSurface(
+            WallpaperSurfaceLevel.CARD,
+            base = if (selected) DsTheme.colors.accentTertiary else DsTheme.colors.bgLayer1,
+        ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -715,9 +716,8 @@ internal fun GalleryStoryCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
-                    style = DsType.std14,
+                    style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -725,7 +725,7 @@ internal fun GalleryStoryCard(
                 if (summary.isNotBlank()) {
                     Text(
                         summary,
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -759,11 +759,11 @@ private fun ArchivedDialogueRow(
                 onLongClick = onLongClick,
             ),
         shape = RoundedCornerShape(10.dp),
-        color = DsTheme.colors.bgLayer2,
+        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer2),
     ) {
         Text(
             text,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         )
@@ -783,15 +783,14 @@ internal fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
             Column(Modifier.weight(1f)) {
                 Text(
                     story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
-                    style = DsType.std14,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     stringResource(R.string.persona_gallery_story_relation),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -801,7 +800,7 @@ internal fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
         state.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
             Text(
                 focus,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -810,7 +809,7 @@ internal fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
         state.dynamics.sharedMoments.lastOrNull()?.takeIf(String::isNotBlank)?.let { moment ->
             Text(
                 moment,
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -828,19 +827,18 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
             Column(Modifier.weight(1f)) {
                 Text(
                     persona.name,
-                    style = DsType.large20,
+                    style = DsType.large20.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     persona.identity.ifBlank { subtitle },
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (persona.identity.isNotBlank()) {
-                    Text(subtitle, style = DsType.caption11, color = DsTheme.colors.labelTertiary)
+                    Text(subtitle, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
                 }
             }
         }
@@ -860,9 +858,8 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 initial,
-                style = if (large) DsType.large20 else DsType.std14,
+                style = (if (large) DsType.large20 else DsType.std14Strong).withReadingWeight(),
                 color = DsTheme.colors.accent,
-                fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -872,11 +869,11 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
 internal fun GalleryPill(text: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = DsTheme.colors.bgLayer1,
+        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
     ) {
         Text(
             text,
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
         )
@@ -915,9 +912,8 @@ internal fun PersonaDetails(persona: PersonaProfile) {
     DsCard {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
-            style = DsType.std14,
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         scalarSections.forEach { (title, value) ->
             PersonaDetailRow(title, value)
@@ -931,8 +927,8 @@ internal fun PersonaDetails(persona: PersonaProfile) {
 @Composable
 private fun PersonaDetailRow(title: String, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = DsType.caption11, color = DsTheme.colors.labelTertiary)
-        Text(value, style = DsType.small13, color = DsTheme.colors.labelSecondary)
+        Text(title, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
+        Text(value, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
     }
 }
 
@@ -954,7 +950,7 @@ internal fun PersonaInspectionPanel(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.persona_gallery_inspection_clean),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }
@@ -965,33 +961,32 @@ internal fun PersonaInspectionPanel(
     if (result.conflicts.isNotEmpty()) {
         Text(
             stringResource(R.string.persona_gallery_conflict_count, result.conflicts.size),
-            style = DsType.std14,
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         result.conflicts.forEach { conflict ->
             DsCard {
                 Text(
                     personaFieldLabel(conflict.field),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.error,
                 )
                 if (conflict.fixedValue.isNotBlank()) {
                     Text(
                         stringResource(R.string.persona_gallery_fixed_value, conflict.fixedValue),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                     )
                 }
                 Text(
                     stringResource(R.string.persona_gallery_observed_value, conflict.observedValue),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
                 )
                 if (conflict.reason.isNotBlank()) {
                     Text(
                         conflict.reason,
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelTertiary,
                     )
                 }
@@ -1002,9 +997,8 @@ internal fun PersonaInspectionPanel(
     if (result.suggestions.isNotEmpty()) {
         Text(
             stringResource(R.string.persona_gallery_suggestions_title),
-            style = DsType.std14,
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
@@ -1020,18 +1014,18 @@ internal fun PersonaInspectionPanel(
                     ) {
                         Text(
                             personaFieldLabel(suggestion.field),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = DsTheme.colors.accent,
                         )
                         Text(
                             suggestion.value,
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = DsTheme.colors.labelPrimary,
                         )
                         if (suggestion.evidence.isNotBlank()) {
                             Text(
                                 stringResource(R.string.persona_gallery_evidence, suggestion.evidence),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = DsTheme.colors.labelTertiary,
                             )
                         }

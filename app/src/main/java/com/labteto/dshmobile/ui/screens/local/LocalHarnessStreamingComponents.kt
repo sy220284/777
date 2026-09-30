@@ -30,6 +30,7 @@ import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
@@ -78,7 +79,7 @@ internal fun LocalStreamingChatTurn(
                 Spacer(Modifier.width(DsSpacing.small))
                 Text(
                     stringResource(R.string.local_chat_replying),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
             }
@@ -115,13 +116,13 @@ internal fun LocalStreamingWorkPreview(
                 }
                 Text(
                     stringResource(R.string.local_streaming_status),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
             }
             Text(
                 preview.ifBlank { stringResource(R.string.local_work_process) },
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = if (preview.isBlank()) {
                     DsTheme.colors.labelTertiary
                 } else {

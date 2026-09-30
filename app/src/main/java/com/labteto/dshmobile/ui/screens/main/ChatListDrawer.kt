@@ -79,6 +79,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -223,7 +224,7 @@ fun ChatListDrawer(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.ALL, colors.sidebar))
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.DRAWER, BackgroundRegion.ALL, colors.sidebar))
             .safeDrawingPadding()
             .padding(horizontal = DsSpacing.medium),
     ) {
@@ -231,7 +232,7 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.app_name), style = DsType.large20, color = colors.labelPrimary, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.app_name), style = DsType.large20.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,
                 contentDescription = stringResource(R.string.chatlist_new_session),
@@ -246,7 +247,7 @@ fun ChatListDrawer(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
-            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14) },
+            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14.withReadingWeight()) },
             leadingIcon = {
                 Icon(
                     Icons.Filled.Search,
@@ -268,7 +269,7 @@ fun ChatListDrawer(
         if (!contentSearchAvailable && query.isNotBlank()) {
             Text(
                 stringResource(R.string.chatlist_search_content_off),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelCaption,
                 modifier = Modifier.padding(bottom = DsSpacing.small),
             )
@@ -299,7 +300,7 @@ fun ChatListDrawer(
                     item(key = "search-empty") {
                         Text(
                             stringResource(R.string.chatlist_search_empty),
-                            style = DsType.std14,
+                            style = DsType.std14.withReadingWeight(),
                             color = colors.labelTertiary,
                             modifier = Modifier.padding(vertical = DsSpacing.small),
                         )
@@ -312,7 +313,7 @@ fun ChatListDrawer(
                     item(key = "search-more") {
                         Text(
                             stringResource(R.string.chatlist_search_refine),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelCaption,
                             modifier = Modifier.padding(vertical = DsSpacing.xsmall),
                         )
@@ -409,7 +410,7 @@ fun ChatListDrawer(
                 Spacer(Modifier.width(DsSpacing.small))
                 Text(
                     stringResource(R.string.chatlist_new_workspace),
-                    style = DsType.std14,
+                    style = DsType.std14.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -609,7 +610,7 @@ private fun SortChip(byRecency: Boolean, onPick: (byRecency: Boolean) -> Unit) {
                 )
                 Text(
                     if (byRecency) updated else manual,
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -748,7 +749,7 @@ private fun SessionRowItem(
             ) {
                 Text(
                     text = sessionTitle(session),
-                    style = DsType.std14,
+                    style = DsType.std14.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -764,7 +765,7 @@ private fun SessionRowItem(
                         ?.let { folder ->
                             Text(
                                 folder,
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelCaption,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -775,13 +776,13 @@ private fun SessionRowItem(
                     } else if (session.running) {
                         Text(
                             stringResource(R.string.subagents_running),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.accent,
                         )
                     } else {
                         Text(
                             relativeTime(session.updatedAt),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelCaption,
                         )
                     }
@@ -829,7 +830,7 @@ private fun SessionRowItem(
     }
 
     if (restoreFailed) {
-        Text(stringResource(R.string.panel_failed), style = DsType.caption11, color = colors.warnLabel)
+        Text(stringResource(R.string.panel_failed), style = DsType.caption11.withReadingWeight(), color = colors.warnLabel)
     }
 
     if (renameOpen) {
@@ -890,7 +891,7 @@ private fun SearchResultRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = sessionTitle(hit.session),
-                style = DsType.rowText,
+                style = DsType.rowText.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -904,7 +905,7 @@ private fun SearchResultRow(
         hit.workspaceLabel.takeIf { it.isNotBlank() }?.let {
             Text(
                 text = it,
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelCaption,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -913,7 +914,7 @@ private fun SearchResultRow(
         hit.snippet?.let {
             Text(
                 text = it,
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -938,7 +939,7 @@ private fun NewSessionDialog(
         if (workspaces.isEmpty()) {
             Text(
                 stringResource(R.string.chatlist_no_workspaces),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         }
@@ -984,7 +985,7 @@ private fun NewWorkspaceDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit
             value = pathText,
             onValueChange = { pathText = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.chatlist_workspace_path), style = DsType.std14) },
+            placeholder = { Text(stringResource(R.string.chatlist_workspace_path), style = DsType.std14.withReadingWeight()) },
             singleLine = true,
             colors = dialogTextFieldColors(),
         )

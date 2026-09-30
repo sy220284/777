@@ -57,6 +57,9 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
 
 private data class TuningPreset(
@@ -181,7 +184,7 @@ internal fun CharacterBehaviorTuningDialog(
                 ) {
                     Text(
                         stringResource(R.string.local_character_tuning_title),
-                        style = DsType.base16Strong,
+                        style = DsType.base16Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                     Text(
@@ -189,14 +192,14 @@ internal fun CharacterBehaviorTuningDialog(
                             .filter(String::isNotBlank)
                             .joinToString(" · ")
                             .ifBlank { personaName },
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
                 Text(
                     selectedPreset?.let { stringResource(it.labelRes) }
                         ?: stringResource(R.string.local_character_tuning_preset_custom),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.characterAccent,
                 )
             }
@@ -204,7 +207,7 @@ internal fun CharacterBehaviorTuningDialog(
 
         Text(
             stringResource(R.string.local_character_tuning_subtitle),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
 
@@ -262,7 +265,7 @@ internal fun CharacterBehaviorTuningDialog(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.bgLayer1,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             border = BorderStroke(1.dp, colors.borderL2),
         ) {
             Column(
@@ -271,7 +274,7 @@ internal fun CharacterBehaviorTuningDialog(
             ) {
                 Text(
                     stringResource(R.string.local_character_tuning_current_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
                 ReadOnlyStateRow(
@@ -320,7 +323,7 @@ internal fun CharacterBehaviorTuningDialog(
             ) {
                 Text(
                     stringResource(R.string.local_character_tuning_advanced),
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -382,7 +385,7 @@ internal fun CharacterBehaviorTuningDialog(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = DsShapes.block,
-                    color = colors.bgLayer1,
+                    color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
                     border = BorderStroke(1.dp, colors.borderL2),
                 ) {
                     Row(
@@ -396,12 +399,12 @@ internal fun CharacterBehaviorTuningDialog(
                         ) {
                             Text(
                                 stringResource(R.string.local_character_tuning_lock_stage),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             Text(
                                 stringResource(R.string.local_character_tuning_lock_stage_hint),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
                         }
@@ -465,13 +468,13 @@ private fun BehaviorSlider(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title,
-                style = DsType.std14Strong,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 valueLabel,
-                style = DsType.small13Strong,
+                style = DsType.small13Strong.withReadingWeight(),
                 color = colors.characterAccent,
             )
         }
@@ -492,9 +495,9 @@ private fun BehaviorSlider(
             ),
         )
         Row(Modifier.fillMaxWidth()) {
-            Text(low, style = DsType.caption11, color = colors.labelTertiary)
+            Text(low, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             Spacer(Modifier.weight(1f))
-            Text(high, style = DsType.caption11, color = colors.labelTertiary)
+            Text(high, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         }
     }
 }
@@ -503,7 +506,7 @@ private fun BehaviorSlider(
 private fun SectionLabel(text: String) {
     Text(
         text,
-        style = DsType.small13Strong,
+        style = DsType.small13Strong.withReadingWeight(),
         color = DsTheme.colors.labelTertiary,
     )
 }
@@ -511,9 +514,9 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun ReadOnlyStateRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = DsType.small13, color = DsTheme.colors.labelSecondary)
+        Text(label, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         Spacer(Modifier.weight(1f))
-        Text(value, style = DsType.small13Strong, color = DsTheme.colors.labelPrimary)
+        Text(value, style = DsType.small13Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
     }
 }
 
@@ -527,7 +530,7 @@ private fun EvolutionMetric(label: String, value: Int, low: String, high: String
     ) {
         Text(
             label,
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -537,7 +540,7 @@ private fun EvolutionMetric(label: String, value: Int, low: String, high: String
         ) {
             Text(
                 evolutionLabel(value, low, high),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.characterAccent,
                 modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = 3.dp),
             )

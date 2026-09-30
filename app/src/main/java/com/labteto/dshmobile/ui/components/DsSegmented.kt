@@ -26,6 +26,9 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /** One choice in a [DsSegmented] track. */
@@ -63,7 +66,7 @@ fun DsSegmented(
     Row(
         modifier = modifier
             .clip(DsShapes.pillFull)
-            .background(colors.hoverSolid)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.hoverSolid))
             // Outlined as well as filled, because the fill alone cannot be trusted to show. The
             // track's grey is a step off `bgLayer1`, but in dark mode it is the *same* colour as
             // `bgLayer2` — so on a sheet the fill vanishes and the control collapses back into the
@@ -111,7 +114,7 @@ private fun DsSegment(
     ) {
         Text(
             label,
-            style = DsType.tabText,
+            style = DsType.tabText.withReadingWeight(),
             color = when {
                 !enabled -> colors.labelDimmed
                 selected -> colors.accent

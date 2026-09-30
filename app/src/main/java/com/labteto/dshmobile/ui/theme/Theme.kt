@@ -292,7 +292,7 @@ fun DshTheme(
         ) {
             MaterialTheme(
                 colorScheme = scheme,
-                typography = DsTypography,
+                typography = dsTypography(readingPreferences.textWeightAdjustment),
                 shapes = DsMaterialShapes,
                 content = content,
             )

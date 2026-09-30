@@ -45,6 +45,8 @@ import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -56,7 +58,12 @@ val LocalFileOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
  * `code` chips and [links](https://example.com). Pipe tables render as scrollable grids.
  */
 @Composable
-fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boolean = true) {
+fun MarkdownText(
+    text: String,
+    modifier: Modifier = Modifier,
+    allowCodeCopy: Boolean = true,
+    bodyStyle: TextStyle = DsType.mdBody,
+) {
     val colors = DsTheme.colors
     val blocks = remember(text) { parseMarkdown(text) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -73,11 +80,11 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, allowCodeCopy: Boo
                 }
                 is MdBlock.Paragraph -> InlineMarkdown(
                     block.lines.joinToString(" "),
-                    DsType.mdBody.copy(color = colors.labelPrimary),
+                    bodyStyle.copy(color = colors.labelPrimary),
                     Modifier.fillMaxWidth(),
                 )
-                is MdBlock.MdList -> MdListBlock(block)
-                is MdBlock.Blockquote -> MdBlockquote(block)
+                is MdBlock.MdList -> MdListBlock(block, bodyStyle)
+                is MdBlock.Blockquote -> MdBlockquote(block, bodyStyle)
                 is MdBlock.Code -> CodeBlock(block.lang, block.code, allowCopy = allowCodeCopy)
                 is MdBlock.Table -> MarkdownTable(block)
             }
@@ -380,26 +387,26 @@ private fun buildInlineContent(
 // ---- Block renderers --------------------------------------------------------
 
 @Composable
-private fun MdListBlock(block: MdBlock.MdList) {
+private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
     Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         block.items.forEachIndexed { index, item ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Text(
                     if (block.ordered) "${index + 1}." else "•",
-                    style = DsType.mdBody.copy(color = colors.labelSecondary),
+                    style = bodyStyle.withReadingWeight().copy(color = colors.labelSecondary),
                     textAlign = if (block.ordered) TextAlign.End else TextAlign.Start,
                     modifier = Modifier.width(if (block.ordered) 28.dp else 18.dp),
                 )
                 Spacer(Modifier.width(6.dp))
-                InlineMarkdown(item, DsType.mdBody.copy(color = colors.labelPrimary), Modifier.weight(1f))
+                InlineMarkdown(item, bodyStyle.copy(color = colors.labelPrimary), Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun MdBlockquote(block: MdBlock.Blockquote) {
+private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 2.dp)) {
         Box(
@@ -412,7 +419,7 @@ private fun MdBlockquote(block: MdBlock.Blockquote) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             block.lines.forEach { line ->
-                InlineMarkdown(line, DsType.mdSmall.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
+                InlineMarkdown(line, bodyStyle.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
             }
         }
     }
@@ -444,7 +451,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             TableAlignment.END -> TextAlign.End
         }
 
-        Row(Modifier.background(colors.bgLayer1)) {
+        Row(Modifier.background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
@@ -511,7 +518,7 @@ private fun CodeBlock(
                     lang != null -> lang
                     else -> "code"
                 },
-                style = DsType.caption11Strong.copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
+                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
                 color = colors.labelCaption,
                 modifier = Modifier.weight(1f),
             )
@@ -530,7 +537,7 @@ private fun CodeBlock(
         }
         Text(
             code,
-            style = DsType.mdCode,
+            style = DsType.mdCode.withReadingWeight(),
             color = colors.labelPrimary,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         )

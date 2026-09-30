@@ -52,6 +52,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -148,12 +149,12 @@ fun PairScreen(
                 DsGroupCard {
                     Text(
                         stringResource(R.string.connect_relay_banner),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                     Text(
                         stringResource(R.string.pair_scan_prompt),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                 }
@@ -174,7 +175,7 @@ fun PairScreen(
                     ) {
                         Text(
                             stringResource(R.string.pair_camera_permission_denied),
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.warnLabel,
                             modifier = Modifier.padding(DsSpacing.medium),
                         )
@@ -201,7 +202,7 @@ fun PairScreen(
                             placeholder = {
                                 Text(
                                     stringResource(R.string.pair_url_hint),
-                                    style = DsType.std14,
+                                    style = DsType.std14.withReadingWeight(),
                                 )
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -269,7 +270,7 @@ private fun TransportNotice(provenance: KeyProvenance) {
     ) {
         Text(
             text,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = if (warn) colors.warnLabel else colors.labelTertiary,
             modifier = Modifier.padding(DsSpacing.medium),
         )
@@ -306,7 +307,7 @@ private fun PairFailureBlock(failure: PairFailure) {
         ) {
             StateDot(StateDotState.Error, size = 8.dp)
             Spacer(Modifier.width(DsSpacing.xsmall))
-            Text(body, style = DsType.small13, color = colors.warnLabel)
+            Text(body, style = DsType.small13.withReadingWeight(), color = colors.warnLabel)
         }
     }
 }

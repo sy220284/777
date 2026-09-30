@@ -38,6 +38,7 @@ import com.labteto.dshmobile.ui.components.formatDurationMs
 import com.labteto.dshmobile.ui.components.formatTokens
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * The turn-by-turn ledger: what the agent did, in order.
@@ -78,7 +79,7 @@ internal fun TrajectoryTab(
             item(key = "empty") {
                 Text(
                     stringResource(R.string.trajectory_empty),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -113,7 +114,7 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>) {
         is UserMessageNode -> {
             val preview = node.previewText.trim()
             if (preview.isNotEmpty()) {
-                Text("> $preview", style = DsType.caption11, color = colors.labelSecondary)
+                Text("> $preview", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
             }
         }
         is AssistantMessageNode -> {
@@ -122,7 +123,7 @@ private fun TrajectoryRow(node: ChatNode, siblings: List<ChatNode>) {
                 if (snippet.isNotEmpty()) {
                     Text(
                         snippet,
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
@@ -188,7 +189,7 @@ private fun TrajectoryTotals(stats: SessionStatsView?, usage: TokenUsageView?) {
         stats?.let {
             Text(
                 stringResource(R.string.chat_stats_turns, it.turns, it.steps),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             Text(
@@ -197,7 +198,7 @@ private fun TrajectoryTotals(stats: SessionStatsView?, usage: TokenUsageView?) {
                     formatDurationMs(it.llmMs),
                     formatDurationMs(it.toolMs),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             Text(
@@ -206,7 +207,7 @@ private fun TrajectoryTotals(stats: SessionStatsView?, usage: TokenUsageView?) {
                     formatDurationMs(it.meanTtftMs),
                     it.tokensPerSecond?.let { rate -> String.format(java.util.Locale.US, "%.0f", rate) } ?: "—",
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -219,7 +220,7 @@ private fun TrajectoryTotals(stats: SessionStatsView?, usage: TokenUsageView?) {
                     formatTokens(it.cacheReadTokens),
                     formatTokens(it.cacheWriteTokens),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }

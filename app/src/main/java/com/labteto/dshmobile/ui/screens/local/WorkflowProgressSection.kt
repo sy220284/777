@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.LocalWorkflowProgress
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun workflowStageLabel(stage: String): String = stringResource(when (stage) {
@@ -26,12 +27,12 @@ internal fun workflowStageLabel(stage: String): String = stringResource(when (st
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-        Text(stringResource(R.string.local_workflow_stage, workflowStageLabel(progress.stage)), style = DsType.caption11Strong, color = colors.labelTertiary)
-        Text(progress.task, style = DsType.small13, color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11, color = colors.labelSecondary)
+        Text(stringResource(R.string.local_workflow_stage, workflowStageLabel(progress.stage)), style = DsType.caption11Strong.withReadingWeight(), color = colors.labelTertiary)
+        Text(progress.task, style = DsType.small13.withReadingWeight(), color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
         progress.blockedReason?.let { reason ->
-            Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13, color = colors.error)
-            if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11, color = colors.error)
+            Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13.withReadingWeight(), color = colors.error)
+            if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11.withReadingWeight(), color = colors.error)
         }
     }
 }

@@ -40,6 +40,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun ChatSurfaceHeader(
@@ -86,7 +87,7 @@ internal fun ChatSurfaceHeader(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
-                        style = DsType.base16Strong,
+                        style = DsType.base16Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -106,7 +107,7 @@ internal fun ChatSurfaceHeader(
                                 activeSpeakerName?.let { speaker ->
                                     stringResource(R.string.local_group_chat_active_speaker, speaker)
                                 } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -116,7 +117,7 @@ internal fun ChatSurfaceHeader(
                     } else if (secondary.isNotBlank()) {
                         Text(
                             secondary,
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -208,14 +209,14 @@ internal fun WorkSurfaceHeader(
             ) {
                 Text(
                     sessionTitle,
-                    style = DsType.base16Strong,
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     if (configured) modelLabel else stringResource(R.string.local_model_setup),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

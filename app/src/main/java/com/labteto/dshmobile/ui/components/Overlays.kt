@@ -57,6 +57,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,7 +134,7 @@ fun DsDialog(
                     ),
                 ) {
                     title?.let {
-                        Text(it, style = DsType.base16Strong, color = colors.labelPrimary)
+                        Text(it, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
                     }
                     Column(
                         modifier = Modifier
@@ -209,7 +210,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
         ) {
             Text(
                 message,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.onAccent,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
@@ -273,7 +274,7 @@ fun DsPopupMenu(
                 text = {
                     Text(
                         item.text,
-                        style = DsType.std14,
+                        style = DsType.std14.withReadingWeight(),
                         color = if (item.danger) colors.error else colors.labelPrimary,
                     )
                 },
@@ -385,7 +386,7 @@ fun DsContextActionMenu(
                         }
                         Text(
                             text = item.text,
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = if (item.danger) colors.error else colors.labelPrimary,
                         )
                     }

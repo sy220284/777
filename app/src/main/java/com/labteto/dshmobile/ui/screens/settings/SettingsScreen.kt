@@ -102,7 +102,9 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -304,7 +306,7 @@ fun SettingsScreen(
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
-                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Cloud,
@@ -332,7 +334,7 @@ fun SettingsScreen(
                             )
                         }
 
-                        Text(stringResource(R.string.settings_group_system), style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_system), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.PhoneAndroid,
@@ -354,7 +356,7 @@ fun SettingsScreen(
                             )
                         }
 
-                        Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14, color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
@@ -373,7 +375,7 @@ fun SettingsScreen(
                         }
                         Text(
                             "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelCaption,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -480,21 +482,21 @@ fun SettingsScreen(
                             if (!localHarness.chatStyleGuardEnabled) {
                                 Text(
                                     stringResource(R.string.settings_chat_filter_disabled_notice),
-                                    style = DsType.small13,
+                                    style = DsType.small13.withReadingWeight(),
                                     color = colors.labelSecondary,
                                 )
                             }
 
                             Text(
                                 stringResource(R.string.settings_chat_builtin_filters_title, builtInFilters.size),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             builtInFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
 
                             Text(
                                 stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             Text(
@@ -503,7 +505,7 @@ fun SettingsScreen(
                                     MAX_CUSTOM_CHAT_FILTERS,
                                     MAX_CUSTOM_CHAT_FILTER_CHARS,
                                 ),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
                             Row(
@@ -543,13 +545,13 @@ fun SettingsScreen(
 
                             Text(
                                 stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             if (personaFilters.isEmpty()) {
                                 Text(
                                     stringResource(R.string.settings_chat_persona_filters_empty),
-                                    style = DsType.caption11,
+                                    style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelTertiary,
                                 )
                             } else {
@@ -558,13 +560,13 @@ fun SettingsScreen(
 
                             Text(
                                 stringResource(R.string.settings_chat_guard_hits_title),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             if (localHarness.styleGuardHits.isEmpty()) {
                                 Text(
                                     stringResource(R.string.settings_chat_guard_hits_empty),
-                                    style = DsType.caption11,
+                                    style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelTertiary,
                                 )
                             } else {
@@ -714,7 +716,7 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 stringResource(R.string.settings_notifications_usage_hint),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.warnLabel,
                                 modifier = Modifier.padding(DsSpacing.medium),
                             )
@@ -796,7 +798,7 @@ fun SettingsScreen(
         ) {
             Text(
                 stringResource(R.string.settings_connection_disconnect_message),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
                 modifier = Modifier.padding(bottom = DsSpacing.medium),
             )
@@ -835,7 +837,7 @@ private fun ChatFilterPhraseRow(
     ) {
         Text(
             text = "• " + phrase,
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -868,7 +870,7 @@ internal fun SettingsCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
-            Text(title, style = DsType.std14, color = colors.labelTertiary)
+            Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         }
         DsGroupCard {
             content()
@@ -880,10 +882,10 @@ internal fun SettingsCard(
 private fun LabelledValue(label: String, value: String) {
     val colors = DsTheme.colors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = DsType.std14, color = colors.labelSecondary, modifier = Modifier.weight(1f))
+        Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelSecondary, modifier = Modifier.weight(1f))
         Text(
             value,
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -927,7 +929,7 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StateDot(statusState)
                 Spacer(Modifier.width(DsSpacing.small))
-                Text(statusText, style = DsType.std14Strong, color = colors.labelPrimary)
+                Text(statusText, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
             }
             connectionState.host?.let { host ->
                 LabelledValue(
@@ -976,7 +978,7 @@ private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
     ) {
         Text(
             stringResource(R.string.settings_language),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -993,7 +995,7 @@ private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
                 ) {
                     Text(
                         current.label,
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                     )
@@ -1044,7 +1046,7 @@ private fun AppearanceReadingPreview(settings: AppSettings) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.bgLayer1, DsShapes.block)
+            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD), DsShapes.block)
             .border(1.dp, colors.borderL2, DsShapes.block)
             .padding(DsSpacing.medium),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -1067,7 +1069,7 @@ private fun AppearanceReadingPreview(settings: AppSettings) {
         }
         Text(
             stringResource(R.string.settings_appearance_preview_hint),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
     }
@@ -1083,7 +1085,7 @@ private fun ReadingPreferencesRow(
     val colors = DsTheme.colors
     Text(
         stringResource(R.string.settings_text_size),
-        style = DsType.std14Strong,
+        style = DsType.std14Strong.withReadingWeight(),
         color = colors.labelPrimary,
     )
     Row(
@@ -1091,7 +1093,7 @@ private fun ReadingPreferencesRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13, color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         Slider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
@@ -1101,14 +1103,14 @@ private fun ReadingPreferencesRow(
         )
         Text(
             stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
-            style = DsType.small13Strong,
+            style = DsType.small13Strong.withReadingWeight(),
             color = colors.labelPrimary,
         )
     }
 
     Text(
         stringResource(R.string.settings_text_weight),
-        style = DsType.std14Strong,
+        style = DsType.std14Strong.withReadingWeight(),
         color = colors.labelPrimary,
     )
     DsSegmented(
@@ -1125,7 +1127,7 @@ private fun ReadingPreferencesRow(
 
     Text(
         stringResource(R.string.settings_component_transparency),
-        style = DsType.std14Strong,
+        style = DsType.std14Strong.withReadingWeight(),
         color = colors.labelPrimary,
     )
     Row(
@@ -1133,7 +1135,7 @@ private fun ReadingPreferencesRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13, color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         Slider(
             value = settings.wallpaperSurfaceTransparency,
             onValueChange = onTransparencyChange,
@@ -1141,11 +1143,11 @@ private fun ReadingPreferencesRow(
             steps = 9,
             modifier = Modifier.weight(1f),
         )
-        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13, color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
     }
     Text(
         stringResource(R.string.settings_component_transparency_hint),
-        style = DsType.small13,
+        style = DsType.small13.withReadingWeight(),
         color = colors.labelSecondary,
     )
 }
@@ -1162,7 +1164,7 @@ private fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
         Text(
             stringResource(R.string.settings_appearance),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
@@ -1258,7 +1260,7 @@ private fun ThemePreviewBlock(
         }
         Text(
             label,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = if (selected) colors.accent else colors.labelSecondary,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
         )
@@ -1271,7 +1273,7 @@ private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
         Text(
             stringResource(R.string.settings_accent_theme),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
@@ -1316,7 +1318,7 @@ private fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     Spacer(Modifier.height(DsSpacing.xsmall))
                     Text(
                         palette.cnName,
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = if (selected) colors.accent else colors.labelTertiary,
                     )
                     if (selected) {
@@ -1345,7 +1347,7 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
     ) {
         Text(
             label,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = if (selected) colors.accent else colors.labelSecondary,
         )
     }
@@ -1373,7 +1375,7 @@ private fun BackgroundRow(
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
         Text(
             stringResource(R.string.settings_background_image),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
         )
         Spacer(Modifier.height(DsSpacing.small))
@@ -1412,7 +1414,7 @@ private fun BackgroundRow(
                     R.string.settings_background_image_active
                 },
             ),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelTertiary,
         )
         Spacer(Modifier.height(DsSpacing.small))

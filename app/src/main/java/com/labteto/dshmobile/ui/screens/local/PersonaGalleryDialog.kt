@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -82,6 +81,8 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,7 +123,7 @@ internal fun PersonaGallerySavePromptDialog(
                 if (isUpdate) R.string.persona_gallery_unsaved_update_hint
                 else R.string.persona_gallery_new_character_hint,
             ),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
         DsButton(
@@ -155,7 +156,7 @@ internal fun PersonaGallerySavePromptDialog(
             enabled = !busy,
         )
         error?.let {
-            Text(it, style = DsType.small13, color = DsTheme.colors.error)
+            Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
         }
     }
 }
@@ -389,7 +390,7 @@ internal fun PersonaGalleryScreen(
         ) {
             Text(
                 stringResource(R.string.persona_gallery_export_format_hint),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
             DsButton(
@@ -417,7 +418,7 @@ internal fun PersonaGalleryScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = DsTheme.colors.bgBase,
+        color = DsTheme.colors.rootSurface(),
     ) {
         Column(
             modifier = Modifier
@@ -463,21 +464,20 @@ internal fun PersonaGalleryScreen(
                 ) {
                     Text(
                         stringResource(R.string.persona_gallery_presets_title),
-                        style = DsType.std14,
+                        style = DsType.std14Strong.withReadingWeight(),
                         color = DsTheme.colors.labelPrimary,
-                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
                     GalleryPill(visiblePresets.size.toString())
                 }
                 Text(
                     stringResource(R.string.persona_gallery_presets_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
                 Text(
                     stringResource(R.string.persona_gallery_preset_long_press_delete_hint),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
                 Column(
@@ -539,7 +539,7 @@ internal fun PersonaGalleryScreen(
             )
             Text(
                 stringResource(R.string.persona_gallery_long_press_delete_hint),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
             )
 
@@ -594,7 +594,7 @@ internal fun PersonaGalleryScreen(
                 ) {
                     Text(
                         stringResource(R.string.persona_gallery_current_synced),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                         modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                     )
@@ -607,9 +607,8 @@ internal fun PersonaGalleryScreen(
             ) {
                 Text(
                     stringResource(R.string.persona_gallery_my_characters),
-                    style = DsType.std14,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 GalleryPill(entries.size.toString())
@@ -638,7 +637,7 @@ internal fun PersonaGalleryScreen(
                     Text(
                         if (entries.isEmpty()) stringResource(R.string.persona_gallery_empty)
                         else stringResource(R.string.persona_gallery_no_match),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                     )
                 }
@@ -762,7 +761,7 @@ internal fun PersonaGalleryScreen(
                 ) {
                     Text(
                         it,
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.labelPrimary,
                         modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                     )
@@ -795,15 +794,14 @@ internal fun PersonaGalleryScreen(
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
-                style = DsType.std14,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
             )
             if (selected.stories.isEmpty()) {
                 DsCard {
                     Text(
                         stringResource(R.string.persona_gallery_storylines_empty),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                     )
                 }
@@ -1037,12 +1035,12 @@ internal fun PersonaGalleryScreen(
                     DsCard {
                         Text(
                             stringResource(R.string.persona_gallery_delete_story_confirm, story.title),
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = DsTheme.colors.error,
                         )
                         Text(
                             stringResource(R.string.persona_gallery_delete_story_hint),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = DsTheme.colors.labelTertiary,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1133,7 +1131,7 @@ internal fun PersonaGalleryScreen(
                 error?.let {
                     Text(
                         it,
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = DsTheme.colors.error,
                         modifier = Modifier.padding(top = DsSpacing.small),
                     )

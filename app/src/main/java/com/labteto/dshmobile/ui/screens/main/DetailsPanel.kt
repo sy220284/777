@@ -85,6 +85,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -261,7 +262,7 @@ private fun HeaderRow(onClose: () -> Unit) {
         )
         Text(
             stringResource(R.string.chat_details_title),
-            style = DsType.large20,
+            style = DsType.large20.withReadingWeight(),
             color = colors.labelPrimary,
         )
     }
@@ -317,7 +318,7 @@ private fun SessionCard(
         summary = session.cwd?.let { basename(it) },
         initiallyExpanded = true,
     ) {
-        session.cwd?.let { Text(it, style = DsType.caption11, color = colors.labelCaption) }
+        session.cwd?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption) }
         // The model and the preset are the two things about a session people most often come here
         // to check, and until now this panel could show only one of them and could change neither.
         // Both pills carry an onClick, which is also what makes them look pressable.
@@ -339,7 +340,7 @@ private fun SessionCard(
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 Text(
                     stringResource(R.string.jobs_running),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -395,7 +396,7 @@ private fun ContextCard(
         if (breakdown == null && pressure == null && usage == null && stats == null) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.chat_context_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -408,13 +409,13 @@ private fun ContextCard(
                     formatTokens(it.inputTokens),
                     formatTokens(it.outputTokens),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             it.cacheHitRatio?.let { ratio ->
                 Text(
                     stringResource(R.string.chat_stats_cache, (ratio * 100).toInt()),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -426,7 +427,7 @@ private fun ContextCard(
                     formatDurationMs(it.llmMs),
                     formatDurationMs(it.toolMs),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -448,7 +449,7 @@ private fun GoalCard(
         if (goal == null) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.goal_none),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -456,7 +457,7 @@ private fun GoalCard(
         if (goal.maxGoalRounds > 0) {
             Text(
                 stringResource(R.string.goal_max_rounds, goal.maxGoalRounds.toString()),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelCaption,
             )
         }
@@ -495,7 +496,7 @@ private fun PlanCard(
         initiallyExpanded = true,
     ) {
         if (loading) {
-            Text(stringResource(R.string.common_loading), style = DsType.caption11, color = colors.labelTertiary)
+            Text(stringResource(R.string.common_loading), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         } else {
             ToggleRow(
                 label = stringResource(R.string.plan_mode_hint),
@@ -516,7 +517,7 @@ private fun JobsCard(jobs: List<JobView>, loading: Boolean) {
         if (jobs.isEmpty()) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.jobs_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -540,14 +541,14 @@ private fun JobsCard(jobs: List<JobView>, loading: Boolean) {
                     val failed = job.status == JobStatus.KILLED || job.status == JobStatus.FAILED
                     Text(
                         stringResource(agentOperationLabelRes(job.kind)),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         stringResource(agentOperationStatusRes(running = running, failed = failed)),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelCaption,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -556,7 +557,7 @@ private fun JobsCard(jobs: List<JobView>, loading: Boolean) {
                 Spacer(Modifier.width(DsSpacing.small))
                 Text(
                     formatDurationMs((job.finishedAt ?: now) - job.startedAt),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelCaption,
                 )
             }
@@ -579,7 +580,7 @@ private fun QueueCard(
         if (queue.isEmpty()) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.chat_queue_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -589,12 +590,12 @@ private fun QueueCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         item.previewText,
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(item.placement, style = DsType.caption11, color = colors.labelCaption)
+                    Text(item.placement, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption)
                 }
                 DsButton(
                     text = stringResource(R.string.common_remove),
@@ -621,7 +622,7 @@ private fun SubagentsCard(
         if (subagents.isEmpty()) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.subagents_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -639,7 +640,7 @@ private fun SubagentsCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.agent_operation_delegate),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -649,7 +650,7 @@ private fun SubagentsCard(
                             if (subagentRunning(entry)) R.string.agent_operation_status_running
                             else R.string.agent_operation_status_done,
                         ),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelCaption,
                     )
                 }
@@ -669,7 +670,7 @@ private fun WorkflowCard(nodes: List<ChatNode>, loading: Boolean) {
         if (workflows.isEmpty()) {
             Text(
                 stringResource(if (loading) R.string.common_loading else R.string.workflow_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@Card
@@ -679,14 +680,14 @@ private fun WorkflowCard(nodes: List<ChatNode>, loading: Boolean) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.agent_operation_delegate),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         stringResource(R.string.workflow_members, workflow.members),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelCaption,
                     )
                 }
@@ -719,7 +720,7 @@ private fun HostCard(hostInfo: HostDescription?) {
     ) {
         Text(
             stringResource(R.string.connect_harness_home, hostInfo.home),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelCaption,
         )
     }

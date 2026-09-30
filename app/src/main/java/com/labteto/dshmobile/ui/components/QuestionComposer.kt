@@ -56,6 +56,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlinx.coroutines.launch
@@ -284,11 +285,11 @@ private fun QuestionHeader(
             Spacer(Modifier.width(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 question.header?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
                 Text(
                     question.question,
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     // A collapsed strip taller than the expanded card's header is not a collapse.
                     maxLines = if (minimized) 2 else Int.MAX_VALUE,
@@ -299,7 +300,7 @@ private fun QuestionHeader(
         if (count > 1) {
             Text(
                 stringResource(R.string.questions_progress, index + 1, count),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             Spacer(Modifier.width(4.dp))
@@ -392,7 +393,7 @@ private fun OptionRow(
                 ) {
                     Text(
                         display.display,
-                        style = DsType.std14,
+                        style = DsType.std14.withReadingWeight(),
                         color = if (selected) colors.accent else colors.labelPrimary,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -401,7 +402,7 @@ private fun OptionRow(
                     }
                 }
                 option.description?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
             }
         }
@@ -431,7 +432,7 @@ private fun OptionMarker(ordinal: Int, selected: Boolean, multiSelect: Boolean) 
             } else {
                 Text(
                     ordinal.toString(),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = if (selected) colors.onAccent else colors.labelTertiary,
                 )
             }
@@ -466,7 +467,7 @@ private fun CustomAnswerField(
         placeholder = {
             Text(
                 stringResource(R.string.questions_custom_placeholder),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelCaption,
             )
         },
@@ -522,7 +523,7 @@ private fun QuestionFooter(
 ) {
     val colors = DsTheme.colors
     feedback?.let {
-        Text(it, style = DsType.caption11, color = colors.error)
+        Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
     }
     Row(
         modifier = Modifier.fillMaxWidth(),

@@ -20,6 +20,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.*
 
 @Composable
@@ -82,7 +83,7 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
             label = { Text(stringResource(R.string.feedback_note)) },
         )
         error?.let {
-            Text(it, style = DsType.small13, color = DsTheme.colors.error)
+            Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
         }
         if (!loaded && !busy) {
             DsButton(

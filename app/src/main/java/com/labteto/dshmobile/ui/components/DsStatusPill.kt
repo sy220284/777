@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Semantic state of an automation task / run. */
 enum class DsStatus { Running, Done, Warning, Failed, Neutral }
@@ -47,6 +48,6 @@ fun DsStatusPill(
             Modifier.size(6.dp).background(dot, CircleShape),
         )
         Spacer(Modifier.width(5.dp))
-        Text(label, style = DsType.caption11Strong, color = dot)
+        Text(label, style = DsType.caption11Strong.withReadingWeight(), color = dot)
     }
 }

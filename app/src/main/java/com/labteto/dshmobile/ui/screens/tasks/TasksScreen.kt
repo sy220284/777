@@ -66,6 +66,7 @@ import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.DateFormat
@@ -459,7 +460,7 @@ fun TasksScreen(
             if (!showCreate && chatMode && !canCreateChatInteraction) {
                 Text(
                     stringResource(R.string.tasks_chat_mode_unavailable),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -578,7 +579,7 @@ private fun ColumnScope.TaskEditorPane(
                             else if (chatMode) R.string.tasks_chat_new
                             else R.string.tasks_new,
                         ),
-                        style = DsType.base16Strong,
+                        style = DsType.base16Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                     if (chatMode) {
@@ -586,13 +587,13 @@ private fun ColumnScope.TaskEditorPane(
                             ?: stringResource(R.string.tasks_chat_character_fallback)
                         Text(
                             stringResource(R.string.tasks_chat_target, characterName),
-                            style = DsType.small13Strong,
+                            style = DsType.small13Strong.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                         if (harnessState.groupChat.enabled) {
                             Text(
                                 stringResource(R.string.tasks_chat_group_unsupported),
-                                style = DsType.small13,
+                                style = DsType.small13.withReadingWeight(),
                                 color = colors.error,
                             )
                         } else {
@@ -628,7 +629,7 @@ private fun ColumnScope.TaskEditorPane(
 
                     Text(
                         stringResource(R.string.tasks_schedule_label),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                     CadenceRow(
@@ -727,7 +728,7 @@ private fun ColumnScope.TaskEditorPane(
                     if (cadence == AutomationCadence.WINDOW) {
                         Text(
                             stringResource(R.string.tasks_chat_window_hint),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                         Row(
@@ -776,12 +777,12 @@ private fun ColumnScope.TaskEditorPane(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     stringResource(R.string.tasks_chat_quiet_hours),
-                                    style = DsType.small13Strong,
+                                    style = DsType.small13Strong.withReadingWeight(),
                                     color = colors.labelPrimary,
                                 )
                                 Text(
                                     stringResource(R.string.tasks_chat_quiet_hours_hint),
-                                    style = DsType.caption11,
+                                    style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelSecondary,
                                 )
                             }
@@ -831,7 +832,7 @@ private fun ColumnScope.TaskEditorPane(
 
                         Text(
                             stringResource(R.string.tasks_chat_min_gap),
-                            style = DsType.small13Strong,
+                            style = DsType.small13Strong.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                         ProactiveGapRow(
@@ -840,7 +841,7 @@ private fun ColumnScope.TaskEditorPane(
                         )
                         Text(
                             stringResource(R.string.tasks_chat_unanswered_limit),
-                            style = DsType.small13Strong,
+                            style = DsType.small13Strong.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
                         ProactiveUnansweredRow(
@@ -850,7 +851,7 @@ private fun ColumnScope.TaskEditorPane(
                     }
 
                     createError?.let {
-                        Text(it, style = DsType.small13, color = colors.error)
+                        Text(it, style = DsType.small13.withReadingWeight(), color = colors.error)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -970,7 +971,7 @@ private fun ChatInteractionPresets(
 
     Text(
         stringResource(R.string.tasks_chat_presets),
-        style = DsType.small13Strong,
+        style = DsType.small13Strong.withReadingWeight(),
         color = DsTheme.colors.labelSecondary,
     )
     ChatPresetRow(
@@ -1227,12 +1228,12 @@ private fun TaskCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                 )
                 Text(
                     timing,
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -1268,14 +1269,14 @@ private fun TaskCard(
         task.lastError?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_status, it.take(160)),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.error,
             )
         }
         task.lastResult?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_result, it.replace("\n", " ").take(180)),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelSecondary,
                 maxLines = 2,
             )
@@ -1284,7 +1285,7 @@ private fun TaskCard(
         if (task.runReceipts.isNotEmpty()) {
             Text(
                 stringResource(R.string.tasks_run_history, task.runReceipts.size),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             val timelineItems = mutableListOf<DsTimelineItem>()
@@ -1357,7 +1358,7 @@ private fun TaskCard(
                     if (task.mode == AutomationMode.CHAT) R.string.tasks_chat_delete_confirm_body
                     else R.string.tasks_delete_confirm_body,
                 ),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             Row(

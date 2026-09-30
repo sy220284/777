@@ -32,9 +32,10 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 @Composable
@@ -58,7 +59,7 @@ internal fun NewSessionModeDialog(
                     R.string.local_new_session_dialog_intro
                 },
             ),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         DsButton(
@@ -80,7 +81,7 @@ internal fun NewSessionModeDialog(
                     R.string.local_new_session_continue_hint
                 },
             ),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
         DsButton(
@@ -97,7 +98,7 @@ internal fun NewSessionModeDialog(
                     R.string.local_new_session_independent_hint
                 },
             ),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
     }
@@ -117,7 +118,7 @@ internal fun GroupNewSessionDialog(
     ) {
         Text(
             stringResource(R.string.local_group_new_session_intro),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         DsButton(
@@ -148,7 +149,7 @@ internal fun ChatPersonaPickerDialog(
     DsDialog(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.local_persona_picker_intro),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         Surface(
@@ -167,11 +168,11 @@ internal fun ChatPersonaPickerDialog(
                 }
                 Text(
                     stringResource(R.string.local_persona_picker_current, currentName),
-                    style = DsType.base16Strong,
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                 )
                 currentPersona.identity.takeIf(String::isNotBlank)?.let {
-                    Text(it, style = DsType.caption11, color = colors.labelSecondary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
         }
@@ -185,20 +186,20 @@ internal fun ChatPersonaPickerDialog(
         if (!canSwitchPersona) {
             Text(
                 stringResource(R.string.local_persona_picker_switch_requires_new_chat),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         } else {
             if (entries.isEmpty()) {
                 Text(
                     stringResource(R.string.local_persona_picker_empty),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             } else {
                 Text(
                     stringResource(R.string.local_persona_picker_saved),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
                 entries.forEach { entry ->
@@ -208,7 +209,10 @@ internal fun ChatPersonaPickerDialog(
                             if (onSelect(entry.id)) onDismiss()
                         },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                        color = colors.wallpaperSurface(
+                            WallpaperSurfaceLevel.CARD,
+                            base = if (selected) colors.bgLayer2 else colors.bgLayer1,
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
@@ -217,7 +221,7 @@ internal fun ChatPersonaPickerDialog(
                         ) {
                             Text(
                                 entry.persona.name,
-                                style = DsType.std14,
+                                style = DsType.std14.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             val subtitle = entry.persona.identity
@@ -225,7 +229,7 @@ internal fun ChatPersonaPickerDialog(
                                 .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
                             Text(
                                 subtitle,
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
                         }
@@ -257,12 +261,12 @@ internal fun ApprovalDialog(
     DsDialog(title = stringResource(R.string.local_approval_title), onDismiss = onDeny) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
-            style = DsType.base16Strong,
+            style = DsType.base16Strong.withReadingWeight(),
             color = colors.labelPrimary,
         )
         Text(
             stringResource(R.string.local_approval_impact, impactLabel),
-            style = DsType.caption11Strong,
+            style = DsType.caption11Strong.withReadingWeight(),
             color = when (approval.impact) {
                 LocalApprovalImpact.LOW -> colors.labelTertiary
                 LocalApprovalImpact.MEDIUM -> colors.warnLabel
@@ -282,12 +286,12 @@ internal fun ApprovalDialog(
             ) {
                 Text(
                     stringResource(R.string.local_approval_purpose_title),
-                    style = DsType.small13Strong,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                 )
                 Text(
                     stringResource(agentApprovalPurposeRes(approval.toolName)),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -301,7 +305,7 @@ internal fun ApprovalDialog(
                     else -> R.string.local_approval_high_risk_scope
                 },
             ),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
 
@@ -326,7 +330,7 @@ internal fun ApprovalDialog(
         } else {
             Text(
                 stringResource(R.string.local_approval_safe_enabled),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -354,7 +358,7 @@ internal fun QuestionDialog(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
     ) {
-        Text(question, style = DsType.base16Strong, color = colors.labelPrimary)
+        Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
         options.forEach { option ->
             DsButton(
                 text = option,
@@ -448,7 +452,7 @@ internal fun ChatPersonaDialog(
     DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.local_persona_intro),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
 
@@ -463,12 +467,12 @@ internal fun ChatPersonaDialog(
             ) {
                 Text(
                     stringResource(R.string.local_persona_ai_title),
-                    style = DsType.base16Strong,
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
                 )
                 Text(
                     stringResource(if (creatingNew) R.string.local_persona_ai_new_hint else R.string.local_persona_ai_hint),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
                 OutlinedTextField(
@@ -509,13 +513,13 @@ internal fun ChatPersonaDialog(
                 if (aiGenerating) {
                     Text(
                         stringResource(R.string.local_persona_ai_working_hint),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelTertiary,
                     )
                 } else if (aiSucceeded) {
                     Text(
                         stringResource(if (creatingNew) R.string.local_persona_ai_new_draft else R.string.local_persona_ai_synced),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                     )
                 }
@@ -528,7 +532,7 @@ internal fun ChatPersonaDialog(
                     }
                     Text(
                         message,
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.error,
                     )
                 }
@@ -579,7 +583,7 @@ internal fun ChatPersonaDialog(
             modifier = Modifier.fillMaxWidth(),
             enabled = name.isNotBlank() && !aiGenerating && !saving,
         )
-        saveError?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
+        saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
     }
 }
 

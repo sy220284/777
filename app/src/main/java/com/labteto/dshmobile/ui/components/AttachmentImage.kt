@@ -32,6 +32,7 @@ import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * One raster attachment in the transcript: a placeholder holding the reference's own aspect ratio
@@ -86,7 +87,7 @@ fun AttachmentImage(
             )
             AttachmentImageState.Failed -> Text(
                 stringResource(R.string.chat_image_failed),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
                 modifier = Modifier.padding(16.dp),
             )

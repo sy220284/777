@@ -78,6 +78,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -109,12 +110,12 @@ internal fun ProjectSettingsCard(
     if (!state.available && state.error == null && !state.loading) return
     SettingsCard(stringResource(R.string.advanced_project_config), Icons.Outlined.Tune) {
         when {
-            state.loading -> Text(stringResource(R.string.advanced_project_loading), style = DsType.small13, color = DsTheme.colors.labelTertiary)
+            state.loading -> Text(stringResource(R.string.advanced_project_loading), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelTertiary)
             state.error != null -> {
-                Text(stringResource(R.string.advanced_project_unavailable, state.error.orEmpty()), style = DsType.small13, color = DsTheme.colors.error)
+                Text(stringResource(R.string.advanced_project_unavailable, state.error.orEmpty()), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
                 DsButton(stringResource(R.string.common_retry), viewModel::refreshRemoteSettings, variant = DsButtonVariant.Ghost)
             }
-            state.namespaces.isEmpty() -> Text(stringResource(R.string.advanced_project_empty), style = DsType.small13, color = DsTheme.colors.labelTertiary)
+            state.namespaces.isEmpty() -> Text(stringResource(R.string.advanced_project_empty), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelTertiary)
             else -> {
                 if (state.writable) {
                     Surface(
@@ -124,7 +125,7 @@ internal fun ProjectSettingsCard(
                     ) {
                         Text(
                             stringResource(R.string.advanced_project_risk_notice),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = DsTheme.colors.warnLabel,
                             modifier = Modifier.padding(DsSpacing.small),
                         )
@@ -133,7 +134,7 @@ internal fun ProjectSettingsCard(
                 Text(
                     if (state.writable) stringResource(R.string.advanced_project_dynamic)
                     else stringResource(R.string.advanced_project_read_only),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
                 // 折叠收纳：编辑器默认收起，警示条始终可见
@@ -148,7 +149,7 @@ internal fun ProjectSettingsCard(
                 ) {
                     Text(
                         stringResource(R.string.advanced_project_namespaces_toggle, state.namespaces.size),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = if (state.writable) DsTheme.colors.warnLabel else DsTheme.colors.labelPrimary,
                         modifier = Modifier.weight(1f),
                     )
@@ -195,7 +196,7 @@ private fun NamespaceSettings(
         if (fields.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_project_no_scalar),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
                 modifier = Modifier.padding(start = DsSpacing.large),
             )
@@ -229,9 +230,9 @@ private fun DynamicSettingEditor(
     var text by remember(namespace.revision, field.path) { mutableStateOf(currentText) }
 
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-        Text(field.title, style = DsType.std14, color = colors.labelPrimary)
+        Text(field.title, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
         field.description?.takeIf(String::isNotBlank)?.let {
-            Text(it, style = DsType.caption11, color = colors.labelTertiary)
+            Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         }
 
         when {
@@ -240,7 +241,7 @@ private fun DynamicSettingEditor(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (checked) stringResource(R.string.common_enabled) else stringResource(R.string.common_disabled),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                         modifier = Modifier.weight(1f),
                     )
@@ -266,7 +267,7 @@ private fun DynamicSettingEditor(
                         ) {
                             Text(
                                 selected.ifBlank { stringResource(R.string.advanced_select) },
-                                style = DsType.std14,
+                                style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                                 modifier = Modifier.padding(DsSpacing.small),
                             )
@@ -356,10 +357,10 @@ internal fun ModelServicesCard(
     SettingsCard(stringResource(R.string.advanced_model_services), Icons.Outlined.Cloud) {
         Text(
             stringResource(R.string.advanced_model_services_hint),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
-        state.error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
+        state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
         state.providers.forEach { provider -> ModelProviderRow(provider, state, viewModel) }
     }
 }
@@ -386,7 +387,7 @@ private fun ModelProviderRow(
         ) {
             Text(
                 stringResource(R.string.advanced_provider_config, provider.settingsNs, provider.settingsPath.joinToString("/")),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             DsButton(
@@ -403,13 +404,13 @@ private fun ModelProviderRow(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     model.name ?: model.id,
-                                    style = DsType.small13Strong,
+                                    style = DsType.small13Strong.withReadingWeight(),
                                     color = colors.labelPrimary,
                                 )
                                 if (model.name != null && model.name != model.id) {
                                     Text(
                                         model.id,
-                                        style = DsType.caption11,
+                                        style = DsType.caption11.withReadingWeight(),
                                         color = colors.labelTertiary,
                                     )
                                 }
@@ -417,7 +418,7 @@ private fun ModelProviderRow(
                             model.contextWindow?.let {
                                 Text(
                                     "$contextWindowLabel $it",
-                                    style = DsType.caption11,
+                                    style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelTertiary,
                                 )
                             }
@@ -464,13 +465,13 @@ internal fun LocalModelSettingsCard(
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
         ChatGptAccountPanel(chatGpt, viewModel, report)
-        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13,
+        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (local.modelProfiles.isEmpty()) {
-            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13,
+            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary)
         }
-        local.error?.let { Text(it, style = DsType.small13, color = colors.error) }
+        local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
         local.modelProfiles.forEach { profile ->
             Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                 modifier = Modifier.fillMaxWidth()) {
@@ -480,7 +481,7 @@ internal fun LocalModelSettingsCard(
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong, color = colors.labelPrimary,
+                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
                             if (profile.model == local.model && profile.baseUrl == local.baseUrl) {
@@ -493,7 +494,7 @@ internal fun LocalModelSettingsCard(
                             } else {
                                 profile.baseUrl
                             },
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -503,7 +504,7 @@ internal fun LocalModelSettingsCard(
                         )
                     }
                     DsMenu(
-                        anchor = { Text("⋯", style = DsType.large20, color = colors.labelSecondary,
+                        anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
                             modifier = Modifier.padding(horizontal = DsSpacing.small)) },
                         items = listOfNotNull(
                             if (profile.model != local.model || profile.baseUrl != local.baseUrl)
@@ -540,7 +541,7 @@ internal fun LocalModelSettingsCard(
         ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong,
+                Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelPrimary)
                 DsMenu(
                     anchor = {
@@ -553,7 +554,7 @@ internal fun LocalModelSettingsCard(
                                     else LocalModelPresets.entries.firstOrNull {
                                         it.model == model && it.baseUrl == baseUrl
                                     }?.let { "${it.provider} · ${it.model}" } ?: model,
-                                    style = DsType.std14Strong, color = colors.labelPrimary,
+                                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
                                     modifier = Modifier.weight(1f))
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                             }
@@ -577,17 +578,17 @@ internal fun LocalModelSettingsCard(
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                 } else {
-                    Text(baseUrl, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                     selectedPreset?.let { preset ->
                         Text(
                             stringResource(R.string.local_model_request_endpoint, if (protocol == LocalModelProtocol.RESPONSES) "${preset.baseUrl.trimEnd('/')}/responses" else preset.chatEndpoint),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         preset.modelsEndpoint?.let { endpoint ->
                             Text(
                                 stringResource(R.string.local_model_models_endpoint, endpoint),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
                         }
@@ -601,7 +602,7 @@ internal fun LocalModelSettingsCard(
                         else R.string.advanced_model_key)) },
                     supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
                     visualTransformation = PasswordVisualTransformation())
-                testStatus?.let { Text(it, style = DsType.small13,
+                testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
                     color = if (it.startsWith("连接成功")) colors.labelSecondary else colors.error) }
                 DsButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
                     onClick = {
@@ -704,13 +705,13 @@ internal fun DeepSeekPricingCard(
     SettingsCard(stringResource(R.string.pricing_deepseek_title), Icons.Outlined.Cloud) {
         Text(
             stringResource(R.string.pricing_current_period, periodLabel),
-            style = DsType.small13Strong,
+            style = DsType.small13Strong.withReadingWeight(),
             color = colors.labelPrimary,
         )
-        Text(sourceLabel, style = DsType.caption11, color = colors.labelTertiary)
+        Text(sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         Text(
             stringResource(R.string.pricing_source_official),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
 
@@ -724,15 +725,15 @@ internal fun DeepSeekPricingCard(
                     modifier = Modifier.padding(DsSpacing.medium),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
-                    Text(model.displayName, style = DsType.std14Strong, color = colors.labelPrimary)
+                    Text(model.displayName, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(
                         "${model.modelId} · ${model.version}",
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     Text(
                         stringResource(R.string.pricing_same_thinking),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                     // 表头：缓存命中 / 缓存未命中 / 输出
@@ -740,17 +741,17 @@ internal fun DeepSeekPricingCard(
                         Spacer(Modifier.weight(1.5f))
                         Text(
                             stringResource(R.string.pricing_col_cache_hit),
-                            style = DsType.caption11, color = colors.labelTertiary,
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
                             modifier = Modifier.weight(1f), textAlign = TextAlign.End,
                         )
                         Text(
                             stringResource(R.string.pricing_col_cache_miss),
-                            style = DsType.caption11, color = colors.labelTertiary,
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
                             modifier = Modifier.weight(1f), textAlign = TextAlign.End,
                         )
                         Text(
                             stringResource(R.string.pricing_col_output),
-                            style = DsType.caption11, color = colors.labelTertiary,
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
                             modifier = Modifier.weight(1f), textAlign = TextAlign.End,
                         )
                     }
@@ -774,13 +775,13 @@ internal fun DeepSeekPricingCard(
 
         Text(
             stringResource(R.string.pricing_holiday_hint),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
         state.error?.let { error ->
             Text(
                 stringResource(R.string.pricing_refresh_failed, error),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.error,
             )
         }
@@ -811,13 +812,13 @@ private fun PriceTableRow(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             periodLabel,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = labelColor,
             modifier = Modifier.weight(1.5f),
         )
-        Text(cacheHit, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-        Text(cacheMiss, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-        Text(output, style = DsType.small13, color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(cacheHit, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(cacheMiss, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(output, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }
 
@@ -891,8 +892,8 @@ internal fun LocalMemorySettingsCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong, color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11, color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
             Switch(
                 checked = local.autoRecall,
@@ -908,8 +909,8 @@ internal fun LocalMemorySettingsCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong, color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11, color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
             Switch(
                 checked = local.autoMemory,
@@ -980,7 +981,7 @@ internal fun MemoryManagementCard(
         if (records.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_empty),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@SettingsCard
@@ -988,7 +989,7 @@ internal fun MemoryManagementCard(
 
         Text(
             stringResource(R.string.advanced_memory_manage_hint),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
         OutlinedTextField(
@@ -1030,14 +1031,14 @@ internal fun MemoryManagementCard(
 
         Text(
             stringResource(R.string.advanced_memory_visible_count, filteredRecords.size, records.size),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
 
         if (visibleRecords.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_filter_empty),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -1064,7 +1065,7 @@ internal fun MemoryManagementCard(
                     }
                     Text(
                         record.content,
-                        style = DsType.std14,
+                        style = DsType.std14.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
@@ -1076,7 +1077,7 @@ internal fun MemoryManagementCard(
                     ) {
                         Text(
                             DateFormat.getDateInstance(DateFormat.SHORT).format(Date(record.updatedAt)),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelCaption,
                             modifier = Modifier.weight(1f),
                         )
@@ -1140,8 +1141,8 @@ internal fun MemoryManagementCard(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong, color = colors.labelPrimary)
-                    Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11, color = colors.labelTertiary)
+                    Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                    Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
                 Switch(checked = pinned, onCheckedChange = { pinned = it })
             }
@@ -1257,9 +1258,9 @@ private fun StepperRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.small13Strong, color = colors.labelPrimary)
+            Text(label, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
             hint?.let {
-                Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
         }
         DsButton(
@@ -1271,7 +1272,7 @@ private fun StepperRow(
         )
         Text(
             value.toString(),
-            style = DsType.std14Strong,
+            style = DsType.std14Strong.withReadingWeight(),
             color = colors.labelPrimary,
             modifier = Modifier.widthIn(min = 30.dp),
             textAlign = TextAlign.Center,
@@ -1334,7 +1335,7 @@ internal fun DeviceCapabilitiesCard(
             variant = DsButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
-        state.error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
+        state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
     }
 }
 
@@ -1356,13 +1357,13 @@ private fun CapabilityRow(
     ) {
         StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
         Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.std14, color = colors.labelSecondary)
-            Text(hint, style = DsType.caption11, color = colors.labelCaption)
+            Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
+            Text(hint, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption)
         }
         if (enabled) {
             Text(
                 stringResource(R.string.advanced_available),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.success,
             )
         } else if (actionLabel != null && onAction != null) {
@@ -1375,7 +1376,7 @@ private fun CapabilityRow(
         } else {
             Text(
                 stringResource(R.string.advanced_not_authorized),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }

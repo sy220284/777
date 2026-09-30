@@ -41,6 +41,7 @@ import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 /**
@@ -94,7 +95,7 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
         Spacer(Modifier.width(8.dp))
         Text(
             stringResource(R.string.goal_title),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -140,7 +141,7 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
-                placeholder = { Text(stringResource(R.string.goal_title), style = DsType.std14) },
+                placeholder = { Text(stringResource(R.string.goal_title), style = DsType.std14.withReadingWeight()) },
                 colors = dialogTextFieldColors(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -201,7 +202,7 @@ internal fun QueueDock(queue: List<QueueItem>, store: SessionStore, modifier: Mo
             ) {
                 Text(
                     item.previewText,
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -243,7 +244,7 @@ internal fun QueueDock(queue: List<QueueItem>, store: SessionStore, modifier: Mo
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
-                placeholder = { Text(stringResource(R.string.chat_composer_hint), style = DsType.std14) },
+                placeholder = { Text(stringResource(R.string.chat_composer_hint), style = DsType.std14.withReadingWeight()) },
                 colors = dialogTextFieldColors(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -14,6 +14,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -37,9 +38,9 @@ fun DsDeliverableCard(
             Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Text(title, style = DsType.std14Strong, color = colors.labelPrimary)
+            Text(title, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
             description?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = DsType.small13, color = colors.labelSecondary)
+                Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             }
         }
     }
