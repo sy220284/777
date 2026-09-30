@@ -4,6 +4,7 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -83,7 +84,7 @@ class ChatGptSessionManager @Inject constructor(
                         ?.jsonPrimitive?.contentOrNull
                 }.getOrNull()
             }
-        } ?: return
+        } ?: throw IOException("无法读取 ChatGPT 会话撤销端点")
         withContext(Dispatchers.IO) {
             val form = FormBody.Builder()
                 .add("token", current.refreshToken)
@@ -95,11 +96,25 @@ class ChatGptSessionManager @Inject constructor(
                 .post(form)
                 .header("Accept", "application/json")
                 .build()
-            runInterruptible { http.newCall(request).execute() }.use { response ->
-                if (!response.isSuccessful) {
-                    throw IOException("撤销 ChatGPT renewable session 失败（HTTP ${response.code}）")
+            var lastFailure: IOException? = null
+            for (attempt in 0 until REVOKE_ATTEMPTS) {
+                val responseCode = try {
+                    runInterruptible { http.newCall(request).execute() }.use { response -> response.code }
+                } catch (error: IOException) {
+                    lastFailure = error
+                    null
+                }
+                if (responseCode != null) {
+                    if (responseCode in 200..299) return@withContext
+                    val failure = IOException("撤销 ChatGPT renewable session 失败（HTTP $responseCode）")
+                    if (responseCode < 500) throw failure
+                    lastFailure = failure
+                }
+                if (attempt < REVOKE_ATTEMPTS - 1) {
+                    delay(REVOKE_RETRY_BASE_MILLIS * (1L shl attempt))
                 }
             }
+            throw lastFailure ?: IOException("撤销 ChatGPT renewable session 失败")
         }
     }
 
@@ -142,12 +157,16 @@ class ChatGptSessionManager @Inject constructor(
             .build()
         val token = requestToken(form)
         val now = System.currentTimeMillis() / 1_000L
+        val grantedScopes = if (token.scopes.isEmpty()) current.scopes else token.scopes
+        require(CHATGPT_PLAN_SCOPE in grantedScopes) {
+            "ChatGPT 套餐授权已失效，请重新连接账户"
+        }
         return current.copy(
             accessToken = token.accessToken,
             refreshToken = token.refreshToken ?: current.refreshToken,
-            idToken = token.idToken ?: current.idToken,
+            idToken = current.idToken,
             tokenType = token.tokenType,
-            scopes = if (token.scopes.isEmpty()) current.scopes else token.scopes,
+            scopes = grantedScopes,
             accessTokenExpiresAtEpochSeconds = now + token.expiresInSeconds,
             savedAtEpochSeconds = now,
         )
@@ -195,5 +214,7 @@ class ChatGptSessionManager @Inject constructor(
 
     private companion object {
         const val REFRESH_EARLY_SECONDS = 90L
+        const val REVOKE_ATTEMPTS = 3
+        const val REVOKE_RETRY_BASE_MILLIS = 300L
     }
 }
