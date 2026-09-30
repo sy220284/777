@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -80,10 +79,6 @@ fun DsSegmented(
                 enabled = enabled,
                 role = role,
                 onClick = { onSelect(segment.key) },
-                // A stretched track is a primary control rather than an inline one, so its segments
-                // get a button's height. 24dp is a comfortable inline chip and an uncomfortably
-                // small thing to hit when it is the first decision on a screen.
-                minHeight = DsSpacing.touchTarget,
                 modifier = Modifier.weight(1f, fill = stretch),
             )
         }
@@ -97,7 +92,6 @@ private fun DsSegment(
     enabled: Boolean,
     role: Role,
     onClick: () -> Unit,
-    minHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
@@ -109,7 +103,7 @@ private fun DsSegment(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .heightIn(min = minHeight)
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.pillFull)
             .background(colors.accentTertiary.copy(alpha = emphasis))
             .selectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
