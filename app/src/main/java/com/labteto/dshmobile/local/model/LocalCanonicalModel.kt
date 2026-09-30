@@ -186,11 +186,38 @@ internal object LocalCanonicalModelCodec {
                 adapterId = adapterId,
                 routeFingerprint = routeFingerprint,
             )
+        } ?: if (adapterId == LocalModelAdapterIds.OPENAI_CHAT) {
+            chatPrivateReplay(parsed, routeFingerprint)
+        } else {
+            null
         }
         val canonical = parsed.copy(replay = replay)
         return reply.copy(
             message = toHistoryMessage(canonical),
             canonicalMessage = canonical,
+        )
+    }
+
+    private fun chatPrivateReplay(
+        message: LocalCanonicalMessage,
+        routeFingerprint: String,
+    ): LocalModelReplayEnvelope? {
+        val reasoning = message.content.filterIsInstance<LocalCanonicalContent.Reasoning>()
+            .joinToString("") { it.text }
+            .takeIf(String::isNotBlank)
+        val metadata = buildJsonObject {
+            message.content.filterIsInstance<LocalCanonicalContent.ToolCall>().forEach { call ->
+                if (call.providerMetadata.isNotEmpty()) put(call.id, call.providerMetadata)
+            }
+        }
+        if (reasoning == null && metadata.isEmpty()) return null
+        return LocalModelReplayEnvelope(
+            adapterId = LocalModelAdapterIds.OPENAI_CHAT,
+            routeFingerprint = routeFingerprint,
+            payload = buildJsonObject {
+                reasoning?.let { put("reasoning_content", it) }
+                if (metadata.isNotEmpty()) put("tool_metadata", metadata)
+            },
         )
     }
 
@@ -238,24 +265,52 @@ internal object LocalCanonicalModelCodec {
                 rawBlocks.forEach { add(it.value) }
             })
         }
-        message.content.filterIsInstance<LocalCanonicalContent.Reasoning>()
+        val compatibleReplay = message.replay?.takeIf {
+            adapterId.isNotEmpty() && replayCompatible(it, adapterId, routeFingerprint)
+        }
+        val reasoning = message.content.filterIsInstance<LocalCanonicalContent.Reasoning>()
             .joinToString("") { it.text }
             .takeIf(String::isNotBlank)
-            ?.let { put("reasoning_content", it) }
+        val mayProjectLegacyChatPrivateState =
+            adapterId == LocalModelAdapterIds.OPENAI_CHAT && message.replay == null
+        if (
+            reasoning != null &&
+            (
+                adapterId.isEmpty() ||
+                    mayProjectLegacyChatPrivateState ||
+                    compatibleReplay?.adapterId == LocalModelAdapterIds.OPENAI_CHAT
+                )
+        ) {
+            put("reasoning_content", reasoning)
+        }
         val calls = message.content.filterIsInstance<LocalCanonicalContent.ToolCall>()
         if (calls.isNotEmpty()) {
+            val replayToolMetadata = compatibleReplay
+                ?.takeIf { it.adapterId == LocalModelAdapterIds.OPENAI_CHAT }
+                ?.payload
+                ?.get("tool_metadata") as? JsonObject
             put("tool_calls", buildJsonArray {
                 calls.forEach { call ->
+                    val metadata = when {
+                        adapterId.isEmpty() && message.replay != null -> JsonObject(emptyMap())
+                        adapterId.isEmpty() -> call.providerMetadata
+                        adapterId == LocalModelAdapterIds.OPENAI_CHAT -> {
+                            (replayToolMetadata?.get(call.id) as? JsonObject)
+                                ?: call.providerMetadata.takeIf { message.replay == null }
+                                ?: JsonObject(emptyMap())
+                        }
+                        else -> JsonObject(emptyMap())
+                    }
                     add(buildJsonObject {
                         put("id", call.id)
                         put("type", "function")
-                        call.providerMetadata.forEach { (key, value) ->
+                        metadata.forEach { (key, value) ->
                             if (key != "function_metadata") put(key, value)
                         }
                         put("function", buildJsonObject {
                             put("name", call.name)
                             put("arguments", call.rawArguments)
-                            (call.providerMetadata["function_metadata"] as? JsonObject)?.forEach { (key, value) ->
+                            (metadata["function_metadata"] as? JsonObject)?.forEach { (key, value) ->
                                 put(key, value)
                             }
                         })
