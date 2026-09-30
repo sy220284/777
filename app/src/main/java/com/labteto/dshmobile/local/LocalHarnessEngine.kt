@@ -1716,7 +1716,6 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { it.copy(error = error.message ?: "重新生成失败") }
         } finally {
             _state.update { it.copy(running = false) }
-            _streamingState.value = LocalHarnessStreamingState()
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
         }
