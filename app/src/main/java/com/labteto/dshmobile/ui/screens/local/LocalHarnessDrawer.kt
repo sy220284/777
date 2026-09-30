@@ -1,11 +1,17 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -51,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +73,7 @@ import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -75,6 +83,7 @@ import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.relativeTime
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -189,7 +198,7 @@ internal fun LocalModeDrawer(
                     )
                 }
 
-                if (searchOpen) {
+                DsExpandableColumn(visible = searchOpen) {
                     OutlinedTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
@@ -388,12 +397,30 @@ private fun DrawerPrimaryAction(
     iconFamily: DsIconFamily = DsIconFamily.Neutral,
 ) {
     val colors = DsTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val hovered by interaction.collectIsHoveredAsState()
+    val feedbackColor by animateColorAsState(
+        targetValue = when {
+            pressed -> colors.hoverAccent
+            hovered -> colors.hover
+            else -> Color.Transparent
+        },
+        animationSpec = DsAnimations.interactionColor,
+        label = "drawerActionFeedback",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
-            .clickable(onClick = onClick)
+            .background(feedbackColor)
+            .hoverable(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            )
             .padding(horizontal = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -480,7 +507,13 @@ private fun LocalSessionDrawerRow(
             }
             .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
-            .background(if (current || selected) colors.sidebarNavActive else colors.sidebar)
+            .background(
+                animateColorAsState(
+                    targetValue = if (current || selected) colors.sidebarNavActive else colors.sidebar,
+                    animationSpec = DsAnimations.interactionColor,
+                    label = "sessionRowBackground",
+                ).value,
+            )
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
@@ -497,7 +530,7 @@ private fun LocalSessionDrawerRow(
         ) {
             Text(
                 title,
-                style = DsType.std14,
+                style = if (current) DsType.std14Strong else DsType.std14,
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

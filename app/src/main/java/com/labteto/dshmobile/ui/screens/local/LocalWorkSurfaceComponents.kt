@@ -26,6 +26,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsPill
@@ -228,41 +229,45 @@ internal fun ExecutionStatusCard(
                                         size = DsButtonSize.Small,
                                     )
                                 }
-                                if (expanded) {
-                                    Text(
-                                        stringResource(R.string.local_run_job_output),
-                                        style = DsType.caption11Strong,
-                                        color = colors.labelTertiary,
-                                    )
-                                    Text(
-                                        expandedJobOutput.ifBlank {
-                                            stringResource(R.string.local_run_job_output_empty)
-                                        },
-                                        style = DsType.caption11,
-                                        color = colors.labelSecondary,
-                                        maxLines = 12,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End,
-                                    ) {
-                                        DsButton(
-                                            text = stringResource(R.string.local_run_job_refresh),
-                                            onClick = { expandedJobOutput = onJobOutput(job.id) },
-                                            variant = DsButtonVariant.Ghost,
-                                            size = DsButtonSize.Small,
+                                DsExpandableColumn(
+                                    visible = expanded,
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                                ) {
+                                        Text(
+                                            stringResource(R.string.local_run_job_output),
+                                            style = DsType.caption11Strong,
+                                            color = colors.labelTertiary,
                                         )
-                                        if (job.status == "running") {
+                                        Text(
+                                            expandedJobOutput.ifBlank {
+                                                stringResource(R.string.local_run_job_output_empty)
+                                            },
+                                            style = DsType.caption11,
+                                            color = colors.labelSecondary,
+                                            maxLines = 12,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                        ) {
                                             DsButton(
-                                                text = stringResource(R.string.local_run_job_stop),
-                                                onClick = {
-                                                    onStopJob(job.id)
-                                                    expandedJobOutput = onJobOutput(job.id)
-                                                },
-                                                variant = DsButtonVariant.Danger,
+                                                text = stringResource(R.string.local_run_job_refresh),
+                                                onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                                variant = DsButtonVariant.Ghost,
                                                 size = DsButtonSize.Small,
                                             )
+                                            if (job.status == "running") {
+                                                DsButton(
+                                                    text = stringResource(R.string.local_run_job_stop),
+                                                    onClick = {
+                                                        onStopJob(job.id)
+                                                        expandedJobOutput = onJobOutput(job.id)
+                                                    },
+                                                    variant = DsButtonVariant.Danger,
+                                                    size = DsButtonSize.Small,
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -270,7 +275,6 @@ internal fun ExecutionStatusCard(
                         }
                     }
                 }
-            }
 
             DsButton(
                 text = stringResource(R.string.local_run_open_results),
@@ -294,8 +298,10 @@ internal fun ExecutionStatusCard(
                 variant = DsButtonVariant.Ghost,
                 size = DsButtonSize.Small,
             )
-            if (technicalDetailsExpanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            DsExpandableColumn(
+                visible = technicalDetailsExpanded,
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
                     Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
                     Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
                     Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
@@ -321,4 +327,3 @@ internal fun ExecutionStatusCard(
             }
         }
     }
-}

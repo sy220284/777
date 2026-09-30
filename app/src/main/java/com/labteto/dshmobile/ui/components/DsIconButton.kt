@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -57,12 +58,17 @@ fun DsIconButton(
         label = "iconButtonScale"
     )
     
-    val background = when {
+    val targetBackground = when {
         !enabled -> Color.Transparent
         isPressed -> colors.hover.compositeOver(containerColor)
         isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(containerColor)
         else -> containerColor
     }
+    val background by animateColorAsState(
+        targetValue = targetBackground,
+        animationSpec = DsAnimations.interactionColor,
+        label = "iconButtonBackground",
+    )
     
     Surface(
         onClick = onClick,
