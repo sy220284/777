@@ -27,6 +27,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /**
@@ -103,7 +104,7 @@ fun DsPill(
         ) {
             Text(
                 text,
-                style = DsType.xsmall12,
+                style = DsType.xsmall12.withReadingWeight(),
                 color = contentColor,
                 maxLines = 1,
             )
