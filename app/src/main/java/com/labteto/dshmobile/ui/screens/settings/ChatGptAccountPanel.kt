@@ -8,15 +8,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
@@ -34,7 +43,19 @@ internal fun ChatGptAccountPanel(
     report: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val welcomePrefs = remember(context) {
+        context.getSharedPreferences("chatgpt_plan_ui", android.content.Context.MODE_PRIVATE)
+    }
+    var showWelcome by remember { mutableStateOf(false) }
     val selected = state.selectedAccount
+    LaunchedEffect(state.connected) {
+        if (state.connected && !welcomePrefs.getBoolean("plan_welcome_seen_v1", false)) {
+            showWelcome = true
+        }
+    }
+
     val busy = state.phase in setOf(
         ChatGptAuthPhase.PREPARING,
         ChatGptAuthPhase.WAITING_FOR_BROWSER,
@@ -157,6 +178,15 @@ internal fun ChatGptAccountPanel(
                     }
                 }
 
+                DsButton(
+                    text = stringResource(R.string.chatgpt_manage_usage),
+                    onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Outline,
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -216,6 +246,30 @@ internal fun ChatGptAccountPanel(
             state.error?.let {
                 Text(it, style = DsType.caption11, color = colors.error)
             }
+        }
+    }
+
+    if (showWelcome) {
+        DsDialog(
+            title = stringResource(R.string.chatgpt_welcome_title),
+            onDismiss = {
+                welcomePrefs.edit().putBoolean("plan_welcome_seen_v1", true).apply()
+                showWelcome = false
+            },
+        ) {
+            Text(
+                stringResource(R.string.chatgpt_welcome_body),
+                style = DsType.std14,
+                color = colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.chatgpt_welcome_confirm),
+                onClick = {
+                    welcomePrefs.edit().putBoolean("plan_welcome_seen_v1", true).apply()
+                    showWelcome = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
