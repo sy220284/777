@@ -15,13 +15,14 @@ import org.junit.Test
 
 class UpdateCheckerTest {
     @Test
-    fun `mirror is preferred and keeps update traffic off GitHub`() = runBlocking {
-        val requestedHosts = mutableListOf<String>()
-        val checker = checker("https://mirror.example/777/") { url ->
-            requestedHosts += url.host
-            when {
-                url.host == "mirror.example" && url.encodedPath == "/777/latest.json" ->
-                    200 to mirrorRelease
+    fun `Gitee mirror is preferred and keeps update check off GitHub`() = runBlocking {
+        val requested = mutableListOf<String>()
+        val checker = checker(GITEE_MIRROR) { url ->
+            requested += url.toString()
+            when (url.encodedPath) {
+                "/api/v5/repos/acme/777-mirror/releases/latest" -> 200 to giteeRelease
+                "/acme/777-mirror/releases/download/v0.12.0-777.50/update-manifest.json" ->
+                    200 to updateManifest
                 else -> error("unexpected request: $url")
             }
         }
@@ -30,40 +31,43 @@ class UpdateCheckerTest {
         assertNotNull(update)
         assertEquals("0.12.0-777.50", update!!.version)
         assertEquals(
-            "https://mirror.example/777/releases/v0.12.0-777.50/app-release.apk",
+            "https://gitee.com/acme/777-mirror/releases/download/v0.12.0-777.50/app-release.apk",
             update.apkUrl,
         )
         assertEquals(1, update.patchChain.size)
         assertEquals(
-            "https://mirror.example/777/releases/v0.12.0-777.50/delta-49-to-50.hpatch",
+            "https://gitee.com/acme/777-mirror/releases/download/v0.12.0-777.50/delta-49-to-50.hpatch",
             update.patchChain.single().url,
         )
-        assertEquals(listOf("mirror.example"), requestedHosts)
+        assertEquals(2, requested.size)
+        assertEquals(listOf("gitee.com", "gitee.com"), requested.map { it.toHttpUrl().host })
     }
 
     @Test
-    fun `reachable current mirror is authoritative and does not probe GitHub`() = runBlocking {
+    fun `reachable current Gitee mirror is authoritative and does not probe GitHub`() = runBlocking {
         val requestedHosts = mutableListOf<String>()
-        val checker = checker("https://mirror.example/777/") { url ->
+        val checker = checker(GITEE_MIRROR) { url ->
             requestedHosts += url.host
-            200 to mirrorRelease
+            200 to giteeRelease
         }
 
         assertNull(checker.checkNow("0.12.0-777.50"))
-        assertEquals(listOf("mirror.example"), requestedHosts)
+        assertEquals(listOf("gitee.com"), requestedHosts)
     }
 
     @Test
-    fun `invalid mirror metadata falls back to GitHub`() = runBlocking {
+    fun `invalid Gitee manifest falls back to GitHub`() = runBlocking {
         val requestedHosts = mutableListOf<String>()
-        val invalidMirror = mirrorRelease.replace(
-            "releases/v0.12.0-777.50/app-release.apk",
-            "../app-release.apk",
+        val invalidManifest = updateManifest.replace(
+            "\"name\":\"app-release.apk\"",
+            "\"name\":\"../app-release.apk\"",
         )
-        val checker = checker("https://mirror.example/777/") { url ->
+        val checker = checker(GITEE_MIRROR) { url ->
             requestedHosts += url.host
             when {
-                url.host == "mirror.example" -> 200 to invalidMirror
+                url.encodedPath == "/api/v5/repos/acme/777-mirror/releases/latest" ->
+                    200 to giteeRelease
+                url.host == "gitee.com" -> 200 to invalidManifest
                 url.encodedPath.endsWith("/latest") -> 200 to release
                 else -> 403 to "{}"
             }
@@ -74,8 +78,23 @@ class UpdateCheckerTest {
             "https://github.com/sy220284/777/releases/download/v0.12.0-777.50/app-release.apk",
             update?.apkUrl,
         )
-        assertEquals("mirror.example", requestedHosts.first())
-        assertEquals("api.github.com", requestedHosts[1])
+        assertEquals(listOf("gitee.com", "gitee.com", "api.github.com"), requestedHosts)
+    }
+
+    @Test
+    fun `Gitee repo base and asset routes are constrained`() {
+        val mirror = parseGiteeMirrorRepository(GITEE_MIRROR)
+        assertNotNull(mirror)
+        assertEquals("acme", mirror!!.owner)
+        assertEquals("777-mirror", mirror.repo)
+        assertEquals(
+            "https://gitee.com/acme/777-mirror/releases/download/v0.12.0-777.50/app-release.apk",
+            giteeReleaseAssetUrl(mirror, "v0.12.0-777.50", "app-release.apk"),
+        )
+        assertNull(giteeReleaseAssetUrl(mirror, "v0.12.0-777.50", "../app-release.apk"))
+        assertNull(parseGiteeMirrorRepository("http://gitee.com/acme/777-mirror/"))
+        assertNull(parseGiteeMirrorRepository("https://example.com/acme/777-mirror/"))
+        assertNull(parseGiteeMirrorRepository("https://gitee.com/acme/777-mirror/extra/"))
     }
 
     @Test
@@ -131,20 +150,6 @@ class UpdateCheckerTest {
         )
     }
 
-    @Test
-    fun `mirror base and asset paths stay on one HTTPS origin`() {
-        val base = parseUpdateMirrorBaseUrl("https://bucket.oss-cn-hangzhou.aliyuncs.com/777")
-        assertNotNull(base)
-        assertEquals(
-            "https://bucket.oss-cn-hangzhou.aliyuncs.com/777/releases/v1/app.apk",
-            resolveMirrorAssetUrl(base!!, "releases/v1/app.apk"),
-        )
-        assertNull(resolveMirrorAssetUrl(base, "../app.apk"))
-        assertNull(resolveMirrorAssetUrl(base, "/app.apk"))
-        assertNull(parseUpdateMirrorBaseUrl("http://bucket.example/777/"))
-        assertNull(parseUpdateMirrorBaseUrl("https://user@bucket.example/777/"))
-    }
-
     private fun checker(
         mirrorBaseUrl: String = "",
         result: (HttpUrl) -> Pair<Int, String>,
@@ -169,21 +174,24 @@ class UpdateCheckerTest {
         {"name":"SHA256SUMS.txt","browser_download_url":"https://github.com/sy220284/777/releases/download/v0.12.0-777.50/SHA256SUMS.txt"}]}
     """.trimIndent()
 
-    private val mirrorRelease = """
+    private val giteeRelease = """
+        {"tag_name":"v0.12.0-777.50","prerelease":false}
+    """.trimIndent()
+
+    private val updateManifest = """
         {
           "schema":1,
-          "version":"0.12.0-777.50",
-          "apk":{
+          "targetVersion":"0.12.0-777.50",
+          "targetApk":{
             "name":"app-release.apk",
-            "path":"releases/v0.12.0-777.50/app-release.apk",
-            "size":118512196,
+            "size":63939424,
             "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
           "patches":[{
             "fromVersion":"0.12.0-777.49",
             "toVersion":"0.12.0-777.50",
             "algorithm":"hdiffpatch-window-zstd-v1",
-            "path":"releases/v0.12.0-777.50/delta-49-to-50.hpatch",
+            "asset":"delta-49-to-50.hpatch",
             "size":1024,
             "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "sourceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -191,4 +199,8 @@ class UpdateCheckerTest {
           }]
         }
     """.trimIndent()
+
+    private companion object {
+        const val GITEE_MIRROR = "https://gitee.com/acme/777-mirror/"
+    }
 }
