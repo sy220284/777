@@ -436,7 +436,7 @@ class OpenAiResponsesClient @Inject constructor(
         strict: Boolean,
         depth: Int,
     ) {
-        if (depth > MAX_STRICT_SCHEMA_DEPTH) {
+        if (strict && depth > MAX_STRICT_SCHEMA_DEPTH) {
             throw invalidToolSchema(index, name, "$path 超过 OpenAI strict schema 的最大 10 层嵌套")
         }
         val properties = schema["properties"]?.let { element ->
@@ -457,10 +457,10 @@ class OpenAiResponsesClient @Inject constructor(
                 }
                 primitive.content
             }.also { names ->
-                if (names.size != names.toSet().size) {
+                if (strict && names.size != names.toSet().size) {
                     throw invalidToolSchema(index, name, "$path.required 不能包含重复字段")
                 }
-                if (properties != null) {
+                if (strict && properties != null) {
                     val unknown = names.filterNot(properties::containsKey)
                     if (unknown.isNotEmpty()) {
                         throw invalidToolSchema(
@@ -515,49 +515,66 @@ class OpenAiResponsesClient @Inject constructor(
             )
         }
 
-        (schema["items"] as? JsonObject)?.let { items ->
-            validateResponseParameterSchema(
-                index,
-                name,
-                items,
-                "$path.items",
-                strict,
-                depth + 1,
-            )
-        }
-
-        (schema["anyOf"] as? JsonArray)?.forEachIndexed { anyOfIndex, child ->
-            val childSchema = child as? JsonObject
-                ?: throw invalidToolSchema(
+        schema["items"]?.let { items ->
+            val itemSchema = items as? JsonObject
+            if (itemSchema != null) {
+                validateResponseParameterSchema(
                     index,
                     name,
-                    "$path.anyOf[$anyOfIndex] 必须是 JSON Schema 对象",
+                    itemSchema,
+                    "$path.items",
+                    strict,
+                    depth + 1,
                 )
-            validateResponseParameterSchema(
-                index,
-                name,
-                childSchema,
-                "$path.anyOf[$anyOfIndex]",
-                strict,
-                depth + 1,
-            )
-        }
-
-        (schema["\$defs"] as? JsonObject)?.forEach { (definitionName, child) ->
-            val childSchema = child as? JsonObject
-                ?: throw invalidToolSchema(
+            } else if (strict) {
+                throw invalidToolSchema(
                     index,
                     name,
-                    "$path.\$defs.$definitionName 必须是 JSON Schema 对象",
+                    "$path.items 在 strict=true 时必须是 JSON Schema 对象",
                 )
-            validateResponseParameterSchema(
-                index,
-                name,
-                childSchema,
-                "$path.\$defs.$definitionName",
-                strict,
-                depth + 1,
-            )
+            }
+        }
+
+        schema["anyOf"]?.let { anyOfElement ->
+            val anyOf = anyOfElement as? JsonArray
+                ?: throw invalidToolSchema(index, name, "$path.anyOf 必须是数组")
+            anyOf.forEachIndexed { anyOfIndex, child ->
+                val childSchema = child as? JsonObject
+                    ?: throw invalidToolSchema(
+                        index,
+                        name,
+                        "$path.anyOf[$anyOfIndex] 必须是 JSON Schema 对象",
+                    )
+                validateResponseParameterSchema(
+                    index,
+                    name,
+                    childSchema,
+                    "$path.anyOf[$anyOfIndex]",
+                    strict,
+                    depth + 1,
+                )
+            }
+        }
+
+        schema["\$defs"]?.let { definitionsElement ->
+            val definitions = definitionsElement as? JsonObject
+                ?: throw invalidToolSchema(index, name, "$path.\$defs 必须是对象")
+            definitions.forEach { (definitionName, child) ->
+                val childSchema = child as? JsonObject
+                    ?: throw invalidToolSchema(
+                        index,
+                        name,
+                        "$path.\$defs.$definitionName 必须是 JSON Schema 对象",
+                    )
+                validateResponseParameterSchema(
+                    index,
+                    name,
+                    childSchema,
+                    "$path.\$defs.$definitionName",
+                    strict,
+                    depth + 1,
+                )
+            }
         }
     }
 
