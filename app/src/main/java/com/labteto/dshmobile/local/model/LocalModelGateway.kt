@@ -7,9 +7,11 @@ import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalModelToolCallingMode
+import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -37,6 +39,23 @@ class LocalModelGateway @Inject constructor(
         selectRunModelProfile(availableProfiles(), credentials.active(), selection).also {
             require(credentials.hasCredential(it)) { "所选模型凭据不可用" }
         }
+
+    suspend fun <T> withFrozenRoute(
+        model: String,
+        baseUrl: String,
+        block: suspend () -> T,
+    ): T {
+        val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
+        val active = credentials.active()?.takeIf {
+            it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizedBaseUrl
+        }
+        val profile = active
+            ?: availableProfiles().singleOrNull {
+                it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizedBaseUrl
+            }
+            ?: profileForRun(model)
+        return withContext(LocalModelRunContext(profile)) { block() }
+    }
 
     suspend fun complete(
         model: String,
