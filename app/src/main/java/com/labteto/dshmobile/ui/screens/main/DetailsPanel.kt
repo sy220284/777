@@ -632,6 +632,7 @@ private fun SubagentsCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clickable(enabled = id != null) { id?.let(onOpen) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
