@@ -1653,40 +1653,14 @@ private fun LocalConversationSurface(
         }
     }
     if (showModelPicker) {
-        val chatGptPlanLabel = stringResource(R.string.chatgpt_plan_usage)
-        DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
-            state.modelProfiles.forEach { profile ->
-                DsButton(
-                    text = buildString {
-                        append(profile.displayName ?: profile.model)
-                        append("  ·  ")
-                        append(
-                            if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                chatGptPlanLabel
-                            } else {
-                                profile.baseUrl.substringAfter("://").substringBefore('/')
-                            },
-                        )
-                    },
-                    onClick = {
-                        onSelectModel(profile.id)
-                        showModelPicker = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = if (profile.model == state.model && profile.baseUrl == state.baseUrl)
-                        DsButtonVariant.Info else DsButtonVariant.Ghost,
-                )
-            }
-            DsButton(
-                text = stringResource(R.string.local_manage_model_config),
-                onClick = {
-                    showModelPicker = false
-                    onConfigure()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
-            )
-        }
+        LocalModelPickerSheet(
+            profiles = state.modelProfiles,
+            currentModel = state.model,
+            currentBaseUrl = state.baseUrl,
+            onSelect = onSelectModel,
+            onConfigure = onConfigure,
+            onDismiss = { showModelPicker = false },
+        )
     }
     if (showAttachmentPicker) {
         DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
