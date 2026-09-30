@@ -383,7 +383,7 @@ class SettingsViewModel @Inject constructor(
     fun disconnectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
             runCatching { localHarness.disconnectChatGptAccount(id) }
-                .onSuccess { onDone(null) }
+                .onSuccess { warning -> onDone(warning) }
                 .onFailure { onDone(it.message ?: "断开 ChatGPT 账户失败") }
         }
     }
