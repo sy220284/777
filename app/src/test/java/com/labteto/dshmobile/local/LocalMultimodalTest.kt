@@ -13,6 +13,24 @@ import org.junit.Test
 
 class LocalMultimodalTest {
     @Test
+    fun providerLimitRejectsOversizedImageBeforeReadingOrEncodingPixels() = runTest {
+        val root = java.nio.file.Files.createTempDirectory("provider-image-limit-").toFile()
+        try {
+            val limit = LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1")
+            val file = File(root, "large.png")
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(limit + 1) }
+            val message = buildLocalUserModelMessage("image", listOf(
+                LocalImportedAttachment("large.png", "large.png", "image/png", limit + 1),
+            ))
+            val error = runCatching { prepareLocalMultimodalMessages(
+                listOf(message), root, LocalImageInputMode.NATIVE, maxImageBytes = limit,
+            ) }.exceptionOrNull()
+            assertTrue(error is IllegalArgumentException)
+            assertTrue(error?.message.orEmpty().contains("直传上限"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun nativeModeMaterializesPixelsWithoutPersistingThem() = runTest {
         val root = createTempDir(prefix = "multimodal-")
         val file = File(root, ".dsh/attachments/abc.png").apply {
@@ -169,11 +187,11 @@ class LocalMultimodalTest {
     }
 
     @Test
-    fun legacyToolPreferenceCannotForceASeparateVisionRoute() {
+    fun explicitToolPreferenceIsRespectedWithoutSelectingAnotherModel() {
         val registry = LocalImageCapabilityRegistry()
 
         assertEquals(
-            LocalImageInputMode.NATIVE,
+            LocalImageInputMode.TOOL,
             resolveLocalImageInputMode(
                 LocalImageInputMode.TOOL,
                 registry,

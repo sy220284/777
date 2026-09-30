@@ -242,6 +242,8 @@ object LocalModelPresets {
                 LocalModelCapability.IMAGE,
             ),
             imageInputSupported = true,
+            // Default reasoning is medium; sampling controls require an explicit none effort.
+            temperatureSupported = false,
             modelsEndpoint = "https://api.openai.com/v1/models",
         ),
         LocalModelPreset(
@@ -381,7 +383,7 @@ object LocalModelPresets {
         ),
         LocalModelPreset(
             provider = "Claude（兼容接口）",
-            model = "claude-sonnet-5",
+            model = "claude-sonnet-5-5",
             baseUrl = "https://api.anthropic.com/v1",
             capabilities = setOf(
                 LocalModelCapability.TEXT,
@@ -413,6 +415,15 @@ object LocalModelPresets {
 
     fun capabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
+
+    /** Capabilities actually encoded by this client's current request/response transports. */
+    fun clientCapabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
+        capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
+            it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE
+        }
+
+    fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
+        if (find(model, baseUrl)?.provider == "MiniMax") 10_000_000L else 20L * 1024L * 1024L
 
     fun documentedImageInputSupport(model: String, baseUrl: String): Boolean? =
         find(model, baseUrl)?.imageInputSupported

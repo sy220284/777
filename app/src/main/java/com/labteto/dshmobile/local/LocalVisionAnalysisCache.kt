@@ -71,6 +71,7 @@ internal class LocalVisionAnalysisCache(
             append(contentIdentity(file)).append('\u0000')
             append(route.baseUrl.trim().trimEnd('/')).append('\u0000')
             append(route.model.trim()).append('\u0000')
+            append(route.profile?.id.orEmpty()).append('\u0000')
             append(prompt.trim().take(4_000))
         }
         return File(root, sha256(keyMaterial.toByteArray(Charsets.UTF_8)) + ".txt")

@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalModelProfilesTest {
+    @Test fun clientCapabilityTagsOnlyAdvertiseImplementedInputs() {
+        LocalModelPresets.entries.forEach { preset ->
+            assertFalse(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl).any {
+                it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO || it == LocalModelCapability.MUSIC
+            })
+        }
+        assertEquals(null, LocalModelPresets.samplingTemperatureFor("gpt-5.6", "https://api.openai.com/v1", 0.85))
+        assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1"))
+        assertTrue(LocalModelPresets.entries.any { it.model == "claude-sonnet-5-5" })
+        assertFalse(LocalModelPresets.entries.any { it.model == "claude-sonnet-5" })
+    }
+
     @Test fun transportAndSearchCapabilitiesFollowProfileContract() {
         val chat = LocalModelProfile("chat", "model", "https://provider.example/v1")
         val responses = chat.copy(id = "responses", protocol = LocalModelProtocol.RESPONSES)
@@ -214,7 +226,7 @@ class LocalModelProfilesTest {
             models("通义千问"),
         )
         assertEquals(
-            setOf("claude-opus-5-5", "claude-sonnet-5", "claude-fable-5-1"),
+            setOf("claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"),
             models("Claude（兼容接口）"),
         )
     }
