@@ -47,6 +47,7 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import androidx.compose.ui.input.key.*
 
@@ -111,7 +112,7 @@ internal fun SubagentsSheet(
             if (entries.isEmpty()) {
                 Text(
                     stringResource(R.string.subagents_empty),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             }
@@ -129,7 +130,7 @@ internal fun SubagentsSheet(
                 if (child.nodes.isEmpty()) {
                     Text(
                         stringResource(R.string.common_loading),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                 } else {
@@ -175,7 +176,7 @@ internal fun SubagentsSheet(
                 if (mode != "continuable") {
                     Text(
                         stringResource(R.string.subagents_readonly),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                 } else {
@@ -193,7 +194,7 @@ internal fun SubagentsSheet(
                                 } else false
                             },
                             placeholder = {
-                                Text(stringResource(R.string.subagents_message), style = DsType.std14)
+                                Text(stringResource(R.string.subagents_message), style = DsType.std14.withReadingWeight())
                             },
                             colors = dialogTextFieldColors(),
                         )
@@ -258,7 +259,7 @@ private fun SubagentRow(entry: SubagentListEntry, selected: Boolean, onClick: ()
         Spacer(Modifier.width(DsSpacing.small))
         Text(
             stringResource(R.string.agent_operation_delegate),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
