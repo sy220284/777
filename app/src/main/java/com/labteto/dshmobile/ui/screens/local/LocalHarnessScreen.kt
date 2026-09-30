@@ -1656,7 +1656,17 @@ private fun LocalConversationSurface(
         DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
             state.modelProfiles.forEach { profile ->
                 DsButton(
-                    text = "${profile.model}  ·  ${profile.baseUrl.substringAfter("://").substringBefore('/')}" ,
+                    text = buildString {
+                        append(profile.displayName ?: profile.model)
+                        append("  ·  ")
+                        append(
+                            if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                                "ChatGPT 套餐"
+                            } else {
+                                profile.baseUrl.substringAfter("://").substringBefore('/')
+                            },
+                        )
+                    },
                     onClick = {
                         onSelectModel(profile.id)
                         showModelPicker = false
