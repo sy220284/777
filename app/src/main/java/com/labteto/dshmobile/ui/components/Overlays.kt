@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -180,15 +181,19 @@ fun DsFullScreenDialog(
 @Composable
 fun rememberDsToast(): Pair<State<String?>, (String) -> Unit> {
     val flow = remember { MutableStateFlow<String?>(null) }
+    var revision by remember { mutableLongStateOf(0L) }
     val state = flow.collectAsState()
     val message = state.value
-    LaunchedEffect(message) {
+    LaunchedEffect(message, revision) {
         if (message != null) {
             delay(3000)
             flow.value = null
         }
     }
-    return state to { flow.value = it }
+    return state to {
+        revision += 1L
+        flow.value = it
+    }
 }
 
 /** Top-center toast plate driven by [rememberDsToast]. */

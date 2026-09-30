@@ -98,6 +98,12 @@ class ToolsViewModel @Inject constructor(
         refresh()
     }
 
+    fun acknowledgeNotice(notice: ToolsNotice) {
+        if (_state.value.notice == notice) {
+            _state.value = _state.value.copy(notice = null)
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = null)
@@ -249,6 +255,8 @@ fun ToolsScreen(
             ToolsNotice.DISCONNECT_FAILED -> noticeMessage?.let(toast.second)
             ToolsNotice.CONNECTING, null -> Unit
         }
+        state.notice?.takeUnless { it == ToolsNotice.CONNECTING }
+            ?.let(viewModel::acknowledgeNotice)
     }
 
     Box(Modifier.fillMaxSize()) {

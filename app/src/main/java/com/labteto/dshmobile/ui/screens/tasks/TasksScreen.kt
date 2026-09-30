@@ -105,6 +105,12 @@ class TasksViewModel @Inject constructor(
         refresh()
     }
 
+    fun acknowledgeNotice(notice: TasksNotice) {
+        if (_state.value.notice == notice) {
+            _state.value = _state.value.copy(notice = null)
+        }
+    }
+
     fun refresh() {
         _state.value = _state.value.copy(tasks = scheduler.list(), notice = null)
     }
@@ -404,7 +410,10 @@ fun TasksScreen(
         )
     }
     LaunchedEffect(state.notice, noticeMessage) {
-        noticeMessage?.let(toast.second)
+        state.notice?.let { notice ->
+            noticeMessage?.let(toast.second)
+            viewModel.acknowledgeNotice(notice)
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
