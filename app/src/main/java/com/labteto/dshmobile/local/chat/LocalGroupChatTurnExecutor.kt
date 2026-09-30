@@ -563,7 +563,6 @@ internal class LocalGroupChatTurnExecutor(
                     transcriptRuntime.applyMessages(
                         listOf(transcript),
                         assistantEvent.sequence,
-                        clearStreamingPreview = true,
                     )
                     val pendingContext = currentGroup.context
                         .applySceneTurn(

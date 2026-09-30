@@ -209,6 +209,10 @@ data class ChatPersonaCorrectionNotice(
 
 /** High-frequency model preview kept outside the aggregate runtime state. */
 data class LocalHarnessStreamingState(
+    val sessionId: String = "",
+    val requestId: String = "",
+    val usageMode: LocalUsageMode? = null,
+    val generation: Long = 0L,
     val assistant: String = "",
     val reasoning: String = "",
 )

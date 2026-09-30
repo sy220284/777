@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.update
 
-import com.labteto.dshmobile.BuildConfig
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -17,7 +16,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** The subset of a GitHub release this app reads. */
 @Serializable
@@ -64,16 +62,6 @@ private data class UpdateManifest(
     val patches: List<UpdateManifestPatch> = emptyList(),
 )
 
-@Serializable
-private data class GiteeRelease(
-    @SerialName("tag_name") val tagName: String = "",
-    val prerelease: Boolean = false,
-)
-
-private sealed interface MirrorCheckResult
-private data class MirrorSuccess(val update: AvailableUpdate?) : MirrorCheckResult
-private data object MirrorUnavailable : MirrorCheckResult
-
 data class DeltaPatch(
     val fromVersion: String,
     val toVersion: String,
@@ -112,50 +100,6 @@ internal fun parseGithubSha256(digest: String?): String? {
 
 private fun normalizeVersion(value: String): String =
     value.trim().removePrefix("v").substringBefore('+')
-
-private val RELEASE_VERSION_PATTERN = Regex("""[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+""")
-private val SHA256_PATTERN = Regex("[0-9a-fA-F]{64}")
-private val SAFE_ASSET_NAME_PATTERN = Regex("[A-Za-z0-9._-]+")
-
-internal data class GiteeMirrorRepository(
-    val base: HttpUrl,
-    val owner: String,
-    val repo: String,
-)
-
-internal fun parseGiteeMirrorRepository(value: String): GiteeMirrorRepository? {
-    val normalized = value.trim().takeIf(String::isNotEmpty)
-        ?.trimEnd('/')
-        ?.plus("/")
-        ?: return null
-    val url = normalized.toHttpUrlOrNull() ?: return null
-    if (url.scheme != "https" ||
-        url.host != "gitee.com" ||
-        url.port != 443 ||
-        url.query != null ||
-        url.fragment != null ||
-        url.username.isNotEmpty() ||
-        url.password.isNotEmpty()
-    ) {
-        return null
-    }
-    val segments = url.pathSegments.filter(String::isNotEmpty)
-    if (segments.size != 2 || segments.any { !SAFE_ASSET_NAME_PATTERN.matches(it) }) return null
-    return GiteeMirrorRepository(url, segments[0], segments[1])
-}
-
-internal fun giteeReleaseAssetUrl(
-    mirror: GiteeMirrorRepository,
-    tag: String,
-    name: String,
-): String? {
-    if (!tag.matches(Regex("""v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+""")) ||
-        !SAFE_ASSET_NAME_PATTERN.matches(name)
-    ) {
-        return null
-    }
-    return mirror.base.resolve("releases/download/$tag/$name")?.toString()
-}
 
 /** Accept only this repository's published release URLs before constructing asset links. */
 internal fun releaseFromWebsiteUrl(url: HttpUrl): AvailableUpdate? {
@@ -231,32 +175,17 @@ internal fun shouldUsePatchChain(apkSize: Long?, patches: List<DeltaPatch>): Boo
 }
 
 /**
- * Manual release checker.
+ * Manual GitHub release checker.
  *
  * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request.
- * A configured Gitee release mirror is checked first, so a normal mainland update check does not
- * depend on GitHub. Missing, invalid or unreachable Gitee metadata falls back to the existing
- * GitHub release chain. Every payload is still verified by digest, package name and signer.
+ * Recent release metadata is fetched so consecutive differential packages can be chained; if any
+ * edge is missing or inconsistent the caller simply receives the full APK fallback.
  */
 @Singleton
-class UpdateChecker internal constructor(
+class UpdateChecker @Inject constructor(
     client: OkHttpClient,
-    mirrorBaseUrl: String,
 ) {
-    @Inject
-    constructor(client: OkHttpClient) : this(client, BuildConfig.UPDATE_MIRROR_BASE_URL)
-
     private val json = Json { ignoreUnknownKeys = true }
-    private val mirrorRepository = parseGiteeMirrorRepository(mirrorBaseUrl)
-
-    private val mirrorClient = client.newBuilder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
-        .pingInterval(0, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .protocols(listOf(Protocol.HTTP_1_1))
-        .build()
 
     // GitHub API/CDN HTTP/2 negotiation is unreliable on some mobile networks and proxies.
     // Isolate update checks from the shared client, force HTTP/1.1, and retry transient failures.
@@ -270,134 +199,6 @@ class UpdateChecker internal constructor(
         .build()
 
     suspend fun checkNow(currentVersion: String): AvailableUpdate? {
-        when (val mirror = checkMirror(currentVersion)) {
-            is MirrorSuccess -> return mirror.update
-            MirrorUnavailable -> Unit
-        }
-        return checkGithub(currentVersion)
-    }
-
-    private suspend fun checkMirror(currentVersion: String): MirrorCheckResult {
-        val mirror = mirrorRepository ?: return MirrorUnavailable
-        val latestApi = "https://gitee.com/api/v5/repos/${mirror.owner}/${mirror.repo}/releases/latest"
-        val request = Request.Builder()
-            .url(latestApi)
-            .header("Accept", "application/json")
-            .header("Cache-Control", "no-cache")
-            .get()
-            .build()
-
-        val release = try {
-            val body = executeMirrorText(request, "检查 Gitee 国内发行版")
-            json.decodeFromString(GiteeRelease.serializer(), body)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            return MirrorUnavailable
-        }
-        if (release.prerelease) return MirrorUnavailable
-
-        val version = normalizeVersion(release.tagName)
-        if (!RELEASE_VERSION_PATTERN.matches(version)) return MirrorUnavailable
-        if (!isNewerVersion(version, currentVersion)) return MirrorSuccess(null)
-
-        val tag = "v$version"
-        val manifestUrl = giteeReleaseAssetUrl(mirror, tag, UPDATE_MANIFEST_NAME)
-            ?: return MirrorUnavailable
-        val manifestRequest = Request.Builder()
-            .url(manifestUrl)
-            .header("Accept", "application/json, application/octet-stream")
-            .header("Cache-Control", "no-cache")
-            .get()
-            .build()
-        val manifest = try {
-            val body = executeMirrorBytes(
-                manifestRequest,
-                "读取 Gitee 更新清单",
-                MAX_MANIFEST_BYTES,
-            )
-            json.decodeFromString(UpdateManifest.serializer(), body.toString(Charsets.UTF_8))
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            return MirrorUnavailable
-        }
-
-        return try {
-            MirrorSuccess(giteeUpdateFromManifest(mirror, tag, manifest, currentVersion))
-        } catch (_: Exception) {
-            MirrorUnavailable
-        }
-    }
-
-    private fun giteeUpdateFromManifest(
-        mirror: GiteeMirrorRepository,
-        tag: String,
-        manifest: UpdateManifest,
-        currentVersion: String,
-    ): AvailableUpdate {
-        val version = normalizeVersion(tag)
-        require(manifest.schema == UPDATE_MANIFEST_SCHEMA) { "Gitee 更新清单 schema 不受支持" }
-        require(normalizeVersion(manifest.targetVersion) == version) { "Gitee 更新清单版本不一致" }
-
-        val apk = manifest.targetApk
-        require(
-            SAFE_ASSET_NAME_PATTERN.matches(apk.name) &&
-                apk.name.endsWith(".apk", ignoreCase = true)
-        ) { "Gitee 更新清单 APK 名称无效" }
-        require(apk.size in 1..MAX_MIRROR_APK_BYTES) { "Gitee 更新清单 APK 大小无效" }
-        val apkSha = apk.sha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-            ?: error("Gitee 更新清单 APK SHA-256 无效")
-        val apkUrl = giteeReleaseAssetUrl(mirror, tag, apk.name)
-            ?: error("Gitee APK 下载地址无效")
-
-        val directPatches = manifest.patches.filter {
-            normalizeVersion(it.fromVersion) == normalizeVersion(currentVersion) &&
-                normalizeVersion(it.toVersion) == version
-        }
-        require(directPatches.size <= 1) { "Gitee 更新清单包含重复的直接增量包" }
-        val candidatePatches = directPatches.map { patch ->
-            require(patch.algorithm == SUPPORTED_PATCH_ALGORITHM) { "Gitee 增量算法不受支持" }
-            require(SAFE_ASSET_NAME_PATTERN.matches(patch.asset)) { "Gitee 增量包名称无效" }
-            require(patch.size in 1..MAX_MIRROR_PATCH_BYTES) { "Gitee 增量包大小无效" }
-            val patchSha = patch.sha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("Gitee 增量包 SHA-256 无效")
-            val sourceSha = patch.sourceSha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("Gitee 增量来源 SHA-256 无效")
-            val targetSha = patch.targetSha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("Gitee 增量目标 SHA-256 无效")
-            require(targetSha == apkSha) { "Gitee 增量目标摘要与 APK 不一致" }
-
-            DeltaPatch(
-                fromVersion = normalizeVersion(patch.fromVersion),
-                toVersion = version,
-                algorithm = patch.algorithm,
-                url = giteeReleaseAssetUrl(mirror, tag, patch.asset)
-                    ?: error("Gitee 增量包下载地址无效"),
-                name = patch.asset,
-                size = patch.size,
-                expectedSha256 = patchSha,
-                sourceSha256 = sourceSha,
-                targetSha256 = targetSha,
-            )
-        }
-        val patchChain = candidatePatches.takeIf {
-            shouldUsePatchChain(apk.size, it)
-        }.orEmpty()
-
-        return AvailableUpdate(
-            version = version,
-            url = mirror.base.resolve("releases/tag/$tag").toString(),
-            apkUrl = apkUrl,
-            apkName = apk.name,
-            apkSize = apk.size,
-            expectedSha256 = apkSha,
-            checksumUrl = null,
-            patchChain = patchChain,
-        )
-    }
-
-    private suspend fun checkGithub(currentVersion: String): AvailableUpdate? {
         // The small latest-release endpoint is sufficient for a verified full APK update.
         // Release history is only needed to save bandwidth with a patch chain.
         val latest = try {
@@ -607,51 +408,6 @@ class UpdateChecker internal constructor(
     private suspend fun executeGithubText(request: Request, purpose: String): String =
         executeGithubBytes(request, purpose, MAX_RELEASE_METADATA_BYTES).toString(Charsets.UTF_8)
 
-    private suspend fun executeMirrorText(request: Request, purpose: String): String =
-        executeMirrorBytes(request, purpose, MAX_MIRROR_METADATA_BYTES).toString(Charsets.UTF_8)
-
-    private suspend fun executeMirrorBytes(
-        request: Request,
-        purpose: String,
-        maxBytes: Long,
-    ): ByteArray {
-        var lastError: IOException? = null
-
-        repeat(MAX_MIRROR_REQUEST_ATTEMPTS) { attempt ->
-            try {
-                mirrorClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        val retryable = response.code == 408 ||
-                            response.code == 429 ||
-                            response.code in 500..599
-                        if (!retryable || attempt + 1 >= MAX_MIRROR_REQUEST_ATTEMPTS) {
-                            throw IOException("${purpose}失败：HTTP ${response.code}")
-                        }
-                        lastError = IOException("${purpose}暂时失败：HTTP ${response.code}")
-                    } else {
-                        val body = response.body ?: throw IOException("${purpose}返回空响应")
-                        val declared = body.contentLength()
-                        if (declared > maxBytes) {
-                            throw IOException("${purpose}响应异常过大：$declared 字节")
-                        }
-                        return readChecksumBytes(body.byteStream(), maxBytes)
-                    }
-                }
-            } catch (error: IOException) {
-                lastError = error
-            }
-
-            if (attempt + 1 < MAX_MIRROR_REQUEST_ATTEMPTS) {
-                delay(MIRROR_RETRY_BACKOFF_MS * (attempt + 1L))
-            }
-        }
-
-        throw IOException(
-            "${purpose}连接失败，已自动重试 $MAX_MIRROR_REQUEST_ATTEMPTS 次。",
-            lastError,
-        )
-    }
-
     private suspend fun executeGithubBytes(
         request: Request,
         purpose: String,
@@ -700,13 +456,8 @@ class UpdateChecker internal constructor(
         const val MAX_PATCH_CHAIN_LENGTH = 6
         const val MAX_MANIFEST_BYTES = 256L * 1024L
         const val MAX_RELEASE_METADATA_BYTES = 2L * 1024L * 1024L
-        const val MAX_MIRROR_METADATA_BYTES = 512L * 1024L
-        const val MAX_MIRROR_APK_BYTES = 200L * 1024L * 1024L
-        const val MAX_MIRROR_PATCH_BYTES = 128L * 1024L * 1024L
         const val MAX_REQUEST_ATTEMPTS = 3
-        const val MAX_MIRROR_REQUEST_ATTEMPTS = 2
         const val REQUEST_RETRY_BACKOFF_MS = 400L
-        const val MIRROR_RETRY_BACKOFF_MS = 250L
         const val RELEASES_URL = "https://github.com/$REPO/releases/latest"
         const val LATEST_RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
         const val RECENT_RELEASES_API =

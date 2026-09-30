@@ -73,7 +73,7 @@ Chat and Work are projections of one runtime, not two independent engines.
 
 `LocalConversationSurfaceState` exposes only the fields relevant to the product surface. Fields owned by the other mode stay at stable defaults, and projections use `distinctUntilChanged`, so Chat-only churn does not wake Work UI and vice versa.
 
-High-frequency streaming preview is kept separate from aggregate state, avoiding full state rewrites for token-by-token output.
+High-frequency streaming preview is kept separate from aggregate state, avoiding full state rewrites for token-by-token output. The preview is transient but not anonymous: every visible stream is owned by an explicit `sessionId + requestId + usageMode`, and UI surfaces render only a matching owner. Late deltas or completion from an older request therefore cannot overwrite or clear a newer preview.
 
 ### Capability runtimes
 

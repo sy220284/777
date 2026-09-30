@@ -20,10 +20,18 @@ internal class LocalStreamPreview(
         if (delta.isEmpty()) return
         if (delta.length >= maxChars) {
             text.clear()
-            text.append(delta.takeLast(maxChars))
+            text.append(takeLastWithoutSplittingSurrogatePair(delta, maxChars))
         } else {
-            val overflow = text.length + delta.length - maxChars
-            if (overflow > 0) text.delete(0, overflow)
+            var overflow = text.length + delta.length - maxChars
+            if (
+                overflow > 0 &&
+                overflow < text.length &&
+                Character.isHighSurrogate(text[overflow - 1]) &&
+                Character.isLowSurrogate(text[overflow])
+            ) {
+                overflow += 1
+            }
+            if (overflow > 0) text.delete(0, overflow.coerceAtMost(text.length))
             text.append(delta)
         }
         dirty = true

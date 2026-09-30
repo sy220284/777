@@ -85,6 +85,7 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
@@ -269,6 +270,7 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
+    private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
             modelGateway = modelGateway,
@@ -276,12 +278,7 @@ class LocalHarnessEngine @Inject constructor(
             historyCompactor = historyCompactor,
             toolSchemas = ::modelToolSchemas,
             defaultEventLog = { eventLog },
-            resetPreview = {
-                _streamingState.value = LocalHarnessStreamingState()
-            },
-            publishPreview = { preview ->
-                _streamingState.update { it.copy(assistant = preview) }
-            },
+            streamingPreviewStore = streamingPreviewStore,
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
@@ -340,10 +337,9 @@ class LocalHarnessEngine @Inject constructor(
                 LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
-    private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
     private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
-    internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
+    internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
@@ -1711,7 +1707,7 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             }
-            transcriptRuntime.applyMessages(transcript, event.sequence, clearStreamingPreview = true)
+            transcriptRuntime.applyMessages(transcript, event.sequence)
             checkpointModelHistory("work/regenerated")
             persist()
         } catch (cancelled: CancellationException) {
@@ -1720,7 +1716,6 @@ class LocalHarnessEngine @Inject constructor(
             _state.update { it.copy(error = error.message ?: "重新生成失败") }
         } finally {
             _state.update { it.copy(running = false) }
-            _streamingState.value = LocalHarnessStreamingState()
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
         }
@@ -2066,7 +2061,6 @@ class LocalHarnessEngine @Inject constructor(
         transcriptRuntime.applyMessages(
             listOf(proactiveMessage),
             assistantEventSequence,
-            clearStreamingPreview = true,
         )
         _state.update { current ->
             if (current.sessionId != session.id) {
@@ -2875,7 +2869,6 @@ class LocalHarnessEngine @Inject constructor(
             transcriptRuntime.applyMessages(
                 transcriptMessages,
                 assistantEvent.sequence,
-                clearStreamingPreview = true,
             )
             val assistantTranscript = transcriptMessages.lastOrNull()
             if (
@@ -3354,7 +3347,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                         runHistory.append(reply.message)
                         updateContextMetrics(binding)
-                        runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
+                        runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                         if (
                             beforeAssistant.usageMode == LocalUsageMode.CHAT &&
                             !beforeAssistant.groupChat.enabled &&
@@ -4740,7 +4733,8 @@ class LocalHarnessEngine @Inject constructor(
         requestLog = requestLog ?: binding?.eventLog,
         temperature = temperature,
         previewGuard = {
-            binding == null || currentSessionId == binding.sessionId
+            currentSessionId == snapshot.sessionId &&
+                _state.value.sessionId == snapshot.sessionId
         },
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
