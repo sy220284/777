@@ -254,6 +254,7 @@ class OpenAiResponsesClient @Inject constructor(
                 put("name", name)
                 function["description"]?.let { put("description", it) }
                 function["parameters"]?.let { put("parameters", it) }
+                function["strict"]?.let { put("strict", it) }
             })
         }
     }
@@ -377,25 +378,36 @@ class OpenAiResponsesClient @Inject constructor(
     }
 
     private fun httpError(status: Int, body: String): LocalModelException {
-        val detail = runCatching {
-            val root = json.parseToJsonElement(body).jsonObject
-            val error = root["error"]
-            when (error) {
-                is JsonObject -> error["message"]?.jsonPrimitive?.contentOrNull
-                is JsonPrimitive -> error.contentOrNull
-                else -> null
-            }
+        val parsed = runCatching {
+            val error = json.parseToJsonElement(body).jsonObject["error"] as? JsonObject
+            error?.get("code")?.jsonPrimitive?.contentOrNull to
+                error?.get("message")?.jsonPrimitive?.contentOrNull
         }.getOrNull()
-        val code = when (status) {
-            401, 403 -> "CHATGPT_AUTH_REVOKED"
-            429 -> "MODEL_HTTP_429"
-            else -> "MODEL_HTTP_$status"
+        val remoteCode = parsed?.first
+        val detail = parsed?.second
+        return when {
+            remoteCode == "subscription_sharing_usage_limit_exceeded" -> LocalModelException(
+                "CHATGPT_PLAN_LIMIT_REACHED",
+                "ChatGPT 套餐用量已达到当前上限，请在 ChatGPT 中管理应用用量。",
+                false,
+            )
+            remoteCode == "subscription_sharing_usage_unavailable" -> LocalModelException(
+                "CHATGPT_PLAN_USAGE_UNAVAILABLE",
+                "ChatGPT 套餐用量当前不可用，请检查账户权限或稍后重试。",
+                false,
+            )
+            status == 401 || status == 403 -> LocalModelException(
+                "CHATGPT_AUTH_REVOKED",
+                "ChatGPT 套餐授权已失效，请在设置中重新连接账户。",
+                false,
+            )
+            else -> LocalModelException(
+                code = remoteCode?.let { "RESPONSES_HTTP_$it" }
+                    ?: if (status == 429) "MODEL_HTTP_429" else "MODEL_HTTP_$status",
+                message = detail ?: "Responses API 请求失败（HTTP $status）",
+                retryable = status == 408 || status == 429 || status >= 500,
+            )
         }
-        return LocalModelException(
-            code = code,
-            message = detail ?: "Responses API 请求失败（HTTP $status）",
-            retryable = status == 408 || status == 429 || status >= 500,
-        )
     }
 
     companion object {
