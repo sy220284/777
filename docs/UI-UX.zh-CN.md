@@ -335,3 +335,5 @@ RuntimeDiagnosticsDialogs.kt
 - streaming 时的重组表现。
 
 UI 修改必须同时验证功能、体验和性能，不允许通过视觉调整重新引入状态或架构回归。
+
+<!-- current-main-validation -->
