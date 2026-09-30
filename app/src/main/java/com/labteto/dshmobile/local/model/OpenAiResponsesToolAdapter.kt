@@ -139,6 +139,7 @@ internal object OpenAiResponsesToolAdapter {
                 path = "parameters",
                 strict = strict,
                 enforceOpenAiToolSchema = true,
+                depth = 1,
             )
         }
         return normalized
@@ -267,6 +268,7 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.items",
                     strict,
                     enforceOpenAiToolSchema,
+                    depth + 1,
                 )
             } else if (strict && enforceOpenAiToolSchema) {
                 throw invalidToolSchema(
@@ -294,6 +296,7 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.anyOf[$anyOfIndex]",
                     strict,
                     enforceOpenAiToolSchema,
+                    depth + 1,
                 )
             }
         }
@@ -315,6 +318,7 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.\$defs.$definitionName",
                     strict,
                     enforceOpenAiToolSchema,
+                    depth + 1,
                 )
             }
         }
